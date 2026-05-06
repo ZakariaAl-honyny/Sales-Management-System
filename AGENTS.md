@@ -5,6 +5,10 @@
 
 ---
 
+<!-- SPECKIT START -->
+**Active Feature Plan**: [specs/001-foundation-setup/plan.md](specs/001-foundation-setup/plan.md)
+<!-- SPECKIT END -->
+
 ## 1. Project Overview
 
 A local desktop sales management system for small retail shops.
