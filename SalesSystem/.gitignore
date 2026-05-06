@@ -1,0 +1,66 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr]m/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+*.nupkg
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+nuget.config
+.nuget/
+packages/
+
+# Secrets
+*.pfx
+*.key
+appsettings.*.json
+appsettings.Development.json
+appsettings.Local.json
+
+# Test results
+[Tt]estResults/
+[Bb]uildResults/
+[Dd]ebugLog*/
+
+# SQL Server
+*.mdf
+*.ldf
+*.db
+
+# Temporary files
+*.tmp
+*.temp
