@@ -1,7 +1,8 @@
 <h1 align="center">🧾 Sales Management System</h1>
 
 <p align="center">
-  <strong>A full-featured desktop sales management system for small retail shops</strong>
+  <strong>A comprehensive sales management platform for small-to-medium retail businesses</strong><br/>
+  <em>Desktop Client + RESTful API Backend — Built with Clean Architecture</em>
 </p>
 
 <p align="center">
@@ -23,7 +24,9 @@
 
 ## 📋 Overview
 
-A **local desktop sales management system** built with Clean Architecture principles, designed for small-to-medium retail shops. The system handles sales, purchases, inventory, returns, and financial tracking with full Arabic/English bilingual support.
+A **comprehensive sales management platform** built with Clean Architecture principles, designed for small-to-medium retail businesses. The current MVP delivers a **WinForms Desktop client** backed by an **ASP.NET Core Web API**, handling sales, purchases, inventory, returns, and financial tracking with full Arabic/English bilingual support.
+
+The API-first architecture is designed to support **future web and mobile clients** without any backend changes.
 
 ### Why This Project?
 
@@ -32,6 +35,7 @@ A **local desktop sales management system** built with Clean Architecture princi
 - 📦 **Multi-warehouse** — Track inventory across multiple storage locations
 - 👥 **Role-based access** — Admin, Manager, and Cashier with granular permissions
 - 📊 **Full audit trail** — Every stock change and financial transaction is tracked
+- 🌐 **API-first design** — RESTful API ready for web/mobile clients in future phases
 
 ---
 
@@ -97,6 +101,22 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - A4 invoice printing with store branding
 - 80mm thermal receipt printing
 - Print preview support
+
+### 🚫 Out of Scope (Future Phases)
+
+The following features are **not included** in the current MVP but are planned for future development:
+
+| Feature | Phase | Notes |
+|---------|-------|-------|
+| 🌐 Web interface | Future | API is ready — only a frontend client is needed |
+| 📱 Mobile application | Future | API supports any HTTP client |
+| 🏢 Multi-branch management | Future | Current scope is single-branch with multi-warehouse |
+| 📒 Full accounting system | Future | Current MVP handles sales/purchase ledgers only |
+| 🔗 External integrations | Future | E-commerce, payment gateways, tax authority APIs |
+| 📧 Email / SMS notifications | Future | Customer alerts and payment reminders |
+| 📈 Advanced analytics | Future | BI dashboards and trend analysis |
+
+> **Note:** The Clean Architecture and API-first design make adding these features straightforward without modifying existing business logic.
 
 ---
 
