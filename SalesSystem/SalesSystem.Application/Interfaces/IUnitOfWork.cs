@@ -13,6 +13,10 @@ public interface IUnitOfWork
     IGenericRepository<Warehouse> Warehouses { get; }
     IGenericRepository<Supplier> Suppliers { get; }
     IGenericRepository<Customer> Customers { get; }
+    IGenericRepository<DocumentSequence> DocumentSequences { get; }
+    IGenericRepository<WarehouseStock> WarehouseStocks { get; }
+    IGenericRepository<InventoryMovement> InventoryMovements { get; }
+    IGenericRepository<StoreSettings> StoreSettings { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
 }

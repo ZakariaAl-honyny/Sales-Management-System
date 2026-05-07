@@ -20,8 +20,6 @@ public class SalesInvoice : BaseEntity
     public decimal DueAmount { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
-    public string? CreatedBy { get; private set; }
-    public string? UpdatedBy { get; private set; }
 
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
@@ -38,14 +36,14 @@ public class SalesInvoice : BaseEntity
         PaymentType paymentType = PaymentType.Cash,
         decimal discountAmount = 0,
         string? notes = null,
-        string? createdBy = null)
+        int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(invoiceNo))
             throw new ArgumentException("InvoiceNo is required.", nameof(invoiceNo));
         if (warehouseId <= 0)
             throw new ArgumentException("WarehouseId is required.", nameof(warehouseId));
 
-        return new SalesInvoice
+        var invoice = new SalesInvoice
         {
             InvoiceNo = invoiceNo,
             WarehouseId = warehouseId,
@@ -55,9 +53,10 @@ public class SalesInvoice : BaseEntity
             PaymentType = paymentType,
             DiscountAmount = discountAmount,
             Notes = notes,
-            CreatedBy = createdBy,
             Status = InvoiceStatus.Draft
         };
+        invoice.SetCreatedBy(createdByUserId);
+        return invoice;
     }
 
     public void AddItem(SalesInvoiceItem item)

@@ -9,15 +9,14 @@ public class CustomerPaymentConfiguration : IEntityTypeConfiguration<CustomerPay
     public void Configure(EntityTypeBuilder<CustomerPayment> builder)
     {
         builder.ToTable("CustomerPayments");
-        builder.HasKey(cp => cp.CustomerPaymentId);
+        builder.HasKey(cp => cp.Id);
         builder.Property(cp => cp.PaymentNo).IsRequired().HasMaxLength(30);
         builder.HasIndex(cp => cp.PaymentNo).IsUnique();
         builder.Property(cp => cp.Amount).IsRequired().HasPrecision(18, 2);
         builder.Property(cp => cp.PaymentMethod).IsRequired();
         builder.Property(cp => cp.ReferenceNo).HasMaxLength(50);
         builder.Property(cp => cp.Notes).HasMaxLength(500);
-        builder.Property(cp => cp.CreatedBy).HasMaxLength(150);
-        
+
         builder.HasOne(cp => cp.Customer)
             .WithMany()
             .HasForeignKey(cp => cp.CustomerId)
@@ -30,15 +29,14 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
     public void Configure(EntityTypeBuilder<SupplierPayment> builder)
     {
         builder.ToTable("SupplierPayments");
-        builder.HasKey(sp => sp.SupplierPaymentId);
+        builder.HasKey(sp => sp.Id);
         builder.Property(sp => sp.PaymentNo).IsRequired().HasMaxLength(30);
         builder.HasIndex(sp => sp.PaymentNo).IsUnique();
         builder.Property(sp => sp.Amount).IsRequired().HasPrecision(18, 2);
         builder.Property(sp => sp.PaymentMethod).IsRequired();
         builder.Property(sp => sp.ReferenceNo).HasMaxLength(50);
         builder.Property(sp => sp.Notes).HasMaxLength(500);
-        builder.Property(sp => sp.CreatedBy).HasMaxLength(150);
-        
+
         builder.HasOne(sp => sp.Supplier)
             .WithMany()
             .HasForeignKey(sp => sp.SupplierId)
@@ -51,7 +49,7 @@ public class InventoryMovementConfiguration : IEntityTypeConfiguration<Inventory
     public void Configure(EntityTypeBuilder<InventoryMovement> builder)
     {
         builder.ToTable("InventoryMovements");
-        builder.HasKey(im => im.InventoryMovementId);
+        builder.HasKey(im => im.Id);
         builder.Property(im => im.QuantityChange).IsRequired().HasPrecision(18, 3);
         builder.Property(im => im.QuantityBefore).IsRequired().HasPrecision(18, 3);
         builder.Property(im => im.QuantityAfter).IsRequired().HasPrecision(18, 3);
@@ -80,7 +78,7 @@ public class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreSettings
     public void Configure(EntityTypeBuilder<StoreSettings> builder)
     {
         builder.ToTable("StoreSettings");
-        builder.HasKey(ss => ss.StoreSettingsId);
+        builder.HasKey(ss => ss.Id);
         builder.Property(ss => ss.StoreName).IsRequired().HasMaxLength(150);
         builder.Property(ss => ss.Phone).HasMaxLength(20);
         builder.Property(ss => ss.Address).HasMaxLength(250);
@@ -95,7 +93,7 @@ public class DocumentSequenceConfiguration : IEntityTypeConfiguration<DocumentSe
     public void Configure(EntityTypeBuilder<DocumentSequence> builder)
     {
         builder.ToTable("DocumentSequences");
-        builder.HasKey(ds => ds.DocumentSequenceId);
+        builder.HasKey(ds => ds.Id);
         builder.Property(ds => ds.DocumentType).IsRequired().HasMaxLength(10);
         builder.HasIndex(ds => ds.DocumentType).IsUnique();
         builder.Property(ds => ds.Prefix).IsRequired().HasMaxLength(10);

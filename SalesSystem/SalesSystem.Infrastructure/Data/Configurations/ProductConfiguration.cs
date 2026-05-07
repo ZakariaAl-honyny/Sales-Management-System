@@ -19,8 +19,6 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.SalePrice).IsRequired().HasPrecision(18, 2);
         builder.Property(p => p.MinStock).IsRequired().HasPrecision(18, 3);
         builder.Property(p => p.Description).HasMaxLength(500);
-        builder.Property(p => p.CreatedBy).HasMaxLength(150);
-        builder.Property(p => p.UpdatedBy).HasMaxLength(150);
         
         builder.HasOne(p => p.Category)
             .WithMany()

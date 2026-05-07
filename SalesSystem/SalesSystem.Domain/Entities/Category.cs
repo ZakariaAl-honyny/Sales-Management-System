@@ -6,29 +6,28 @@ public class Category : BaseEntity
 {
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public string? CreatedBy { get; private set; }
-    public string? UpdatedBy { get; private set; }
 
     private Category() { }
 
-    public static Category Create(string name, string? description = null, string? createdBy = null)
+    public static Category Create(string name, string? description = null, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required.", nameof(name));
 
-        return new Category
+        var category = new Category
         {
             Name = name,
-            Description = description,
-            CreatedBy = createdBy
+            Description = description
         };
+        category.SetCreatedBy(createdByUserId);
+        return category;
     }
 
-    public void Update(string name, string? description, string? updatedBy = null)
+    public void Update(string name, string? description, int? updatedByUserId = null)
     {
         Name = name;
         Description = description;
-        UpdatedBy = updatedBy;
+        SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }
 }

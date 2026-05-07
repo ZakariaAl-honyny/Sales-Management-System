@@ -9,12 +9,10 @@ public class User : BaseEntity
     public string PasswordHash { get; private set; } = string.Empty;
     public string FullName { get; private set; } = string.Empty;
     public UserRole Role { get; private set; }
-    public string? CreatedBy { get; private set; }
-    public string? UpdatedBy { get; private set; }
 
     protected User() { } // EF Core
 
-    public static User Create(string userName, string passwordHash, string fullName, UserRole role, string? createdBy = null)
+    public static User Create(string userName, string passwordHash, string fullName, UserRole role, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(userName))
             throw new ArgumentException("UserName is required.", nameof(userName));
@@ -23,29 +21,30 @@ public class User : BaseEntity
         if (string.IsNullOrWhiteSpace(fullName))
             throw new ArgumentException("FullName is required.", nameof(fullName));
 
-        return new User
+        var user = new User
         {
             UserName = userName,
             PasswordHash = passwordHash,
             FullName = fullName,
             Role = role,
-            CreatedBy = createdBy,
             IsActive = true
         };
+        user.SetCreatedBy(createdByUserId);
+        return user;
     }
 
-    public void Update(string fullName, UserRole role, string? updatedBy = null)
+    public void Update(string fullName, UserRole role, int? updatedByUserId = null)
     {
         FullName = fullName;
         Role = role;
-        UpdatedBy = updatedBy;
+        SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }
 
-    public void ChangePassword(string newPasswordHash, string? updatedBy = null)
+    public void ChangePassword(string newPasswordHash, int? updatedByUserId = null)
     {
         PasswordHash = newPasswordHash;
-        UpdatedBy = updatedBy;
+        SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }
 }

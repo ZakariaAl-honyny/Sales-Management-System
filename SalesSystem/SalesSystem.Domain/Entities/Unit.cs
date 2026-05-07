@@ -6,29 +6,28 @@ public class Unit : BaseEntity
 {
     public string Name { get; private set; } = string.Empty;
     public string? Symbol { get; private set; }
-    public string? CreatedBy { get; private set; }
-    public string? UpdatedBy { get; private set; }
 
     protected Unit() { }
 
-    public static Unit Create(string name, string? symbol = null, string? createdBy = null)
+    public static Unit Create(string name, string? symbol = null, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required.", nameof(name));
 
-        return new Unit
+        var unit = new Unit
         {
             Name = name,
-            Symbol = symbol,
-            CreatedBy = createdBy
+            Symbol = symbol
         };
+        unit.SetCreatedBy(createdByUserId);
+        return unit;
     }
 
-    public void Update(string name, string? symbol, string? updatedBy = null)
+    public void Update(string name, string? symbol, int? updatedByUserId = null)
     {
         Name = name;
         Symbol = symbol;
-        UpdatedBy = updatedBy;
+        SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }
 }

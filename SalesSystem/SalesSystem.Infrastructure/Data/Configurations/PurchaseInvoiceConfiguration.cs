@@ -21,8 +21,6 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
         builder.Property(pi => pi.Notes).HasMaxLength(500);
         builder.Property(pi => pi.PaymentType).HasConversion<byte>();
         builder.Property(pi => pi.Status).HasConversion<byte>();
-        builder.Property(pi => pi.CreatedBy).HasMaxLength(150);
-        builder.Property(pi => pi.UpdatedBy).HasMaxLength(150);
         
         builder.HasOne(pi => pi.Supplier)
             .WithMany()

@@ -21,8 +21,6 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
         builder.Property(si => si.Notes).HasMaxLength(500);
         builder.Property(si => si.PaymentType).HasConversion<byte>();
         builder.Property(si => si.Status).HasConversion<byte>();
-        builder.Property(si => si.CreatedBy).HasMaxLength(150);
-        builder.Property(si => si.UpdatedBy).HasMaxLength(150);
         
         builder.HasOne(si => si.Customer)
             .WithMany()

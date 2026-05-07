@@ -1,8 +1,9 @@
+using SalesSystem.Domain.Common;
+
 namespace SalesSystem.Domain.Entities;
 
-public class DocumentSequence
+public class DocumentSequence : BaseEntity
 {
-    public int DocumentSequenceId { get; private set; }
     public string DocumentType { get; private set; } = string.Empty;
     public string Prefix { get; private set; } = string.Empty;
     public int Year { get; private set; }

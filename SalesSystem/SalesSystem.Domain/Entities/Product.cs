@@ -13,8 +13,6 @@ public class Product : BaseEntity
     public decimal SalePrice { get; private set; }
     public decimal MinStock { get; private set; }
     public string? Description { get; private set; }
-    public string? CreatedBy { get; private set; }
-    public string? UpdatedBy { get; private set; }
 
     // Navigation properties
     public virtual Category? Category { get; private set; }
@@ -33,7 +31,7 @@ public class Product : BaseEntity
         int? categoryId = null,
         int? unitId = null,
         string? description = null,
-        string? createdBy = null)
+        int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required.", nameof(name));
@@ -44,7 +42,7 @@ public class Product : BaseEntity
         if (minStock < 0)
             throw new ArgumentException("MinStock cannot be negative.", nameof(minStock));
 
-        return new Product
+        var product = new Product
         {
             Name = name,
             PurchasePrice = purchasePrice,
@@ -54,9 +52,10 @@ public class Product : BaseEntity
             Barcode = barcode,
             CategoryId = categoryId,
             UnitId = unitId,
-            Description = description,
-            CreatedBy = createdBy
+            Description = description
         };
+        product.SetCreatedBy(createdByUserId);
+        return product;
     }
 
     public void Update(
@@ -69,7 +68,7 @@ public class Product : BaseEntity
         int? categoryId,
         int? unitId,
         string? description,
-        string? updatedBy)
+        int? updatedByUserId)
     {
         Name = name;
         PurchasePrice = purchasePrice;
@@ -80,7 +79,7 @@ public class Product : BaseEntity
         CategoryId = categoryId;
         UnitId = unitId;
         Description = description;
-        UpdatedBy = updatedBy;
+        SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }
 }

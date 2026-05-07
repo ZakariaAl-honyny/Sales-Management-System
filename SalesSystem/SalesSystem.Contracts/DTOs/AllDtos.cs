@@ -2,9 +2,9 @@ namespace SalesSystem.Contracts.DTOs;
 
 public record UserDto(int Id, string UserName, string FullName, byte Role);
 
-public record UnitDto(int Id, string Name, string? Symbol);
+public record UnitDto(int Id, string Name, string? Symbol, bool IsActive);
 
-public record CategoryDto(int Id, string Name, string? Description);
+public record CategoryDto(int Id, string Name, string? Description, bool IsActive);
 
 public record ProductDto(
     int Id,
@@ -18,15 +18,16 @@ public record ProductDto(
     decimal PurchasePrice,
     decimal SalePrice,
     decimal MinStock,
-    string? Description);
+    string? Description,
+    bool IsActive);
 
-public record WarehouseDto(int Id, string? Code, string Name, string? Location, bool IsDefault);
+public record WarehouseDto(int Id, string? Code, string Name, string? Location, bool IsDefault, bool IsActive);
 
 public record WarehouseStockDto(int Id, int WarehouseId, string WarehouseName, int ProductId, string ProductName, decimal Quantity);
 
-public record SupplierDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance);
+public record SupplierDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance, bool IsActive);
 
-public record CustomerDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance);
+public record CustomerDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance, bool IsActive);
 
 public record SalesInvoiceDto(
     int Id,
