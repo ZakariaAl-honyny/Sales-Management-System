@@ -14,8 +14,6 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
         builder.HasIndex(w => w.Code).IsUnique();
         builder.Property(w => w.Name).IsRequired().HasMaxLength(100);
         builder.Property(w => w.Location).HasMaxLength(250);
-        builder.Property(w => w.CreatedBy).HasMaxLength(150);
-        builder.Property(w => w.UpdatedBy).HasMaxLength(150);
         builder.HasQueryFilter(w => w.IsActive);
     }
 }
@@ -25,7 +23,7 @@ public class WarehouseStockConfiguration : IEntityTypeConfiguration<WarehouseSto
     public void Configure(EntityTypeBuilder<WarehouseStock> builder)
     {
         builder.ToTable("WarehouseStocks");
-        builder.HasKey(ws => ws.WarehouseStockId);
+        builder.HasKey(ws => ws.Id);
         builder.Property(ws => ws.Quantity).IsRequired().HasPrecision(18, 3);
         builder.HasIndex(ws => new { ws.WarehouseId, ws.ProductId }).IsUnique();
         

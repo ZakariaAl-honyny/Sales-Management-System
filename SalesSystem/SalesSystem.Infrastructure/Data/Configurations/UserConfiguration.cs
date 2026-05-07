@@ -16,8 +16,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PasswordHash).IsRequired().HasMaxLength(256);
         builder.Property(u => u.FullName).IsRequired().HasMaxLength(150);
         builder.Property(u => u.Role).IsRequired().HasConversion<byte>();
-        builder.Property(u => u.CreatedBy).HasMaxLength(150);
-        builder.Property(u => u.UpdatedBy).HasMaxLength(150);
         builder.HasQueryFilter(u => u.IsActive);
     }
 }

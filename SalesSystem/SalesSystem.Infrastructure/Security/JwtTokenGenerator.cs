@@ -1,0 +1,45 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
+using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
+using SalesSystem.Domain.Entities;
+
+namespace SalesSystem.Infrastructure.Security;
+
+/// <summary>
+/// JWT token generator implementation.
+/// </summary>
+public class JwtTokenGenerator : IJwtTokenGenerator
+{
+    private readonly JwtSettings _jwtSettings;
+
+    public JwtTokenGenerator(JwtSettings jwtSettings)
+    {
+        _jwtSettings = jwtSettings;
+    }
+
+    public string GenerateToken(User user)
+    {
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName),
+            new Claim(ClaimTypes.Role, ((byte)user.Role).ToString())
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: _jwtSettings.Issuer,
+            audience: _jwtSettings.Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(_jwtSettings.ExpirationHours),
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+}

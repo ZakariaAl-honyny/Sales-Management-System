@@ -1,3 +1,3 @@
 namespace SalesSystem.Contracts.Responses;
 
-public record LoginResponse(string Token, string UserName, string FullName, byte Role, DateTime ExpiresAt);
+public record LoginResponse(int UserId, string UserName, string FullName, byte Role, string Token, DateTime ExpiresAt);

@@ -1,8 +1,9 @@
+using SalesSystem.Domain.Common;
+
 namespace SalesSystem.Domain.Entities;
 
-public class StoreSettings
+public class StoreSettings : BaseEntity
 {
-    public int StoreSettingsId { get; private set; }
     public string StoreName { get; private set; } = string.Empty;
     public string? Phone { get; private set; }
     public string? Address { get; private set; }
@@ -10,7 +11,6 @@ public class StoreSettings
     public string CurrencyCode { get; private set; } = "SAR";
     public decimal DefaultTaxRate { get; private set; }
     public bool IsTaxEnabled { get; private set; }
-    public DateTime? UpdatedAt { get; private set; }
 
     private StoreSettings() { }
 
@@ -54,6 +54,6 @@ public class StoreSettings
         CurrencyCode = currencyCode;
         DefaultTaxRate = defaultTaxRate;
         IsTaxEnabled = isTaxEnabled;
-        UpdatedAt = DateTime.UtcNow;
+        UpdateTimestamp();
     }
 }

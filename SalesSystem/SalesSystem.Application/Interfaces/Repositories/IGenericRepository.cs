@@ -9,4 +9,5 @@ public interface IGenericRepository<T> where T : BaseEntity
     Task<T> AddAsync(T entity, CancellationToken ct = default);
     Task UpdateAsync(T entity, CancellationToken ct = default);
     Task SoftDeleteAsync(int id, CancellationToken ct = default);
+    IQueryable<T> Query();
 }

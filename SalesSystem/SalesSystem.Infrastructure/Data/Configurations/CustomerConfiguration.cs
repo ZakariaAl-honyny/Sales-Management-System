@@ -18,8 +18,6 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         builder.Property(s => s.Address).HasMaxLength(250);
         builder.Property(s => s.OpeningBalance).HasPrecision(18, 2);
         builder.Property(s => s.CurrentBalance).HasPrecision(18, 2);
-        builder.Property(s => s.CreatedBy).HasMaxLength(150);
-        builder.Property(s => s.UpdatedBy).HasMaxLength(150);
         builder.HasQueryFilter(s => s.IsActive);
     }
 }
@@ -38,8 +36,6 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(c => c.Address).HasMaxLength(250);
         builder.Property(c => c.OpeningBalance).HasPrecision(18, 2);
         builder.Property(c => c.CurrentBalance).HasPrecision(18, 2);
-        builder.Property(c => c.CreatedBy).HasMaxLength(150);
-        builder.Property(c => c.UpdatedBy).HasMaxLength(150);
         builder.HasQueryFilter(c => c.IsActive);
     }
 }

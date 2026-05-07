@@ -1,9 +1,9 @@
 namespace SalesSystem.Contracts.Requests.Products;
 
 public record CreateProductRequest(
+    string Name,
     string? Code,
     string? Barcode,
-    string Name,
     int? CategoryId,
     int? UnitId,
     decimal PurchasePrice,
@@ -13,12 +13,13 @@ public record CreateProductRequest(
 
 public record UpdateProductRequest(
     int Id,
+    string Name,
     string? Code,
     string? Barcode,
-    string Name,
     int? CategoryId,
     int? UnitId,
     decimal PurchasePrice,
     decimal SalePrice,
     decimal MinStock,
-    string? Description);
+    string? Description,
+    bool IsActive);

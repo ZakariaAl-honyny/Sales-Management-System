@@ -2,13 +2,11 @@ using SalesSystem.Domain.Common;
 
 namespace SalesSystem.Domain.Entities;
 
-public class WarehouseStock
+public class WarehouseStock : BaseEntity
 {
-    public int WarehouseStockId { get; private set; }
     public int WarehouseId { get; private set; }
     public int ProductId { get; private set; }
     public decimal Quantity { get; private set; }
-    public DateTime UpdatedAt { get; private set; }
 
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual Product? Product { get; private set; }
@@ -28,8 +26,7 @@ public class WarehouseStock
         {
             WarehouseId = warehouseId,
             ProductId = productId,
-            Quantity = quantity,
-            UpdatedAt = DateTime.UtcNow
+            Quantity = quantity
         };
     }
 
@@ -38,7 +35,7 @@ public class WarehouseStock
         if (amount <= 0)
             throw new ArgumentException("Amount must be positive.", nameof(amount));
         Quantity += amount;
-        UpdatedAt = DateTime.UtcNow;
+        UpdateTimestamp();
     }
 
     public void DecreaseQuantity(decimal amount)
@@ -48,7 +45,7 @@ public class WarehouseStock
         if (Quantity < amount)
             throw new InvalidOperationException("Insufficient stock.");
         Quantity -= amount;
-        UpdatedAt = DateTime.UtcNow;
+        UpdateTimestamp();
     }
 
     public void SetQuantity(decimal quantity)
@@ -56,6 +53,6 @@ public class WarehouseStock
         if (quantity < 0)
             throw new ArgumentException("Quantity cannot be negative.", nameof(quantity));
         Quantity = quantity;
-        UpdatedAt = DateTime.UtcNow;
+        UpdateTimestamp();
     }
 }

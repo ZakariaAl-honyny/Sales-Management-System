@@ -1,10 +1,10 @@
 using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Common;
 
 namespace SalesSystem.Domain.Entities;
 
-public class InventoryMovement
+public class InventoryMovement : BaseEntity
 {
-    public long InventoryMovementId { get; private set; }
     public int ProductId { get; private set; }
     public int WarehouseId { get; private set; }
     public MovementType MovementType { get; private set; }
@@ -16,7 +16,6 @@ public class InventoryMovement
     public decimal? UnitCost { get; private set; }
     public DateTime MovementDate { get; private set; }
     public string? Notes { get; private set; }
-    public int? CreatedByUserId { get; private set; }
 
     public virtual Product? Product { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
@@ -46,7 +45,7 @@ public class InventoryMovement
         if (referenceId <= 0)
             throw new ArgumentException("ReferenceId is required.", nameof(referenceId));
 
-        return new InventoryMovement
+        var movement = new InventoryMovement
         {
             ProductId = productId,
             WarehouseId = warehouseId,
@@ -58,8 +57,9 @@ public class InventoryMovement
             ReferenceId = referenceId,
             UnitCost = unitCost,
             Notes = notes,
-            CreatedByUserId = createdByUserId,
             MovementDate = DateTime.UtcNow
         };
+        movement.SetCreatedBy(createdByUserId);
+        return movement;
     }
 }

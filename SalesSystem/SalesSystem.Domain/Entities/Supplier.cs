@@ -12,8 +12,6 @@ public class Supplier : BaseEntity
     public string? Address { get; private set; }
     public decimal OpeningBalance { get; private set; }
     public decimal CurrentBalance { get; private set; }
-    public string? CreatedBy { get; private set; }
-    public string? UpdatedBy { get; private set; }
 
     private Supplier() { }
 
@@ -24,12 +22,12 @@ public class Supplier : BaseEntity
         string? phone = null,
         string? email = null,
         string? address = null,
-        string? createdBy = null)
+        int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required.", nameof(name));
 
-        return new Supplier
+        var supplier = new Supplier
         {
             Name = name,
             OpeningBalance = openingBalance,
@@ -37,9 +35,10 @@ public class Supplier : BaseEntity
             Code = code,
             Phone = phone,
             Email = email,
-            Address = address,
-            CreatedBy = createdBy
+            Address = address
         };
+        supplier.SetCreatedBy(createdByUserId);
+        return supplier;
     }
 
     public void IncreaseBalance(decimal amount)
@@ -62,14 +61,14 @@ public class Supplier : BaseEntity
         string? phone,
         string? email,
         string? address,
-        string? updatedBy)
+        int? updatedByUserId)
     {
         Name = name;
         Code = code;
         Phone = phone;
         Email = email;
         Address = address;
-        UpdatedBy = updatedBy;
+        SetUpdatedBy(updatedByUserId);
         UpdatedAt = DateTime.UtcNow;
     }
 }
