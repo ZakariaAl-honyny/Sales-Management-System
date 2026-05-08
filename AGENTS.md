@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/004-desktop-shell/plan.md](specs/004-desktop-shell/plan.md)
+**Active Feature Plan**: [specs/005-desktop-modules/plan.md](specs/005-desktop-modules/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
@@ -363,6 +363,7 @@ public enum MovementType : byte
 | `Swashbuckle.AspNetCore` 6.x | Api |
 | `Microsoft.Extensions.Http` 10.x | Desktop |
 | `System.Text.Json` 10.x | Desktop |
+| `ClosedXML` 0.102.x | Desktop (Excel report export — FR-021) |
 
 **Any package not listed here requires human approval.**
 
