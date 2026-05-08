@@ -363,6 +363,7 @@ public enum MovementType : byte
 | `Swashbuckle.AspNetCore` 6.x | Api |
 | `Microsoft.Extensions.Http` 10.x | Desktop |
 | `System.Text.Json` 10.x | Desktop |
+| `ClosedXML` 0.102.x | Desktop (Excel report export — FR-021) |
 
 **Any package not listed here requires human approval.**
 
