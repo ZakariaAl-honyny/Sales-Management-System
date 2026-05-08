@@ -5,11 +5,21 @@
 **Status**: Draft  
 **Input**: User description: "Phase 5 — Desktop Modules: Replace all placeholder controls with fully functional WinForms modules that communicate with the backend API. Each module provides list views with search/filter, add/edit dialogs, delete/deactivate with confirmation, and EventBus-driven cross-module refresh."
 
+## Clarifications
+
+### Session 2026-05-08
+
+- Q: Should the Sales/Purchase module UI include tax calculation logic in Phase 5? → A: Add a "Tax Inclusive/Exclusive" toggle on the invoice form itself to handle tax calculations dynamically.
+- Q: Should the system allow recording a payment that results in a negative balance? → A: Allow overpayments (balance can become negative), enabling credit balances for customers and suppliers.
+- Q: Should the system support exporting reports to external formats in Phase 5? → A: Export to both Excel and CSV for all generated reports.
+- Q: Should there be a UI mechanism to view and re-activate deactivated entities? → A: Add a "Show Deactivated" toggle on each list screen to allow managers to find and re-activate entities.
+- Q: How should Categories and Units management be accessed? → A: Accessible via entry points inside the Product Editor dialog for on-the-fly management.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Products CRUD Module (Priority: P1)
 
-A manager opens the Products screen and sees a searchable, filterable table of all products. They can add a new product by filling out a form (Code, Barcode, Name, Category, Unit, PurchasePrice, SalePrice, MinStock, Description), edit an existing product inline or via dialog, and deactivate a product with a confirmation prompt. When a product is added or modified, every other open screen that displays product data automatically refreshes.
+A manager opens the Products screen and sees a searchable, filterable table of all products. They can add a new product by filling out a form (Code, Barcode, Name, Category, Unit, PurchasePrice, SalePrice, MinStock, Description), where Categories and Units can be managed on-the-fly via quick-add buttons. They can edit an existing product inline or via dialog, and deactivate a product with a confirmation prompt. When a product is added or modified, every other open screen that displays product data automatically refreshes.
 
 **Why this priority**: Products is the foundational CRUD module. Its implementation establishes the reusable pattern (List + Editor + EventBus) that all subsequent modules replicate. Every financial module depends on product data.
 
@@ -23,6 +33,7 @@ A manager opens the Products screen and sees a searchable, filterable table of a
 4. **Given** a product is selected, **When** the user clicks "Deactivate" and confirms the dialog, **Then** the product is soft-deleted (IsActive=false) and removed from the default active-only list.
 5. **Given** the user is a Cashier, **When** they navigate to Products, **Then** they cannot access the screen (role restriction: ManagerAndAbove).
 6. **Given** products with categories exist, **When** the user selects a Category filter, **Then** only products in that category are displayed.
+7. **Given** deactivated products exist, **When** the user toggles "Show Deactivated", **Then** the list includes inactive products, allowing them to be edited or re-activated.
 
 ---
 
@@ -41,6 +52,7 @@ A manager opens the Customers screen and views a table of all customers with the
 3. **Given** a customer has a non-zero balance, **When** the user views the customer list, **Then** the balance is displayed in the correct format (2 decimal places) with color coding (red for owing, green for credit).
 4. **Given** the user is a Cashier, **When** they access Customers, **Then** they can view the list but cannot add, edit, or deactivate customers.
 5. **Given** a supplier is selected, **When** the user deactivates them, **Then** a confirmation dialog appears in Arabic, and upon confirmation, the supplier is soft-deleted.
+6. **Given** deactivated customers/suppliers exist, **When** the user toggles "Show Deactivated", **Then** they appear in the list for re-activation.
 
 ---
 
@@ -63,7 +75,7 @@ An admin opens the Warehouses screen to manage storage locations. They can add n
 
 ### User Story 4 - Sales Invoice Module (Priority: P1)
 
-A cashier creates a new sales invoice by selecting a customer (or using the default Cash customer), choosing a source warehouse, adding products with quantities and prices, applying line-level and invoice-level discounts, specifying payment type (Cash/Credit/Mixed), and posting the invoice. The system validates stock availability, computes totals automatically, deducts stock, and updates customer balance upon posting.
+A cashier creates a new sales invoice by selecting a customer (or using the default Cash customer), choosing a source warehouse, adding products with quantities and prices, applying line-level and invoice-level discounts, specifying a tax-inclusive or tax-exclusive calculation toggle, specifying payment type (Cash/Credit/Mixed), and posting the invoice. The system validates stock availability, computes totals and taxes automatically, deducts stock, and updates customer balance upon posting.
 
 **Why this priority**: Sales is the most important business function — it is the primary revenue-generating operation for the retail shop.
 
@@ -73,7 +85,7 @@ A cashier creates a new sales invoice by selecting a customer (or using the defa
 
 1. **Given** a cashier opens the Sales screen, **When** they click "New Invoice", **Then** a blank invoice form appears with the default Cash customer and default warehouse pre-selected.
 2. **Given** an invoice is being created, **When** the user adds a product by scanning a barcode or searching by name, **Then** the product is added as a line item with its default SalePrice.
-3. **Given** line items exist, **When** the user modifies quantity or applies a discount, **Then** the LineTotal, SubTotal, TotalAmount, and DueAmount recalculate instantly in the UI.
+3. **Given** line items exist, **When** the user modifies quantity, applies a discount, or toggles tax mode, **Then** the LineTotal, SubTotal, TaxAmount, TotalAmount, and DueAmount recalculate instantly in the UI.
 4. **Given** the payment type is Mixed, **When** the user enters a PaidAmount, **Then** the DueAmount is calculated as TotalAmount - PaidAmount, and the system validates PaidAmount ≤ TotalAmount.
 5. **Given** sufficient stock exists, **When** the invoice is posted, **Then** stock is deducted from the selected warehouse, InventoryMovements are created, and customer balance is updated if DueAmount > 0.
 6. **Given** insufficient stock for any line item, **When** the user attempts to post, **Then** a clear Arabic error message identifies which product(s) have insufficient stock.
@@ -84,7 +96,7 @@ A cashier creates a new sales invoice by selecting a customer (or using the defa
 
 ### User Story 5 - Purchase Invoice Module (Priority: P1)
 
-A manager creates a purchase invoice by selecting a supplier, choosing a destination warehouse, adding products with quantities and unit costs, applying discounts, and specifying payment type. On posting, stock increases in the destination warehouse and supplier balance updates.
+A manager creates a purchase invoice by selecting a supplier, choosing a destination warehouse, adding products with quantities and unit costs, applying discounts and tax toggles, and specifying payment type. On posting, stock increases in the destination warehouse and supplier balance updates.
 
 **Why this priority**: Purchases are the primary way stock enters the system. Without this module, the shop cannot replenish inventory.
 
@@ -141,24 +153,25 @@ A manager records customer payments (cash received from customer → decreases c
 
 **Why this priority**: Payments close the credit cycle for both customers and suppliers, enabling accurate balance tracking.
 
-**Independent Test**: Record a customer payment of 500, verify customer balance decreases by 500. Record a supplier payment of 300, verify supplier balance decreases by 300.
+**Independent Test**: Record a customer payment of 500, verify customer balance decreases by 500. Record a supplier payment of 300, verify supplier balance decreases by 300. Record an overpayment (e.g., 1000 on a 500 balance) and verify the balance becomes negative (-500).
 
 **Acceptance Scenarios**:
 
 1. **Given** a customer has a balance of 1000, **When** a payment of 500 is recorded, **Then** the customer balance becomes 500.
 2. **Given** a supplier has a balance of 2000 (we owe them), **When** a payment of 800 is recorded, **Then** the supplier balance becomes 1200.
 3. **Given** a payment is being created, **When** the user optionally links it to a specific invoice, **Then** the payment is associated with that invoice for audit purposes.
-4. **Given** the payment list screen, **When** the user filters by date range, **Then** only payments within the selected range are displayed.
+4. **Given** a customer has a balance of 1000, **When** a payment of 1500 is recorded, **Then** the customer balance becomes -500 (credit) and a confirmation notification appears.
+5. **Given** the payment list screen, **When** the user filters by date range, **Then** only payments within the selected range are displayed.
 
 ---
 
 ### User Story 9 - Reports Module (Priority: P3)
 
-A manager accesses the Reports screen and can generate: Daily Sales Report, Daily Purchases Report, Stock Report (per warehouse or all), Customer Balance Report, Supplier Balance Report, Product Movement Report, and Low Stock Alert Report. All reports are filterable by date range and/or entity.
+A manager accesses the Reports screen and can generate: Daily Sales Report, Daily Purchases Report, Stock Report (per warehouse or all), Customer Balance Report, Supplier Balance Report, Product Movement Report, and Low Stock Alert Report. All reports are filterable by date range and/or entity, can be viewed on-screen, and exported to Excel or CSV.
 
 **Why this priority**: Reports provide business intelligence but do not affect transactional data. The system can operate fully without reports initially.
 
-**Independent Test**: Generate a Daily Sales Report for a specific date range. Verify the report shows correct invoice totals, item counts, and payment breakdowns.
+**Independent Test**: Generate a Daily Sales Report for a specific date range. Verify the report shows correct invoice totals, item counts, and payment breakdowns. Export the report to Excel and CSV, and verify the exported files contain the correct data.
 
 **Acceptance Scenarios**:
 
@@ -167,6 +180,7 @@ A manager accesses the Reports screen and can generate: Daily Sales Report, Dail
 3. **Given** products with MinStock configured, **When** the user generates a Low Stock Alert Report, **Then** only products where current stock < MinStock are shown.
 4. **Given** a customer has transactions, **When** the user generates a Customer Balance Report for that customer, **Then** all invoices, returns, and payments affecting that customer's balance are listed.
 5. **Given** reports are generated, **When** the user views them, **Then** data loads within 5 seconds for up to 1 year of transaction history.
+6. **Given** a generated report, **When** the user clicks "Export to Excel" or "Export to CSV", **Then** a file save dialog appears and the report data is saved in the chosen format.
 
 ---
 
@@ -200,9 +214,9 @@ When a user logs in, the Dashboard screen displays summary cards showing today's
 
 - **FR-001**: System MUST implement a reusable CRUD module pattern consisting of a list view (DataGridView with SearchBar), an editor dialog/panel, and EventBus integration for cross-module updates.
 - **FR-002**: System MUST provide search functionality with 300ms debounce on all list screens, searching across Name and Code/Barcode fields.
-- **FR-003**: System MUST support category-based and status-based filtering on list screens where applicable.
+- **FR-003**: System MUST support category-based and status-based filtering on list screens where applicable, including a "Show Deactivated" toggle.
 - **FR-004**: System MUST enforce role-based access control at the UI level — modules visible only to authorized roles per the Permissions Matrix.
-- **FR-005**: System MUST compute all financial totals (LineTotal, SubTotal, TotalAmount, DueAmount) in real-time as the user modifies invoice line items.
+- **FR-005**: System MUST compute all financial totals (LineTotal, SubTotal, TaxAmount, TotalAmount, DueAmount) in real-time as the user modifies invoice line items or toggles the tax mode.
 - **FR-006**: System MUST validate stock availability before allowing invoice posting, displaying specific per-item error messages in Arabic.
 - **FR-007**: System MUST use soft-delete (IsActive=false) for all entity deactivation — no hard deletes.
 - **FR-008**: System MUST publish EventBus messages (entity ID only, no data payloads) after every create, update, or deactivate operation.
@@ -218,6 +232,7 @@ When a user logs in, the Dashboard screen displays summary cards showing today's
 - **FR-018**: System MUST allow returns to optionally reference an original invoice and validate return quantities against remaining returnable quantities.
 - **FR-019**: System MUST prevent stock transfers where source and destination warehouses are the same.
 - **FR-020**: System MUST provide 7 report types: Daily Sales, Daily Purchases, Stock, Customer Balance, Supplier Balance, Product Movement, and Low Stock Alert.
+- **FR-021**: System MUST support exporting all reports to Excel (.xlsx) and CSV (.csv) formats.
 
 ### Key Entities
 
@@ -253,6 +268,6 @@ When a user logs in, the Dashboard screen displays summary cards showing today's
 - Placeholder controls exist in `Controls/Placeholders/` and will be replaced with fully functional module controls organized in dedicated subdirectories (e.g., `Controls/Products/`).
 - The system operates on a local network — latency between Desktop and API is minimal (<50ms).
 - All 13 existing placeholder UserControls registered in `Program.cs` DI will be replaced or updated with real implementations.
-- Categories and Units management (supporting CRUD for product metadata) will be implemented as sub-modules accessible from the Products screen.
+- Categories and Units management (supporting CRUD for product metadata) will be implemented as sub-dialogs accessible from the Product Editor screen.
 - Print functionality for invoices is out of scope for this phase (covered in Phase 6).
 - User Management and Settings screens are out of scope for this phase (covered in Phase 7).
