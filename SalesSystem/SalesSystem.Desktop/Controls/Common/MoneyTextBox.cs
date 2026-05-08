@@ -1,25 +1,30 @@
-﻿namespace SalesSystem.Desktop.Controls.Common;
+using System.ComponentModel;
 
-public class MoneyTextBox : TextBox
+namespace SalesSystem.Desktop.Controls.Common;
+
+public sealed class MoneyTextBox : TextBox
 {
-    public decimal DecimalValue => decimal.TryParse(this.Text, out var v) ? v : 0m;
+    [Browsable(false)]
+    public decimal DecimalValue => decimal.TryParse(Text, out var v) ? v : 0m;
 
     public MoneyTextBox()
     {
-        this.TextAlign = HorizontalAlignment.Left;
+        TextAlign = HorizontalAlignment.Left; // Numbers usually left-aligned even in RTL for readability if it's pure decimal
+        // Actually PRD says decimal(18,2) or (18,3). Standard is 2.
     }
 
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
         base.OnKeyPress(e);
 
+        // Allow digits, control keys (backspace), and one decimal point
         if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.')
         {
             e.Handled = true;
         }
 
-        // only allow one decimal point
-        if (e.KeyChar == '.' && this.Text.IndexOf('.') > -1)
+        // Only allow one decimal point
+        if (e.KeyChar == '.' && Text.Contains('.'))
         {
             e.Handled = true;
         }
@@ -28,13 +33,13 @@ public class MoneyTextBox : TextBox
     protected override void OnLeave(EventArgs e)
     {
         base.OnLeave(e);
-        if (decimal.TryParse(this.Text, out var val))
+        if (decimal.TryParse(Text, out var value))
         {
-            this.Text = val.ToString("F2");
+            Text = value.ToString("F2");
         }
         else
         {
-            this.Text = "0.00";
+            Text = "0.00";
         }
     }
 }
