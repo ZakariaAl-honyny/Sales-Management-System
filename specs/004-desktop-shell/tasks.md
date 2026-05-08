@@ -12,9 +12,9 @@
 
 **Purpose**: Add Generic Host, appsettings.json, and create folder skeleton.
 
-- [ ] T001 Add `Microsoft.Extensions.Hosting` 10.x to `SalesSystem/SalesSystem.Desktop/SalesSystem.Desktop.csproj` via `dotnet add package`
-- [ ] T002 Create `SalesSystem/SalesSystem.Desktop/appsettings.json` with content `{ "ApiSettings": { "BaseUrl": "https://localhost:7001" } }` and set `<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>` in the csproj
-- [ ] T003 [P] Create empty folder structure: `Configuration/`, `Models/`, `Messages/`, `Services/Interfaces/`, `Services/Http/`, `Forms/`, `Controls/Common/`, `Controls/Placeholders/` under `SalesSystem/SalesSystem.Desktop/`
+- [x] T001 Add `Microsoft.Extensions.Hosting` 10.x to `SalesSystem/SalesSystem.Desktop/SalesSystem.Desktop.csproj` via `dotnet add package`
+- [x] T002 Create `SalesSystem/SalesSystem.Desktop/appsettings.json` with content `{ "ApiSettings": { "BaseUrl": "https://localhost:7001" } }` and set `<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>` in the csproj
+- [x] T003 [P] Create empty folder structure: `Configuration/`, `Models/`, `Messages/`, `Services/Interfaces/`, `Services/Http/`, `Forms/`, `Controls/Common/`, `Controls/Placeholders/` under `SalesSystem/SalesSystem.Desktop/`
 
 ---
 
