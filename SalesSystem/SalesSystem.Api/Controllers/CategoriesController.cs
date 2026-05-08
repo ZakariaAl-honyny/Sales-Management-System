@@ -7,8 +7,11 @@ using SalesSystem.Contracts.DTOs;
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Categories management API
+/// Controller for managing product categories.
 /// </summary>
+/// <remarks>
+/// Requires Manager or Admin role (Policy: ManagerAndAbove).
+/// </remarks>
 [ApiController]
 [Route("api/v1/categories")]
 [Authorize(Policy = "ManagerAndAbove")]
@@ -22,16 +25,16 @@ public class CategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all categories with optional search and pagination
+    /// Retrieves all categories with pagination.
     /// </summary>
-    /// <param name="search">Search by category name</param>
-    /// <param name="page">Page number (default: 1)</param>
-    /// <param name="pageSize">Items per page (default: 10)</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Paginated list of categories</returns>
+    /// <param name="search">Optional search term for category name.</param>
+    /// <param name="page">Page number (default: 1).</param>
+    /// <param name="pageSize">Items per page (default: 10).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns paginated list of categories.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<CategoryDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _categoryService.GetAllAsync(search, page, pageSize, ct);
@@ -39,14 +42,14 @@ public class CategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a category by ID
+    /// Retrieves a category by its ID.
     /// </summary>
-    /// <param name="id">Category ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Category details</returns>
+    /// <param name="id">Category ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the category if found.</returns>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(CategoryDto), 200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _categoryService.GetByIdAsync(id, ct);
@@ -54,14 +57,14 @@ public class CategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new category
+    /// Creates a new category.
     /// </summary>
-    /// <param name="request">Category creation request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Created category</returns>
+    /// <param name="request">Create category request with Name and optional Description.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the created category with ID.</returns>
     [HttpPost]
-    [ProducesResponseType(typeof(CategoryDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateCategoryRequest request, CancellationToken ct)
     {
         var result = await _categoryService.CreateAsync(request, ct);
@@ -69,16 +72,15 @@ public class CategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing category
+    /// Updates an existing category.
     /// </summary>
-    /// <param name="id">Category ID</param>
-    /// <param name="request">Category update request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Updated category</returns>
+    /// <param name="id">Category ID to update.</param>
+    /// <param name="request">Update category request with Id, Name, Description, and IsActive.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the updated category.</returns>
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(CategoryDto), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCategoryRequest request, CancellationToken ct)
     {
         var result = await _categoryService.UpdateAsync(id, request, ct);
@@ -86,18 +88,19 @@ public class CategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a category (soft delete)
+    /// Deletes a category.
     /// </summary>
-    /// <param name="id">Category ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Success message</returns>
+    /// <param name="id">Category ID to delete.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns success message with deleted ID.</returns>
     [HttpDelete("{id:int}")]
-    [ProducesResponseType(typeof(string), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var result = await _categoryService.DeleteAsync(id, ct);
-        return result.IsSuccess ? Ok("Category deleted successfully") : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+            return Ok(new { message = "تم الحذف بنجاح", id });
+        return BadRequest(new { error = result.Error });
     }
 }

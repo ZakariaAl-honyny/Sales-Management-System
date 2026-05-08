@@ -7,8 +7,11 @@ using SalesSystem.Contracts.DTOs;
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Warehouses management API
+/// Controller for managing warehouses.
 /// </summary>
+/// <remarks>
+/// Requires Admin role only (Policy: AdminOnly).
+/// </remarks>
 [ApiController]
 [Route("api/v1/warehouses")]
 [Authorize(Policy = "AdminOnly")]
@@ -22,16 +25,16 @@ public class WarehousesController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all warehouses with optional search and pagination
+    /// Retrieves all warehouses with pagination.
     /// </summary>
-    /// <param name="search">Search by name or code</param>
-    /// <param name="page">Page number (default: 1)</param>
-    /// <param name="pageSize">Items per page (default: 10)</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Paginated list of warehouses</returns>
+    /// <param name="search">Optional search term by warehouse name or code.</param>
+    /// <param name="page">Page number (default: 1).</param>
+    /// <param name="pageSize">Items per page (default: 10).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns paginated list of warehouses.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<WarehouseDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _warehouseService.GetAllAsync(search, page, pageSize, ct);
@@ -39,14 +42,14 @@ public class WarehousesController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a warehouse by ID
+    /// Retrieves a warehouse by its ID.
     /// </summary>
-    /// <param name="id">Warehouse ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Warehouse details</returns>
+    /// <param name="id">Warehouse ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the warehouse if found.</returns>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(WarehouseDto), 200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _warehouseService.GetByIdAsync(id, ct);
@@ -54,14 +57,14 @@ public class WarehousesController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new warehouse
+    /// Creates a new warehouse.
     /// </summary>
-    /// <param name="request">Warehouse creation request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Created warehouse</returns>
+    /// <param name="request">Create warehouse request with Name, Code, and optional Location.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the created warehouse with ID.</returns>
     [HttpPost]
-    [ProducesResponseType(typeof(WarehouseDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateWarehouseRequest request, CancellationToken ct)
     {
         var result = await _warehouseService.CreateAsync(request, ct);
@@ -69,16 +72,15 @@ public class WarehousesController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing warehouse
+    /// Updates an existing warehouse.
     /// </summary>
-    /// <param name="id">Warehouse ID</param>
-    /// <param name="request">Warehouse update request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Updated warehouse</returns>
+    /// <param name="id">Warehouse ID to update.</param>
+    /// <param name="request">Update warehouse request with all warehouse fields.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the updated warehouse.</returns>
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(WarehouseDto), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateWarehouseRequest request, CancellationToken ct)
     {
         var result = await _warehouseService.UpdateAsync(id, request, ct);
@@ -86,18 +88,19 @@ public class WarehousesController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a warehouse (soft delete)
+    /// Deletes a warehouse.
     /// </summary>
-    /// <param name="id">Warehouse ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Success message</returns>
+    /// <param name="id">Warehouse ID to delete.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns success message with deleted ID.</returns>
     [HttpDelete("{id:int}")]
-    [ProducesResponseType(typeof(string), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var result = await _warehouseService.DeleteAsync(id, ct);
-        return result.IsSuccess ? Ok("Warehouse deleted successfully") : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+            return Ok(new { message = "تم الحذف بنجاح", id });
+        return BadRequest(new { error = result.Error });
     }
 }

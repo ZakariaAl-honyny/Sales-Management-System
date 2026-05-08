@@ -3,12 +3,17 @@ using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests.Customers;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Customers management API
+/// Controller for managing customers.
 /// </summary>
+/// <remarks>
+/// - GET endpoints: All Staff roles (Admin, Manager, Cashier)<br/>
+/// - POST/PUT/DELETE endpoints: Manager and Admin only (Policy: ManagerAndAbove)
+/// </remarks>
 [ApiController]
 [Route("api/v1/customers")]
 [Authorize]
@@ -22,17 +27,17 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all customers with optional search and pagination
+    /// Retrieves all customers with pagination.
     /// </summary>
-    /// <param name="search">Search by name, code, phone, or email</param>
-    /// <param name="page">Page number (default: 1)</param>
-    /// <param name="pageSize">Items per page (default: 10)</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Paginated list of customers</returns>
+    /// <param name="search">Optional search term by customer name or code.</param>
+    /// <param name="page">Page number (default: 1).</param>
+    /// <param name="pageSize">Items per page (default: 10).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns paginated list of customers.</returns>
     [HttpGet]
     [Authorize(Policy = "AllStaff")]
-    [ProducesResponseType(typeof(PagedResult<CustomerDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _customerService.GetAllAsync(search, page, pageSize, ct);
@@ -40,15 +45,15 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a customer by ID
+    /// Retrieves a customer by its ID.
     /// </summary>
-    /// <param name="id">Customer ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Customer details</returns>
+    /// <param name="id">Customer ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the customer if found.</returns>
     [HttpGet("{id:int}")]
     [Authorize(Policy = "AllStaff")]
-    [ProducesResponseType(typeof(CustomerDto), 200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _customerService.GetByIdAsync(id, ct);
@@ -56,15 +61,15 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new customer
+    /// Creates a new customer.
     /// </summary>
-    /// <param name="request">Customer creation request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Created customer</returns>
+    /// <param name="request">Create customer request with Name, Code, and optional fields.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the created customer with ID.</returns>
     [HttpPost]
     [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(typeof(CustomerDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateCustomerRequest request, CancellationToken ct)
     {
         var result = await _customerService.CreateAsync(request, ct);
@@ -72,17 +77,16 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing customer
+    /// Updates an existing customer.
     /// </summary>
-    /// <param name="id">Customer ID</param>
-    /// <param name="request">Customer update request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Updated customer</returns>
+    /// <param name="id">Customer ID to update.</param>
+    /// <param name="request">Update customer request with all customer fields.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the updated customer.</returns>
     [HttpPut("{id:int}")]
     [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(typeof(CustomerDto), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerRequest request, CancellationToken ct)
     {
         var result = await _customerService.UpdateAsync(id, request, ct);
@@ -90,19 +94,20 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a customer (soft delete)
+    /// Deletes a customer.
     /// </summary>
-    /// <param name="id">Customer ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Success message</returns>
+    /// <param name="id">Customer ID to delete.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns success message with deleted ID.</returns>
     [HttpDelete("{id:int}")]
     [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(typeof(string), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var result = await _customerService.DeleteAsync(id, ct);
-        return result.IsSuccess ? Ok("Customer deleted successfully") : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+            return Ok(new { message = "تم الحذف بنجاح", id });
+        return BadRequest(new { error = result.Error });
     }
 }

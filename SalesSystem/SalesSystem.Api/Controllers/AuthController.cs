@@ -23,13 +23,13 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Authenticates a user and returns a JWT token
     /// </summary>
-    /// <param name="request">Login credentials (username and password)</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>JWT token with user information</returns>
+    /// <param name="request">The login request containing username and password.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns JWT token with user info if credentials are valid.</returns>
     [HttpPost("login")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(LoginResponse), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var result = await _authService.LoginAsync(request, ct);

@@ -7,8 +7,11 @@ using SalesSystem.Contracts.DTOs;
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Units of measurement management API
+/// Controller for managing measurement units.
 /// </summary>
+/// <remarks>
+/// Requires Manager or Admin role (Policy: ManagerAndAbove).
+/// </remarks>
 [ApiController]
 [Route("api/v1/units")]
 [Authorize(Policy = "ManagerAndAbove")]
@@ -22,16 +25,16 @@ public class UnitsController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all units with optional search and pagination
+    /// Retrieves all units with pagination.
     /// </summary>
-    /// <param name="search">Search by unit name</param>
-    /// <param name="page">Page number (default: 1)</param>
-    /// <param name="pageSize">Items per page (default: 10)</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Paginated list of units</returns>
+    /// <param name="search">Optional search term by unit name.</param>
+    /// <param name="page">Page number (default: 1).</param>
+    /// <param name="pageSize">Items per page (default: 10).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns paginated list of units.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<UnitDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _unitService.GetAllAsync(search, page, pageSize, ct);
@@ -39,14 +42,14 @@ public class UnitsController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a unit by ID
+    /// Retrieves a unit by its ID.
     /// </summary>
-    /// <param name="id">Unit ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Unit details</returns>
+    /// <param name="id">Unit ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the unit if found.</returns>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(UnitDto), 200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _unitService.GetByIdAsync(id, ct);
@@ -54,14 +57,14 @@ public class UnitsController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new unit
+    /// Creates a new unit.
     /// </summary>
-    /// <param name="request">Unit creation request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Created unit</returns>
+    /// <param name="request">Create unit request with Name and optional Symbol.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the created unit with ID.</returns>
     [HttpPost]
-    [ProducesResponseType(typeof(UnitDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateUnitRequest request, CancellationToken ct)
     {
         var result = await _unitService.CreateAsync(request, ct);
@@ -69,16 +72,15 @@ public class UnitsController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing unit
+    /// Updates an existing unit.
     /// </summary>
-    /// <param name="id">Unit ID</param>
-    /// <param name="request">Unit update request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Updated unit</returns>
+    /// <param name="id">Unit ID to update.</param>
+    /// <param name="request">Update unit request with all unit fields.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the updated unit.</returns>
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(UnitDto), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateUnitRequest request, CancellationToken ct)
     {
         var result = await _unitService.UpdateAsync(id, request, ct);
@@ -86,18 +88,19 @@ public class UnitsController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a unit (soft delete)
+    /// Deletes a unit.
     /// </summary>
-    /// <param name="id">Unit ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Success message</returns>
+    /// <param name="id">Unit ID to delete.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns success message with deleted ID.</returns>
     [HttpDelete("{id:int}")]
-    [ProducesResponseType(typeof(string), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var result = await _unitService.DeleteAsync(id, ct);
-        return result.IsSuccess ? Ok("Unit deleted successfully") : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+            return Ok(new { message = "تم الحذف بنجاح", id });
+        return BadRequest(new { error = result.Error });
     }
 }

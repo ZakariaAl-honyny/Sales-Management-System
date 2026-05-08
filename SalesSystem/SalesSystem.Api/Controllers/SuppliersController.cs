@@ -7,8 +7,11 @@ using SalesSystem.Contracts.DTOs;
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Suppliers management API
+/// Controller for managing suppliers.
 /// </summary>
+/// <remarks>
+/// Requires Manager or Admin role (Policy: ManagerAndAbove).
+/// </remarks>
 [ApiController]
 [Route("api/v1/suppliers")]
 [Authorize(Policy = "ManagerAndAbove")]
@@ -22,16 +25,16 @@ public class SuppliersController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all suppliers with optional search and pagination
+    /// Retrieves all suppliers with pagination.
     /// </summary>
-    /// <param name="search">Search by name, code, phone, or email</param>
-    /// <param name="page">Page number (default: 1)</param>
-    /// <param name="pageSize">Items per page (default: 10)</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Paginated list of suppliers</returns>
+    /// <param name="search">Optional search term by supplier name or code.</param>
+    /// <param name="page">Page number (default: 1).</param>
+    /// <param name="pageSize">Items per page (default: 10).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns paginated list of suppliers.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<SupplierDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _supplierService.GetAllAsync(search, page, pageSize, ct);
@@ -39,14 +42,14 @@ public class SuppliersController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a supplier by ID
+    /// Retrieves a supplier by its ID.
     /// </summary>
-    /// <param name="id">Supplier ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Supplier details</returns>
+    /// <param name="id">Supplier ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the supplier if found.</returns>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(SupplierDto), 200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _supplierService.GetByIdAsync(id, ct);
@@ -54,14 +57,14 @@ public class SuppliersController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new supplier
+    /// Creates a new supplier.
     /// </summary>
-    /// <param name="request">Supplier creation request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Created supplier</returns>
+    /// <param name="request">Create supplier request with Name, Code, and optional fields.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the created supplier with ID.</returns>
     [HttpPost]
-    [ProducesResponseType(typeof(SupplierDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateSupplierRequest request, CancellationToken ct)
     {
         var result = await _supplierService.CreateAsync(request, ct);
@@ -69,16 +72,15 @@ public class SuppliersController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing supplier
+    /// Updates an existing supplier.
     /// </summary>
-    /// <param name="id">Supplier ID</param>
-    /// <param name="request">Supplier update request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Updated supplier</returns>
+    /// <param name="id">Supplier ID to update.</param>
+    /// <param name="request">Update supplier request with all supplier fields.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the updated supplier.</returns>
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(SupplierDto), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateSupplierRequest request, CancellationToken ct)
     {
         var result = await _supplierService.UpdateAsync(id, request, ct);
@@ -86,18 +88,19 @@ public class SuppliersController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a supplier (soft delete)
+    /// Deletes a supplier.
     /// </summary>
-    /// <param name="id">Supplier ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Success message</returns>
+    /// <param name="id">Supplier ID to delete.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns success message with deleted ID.</returns>
     [HttpDelete("{id:int}")]
-    [ProducesResponseType(typeof(string), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var result = await _supplierService.DeleteAsync(id, ct);
-        return result.IsSuccess ? Ok("Supplier deleted successfully") : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+            return Ok(new { message = "تم الحذف بنجاح", id });
+        return BadRequest(new { error = result.Error });
     }
 }
