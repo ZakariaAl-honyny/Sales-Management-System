@@ -23,7 +23,14 @@ public record ProductDto(
 
 public record WarehouseDto(int Id, string? Code, string Name, string? Location, bool IsDefault, bool IsActive);
 
-public record WarehouseStockDto(int Id, int WarehouseId, string WarehouseName, int ProductId, string ProductName, decimal Quantity);
+public record WarehouseStockDto(
+    int WarehouseId, 
+    string? WarehouseName, 
+    int ProductId, 
+    string ProductName, 
+    string? UnitName, 
+    decimal Quantity, 
+    decimal ReorderLevel);
 
 public record SupplierDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance, bool IsActive);
 
@@ -90,36 +97,46 @@ public record PurchaseInvoiceItemDto(
 public record SalesReturnDto(
     int Id,
     string ReturnNo,
-    int? SalesInvoiceId,
-    int CustomerId,
-    string CustomerName,
     int WarehouseId,
     string WarehouseName,
+    int? CustomerId,
+    string CustomerName,
+    int? SalesInvoiceId,
     DateTime ReturnDate,
-    string? Reason,
-    decimal SubTotal,
     decimal TotalAmount,
-    byte Status,
+    string? Notes,
     IReadOnlyList<SalesReturnItemDto> Items);
 
-public record SalesReturnItemDto(int Id, int ProductId, string ProductName, decimal Quantity, decimal UnitPrice, decimal LineTotal);
+public record SalesReturnItemDto(
+    int Id, 
+    int ProductId, 
+    string ProductName, 
+    decimal Quantity, 
+    decimal UnitPrice, 
+    decimal DiscountAmount, 
+    decimal LineTotal);
 
 public record PurchaseReturnDto(
     int Id,
     string ReturnNo,
-    int? PurchaseInvoiceId,
-    int SupplierId,
-    string SupplierName,
     int WarehouseId,
     string WarehouseName,
+    int SupplierId,
+    string SupplierName,
+    int? PurchaseInvoiceId,
     DateTime ReturnDate,
-    string? Reason,
-    decimal SubTotal,
     decimal TotalAmount,
-    byte Status,
+    string? Notes,
     IReadOnlyList<PurchaseReturnItemDto> Items);
 
-public record PurchaseReturnItemDto(int Id, int ProductId, string ProductName, decimal Quantity, decimal UnitCost, decimal LineTotal);
+public record PurchaseReturnItemDto(
+    int Id, 
+    int ProductId, 
+    string ProductName, 
+    decimal Quantity, 
+    decimal UnitCost, 
+    decimal DiscountAmount, 
+    decimal LineTotal);
 
 public record StockTransferDto(
     int Id,
@@ -130,7 +147,6 @@ public record StockTransferDto(
     string ToWarehouseName,
     DateTime TransferDate,
     string? Notes,
-    byte Status,
     IReadOnlyList<StockTransferItemDto> Items);
 
 public record StockTransferItemDto(int Id, int ProductId, string ProductName, decimal Quantity, string? Notes);
@@ -140,11 +156,10 @@ public record CustomerPaymentDto(
     string PaymentNo,
     int CustomerId,
     string CustomerName,
-    int? SalesInvoiceId,
-    DateTime PaymentDate,
     decimal Amount,
     byte PaymentMethod,
-    string? ReferenceNo,
+    DateTime PaymentDate,
+    int? SalesInvoiceId,
     string? Notes);
 
 public record SupplierPaymentDto(
@@ -152,11 +167,10 @@ public record SupplierPaymentDto(
     string PaymentNo,
     int SupplierId,
     string SupplierName,
-    int? PurchaseInvoiceId,
-    DateTime PaymentDate,
     decimal Amount,
     byte PaymentMethod,
-    string? ReferenceNo,
+    DateTime PaymentDate,
+    int? PurchaseInvoiceId,
     string? Notes);
 
 public record InventoryMovementDto(
@@ -171,8 +185,8 @@ public record InventoryMovementDto(
     decimal QuantityAfter,
     string ReferenceType,
     int ReferenceId,
-    decimal? UnitCost,
-    DateTime MovementDate);
+    DateTime MovementDate,
+    string? Notes);
 
 public record StoreSettingsDto(
     int Id,
@@ -185,3 +199,12 @@ public record StoreSettingsDto(
     bool IsTaxEnabled);
 
 public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
+
+public record DashboardSummaryDto(
+    decimal TotalSalesToday,
+    int NumberOfSalesToday,
+    decimal TotalPurchasesToday,
+    int LowStockItemsCount,
+    int ActiveCustomersCount,
+    decimal TotalReceivables,
+    decimal TotalPayables);

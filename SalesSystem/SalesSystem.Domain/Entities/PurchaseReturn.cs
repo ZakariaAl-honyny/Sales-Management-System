@@ -10,14 +10,16 @@ public class PurchaseReturnItem
     public int ProductId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal UnitCost { get; private set; }
+    public decimal DiscountAmount { get; private set; }
     public decimal LineTotal { get; private set; }
+    public string? Notes { get; private set; }
 
     public virtual PurchaseReturn? PurchaseReturn { get; private set; }
     public virtual Product? Product { get; private set; }
 
     private PurchaseReturnItem() { }
 
-    public static PurchaseReturnItem Create(int productId, decimal quantity, decimal unitCost)
+    public static PurchaseReturnItem Create(int productId, decimal quantity, decimal unitCost, decimal discountAmount = 0, string? notes = null)
     {
         if (productId <= 0)
             throw new ArgumentException("ProductId is required.", nameof(productId));
@@ -30,13 +32,15 @@ public class PurchaseReturnItem
         {
             ProductId = productId,
             Quantity = quantity,
-            UnitCost = unitCost
+            UnitCost = unitCost,
+            DiscountAmount = discountAmount,
+            Notes = notes
         };
         item.RecalculateLineTotal();
         return item;
     }
 
-    public void RecalculateLineTotal() => LineTotal = Quantity * UnitCost;
+    public void RecalculateLineTotal() => LineTotal = (Quantity * UnitCost) - DiscountAmount;
 }
 
 public class PurchaseReturn : BaseEntity
@@ -46,7 +50,7 @@ public class PurchaseReturn : BaseEntity
     public int SupplierId { get; private set; }
     public int WarehouseId { get; private set; }
     public DateTime ReturnDate { get; private set; }
-    public string? Reason { get; private set; }
+    public string? Notes { get; private set; }
     public decimal SubTotal { get; private set; }
     public decimal TotalAmount { get; private set; }
     public InvoiceStatus Status { get; private set; }
@@ -60,33 +64,37 @@ public class PurchaseReturn : BaseEntity
 
     public static PurchaseReturn Create(
         string returnNo,
-        int supplierId,
         int warehouseId,
+        int supplierId,
         int? purchaseInvoiceId = null,
-        string? reason = null,
-        DateTime? returnDate = null)
+        DateTime? returnDate = null,
+        string? notes = null,
+        int? userId = null)
     {
         if (string.IsNullOrWhiteSpace(returnNo))
             throw new ArgumentException("ReturnNo is required.", nameof(returnNo));
-        if (supplierId <= 0)
-            throw new ArgumentException("SupplierId is required.", nameof(supplierId));
         if (warehouseId <= 0)
             throw new ArgumentException("WarehouseId is required.", nameof(warehouseId));
+        if (supplierId <= 0)
+            throw new ArgumentException("SupplierId is required.", nameof(supplierId));
 
-        return new PurchaseReturn
+        var pr = new PurchaseReturn
         {
             ReturnNo = returnNo,
-            SupplierId = supplierId,
             WarehouseId = warehouseId,
+            SupplierId = supplierId,
             PurchaseInvoiceId = purchaseInvoiceId,
-            Reason = reason,
             ReturnDate = returnDate ?? DateTime.UtcNow,
+            Notes = notes,
             Status = InvoiceStatus.Draft
         };
+        pr.SetCreatedBy(userId);
+        return pr;
     }
 
-    public void AddItem(PurchaseReturnItem item)
+    public void AddItem(int productId, decimal quantity, decimal unitCost, decimal discountAmount = 0, string? notes = null)
     {
+        var item = PurchaseReturnItem.Create(productId, quantity, unitCost, discountAmount, notes);
         Items.Add(item);
         RecalculateTotals();
     }

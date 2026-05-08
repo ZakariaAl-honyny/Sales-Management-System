@@ -74,6 +74,12 @@ public class StockTransfer : BaseEntity
         };
     }
 
+    public void AddItem(int productId, decimal quantity, string? notes = null)
+    {
+        var item = StockTransferItem.Create(productId, quantity, notes);
+        AddItem(item);
+    }
+
     public void AddItem(StockTransferItem item)
     {
         if (Status != InvoiceStatus.Draft)

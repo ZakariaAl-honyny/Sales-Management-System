@@ -681,13 +681,150 @@ CREATE TABLE dbo.StoreSettings
     Phone           NVARCHAR(20)  NULL,
     Address         NVARCHAR(250) NULL,
     LogoPath        NVARCHAR(255) NULL,
-    CurrencyCode    NVARCHAR(10)  NOT NULL DEFAULT N'SAR',
-    DefaultTaxRate  DECIMAL(5,2)  NOT NULL DEFAULT 0,
-    IsTaxEnabled    BIT           NOT NULL DEFAULT 0,
+    CurrencyCode    NVARCHAR(10)  NOT NULL CONSTRAINT DF_StoreSettings_Currency DEFAULT(N'SAR'),
+    DefaultTaxRate  DECIMAL(5,2)  NOT NULL CONSTRAINT DF_StoreSettings_TaxRate DEFAULT(0),
+    IsTaxEnabled    BIT           NOT NULL CONSTRAINT DF_StoreSettings_TaxEnabled DEFAULT(0),
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_StoreSettings_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_StoreSettings_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL
+);
+
+-- 15. PurchaseReturns
+CREATE TABLE dbo.PurchaseReturns
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturns PRIMARY KEY,
+    ReturnNo          NVARCHAR(30)  NOT NULL UNIQUE,
+    PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
+    SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
+    WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    ReturnDate        DATETIME2     NOT NULL,
+    Reason            NVARCHAR(250) NULL,
+    SubTotal          DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 16. PurchaseReturnItems
+CREATE TABLE dbo.PurchaseReturnItems
+(
+    PurchaseReturnItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturnItems PRIMARY KEY,
+    PurchaseReturnId     INT NOT NULL REFERENCES dbo.PurchaseReturns(Id),
+    ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity             DECIMAL(18,3) NOT NULL,
+    UnitCost             DECIMAL(18,2) NOT NULL,
+    LineTotal            DECIMAL(18,2) NOT NULL
+);
+
+-- 17. SalesReturns
+CREATE TABLE dbo.SalesReturns
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturns PRIMARY KEY,
+    ReturnNo          NVARCHAR(30)  NOT NULL UNIQUE,
+    SalesInvoiceId    INT           NULL REFERENCES dbo.SalesInvoices(Id),
+    CustomerId        INT           NOT NULL REFERENCES dbo.Customers(Id),
+    WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    ReturnDate        DATETIME2     NOT NULL,
+    Reason            NVARCHAR(250) NULL,
+    SubTotal          DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 18. SalesReturnItems
+CREATE TABLE dbo.SalesReturnItems
+(
+    SalesReturnItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturnItems PRIMARY KEY,
+    SalesReturnId     INT NOT NULL REFERENCES dbo.SalesReturns(Id),
+    ProductId         INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity          DECIMAL(18,3) NOT NULL,
+    UnitPrice         DECIMAL(18,2) NOT NULL,
+    LineTotal         DECIMAL(18,2) NOT NULL
+);
+
+-- 19. StockTransfers
+CREATE TABLE dbo.StockTransfers
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransfers PRIMARY KEY,
+    TransferNo        NVARCHAR(30)  NOT NULL UNIQUE,
+    FromWarehouseId   INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    ToWarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    TransferDate      DATETIME2     NOT NULL,
+    Notes             NVARCHAR(500) NULL,
+    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 20. StockTransferItems
+CREATE TABLE dbo.StockTransferItems
+(
+    StockTransferItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransferItems PRIMARY KEY,
+    StockTransferId     INT NOT NULL REFERENCES dbo.StockTransfers(Id),
+    ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity            DECIMAL(18,3) NOT NULL,
+    Notes               NVARCHAR(250) NULL
+);
+
+-- 21. CustomerPayments
+CREATE TABLE dbo.CustomerPayments
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CustomerPayments PRIMARY KEY,
+    PaymentNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    CustomerId      INT           NOT NULL REFERENCES dbo.Customers(Id),
+    SalesInvoiceId  INT           NULL REFERENCES dbo.SalesInvoices(Id),
+    PaymentDate     DATETIME2     NOT NULL,
+    Amount          DECIMAL(18,2) NOT NULL,
+    PaymentMethod   TINYINT       NOT NULL, -- 1=Cash, 2=Bank Transfer, 3=Card, 4=Other
+    ReferenceNo     NVARCHAR(50)  NULL,
+    Notes           NVARCHAR(500) NULL,
     CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
     UpdatedAt       DATETIME2     NULL
 );
+
+-- 22. SupplierPayments
+CREATE TABLE dbo.SupplierPayments
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SupplierPayments PRIMARY KEY,
+    PaymentNo         NVARCHAR(30)  NOT NULL UNIQUE,
+    SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
+    PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
+    PaymentDate       DATETIME2     NOT NULL,
+    Amount            DECIMAL(18,2) NOT NULL,
+    PaymentMethod     TINYINT       NOT NULL,
+    ReferenceNo       NVARCHAR(50)  NULL,
+    Notes             NVARCHAR(500) NULL,
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 23. DocumentSequences
+CREATE TABLE dbo.DocumentSequences
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_DocumentSequences PRIMARY KEY,
+    Prefix          NVARCHAR(10)  NOT NULL UNIQUE,
+    LastNumber      INT           NOT NULL CONSTRAINT DF_DocumentSequences_LastNumber DEFAULT(0),
+    UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_DocumentSequences_UpdatedAt DEFAULT(SYSDATETIME())
+);
+
 ```

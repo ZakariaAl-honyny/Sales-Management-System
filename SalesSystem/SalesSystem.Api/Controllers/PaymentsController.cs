@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests.Payments;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Common;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
@@ -30,8 +31,8 @@ public class PaymentsController : ControllerBase
     /// <returns>Created payment</returns>
     [HttpPost("customer")]
     [Authorize(Policy = "AllStaff")]
-    [ProducesResponseType(typeof(CustomerPaymentDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(CustomerPaymentDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateCustomerPayment([FromBody] CreateCustomerPaymentRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -51,8 +52,8 @@ public class PaymentsController : ControllerBase
     /// <returns>Paginated list of customer payments</returns>
     [HttpGet("customer")]
     [Authorize(Policy = "AllStaff")]
-    [ProducesResponseType(typeof(PagedResult<CustomerPaymentDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(PagedResult<CustomerPaymentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetCustomerPayments(
         [FromQuery] int? customerId,
         [FromQuery] int page = 1,
@@ -71,8 +72,8 @@ public class PaymentsController : ControllerBase
     /// <returns>Created payment</returns>
     [HttpPost("supplier")]
     [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(typeof(SupplierPaymentDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(SupplierPaymentDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateSupplierPayment([FromBody] CreateSupplierPaymentRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -92,8 +93,8 @@ public class PaymentsController : ControllerBase
     /// <returns>Paginated list of supplier payments</returns>
     [HttpGet("supplier")]
     [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(typeof(PagedResult<SupplierPaymentDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(PagedResult<SupplierPaymentDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetSupplierPayments(
         [FromQuery] int? supplierId,
         [FromQuery] int page = 1,

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests.Returns;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Common;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
@@ -31,8 +32,8 @@ public class SalesReturnsController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Paginated list of sales returns</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<SalesReturnDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(PagedResult<SalesReturnDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll([FromQuery] int? customerId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _returnService.GetAllAsync(customerId, page, pageSize, ct);
@@ -46,8 +47,8 @@ public class SalesReturnsController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Return details</returns>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(SalesReturnDto), 200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(typeof(SalesReturnDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _returnService.GetByIdAsync(id, ct);
@@ -61,8 +62,8 @@ public class SalesReturnsController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Created return</returns>
     [HttpPost]
-    [ProducesResponseType(typeof(SalesReturnDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(SalesReturnDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateSalesReturnRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -99,8 +100,8 @@ public class PurchaseReturnsController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Paginated list of purchase returns</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<PurchaseReturnDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(PagedResult<PurchaseReturnDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll([FromQuery] int? supplierId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _returnService.GetAllAsync(supplierId, page, pageSize, ct);
@@ -114,8 +115,8 @@ public class PurchaseReturnsController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Return details</returns>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(PurchaseReturnDto), 200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(typeof(PurchaseReturnDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _returnService.GetByIdAsync(id, ct);
@@ -129,8 +130,8 @@ public class PurchaseReturnsController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Created return</returns>
     [HttpPost]
-    [ProducesResponseType(typeof(PurchaseReturnDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(PurchaseReturnDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreatePurchaseReturnRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

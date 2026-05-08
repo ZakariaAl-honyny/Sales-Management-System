@@ -35,10 +35,10 @@ public class CustomersController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns paginated list of customers.</returns>
     [HttpGet]
-    [Authorize(Policy = "AllStaff")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(typeof(PagedResult<CustomerDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
+    public async Task<ActionResult<PagedResult<CustomerDto>>> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _customerService.GetAllAsync(search, page, pageSize, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
@@ -51,10 +51,10 @@ public class CustomersController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the customer if found.</returns>
     [HttpGet("{id:int}")]
-    [Authorize(Policy = "AllStaff")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(int id, CancellationToken ct)
+    public async Task<ActionResult<CustomerDto>> GetById(int id, CancellationToken ct)
     {
         var result = await _customerService.GetByIdAsync(id, ct);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
@@ -68,12 +68,12 @@ public class CustomersController : ControllerBase
     /// <returns>Returns the created customer with ID.</returns>
     [HttpPost]
     [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Create([FromBody] CreateCustomerRequest request, CancellationToken ct)
+    public async Task<ActionResult<CustomerDto>> Create([FromBody] CreateCustomerRequest request, CancellationToken ct)
     {
         var result = await _customerService.CreateAsync(request, ct);
-        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value) : BadRequest(new { error = result.Error });
+        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ public class CustomersController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the updated customer.</returns>
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "ManagerAndAbove")]
+    [Authorize(Policy = "ManagerAndAbove")] 
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerRequest request, CancellationToken ct)

@@ -16,6 +16,13 @@ public interface IUnitOfWork
     IGenericRepository<DocumentSequence> DocumentSequences { get; }
     IGenericRepository<WarehouseStock> WarehouseStocks { get; }
     IGenericRepository<InventoryMovement> InventoryMovements { get; }
+    IGenericRepository<SalesInvoice> SalesInvoices { get; }
+    IGenericRepository<PurchaseInvoice> PurchaseInvoices { get; }
+    IGenericRepository<SalesReturn> SalesReturns { get; }
+    IGenericRepository<PurchaseReturn> PurchaseReturns { get; }
+    IGenericRepository<StockTransfer> StockTransfers { get; }
+    IGenericRepository<CustomerPayment> CustomerPayments { get; }
+    IGenericRepository<SupplierPayment> SupplierPayments { get; }
     IGenericRepository<StoreSettings> StoreSettings { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);

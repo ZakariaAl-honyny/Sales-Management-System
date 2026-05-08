@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests.Categories;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -32,10 +33,10 @@ public class CategoriesController : ControllerBase
     /// <param name="pageSize">Items per page (default: 10).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns paginated list of categories.</returns>
-    [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [HttpGet] 
+    [ProducesResponseType(typeof(PagedResult<CategoryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
+    public async Task<ActionResult<PagedResult<CategoryDto>>> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _categoryService.GetAllAsync(search, page, pageSize, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
@@ -68,7 +69,7 @@ public class CategoriesController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateCategoryRequest request, CancellationToken ct)
     {
         var result = await _categoryService.CreateAsync(request, ct);
-        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value) : BadRequest(new { error = result.Error });
+        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>

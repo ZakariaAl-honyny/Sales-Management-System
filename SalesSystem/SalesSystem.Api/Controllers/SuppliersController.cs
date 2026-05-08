@@ -68,7 +68,7 @@ public class SuppliersController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateSupplierRequest request, CancellationToken ct)
     {
         var result = await _supplierService.CreateAsync(request, ct);
-        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value) : BadRequest(new { error = result.Error });
+        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>

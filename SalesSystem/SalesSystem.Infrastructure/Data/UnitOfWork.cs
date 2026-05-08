@@ -25,6 +25,13 @@ public class UnitOfWork : IUnitOfWork
     private IGenericRepository<DocumentSequence>? _documentSequences;
     private IGenericRepository<WarehouseStock>? _warehouseStocks;
     private IGenericRepository<InventoryMovement>? _inventoryMovements;
+    private IGenericRepository<SalesInvoice>? _salesInvoices;
+    private IGenericRepository<PurchaseInvoice>? _purchaseInvoices;
+    private IGenericRepository<SalesReturn>? _salesReturns;
+    private IGenericRepository<PurchaseReturn>? _purchaseReturns;
+    private IGenericRepository<StockTransfer>? _stockTransfers;
+    private IGenericRepository<CustomerPayment>? _customerPayments;
+    private IGenericRepository<SupplierPayment>? _supplierPayments;
     private IGenericRepository<StoreSettings>? _storeSettings;
 
     public UnitOfWork(SalesDbContext context)
@@ -42,6 +49,13 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<DocumentSequence> DocumentSequences => _documentSequences ??= new GenericRepository<DocumentSequence>(_context);
     public IGenericRepository<WarehouseStock> WarehouseStocks => _warehouseStocks ??= new GenericRepository<WarehouseStock>(_context);
     public IGenericRepository<InventoryMovement> InventoryMovements => _inventoryMovements ??= new GenericRepository<InventoryMovement>(_context);
+    public IGenericRepository<SalesInvoice> SalesInvoices => _salesInvoices ??= new GenericRepository<SalesInvoice>(_context);
+    public IGenericRepository<PurchaseInvoice> PurchaseInvoices => _purchaseInvoices ??= new GenericRepository<PurchaseInvoice>(_context);
+    public IGenericRepository<SalesReturn> SalesReturns => _salesReturns ??= new GenericRepository<SalesReturn>(_context);
+    public IGenericRepository<PurchaseReturn> PurchaseReturns => _purchaseReturns ??= new GenericRepository<PurchaseReturn>(_context);
+    public IGenericRepository<StockTransfer> StockTransfers => _stockTransfers ??= new GenericRepository<StockTransfer>(_context);
+    public IGenericRepository<CustomerPayment> CustomerPayments => _customerPayments ??= new GenericRepository<CustomerPayment>(_context);
+    public IGenericRepository<SupplierPayment> SupplierPayments => _supplierPayments ??= new GenericRepository<SupplierPayment>(_context);
     public IGenericRepository<StoreSettings> StoreSettings => _storeSettings ??= new GenericRepository<StoreSettings>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)

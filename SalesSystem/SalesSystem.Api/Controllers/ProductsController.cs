@@ -72,7 +72,7 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateProductRequest request, CancellationToken ct)
     {
         var result = await _productService.CreateAsync(request, ct);
-        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value) : BadRequest(new { error = result.Error });
+        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>

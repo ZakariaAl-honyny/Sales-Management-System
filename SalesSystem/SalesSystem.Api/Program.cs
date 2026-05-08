@@ -85,6 +85,12 @@ builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IDocumentSequenceService, DocumentSequenceService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
+builder.Services.AddScoped<ISalesService, SalesService>();
+builder.Services.AddScoped<IPurchaseService, PurchaseService>();
+builder.Services.AddScoped<ISalesReturnService, SalesReturnService>();
+builder.Services.AddScoped<IPurchaseReturnService, PurchaseReturnService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================

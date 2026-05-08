@@ -10,14 +10,16 @@ public class SalesReturnItem
     public int ProductId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
+    public decimal DiscountAmount { get; private set; }
     public decimal LineTotal { get; private set; }
+    public string? Notes { get; private set; }
 
     public virtual SalesReturn? SalesReturn { get; private set; }
     public virtual Product? Product { get; private set; }
 
     private SalesReturnItem() { }
 
-    public static SalesReturnItem Create(int productId, decimal quantity, decimal unitPrice)
+    public static SalesReturnItem Create(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, string? notes = null)
     {
         if (productId <= 0)
             throw new ArgumentException("ProductId is required.", nameof(productId));
@@ -30,23 +32,25 @@ public class SalesReturnItem
         {
             ProductId = productId,
             Quantity = quantity,
-            UnitPrice = unitPrice
+            UnitPrice = unitPrice,
+            DiscountAmount = discountAmount,
+            Notes = notes
         };
         item.RecalculateLineTotal();
         return item;
     }
 
-    public void RecalculateLineTotal() => LineTotal = Quantity * UnitPrice;
+    public void RecalculateLineTotal() => LineTotal = (Quantity * UnitPrice) - DiscountAmount;
 }
 
 public class SalesReturn : BaseEntity
 {
     public string ReturnNo { get; private set; } = string.Empty;
     public int? SalesInvoiceId { get; private set; }
-    public int CustomerId { get; private set; }
+    public int? CustomerId { get; private set; }
     public int WarehouseId { get; private set; }
     public DateTime ReturnDate { get; private set; }
-    public string? Reason { get; private set; }
+    public string? Notes { get; private set; }
     public decimal SubTotal { get; private set; }
     public decimal TotalAmount { get; private set; }
     public InvoiceStatus Status { get; private set; }
@@ -60,33 +64,35 @@ public class SalesReturn : BaseEntity
 
     public static SalesReturn Create(
         string returnNo,
-        int customerId,
         int warehouseId,
+        int? customerId,
         int? salesInvoiceId = null,
-        string? reason = null,
-        DateTime? returnDate = null)
+        DateTime? returnDate = null,
+        string? notes = null,
+        int? userId = null)
     {
         if (string.IsNullOrWhiteSpace(returnNo))
             throw new ArgumentException("ReturnNo is required.", nameof(returnNo));
-        if (customerId <= 0)
-            throw new ArgumentException("CustomerId is required.", nameof(customerId));
         if (warehouseId <= 0)
             throw new ArgumentException("WarehouseId is required.", nameof(warehouseId));
 
-        return new SalesReturn
+        var sr = new SalesReturn
         {
             ReturnNo = returnNo,
-            CustomerId = customerId,
             WarehouseId = warehouseId,
+            CustomerId = customerId,
             SalesInvoiceId = salesInvoiceId,
-            Reason = reason,
             ReturnDate = returnDate ?? DateTime.UtcNow,
+            Notes = notes,
             Status = InvoiceStatus.Draft
         };
+        sr.SetCreatedBy(userId);
+        return sr;
     }
 
-    public void AddItem(SalesReturnItem item)
+    public void AddItem(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, string? notes = null)
     {
+        var item = SalesReturnItem.Create(productId, quantity, unitPrice, discountAmount, notes);
         Items.Add(item);
         RecalculateTotals();
     }
