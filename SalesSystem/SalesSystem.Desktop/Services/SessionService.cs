@@ -5,7 +5,15 @@ namespace SalesSystem.Desktop.Services;
 
 public sealed class SessionService : ISessionService
 {
-    public UserSession? Current { get; private set; }
+    private readonly object _lock = new();
+    private UserSession? _current;
+
+    public UserSession? Current 
+    { 
+        get { lock (_lock) return _current; }
+        private set { lock (_lock) _current = value; }
+    }
+
     public bool IsAuthenticated => Current != null;
 
     public void SignIn(UserSession session)

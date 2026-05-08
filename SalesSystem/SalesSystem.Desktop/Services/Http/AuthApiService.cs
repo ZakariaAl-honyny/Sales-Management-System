@@ -1,11 +1,8 @@
-using System.Net.Http.Json;
-using System.Text.Json;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.Requests.Auth;
-using SalesSystem.Contracts.Responses;
-using SalesSystem.Contracts.Enums;
 using SalesSystem.Desktop.Models;
 using SalesSystem.Desktop.Services.Interfaces;
+using System.Net.Http.Json;
 
 namespace SalesSystem.Desktop.Services.Http;
 
@@ -23,49 +20,26 @@ public sealed class AuthApiService : IAuthApiService
         try
         {
             var request = new LoginRequest(userName, password);
-            var response = await _httpClient.PostAsJsonAsync("api/v1/auth/login", request, ct);
+            var response = await _httpClient.PostAsJsonAsync("/api/v1/auth/login", request, ct);
 
             if (response.IsSuccessStatusCode)
             {
-                var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>(cancellationToken: ct);
-                if (loginResponse == null)
-                    return Result<UserSession>.Failure("›‘· «” ·«„ »Ì«‰«  «·Ã·”… „‰ «·Œ«œ„");
-
-                var session = new UserSession
-                {
-                    UserId = loginResponse.UserId,
-                    UserName = loginResponse.UserName,
-                    FullName = loginResponse.FullName,
-                    Role = (UserRole)loginResponse.Role,
-                    Token = loginResponse.Token
-                };
-
-                return Result<UserSession>.Success(session);
+                var session = await response.Content.ReadFromJsonAsync<UserSession>(cancellationToken: ct);
+                return session != null 
+                    ? Result<UserSession>.Success(session) 
+                    : Result<UserSession>.Failure("\u062E\u0637\u0623 \u0641\u064A \u062A\u062D\u0648\u064A\u0644 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A");
             }
 
-            // Handle failure
-            var errorContent = await response.Content.ReadAsStringAsync(ct);
-            string errorMessage = "›‘·  ”ÃÌ· «·œŒÊ·";
-
-            try 
-            {
-                using var doc = JsonDocument.Parse(errorContent);
-                if (doc.RootElement.TryGetProperty("error", out var errorProp))
-                {
-                    errorMessage = errorProp.GetString() ?? errorMessage;
-                }
-            }
-            catch { /* Ignore parse errors */ }
-
-            return Result<UserSession>.Failure(errorMessage);
+            var error = await response.Content.ReadAsStringAsync(ct);
+            return Result<UserSession>.Failure(string.IsNullOrWhiteSpace(error) ? "\u0627\u0633\u0645 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645 \u0623\u0648 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u063A\u064A\u0631 \u0635\u062D\u064A\u062D\u0629" : error);
         }
         catch (HttpRequestException)
         {
-            return Result<UserSession>.Failure("·« Ì„ﬂ‰ «·« ’«· »«·Œ«œ„.  √ﬂœ „‰  ‘€Ì· «·Œœ„….");
+            return Result<UserSession>.Failure("\u0644\u0627 \u064A\u0645\u0643\u0646 \u0627\u0644\u0627\u062A\u0635\u0627\u0644 \u0628\u0627\u0644\u062E\u0627\u062F\u0645. \u062A\u0623\u0643\u062F \u0645\u0646 \u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u062E\u062F\u0645\u0629.");
         }
         catch (Exception ex)
         {
-            return Result<UserSession>.Failure($"ÕœÀ Œÿ√ €Ì— „ Êﬁ⁄: {ex.Message}");
+            return Result<UserSession>.Failure($"\u062D\u062F\u062B \u062E\u0637\u0623 \u063A\u064A\u0631 \u0645\u062A\u0648\u0642\u0639: {ex.Message}");
         }
     }
 }
