@@ -10,15 +10,19 @@ public sealed class SummaryCardControl : UserControl
     private Color _accentColor = Color.FromArgb(33, 150, 243);
 
     [Category("Appearance")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string Title { get => _lblTitle.Text; set => _lblTitle.Text = value; }
 
     [Category("Appearance")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string Value { get => _lblValue.Text; set => _lblValue.Text = value; }
 
     [Category("Appearance")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public Image? Icon { get => _picIcon.Image; set => _picIcon.Image = value; }
 
     [Category("Appearance")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public Color AccentColor 
     { 
         get => _accentColor; 

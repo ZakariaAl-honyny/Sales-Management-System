@@ -125,10 +125,10 @@
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T040 Update `SalesSystem/SalesSystem.Desktop/Forms/LoginForm.Designer.cs` — set `RightToLeft=Yes`, `RightToLeftLayout=true` for full RTL Arabic layout
-- [ ] T041 Update `SalesSystem/SalesSystem.Desktop/Forms/MainForm.Designer.cs` — set `RightToLeft=Yes`, `RightToLeftLayout=true`; sidebar docked `Right` in RTL mode
-- [ ] T042 Run `dotnet build SalesSystem/SalesSystem.Desktop/SalesSystem.Desktop.csproj` and resolve all compiler errors
-- [ ] T043 Execute the verification checklist in `specs/004-desktop-shell/quickstart.md` — manually test all 12 scenarios; document any failures as GitHub issues
+- [x] T040 Update `SalesSystem/SalesSystem.Desktop/Forms/LoginForm.Designer.cs` — set `RightToLeft=Yes`, `RightToLeftLayout=true` for full RTL Arabic layout
+- [x] T041 Update `SalesSystem/SalesSystem.Desktop/Forms/MainForm.Designer.cs` — set `RightToLeft=Yes`, `RightToLeftLayout=true`; sidebar docked `Right` in RTL mode
+- [x] T042 Run `dotnet build SalesSystem/SalesSystem.Desktop/SalesSystem.Desktop.csproj` and resolve all compiler errors
+- [x] T043 Execute the verification checklist in `specs/004-desktop-shell/quickstart.md` — manually test all 12 scenarios; document any failures as GitHub issues
 
 ---
 

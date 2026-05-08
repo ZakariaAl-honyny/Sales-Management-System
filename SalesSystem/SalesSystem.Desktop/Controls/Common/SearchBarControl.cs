@@ -12,6 +12,7 @@ public sealed class SearchBarControl : UserControl
     public event EventHandler<string>? SearchChanged;
 
     [Category("Appearance")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string Placeholder
     {
         get => _placeholderText;

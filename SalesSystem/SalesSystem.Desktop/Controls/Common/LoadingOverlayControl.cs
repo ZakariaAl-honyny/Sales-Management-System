@@ -8,6 +8,7 @@ public sealed class LoadingOverlayControl : UserControl
     private string _loadingText = "\u062C\u0627\u0631\u064A \u0627\u0644\u062A\u062D\u0645\u064A\u0644...";
 
     [Category("Appearance")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
     public string LoadingText
     {
         get => _loadingText;
@@ -46,13 +47,13 @@ public sealed class LoadingOverlayControl : UserControl
         );
     }
 
-    public new void Show()
+    public void ShowOverlay()
     {
         BringToFront();
         Visible = true;
     }
 
-    public new void Hide()
+    public void HideOverlay()
     {
         Visible = false;
     }
