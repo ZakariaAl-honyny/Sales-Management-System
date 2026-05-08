@@ -74,10 +74,10 @@
 **Goal**: Clicking sidebar items swaps screens in content panel, disposes previous, highlights active.
 **Independent Test**: Click all sidebar items sequentially, verify each loads, previous is disposed, active item highlighted.
 
-- [ ] T026 [US3] Implement `SalesSystem/SalesSystem.Desktop/Services/NavigationService.cs` — `INavigationService` implementation; holds `Panel? _panel`, `UserControl? _current`, `Type? _currentScreen`; `SetContentPanel` stores panel ref; `NavigateTo<TControl>`: dispose `_current`, clear `_panel.Controls`, resolve `new TControl` via `IServiceProvider`, set `Dock=Fill`, add to `_panel.Controls`, set `_currentScreen`; all on UI thread
-- [ ] T027 [US3] Register all 13 placeholder `UserControl` types as `Transient` in `Program.cs` DI registration block (T017 update)
-- [ ] T028 [US3] Wire sidebar button `Click` handlers in `MainForm` to call `_navigationService.NavigateTo<TScreenType>()` (use generic method dispatch via a dictionary `Type→Action`)
-- [ ] T029 [US3] Implement active sidebar item highlight in `MainForm` — on each navigation, reset all sidebar buttons to default `BackColor`; set clicked button `BackColor` to accent color; store reference to active button
+- [x] T026 [US3] Implement `SalesSystem/SalesSystem.Desktop/Services/NavigationService.cs` — `INavigationService` implementation; holds `Panel? _panel`, `UserControl? _current`, `Type? _currentScreen`; `SetContentPanel` stores panel ref; `NavigateTo<TControl>`: dispose `_current`, clear `_panel.Controls`, resolve `new TControl` via `IServiceProvider`, set `Dock=Fill`, add to `_panel.Controls`, set `_currentScreen`; all on UI thread
+- [x] T027 [US3] Register all 13 placeholder `UserControl` types as `Transient` in `Program.cs` DI registration block (T017 update)
+- [x] T028 [US3] Wire sidebar button `Click` handlers in `MainForm` to call `_navigationService.NavigateTo<TScreenType>()` (use generic method dispatch via a dictionary `Type→Action`)
+- [x] T029 [US3] Implement active sidebar item highlight in `MainForm` — on each navigation, reset all sidebar buttons to default `BackColor`; set clicked button `BackColor` to accent color; store reference to active button
 
 **Checkpoint**: Full navigation cycle working, breakpoint in `BaseModuleControl.Dispose` confirms cleanup.
 
