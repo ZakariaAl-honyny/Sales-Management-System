@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using SalesSystem.Desktop.Services.Interfaces;
 
 namespace SalesSystem.Desktop.Services;
@@ -22,6 +22,20 @@ public sealed class NavigationService : INavigationService
     }
 
     public void NavigateTo<TControl>() where TControl : UserControl
+    {
+        if (_contentPanel == null) return;
+
+        if (_contentPanel.InvokeRequired)
+        {
+            _contentPanel.Invoke(() => NavigateToInternal<TControl>());
+        }
+        else
+        {
+            NavigateToInternal<TControl>();
+        }
+    }
+
+    private void NavigateToInternal<TControl>() where TControl : UserControl
     {
         if (_contentPanel == null) return;
 
