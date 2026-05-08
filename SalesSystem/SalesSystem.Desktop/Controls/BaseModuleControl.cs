@@ -1,13 +1,17 @@
+using System.Windows.Forms;
+
 namespace SalesSystem.Desktop.Controls;
 
 public abstract class BaseModuleControl : UserControl
 {
-    private readonly List<IDisposable> _subscriptions = new();
+    protected readonly List<IDisposable> _subscriptions = new();
 
     protected abstract void RegisterSubscriptions();
 
     protected void AddSubscription(IDisposable subscription)
-        => _subscriptions.Add(subscription);
+    {
+        _subscriptions.Add(subscription);
+    }
 
     protected override void OnLoad(EventArgs e)
     {
@@ -19,7 +23,10 @@ public abstract class BaseModuleControl : UserControl
     {
         if (disposing)
         {
-            foreach (var s in _subscriptions) s.Dispose();
+            foreach (var sub in _subscriptions)
+            {
+                sub.Dispose();
+            }
             _subscriptions.Clear();
         }
         base.Dispose(disposing);

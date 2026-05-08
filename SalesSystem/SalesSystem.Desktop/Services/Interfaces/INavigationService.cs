@@ -1,3 +1,5 @@
+using System.Windows.Forms;
+
 namespace SalesSystem.Desktop.Services.Interfaces;
 
 public interface INavigationService

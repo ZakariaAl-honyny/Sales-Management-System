@@ -1,7 +1,9 @@
 namespace SalesSystem.Desktop.Messages;
 
+// Base — all messages derive from this
 public abstract record EntityChangedMessage(int EntityId);
 
+// Concrete message types
 public record ProductChangedMessage(int EntityId)    : EntityChangedMessage(EntityId);
 public record CustomerChangedMessage(int EntityId)   : EntityChangedMessage(EntityId);
 public record SupplierChangedMessage(int EntityId)   : EntityChangedMessage(EntityId);

@@ -1,7 +1,6 @@
-using System.Net;
-using System.Net.Http.Headers;
-using SalesSystem.Desktop.Services.Interfaces;
 using SalesSystem.Desktop.Messages;
+using SalesSystem.Desktop.Services.Interfaces;
+using System.Net.Http.Headers;
 
 namespace SalesSystem.Desktop.Services.Http;
 
@@ -18,15 +17,14 @@ public sealed class AuthTokenHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var session = _sessionService.Current;
-        if (session != null && !string.IsNullOrEmpty(session.Token))
+        if (_sessionService.IsAuthenticated)
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", session.Token);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _sessionService.Current!.Token);
         }
 
         var response = await base.SendAsync(request, cancellationToken);
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
             _sessionService.SignOut();
             _eventBus.Publish(new SessionExpiredMessage());

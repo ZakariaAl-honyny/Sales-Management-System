@@ -1,87 +1,60 @@
-﻿using System.Collections.Concurrent;
 using SalesSystem.Desktop.Services.Interfaces;
+using System.Collections.Concurrent;
 
 namespace SalesSystem.Desktop.Services;
 
 public sealed class EventBus : IEventBus
 {
-    private readonly ConcurrentDictionary<Type, List<WeakReference<Delegate>>> _subscriptions = new();
-    private readonly object _lock = new();
+    private readonly ConcurrentDictionary<Type, List<object>> _subscriptions = new();
 
     public IDisposable Subscribe<TMessage>(Action<TMessage> handler) where TMessage : class
     {
         var messageType = typeof(TMessage);
-        var weakHandler = new WeakReference<Delegate>(handler);
-
-        lock (_lock)
+        var handlers = _subscriptions.GetOrAdd(messageType, _ => new List<object>());
+        
+        lock (handlers)
         {
-            if (!_subscriptions.TryGetValue(messageType, out var handlers))
-            {
-                handlers = new List<WeakReference<Delegate>>();
-                _subscriptions[messageType] = handlers;
-            }
-            handlers.Add(weakHandler);
+            handlers.Add(handler);
         }
 
-        return new SubscriptionToken(() => Unsubscribe(messageType, weakHandler));
+        return new Unsubscriber(handlers, handler);
     }
 
     public void Publish<TMessage>(TMessage message) where TMessage : class
     {
         var messageType = typeof(TMessage);
-        if (!_subscriptions.TryGetValue(messageType, out var handlers)) return;
-
-        List<Delegate> aliveHandlers = new();
-        lock (_lock)
+        if (_subscriptions.TryGetValue(messageType, out var handlers))
         {
-            for (int i = handlers.Count - 1; i >= 0; i--)
+            List<object> handlersCopy;
+            lock (handlers)
             {
-                if (handlers[i].TryGetTarget(out var target))
-                {
-                    aliveHandlers.Add(target);
-                }
-                else
-                {
-                    handlers.RemoveAt(i);
-                }
+                handlersCopy = new List<object>(handlers);
             }
-        }
 
-        foreach (var handler in aliveHandlers)
-        {
-            ExecuteHandler(handler, message);
-        }
-    }
-
-    private void ExecuteHandler(Delegate handler, object message)
-    {
-        var mainForm = Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null;
-
-        if (mainForm != null && mainForm.InvokeRequired)
-        {
-            mainForm.Invoke(() => handler.DynamicInvoke(message));
-        }
-        else
-        {
-            handler.DynamicInvoke(message);
-        }
-    }
-
-    private void Unsubscribe(Type messageType, WeakReference<Delegate> weakHandler)
-    {
-        lock (_lock)
-        {
-            if (_subscriptions.TryGetValue(messageType, out var handlers))
+            foreach (var handler in handlersCopy)
             {
-                handlers.Remove(weakHandler);
+                ((Action<TMessage>)handler).Invoke(message);
             }
         }
     }
 
-    private class SubscriptionToken : IDisposable
+    private sealed class Unsubscriber : IDisposable
     {
-        private readonly Action _unsubscribe;
-        public SubscriptionToken(Action unsubscribe) => _unsubscribe = unsubscribe;
-        public void Dispose() => _unsubscribe();
+        private readonly List<object> _handlers;
+        private readonly object _handler;
+
+        public Unsubscriber(List<object> handlers, object handler)
+        {
+            _handlers = handlers;
+            _handler = handler;
+        }
+
+        public void Dispose()
+        {
+            lock (_handlers)
+            {
+                _handlers.Remove(_handler);
+            }
+        }
     }
 }

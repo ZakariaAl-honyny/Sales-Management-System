@@ -37,21 +37,8 @@ static class Program
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 }).AddHttpMessageHandler<AuthTokenHandler>();
 
-                services.AddHttpClient<ICategoryApiService, CategoryApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IUnitApiService, UnitApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IWarehouseApiService, WarehouseApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
+                // Domain API Services (Placeholders or actual implementations)
+                // Note: These will be fleshed out in subsequent user stories
                 services.AddHttpClient<IProductApiService, ProductApiService>(client =>
                 {
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
@@ -67,7 +54,7 @@ static class Program
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 }).AddHttpMessageHandler<AuthTokenHandler>();
 
-                services.AddHttpClient<ISalesInvoiceApiService, SalesInvoiceApiService>(client =>
+                services.AddHttpClient<IWarehouseApiService, WarehouseApiService>(client =>
                 {
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 }).AddHttpMessageHandler<AuthTokenHandler>();
@@ -77,12 +64,7 @@ static class Program
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 }).AddHttpMessageHandler<AuthTokenHandler>();
 
-                services.AddHttpClient<IInventoryApiService, InventoryApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IStockTransferApiService, StockTransferApiService>(client =>
+                services.AddHttpClient<ISalesInvoiceApiService, SalesInvoiceApiService>(client =>
                 {
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 }).AddHttpMessageHandler<AuthTokenHandler>();
@@ -93,6 +75,11 @@ static class Program
                 }).AddHttpMessageHandler<AuthTokenHandler>();
 
                 services.AddHttpClient<IPurchaseReturnApiService, PurchaseReturnApiService>(client =>
+                {
+                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
+                }).AddHttpMessageHandler<AuthTokenHandler>();
+
+                services.AddHttpClient<IStockTransferApiService, StockTransferApiService>(client =>
                 {
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 }).AddHttpMessageHandler<AuthTokenHandler>();
@@ -122,18 +109,18 @@ static class Program
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 }).AddHttpMessageHandler<AuthTokenHandler>();
 
-                // Services
+                // Core Infrastructure Services
                 services.AddSingleton<IEventBus, EventBus>();
                 services.AddSingleton<ISessionService, SessionService>();
                 services.AddSingleton<INavigationService, NavigationService>();
                 services.AddSingleton<INotificationService, NotificationService>();
                 services.AddSingleton<IDialogService, DialogService>();
 
-                // Forms
+                // UI Components
                 services.AddTransient<LoginForm>();
                 services.AddTransient<MainForm>();
 
-                // Placeholders
+                // Module Controls (Placeholders)
                 services.AddTransient<DashboardControl>();
                 services.AddTransient<ProductsControl>();
                 services.AddTransient<CustomersControl>();
@@ -142,8 +129,7 @@ static class Program
                 services.AddTransient<PurchasesControl>();
                 services.AddTransient<SalesControl>();
                 services.AddTransient<ReturnsControl>();
-                services.AddTransient<InventoryControl>();
-                services.AddTransient<StockTransfersControl>();
+                services.AddTransient<TransfersControl>();
                 services.AddTransient<PaymentsControl>();
                 services.AddTransient<ReportsControl>();
                 services.AddTransient<SettingsControl>();
@@ -152,16 +138,16 @@ static class Program
             .Build();
 
         using var scope = host.Services.CreateScope();
-        var services = scope.ServiceProvider;
+        var serviceProvider = scope.ServiceProvider;
         
         try
         {
-            var loginForm = services.GetRequiredService<LoginForm>();
+            var loginForm = serviceProvider.GetRequiredService<LoginForm>();
             Application.Run(loginForm);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"حدث خطأ أثناء تشغيل التطبيق: {ex.Message}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"\u062D\u062F\u062B \u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062A\u0634\u063A\u064A\u0644 \u062A\u064A\u0642: {ex.Message}", "\u062E\u0637\u0623", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }
