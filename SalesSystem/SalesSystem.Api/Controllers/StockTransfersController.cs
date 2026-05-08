@@ -32,8 +32,8 @@ public class StockTransfersController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Paginated list of stock transfers</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(PagedResult<StockTransferDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(PagedResult<StockTransferDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? fromWarehouseId, 
         [FromQuery] int? toWarehouseId, 
@@ -52,8 +52,8 @@ public class StockTransfersController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Transfer details</returns>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(StockTransferDto), 200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(typeof(StockTransferDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _inventoryService.GetTransferByIdAsync(id, ct);
@@ -67,8 +67,8 @@ public class StockTransfersController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Created transfer</returns>
     [HttpPost]
-    [ProducesResponseType(typeof(StockTransferDto), 201)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(StockTransferDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateStockTransferRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

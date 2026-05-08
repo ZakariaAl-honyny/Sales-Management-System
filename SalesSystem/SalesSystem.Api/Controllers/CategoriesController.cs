@@ -32,10 +32,10 @@ public class CategoriesController : ControllerBase
     /// <param name="pageSize">Items per page (default: 10).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns paginated list of categories.</returns>
-    [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
+    [HttpGet] 
+    [ProducesResponseType(typeof(PaginatedResponse<CategoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PaginatedResponse<CategoryDto>>> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
     {
         var result = await _categoryService.GetAllAsync(search, page, pageSize, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });

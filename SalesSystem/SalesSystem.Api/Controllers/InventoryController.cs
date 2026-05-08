@@ -28,8 +28,8 @@ public class InventoryController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Stock quantity</returns>
     [HttpGet("stock")]
-    [ProducesResponseType(typeof(decimal), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(decimal), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetStock([FromQuery] int productId, [FromQuery] int warehouseId, CancellationToken ct)
     {
         var result = await _inventoryService.GetStockAsync(productId, warehouseId, ct);
@@ -47,8 +47,8 @@ public class InventoryController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Paginated list of inventory movements</returns>
     [HttpGet("movements")]
-    [ProducesResponseType(typeof(PagedResult<InventoryMovementDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(PagedResult<InventoryMovementDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetMovements(
         [FromQuery] int? productId,
         [FromQuery] int? warehouseId,
@@ -71,8 +71,8 @@ public class InventoryController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Paginated list of warehouse stocks</returns>
     [HttpGet("warehouse-stocks")]
-    [ProducesResponseType(typeof(PagedResult<WarehouseStockDto>), 200)]
-    [ProducesResponseType(400)]
+    [ProducesResponseType(typeof(PagedResult<WarehouseStockDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetWarehouseStocks(
         [FromQuery] int? warehouseId,
         [FromQuery] int? productId,

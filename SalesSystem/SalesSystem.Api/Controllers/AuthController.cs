@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests.Auth;
 using SalesSystem.Contracts.Responses;
@@ -28,9 +29,9 @@ public class AuthController : ControllerBase
     /// <returns>Returns JWT token with user info if credentials are valid.</returns>
     [HttpPost("login")]
     [AllowAnonymous]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var result = await _authService.LoginAsync(request, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
