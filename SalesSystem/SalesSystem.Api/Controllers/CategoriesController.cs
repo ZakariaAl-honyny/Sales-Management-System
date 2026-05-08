@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests.Categories;
+using SalesSystem.Contracts.DTOs;
 
 namespace SalesSystem.Api.Controllers;
 

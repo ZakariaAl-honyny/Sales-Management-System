@@ -2,11 +2,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests.Auth;
+using SalesSystem.Contracts.Responses;
 
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Controller for authentication operations.
+/// Authentication controller for user login
 /// </summary>
 [ApiController]
 [Route("api/v1/auth")]
@@ -20,7 +21,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Authenticates a user and returns a JWT token.
+    /// Authenticates a user and returns a JWT token
     /// </summary>
     /// <param name="request">The login request containing username and password.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -32,12 +33,6 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var result = await _authService.LoginAsync(request, ct);
-
-        if (result.IsSuccess)
-        {
-            return Ok(result.Value);
-        }
-
-        return Unauthorized(new { error = result.Error });
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 }
