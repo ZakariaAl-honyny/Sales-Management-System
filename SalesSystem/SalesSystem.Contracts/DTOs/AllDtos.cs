@@ -199,3 +199,12 @@ public record StoreSettingsDto(
     bool IsTaxEnabled);
 
 public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
+
+public record DashboardSummaryDto(
+    decimal TotalSalesToday,
+    int NumberOfSalesToday,
+    decimal TotalPurchasesToday,
+    int LowStockItemsCount,
+    int ActiveCustomersCount,
+    decimal TotalReceivables,
+    decimal TotalPayables);
