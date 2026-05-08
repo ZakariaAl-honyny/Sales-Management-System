@@ -88,9 +88,9 @@
 **Goal**: In-process pub/sub; UI thread marshaling; auto-cleanup on dispose.
 **Independent Test**: Publish a message, verify subscriber receives it on UI thread; dispose subscriber, publish again, verify no invocation.
 
-- [ ] T030 [US4] Implement `SalesSystem/SalesSystem.Desktop/Services/EventBus.cs` — `IEventBus` implementation; use `ConcurrentDictionary<Type, List<WeakReference<Delegate>>>` for handler registry; `Subscribe<TMessage>`: add `WeakReference<Action<TMessage>>` entry, return `Subscription` disposable token that removes the entry; `Publish<TMessage>`: iterate live references, marshal to UI thread via `Application.OpenForms` first form `Invoke` if `InvokeRequired`, invoke handler, remove dead references; thread-safe with `lock` on the list
-- [ ] T031 [US4] Update `MainForm.Dispose(bool)` in `MainForm.cs` — ensure `_eventBusSubscription?.Dispose()` is called for the `SessionExpiredMessage` subscription registered in `OnLoad` (T025)
-- [ ] T032 [US4] Implement `MainForm.HandleSessionExpired()` — on `SessionExpiredMessage`: call `_sessionService.SignOut()`, create new `LoginForm` via DI, show it, close `MainForm`
+- [x] T030 [US4] Implement `SalesSystem/SalesSystem.Desktop/Services/EventBus.cs` — `IEventBus` implementation; use `ConcurrentDictionary<Type, List<WeakReference<Delegate>>>` for handler registry; `Subscribe<TMessage>`: add `WeakReference<Action<TMessage>>` entry, return `Subscription` disposable token that removes the entry; `Publish<TMessage>`: iterate live references, marshal to UI thread via `Application.OpenForms` first form `Invoke` if `InvokeRequired`, invoke handler, remove dead references; thread-safe with `lock` on the list
+- [x] T031 [US4] Update `MainForm.Dispose(bool)` in `MainForm.cs` — ensure `_eventBusSubscription?.Dispose()` is called for the `SessionExpiredMessage` subscription registered in `OnLoad` (T025)
+- [x] T032 [US4] Implement `MainForm.HandleSessionExpired()` — on `SessionExpiredMessage`: call `_sessionService.SignOut()`, create new `LoginForm` via DI, show it, close `MainForm`
 
 **Checkpoint**: Event published from any control propagates to subscribers; disposed controls do not receive events.
 
@@ -101,9 +101,9 @@
 **Goal**: Toast notifications bottom-right auto-dismiss 3s; confirmation dialogs in Arabic.
 **Independent Test**: Call `ShowSuccess/ShowError/ShowWarning`, verify toast appears bottom-right and auto-dismisses; call `Confirm`, verify dialog shows Arabic text and returns correct bool.
 
-- [ ] T033 [US5] Create `SalesSystem/SalesSystem.Desktop/Forms/ToastForm.cs` — frameless `Form` subclass; `FormBorderStyle=None`, `ShowInTaskbar=false`, `TopMost=true`; override `ShowWithoutActivation => true`; override `CreateParams` to add `WS_EX_NOACTIVATE` extended style; constructor takes `Notification`; sets `BackColor` by `NotificationType` (Success=#2ECC71, Error=#E74C3C, Warning=#E67E22); contains Arabic `lblMessage`; uses `System.Windows.Forms.Timer` (Interval=Duration) to call `this.Close()` on tick; `Show(IWin32Window owner)` calculates bottom-right position from `Screen.FromControl(owner).WorkingArea`
-- [ ] T034 [US5] Implement `SalesSystem/SalesSystem.Desktop/Services/NotificationService.cs` — `INotificationService` implementation; inject `IServiceProvider`; `ShowSuccess/ShowError/ShowWarning` create `ToastForm` with appropriate `Notification` and call `.Show(Application.OpenForms[0])`; marshal to UI thread if needed
-- [ ] T035 [US5] Implement `SalesSystem/SalesSystem.Desktop/Services/DialogService.cs` — `IDialogService` implementation; `Confirm` shows `MessageBox.Show(message, title, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)` RTL-aware; returns `true` if result is `DialogResult.Yes`
+- [x] T033 [US5] Create `SalesSystem/SalesSystem.Desktop/Forms/ToastForm.cs` — frameless `Form` subclass; `FormBorderStyle=None`, `ShowInTaskbar=false`, `TopMost=true`; override `ShowWithoutActivation => true`; override `CreateParams` to add `WS_EX_NOACTIVATE` extended style; constructor takes `Notification`; sets `BackColor` by `NotificationType` (Success=#2ECC71, Error=#E74C3C, Warning=#E67E22); contains Arabic `lblMessage`; uses `System.Windows.Forms.Timer` (Interval=Duration) to call `this.Close()` on tick; `Show(IWin32Window owner)` calculates bottom-right position from `Screen.FromControl(owner).WorkingArea`
+- [x] T034 [US5] Implement `SalesSystem/SalesSystem.Desktop/Services/NotificationService.cs` — `INotificationService` implementation; inject `IServiceProvider`; `ShowSuccess/ShowError/ShowWarning` create `ToastForm` with appropriate `Notification` and call `.Show(Application.OpenForms[0])`; marshal to UI thread if needed
+- [x] T035 [US5] Implement `SalesSystem/SalesSystem.Desktop/Services/DialogService.cs` — `IDialogService` implementation; `Confirm` shows `MessageBox.Show(message, title, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2)` RTL-aware; returns `true` if result is `DialogResult.Yes`
 
 **Checkpoint**: Toast appears bottom-right, correct color, auto-dismisses in 3s. Dialog returns correct bool.
 
