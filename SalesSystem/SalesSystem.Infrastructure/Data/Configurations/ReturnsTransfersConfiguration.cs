@@ -14,7 +14,7 @@ public class SalesReturnConfiguration : IEntityTypeConfiguration<SalesReturn>
         builder.HasIndex(sr => sr.ReturnNo).IsUnique();
         builder.Property(sr => sr.SubTotal).HasPrecision(18, 2);
         builder.Property(sr => sr.TotalAmount).HasPrecision(18, 2);
-        builder.Property(sr => sr.Reason).HasMaxLength(250);
+        builder.Property(sr => sr.Notes).HasColumnName("Reason").HasMaxLength(250);
         builder.Property(sr => sr.Status).HasConversion<byte>();
         
         builder.HasOne(sr => sr.Customer)
@@ -42,7 +42,9 @@ public class SalesReturnItemConfiguration : IEntityTypeConfiguration<SalesReturn
         builder.HasKey(sri => sri.SalesReturnItemId);
         builder.Property(sri => sri.Quantity).HasPrecision(18, 3);
         builder.Property(sri => sri.UnitPrice).HasPrecision(18, 2);
+        builder.Property(sri => sri.DiscountAmount).HasPrecision(18, 2);
         builder.Property(sri => sri.LineTotal).HasPrecision(18, 2);
+        builder.Ignore(sri => sri.Notes); // DB Schema doesn't have Notes for return items
         
         builder.HasOne(sri => sri.Product)
             .WithMany()
@@ -61,7 +63,7 @@ public class PurchaseReturnConfiguration : IEntityTypeConfiguration<PurchaseRetu
         builder.HasIndex(pr => pr.ReturnNo).IsUnique();
         builder.Property(pr => pr.SubTotal).HasPrecision(18, 2);
         builder.Property(pr => pr.TotalAmount).HasPrecision(18, 2);
-        builder.Property(pr => pr.Reason).HasMaxLength(250);
+        builder.Property(pr => pr.Notes).HasColumnName("Reason").HasMaxLength(250);
         builder.Property(pr => pr.Status).HasConversion<byte>();
         
         builder.HasOne(pr => pr.Supplier)
@@ -89,7 +91,9 @@ public class PurchaseReturnItemConfiguration : IEntityTypeConfiguration<Purchase
         builder.HasKey(pri => pri.PurchaseReturnItemId);
         builder.Property(pri => pri.Quantity).HasPrecision(18, 3);
         builder.Property(pri => pri.UnitCost).HasPrecision(18, 2);
+        builder.Property(pri => pri.DiscountAmount).HasPrecision(18, 2);
         builder.Property(pri => pri.LineTotal).HasPrecision(18, 2);
+        builder.Ignore(pri => pri.Notes); // DB Schema doesn't have Notes for return items
         
         builder.HasOne(pri => pri.Product)
             .WithMany()

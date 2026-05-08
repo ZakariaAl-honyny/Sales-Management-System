@@ -242,8 +242,40 @@ public class InventoryService : IInventoryService
 
         return Result<IEnumerable<WarehouseStockDto>>.Success(dtos);
     }
+    
+    public async Task<Result<PagedResult<WarehouseStockDto>>> GetWarehouseStocksAsync(int? warehouseId, int? productId, int page, int pageSize, CancellationToken ct)
+    {
+        var query = _uow.WarehouseStocks.Query()
+            .Include(s => s.Product)
+                .ThenInclude(p => p!.Unit)
+            .Include(s => s.Warehouse)
+            .AsQueryable();
 
-    public async Task<Result<PagedResult<InventoryMovementDto>>> GetMovementsAsync(int? productId, int? warehouseId, int page, int pageSize, CancellationToken ct)
+        if (warehouseId.HasValue) query = query.Where(s => s.WarehouseId == warehouseId.Value);
+        if (productId.HasValue) query = query.Where(s => s.ProductId == productId.Value);
+
+        var totalItems = await query.CountAsync(ct);
+        var items = await query
+            .OrderBy(s => s.Warehouse!.Name)
+            .ThenBy(s => s.Product!.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        var dtos = items.Select(s => new WarehouseStockDto(
+            s.WarehouseId,
+            s.Warehouse?.Name,
+            s.ProductId,
+            s.Product?.Name ?? "Unknown",
+            s.Product?.Unit?.Name,
+            s.Quantity,
+            s.ReorderLevel
+        )).ToList();
+
+        return Result<PagedResult<WarehouseStockDto>>.Success(PagedResult<WarehouseStockDto>.Create(dtos, totalItems, page, pageSize));
+    }
+
+    public async Task<Result<PagedResult<InventoryMovementDto>>> GetMovementsAsync(int? productId, int? warehouseId, int? movementType, int page, int pageSize, CancellationToken ct)
     {
         var query = _uow.InventoryMovements.Query()
             .Include(m => m.Product)
@@ -252,6 +284,7 @@ public class InventoryService : IInventoryService
 
         if (productId.HasValue) query = query.Where(m => m.ProductId == productId.Value);
         if (warehouseId.HasValue) query = query.Where(m => m.WarehouseId == warehouseId.Value);
+        if (movementType.HasValue) query = query.Where(m => (int)m.MovementType == movementType.Value);
 
         var totalItems = await query.CountAsync(ct);
         var items = await query

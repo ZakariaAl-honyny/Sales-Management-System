@@ -469,517 +469,832 @@ text
 المعمارية: Clean Architecture + WinForms Desktop + ASP.NET Core API
 قاعدة البيانات: SQL Server
 2. وصف المشروع
-نظام إدارة مبيعات لمحل صغير يعمل على Desktop محلياً عبر ASP.NET Core Web API وقاعدة بيانات SQL Server. يشمل إدارة المنتجات، المخازن المتعددة، المبيعات، المشتريات، المرتجعات، الديون، والتقارير.
+نظام إدارة مبيعات لمحل صغير يعمل على Desktop محلياً عبر ASP.NET Core Web API وقاعدة بيانات SQL Server. يشمل إدارة المنتجات، المخازن المتع5. قاعدة البيانات — Schema الكامل
+(Updated to match docs/database-schema.md)
 
-3. المبادئ الحاكمة (Constitution)
-text
+# 1) Important Design Rules Before Tables
+These rules will save you many problems later:
 
-هذه المبادئ غير قابلة للتفاوض في كل سطر كود:
+## Data Types
+- **Primary Keys**: `int IDENTITY(1,1)` — Named `Id` in all entities (BaseEntity pattern).
+- **Texts**: `nvarchar` (to support Arabic/English).
+- **Currency/Money**: `decimal(18,2)` — Precision 18, Scale 2.
+- **Quantities**: `decimal(18,3)` — Precision 18, Scale 3.
+- **Status and Types**: `tinyint` (for Enums).
+- **Flags**: `bit` (0/1).
+- **Dates and Times**: `datetime2`.
+- **Audit Tracking**: Standardized across all entities:
+    - `CreatedAt` datetime2
+    - `CreatedByUserId` int null (FK to Users.Id)
+    - `UpdatedAt` datetime2 null
+    - `UpdatedByUserId` int null (FK to Users.Id)
+    - `IsActive` bit (Soft delete flag)
 
-1. كل الأموال: decimal(18,2) — ممنوع float/double/real
-2. كل الكميات: decimal(18,3) — ممنوع int إلا بإذن صريح
-3. كل العمليات المالية داخل Database Transaction
-4. لا حذف نهائي للفواتير — فقط Cancelled
-5. المخزون يُخصم فقط بعد نجاح Transaction كاملة
-6. كل Result يُعاد كـ Result<T> لا Exception مباشرة
-7. الـ Desktop لا يتصل بقاعدة البيانات مباشرة أبداً
-4. هيكل الـ Solution
-text
+---
 
-SalesSystem/
-├── SalesSystem.Contracts/          ← DTOs + Requests + Responses
-├── SalesSystem.Domain/             ← Entities + Business Rules
-├── SalesSystem.Application/        ← Services + Interfaces + Logic
-├── SalesSystem.Infrastructure/     ← EF Core + DB + Repositories
-├── SalesSystem.Api/                ← Controllers + Endpoints
-└── SalesSystem.Desktop/            ← WinForms UI
-5. قاعدة البيانات — Schema الكامل
-5.1 قواعد أنواع البيانات (إلزامية)
-SQL
+# 2) Proposed Database
+Database Name example: **`SalesSystemDb`**
+Default schema: **`dbo`**
 
--- ✅ الصحيح
-SalePrice    decimal(18,2)   -- الأموال
-Quantity     decimal(18,3)   -- الكميات
-Status       tinyint         -- الحالات
-Name         nvarchar(150)   -- النصوص العربية والإنجليزية
-CreatedAt    datetime2       -- التواريخ
+---
 
--- ❌ ممنوع
-SalePrice    float           -- خطأ فادح في الحسابات المالية
-SalePrice    real            -- نفس المشكلة
-SalePrice    money           -- غير موثوق للعمليات المعقدة
-Name         varchar         -- لا يدعم العربية
-5.2 جداول النظام الكاملة
-A) Users — المستخدمون
-SQL
+# 3) Core Tables
 
-CREATE TABLE Users (
-    UserId          int IDENTITY(1,1) PRIMARY KEY,
-    UserName        nvarchar(50)  NOT NULL UNIQUE,
-    PasswordHash    nvarchar(256) NOT NULL,
-    FullName        nvarchar(150) NOT NULL,
-    Role            tinyint       NOT NULL,
-        -- 1 = Admin
-        -- 2 = Manager  
-        -- 3 = Cashier
-    IsActive        bit           NOT NULL DEFAULT 1,
-    CreatedAt       datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt       datetime2     NULL
+---
+
+## A) Users
+### Columns
+- `Id` int PK
+- `UserName` nvarchar(50) not null unique
+- `PasswordHash` nvarchar(256) not null
+- `FullName` nvarchar(150) not null
+- `Role` tinyint not null (1=Admin, 2=Manager, 3=Cashier)
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## B) Units
+### Columns
+- `Id` int PK
+- `Name` nvarchar(50) not null
+- `Symbol` nvarchar(20) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## C) Categories
+### Columns
+- `Id` int PK
+- `Name` nvarchar(100) not null
+- `Description` nvarchar(250) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## D) Products
+### Columns
+- `Id` int PK
+- `Code` nvarchar(30) null unique
+- `Barcode` nvarchar(50) null unique
+- `Name` nvarchar(150) not null
+- `CategoryId` int null FK
+- `UnitId` int null FK
+- `PurchasePrice` decimal(18,2) not null default 0
+- `SalePrice` decimal(18,2) not null default 0
+- `MinStock` decimal(18,3) not null default 0
+- `Description` nvarchar(500) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## E) Warehouses
+### Columns
+- `Id` int PK
+- `Code` nvarchar(30) null unique
+- `Name` nvarchar(100) not null
+- `Location` nvarchar(250) null
+- `IsDefault` bit not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## F) WarehouseStocks
+### Columns
+- `Id` int PK
+- `WarehouseId` int not null FK
+- `ProductId` int not null FK
+- `Quantity` decimal(18,3) not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 not null
+
+### Important Constraints
+- `UNIQUE(WarehouseId, ProductId)`
+- `CHECK (Quantity >= 0)` — CRITICAL: prevents negative stock at DB level
+
+---
+
+## G) Suppliers
+### Columns
+- `Id` int PK
+- `Code` nvarchar(30) null unique
+- `Name` nvarchar(150) not null
+- `Phone` nvarchar(20) null
+- `Email` nvarchar(100) null
+- `Address` nvarchar(250) null
+- `OpeningBalance` decimal(18,2) not null default 0
+- `CurrentBalance` decimal(18,2) not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## H) Customers
+### Columns
+- `Id` int PK
+- `Code` nvarchar(30) null unique
+- `Name` nvarchar(150) not null
+- `Phone` nvarchar(20) null
+- `Email` nvarchar(100) null
+- `Address` nvarchar(250) null
+- `OpeningBalance` decimal(18,2) not null default 0
+- `CurrentBalance` decimal(18,2) not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+# 4) Purchases
+
+## I) PurchaseInvoices
+### Columns
+- `Id` int PK
+- `InvoiceNo` nvarchar(30) not null unique
+- `SupplierId` int not null FK
+- `WarehouseId` int not null FK
+- `InvoiceDate` datetime2 not null
+- `DueDate` date null
+- `PaymentType` tinyint not null (1=Cash, 2=Credit, 3=Mixed)
+- `SubTotal` decimal(18,2) not null default 0
+- `DiscountAmount` decimal(18,2) not null default 0
+- `TaxAmount` decimal(18,2) not null default 0
+- `TotalAmount` decimal(18,2) not null default 0
+- `PaidAmount` decimal(18,2) not null default 0
+- `DueAmount` decimal(18,2) not null default 0
+- `Notes` nvarchar(500) null
+- `Status` tinyint not null (1=Draft, 2=Posted, 3=Cancelled)
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## J) PurchaseInvoiceItems
+### Columns
+- `PurchaseInvoiceItemId` int PK
+- `PurchaseInvoiceId` int not null FK
+- `ProductId` int not null FK
+- `Quantity` decimal(18,3) not null
+- `UnitCost` decimal(18,2) not null
+- `DiscountAmount` decimal(18,2) not null default 0
+- `LineTotal` decimal(18,2) not null
+- `Notes` nvarchar(250) null
+
+---
+
+# 5) Sales
+
+## K) SalesInvoices
+### Columns
+- `Id` int PK
+- `InvoiceNo` nvarchar(30) not null unique
+- `CustomerId` int null FK
+- `WarehouseId` int not null FK
+- `InvoiceDate` datetime2 not null
+- `DueDate` date null
+- `PaymentType` tinyint not null (1=Cash, 2=Credit, 3=Mixed)
+- `SubTotal` decimal(18,2) not null default 0
+- `DiscountAmount` decimal(18,2) not null default 0
+- `TaxAmount` decimal(18,2) not null default 0
+- `TotalAmount` decimal(18,2) not null default 0
+- `PaidAmount` decimal(18,2) not null default 0
+- `DueAmount` decimal(18,2) not null default 0
+- `Notes` nvarchar(500) null
+- `Status` tinyint not null (1=Draft, 2=Posted, 3=Cancelled)
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## L) SalesInvoiceItems
+### Columns
+- `SalesInvoiceItemId` int PK
+- `SalesInvoiceId` int not null FK
+- `ProductId` int not null FK
+- `Quantity` decimal(18,3) not null
+- `UnitPrice` decimal(18,2) not null
+- `DiscountAmount` decimal(18,2) not null default 0
+- `LineTotal` decimal(18,2) not null
+- `Notes` nvarchar(250) null
+
+---
+
+# 6) Returns
+
+## M) PurchaseReturns
+### Columns
+- `Id` int PK
+- `ReturnNo` nvarchar(30) not null unique
+- `PurchaseInvoiceId` int null FK
+- `SupplierId` int not null FK
+- `WarehouseId` int not null FK
+- `ReturnDate` datetime2 not null
+- `Reason` nvarchar(250) null
+- `SubTotal` decimal(18,2) not null default 0
+- `TotalAmount` decimal(18,2) not null default 0
+- `Status` tinyint not null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## N) PurchaseReturnItems
+### Columns
+- `PurchaseReturnItemId` int PK
+- `PurchaseReturnId` int not null FK
+- `ProductId` int not null FK
+- `Quantity` decimal(18,3) not null
+- `UnitCost` decimal(18,2) not null
+- `LineTotal` decimal(18,2) not null
+
+---
+
+## O) SalesReturns
+### Columns
+- `Id` int PK
+- `ReturnNo` nvarchar(30) not null unique
+- `SalesInvoiceId` int null FK
+- `CustomerId` int not null FK
+- `WarehouseId` int not null FK
+- `ReturnDate` datetime2 not null
+- `Reason` nvarchar(250) null
+- `SubTotal` decimal(18,2) not null default 0
+- `TotalAmount` decimal(18,2) not null default 0
+- `Status` tinyint not null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## P) SalesReturnItems
+### Columns
+- `SalesReturnItemId` int PK
+- `SalesReturnId` int not null FK
+- `ProductId` int not null FK
+- `Quantity` decimal(18,3) not null
+- `UnitPrice` decimal(18,2) not null
+- `LineTotal` decimal(18,2) not null
+
+---
+
+# 7) Stock Transfer Between Warehouses
+
+## Q) StockTransfers
+### Columns
+- `Id` int PK
+- `TransferNo` nvarchar(30) not null unique
+- `FromWarehouseId` int not null FK
+- `ToWarehouseId` int not null FK
+- `TransferDate` datetime2 not null
+- `Notes` nvarchar(500) null
+- `Status` tinyint not null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## R) StockTransferItems
+### Columns
+- `StockTransferItemId` int PK
+- `StockTransferId` int not null FK
+- `ProductId` int not null FK
+- `Quantity` decimal(18,3) not null
+- `Notes` nvarchar(250) null
+
+---
+
+# 8) Payments and Collections
+
+## S) CustomerPayments
+### Columns
+- `Id` int PK
+- `PaymentNo` nvarchar(30) not null unique
+- `CustomerId` int not null FK
+- `SalesInvoiceId` int null FK
+- `PaymentDate` datetime2 not null
+- `Amount` decimal(18,2) not null
+- `PaymentMethod` tinyint not null (1=Cash, 2=Bank Transfer, 3=Card, 4=Other)
+- `ReferenceNo` nvarchar(50) null
+- `Notes` nvarchar(500) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## T) SupplierPayments
+### Columns
+- `Id` int PK
+- `PaymentNo` nvarchar(30) not null unique
+- `SupplierId` int not null FK
+- `PurchaseInvoiceId` int null FK
+- `PaymentDate` datetime2 not null
+- `Amount` decimal(18,2) not null
+- `PaymentMethod` tinyint not null
+- `ReferenceNo` nvarchar(50) null
+- `Notes` nvarchar(500) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+# 9) Store Settings
+
+## U) StoreSettings
+### Columns
+- `Id` int PK
+- `StoreName` nvarchar(150) not null
+- `Phone` nvarchar(20) null
+- `Address` nvarchar(250) null
+- `LogoPath` nvarchar(255) null
+- `CurrencyCode` nvarchar(10) not null default 'SAR'
+- `DefaultTaxRate` decimal(5,2) not null default 0
+- `IsTaxEnabled` bit not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+# 10) Inventory Movement Log (Critical)
+## V) InventoryMovements
+### Columns
+- `Id` int PK
+- `ProductId` int not null FK
+- `WarehouseId` int not null FK
+- `MovementType` tinyint not null (1=PurchaseIn, 2=SaleOut, 3=SaleReturnIn, 4=PurchaseReturnOut, 5=TransferOut, 6=TransferIn, 7=Adjustment)
+- `QuantityChange` decimal(18,3) not null — positive=IN, negative=OUT
+- `QuantityBefore` decimal(18,3) not null — stock before this movement
+- `QuantityAfter` decimal(18,3) not null — stock after (= Before + Change)
+- `ReferenceType` nvarchar(30) not null
+- `ReferenceId` int not null
+- `UnitCost` decimal(18,2) null
+- `MovementDate` datetime2 not null
+- `Notes` nvarchar(500) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+# 11) Full SQL Server Implementation Script
+
+```sql
+IF DB_ID(N'SalesSystemDb') IS NULL
+BEGIN
+    CREATE DATABASE SalesSystemDb;
+END
+GO
+
+USE SalesSystemDb;
+GO
+
+-- 1. Users
+CREATE TABLE dbo.Users
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Users PRIMARY KEY,
+    UserName        NVARCHAR(50)  NOT NULL,
+    PasswordHash    NVARCHAR(256) NOT NULL,
+    FullName        NVARCHAR(150) NOT NULL,
+    Role            TINYINT       NOT NULL, -- 1=Admin, 2=Manager, 3=Cashier
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Users_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Users_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
+
+    CONSTRAINT UQ_Users_UserName UNIQUE (UserName),
+    CONSTRAINT CK_Users_Role CHECK (Role IN (1,2,3))
 );
 
--- Seed: المستخدم الافتراضي
-INSERT INTO Users (UserName, PasswordHash, FullName, Role, IsActive, CreatedAt)
-VALUES ('admin', '<BCrypt_Hash_of_admin123>', N'مدير النظام', 1, 1, GETDATE());
-B) Units — وحدات القياس
-SQL
-
-CREATE TABLE Units (
-    UnitId      int IDENTITY(1,1) PRIMARY KEY,
-    Name        nvarchar(50)  NOT NULL,
-    Symbol      nvarchar(20)  NULL,
-    IsActive    bit           NOT NULL DEFAULT 1,
-    CreatedAt   datetime2     NOT NULL DEFAULT GETDATE()
+-- 2. Units
+CREATE TABLE dbo.Units
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Units PRIMARY KEY,
+    Name            NVARCHAR(50)  NOT NULL,
+    Symbol          NVARCHAR(20)  NULL,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Units_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Units_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL
 );
 
--- Seed الأساسي
-INSERT INTO Units (Name, Symbol, IsActive, CreatedAt) VALUES
-(N'قطعة',   N'قطعة', 1, GETDATE()),
-(N'كيلو',   N'كجم',  1, GETDATE()),
-(N'لتر',    N'لتر',  1, GETDATE()),
-(N'متر',    N'م',    1, GETDATE()),
-(N'صندوق',  N'صندق', 1, GETDATE());
-C) Categories — التصنيفات
-SQL
-
-CREATE TABLE Categories (
-    CategoryId      int IDENTITY(1,1) PRIMARY KEY,
-    Name            nvarchar(100) NOT NULL,
-    Description     nvarchar(250) NULL,
-    IsActive        bit           NOT NULL DEFAULT 1,
-    CreatedAt       datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt       datetime2     NULL
-);
-D) Products — المنتجات
-SQL
-
-CREATE TABLE Products (
-    ProductId       int IDENTITY(1,1) PRIMARY KEY,
-    Code            nvarchar(30)  NULL UNIQUE,
-    Barcode         nvarchar(50)  NULL UNIQUE,
-    Name            nvarchar(150) NOT NULL,
-    CategoryId      int           NULL REFERENCES Categories(CategoryId),
-    UnitId          int           NULL REFERENCES Units(UnitId),
-    PurchasePrice   decimal(18,2) NOT NULL DEFAULT 0,
-    SalePrice       decimal(18,2) NOT NULL DEFAULT 0,
-    MinStock        decimal(18,3) NOT NULL DEFAULT 0,
-    Description     nvarchar(500) NULL,
-    IsActive        bit           NOT NULL DEFAULT 1,
-    CreatedAt       datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt       datetime2     NULL,
-
-    -- قواعد على مستوى DB
-    CONSTRAINT CK_Products_SalePrice   CHECK (SalePrice >= 0),
-    CONSTRAINT CK_Products_PurchasePrice CHECK (PurchasePrice >= 0),
-    CONSTRAINT CK_Products_MinStock    CHECK (MinStock >= 0)
+-- 3. Categories
+CREATE TABLE dbo.Categories
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Categories PRIMARY KEY,
+    Name            NVARCHAR(100) NOT NULL,
+    Description     NVARCHAR(250) NULL,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Categories_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Categories_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL
 );
 
-CREATE INDEX IX_Products_Barcode ON Products(Barcode) WHERE Barcode IS NOT NULL;
-CREATE INDEX IX_Products_Name    ON Products(Name);
-E) Warehouses — المخازن
-SQL
+-- 4. Warehouses
+CREATE TABLE dbo.Warehouses
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Warehouses PRIMARY KEY,
+    Code            NVARCHAR(30)  NULL,
+    Name            NVARCHAR(100) NOT NULL,
+    Location        NVARCHAR(250) NULL,
+    IsDefault       BIT           NOT NULL CONSTRAINT DF_Warehouses_IsDefault DEFAULT(0),
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Warehouses_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Warehouses_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
 
-CREATE TABLE Warehouses (
-    WarehouseId     int IDENTITY(1,1) PRIMARY KEY,
-    Code            nvarchar(30)  NULL UNIQUE,
-    Name            nvarchar(100) NOT NULL,
-    Location        nvarchar(250) NULL,
-    IsDefault       bit           NOT NULL DEFAULT 0,
-    IsActive        bit           NOT NULL DEFAULT 1,
-    CreatedAt       datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt       datetime2     NULL
+    CONSTRAINT UQ_Warehouses_Code UNIQUE (Code)
 );
 
--- Seed: المخزن الافتراضي
-INSERT INTO Warehouses (Code, Name, IsDefault, IsActive, CreatedAt)
-VALUES ('WH-001', N'المخزن الرئيسي', 1, 1, GETDATE());
+-- 5. Products
+CREATE TABLE dbo.Products
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Products PRIMARY KEY,
+    Code            NVARCHAR(30)  NULL,
+    Barcode         NVARCHAR(50)  NULL,
+    Name            NVARCHAR(150) NOT NULL,
+    CategoryId      INT           NULL REFERENCES dbo.Categories(Id),
+    UnitId          INT           NULL REFERENCES dbo.Units(Id),
+    PurchasePrice   DECIMAL(18,2) NOT NULL DEFAULT 0,
+    SalePrice       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    MinStock        DECIMAL(18,3) NOT NULL DEFAULT 0,
+    Description     NVARCHAR(500) NULL,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Products_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Products_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
 
--- ضمان مخزن افتراضي واحد فقط
--- يُنفذ في Application Layer قبل الحفظ
-F) WarehouseStocks — رصيد المخزون ⚠️ الجدول الأهم
-SQL
+    CONSTRAINT UQ_Products_Code UNIQUE (Code),
+    CONSTRAINT UQ_Products_Barcode UNIQUE (Barcode)
+);
 
-CREATE TABLE WarehouseStocks (
-    WarehouseStockId    int           IDENTITY(1,1) PRIMARY KEY,
-    WarehouseId         int           NOT NULL REFERENCES Warehouses(WarehouseId),
-    ProductId           int           NOT NULL REFERENCES Products(ProductId),
-    Quantity            decimal(18,3) NOT NULL DEFAULT 0,
-    UpdatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
+-- 6. WarehouseStocks
+CREATE TABLE dbo.WarehouseStocks
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_WarehouseStocks PRIMARY KEY,
+    WarehouseId     INT NOT NULL REFERENCES dbo.Warehouses(Id),
+    ProductId       INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity        DECIMAL(18,3) NOT NULL DEFAULT 0,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_WarehouseStocks_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_WarehouseStocks_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_WarehouseStocks_UpdatedAt DEFAULT(SYSDATETIME()),
 
-    -- قيد حرج: منتج واحد في مخزن واحد فقط
-    CONSTRAINT UQ_WarehouseStocks UNIQUE (WarehouseId, ProductId),
-
-    -- لا كميات سالبة على مستوى DB كخط دفاع أخير
+    CONSTRAINT UQ_WarehouseStocks_Warehouse_Product UNIQUE (WarehouseId, ProductId),
     CONSTRAINT CK_WarehouseStocks_Qty CHECK (Quantity >= 0)
 );
 
-CREATE INDEX IX_WarehouseStocks_Product ON WarehouseStocks(ProductId);
-G) Suppliers — الموردون
-SQL
+-- 7. Suppliers
+CREATE TABLE dbo.Suppliers
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Suppliers PRIMARY KEY,
+    Code            NVARCHAR(30)  NULL,
+    Name            NVARCHAR(150) NOT NULL,
+    Phone           NVARCHAR(20)  NULL,
+    Email           NVARCHAR(100) NULL,
+    Address         NVARCHAR(250) NULL,
+    OpeningBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    CurrentBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Suppliers_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Suppliers_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
 
-CREATE TABLE Suppliers (
-    SupplierId          int           IDENTITY(1,1) PRIMARY KEY,
-    Code                nvarchar(30)  NULL UNIQUE,
-    Name                nvarchar(150) NOT NULL,
-    Phone               nvarchar(20)  NULL,
-    Email               nvarchar(100) NULL,
-    Address             nvarchar(250) NULL,
-    OpeningBalance      decimal(18,2) NOT NULL DEFAULT 0,
-    CurrentBalance      decimal(18,2) NOT NULL DEFAULT 0,
-        -- موجب = علينا للمورد
-        -- سالب = المورد مدين لنا
-    IsActive            bit           NOT NULL DEFAULT 1,
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt           datetime2     NULL
-);
-H) Customers — العملاء
-SQL
-
-CREATE TABLE Customers (
-    CustomerId          int           IDENTITY(1,1) PRIMARY KEY,
-    Code                nvarchar(30)  NULL UNIQUE,
-    Name                nvarchar(150) NOT NULL,
-    Phone               nvarchar(20)  NULL,
-    Email               nvarchar(100) NULL,
-    Address             nvarchar(250) NULL,
-    OpeningBalance      decimal(18,2) NOT NULL DEFAULT 0,
-    CurrentBalance      decimal(18,2) NOT NULL DEFAULT 0,
-        -- موجب = العميل مدين لنا
-        -- سالب = لدينا رصيد للعميل
-    IsActive            bit           NOT NULL DEFAULT 1,
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt           datetime2     NULL
+    CONSTRAINT UQ_Suppliers_Code UNIQUE (Code)
 );
 
--- Seed: عميل نقدي افتراضي للبيع بدون عميل محدد
-INSERT INTO Customers (Code, Name, CurrentBalance, IsActive, CreatedAt)
-VALUES ('CASH', N'عميل نقدي', 0, 1, GETDATE());
-I) PurchaseInvoices — فواتير الشراء
-SQL
+-- 8. Customers
+CREATE TABLE dbo.Customers
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Customers PRIMARY KEY,
+    Code            NVARCHAR(30)  NULL,
+    Name            NVARCHAR(150) NOT NULL,
+    Phone           NVARCHAR(20)  NULL,
+    Email           NVARCHAR(100) NULL,
+    Address         NVARCHAR(250) NULL,
+    OpeningBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    CurrentBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Customers_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Customers_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
 
-CREATE TABLE PurchaseInvoices (
-    PurchaseInvoiceId   int           IDENTITY(1,1) PRIMARY KEY,
-    InvoiceNo           nvarchar(30)  NOT NULL UNIQUE,
-    SupplierId          int           NOT NULL REFERENCES Suppliers(SupplierId),
-    WarehouseId         int           NOT NULL REFERENCES Warehouses(WarehouseId),
-    InvoiceDate         datetime2     NOT NULL,
-    DueDate             date          NULL,
-    PaymentType         tinyint       NOT NULL,
-        -- 1 = Cash (نقدي)
-        -- 2 = Credit (آجل)
-        -- 3 = Mixed (مختلط)
-    SubTotal            decimal(18,2) NOT NULL DEFAULT 0,
-    DiscountAmount      decimal(18,2) NOT NULL DEFAULT 0,
-    TaxAmount           decimal(18,2) NOT NULL DEFAULT 0,
-    TotalAmount         decimal(18,2) NOT NULL DEFAULT 0,
-    PaidAmount          decimal(18,2) NOT NULL DEFAULT 0,
-    DueAmount           decimal(18,2) NOT NULL DEFAULT 0,
-        -- DueAmount = TotalAmount - PaidAmount (يُحسب دائماً)
-    Notes               nvarchar(500) NULL,
-    Status              tinyint       NOT NULL DEFAULT 1,
-        -- 1 = Draft
-        -- 2 = Posted (مرحَّل - يؤثر على المخزون)
-        -- 3 = Cancelled
-    CreatedByUserId     int           NULL REFERENCES Users(UserId),
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt           datetime2     NULL,
-
-    CONSTRAINT CK_PurchaseInvoice_Amounts CHECK (
-        TotalAmount >= 0 AND
-        PaidAmount >= 0 AND
-        DueAmount >= 0 AND
-        PaidAmount <= TotalAmount
-    )
-);
-J) PurchaseInvoiceItems — عناصر فاتورة الشراء
-SQL
-
-CREATE TABLE PurchaseInvoiceItems (
-    PurchaseInvoiceItemId   int           IDENTITY(1,1) PRIMARY KEY,
-    PurchaseInvoiceId       int           NOT NULL 
-                                REFERENCES PurchaseInvoices(PurchaseInvoiceId),
-    ProductId               int           NOT NULL REFERENCES Products(ProductId),
-    Quantity                decimal(18,3) NOT NULL,
-    UnitCost                decimal(18,2) NOT NULL,
-    DiscountAmount          decimal(18,2) NOT NULL DEFAULT 0,
-    LineTotal               decimal(18,2) NOT NULL,
-        -- LineTotal = (Quantity * UnitCost) - DiscountAmount
-    Notes                   nvarchar(250) NULL,
-
-    CONSTRAINT CK_PurchaseItem_Qty      CHECK (Quantity > 0),
-    CONSTRAINT CK_PurchaseItem_Cost     CHECK (UnitCost >= 0),
-    CONSTRAINT CK_PurchaseItem_Discount CHECK (DiscountAmount >= 0),
-    CONSTRAINT CK_PurchaseItem_Total    CHECK (LineTotal >= 0)
-);
-K) SalesInvoices — فواتير البيع
-SQL
-
-CREATE TABLE SalesInvoices (
-    SalesInvoiceId      int           IDENTITY(1,1) PRIMARY KEY,
-    InvoiceNo           nvarchar(30)  NOT NULL UNIQUE,
-    CustomerId          int           NOT NULL REFERENCES Customers(CustomerId),
-        -- استخدم Customer "CASH" للبيع النقدي
-    WarehouseId         int           NOT NULL REFERENCES Warehouses(WarehouseId),
-    InvoiceDate         datetime2     NOT NULL,
-    DueDate             date          NULL,
-    PaymentType         tinyint       NOT NULL,
-        -- 1 = Cash
-        -- 2 = Credit
-        -- 3 = Mixed
-    SubTotal            decimal(18,2) NOT NULL DEFAULT 0,
-    DiscountAmount      decimal(18,2) NOT NULL DEFAULT 0,
-    TaxAmount           decimal(18,2) NOT NULL DEFAULT 0,
-    TotalAmount         decimal(18,2) NOT NULL DEFAULT 0,
-    PaidAmount          decimal(18,2) NOT NULL DEFAULT 0,
-    DueAmount           decimal(18,2) NOT NULL DEFAULT 0,
-    Notes               nvarchar(500) NULL,
-    Status              tinyint       NOT NULL DEFAULT 1,
-        -- 1 = Draft
-        -- 2 = Posted
-        -- 3 = Cancelled
-    CreatedByUserId     int           NULL REFERENCES Users(UserId),
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt           datetime2     NULL,
-
-    CONSTRAINT CK_SalesInvoice_Amounts CHECK (
-        TotalAmount >= 0 AND
-        PaidAmount >= 0 AND
-        DueAmount >= 0 AND
-        PaidAmount <= TotalAmount
-    )
-);
-L) SalesInvoiceItems — عناصر فاتورة البيع
-SQL
-
-CREATE TABLE SalesInvoiceItems (
-    SalesInvoiceItemId  int           IDENTITY(1,1) PRIMARY KEY,
-    SalesInvoiceId      int           NOT NULL 
-                                REFERENCES SalesInvoices(SalesInvoiceId),
-    ProductId           int           NOT NULL REFERENCES Products(ProductId),
-    Quantity            decimal(18,3) NOT NULL,
-    UnitPrice           decimal(18,2) NOT NULL,
-    DiscountAmount      decimal(18,2) NOT NULL DEFAULT 0,
-    LineTotal           decimal(18,2) NOT NULL,
-        -- LineTotal = (Quantity * UnitPrice) - DiscountAmount
-    Notes               nvarchar(250) NULL,
-
-    CONSTRAINT CK_SalesItem_Qty      CHECK (Quantity > 0),
-    CONSTRAINT CK_SalesItem_Price    CHECK (UnitPrice >= 0),
-    CONSTRAINT CK_SalesItem_Discount CHECK (DiscountAmount >= 0),
-    CONSTRAINT CK_SalesItem_Total    CHECK (LineTotal >= 0)
-);
-M) PurchaseReturns — مرتجع الشراء
-SQL
-
-CREATE TABLE PurchaseReturns (
-    PurchaseReturnId    int           IDENTITY(1,1) PRIMARY KEY,
-    ReturnNo            nvarchar(30)  NOT NULL UNIQUE,
-    PurchaseInvoiceId   int           NULL 
-                            REFERENCES PurchaseInvoices(PurchaseInvoiceId),
-        -- NULL = مرتجع بدون فاتورة أصلية
-    SupplierId          int           NOT NULL REFERENCES Suppliers(SupplierId),
-    WarehouseId         int           NOT NULL REFERENCES Warehouses(WarehouseId),
-    ReturnDate          datetime2     NOT NULL,
-    Reason              nvarchar(250) NULL,
-    TotalAmount         decimal(18,2) NOT NULL DEFAULT 0,
-    Status              tinyint       NOT NULL DEFAULT 1,
-        -- 1 = Draft
-        -- 2 = Posted (يؤثر على المخزون والرصيد)
-        -- 3 = Cancelled
-    CreatedByUserId     int           NULL REFERENCES Users(UserId),
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt           datetime2     NULL
+    CONSTRAINT UQ_Customers_Code UNIQUE (Code)
 );
 
-CREATE TABLE PurchaseReturnItems (
-    PurchaseReturnItemId    int           IDENTITY(1,1) PRIMARY KEY,
-    PurchaseReturnId        int           NOT NULL 
-                                REFERENCES PurchaseReturns(PurchaseReturnId),
-    ProductId               int           NOT NULL REFERENCES Products(ProductId),
-    Quantity                decimal(18,3) NOT NULL,
-    UnitCost                decimal(18,2) NOT NULL,
-    LineTotal               decimal(18,2) NOT NULL,
-
-    CONSTRAINT CK_PRItem_Qty   CHECK (Quantity > 0),
-    CONSTRAINT CK_PRItem_Total CHECK (LineTotal >= 0)
-);
-N) SalesReturns — مرتجع البيع
-SQL
-
-CREATE TABLE SalesReturns (
-    SalesReturnId       int           IDENTITY(1,1) PRIMARY KEY,
-    ReturnNo            nvarchar(30)  NOT NULL UNIQUE,
-    SalesInvoiceId      int           NULL 
-                            REFERENCES SalesInvoices(SalesInvoiceId),
-    CustomerId          int           NOT NULL REFERENCES Customers(CustomerId),
-    WarehouseId         int           NOT NULL REFERENCES Warehouses(WarehouseId),
-    ReturnDate          datetime2     NOT NULL,
-    Reason              nvarchar(250) NULL,
-    TotalAmount         decimal(18,2) NOT NULL DEFAULT 0,
-    Status              tinyint       NOT NULL DEFAULT 1,
-    CreatedByUserId     int           NULL REFERENCES Users(UserId),
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt           datetime2     NULL
+-- 9. PurchaseInvoices
+CREATE TABLE dbo.PurchaseInvoices
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoices PRIMARY KEY,
+    InvoiceNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    SupplierId      INT           NOT NULL REFERENCES dbo.Suppliers(Id),
+    WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    InvoiceDate     DATETIME2     NOT NULL,
+    DueDate         DATE          NULL,
+    PaymentType     TINYINT       NOT NULL,
+    SubTotal        DECIMAL(18,2) NOT NULL DEFAULT 0,
+    DiscountAmount  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TaxAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalAmount     DECIMAL(18,2) NOT NULL DEFAULT 0,
+    PaidAmount      DECIMAL(18,2) NOT NULL DEFAULT 0,
+    DueAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Notes           NVARCHAR(500) NULL,
+    Status          TINYINT       NOT NULL,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt       DATETIME2     NULL
 );
 
-CREATE TABLE SalesReturnItems (
-    SalesReturnItemId   int           IDENTITY(1,1) PRIMARY KEY,
-    SalesReturnId       int           NOT NULL 
-                                REFERENCES SalesReturns(SalesReturnId),
-    ProductId           int           NOT NULL REFERENCES Products(ProductId),
-    Quantity            decimal(18,3) NOT NULL,
-    UnitPrice           decimal(18,2) NOT NULL,
-    LineTotal           decimal(18,2) NOT NULL,
-
-    CONSTRAINT CK_SRItem_Qty   CHECK (Quantity > 0),
-    CONSTRAINT CK_SRItem_Total CHECK (LineTotal >= 0)
-);
-O) StockTransfers — تحويل المخزون
-SQL
-
-CREATE TABLE StockTransfers (
-    StockTransferId     int           IDENTITY(1,1) PRIMARY KEY,
-    TransferNo          nvarchar(30)  NOT NULL UNIQUE,
-    FromWarehouseId     int           NOT NULL REFERENCES Warehouses(WarehouseId),
-    ToWarehouseId       int           NOT NULL REFERENCES Warehouses(WarehouseId),
-    TransferDate        datetime2     NOT NULL,
-    Notes               nvarchar(500) NULL,
-    Status              tinyint       NOT NULL DEFAULT 1,
-    CreatedByUserId     int           NULL REFERENCES Users(UserId),
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-    UpdatedAt           datetime2     NULL,
-
-    -- لا تحويل من مخزن لنفسه
-    CONSTRAINT CK_StockTransfer_Warehouses 
-        CHECK (FromWarehouseId != ToWarehouseId)
+-- 10. PurchaseInvoiceItems
+CREATE TABLE dbo.PurchaseInvoiceItems
+(
+    PurchaseInvoiceItemId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoiceItems PRIMARY KEY,
+    PurchaseInvoiceId       INT NOT NULL REFERENCES dbo.PurchaseInvoices(Id),
+    ProductId               INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity                DECIMAL(18,3) NOT NULL,
+    UnitCost                DECIMAL(18,2) NOT NULL,
+    DiscountAmount          DECIMAL(18,2) NOT NULL DEFAULT 0,
+    LineTotal               DECIMAL(18,2) NOT NULL
 );
 
-CREATE TABLE StockTransferItems (
-    StockTransferItemId int           IDENTITY(1,1) PRIMARY KEY,
-    StockTransferId     int           NOT NULL 
-                            REFERENCES StockTransfers(StockTransferId),
-    ProductId           int           NOT NULL REFERENCES Products(ProductId),
-    Quantity            decimal(18,3) NOT NULL,
-    Notes               nvarchar(250) NULL,
-
-    CONSTRAINT CK_STItem_Qty CHECK (Quantity > 0)
-);
-P) CustomerPayments + SupplierPayments
-SQL
-
-CREATE TABLE CustomerPayments (
-    CustomerPaymentId   int           IDENTITY(1,1) PRIMARY KEY,
-    PaymentNo           nvarchar(30)  NOT NULL UNIQUE,
-    CustomerId          int           NOT NULL REFERENCES Customers(CustomerId),
-    SalesInvoiceId      int           NULL 
-                            REFERENCES SalesInvoices(SalesInvoiceId),
-    PaymentDate         datetime2     NOT NULL,
-    Amount              decimal(18,2) NOT NULL,
-    PaymentMethod       tinyint       NOT NULL,
-        -- 1 = Cash
-        -- 2 = Bank Transfer
-        -- 3 = Card
-        -- 4 = Other
-    ReferenceNo         nvarchar(50)  NULL,
-    Notes               nvarchar(500) NULL,
-    CreatedByUserId     int           NULL REFERENCES Users(UserId),
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT CK_CustomerPayment_Amount CHECK (Amount > 0)
+-- 11. SalesInvoices
+CREATE TABLE dbo.SalesInvoices
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoices PRIMARY KEY,
+    InvoiceNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    CustomerId      INT           NULL REFERENCES dbo.Customers(Id),
+    WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    InvoiceDate     DATETIME2     NOT NULL,
+    DueDate         DATE          NULL,
+    PaymentType     TINYINT       NOT NULL,
+    SubTotal        DECIMAL(18,2) NOT NULL DEFAULT 0,
+    DiscountAmount  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TaxAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalAmount     DECIMAL(18,2) NOT NULL DEFAULT 0,
+    PaidAmount      DECIMAL(18,2) NOT NULL DEFAULT 0,
+    DueAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Notes           NVARCHAR(500) NULL,
+    Status          TINYINT       NOT NULL,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt       DATETIME2     NULL
 );
 
-CREATE TABLE SupplierPayments (
-    SupplierPaymentId   int           IDENTITY(1,1) PRIMARY KEY,
-    PaymentNo           nvarchar(30)  NOT NULL UNIQUE,
-    SupplierId          int           NOT NULL REFERENCES Suppliers(SupplierId),
-    PurchaseInvoiceId   int           NULL 
-                            REFERENCES PurchaseInvoices(PurchaseInvoiceId),
-    PaymentDate         datetime2     NOT NULL,
-    Amount              decimal(18,2) NOT NULL,
-    PaymentMethod       tinyint       NOT NULL,
-    ReferenceNo         nvarchar(50)  NULL,
-    Notes               nvarchar(500) NULL,
-    CreatedByUserId     int           NULL REFERENCES Users(UserId),
-    CreatedAt           datetime2     NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT CK_SupplierPayment_Amount CHECK (Amount > 0)
-);
-Q) InventoryMovements — سجل حركة المخزون ⚠️ حرج جداً
-SQL
-
-CREATE TABLE InventoryMovements (
-    InventoryMovementId bigint        IDENTITY(1,1) PRIMARY KEY,
-    ProductId           int           NOT NULL REFERENCES Products(ProductId),
-    WarehouseId         int           NOT NULL REFERENCES Warehouses(WarehouseId),
-    MovementType        tinyint       NOT NULL,
-        -- 1 = PurchaseIn      (شراء — يزيد المخزون)
-        -- 2 = SaleOut         (بيع — يقلل المخزون)
-        -- 3 = SaleReturnIn    (مرتجع بيع — يزيد المخزون)
-        -- 4 = PurchaseReturnOut (مرتجع شراء — يقلل المخزون)
-        -- 5 = TransferOut     (تحويل خروج — يقلل)
-        -- 6 = TransferIn      (تحويل دخول — يزيد)
-        -- 7 = Adjustment      (تسوية يدوية)
-    QuantityChange      decimal(18,3) NOT NULL,
-        -- موجب = زيادة في المخزون
-        -- سالب = نقص من المخزون
-    QuantityBefore      decimal(18,3) NOT NULL,
-    QuantityAfter       decimal(18,3) NOT NULL,
-        -- QuantityAfter = QuantityBefore + QuantityChange
-    ReferenceType       nvarchar(30)  NOT NULL,
-        -- 'PurchaseInvoice' | 'SalesInvoice' | 'SalesReturn'
-        -- 'PurchaseReturn' | 'StockTransfer' | 'Adjustment'
-    ReferenceId         int           NOT NULL,
-    UnitCost            decimal(18,2) NULL,
-    MovementDate        datetime2     NOT NULL DEFAULT GETDATE(),
-    Notes               nvarchar(500) NULL,
-    CreatedByUserId     int           NULL REFERENCES Users(UserId)
+-- 12. SalesInvoiceItems
+CREATE TABLE dbo.SalesInvoiceItems
+(
+    SalesInvoiceItemId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoiceItems PRIMARY KEY,
+    SalesInvoiceId       INT NOT NULL REFERENCES dbo.SalesInvoices(Id),
+    ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity             DECIMAL(18,3) NOT NULL,
+    UnitPrice            DECIMAL(18,2) NOT NULL,
+    DiscountAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    LineTotal            DECIMAL(18,2) NOT NULL
 );
 
-CREATE INDEX IX_InventoryMovements_Product   
-    ON InventoryMovements(ProductId, MovementDate DESC);
-CREATE INDEX IX_InventoryMovements_Reference 
-    ON InventoryMovements(ReferenceType, ReferenceId);
-R) StoreSettings + Sequences
-SQL
-
-CREATE TABLE StoreSettings (
-    StoreSettingsId     int           IDENTITY(1,1) PRIMARY KEY,
-    StoreName           nvarchar(150) NOT NULL,
-    Phone               nvarchar(20)  NULL,
-    Address             nvarchar(250) NULL,
-    LogoPath            nvarchar(255) NULL,
-    CurrencyCode        nvarchar(10)  NOT NULL DEFAULT 'SAR',
-    DefaultTaxRate      decimal(5,2)  NOT NULL DEFAULT 0,
-    IsTaxEnabled        bit           NOT NULL DEFAULT 0,
-    UpdatedAt           datetime2     NULL
+-- 13. InventoryMovements
+CREATE TABLE dbo.InventoryMovements
+(
+    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InventoryMovements PRIMARY KEY,
+    ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
+    WarehouseId         INT NOT NULL REFERENCES dbo.Warehouses(Id),
+    MovementType        TINYINT NOT NULL,
+    QuantityChange      DECIMAL(18,3) NOT NULL,
+    QuantityBefore      DECIMAL(18,3) NOT NULL,
+    QuantityAfter       DECIMAL(18,3) NOT NULL,
+    ReferenceType       NVARCHAR(30) NOT NULL,
+    ReferenceId         INT NOT NULL,
+    UnitCost            DECIMAL(18,2) NULL,
+    MovementDate        DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    Notes               NVARCHAR(500) NULL,
+    CreatedByUserId     INT NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId     INT NULL REFERENCES dbo.Users(Id),
+    IsActive            BIT NOT NULL DEFAULT(1),
+    CreatedAt           DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt           DATETIME2 NULL
 );
 
--- جدول تسلسل أرقام الفواتير
-CREATE TABLE DocumentSequences (
-    SequenceId      int           IDENTITY(1,1) PRIMARY KEY,
-    Prefix          nvarchar(10)  NOT NULL UNIQUE,
-        -- 'INV' | 'PUR' | 'SR' | 'PR' | 'TRF' | 'PAY'
-    LastNumber      int           NOT NULL DEFAULT 0,
-    UpdatedAt       datetime2     NOT NULL DEFAULT GETDATE()
+CREATE INDEX IX_InventoryMovements_Product ON dbo.InventoryMovements(ProductId, MovementDate DESC);
+CREATE INDEX IX_InventoryMovements_Reference ON dbo.InventoryMovements(ReferenceType, ReferenceId);
+
+-- 14. StoreSettings
+CREATE TABLE dbo.StoreSettings
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StoreSettings PRIMARY KEY,
+    StoreName       NVARCHAR(150) NOT NULL,
+    Phone           NVARCHAR(20)  NULL,
+    Address         NVARCHAR(250) NULL,
+    LogoPath        NVARCHAR(255) NULL,
+    CurrencyCode    NVARCHAR(10)  NOT NULL CONSTRAINT DF_StoreSettings_Currency DEFAULT(N'SAR'),
+    DefaultTaxRate  DECIMAL(5,2)  NOT NULL CONSTRAINT DF_StoreSettings_TaxRate DEFAULT(0),
+    IsTaxEnabled    BIT           NOT NULL DEFAULT(0),
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_StoreSettings_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_StoreSettings_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL
 );
 
-INSERT INTO DocumentSequences (Prefix, LastNumber) VALUES
-('INV', 0),   -- Sales Invoices
-('PUR', 0),   -- Purchase Invoices
-('SR',  0),   -- Sales Returns
-('PR',  0),   -- Purchase Returns
-('TRF', 0),   -- Stock Transfers
-('CPAY', 0),  -- Customer Payments
-('SPAY', 0);  -- Supplier Payments
+-- 15. PurchaseReturns
+CREATE TABLE dbo.PurchaseReturns
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturns PRIMARY KEY,
+    ReturnNo          NVARCHAR(30)  NOT NULL UNIQUE,
+    PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
+    SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
+    WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    ReturnDate        DATETIME2     NOT NULL,
+    Reason            NVARCHAR(250) NULL,
+    SubTotal          DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 16. PurchaseReturnItems
+CREATE TABLE dbo.PurchaseReturnItems
+(
+    PurchaseReturnItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturnItems PRIMARY KEY,
+    PurchaseReturnId     INT NOT NULL REFERENCES dbo.PurchaseReturns(Id),
+    ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity             DECIMAL(18,3) NOT NULL,
+    UnitCost             DECIMAL(18,2) NOT NULL,
+    LineTotal            DECIMAL(18,2) NOT NULL
+);
+
+-- 17. SalesReturns
+CREATE TABLE dbo.SalesReturns
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturns PRIMARY KEY,
+    ReturnNo          NVARCHAR(30)  NOT NULL UNIQUE,
+    SalesInvoiceId    INT           NULL REFERENCES dbo.SalesInvoices(Id),
+    CustomerId        INT           NOT NULL REFERENCES dbo.Customers(Id),
+    WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    ReturnDate        DATETIME2     NOT NULL,
+    Reason            NVARCHAR(250) NULL,
+    SubTotal          DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 18. SalesReturnItems
+CREATE TABLE dbo.SalesReturnItems
+(
+    SalesReturnItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturnItems PRIMARY KEY,
+    SalesReturnId     INT NOT NULL REFERENCES dbo.SalesReturns(Id),
+    ProductId         INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity          DECIMAL(18,3) NOT NULL,
+    UnitPrice         DECIMAL(18,2) NOT NULL,
+    LineTotal         DECIMAL(18,2) NOT NULL
+);
+
+-- 19. StockTransfers
+CREATE TABLE dbo.StockTransfers
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransfers PRIMARY KEY,
+    TransferNo        NVARCHAR(30)  NOT NULL UNIQUE,
+    FromWarehouseId   INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    ToWarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    TransferDate      DATETIME2     NOT NULL,
+    Notes             NVARCHAR(500) NULL,
+    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 20. StockTransferItems
+CREATE TABLE dbo.StockTransferItems
+(
+    StockTransferItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransferItems PRIMARY KEY,
+    StockTransferId     INT NOT NULL REFERENCES dbo.StockTransfers(Id),
+    ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
+    Quantity            DECIMAL(18,3) NOT NULL,
+    Notes               NVARCHAR(250) NULL
+);
+
+-- 21. CustomerPayments
+CREATE TABLE dbo.CustomerPayments
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CustomerPayments PRIMARY KEY,
+    PaymentNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    CustomerId      INT           NOT NULL REFERENCES dbo.Customers(Id),
+    SalesInvoiceId  INT           NULL REFERENCES dbo.SalesInvoices(Id),
+    PaymentDate     DATETIME2     NOT NULL,
+    Amount          DECIMAL(18,2) NOT NULL,
+    PaymentMethod   TINYINT       NOT NULL, -- 1=Cash, 2=Bank Transfer, 3=Card, 4=Other
+    ReferenceNo     NVARCHAR(50)  NULL,
+    Notes           NVARCHAR(500) NULL,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt       DATETIME2     NULL
+);
+
+-- 22. SupplierPayments
+CREATE TABLE dbo.SupplierPayments
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SupplierPayments PRIMARY KEY,
+    PaymentNo         NVARCHAR(30)  NOT NULL UNIQUE,
+    SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
+    PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
+    PaymentDate       DATETIME2     NOT NULL,
+    Amount            DECIMAL(18,2) NOT NULL,
+    PaymentMethod     TINYINT       NOT NULL,
+    ReferenceNo       NVARCHAR(50)  NULL,
+    Notes             NVARCHAR(500) NULL,
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 23. DocumentSequences
+CREATE TABLE dbo.DocumentSequences
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_DocumentSequences PRIMARY KEY,
+    Prefix          NVARCHAR(10)  NOT NULL UNIQUE,
+    LastNumber      INT           NOT NULL CONSTRAINT DF_DocumentSequences_LastNumber DEFAULT(0),
+    UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_DocumentSequences_UpdatedAt DEFAULT(SYSDATETIME())
+);
+```
+
 6. Domain Entities — C# Classes
 6.1 Base Entity
 csharp

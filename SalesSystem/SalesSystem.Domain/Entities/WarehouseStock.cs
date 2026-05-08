@@ -7,6 +7,7 @@ public class WarehouseStock : BaseEntity
     public int WarehouseId { get; private set; }
     public int ProductId { get; private set; }
     public decimal Quantity { get; private set; }
+    public decimal ReorderLevel { get; private set; }
 
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual Product? Product { get; private set; }

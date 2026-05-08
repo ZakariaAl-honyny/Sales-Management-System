@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests.Payments;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Common;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;

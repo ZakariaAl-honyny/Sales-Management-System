@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/002-backend-core/plan.md](specs/002-backend-core/plan.md)
+**Active Feature Plan**: [specs/003-business-logic/plan.md](specs/003-business-logic/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview

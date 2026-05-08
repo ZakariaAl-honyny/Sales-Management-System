@@ -68,7 +68,7 @@ public class WarehousesController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateWarehouseRequest request, CancellationToken ct)
     {
         var result = await _warehouseService.CreateAsync(request, ct);
-        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value) : BadRequest(new { error = result.Error });
+        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>
