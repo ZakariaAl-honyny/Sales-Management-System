@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/004-desktop-shell/plan.md](specs/004-desktop-shell/plan.md)
+**Active Feature Plan**: [specs/005-desktop-modules/plan.md](specs/005-desktop-modules/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
