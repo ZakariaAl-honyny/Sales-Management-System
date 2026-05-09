@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/005-desktop-modules/plan.md](specs/005-desktop-modules/plan.md)
+**Active Feature Plan**: [specs/006-printing/plan.md](specs/006-printing/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
