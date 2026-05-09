@@ -16,80 +16,194 @@
         private void InitializeComponent()
         {
             this.pnlHeader = new System.Windows.Forms.Panel();
-            this.cmbSupplier = new System.Windows.Forms.ComboBox();
-            this.lblSupplier = new System.Windows.Forms.Label();
-            this.cmbWarehouse = new System.Windows.Forms.ComboBox();
-            this.lblWarehouse = new System.Windows.Forms.Label();
-            this.dtpDate = new System.Windows.Forms.DateTimePicker();
+            this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
+            this.lblInvoiceNoLabel = new System.Windows.Forms.Label();
+            this.lblInvoiceNo = new System.Windows.Forms.Label();
             this.lblDate = new System.Windows.Forms.Label();
+            this.dtpDate = new System.Windows.Forms.DateTimePicker();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.lblSupplier = new System.Windows.Forms.Label();
+            this.cmbSupplier = new System.Windows.Forms.ComboBox();
+            this.lblWarehouse = new System.Windows.Forms.Label();
+            this.cmbWarehouse = new System.Windows.Forms.ComboBox();
+            this.lblReference = new System.Windows.Forms.Label();
+            this.txtReference = new System.Windows.Forms.TextBox();
+            this.pnlTaxDiscountHeader = new System.Windows.Forms.FlowLayoutPanel();
+            this.chkTaxInclusive = new System.Windows.Forms.CheckBox();
+            this.lblTaxRate = new System.Windows.Forms.Label();
+            this.numTaxRate = new System.Windows.Forms.NumericUpDown();
             this.dgvItems = new System.Windows.Forms.DataGridView();
             this.pnlFooter = new System.Windows.Forms.Panel();
-            this.txtNotes = new System.Windows.Forms.TextBox();
-            this.lblNotes = new System.Windows.Forms.Label();
+            this.tableLayoutPanel2 = new System.Windows.Forms.TableLayoutPanel();
+            this.lblSubTotal = new System.Windows.Forms.Label();
+            this.lblSubTotalVal = new System.Windows.Forms.Label();
+            this.lblTaxAmount = new System.Windows.Forms.Label();
+            this.lblTaxAmountVal = new System.Windows.Forms.Label();
             this.lblTotal = new System.Windows.Forms.Label();
-            this.lblTotalValue = new System.Windows.Forms.Label();
-            this.btnSave = new System.Windows.Forms.Button();
+            this.lblTotalVal = new System.Windows.Forms.Label();
+            this.txtNotes = new System.Windows.Forms.TextBox();
+            this.pnlButtons = new System.Windows.Forms.Panel();
+            this.btnAddItem = new System.Windows.Forms.Button();
+            this.btnRemoveItem = new System.Windows.Forms.Button();
+            this.btnSaveDraft = new System.Windows.Forms.Button();
+            this.btnPost = new System.Windows.Forms.Button();
             this.btnClose = new System.Windows.Forms.Button();
             
             this.pnlHeader.SuspendLayout();
+            this.tableLayoutPanel1.SuspendLayout();
+            this.pnlTaxDiscountHeader.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numTaxRate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvItems)).BeginInit();
             this.pnlFooter.SuspendLayout();
+            this.tableLayoutPanel2.SuspendLayout();
+            this.pnlButtons.SuspendLayout();
             this.SuspendLayout();
 
-            this.pnlHeader.Dock = DockStyle.Top;
-            this.pnlHeader.Height = 80;
-            this.pnlHeader.Controls.AddRange(new Control[] { cmbSupplier, lblSupplier, cmbWarehouse, lblWarehouse, dtpDate, lblDate });
-            
-            lblSupplier.Text = "المورد:"; lblSupplier.Location = new Point(20, 20);
-            cmbSupplier.Location = new Point(100, 17); cmbSupplier.Size = new Size(200, 27); cmbSupplier.DropDownStyle = ComboBoxStyle.DropDownList;
-            
-            lblWarehouse.Text = "المستودع:"; lblWarehouse.Location = new Point(320, 20);
-            cmbWarehouse.Location = new Point(400, 17); cmbWarehouse.Size = new Size(150, 27); cmbWarehouse.DropDownStyle = ComboBoxStyle.DropDownList;
-            
-            lblDate.Text = "التاريخ:"; lblDate.Location = new Point(570, 20);
-            dtpDate.Location = new Point(630, 17); dtpDate.Size = new Size(130, 27);
+            this.pnlHeader.Controls.Add(this.tableLayoutPanel1);
+            this.pnlHeader.Dock = System.Windows.Forms.DockStyle.Top;
+            this.pnlHeader.Height = 150;
+            this.pnlHeader.Padding = new System.Windows.Forms.Padding(10);
 
-            this.dgvItems.Dock = DockStyle.Fill;
-            this.dgvItems.BackgroundColor = Color.White;
+            this.tableLayoutPanel1.ColumnCount = 6;
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 33F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 33F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 34F));
+            this.tableLayoutPanel1.Controls.Add(this.lblInvoiceNoLabel, 0, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblInvoiceNo, 1, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblDate, 2, 0);
+            this.tableLayoutPanel1.Controls.Add(this.dtpDate, 3, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblStatus, 5, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblSupplier, 0, 1);
+            this.tableLayoutPanel1.Controls.Add(this.cmbSupplier, 1, 1);
+            this.tableLayoutPanel1.Controls.Add(this.lblWarehouse, 2, 1);
+            this.tableLayoutPanel1.Controls.Add(this.cmbWarehouse, 3, 1);
+            this.tableLayoutPanel1.Controls.Add(this.lblReference, 4, 1);
+            this.tableLayoutPanel1.Controls.Add(this.txtReference, 5, 1);
+            this.tableLayoutPanel1.Controls.Add(this.pnlTaxDiscountHeader, 0, 2);
+            this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tableLayoutPanel1.RowCount = 3;
 
-            this.pnlFooter.Dock = DockStyle.Bottom;
-            this.pnlFooter.Height = 100;
-            this.pnlFooter.Controls.AddRange(new Control[] { txtNotes, lblNotes, lblTotal, lblTotalValue, btnSave, btnClose });
-            
-            lblNotes.Text = "ملاحظات:"; lblNotes.Location = new Point(20, 20);
-            txtNotes.Location = new Point(100, 17); txtNotes.Size = new Size(400, 60); txtNotes.Multiline = true;
-            
-            lblTotal.Text = "إجمالي المرتجع:"; lblTotal.Location = new Point(520, 20); lblTotal.Font = new Font(this.Font, FontStyle.Bold);
-            lblTotalValue.Text = "0.00"; lblTotalValue.Location = new Point(650, 20); lblTotalValue.Font = new Font(this.Font, FontStyle.Bold);
-            
-            btnSave.Text = "حفظ المرتجع"; btnSave.Location = new Point(520, 50); btnSave.Size = new Size(120, 35); btnSave.BackColor = Color.FromArgb(231, 76, 60); btnSave.ForeColor = Color.White; btnSave.FlatStyle = FlatStyle.Flat;
-            btnSave.Click += new EventHandler(this.btnSave_Click);
-            
-            btnClose.Text = "إغلاق"; btnClose.Location = new Point(780, 50); btnClose.Size = new Size(100, 35); btnClose.Click += (s,e) => this.Close();
+            this.lblInvoiceNoLabel.Text = "رقم المرتجع:";
+            this.lblInvoiceNo.Text = "جديد";
+            this.lblDate.Text = "التاريخ:";
+            this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.lblStatus.BackColor = System.Drawing.Color.DarkRed;
+            this.lblStatus.ForeColor = System.Drawing.Color.White;
+            this.lblStatus.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblSupplier.Text = "المورد:";
+            this.lblWarehouse.Text = "مستودع الصرف:";
+            this.lblReference.Text = "فاتورة المرجع:";
 
-            this.ClientSize = new System.Drawing.Size(900, 600);
+            this.tableLayoutPanel1.SetColumnSpan(this.pnlTaxDiscountHeader, 6);
+            this.pnlTaxDiscountHeader.Controls.Add(this.chkTaxInclusive);
+            this.pnlTaxDiscountHeader.Controls.Add(this.lblTaxRate);
+            this.pnlTaxDiscountHeader.Controls.Add(this.numTaxRate);
+            this.pnlTaxDiscountHeader.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlTaxDiscountHeader.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
+
+            this.chkTaxInclusive.Text = "شامل الضريبة";
+            this.numTaxRate.Value = 15;
+
+            this.dgvItems.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.dgvItems.BackgroundColor = System.Drawing.Color.White;
+
+            this.pnlFooter.Controls.Add(this.tableLayoutPanel2);
+            this.pnlFooter.Controls.Add(this.txtNotes);
+            this.pnlFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.pnlFooter.Height = 150;
+            this.pnlFooter.Padding = new System.Windows.Forms.Padding(10);
+
+            this.tableLayoutPanel2.ColumnCount = 2;
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 120F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel2.Controls.Add(this.lblSubTotal, 0, 0);
+            this.tableLayoutPanel2.Controls.Add(this.lblSubTotalVal, 1, 0);
+            this.tableLayoutPanel2.Controls.Add(this.lblTaxAmount, 0, 1);
+            this.tableLayoutPanel2.Controls.Add(this.lblTaxAmountVal, 1, 1);
+            this.tableLayoutPanel2.Controls.Add(this.lblTotal, 0, 2);
+            this.tableLayoutPanel2.Controls.Add(this.lblTotalVal, 1, 2);
+            this.tableLayoutPanel2.Dock = System.Windows.Forms.DockStyle.Right;
+            this.tableLayoutPanel2.Width = 300;
+
+            this.lblSubTotal.Text = "الإجمالي الفرعي:";
+            this.lblTaxAmount.Text = "مبلغ الضريبة:";
+            this.lblTotal.Text = "إجمالي المرتجع:";
+            this.lblTotal.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
+
+            this.txtNotes.Dock = System.Windows.Forms.DockStyle.Left;
+            this.txtNotes.Width = 400;
+            this.txtNotes.Multiline = true;
+            this.txtNotes.PlaceholderText = "ملاحظات المرتجع...";
+
+            this.pnlButtons.Controls.Add(this.btnClose);
+            this.pnlButtons.Controls.Add(this.btnPost);
+            this.pnlButtons.Controls.Add(this.btnSaveDraft);
+            this.pnlButtons.Controls.Add(this.btnRemoveItem);
+            this.pnlButtons.Controls.Add(this.btnAddItem);
+            this.pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.pnlButtons.Height = 60;
+
+            this.btnAddItem.Text = "إضافة صنف";
+            this.btnRemoveItem.Text = "حذف صنف";
+            this.btnSaveDraft.Text = "حفظ مسودة";
+            this.btnPost.Text = "ترحيل";
+            this.btnPost.BackColor = System.Drawing.Color.FromArgb(46, 204, 113);
+            this.btnPost.ForeColor = System.Drawing.Color.White;
+            this.btnClose.Text = "إغلاق";
+
+            this.btnAddItem.Dock = System.Windows.Forms.DockStyle.Right; this.btnAddItem.Width = 120;
+            this.btnRemoveItem.Dock = System.Windows.Forms.DockStyle.Right; this.btnRemoveItem.Width = 120;
+            this.btnSaveDraft.Dock = System.Windows.Forms.DockStyle.Left; this.btnSaveDraft.Width = 120;
+            this.btnPost.Dock = System.Windows.Forms.DockStyle.Left; this.btnPost.Width = 120;
+            this.btnClose.Dock = System.Windows.Forms.DockStyle.Left; this.btnClose.Width = 80;
+
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(1100, 750);
             this.Controls.Add(this.dgvItems);
-            this.Controls.Add(this.pnlHeader);
+            this.Controls.Add(this.pnlButtons);
             this.Controls.Add(this.pnlFooter);
-            this.RightToLeft = RightToLeft.Yes;
+            this.Controls.Add(this.pnlHeader);
+            this.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.RightToLeftLayout = true;
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.Text = "مرتجع مشتريات";
-            
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+
+            this.btnAddItem.Click += new System.EventHandler(this.btnAddItem_Click);
+            this.btnRemoveItem.Click += new System.EventHandler(this.btnRemoveItem_Click);
+            this.btnSaveDraft.Click += new System.EventHandler(this.btnSaveDraft_Click);
+            this.btnPost.Click += new System.EventHandler(this.btnPost_Click);
+            this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
+            this.chkTaxInclusive.CheckedChanged += (s,e) => CalculateTotals();
+            this.numTaxRate.ValueChanged += (s,e) => CalculateTotals();
+
             this.pnlHeader.ResumeLayout(false);
-            this.pnlHeader.PerformLayout();
+            this.tableLayoutPanel1.ResumeLayout(false);
+            this.tableLayoutPanel1.PerformLayout();
+            this.pnlTaxDiscountHeader.ResumeLayout(false);
+            this.pnlTaxDiscountHeader.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numTaxRate)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvItems)).EndInit();
             this.pnlFooter.ResumeLayout(false);
             this.pnlFooter.PerformLayout();
+            this.tableLayoutPanel2.ResumeLayout(false);
+            this.tableLayoutPanel2.PerformLayout();
+            this.pnlButtons.ResumeLayout(false);
             this.ResumeLayout(false);
         }
 
-        private Panel pnlHeader, pnlFooter;
-        private ComboBox cmbSupplier, cmbWarehouse;
-        private Label lblSupplier, lblWarehouse, lblDate, lblNotes, lblTotal, lblTotalValue;
-        private DateTimePicker dtpDate;
-        private DataGridView dgvItems;
-        private TextBox txtNotes;
-        private Button btnSave, btnClose;
+        private System.Windows.Forms.Panel pnlHeader, pnlFooter, pnlButtons;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1, tableLayoutPanel2;
+        private System.Windows.Forms.FlowLayoutPanel pnlTaxDiscountHeader;
+        private System.Windows.Forms.Label lblInvoiceNoLabel, lblInvoiceNo, lblDate, lblStatus, lblSupplier, lblWarehouse, lblReference, lblSubTotal, lblSubTotalVal, lblTaxAmount, lblTaxAmountVal, lblTotal, lblTotalVal, lblTaxRate;
+        private System.Windows.Forms.DateTimePicker dtpDate;
+        private System.Windows.Forms.ComboBox cmbSupplier, cmbWarehouse;
+        private System.Windows.Forms.TextBox txtReference, txtNotes;
+        private System.Windows.Forms.DataGridView dgvItems;
+        private System.Windows.Forms.CheckBox chkTaxInclusive;
+        private System.Windows.Forms.NumericUpDown numTaxRate;
+        private System.Windows.Forms.Button btnAddItem, btnRemoveItem, btnSaveDraft, btnPost, btnClose;
     }
 }

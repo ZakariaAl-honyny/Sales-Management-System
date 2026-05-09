@@ -26,3 +26,4 @@ public sealed class SessionService : ISessionService
         Current = null;
     }
 }
+

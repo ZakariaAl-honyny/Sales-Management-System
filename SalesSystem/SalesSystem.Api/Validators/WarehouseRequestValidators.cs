@@ -1,5 +1,5 @@
-using FluentValidation;
-using SalesSystem.Contracts.Requests.Warehouses;
+﻿using FluentValidation;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Validators;
 
@@ -8,14 +8,14 @@ public class CreateWarehouseRequestValidator : AbstractValidator<CreateWarehouse
     public CreateWarehouseRequestValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("اسم المخزن مطلوب")
-            .MaximumLength(100).WithMessage("اسم المخزن لا يمكن أن يتجاوز 100 حرف");
+            .NotEmpty().WithMessage("ط§ط³ظ… ط§ظ„ظ…ط®ط²ظ† ظ…ط·ظ„ظˆط¨")
+            .MaximumLength(100).WithMessage("ط§ط³ظ… ط§ظ„ظ…ط®ط²ظ† ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 100 ط­ط±ظپ");
 
         RuleFor(x => x.Code)
-            .MaximumLength(30).WithMessage("كود المخزن لا يمكن أن يتجاوز 30 حرف");
+            .MaximumLength(30).WithMessage("ظƒظˆط¯ ط§ظ„ظ…ط®ط²ظ† ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 30 ط­ط±ظپ");
 
         RuleFor(x => x.Location)
-            .MaximumLength(200).WithMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
+            .MaximumLength(200).WithMessage("ط§ظ„ط¹ظ†ظˆط§ظ† ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 200 ط­ط±ظپ");
     }
 }
 
@@ -24,13 +24,14 @@ public class UpdateWarehouseRequestValidator : AbstractValidator<UpdateWarehouse
     public UpdateWarehouseRequestValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("اسم المخزن مطلوب")
-            .MaximumLength(100).WithMessage("اسم المخزن لا يمكن أن يتجاوز 100 حرف");
+            .NotEmpty().WithMessage("ط§ط³ظ… ط§ظ„ظ…ط®ط²ظ† ظ…ط·ظ„ظˆط¨")
+            .MaximumLength(100).WithMessage("ط§ط³ظ… ط§ظ„ظ…ط®ط²ظ† ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 100 ط­ط±ظپ");
 
         RuleFor(x => x.Code)
-            .MaximumLength(30).WithMessage("كود المخزن لا يمكن أن يتجاوز 30 حرف");
+            .MaximumLength(30).WithMessage("ظƒظˆط¯ ط§ظ„ظ…ط®ط²ظ† ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 30 ط­ط±ظپ");
 
         RuleFor(x => x.Location)
-            .MaximumLength(200).WithMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
+            .MaximumLength(200).WithMessage("ط§ظ„ط¹ظ†ظˆط§ظ† ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 200 ط­ط±ظپ");
     }
 }
+

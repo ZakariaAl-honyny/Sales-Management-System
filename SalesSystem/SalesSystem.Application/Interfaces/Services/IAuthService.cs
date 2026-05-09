@@ -1,5 +1,5 @@
 using SalesSystem.Contracts.Common;
-using SalesSystem.Contracts.Requests.Auth;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 
 namespace SalesSystem.Application.Interfaces.Services;

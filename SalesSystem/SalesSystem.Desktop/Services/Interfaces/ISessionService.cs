@@ -9,3 +9,4 @@ public interface ISessionService
     void SignIn(UserSession session);
     void SignOut();
 }
+

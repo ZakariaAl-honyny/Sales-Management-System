@@ -6,3 +6,4 @@ public interface INotificationService
     void ShowError(string message);
     void ShowWarning(string message);
 }
+

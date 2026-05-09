@@ -11,6 +11,7 @@ public class Customer : BaseEntity
     public string? Address { get; private set; }
     public decimal OpeningBalance { get; private set; }
     public decimal CurrentBalance { get; private set; }
+    public decimal CreditLimit { get; private set; }
 
     private Customer() { }
 

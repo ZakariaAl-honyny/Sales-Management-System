@@ -1,4 +1,4 @@
-﻿using SalesSystem.Desktop.Models;
+using SalesSystem.Desktop.Models;
 
 namespace SalesSystem.Desktop.Forms;
 
@@ -68,3 +68,6 @@ public sealed class ToastForm : Form
         );
     }
 }
+
+
+

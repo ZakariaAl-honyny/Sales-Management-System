@@ -66,3 +66,6 @@ public sealed class LoadingOverlayControl : UserControl
         base.OnPaint(e);
     }
 }
+
+
+

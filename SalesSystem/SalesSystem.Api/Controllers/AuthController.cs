@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.Requests.Auth;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 
 namespace SalesSystem.Api.Controllers;

@@ -1,5 +1,5 @@
-using FluentValidation;
-using SalesSystem.Contracts.Requests.Suppliers;
+﻿using FluentValidation;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Validators;
 
@@ -8,19 +8,19 @@ public class CreateSupplierRequestValidator : AbstractValidator<CreateSupplierRe
     public CreateSupplierRequestValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("اسم المورد مطلوب")
-            .MaximumLength(150).WithMessage("اسم المورد لا يمكن أن يتجاوز 150 حرف");
+            .NotEmpty().WithMessage("ط§ط³ظ… ط§ظ„ظ…ظˆط±ط¯ ظ…ط·ظ„ظˆط¨")
+            .MaximumLength(150).WithMessage("ط§ط³ظ… ط§ظ„ظ…ظˆط±ط¯ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 150 ط­ط±ظپ");
 
         RuleFor(x => x.Phone)
-            .MaximumLength(20).WithMessage("رقم الهاتف لا يمكن أن يتجاوز 20 حرف");
+            .MaximumLength(20).WithMessage("ط±ظ‚ظ… ط§ظ„ظ‡ط§طھظپ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 20 ط­ط±ظپ");
 
         RuleFor(x => x.Email)
-            .EmailAddress().WithMessage("البريد الإلكتروني غير صحيح")
-            .MaximumLength(100).WithMessage("البريد الإلكتروني لا يمكن أن يتجاوز 100 حرف")
+            .EmailAddress().WithMessage("ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ط؛ظٹط± طµط­ظٹط­")
+            .MaximumLength(100).WithMessage("ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 100 ط­ط±ظپ")
             .When(x => !string.IsNullOrEmpty(x.Email));
 
         RuleFor(x => x.Code)
-            .MaximumLength(30).WithMessage("كود المورد لا يمكن أن يتجاوز 30 حرف");
+            .MaximumLength(30).WithMessage("ظƒظˆط¯ ط§ظ„ظ…ظˆط±ط¯ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 30 ط­ط±ظپ");
     }
 }
 
@@ -29,18 +29,19 @@ public class UpdateSupplierRequestValidator : AbstractValidator<UpdateSupplierRe
     public UpdateSupplierRequestValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("اسم المورد مطلوب")
-            .MaximumLength(150).WithMessage("اسم المورد لا يمكن أن يتجاوز 150 حرف");
+            .NotEmpty().WithMessage("ط§ط³ظ… ط§ظ„ظ…ظˆط±ط¯ ظ…ط·ظ„ظˆط¨")
+            .MaximumLength(150).WithMessage("ط§ط³ظ… ط§ظ„ظ…ظˆط±ط¯ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 150 ط­ط±ظپ");
 
         RuleFor(x => x.Phone)
-            .MaximumLength(20).WithMessage("رقم الهاتف لا يمكن أن يتجاوز 20 حرف");
+            .MaximumLength(20).WithMessage("ط±ظ‚ظ… ط§ظ„ظ‡ط§طھظپ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 20 ط­ط±ظپ");
 
         RuleFor(x => x.Email)
-            .EmailAddress().WithMessage("البريد الإلكتروني غير صحيح")
-            .MaximumLength(100).WithMessage("البريد الإلكتروني لا يمكن أن يتجاوز 100 حرف")
+            .EmailAddress().WithMessage("ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ط؛ظٹط± طµط­ظٹط­")
+            .MaximumLength(100).WithMessage("ط§ظ„ط¨ط±ظٹط¯ ط§ظ„ط¥ظ„ظƒطھط±ظˆظ†ظٹ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 100 ط­ط±ظپ")
             .When(x => !string.IsNullOrEmpty(x.Email));
 
         RuleFor(x => x.Code)
-            .MaximumLength(30).WithMessage("كود المورد لا يمكن أن يتجاوز 30 حرف");
+            .MaximumLength(30).WithMessage("ظƒظˆط¯ ط§ظ„ظ…ظˆط±ط¯ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 30 ط­ط±ظپ");
     }
 }
+

@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Inventory;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 
@@ -31,7 +31,7 @@ public class InventoryService : IInventoryService
             .FirstOrDefaultAsync(ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
 
         if (stock == null)
-            return Result<decimal>.Failure("لم يتم العثور على سجل مخزون لهذا المنتج في هذا المستودع");
+            return Result<decimal>.Failure("ط¸â€‍ط¸â€¦ ط¸ظ¹ط·ع¾ط¸â€¦ ط·آ§ط¸â€‍ط·آ¹ط·آ«ط¸ث†ط·آ± ط·آ¹ط¸â€‍ط¸â€° ط·آ³ط·آ¬ط¸â€‍ ط¸â€¦ط·آ®ط·آ²ط¸ث†ط¸â€  ط¸â€‍ط¸â€،ط·آ°ط·آ§ ط·آ§ط¸â€‍ط¸â€¦ط¸â€ ط·ع¾ط·آ¬ ط¸ظ¾ط¸ظ¹ ط¸â€،ط·آ°ط·آ§ ط·آ§ط¸â€‍ط¸â€¦ط·آ³ط·ع¾ط¸ث†ط·آ¯ط·آ¹");
 
         return Result<decimal>.Success(stock.Quantity);
     }
@@ -42,7 +42,7 @@ public class InventoryService : IInventoryService
         if (!stockResult.IsSuccess) return stockResult;
 
         if (stockResult.Value < requiredQty)
-            return Result.Failure($"المخزون غير كافٍ للمنتج {productId}: المتوفر {stockResult.Value}، المطلوب {requiredQty}");
+            return Result.Failure($"ط·آ§ط¸â€‍ط¸â€¦ط·آ®ط·آ²ط¸ث†ط¸â€  ط·ط›ط¸ظ¹ط·آ± ط¸ئ’ط·آ§ط¸ظ¾ط¸ع† ط¸â€‍ط¸â€‍ط¸â€¦ط¸â€ ط·ع¾ط·آ¬ {productId}: ط·آ§ط¸â€‍ط¸â€¦ط·ع¾ط¸ث†ط¸ظ¾ط·آ± {stockResult.Value}ط·إ’ ط·آ§ط¸â€‍ط¸â€¦ط·آ·ط¸â€‍ط¸ث†ط·آ¨ {requiredQty}");
 
         return Result.Success();
     }
@@ -88,7 +88,7 @@ public class InventoryService : IInventoryService
             .FirstOrDefaultAsync(ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
 
         if (stock == null)
-            return Result.Failure("سجل المخزون غير موجود");
+            return Result.Failure("ط·آ³ط·آ¬ط¸â€‍ ط·آ§ط¸â€‍ط¸â€¦ط·آ®ط·آ²ط¸ث†ط¸â€  ط·ط›ط¸ظ¹ط·آ± ط¸â€¦ط¸ث†ط·آ¬ط¸ث†ط·آ¯");
 
         decimal qtyBefore = stock.Quantity;
         stock.DecreaseQuantity(quantity);
@@ -128,7 +128,7 @@ public class InventoryService : IInventoryService
             .FirstOrDefaultAsync(t => t.Id == id, ct);
 
         if (transfer == null)
-            return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
+            return Result<StockTransferDto>.Failure("ط·آ§ط¸â€‍ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍ ط·ط›ط¸ظ¹ط·آ± ط¸â€¦ط¸ث†ط·آ¬ط¸ث†ط·آ¯", ErrorCodes.NotFound);
 
         return Result<StockTransferDto>.Success(MapToDto(transfer));
     }
@@ -158,10 +158,10 @@ public class InventoryService : IInventoryService
     public async Task<Result<StockTransferDto>> CreateTransferAsync(CreateStockTransferRequest request, int userId, CancellationToken ct)
     {
         if (request.FromWarehouseId == request.ToWarehouseId)
-            return Result<StockTransferDto>.Failure("لا يمكن التحويل لنفس المخزن");
+            return Result<StockTransferDto>.Failure("ط¸â€‍ط·آ§ ط¸ظ¹ط¸â€¦ط¸ئ’ط¸â€  ط·آ§ط¸â€‍ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍ ط¸â€‍ط¸â€ ط¸ظ¾ط·آ³ ط·آ§ط¸â€‍ط¸â€¦ط·آ®ط·آ²ط¸â€ ");
 
         if (request.Items.Count == 0)
-            return Result<StockTransferDto>.Failure("يجب إضافة أصناف للتحويل");
+            return Result<StockTransferDto>.Failure("ط¸ظ¹ط·آ¬ط·آ¨ ط·آ¥ط·آ¶ط·آ§ط¸ظ¾ط·آ© ط·آ£ط·آµط¸â€ ط·آ§ط¸ظ¾ ط¸â€‍ط¸â€‍ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍");
 
         // 1. Validation BEFORE transaction
         foreach (var item in request.Items)
@@ -212,7 +212,7 @@ public class InventoryService : IInventoryService
         {
             await transaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error creating stock transfer");
-            return Result<StockTransferDto>.Failure("حدث خطأ أثناء حفظ التحويل");
+            return Result<StockTransferDto>.Failure("ط·آ­ط·آ¯ط·آ« ط·آ®ط·آ·ط·آ£ ط·آ£ط·آ«ط¸â€ ط·آ§ط·طŒ ط·آ­ط¸ظ¾ط·آ¸ ط·آ§ط¸â€‍ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍");
         }
     }
 
@@ -314,7 +314,7 @@ public class InventoryService : IInventoryService
 
     #endregion
 
-    private static StockTransferDto MapToDto(StockTransfer t)
+        private static StockTransferDto MapToDto(StockTransfer t)
     {
         return new StockTransferDto(
             t.Id,
@@ -325,9 +325,11 @@ public class InventoryService : IInventoryService
             t.ToWarehouse?.Name ?? "Unknown",
             t.TransferDate,
             t.Notes,
+            (byte)t.Status,
             t.Items.Select(it => new StockTransferItemDto(
                 it.StockTransferItemId,
                 it.ProductId,
+                it.Product?.Code,
                 it.Product?.Name ?? "Unknown",
                 it.Quantity,
                 it.Notes
@@ -335,3 +337,5 @@ public class InventoryService : IInventoryService
         );
     }
 }
+
+

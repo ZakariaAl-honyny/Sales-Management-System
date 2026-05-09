@@ -6,63 +6,124 @@
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null)) components.Dispose();
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
             base.Dispose(disposing);
         }
 
         private void InitializeComponent()
         {
+            this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.lblSupplier = new System.Windows.Forms.Label();
             this.cmbSupplier = new System.Windows.Forms.ComboBox();
+            this.lblBalance = new System.Windows.Forms.Label();
+            this.lblBalanceVal = new System.Windows.Forms.Label();
+            this.lblInvoice = new System.Windows.Forms.Label();
+            this.cmbInvoice = new System.Windows.Forms.ComboBox();
             this.lblAmount = new System.Windows.Forms.Label();
             this.numAmount = new System.Windows.Forms.NumericUpDown();
-            this.lblMethod = new System.Windows.Forms.Label();
-            this.cmbMethod = new System.Windows.Forms.ComboBox();
             this.lblDate = new System.Windows.Forms.Label();
             this.dtpDate = new System.Windows.Forms.DateTimePicker();
             this.lblNotes = new System.Windows.Forms.Label();
             this.txtNotes = new System.Windows.Forms.TextBox();
+            this.pnlButtons = new System.Windows.Forms.FlowLayoutPanel();
             this.btnSave = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
+            
             ((System.ComponentModel.ISupportInitialize)(this.numAmount)).BeginInit();
+            this.tableLayoutPanel1.SuspendLayout();
+            this.pnlButtons.SuspendLayout();
             this.SuspendLayout();
 
-            lblSupplier.Text = "المورد:"; lblSupplier.Location = new Point(20, 20);
-            cmbSupplier.Location = new Point(120, 17); cmbSupplier.Size = new Size(240, 27); cmbSupplier.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.tableLayoutPanel1.ColumnCount = 2;
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 120F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel1.Controls.Add(this.lblSupplier, 0, 0);
+            this.tableLayoutPanel1.Controls.Add(this.cmbSupplier, 1, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblBalance, 0, 1);
+            this.tableLayoutPanel1.Controls.Add(this.lblBalanceVal, 1, 1);
+            this.tableLayoutPanel1.Controls.Add(this.lblInvoice, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.cmbInvoice, 1, 2);
+            this.tableLayoutPanel1.Controls.Add(this.lblAmount, 0, 3);
+            this.tableLayoutPanel1.Controls.Add(this.numAmount, 1, 3);
+            this.tableLayoutPanel1.Controls.Add(this.lblDate, 0, 4);
+            this.tableLayoutPanel1.Controls.Add(this.dtpDate, 1, 4);
+            this.tableLayoutPanel1.Controls.Add(this.lblNotes, 0, 5);
+            this.tableLayoutPanel1.Controls.Add(this.txtNotes, 1, 5);
+            this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Top;
+            this.tableLayoutPanel1.Height = 350;
+            this.tableLayoutPanel1.Padding = new System.Windows.Forms.Padding(10);
+            this.tableLayoutPanel1.RowCount = 6;
 
-            lblAmount.Text = "المبلغ:"; lblAmount.Location = new Point(20, 60);
-            numAmount.Location = new Point(120, 57); numAmount.Size = new Size(120, 27); numAmount.Maximum = 1000000; numAmount.DecimalPlaces = 2;
+            this.lblSupplier.Text = "المورد:";
+            this.lblBalance.Text = "الرصيد الحالي:";
+            this.lblBalanceVal.Text = "0.00";
+            this.lblBalanceVal.ForeColor = System.Drawing.Color.Red;
+            this.lblBalanceVal.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblInvoice.Text = "ربط بفاتورة:";
+            this.lblAmount.Text = "المبلغ المدفوع:";
+            this.lblDate.Text = "التاريخ:";
+            this.lblNotes.Text = "ملاحظات:";
 
-            lblMethod.Text = "طريقة الدفع:"; lblMethod.Location = new Point(20, 100);
-            cmbMethod.Location = new Point(120, 97); cmbMethod.Size = new Size(120, 27); cmbMethod.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbSupplier.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.cmbInvoice.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.numAmount.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.dtpDate.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtNotes.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtNotes.Multiline = true;
+            this.txtNotes.Height = 100;
 
-            lblDate.Text = "التاريخ:"; lblDate.Location = new Point(20, 140);
-            dtpDate.Location = new Point(120, 137); dtpDate.Size = new Size(120, 27);
+            this.numAmount.Maximum = 10000000;
+            this.numAmount.DecimalPlaces = 2;
 
-            lblNotes.Text = "ملاحظات:"; lblNotes.Location = new Point(20, 180);
-            txtNotes.Location = new Point(120, 177); txtNotes.Size = new Size(240, 60); txtNotes.Multiline = true;
+            this.pnlButtons.Controls.Add(this.btnCancel);
+            this.pnlButtons.Controls.Add(this.btnSave);
+            this.pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.pnlButtons.Height = 50;
+            this.pnlButtons.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
+            this.pnlButtons.Padding = new System.Windows.Forms.Padding(10, 0, 10, 0);
 
-            btnSave.Text = "حفظ"; btnSave.Location = new Point(120, 260); btnSave.Size = new Size(100, 35); btnSave.BackColor = Color.FromArgb(46, 204, 113); btnSave.ForeColor = Color.White; btnSave.FlatStyle = FlatStyle.Flat;
-            btnSave.Click += new EventHandler(this.btnSave_Click);
+            this.btnSave.Text = "صرف السند";
+            this.btnSave.Width = 100;
+            this.btnSave.Height = 35;
+            this.btnSave.BackColor = System.Drawing.Color.FromArgb(231, 76, 60);
+            this.btnSave.ForeColor = System.Drawing.Color.White;
+            this.btnSave.FlatStyle = FlatStyle.Flat;
 
-            btnCancel.Text = "إلغاء"; btnCancel.Location = new Point(230, 260); btnCancel.Size = new Size(100, 35); btnCancel.Click += (s,e) => this.Close();
+            this.btnCancel.Text = "إلغاء";
+            this.btnCancel.Width = 80;
+            this.btnCancel.Height = 35;
+            this.btnCancel.FlatStyle = FlatStyle.Flat;
 
-            this.ClientSize = new System.Drawing.Size(400, 320);
-            this.Controls.AddRange(new Control[] { lblSupplier, cmbSupplier, lblAmount, numAmount, lblMethod, cmbMethod, lblDate, dtpDate, lblNotes, txtNotes, btnSave, btnCancel });
-            this.RightToLeft = RightToLeft.Yes;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(500, 420);
+            this.Controls.Add(this.pnlButtons);
+            this.Controls.Add(this.tableLayoutPanel1);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.RightToLeftLayout = true;
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.Text = "سند صرف لمورد";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.Text = "سند صرف مورد";
+
             ((System.ComponentModel.ISupportInitialize)(this.numAmount)).EndInit();
+            this.tableLayoutPanel1.ResumeLayout(false);
+            this.tableLayoutPanel1.PerformLayout();
+            this.pnlButtons.ResumeLayout(false);
             this.ResumeLayout(false);
-            this.PerformLayout();
         }
 
-        private Label lblSupplier, lblAmount, lblMethod, lblDate, lblNotes;
-        private ComboBox cmbSupplier, cmbMethod;
-        private NumericUpDown numAmount;
-        private DateTimePicker dtpDate;
-        private TextBox txtNotes;
-        private Button btnSave, btnCancel;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
+        private System.Windows.Forms.Label lblSupplier, lblBalance, lblBalanceVal, lblInvoice, lblAmount, lblDate, lblNotes;
+        private System.Windows.Forms.ComboBox cmbSupplier, cmbInvoice;
+        private System.Windows.Forms.NumericUpDown numAmount;
+        private System.Windows.Forms.DateTimePicker dtpDate;
+        private System.Windows.Forms.TextBox txtNotes;
+        private System.Windows.Forms.FlowLayoutPanel pnlButtons;
+        private System.Windows.Forms.Button btnSave, btnCancel;
     }
 }

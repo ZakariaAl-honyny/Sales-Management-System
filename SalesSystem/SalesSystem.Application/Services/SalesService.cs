@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Sales;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
@@ -40,7 +40,7 @@ public class SalesService : ISalesService
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
         if (invoice == null)
-            return Result<SalesInvoiceDto>.Failure("فاتورة المبيعات غير موجودة", ErrorCodes.NotFound);
+            return Result<SalesInvoiceDto>.Failure("ظپط§طھظˆط±ط© ط§ظ„ظ…ط¨ظٹط¹ط§طھ ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©", ErrorCodes.NotFound);
 
         return Result<SalesInvoiceDto>.Success(MapToDto(invoice));
     }
@@ -81,7 +81,7 @@ public class SalesService : ISalesService
                 request.CustomerId,
                 request.InvoiceDate,
                 request.DueDate,
-                request.PaymentType,
+                (Domain.Enums.PaymentType)request.PaymentType,
                 request.DiscountAmount,
                 request.Notes
             );
@@ -113,7 +113,7 @@ public class SalesService : ISalesService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating sales invoice draft");
-            return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء حفظ مسودة الفاتورة");
+            return Result<SalesInvoiceDto>.Failure("ط­ط¯ط« ط®ط·ط£ ط£ط«ظ†ط§ط، ط­ظپط¸ ظ…ط³ظˆط¯ط© ط§ظ„ظپط§طھظˆط±ط©");
         }
     }
 
@@ -124,10 +124,10 @@ public class SalesService : ISalesService
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
         if (invoice == null)
-            return Result<SalesInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
+            return Result<SalesInvoiceDto>.Failure("ط§ظ„ظپط§طھظˆط±ط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©", ErrorCodes.NotFound);
 
         if (invoice.Status != InvoiceStatus.Draft)
-            return Result<SalesInvoiceDto>.Failure("يمكن فقط ترحيل الفواتير المسودة");
+            return Result<SalesInvoiceDto>.Failure("ظٹظ…ظƒظ† ظپظ‚ط· طھط±ط­ظٹظ„ ط§ظ„ظپظˆط§طھظٹط± ط§ظ„ظ…ط³ظˆط¯ط©");
 
         // 1. Validate Stock BEFORE Transaction
         foreach (var item in invoice.Items)
@@ -171,14 +171,14 @@ public class SalesService : ISalesService
                 if (!invoice.CustomerId.HasValue)
                 {
                     await transaction.RollbackAsync(ct);
-                    return Result<SalesInvoiceDto>.Failure("يجب تحديد عميل للفواتير الآجلة");
+                    return Result<SalesInvoiceDto>.Failure("ظٹط¬ط¨ طھط­ط¯ظٹط¯ ط¹ظ…ظٹظ„ ظ„ظ„ظپظˆط§طھظٹط± ط§ظ„ط¢ط¬ظ„ط©");
                 }
 
                 var customer = await _uow.Customers.GetByIdAsync(invoice.CustomerId.Value, ct);
                 if (customer == null)
                 {
                     await transaction.RollbackAsync(ct);
-                    return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
+                    return Result<SalesInvoiceDto>.Failure("ط§ظ„ط¹ظ…ظٹظ„ ط؛ظٹط± ظ…ظˆط¬ظˆط¯");
                 }
                 customer.IncreaseBalance(invoice.DueAmount);
             }
@@ -199,7 +199,7 @@ public class SalesService : ISalesService
         {
             await transaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error posting sales invoice {Id}", id);
-            return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء ترحيل الفاتورة");
+            return Result<SalesInvoiceDto>.Failure("ط­ط¯ط« ط®ط·ط£ ط£ط«ظ†ط§ط، طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط©");
         }
     }
 
@@ -210,7 +210,7 @@ public class SalesService : ISalesService
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
         if (invoice == null)
-            return Result<SalesInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
+            return Result<SalesInvoiceDto>.Failure("ط§ظ„ظپط§طھظˆط±ط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©", ErrorCodes.NotFound);
 
         if (invoice.Status == InvoiceStatus.Cancelled)
             return await GetByIdAsync(id, ct);
@@ -264,11 +264,11 @@ public class SalesService : ISalesService
         {
             await transaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error cancelling sales invoice {Id}", id);
-            return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء إلغاء الفاتورة");
+            return Result<SalesInvoiceDto>.Failure("ط­ط¯ط« ط®ط·ط£ ط£ط«ظ†ط§ط، ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط©");
         }
     }
 
-    private static SalesInvoiceDto MapToDto(SalesInvoice i)
+        private static SalesInvoiceDto MapToDto(SalesInvoice i)
     {
         return new SalesInvoiceDto(
             i.Id,
@@ -291,6 +291,7 @@ public class SalesService : ISalesService
             i.Items.Select(it => new SalesInvoiceItemDto(
                 it.SalesInvoiceItemId,
                 it.ProductId,
+                it.Product?.Code,
                 it.Product?.Name ?? "Unknown",
                 it.Quantity,
                 it.UnitPrice,
@@ -300,3 +301,5 @@ public class SalesService : ISalesService
         );
     }
 }
+
+

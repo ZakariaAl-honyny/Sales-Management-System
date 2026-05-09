@@ -1,4 +1,4 @@
-namespace SalesSystem.Contracts.DTOs;
+﻿namespace SalesSystem.Contracts.DTOs;
 
 public record UserDto(int Id, string UserName, string FullName, byte Role);
 
@@ -34,7 +34,7 @@ public record WarehouseStockDto(
 
 public record SupplierDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance, bool IsActive);
 
-public record CustomerDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance, bool IsActive);
+public record CustomerDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive);
 
 public record SalesInvoiceDto(
     int Id,
@@ -56,10 +56,7 @@ public record SalesInvoiceDto(
     byte Status,
     IReadOnlyList<SalesInvoiceItemDto> Items);
 
-public record SalesInvoiceItemDto(
-    int Id,
-    int ProductId,
-    string ProductName,
+public record SalesInvoiceItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
     decimal Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
@@ -85,10 +82,7 @@ public record PurchaseInvoiceDto(
     byte Status,
     IReadOnlyList<PurchaseInvoiceItemDto> Items);
 
-public record PurchaseInvoiceItemDto(
-    int Id,
-    int ProductId,
-    string ProductName,
+public record PurchaseInvoiceItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
     decimal Quantity,
     decimal UnitCost,
     decimal DiscountAmount,
@@ -105,12 +99,9 @@ public record SalesReturnDto(
     DateTime ReturnDate,
     decimal TotalAmount,
     string? Notes,
-    IReadOnlyList<SalesReturnItemDto> Items);
+    byte Status, IReadOnlyList<SalesReturnItemDto> Items);
 
-public record SalesReturnItemDto(
-    int Id, 
-    int ProductId, 
-    string ProductName, 
+public record SalesReturnItemDto(int Id, int ProductId, string? ProductCode, string ProductName, 
     decimal Quantity, 
     decimal UnitPrice, 
     decimal DiscountAmount, 
@@ -127,12 +118,9 @@ public record PurchaseReturnDto(
     DateTime ReturnDate,
     decimal TotalAmount,
     string? Notes,
-    IReadOnlyList<PurchaseReturnItemDto> Items);
+    byte Status, IReadOnlyList<PurchaseReturnItemDto> Items);
 
-public record PurchaseReturnItemDto(
-    int Id, 
-    int ProductId, 
-    string ProductName, 
+public record PurchaseReturnItemDto(int Id, int ProductId, string? ProductCode, string ProductName, 
     decimal Quantity, 
     decimal UnitCost, 
     decimal DiscountAmount, 
@@ -147,9 +135,9 @@ public record StockTransferDto(
     string ToWarehouseName,
     DateTime TransferDate,
     string? Notes,
-    IReadOnlyList<StockTransferItemDto> Items);
+    byte Status, IReadOnlyList<StockTransferItemDto> Items);
 
-public record StockTransferItemDto(int Id, int ProductId, string ProductName, decimal Quantity, string? Notes);
+public record StockTransferItemDto(int Id, int ProductId, string? ProductCode, string ProductName, decimal Quantity, string? Notes);
 
 public record CustomerPaymentDto(
     int Id,
@@ -208,3 +196,88 @@ public record DashboardSummaryDto(
     int ActiveCustomersCount,
     decimal TotalReceivables,
     decimal TotalPayables);
+
+public record SalesReportDto(
+    DateTime InvoiceDate,
+    string InvoiceNo,
+    string CustomerName,
+    decimal SubTotal,
+    decimal DiscountAmount,
+    decimal TaxAmount,
+    decimal TotalAmount,
+    decimal PaidAmount,
+    decimal DueAmount
+);
+
+public record PurchaseReportDto(
+    DateTime InvoiceDate,
+    string InvoiceNo,
+    string SupplierName,
+    decimal SubTotal,
+    decimal DiscountAmount,
+    decimal TaxAmount,
+    decimal TotalAmount,
+    decimal PaidAmount,
+    decimal DueAmount
+);
+
+public record StockReportDto(
+    int ProductId,
+    string ProductCode,
+    string ProductName,
+    string CategoryName,
+    string UnitName,
+    string WarehouseName,
+    decimal CurrentStock,
+    decimal ReorderLevel,
+    decimal PurchasePrice,
+    decimal TotalValue
+);
+
+public record CustomerBalanceReportDto(
+    int CustomerId,
+    string CustomerCode,
+    string CustomerName,
+    decimal OpeningBalance,
+    decimal TotalSales,
+    decimal TotalReturns,
+    decimal TotalPayments,
+    decimal TotalCredit,
+    decimal CurrentBalance
+);
+
+public record SupplierBalanceReportDto(
+    int SupplierId,
+    string SupplierCode,
+    string SupplierName,
+    decimal OpeningBalance,
+    decimal TotalPurchases,
+    decimal TotalReturns,
+    decimal TotalPayments,
+    decimal TotalDebit,
+    decimal CurrentBalance
+);
+
+public record ProductMovementReportDto(
+    DateTime Date,
+    string WarehouseName,
+    string MovementType,
+    string ReferenceNo,
+    decimal QuantityChange,
+    decimal QuantityAfter
+);
+
+public record LowStockReportDto(
+    int ProductId,
+    string? ProductCode,
+    string ProductName,
+    string? CategoryName,
+    string? UnitName,
+    string WarehouseName,
+    decimal Quantity,
+    decimal ReorderLevel
+);
+
+
+
+

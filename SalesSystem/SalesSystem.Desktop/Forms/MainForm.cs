@@ -1,8 +1,21 @@
 using SalesSystem.Contracts.Enums;
 using SalesSystem.Desktop.Models;
 using SalesSystem.Desktop.Services.Interfaces;
-using SalesSystem.Desktop.Controls.Placeholders;
-using SalesSystem.Desktop.Messages;
+using SalesSystem.Desktop.Messaging.Messages;
+using SalesSystem.Desktop.Controls.Dashboard;
+using SalesSystem.Desktop.Controls.Sales;
+using SalesSystem.Desktop.Controls.Purchases;
+using SalesSystem.Desktop.Controls.Returns;
+using SalesSystem.Desktop.Controls.Inventory;
+using SalesSystem.Desktop.Controls.Payments;
+using SalesSystem.Desktop.Controls.Reports;
+using SalesSystem.Desktop.Controls.Settings;
+using SalesSystem.Desktop.Controls.Users;
+using SalesSystem.Desktop.Controls.Products;
+using SalesSystem.Desktop.Controls.Customers;
+using SalesSystem.Desktop.Controls.Suppliers;
+using SalesSystem.Desktop.Controls.Warehouses;
+using SalesSystem.Desktop.Controls.StockTransfers;
 
 namespace SalesSystem.Desktop.Forms;
 
@@ -55,19 +68,19 @@ public partial class MainForm : Form
         var items = new List<NavigationItem>
         {
             new NavigationItem { Label = "لوحة التحكم", ScreenType = typeof(DashboardControl), MinRole = UserRole.Admin },
-            new NavigationItem { Label = "المنتجات", ScreenType = typeof(ProductsControl), MinRole = UserRole.Manager },
-            new NavigationItem { Label = "العملاء", ScreenType = typeof(CustomersControl), MinRole = UserRole.Cashier },
-            new NavigationItem { Label = "الموردون", ScreenType = typeof(SuppliersControl), MinRole = UserRole.Manager },
-            new NavigationItem { Label = "المستودعات", ScreenType = typeof(WarehousesControl), MinRole = UserRole.Admin },
-            new NavigationItem { Label = "فواتير الشراء", ScreenType = typeof(PurchasesControl), MinRole = UserRole.Manager },
-            new NavigationItem { Label = "فواتير البيع", ScreenType = typeof(SalesControl), MinRole = UserRole.Cashier },
-            new NavigationItem { Label = "المرتجعـات", ScreenType = typeof(ReturnsControl), MinRole = UserRole.Cashier },
-            new NavigationItem { Label = "حركة المخزون", ScreenType = typeof(InventoryControl), MinRole = UserRole.Manager },
-            new NavigationItem { Label = "تحويل المخزون", ScreenType = typeof(StockTransfersControl), MinRole = UserRole.Manager },
-            new NavigationItem { Label = "المدفوعات", ScreenType = typeof(PaymentsControl), MinRole = UserRole.Manager },
-            new NavigationItem { Label = "التقارير", ScreenType = typeof(ReportsControl), MinRole = UserRole.Manager },
-            new NavigationItem { Label = "الإعدادات", ScreenType = typeof(SettingsControl), MinRole = UserRole.Admin },
-            new NavigationItem { Label = "المستخدمون", ScreenType = typeof(UsersControl), MinRole = UserRole.Admin }
+            new NavigationItem { Label = "المنتجات", ScreenType = typeof(ProductsListControl), MinRole = UserRole.Manager },
+            new NavigationItem { Label = "العملاء", ScreenType = typeof(CustomersListControl), MinRole = UserRole.Cashier },
+            new NavigationItem { Label = "الموردون", ScreenType = typeof(SuppliersListControl), MinRole = UserRole.Manager },
+            new NavigationItem { Label = "المستودعات", ScreenType = typeof(WarehousesListControl), MinRole = UserRole.Admin },
+            new NavigationItem { Label = "فواتير الشراء", ScreenType = typeof(PurchasesListControl), MinRole = UserRole.Manager },
+            new NavigationItem { Label = "فواتير البيع", ScreenType = typeof(SalesListControl), MinRole = UserRole.Cashier },
+            new NavigationItem { Label = "المرتجعـات", ScreenType = typeof(ReturnsListControl), MinRole = UserRole.Cashier },
+            new NavigationItem { Label = "حركة المخزون", ScreenType = typeof(InventoryListControl), MinRole = UserRole.Manager },
+            new NavigationItem { Label = "تحويل المخزون", ScreenType = typeof(StockTransfersListControl), MinRole = UserRole.Manager },
+            new NavigationItem { Label = "المدفوعات", ScreenType = typeof(PaymentsListControl), MinRole = UserRole.Manager },
+            new NavigationItem { Label = "التقارير", ScreenType = typeof(ReportsListControl), MinRole = UserRole.Manager },
+            new NavigationItem { Label = "الإعدادات", ScreenType = typeof(SettingsListControl), MinRole = UserRole.Admin },
+            new NavigationItem { Label = "المستخدمون", ScreenType = typeof(UsersListControl), MinRole = UserRole.Admin }
         };
 
         foreach (var item in items)

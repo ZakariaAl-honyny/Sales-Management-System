@@ -5,7 +5,12 @@ namespace SalesSystem.Desktop.Controls.Common;
 public sealed class MoneyTextBox : TextBox
 {
     [Browsable(false)]
-    public decimal DecimalValue => decimal.TryParse(Text, out var v) ? v : 0m;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public decimal DecimalValue 
+    {
+        get => decimal.TryParse(Text, out var v) ? v : 0m;
+        set => Text = value.ToString("F2");
+    }
 
     public MoneyTextBox()
     {
@@ -43,3 +48,6 @@ public sealed class MoneyTextBox : TextBox
         }
     }
 }
+
+
+

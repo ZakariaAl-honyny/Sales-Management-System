@@ -1,4 +1,4 @@
-Ôªønamespace SalesSystem.Desktop.Forms
+namespace SalesSystem.Desktop.Forms
 {
     partial class UnitDialog
     {
@@ -28,7 +28,7 @@
             this.lblName.Location = new System.Drawing.Point(20, 30);
             this.lblName.Name = "lblName";
             this.lblName.Size = new System.Drawing.Size(100, 25);
-            this.lblName.Text = "ÿßÿ≥ŸÖ ÿßŸÑŸàÿ≠ÿØÿ©:";
+            this.lblName.Text = "«”„ «·ÊÕœ…:";
             
             // txtName
             this.txtName.Location = new System.Drawing.Point(130, 27);
@@ -39,7 +39,7 @@
             this.lblSymbol.Location = new System.Drawing.Point(20, 70);
             this.lblSymbol.Name = "lblSymbol";
             this.lblSymbol.Size = new System.Drawing.Size(100, 25);
-            this.lblSymbol.Text = "ÿßŸÑÿ±ŸÖÿ≤ (ŸÉÿ¨ŸÖ):";
+            this.lblSymbol.Text = "«·—„“ (ﬂÃ„):";
             
             // txtSymbol
             this.txtSymbol.Location = new System.Drawing.Point(130, 67);
@@ -50,7 +50,7 @@
             this.chkIsActive.Location = new System.Drawing.Point(130, 110);
             this.chkIsActive.Name = "chkIsActive";
             this.chkIsActive.Size = new System.Drawing.Size(100, 24);
-            this.chkIsActive.Text = "ŸÜÿ¥ÿ∑";
+            this.chkIsActive.Text = "‰‘ÿ";
             
             // btnSave
             this.btnSave.BackColor = System.Drawing.Color.FromArgb(46, 204, 113);
@@ -59,7 +59,7 @@
             this.btnSave.Location = new System.Drawing.Point(260, 160);
             this.btnSave.Name = "btnSave";
             this.btnSave.Size = new System.Drawing.Size(100, 35);
-            this.btnSave.Text = "ÿ≠ŸÅÿ∏";
+            this.btnSave.Text = "Õ›Ÿ";
             this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
             
             // btnCancel
@@ -69,7 +69,7 @@
             this.btnCancel.Location = new System.Drawing.Point(150, 160);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(100, 35);
-            this.btnCancel.Text = "ÿ•ŸÑÿ∫ÿßÿ°";
+            this.btnCancel.Text = "≈·€«¡";
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             
             // UnitDialog
@@ -103,3 +103,6 @@
         private System.Windows.Forms.CheckBox chkIsActive;
     }
 }
+
+
+
