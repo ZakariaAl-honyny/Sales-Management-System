@@ -35,7 +35,7 @@ public class CustomersController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns paginated list of customers.</returns>
     [HttpGet]
-    [Authorize(Policy = "ManagerAndAbove")]
+    [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(typeof(PagedResult<CustomerDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PagedResult<CustomerDto>>> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
@@ -51,7 +51,7 @@ public class CustomersController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the customer if found.</returns>
     [HttpGet("{id:int}")]
-    [Authorize(Policy = "ManagerAndAbove")]
+    [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CustomerDto>> GetById(int id, CancellationToken ct)
