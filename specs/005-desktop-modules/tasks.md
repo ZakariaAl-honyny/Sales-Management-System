@@ -175,7 +175,7 @@
 - [x] T051 [P] Audit role-based UI gating in all list controls: verify ManagerAndAbove restrictions and AdminOnly restrictions match the Permissions Matrix in `AGENTS.md آ§6`.
 - [x] T052 Remove all files from `SalesSystem/SalesSystem.Desktop/Controls/Placeholders/` that have been replaced. Remove their `services.AddTransient<XxxPlaceholderControl>()` registrations from `Program.cs`.
 - [x] T053 Run `dotnet build SalesSystem/SalesSystem.sln` and fix any compiler errors or warnings related to new code.
-- [ ] T054 Push branch to remote: `git add -A && git commit -m "feat: implement all Phase 5 desktop modules" && git push origin 005-desktop-modules`
+- [x] T054 Push branch to remote: `git add -A && git commit -m "feat: implement all Phase 5 desktop modules" && git push origin 005-desktop-modules`
 
 ---
 
