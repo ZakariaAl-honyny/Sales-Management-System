@@ -1,4 +1,4 @@
-﻿namespace SalesSystem.Desktop;
+namespace SalesSystem.Desktop;
 
 partial class Form1
 {
@@ -36,3 +36,4 @@ partial class Form1
 
     #endregion
 }
+

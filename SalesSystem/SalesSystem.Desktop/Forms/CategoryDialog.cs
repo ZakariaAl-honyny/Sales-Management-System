@@ -1,5 +1,7 @@
-﻿using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Desktop.Services.Interfaces;
+using SalesSystem.Desktop.Services.Api.Interfaces;
 
 namespace SalesSystem.Desktop.Forms;
 
@@ -19,6 +21,7 @@ public partial class CategoryDialog : Form
         _existingCategory = existingCategory;
         
         InitializeComponent();
+        this.RightToLeft = RightToLeft.Yes;
         
         if (_existingCategory != null)
         {
@@ -48,7 +51,8 @@ public partial class CategoryDialog : Form
         {
             if (_existingCategory == null)
             {
-                var result = await _apiService.CreateAsync(txtName.Text, txtDescription.Text);
+                var request = new CreateCategoryRequest(txtName.Text, txtDescription.Text);
+                var result = await _apiService.CreateAsync(request);
                 if (result.IsSuccess)
                 {
                     _notificationService.ShowSuccess("تمت الإضافة بنجاح");
@@ -59,7 +63,8 @@ public partial class CategoryDialog : Form
             }
             else
             {
-                var result = await _apiService.UpdateAsync(_existingCategory.Id, txtName.Text, txtDescription.Text, chkIsActive.Checked);
+                var request = new UpdateCategoryRequest(txtName.Text, txtDescription.Text, chkIsActive.Checked);
+                var result = await _apiService.UpdateAsync(_existingCategory.Id, request);
                 if (result.IsSuccess)
                 {
                     _notificationService.ShowSuccess("تم التعديل بنجاح");
@@ -77,3 +82,4 @@ public partial class CategoryDialog : Form
 
     private void btnCancel_Click(object sender, EventArgs e) => this.Close();
 }
+

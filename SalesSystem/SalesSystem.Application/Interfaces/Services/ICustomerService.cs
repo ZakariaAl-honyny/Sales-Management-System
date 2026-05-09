@@ -1,6 +1,6 @@
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Customers;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Application.Interfaces.Services;
 

@@ -8,3 +8,4 @@ public interface INavigationService
     void NavigateTo<TControl>() where TControl : UserControl;
     Type? CurrentScreen { get; }
 }
+

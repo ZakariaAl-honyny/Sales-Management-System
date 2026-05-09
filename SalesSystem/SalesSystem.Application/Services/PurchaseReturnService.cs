@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Returns;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 
@@ -39,7 +39,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             .FirstOrDefaultAsync(r => r.Id == id, ct);
 
         if (pr == null)
-            return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود", ErrorCodes.NotFound);
+            return Result<PurchaseReturnDto>.Failure("ظ…ط±طھط¬ط¹ ط§ظ„ظ…ط´طھط±ظٹط§طھ ط؛ظٹط± ظ…ظˆط¬ظˆط¯", ErrorCodes.NotFound);
 
         return Result<PurchaseReturnDto>.Success(MapToDto(pr));
     }
@@ -74,16 +74,16 @@ public class PurchaseReturnService : IPurchaseReturnService
                 .Include(i => i.Items)
                 .FirstOrDefaultAsync(i => i.Id == request.PurchaseInvoiceId.Value, ct);
 
-            if (invoice == null) return Result<PurchaseReturnDto>.Failure("الفاتورة الأصلية غير موجودة");
+            if (invoice == null) return Result<PurchaseReturnDto>.Failure("ط§ظ„ظپط§طھظˆط±ط© ط§ظ„ط£طµظ„ظٹط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©");
 
             foreach (var item in request.Items)
             {
                 var originalLine = invoice.Items.FirstOrDefault(it => it.ProductId == item.ProductId);
                 if (originalLine == null)
-                    return Result<PurchaseReturnDto>.Failure($"المنتج {item.ProductId} غير موجود في الفاتورة الأصلية");
+                    return Result<PurchaseReturnDto>.Failure($"ط§ظ„ظ…ظ†طھط¬ {item.ProductId} ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ظپظٹ ط§ظ„ظپط§طھظˆط±ط© ط§ظ„ط£طµظ„ظٹط©");
                 
                 if (item.Quantity > originalLine.Quantity)
-                    return Result<PurchaseReturnDto>.Failure($"الكمية المرتجعة للمنتج {item.ProductId} أكبر من الكمية المشتراة ({originalLine.Quantity})");
+                    return Result<PurchaseReturnDto>.Failure($"ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ…ط±طھط¬ط¹ط© ظ„ظ„ظ…ظ†طھط¬ {item.ProductId} ط£ظƒط¨ط± ظ…ظ† ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ…ط´طھط±ط§ط© ({originalLine.Quantity})");
             }
         }
 
@@ -155,11 +155,11 @@ public class PurchaseReturnService : IPurchaseReturnService
         {
             await transaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error creating purchase return");
-            return Result<PurchaseReturnDto>.Failure("حدث خطأ أثناء حفظ المرتجع");
+            return Result<PurchaseReturnDto>.Failure("ط­ط¯ط« ط®ط·ط£ ط£ط«ظ†ط§ط، ط­ظپط¸ ط§ظ„ظ…ط±طھط¬ط¹");
         }
     }
 
-    private static PurchaseReturnDto MapToDto(PurchaseReturn r)
+        private static PurchaseReturnDto MapToDto(PurchaseReturn r)
     {
         return new PurchaseReturnDto(
             r.Id,
@@ -172,9 +172,11 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.ReturnDate,
             r.TotalAmount,
             r.Notes,
+            (byte)r.Status,
             r.Items.Select(it => new PurchaseReturnItemDto(
                 it.PurchaseReturnItemId,
                 it.ProductId,
+                it.Product?.Code,
                 it.Product?.Name ?? "Unknown",
                 it.Quantity,
                 it.UnitCost,
@@ -184,3 +186,5 @@ public class PurchaseReturnService : IPurchaseReturnService
         );
     }
 }
+
+

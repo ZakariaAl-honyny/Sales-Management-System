@@ -1,4 +1,4 @@
-﻿using SalesSystem.Desktop.Models;
+using SalesSystem.Desktop.Models;
 using SalesSystem.Desktop.Services.Interfaces;
 using SalesSystem.Desktop.Forms;
 
@@ -25,3 +25,4 @@ public sealed class NotificationService : INotificationService
         }
     }
 }
+

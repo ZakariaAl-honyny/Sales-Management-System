@@ -75,3 +75,6 @@ public sealed class SummaryCardControl : UserControl
         e.Graphics.DrawRectangle(Pens.LightGray, 0, 0, Width - 1, Height - 1);
     }
 }
+
+
+

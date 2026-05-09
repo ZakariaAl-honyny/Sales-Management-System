@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.Requests.Products;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Controllers;
 

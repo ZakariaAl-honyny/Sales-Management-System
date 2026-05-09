@@ -101,3 +101,6 @@ public sealed class SearchBarControl : UserControl
         e.Graphics.DrawRectangle(Pens.LightGray, 0, 0, Width - 1, Height - 1);
     }
 }
+
+
+

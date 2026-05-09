@@ -126,3 +126,6 @@ namespace SalesSystem.Desktop.Forms
         private System.Windows.Forms.Panel pnlContent;
     }
 }
+
+
+

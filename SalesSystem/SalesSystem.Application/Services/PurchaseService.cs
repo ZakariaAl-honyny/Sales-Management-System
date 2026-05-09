@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Purchases;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
@@ -40,7 +40,7 @@ public class PurchaseService : IPurchaseService
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
         if (invoice == null)
-            return Result<PurchaseInvoiceDto>.Failure("فاتورة المشتريات غير موجودة", ErrorCodes.NotFound);
+            return Result<PurchaseInvoiceDto>.Failure("ظپط§طھظˆط±ط© ط§ظ„ظ…ط´طھط±ظٹط§طھ ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©", ErrorCodes.NotFound);
 
         return Result<PurchaseInvoiceDto>.Success(MapToDto(invoice));
     }
@@ -81,7 +81,7 @@ public class PurchaseService : IPurchaseService
                 request.SupplierId,
                 request.InvoiceDate,
                 request.DueDate,
-                request.PaymentType,
+                (Domain.Enums.PaymentType)request.PaymentType,
                 request.DiscountAmount,
                 request.Notes
             );
@@ -113,7 +113,7 @@ public class PurchaseService : IPurchaseService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating purchase invoice draft");
-            return Result<PurchaseInvoiceDto>.Failure("حدث خطأ أثناء حفظ مسودة الفاتورة");
+            return Result<PurchaseInvoiceDto>.Failure("ط­ط¯ط« ط®ط·ط£ ط£ط«ظ†ط§ط، ط­ظپط¸ ظ…ط³ظˆط¯ط© ط§ظ„ظپط§طھظˆط±ط©");
         }
     }
 
@@ -124,10 +124,10 @@ public class PurchaseService : IPurchaseService
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
         if (invoice == null)
-            return Result<PurchaseInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
+            return Result<PurchaseInvoiceDto>.Failure("ط§ظ„ظپط§طھظˆط±ط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©", ErrorCodes.NotFound);
 
         if (invoice.Status != InvoiceStatus.Draft)
-            return Result<PurchaseInvoiceDto>.Failure("يمكن فقط ترحيل الفواتير المسودة");
+            return Result<PurchaseInvoiceDto>.Failure("ظٹظ…ظƒظ† ظپظ‚ط· طھط±ط­ظٹظ„ ط§ظ„ظپظˆط§طھظٹط± ط§ظ„ظ…ط³ظˆط¯ط©");
 
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
@@ -163,7 +163,7 @@ public class PurchaseService : IPurchaseService
                 if (supplier == null)
                 {
                     await transaction.RollbackAsync(ct);
-                    return Result<PurchaseInvoiceDto>.Failure("المورد غير موجود");
+                    return Result<PurchaseInvoiceDto>.Failure("ط§ظ„ظ…ظˆط±ط¯ ط؛ظٹط± ظ…ظˆط¬ظˆط¯");
                 }
                 supplier.IncreaseBalance(invoice.DueAmount);
             }
@@ -184,7 +184,7 @@ public class PurchaseService : IPurchaseService
         {
             await transaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error posting purchase invoice {Id}", id);
-            return Result<PurchaseInvoiceDto>.Failure("حدث خطأ أثناء ترحيل الفاتورة");
+            return Result<PurchaseInvoiceDto>.Failure("ط­ط¯ط« ط®ط·ط£ ط£ط«ظ†ط§ط، طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط©");
         }
     }
 
@@ -195,7 +195,7 @@ public class PurchaseService : IPurchaseService
             .FirstOrDefaultAsync(i => i.Id == id, ct);
 
         if (invoice == null)
-            return Result<PurchaseInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
+            return Result<PurchaseInvoiceDto>.Failure("ط§ظ„ظپط§طھظˆط±ط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©", ErrorCodes.NotFound);
 
         if (invoice.Status == InvoiceStatus.Cancelled)
             return await GetByIdAsync(id, ct);
@@ -249,11 +249,11 @@ public class PurchaseService : IPurchaseService
         {
             await transaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error cancelling purchase invoice {Id}", id);
-            return Result<PurchaseInvoiceDto>.Failure("حدث خطأ أثناء إلغاء الفاتورة");
+            return Result<PurchaseInvoiceDto>.Failure("ط­ط¯ط« ط®ط·ط£ ط£ط«ظ†ط§ط، ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط©");
         }
     }
 
-    private static PurchaseInvoiceDto MapToDto(PurchaseInvoice i)
+        private static PurchaseInvoiceDto MapToDto(PurchaseInvoice i)
     {
         return new PurchaseInvoiceDto(
             i.Id,
@@ -276,6 +276,7 @@ public class PurchaseService : IPurchaseService
             i.Items.Select(it => new PurchaseInvoiceItemDto(
                 it.PurchaseInvoiceItemId,
                 it.ProductId,
+                it.Product?.Code,
                 it.Product?.Name ?? "Unknown",
                 it.Quantity,
                 it.UnitCost,
@@ -285,3 +286,5 @@ public class PurchaseService : IPurchaseService
         );
     }
 }
+
+

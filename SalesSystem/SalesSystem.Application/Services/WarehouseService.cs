@@ -4,7 +4,7 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Warehouses;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Services;

@@ -56,3 +56,4 @@ public sealed class NavigationService : INavigationService
         _contentPanel.Controls.Add(control);
     }
 }
+

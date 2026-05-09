@@ -14,3 +14,4 @@ public sealed class UserSession
     public bool IsAdmin => Role == UserRole.Admin;
     public bool IsManager => Role is UserRole.Admin or UserRole.Manager;
 }
+

@@ -1,5 +1,9 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using SalesSystem.Desktop.Models;
+using SalesSystem.Contracts.Enums;
+using SalesSystem.Contracts.Requests;
+using Microsoft.Extensions.DependencyInjection;
 using SalesSystem.Desktop.Services.Interfaces;
+using SalesSystem.Desktop.Services.Api.Interfaces;
 
 namespace SalesSystem.Desktop.Forms;
 
@@ -39,11 +43,11 @@ public partial class LoginForm : Form
         try
         {
             SetLoading(true);
-            var result = await _authApiService.LoginAsync(username, password);
+            var result = await _authApiService.LoginAsync(new LoginRequest(username, password));
 
             if (result.IsSuccess && result.Value != null)
             {
-                _sessionService.SignIn(result.Value);
+                _sessionService.SignIn(new UserSession { UserId = result.Value.UserId, UserName = result.Value.UserName, FullName = result.Value.FullName, Role = (UserRole)result.Value.Role, Token = result.Value.Token });
                 
                 var mainForm = _serviceProvider.GetRequiredService<MainForm>();
                 mainForm.Show();
@@ -75,3 +79,11 @@ public partial class LoginForm : Form
         lblError.Visible = true;
     }
 }
+
+
+
+
+
+
+
+

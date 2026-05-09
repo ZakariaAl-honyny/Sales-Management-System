@@ -8,3 +8,4 @@ public sealed class Notification
     public NotificationType Type { get; init; }
     public int Duration { get; init; } = 3000; // ms, default 3s
 }
+

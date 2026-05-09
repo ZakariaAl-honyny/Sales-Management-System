@@ -4,7 +4,7 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Customers;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Services;
@@ -137,6 +137,7 @@ public class CustomerService : ICustomerService
             c.Address,
             c.OpeningBalance,
             c.CurrentBalance,
+            c.CreditLimit,
             c.IsActive
         );
     }

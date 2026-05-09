@@ -16,135 +16,253 @@
         private void InitializeComponent()
         {
             this.pnlHeader = new System.Windows.Forms.Panel();
-            this.cmbSupplier = new System.Windows.Forms.ComboBox();
-            this.lblSupplier = new System.Windows.Forms.Label();
-            this.dtpDate = new System.Windows.Forms.DateTimePicker();
+            this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
+            this.lblInvoiceNoLabel = new System.Windows.Forms.Label();
+            this.lblInvoiceNo = new System.Windows.Forms.Label();
             this.lblDate = new System.Windows.Forms.Label();
-            this.cmbWarehouse = new System.Windows.Forms.ComboBox();
+            this.dtpDate = new System.Windows.Forms.DateTimePicker();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.lblSupplier = new System.Windows.Forms.Label();
+            this.cmbSupplier = new System.Windows.Forms.ComboBox();
             this.lblWarehouse = new System.Windows.Forms.Label();
-            this.cmbPaymentType = new System.Windows.Forms.ComboBox();
+            this.cmbWarehouse = new System.Windows.Forms.ComboBox();
             this.lblPaymentType = new System.Windows.Forms.Label();
+            this.cmbPaymentType = new System.Windows.Forms.ComboBox();
+            this.pnlTaxDiscountHeader = new System.Windows.Forms.FlowLayoutPanel();
+            this.chkTaxInclusive = new System.Windows.Forms.CheckBox();
+            this.lblTaxRate = new System.Windows.Forms.Label();
+            this.numTaxRate = new System.Windows.Forms.NumericUpDown();
             this.dgvItems = new System.Windows.Forms.DataGridView();
             this.pnlFooter = new System.Windows.Forms.Panel();
-            this.txtNotes = new System.Windows.Forms.TextBox();
-            this.lblNotes = new System.Windows.Forms.Label();
-            this.lblSubtotal = new System.Windows.Forms.Label();
-            this.lblSubtotalValue = new System.Windows.Forms.Label();
-            this.lblDiscount = new System.Windows.Forms.Label();
-            this.txtDiscount = new SalesSystem.Desktop.Controls.Common.MoneyTextBox();
-            this.lblTax = new System.Windows.Forms.Label();
-            this.txtTax = new SalesSystem.Desktop.Controls.Common.MoneyTextBox();
+            this.tableLayoutPanel2 = new System.Windows.Forms.TableLayoutPanel();
+            this.lblSubTotal = new System.Windows.Forms.Label();
+            this.lblSubTotalVal = new System.Windows.Forms.Label();
+            this.lblTaxAmount = new System.Windows.Forms.Label();
+            this.lblTaxAmountVal = new System.Windows.Forms.Label();
+            this.lblInvoiceDiscount = new System.Windows.Forms.Label();
+            this.numInvoiceDiscount = new System.Windows.Forms.NumericUpDown();
             this.lblTotal = new System.Windows.Forms.Label();
-            this.lblTotalValue = new System.Windows.Forms.Label();
+            this.lblTotalVal = new System.Windows.Forms.Label();
             this.lblPaid = new System.Windows.Forms.Label();
             this.txtPaid = new SalesSystem.Desktop.Controls.Common.MoneyTextBox();
             this.lblDue = new System.Windows.Forms.Label();
-            this.lblDueValue = new System.Windows.Forms.Label();
+            this.lblDueVal = new System.Windows.Forms.Label();
+            this.txtNotes = new System.Windows.Forms.TextBox();
             this.pnlButtons = new System.Windows.Forms.Panel();
-            this.btnSave = new System.Windows.Forms.Button();
+            this.btnAddItem = new System.Windows.Forms.Button();
+            this.btnRemoveItem = new System.Windows.Forms.Button();
+            this.btnSaveDraft = new System.Windows.Forms.Button();
             this.btnPost = new System.Windows.Forms.Button();
-            this.btnCancel = new System.Windows.Forms.Button();
+            this.btnCancelInvoice = new System.Windows.Forms.Button();
             this.btnClose = new System.Windows.Forms.Button();
             
             this.pnlHeader.SuspendLayout();
+            this.tableLayoutPanel1.SuspendLayout();
+            this.pnlTaxDiscountHeader.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numTaxRate)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numInvoiceDiscount)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvItems)).BeginInit();
             this.pnlFooter.SuspendLayout();
+            this.tableLayoutPanel2.SuspendLayout();
             this.pnlButtons.SuspendLayout();
             this.SuspendLayout();
 
-            this.pnlHeader.Dock = DockStyle.Top;
-            this.pnlHeader.Height = 100;
-            this.pnlHeader.Controls.AddRange(new Control[] { cmbSupplier, lblSupplier, dtpDate, lblDate, cmbWarehouse, lblWarehouse, cmbPaymentType, lblPaymentType });
-            
-            lblSupplier.Text = "المورد:"; lblSupplier.Location = new Point(20, 20);
-            cmbSupplier.Location = new Point(100, 17); cmbSupplier.Size = new Size(200, 27); cmbSupplier.DropDownStyle = ComboBoxStyle.DropDownList;
-            
-            lblDate.Text = "التاريخ:"; lblDate.Location = new Point(320, 20);
-            dtpDate.Location = new Point(400, 17); dtpDate.Size = new Size(150, 27);
-            
-            lblWarehouse.Text = "المستودع:"; lblWarehouse.Location = new Point(570, 20);
-            cmbWarehouse.Location = new Point(650, 17); cmbWarehouse.Size = new Size(150, 27); cmbWarehouse.DropDownStyle = ComboBoxStyle.DropDownList;
-            
-            lblPaymentType.Text = "الدفع:"; lblPaymentType.Location = new Point(20, 60);
-            cmbPaymentType.Location = new Point(100, 57); cmbPaymentType.Size = new Size(200, 27); cmbPaymentType.Items.AddRange(new object[] { "نقدي", "آجل", "مختلط" }); cmbPaymentType.DropDownStyle = ComboBoxStyle.DropDownList;
+            // pnlHeader
+            this.pnlHeader.Controls.Add(this.tableLayoutPanel1);
+            this.pnlHeader.Dock = System.Windows.Forms.DockStyle.Top;
+            this.pnlHeader.Height = 150;
+            this.pnlHeader.Padding = new System.Windows.Forms.Padding(10);
 
-            this.dgvItems.Dock = DockStyle.Fill;
-            this.dgvItems.BackgroundColor = Color.White;
+            // tableLayoutPanel1
+            this.tableLayoutPanel1.ColumnCount = 6;
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 33F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 33F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 34F));
+            this.tableLayoutPanel1.Controls.Add(this.lblInvoiceNoLabel, 0, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblInvoiceNo, 1, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblDate, 2, 0);
+            this.tableLayoutPanel1.Controls.Add(this.dtpDate, 3, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblStatus, 5, 0);
+            this.tableLayoutPanel1.Controls.Add(this.lblSupplier, 0, 1);
+            this.tableLayoutPanel1.Controls.Add(this.cmbSupplier, 1, 1);
+            this.tableLayoutPanel1.Controls.Add(this.lblWarehouse, 2, 1);
+            this.tableLayoutPanel1.Controls.Add(this.cmbWarehouse, 3, 1);
+            this.tableLayoutPanel1.Controls.Add(this.lblPaymentType, 4, 1);
+            this.tableLayoutPanel1.Controls.Add(this.cmbPaymentType, 5, 1);
+            this.tableLayoutPanel1.Controls.Add(this.pnlTaxDiscountHeader, 0, 2);
+            this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tableLayoutPanel1.RowCount = 3;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 40F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 40F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 40F));
 
-            this.pnlFooter.Dock = DockStyle.Bottom;
-            this.pnlFooter.Height = 150;
-            this.pnlFooter.Controls.AddRange(new Control[] { txtNotes, lblNotes, lblSubtotal, lblSubtotalValue, lblDiscount, txtDiscount, lblTax, txtTax, lblTotal, lblTotalValue, lblPaid, txtPaid, lblDue, lblDueValue });
-            
-            lblNotes.Text = "ملاحظات:"; lblNotes.Location = new Point(20, 20);
-            txtNotes.Location = new Point(100, 17); txtNotes.Size = new Size(300, 80); txtNotes.Multiline = true;
-            
-            int footerX = 450, footerInputX = 550, footerY = 20, footerSpacing = 35;
-            
-            lblSubtotal.Text = "الإجمالي الفرعي:"; lblSubtotal.Location = new Point(footerX, footerY);
-            lblSubtotalValue.Location = new Point(footerInputX, footerY); lblSubtotalValue.Text = "0.00";
-            
-            footerY += footerSpacing;
-            lblDiscount.Text = "الخصم:"; lblDiscount.Location = new Point(footerX, footerY);
-            txtDiscount.Location = new Point(footerInputX, footerY-3); txtDiscount.Size = new Size(100, 27);
-            txtDiscount.TextChanged += (s,e) => CalculateTotals();
+            this.lblInvoiceNoLabel.Text = "رقم الفاتورة:";
+            this.lblInvoiceNo.Text = "جديد";
+            this.lblDate.Text = "التاريخ:";
+            this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.lblStatus.BackColor = System.Drawing.Color.Blue;
+            this.lblStatus.ForeColor = System.Drawing.Color.White;
+            this.lblStatus.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.lblSupplier.Text = "المورد:";
+            this.lblWarehouse.Text = "مستودع الوجهة:";
+            this.lblPaymentType.Text = "نوع الدفع:";
 
-            lblTax.Text = "الضريبة:"; lblTax.Location = new Point(footerInputX + 120, footerY);
-            txtTax.Location = new Point(footerInputX + 180, footerY-3); txtTax.Size = new Size(100, 27);
-            txtTax.TextChanged += (s,e) => CalculateTotals();
+            this.cmbPaymentType.Items.AddRange(new object[] { "نقدي", "آجل", "مشترك" });
 
-            footerY += footerSpacing;
-            lblTotal.Text = "الإجمالي النهائي:"; lblTotal.Location = new Point(footerX, footerY);
-            lblTotalValue.Location = new Point(footerInputX, footerY); lblTotalValue.Text = "0.00"; lblTotalValue.Font = new Font(this.Font, FontStyle.Bold);
+            // pnlTaxDiscountHeader
+            this.tableLayoutPanel1.SetColumnSpan(this.pnlTaxDiscountHeader, 6);
+            this.pnlTaxDiscountHeader.Controls.Add(this.chkTaxInclusive);
+            this.pnlTaxDiscountHeader.Controls.Add(this.lblTaxRate);
+            this.pnlTaxDiscountHeader.Controls.Add(this.numTaxRate);
+            this.pnlTaxDiscountHeader.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.pnlTaxDiscountHeader.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft;
 
-            lblPaid.Text = "المدفوع:"; lblPaid.Location = new Point(footerInputX + 120, footerY);
-            txtPaid.Location = new Point(footerInputX + 180, footerY-3); txtPaid.Size = new Size(100, 27);
-            txtPaid.TextChanged += (s,e) => CalculateTotals();
+            this.chkTaxInclusive.Text = "شامل الضريبة";
+            this.chkTaxInclusive.Width = 120;
+            this.lblTaxRate.Text = "نسبة الضريبة %:";
+            this.lblTaxRate.AutoSize = true;
+            this.lblTaxRate.Margin = new System.Windows.Forms.Padding(0, 5, 0, 0);
+            this.numTaxRate.DecimalPlaces = 2;
+            this.numTaxRate.Width = 80;
+            this.numTaxRate.Value = 15;
 
-            footerY += footerSpacing;
-            lblDue.Text = "المتبقي:"; lblDue.Location = new Point(footerX, footerY);
-            lblDueValue.Location = new Point(footerInputX, footerY); lblDueValue.Text = "0.00";
+            // dgvItems
+            this.dgvItems.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.dgvItems.BackgroundColor = System.Drawing.Color.White;
+            this.dgvItems.BorderStyle = System.Windows.Forms.BorderStyle.None;
 
-            this.pnlButtons.Dock = DockStyle.Bottom;
+            // pnlFooter
+            this.pnlFooter.Controls.Add(this.tableLayoutPanel2);
+            this.pnlFooter.Controls.Add(this.txtNotes);
+            this.pnlFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.pnlFooter.Height = 200;
+            this.pnlFooter.Padding = new System.Windows.Forms.Padding(10);
+
+            // tableLayoutPanel2
+            this.tableLayoutPanel2.ColumnCount = 2;
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 120F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel2.Controls.Add(this.lblSubTotal, 0, 0);
+            this.tableLayoutPanel2.Controls.Add(this.lblSubTotalVal, 1, 0);
+            this.tableLayoutPanel2.Controls.Add(this.lblTaxAmount, 0, 1);
+            this.tableLayoutPanel2.Controls.Add(this.lblTaxAmountVal, 1, 1);
+            this.tableLayoutPanel2.Controls.Add(this.lblInvoiceDiscount, 0, 2);
+            this.tableLayoutPanel2.Controls.Add(this.numInvoiceDiscount, 1, 2);
+            this.tableLayoutPanel2.Controls.Add(this.lblTotal, 0, 3);
+            this.tableLayoutPanel2.Controls.Add(this.lblTotalVal, 1, 3);
+            this.tableLayoutPanel2.Controls.Add(this.lblPaid, 0, 4);
+            this.tableLayoutPanel2.Controls.Add(this.txtPaid, 1, 4);
+            this.tableLayoutPanel2.Controls.Add(this.lblDue, 0, 5);
+            this.tableLayoutPanel2.Controls.Add(this.lblDueVal, 1, 5);
+            this.tableLayoutPanel2.Dock = System.Windows.Forms.DockStyle.Right;
+            this.tableLayoutPanel2.Width = 300;
+            this.tableLayoutPanel2.RowCount = 6;
+
+            this.lblSubTotal.Text = "الإجمالي الفرعي:";
+            this.lblTaxAmount.Text = "مبلغ الضريبة:";
+            this.lblInvoiceDiscount.Text = "خصم الفاتورة:";
+            this.lblTotal.Text = "الإجمالي النهائي:";
+            this.lblTotal.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
+            this.lblPaid.Text = "المبلغ المدفوع:";
+            this.lblDue.Text = "المبلغ المتبقي:";
+            this.lblDue.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
+
+            this.numInvoiceDiscount.DecimalPlaces = 2;
+            this.numInvoiceDiscount.Maximum = 1000000;
+            this.numInvoiceDiscount.Width = 150;
+
+            // txtNotes
+            this.txtNotes.Dock = System.Windows.Forms.DockStyle.Left;
+            this.txtNotes.Width = 400;
+            this.txtNotes.Multiline = true;
+            this.txtNotes.PlaceholderText = "ملاحظات الفاتورة...";
+
+            // pnlButtons
+            this.pnlButtons.Controls.Add(this.btnClose);
+            this.pnlButtons.Controls.Add(this.btnCancelInvoice);
+            this.pnlButtons.Controls.Add(this.btnPost);
+            this.pnlButtons.Controls.Add(this.btnSaveDraft);
+            this.pnlButtons.Controls.Add(this.btnRemoveItem);
+            this.pnlButtons.Controls.Add(this.btnAddItem);
+            this.pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.pnlButtons.Height = 60;
-            this.pnlButtons.Padding = new Padding(10);
-            this.pnlButtons.Controls.AddRange(new Control[] { btnClose, btnCancel, btnPost, btnSave });
-            
-            btnSave.Text = "حفظ مسودة"; btnSave.Location = new Point(10, 12); btnSave.Size = new Size(100, 35); btnSave.BackColor = Color.FromArgb(52, 73, 94); btnSave.ForeColor = Color.White; btnSave.FlatStyle = FlatStyle.Flat;
-            btnSave.Click += new EventHandler(this.btnSave_Click);
+            this.pnlButtons.Padding = new System.Windows.Forms.Padding(5);
 
-            btnPost.Text = "حفظ وترحيل"; btnPost.Location = new Point(120, 12); btnPost.Size = new Size(100, 35); btnPost.BackColor = Color.FromArgb(46, 204, 113); btnPost.ForeColor = Color.White; btnPost.FlatStyle = FlatStyle.Flat;
-            btnPost.Click += new EventHandler(this.btnPost_Click);
+            this.btnAddItem.Text = "إضافة صنف (F2)";
+            this.btnRemoveItem.Text = "حذف صنف (Del)";
+            this.btnSaveDraft.Text = "حفظ مسودة";
+            this.btnPost.Text = "ترحيل (F5)";
+            this.btnPost.BackColor = System.Drawing.Color.FromArgb(46, 204, 113);
+            this.btnPost.ForeColor = System.Drawing.Color.White;
+            this.btnPost.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCancelInvoice.Text = "إلغاء الفاتورة";
+            this.btnCancelInvoice.BackColor = System.Drawing.Color.FromArgb(231, 76, 60);
+            this.btnCancelInvoice.ForeColor = System.Drawing.Color.White;
+            this.btnCancelInvoice.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnClose.Text = "إغلاق";
 
-            btnCancel.Text = "إلغاء الفاتورة"; btnCancel.Location = new Point(230, 12); btnCancel.Size = new Size(100, 35); btnCancel.BackColor = Color.FromArgb(231, 76, 60); btnCancel.ForeColor = Color.White; btnCancel.FlatStyle = FlatStyle.Flat;
-            btnCancel.Click += new EventHandler(this.btnCancel_Click);
+            this.btnAddItem.Dock = System.Windows.Forms.DockStyle.Right; this.btnAddItem.Width = 120;
+            this.btnRemoveItem.Dock = System.Windows.Forms.DockStyle.Right; this.btnRemoveItem.Width = 120;
+            this.btnSaveDraft.Dock = System.Windows.Forms.DockStyle.Left; this.btnSaveDraft.Width = 120;
+            this.btnPost.Dock = System.Windows.Forms.DockStyle.Left; this.btnPost.Width = 120;
+            this.btnCancelInvoice.Dock = System.Windows.Forms.DockStyle.Left; this.btnCancelInvoice.Width = 120;
+            this.btnClose.Dock = System.Windows.Forms.DockStyle.Left; this.btnClose.Width = 80;
 
-            btnClose.Text = "إغلاق"; btnClose.Location = new Point(780, 12); btnClose.Size = new Size(100, 35); btnClose.Click += (s,e) => this.Close();
-
-            this.ClientSize = new System.Drawing.Size(900, 700);
+            // Form
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(1100, 750);
             this.Controls.Add(this.dgvItems);
-            this.Controls.Add(this.pnlHeader);
-            this.Controls.Add(this.pnlFooter);
             this.Controls.Add(this.pnlButtons);
-            this.RightToLeft = RightToLeft.Yes;
+            this.Controls.Add(this.pnlFooter);
+            this.Controls.Add(this.pnlHeader);
+            this.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.RightToLeftLayout = true;
-            this.StartPosition = FormStartPosition.CenterParent;
-            
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+
+            // Events
+            this.btnAddItem.Click += new System.EventHandler(this.btnAddItem_Click);
+            this.btnRemoveItem.Click += new System.EventHandler(this.btnRemoveItem_Click);
+            this.btnSaveDraft.Click += new System.EventHandler(this.btnSaveDraft_Click);
+            this.btnPost.Click += new System.EventHandler(this.btnPost_Click);
+            this.btnCancelInvoice.Click += new System.EventHandler(this.btnCancelInvoice_Click);
+            this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
+            this.chkTaxInclusive.CheckedChanged += (s,e) => CalculateTotals();
+            this.numTaxRate.ValueChanged += (s,e) => CalculateTotals();
+            this.numInvoiceDiscount.ValueChanged += (s,e) => CalculateTotals();
+            this.txtPaid.TextChanged += (s,e) => CalculateTotals();
+
             this.pnlHeader.ResumeLayout(false);
-            this.pnlHeader.PerformLayout();
+            this.tableLayoutPanel1.ResumeLayout(false);
+            this.tableLayoutPanel1.PerformLayout();
+            this.pnlTaxDiscountHeader.ResumeLayout(false);
+            this.pnlTaxDiscountHeader.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.numTaxRate)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numInvoiceDiscount)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvItems)).EndInit();
             this.pnlFooter.ResumeLayout(false);
             this.pnlFooter.PerformLayout();
+            this.tableLayoutPanel2.ResumeLayout(false);
+            this.tableLayoutPanel2.PerformLayout();
             this.pnlButtons.ResumeLayout(false);
             this.ResumeLayout(false);
         }
 
-        private Panel pnlHeader, pnlFooter, pnlButtons;
-        private ComboBox cmbSupplier, cmbWarehouse, cmbPaymentType;
-        private Label lblSupplier, lblDate, lblWarehouse, lblPaymentType, lblNotes, lblSubtotal, lblSubtotalValue, lblDiscount, lblTax, lblTotal, lblTotalValue, lblPaid, lblDue, lblDueValue;
-        private DateTimePicker dtpDate;
-        private DataGridView dgvItems;
-        private TextBox txtNotes;
-        private SalesSystem.Desktop.Controls.Common.MoneyTextBox txtDiscount, txtTax, txtPaid;
-        private Button btnSave, btnPost, btnCancel, btnClose;
+        private System.Windows.Forms.Panel pnlHeader, pnlFooter, pnlButtons;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1, tableLayoutPanel2;
+        private System.Windows.Forms.FlowLayoutPanel pnlTaxDiscountHeader;
+        private System.Windows.Forms.Label lblInvoiceNoLabel, lblInvoiceNo, lblDate, lblStatus, lblSupplier, lblWarehouse, lblPaymentType, lblSubTotal, lblSubTotalVal, lblTaxAmount, lblTaxAmountVal, lblInvoiceDiscount, lblTotal, lblTotalVal, lblPaid, lblDue, lblDueVal, lblTaxRate;
+        private System.Windows.Forms.DateTimePicker dtpDate;
+        private System.Windows.Forms.ComboBox cmbSupplier, cmbWarehouse, cmbPaymentType;
+        private System.Windows.Forms.DataGridView dgvItems;
+        private System.Windows.Forms.TextBox txtNotes;
+        private System.Windows.Forms.CheckBox chkTaxInclusive;
+        private System.Windows.Forms.NumericUpDown numTaxRate, numInvoiceDiscount;
+        private SalesSystem.Desktop.Controls.Common.MoneyTextBox txtPaid;
+        private System.Windows.Forms.Button btnAddItem, btnRemoveItem, btnSaveDraft, btnPost, btnCancelInvoice, btnClose;
     }
 }

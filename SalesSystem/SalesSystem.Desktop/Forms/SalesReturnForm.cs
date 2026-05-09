@@ -1,8 +1,13 @@
-﻿using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Returns;
+﻿using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Enums;
 using SalesSystem.Desktop.Services.Interfaces;
+using SalesSystem.Desktop.Services.Api.Interfaces;
 using SalesSystem.Desktop.Controls.Common;
+using SalesSystem.Desktop.Messaging.Messages;
 using System.ComponentModel;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace SalesSystem.Desktop.Forms;
 
@@ -13,22 +18,29 @@ public partial class SalesReturnForm : Form
     private readonly IProductApiService _productApi;
     private readonly IWarehouseApiService _warehouseApi;
     private readonly INotificationService _notification;
+    private readonly IEventBus _eventBus;
     
-    private BindingList<ReturnLineItemViewModel> _lines = new();
-    private List<ProductDto> _products = new();
+    private SalesReturnDto? _invoice;
+    private BindingList<InvoiceLineItemViewModel> _lines = new();
+    private List<ProductDto> _allProducts = new();
+    private bool _isUpdating = false;
 
     public SalesReturnForm(
         ISalesReturnApiService returnApi,
         ICustomerApiService customerApi,
         IProductApiService productApi,
         IWarehouseApiService warehouseApi,
-        INotificationService notification)
+        INotificationService notification,
+        IEventBus eventBus,
+        SalesReturnDto? invoice = null)
     {
         _returnApi = returnApi;
         _customerApi = customerApi;
         _productApi = productApi;
         _warehouseApi = warehouseApi;
         _notification = notification;
+        _eventBus = eventBus;
+        _invoice = invoice;
 
         InitializeComponent();
         SetupGrid();
@@ -38,114 +50,156 @@ public partial class SalesReturnForm : Form
     {
         base.OnLoad(e);
         await LoadLookups();
+
+        if (_invoice != null) BindInvoice();
+        else ResetForm();
+        
+        UpdateUIState();
     }
 
     private async Task LoadLookups()
     {
-        var customers = await _customerApi.GetAllAsync();
-        if (customers.IsSuccess)
+        var warehouseRes = await _warehouseApi.GetAllAsync();
+        if (warehouseRes.IsSuccess)
         {
-            var list = customers.Value.ToList();
-            list.Insert(0, new CustomerDto(0, null, "عميل نقدي", "", "", "", 0, 0, true));
+            cmbWarehouse.DataSource = warehouseRes.Value;
+            cmbWarehouse.DisplayMember = "Name";
+            cmbWarehouse.ValueMember = "Id";
+        }
+
+        var customerRes = await _customerApi.GetAllAsync();
+        if (customerRes.IsSuccess)
+        {
+            var list = customerRes.Value!.ToList();
+            list.Insert(0, new CustomerDto(0, "", "عميل نقدي", "", "", "", 0, 0, 0, true));
             cmbCustomer.DataSource = list;
             cmbCustomer.DisplayMember = "Name";
             cmbCustomer.ValueMember = "Id";
         }
 
-        var warehouses = await _warehouseApi.GetAllAsync();
-        if (warehouses.IsSuccess)
-        {
-            cmbWarehouse.DataSource = warehouses.Value;
-            cmbWarehouse.DisplayMember = "Name";
-            cmbWarehouse.ValueMember = "Id";
-        }
+        var productRes = await _productApi.GetAllAsync();
+        if (productRes.IsSuccess) _allProducts = productRes.Value!.ToList();
+    }
 
-        var products = await _productApi.GetAllAsync();
-        if (products.IsSuccess) _products = products.Value.ToList();
+    private void BindInvoice()
+    {
+        _isUpdating = true;
+        this.Text = $"مرتجع مبيعات - {_invoice!.ReturnNo}";
+        lblInvoiceNo.Text = _invoice.ReturnNo;
+        dtpDate.Value = _invoice.ReturnDate;
+        cmbCustomer.SelectedValue = _invoice.CustomerId ?? 0;
+        cmbWarehouse.SelectedValue = _invoice.WarehouseId;
+        txtNotes.Text = _invoice.Notes;
+
+        _lines.Clear();
+        foreach (var item in _invoice.Items)
+        {
+            _lines.Add(new InvoiceLineItemViewModel {
+                ProductId = item.ProductId,
+                ProductName = item.ProductName,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                DiscountAmount = item.DiscountAmount
+            });
+        }
+        _isUpdating = false;
+        CalculateTotals();
+    }
+
+    private void ResetForm()
+    {
+        this.Text = "مرتجع مبيعات جديد";
+        lblInvoiceNo.Text = "جديد";
+        dtpDate.Value = DateTime.Now;
+        _lines.Clear();
+        txtNotes.Clear();
     }
 
     private void SetupGrid()
     {
         dgvItems.AutoGenerateColumns = false;
-        var colProduct = new DataGridViewComboBoxColumn
-        {
-            Name = "ColProduct",
-            HeaderText = "المنتج",
-            DataSource = _products,
-            DisplayMember = "Name",
-            ValueMember = "Id",
-            DataPropertyName = "ProductId",
-            Width = 250,
-            FlatStyle = FlatStyle.Flat
-        };
-        dgvItems.Columns.Add(colProduct);
+        dgvItems.Columns.Add(new DataGridViewTextBoxColumn { Name = "ColCode", HeaderText = "الكود/الباركود", DataPropertyName = "ProductCode", Width = 150 });
+        dgvItems.Columns.Add(new DataGridViewTextBoxColumn { Name = "ColName", HeaderText = "اسم المنتج", DataPropertyName = "ProductName", Width = 250, ReadOnly = true });
         dgvItems.Columns.Add(new DataGridViewTextBoxColumn { Name = "ColQty", HeaderText = "الكمية", DataPropertyName = "Quantity", Width = 80 });
         dgvItems.Columns.Add(new DataGridViewTextBoxColumn { Name = "ColPrice", HeaderText = "السعر", DataPropertyName = "UnitPrice", Width = 100 });
         dgvItems.Columns.Add(new DataGridViewTextBoxColumn { Name = "ColTotal", HeaderText = "الإجمالي", DataPropertyName = "LineTotal", Width = 100, ReadOnly = true });
-        
         dgvItems.DataSource = _lines;
-        dgvItems.CellValueChanged += (s, e) => {
-            if (e.RowIndex >= 0)
-            {
-                var row = _lines[e.RowIndex];
-                if (e.ColumnIndex == 0 && row.ProductId > 0)
-                {
-                    var p = _products.FirstOrDefault(x => x.Id == row.ProductId);
-                    if (p != null) row.UnitPrice = p.SalePrice;
-                }
-                CalculateTotal();
-                dgvItems.Refresh();
+        dgvItems.CellEndEdit += (s, e) => {
+            if (_isUpdating || e.RowIndex < 0) return;
+            var row = _lines[e.RowIndex];
+            if (dgvItems.Columns[e.ColumnIndex].Name == "ColCode") {
+                var p = _allProducts.FirstOrDefault(x => x.Code == row.ProductCode || x.Barcode == row.ProductCode);
+                if (p != null) { row.ProductId = p.Id; row.ProductName = p.Name; row.UnitPrice = p.SalePrice; if (row.Quantity == 0) row.Quantity = 1; }
             }
+            CalculateTotals();
+            dgvItems.Refresh();
         };
     }
 
-    private void CalculateTotal()
+    private void CalculateTotals()
     {
-        lblTotalValue.Text = _lines.Sum(x => x.LineTotal).ToString("N2");
+        decimal total = _lines.Sum(x => x.LineTotal);
+        lblTotalVal.Text = total.ToString("N2");
     }
 
-    private async void btnSave_Click(object sender, EventArgs e)
+    private void UpdateUIState()
     {
-        if (_lines.Count == 0) { _notification.ShowWarning("يرجى إضافة أصناف للمرتجع"); return; }
-        
-        var items = _lines.Select(x => new ReturnItemRequest(x.ProductId, x.Quantity, x.UnitPrice, 0)).ToList();
-        var request = new CreateSalesReturnRequest(
-            null, // Optional original invoice
-            (int)cmbCustomer.SelectedValue == 0 ? null : (int)cmbCustomer.SelectedValue,
-            (int)cmbWarehouse.SelectedValue,
-            dtpDate.Value,
-            txtNotes.Text,
-            items
-        );
+        bool editable = _invoice == null || _invoice.Status == (byte)InvoiceStatus.Draft;
+        pnlHeader.Enabled = editable;
+        dgvItems.ReadOnly = !editable;
+        pnlFooter.Enabled = editable;
+        btnAddItem.Enabled = editable;
+        btnRemoveItem.Enabled = editable;
+        btnSaveDraft.Visible = editable;
+        btnPost.Visible = editable;
+        lblStatus.Text = _invoice?.Status switch { 1 => "مسودة", 2 => "مرحل", 3 => "ملغي", _ => "جديد" };
+    }
 
-        btnSave.Enabled = false;
-        try
-        {
+    private void btnAddItem_Click(object sender, EventArgs e) { _lines.Add(new InvoiceLineItemViewModel()); dgvItems.Focus(); }
+    private void btnRemoveItem_Click(object sender, EventArgs e) { if (dgvItems.CurrentRow?.DataBoundItem is InvoiceLineItemViewModel line) { _lines.Remove(line); CalculateTotals(); } }
+
+    private async void btnSaveDraft_Click(object sender, EventArgs e) => await SaveInvoiceAsync(false);
+    private async void btnPost_Click(object sender, EventArgs e) => await SaveInvoiceAsync(true);
+
+    private async Task SaveInvoiceAsync(bool post)
+    {
+        if (!_lines.Any(l => l.ProductId > 0)) { _notification.ShowWarning("يرجى إضافة أصناف"); return; }
+        if (post && MessageBox.Show("ترحيل المرتجع؟ سيتم زيادة المخزون وتقليل رصيد العميل.", "تأكيد", MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+
+        try {
+            var items = _lines.Where(l => l.ProductId > 0).Select(l => new ReturnItemRequest(l.ProductId, l.Quantity, l.UnitPrice, l.DiscountAmount)).ToList();
+            var request = new CreateSalesReturnRequest(
+                null,
+                (int)(cmbCustomer.SelectedValue ?? 0) == 0 ? null : (int)(cmbCustomer.SelectedValue ?? 0),
+                (int)(cmbWarehouse.SelectedValue ?? 0),
+                dtpDate.Value,
+                txtNotes.Text,
+                items);
+            
             var result = await _returnApi.CreateAsync(request);
-            if (result.IsSuccess)
-            {
-                _notification.ShowSuccess("تم حفظ مرتجع المبيعات بنجاح");
-                this.DialogResult = DialogResult.OK;
-                this.Close();
-            }
-            else _notification.ShowError(result.Error!);
-        }
-        finally { btnSave.Enabled = true; }
+            if (result.IsSuccess) {
+                if (post) {
+                    var postRes = await _returnApi.PostAsync(result.Value.Id);
+                    if (postRes.IsSuccess) { _notification.ShowSuccess("تم الترحيل"); foreach (var item in items) _eventBus.Publish(new StockChangedMessage(item.ProductId)); }
+                    else _notification.ShowError(postRes.Error!);
+                } else _notification.ShowSuccess("تم الحفظ");
+                _eventBus.Publish(new SalesReturnChangedMessage(result.Value.Id));
+                this.DialogResult = DialogResult.OK; this.Close();
+            } else _notification.ShowError(result.Error!);
+        } catch (Exception ex) { _notification.ShowError("خطأ: " + ex.Message); }
     }
 
-    public class ReturnLineItemViewModel : INotifyPropertyChanged
-    {
-        private int _productId;
-        public int ProductId { get => _productId; set { _productId = value; OnPropertyChanged(nameof(ProductId)); OnPropertyChanged(nameof(LineTotal)); } }
-        
-        private decimal _quantity;
-        public decimal Quantity { get => _quantity; set { _quantity = value; OnPropertyChanged(nameof(Quantity)); OnPropertyChanged(nameof(LineTotal)); } }
-        
-        private decimal _unitPrice;
-        public decimal UnitPrice { get => _unitPrice; set { _unitPrice = value; OnPropertyChanged(nameof(UnitPrice)); OnPropertyChanged(nameof(LineTotal)); } }
-        
-        public decimal LineTotal => Quantity * UnitPrice;
+    private void btnClose_Click(object sender, EventArgs e) => this.Close();
 
+    public class InvoiceLineItemViewModel : INotifyPropertyChanged
+    {
+        public int ProductId { get; set; }
+        public string? ProductCode { get; set; }
+        public string? ProductName { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal DiscountAmount { get; set; }
+        public decimal LineTotal => (Quantity * UnitPrice) - DiscountAmount;
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }

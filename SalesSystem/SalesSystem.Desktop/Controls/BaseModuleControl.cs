@@ -32,3 +32,6 @@ public abstract class BaseModuleControl : UserControl
         base.Dispose(disposing);
     }
 }
+
+
+

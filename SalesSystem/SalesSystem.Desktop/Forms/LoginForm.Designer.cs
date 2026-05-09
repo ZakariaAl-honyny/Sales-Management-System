@@ -1,4 +1,4 @@
-ï»¿namespace SalesSystem.Desktop.Forms
+namespace SalesSystem.Desktop.Forms
 {
     partial class LoginForm
     {
@@ -21,14 +21,14 @@
             this.lblTitle.Name = "lblTitle";
             this.lblTitle.Size = new System.Drawing.Size(480, 40);
             this.lblTitle.TabIndex = 0;
-            this.lblTitle.Text = "Ù†Ø¸Ø§Ù… Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª";
+            this.lblTitle.Text = "äÙÇã ÅÏÇÑÉ ÇáãÈíÚÇÊ";
             this.lblTitle.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             
             // lblUserName
             this.lblUserName.Location = new System.Drawing.Point(80, 100);
             this.lblUserName.Name = "lblUserName";
             this.lblUserName.Size = new System.Drawing.Size(100, 25);
-            this.lblUserName.Text = "Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…:";
+            this.lblUserName.Text = "ÇÓã ÇáãÓÊÎÏã:";
             
             // txtUserName
             this.txtUserName.Location = new System.Drawing.Point(180, 97);
@@ -40,7 +40,7 @@
             this.lblPassword.Location = new System.Drawing.Point(80, 140);
             this.lblPassword.Name = "lblPassword";
             this.lblPassword.Size = new System.Drawing.Size(100, 25);
-            this.lblPassword.Text = "ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±:";
+            this.lblPassword.Text = "ßáãÉ ÇáãÑæÑ:";
             
             // txtPassword
             this.txtPassword.Location = new System.Drawing.Point(180, 137);
@@ -57,7 +57,7 @@
             this.btnLogin.Name = "btnLogin";
             this.btnLogin.Size = new System.Drawing.Size(200, 40);
             this.btnLogin.TabIndex = 3;
-            this.btnLogin.Text = "Ø¯Ø®ÙˆÙ„";
+            this.btnLogin.Text = "ÏÎæá";
             this.btnLogin.UseVisualStyleBackColor = false;
             this.btnLogin.Click += new System.EventHandler(this.btnLogin_Click);
             
@@ -84,7 +84,7 @@
             this.MaximizeBox = false;
             this.Name = "LoginForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„";
+            this.Text = "ÊÓÌíá ÇáÏÎæá";
             this.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.RightToLeftLayout = true;
             this.ResumeLayout(false);
@@ -100,3 +100,6 @@
         private System.Windows.Forms.Label lblError;
     }
 }
+
+
+

@@ -1,10 +1,10 @@
-ï»¿using SalesSystem.Desktop.Services.Interfaces;
+using SalesSystem.Desktop.Services.Interfaces;
 
 namespace SalesSystem.Desktop.Services;
 
 public sealed class DialogService : IDialogService
 {
-    public bool Confirm(string message, string title = "ØªØ£ÙƒÙŠØ¯")
+    public bool Confirm(string message, string title = "ÊÃßíÏ")
     {
         var result = MessageBox.Show(
             message, 
@@ -17,3 +17,4 @@ public sealed class DialogService : IDialogService
         return result == DialogResult.Yes;
     }
 }
+

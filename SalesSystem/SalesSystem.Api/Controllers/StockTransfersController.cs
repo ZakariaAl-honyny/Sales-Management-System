@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.Requests.Inventory;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Common;
 using System.Security.Claims;

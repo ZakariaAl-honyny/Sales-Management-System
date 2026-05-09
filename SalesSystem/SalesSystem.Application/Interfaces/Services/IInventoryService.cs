@@ -1,6 +1,6 @@
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests.Inventory;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Interfaces.Services;

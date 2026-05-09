@@ -1,5 +1,7 @@
-﻿using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Desktop.Services.Interfaces;
+using SalesSystem.Desktop.Services.Api.Interfaces;
 
 namespace SalesSystem.Desktop.Forms;
 
@@ -19,6 +21,7 @@ public partial class UnitDialog : Form
         _existingUnit = existingUnit;
         
         InitializeComponent();
+        this.RightToLeft = RightToLeft.Yes;
         
         if (_existingUnit != null)
         {
@@ -48,7 +51,8 @@ public partial class UnitDialog : Form
         {
             if (_existingUnit == null)
             {
-                var result = await _apiService.CreateAsync(txtName.Text, txtSymbol.Text);
+                var request = new CreateUnitRequest(txtName.Text, txtSymbol.Text);
+                var result = await _apiService.CreateAsync(request);
                 if (result.IsSuccess)
                 {
                     _notificationService.ShowSuccess("تمت الإضافة بنجاح");
@@ -59,7 +63,8 @@ public partial class UnitDialog : Form
             }
             else
             {
-                var result = await _apiService.UpdateAsync(_existingUnit.Id, txtName.Text, txtSymbol.Text, chkIsActive.Checked);
+                var request = new UpdateUnitRequest(txtName.Text, txtSymbol.Text, chkIsActive.Checked);
+                var result = await _apiService.UpdateAsync(_existingUnit.Id, request);
                 if (result.IsSuccess)
                 {
                     _notificationService.ShowSuccess("تم التعديل بنجاح");
@@ -77,3 +82,4 @@ public partial class UnitDialog : Form
 
     private void btnCancel_Click(object sender, EventArgs e) => this.Close();
 }
+

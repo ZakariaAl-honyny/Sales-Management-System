@@ -1,12 +1,28 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SalesSystem.Desktop.Configuration;
 using SalesSystem.Desktop.Forms;
 using SalesSystem.Desktop.Services;
-using SalesSystem.Desktop.Services.Http;
+using SalesSystem.Desktop.Controls.Returns;
+using SalesSystem.Desktop.Controls.Inventory;
+using SalesSystem.Desktop.Controls.StockTransfers;
+using SalesSystem.Desktop.Controls.Payments;
+using SalesSystem.Desktop.Controls.Settings;
+using SalesSystem.Desktop.Controls.Users;
+using SalesSystem.Desktop.Services.Api.Interfaces;
+using SalesSystem.Desktop.Services.Api;
 using SalesSystem.Desktop.Services.Interfaces;
-using SalesSystem.Desktop.Controls.Placeholders;
+using SalesSystem.Desktop.Controls.Suppliers;
+using SalesSystem.Desktop.Controls.Customers;
+using SalesSystem.Desktop.Controls.Categories;
+using SalesSystem.Desktop.Controls.Units;
+using SalesSystem.Desktop.Controls.Products;
+using SalesSystem.Desktop.Controls.Warehouses;
+using SalesSystem.Desktop.Controls.Sales;
+using SalesSystem.Desktop.Controls.Purchases;
+using SalesSystem.Desktop.Controls.Reports;
+using SalesSystem.Desktop.Controls.Dashboard;
 
 namespace SalesSystem.Desktop;
 
@@ -32,82 +48,31 @@ static class Program
                 // Http Services
                 services.AddTransient<AuthTokenHandler>();
                 
-                services.AddHttpClient<IAuthApiService, AuthApiService>(client =>
+                services.AddHttpClient<HttpClientService>(client =>
                 {
                     client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 }).AddHttpMessageHandler<AuthTokenHandler>();
 
-                // Domain API Services (Placeholders or actual implementations)
-                // Note: These will be fleshed out in subsequent user stories
-                services.AddHttpClient<IProductApiService, ProductApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<ICustomerApiService, CustomerApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<ISupplierApiService, SupplierApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IWarehouseApiService, WarehouseApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IPurchaseInvoiceApiService, PurchaseInvoiceApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<ISalesInvoiceApiService, SalesInvoiceApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<ISalesReturnApiService, SalesReturnApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IPurchaseReturnApiService, PurchaseReturnApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IStockTransferApiService, StockTransferApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<ICustomerPaymentApiService, CustomerPaymentApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<ISupplierPaymentApiService, SupplierPaymentApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IDashboardApiService, DashboardApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<ISettingsApiService, SettingsApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
-
-                services.AddHttpClient<IUserApiService, UserApiService>(client =>
-                {
-                    client.BaseAddress = new Uri(apiSettings.BaseUrl);
-                }).AddHttpMessageHandler<AuthTokenHandler>();
+                // API Services (Modular Architecture)
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IAuthApiService, SalesSystem.Desktop.Services.Api.AuthApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IProductApiService, SalesSystem.Desktop.Services.Api.ProductApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.ICategoryApiService, SalesSystem.Desktop.Services.Api.CategoryApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IUnitApiService, SalesSystem.Desktop.Services.Api.UnitApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.ICustomerApiService, SalesSystem.Desktop.Services.Api.CustomerApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.ISupplierApiService, SalesSystem.Desktop.Services.Api.SupplierApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IWarehouseApiService, SalesSystem.Desktop.Services.Api.WarehouseApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.ISalesInvoiceApiService, SalesSystem.Desktop.Services.Api.SalesInvoiceApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IPurchaseInvoiceApiService, SalesSystem.Desktop.Services.Api.PurchaseInvoiceApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.ISalesReturnApiService, SalesSystem.Desktop.Services.Api.SalesReturnApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IPurchaseReturnApiService, SalesSystem.Desktop.Services.Api.PurchaseReturnApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IStockTransferApiService, SalesSystem.Desktop.Services.Api.StockTransferApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.ICustomerPaymentApiService, SalesSystem.Desktop.Services.Api.CustomerPaymentApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.ISupplierPaymentApiService, SalesSystem.Desktop.Services.Api.SupplierPaymentApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IReportApiService, SalesSystem.Desktop.Services.Api.ReportApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IDashboardApiService, SalesSystem.Desktop.Services.Api.DashboardApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IInventoryApiService, SalesSystem.Desktop.Services.Api.InventoryApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.ISettingsApiService, SalesSystem.Desktop.Services.Api.SettingsApiService>();
+                services.AddScoped<SalesSystem.Desktop.Services.Api.Interfaces.IUserApiService, SalesSystem.Desktop.Services.Api.UserApiService>();
 
                 // Core Infrastructure Services
                 services.AddSingleton<IEventBus, EventBus>();
@@ -116,24 +81,44 @@ static class Program
                 services.AddSingleton<INotificationService, NotificationService>();
                 services.AddSingleton<IDialogService, DialogService>();
 
-                // UI Components
+                // UI Components - Forms
                 services.AddTransient<LoginForm>();
                 services.AddTransient<MainForm>();
+                services.AddTransient<ProductEditorForm>();
+                services.AddTransient<CustomerEditorForm>();
+                services.AddTransient<SupplierEditorForm>();
+                services.AddTransient<CategoryDialog>();
+                services.AddTransient<CategoryManagerDialog>();
+                services.AddTransient<UnitDialog>();
+                services.AddTransient<UnitManagerDialog>();
+                services.AddTransient<WarehouseEditorForm>();
+                services.AddTransient<SalesInvoiceForm>();
+                services.AddTransient<PurchaseInvoiceForm>();
+                services.AddTransient<SalesReturnForm>();
+                services.AddTransient<PurchaseReturnForm>();
+                services.AddTransient<StockTransferForm>();
+                services.AddTransient<CustomerPaymentDialog>();
+                services.AddTransient<SupplierPaymentDialog>();
+                
+                // Factories
 
-                // Module Controls (Placeholders)
+                // Module Controls
                 services.AddTransient<DashboardControl>();
-                services.AddTransient<ProductsControl>();
-                services.AddTransient<CustomersControl>();
-                services.AddTransient<SuppliersControl>();
-                services.AddTransient<WarehousesControl>();
-                services.AddTransient<PurchasesControl>();
-                services.AddTransient<SalesControl>();
-                services.AddTransient<ReturnsControl>();
-                services.AddTransient<TransfersControl>();
-                services.AddTransient<PaymentsControl>();
-                services.AddTransient<ReportsControl>();
-                services.AddTransient<SettingsControl>();
-                services.AddTransient<UsersControl>();
+                services.AddTransient<ProductsListControl>();
+                services.AddTransient<CustomersListControl>();
+                services.AddTransient<SuppliersListControl>();
+                services.AddTransient<WarehousesListControl>();
+                services.AddTransient<PurchasesListControl>();
+                services.AddTransient<SalesListControl>();
+                services.AddTransient<ReportsListControl>();
+                services.AddTransient<ReturnsListControl>();
+                services.AddTransient<InventoryListControl>();
+                services.AddTransient<StockTransfersListControl>();
+                services.AddTransient<PaymentsListControl>();
+                services.AddTransient<SettingsListControl>();
+                services.AddTransient<UsersListControl>();
+                
+                // Placeholder Controls (Redirect to placeholders until fully implemented)
             })
             .Build();
 
@@ -147,7 +132,7 @@ static class Program
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"\u062D\u062F\u062B \u062E\u0637\u0623 \u0623\u062B\u0646\u0627\u0621 \u062A\u0634\u063A\u064A\u0644 \u062A\u064A\u0642: {ex.Message}", "\u062E\u0637\u0623", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"ط­ط¯ط« ط®ط·ط£ ط£ط«ظ†ط§ط، طھط´ط؛ظٹظ„ ط§ظ„طھط·ط¨ظٹظ‚: {ex.Message}", "ط®ط·ط£", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

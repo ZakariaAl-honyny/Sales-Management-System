@@ -17,3 +17,4 @@ public sealed class NavigationItem
         return (byte)userRole <= (byte)MinRole;
     }
 }
+
