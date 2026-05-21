@@ -5,5 +5,6 @@ public enum InvoiceTypePrint
     Sales,
     Purchase,
     SalesReturn,
-    PurchaseReturn
+    PurchaseReturn,
+    Test = 5
 }

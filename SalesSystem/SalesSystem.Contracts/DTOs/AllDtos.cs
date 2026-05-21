@@ -279,6 +279,13 @@ public record InventoryMovementDto(
     DateTime MovementDate,
     string? Notes);
 
+public record PrintSettingsDto(
+    string ThermalPrinterName,
+    string A4PrinterName,
+    string LogoPath,
+    string StoreTaxNumber,
+    decimal TaxRate);
+
 public record StoreSettingsDto(
     int Id,
     string StoreName,

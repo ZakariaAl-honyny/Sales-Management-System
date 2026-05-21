@@ -200,6 +200,60 @@ public class PrintController : ControllerBase
         return result.IsSuccess ? Ok(result) : BadRequest(result);
     }
 
+    /// <summary>
+    /// Prints a test page to verify printer connectivity.
+    /// </summary>
+    [HttpPost("test")]
+    public async Task<IActionResult> PrintTestPage(CancellationToken ct)
+    {
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
+
+        // Create a minimal test invoice DTO
+        var testInvoice = new InvoicePrintDto
+        {
+            InvoiceType = InvoiceTypePrint.Test,
+            InvoiceNumber = "TEST",
+            InvoiceDate = DateTime.Now,
+            StoreName = storeName,
+            StorePhone = storePhone,
+            StoreAddress = storeAddress,
+            StoreTaxNumber = storeTaxNumber,
+            LogoBytes = logoBytes,
+            CustomerOrSupplierName = "---",
+            TaxRate = taxRate,
+            Items = new List<InvoiceItemPrintDto>
+            {
+                new("هذه طباعة تجريبية", "", 1, 0, 0, 0)
+            },
+            SubTotal = 0,
+            DiscountAmount = 0,
+            TaxAmount = 0,
+            GrandTotal = 0,
+            AmountPaid = 0,
+            ChangeAmount = 0,
+            PaymentMethod = "نقدي",
+            Notes = "طباعة تجريبية للتحقق من اتصال الطابعة"
+        };
+
+        // Try A4 first
+        var a4Result = await _printService.PrintA4Async(testInvoice);
+        if (a4Result.IsSuccess)
+            return Ok(new { message = "تم إرسال صفحة الاختبار إلى طابعة A4 بنجاح" });
+
+        // Fallback to thermal
+        var thermalResult = await _printService.PrintThermalAsync(testInvoice);
+        if (thermalResult.IsSuccess)
+            return Ok(new { message = "تم إرسال صفحة الاختبار إلى الطابعة الحرارية بنجاح" });
+
+        // Both failed
+        return BadRequest(new
+        {
+            error = "فشلت طباعة الاختبار",
+            a4Error = a4Result.ErrorMessage,
+            thermalError = thermalResult.ErrorMessage
+        });
+    }
+
     private async Task<(string name, string phone, string address, string taxNumber,
         byte[]? logoBytes, decimal taxRate)> LoadStoreInfoAsync(CancellationToken ct)
     {

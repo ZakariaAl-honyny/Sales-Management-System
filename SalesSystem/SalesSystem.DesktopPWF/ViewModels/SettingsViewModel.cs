@@ -39,6 +39,7 @@ public class SettingsViewModel : ViewModelBase
     private string _a4PrinterName = string.Empty;
     private string _logoPath = string.Empty;
     private string _storeTaxNumber = string.Empty;
+    private decimal _printTaxRate;
 
     public SettingsViewModel()
     {
@@ -51,6 +52,7 @@ public class SettingsViewModel : ViewModelBase
         CreateBackupCommand = new AsyncRelayCommand(async _ => await CreateBackupAsync());
         RestoreBackupCommand = new AsyncRelayCommand(async _ => await RestoreBackupAsync(), _ => !string.IsNullOrEmpty(SelectedBackup));
         BrowseLogoCommand = new RelayCommand(_ => BrowseLogo());
+        TestPrintCommand = new AsyncRelayCommand(async _ => await TestPrintAsync());
 
         _ = LoadSettingsAsync();
         _ = RefreshBackupListAsync();
@@ -173,6 +175,12 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _storeTaxNumber, value);
     }
 
+    public decimal PrintTaxRate
+    {
+        get => _printTaxRate;
+        set => SetProperty(ref _printTaxRate, value);
+    }
+
     public List<string> InstalledPrinters { get; } =
         System.Drawing.Printing.PrinterSettings.InstalledPrinters
             .Cast<string>()
@@ -186,6 +194,7 @@ public class SettingsViewModel : ViewModelBase
     public AsyncRelayCommand CreateBackupCommand { get; }
     public AsyncRelayCommand RestoreBackupCommand { get; }
     public ICommand BrowseLogoCommand { get; }
+    public ICommand TestPrintCommand { get; }
     #endregion
 
     #region Logic
@@ -203,6 +212,37 @@ public class SettingsViewModel : ViewModelBase
         {
             LogoPath = dialog.FileName;
             StatusMessage = "✅ تم اختيار الشعار";
+        }
+    }
+
+    private async Task TestPrintAsync()
+    {
+        IsLoading = true;
+        StatusMessage = string.Empty;
+        try
+        {
+            // Use the existing HttpClient — call the API test endpoint
+            var httpClient = App.GetService<System.Net.Http.HttpClient>();
+            var response = await httpClient.PostAsync("api/v1/print/test", null);
+            if (response.IsSuccessStatusCode)
+            {
+                StatusMessage = "✅ تمت طباعة الاختبار بنجاح";
+            }
+            else
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                StatusMessage = "❌ فشلت طباعة الاختبار";
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة", errorBody);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = HandleException(ex, "SettingsViewModel.TestPrintAsync",
+                "[SettingsViewModel.TestPrintAsync] Test print failed.");
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 
@@ -228,6 +268,25 @@ public class SettingsViewModel : ViewModelBase
                 AllowNegativeStock = s.AllowNegativeStock;
                 AutoUpdatePrices = s.AutoUpdatePrices;
                 InvoicePrefix = s.InvoicePrefix;
+            }
+
+            // Load print settings
+            try
+            {
+                var printResult = await _settingsService.GetPrintSettingsAsync();
+                if (printResult.IsSuccess && printResult.Value != null)
+                {
+                    var p = printResult.Value;
+                    ThermalPrinterName = p.ThermalPrinterName;
+                    A4PrinterName = p.A4PrinterName;
+                    LogoPath = p.LogoPath;
+                    StoreTaxNumber = p.StoreTaxNumber;
+                    PrintTaxRate = p.TaxRate;
+                }
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "Failed to load print settings");
             }
         }
         catch (Exception ex)
@@ -288,6 +347,16 @@ public class SettingsViewModel : ViewModelBase
             if (result.IsSuccess)
             {
                 _settingsService.RefreshCache();
+
+                // Save print settings
+                var printRequest = new UpdatePrintSettingsRequest(
+                    ThermalPrinterName,
+                    A4PrinterName,
+                    LogoPath,
+                    StoreTaxNumber,
+                    PrintTaxRate);
+                await _settingsService.UpdatePrintSettingsAsync(printRequest);
+
                 StatusMessage = "✅ تم حفظ الإعدادات بنجاح";
                 _ = Task.Delay(3000).ContinueWith(_ => StatusMessage = string.Empty);
             }

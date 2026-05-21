@@ -4,6 +4,7 @@ using QuestPDF.Fluent;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Infrastructure.Printing.A4;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Infrastructure.Printing.Thermal;
 
 namespace SalesSystem.Infrastructure.Printing;
@@ -11,11 +12,13 @@ namespace SalesSystem.Infrastructure.Printing;
 public class PrintService : IPrintService
 {
     private readonly ILogger<PrintService> _logger;
+    private readonly ISystemSettingsRepository _settingsRepo;
     private readonly ThermalReceiptGenerator _thermalGenerator;
 
-    public PrintService(ILogger<PrintService> logger)
+    public PrintService(ILogger<PrintService> logger, ISystemSettingsRepository settingsRepo)
     {
         _logger = logger;
+        _settingsRepo = settingsRepo;
         _thermalGenerator = new ThermalReceiptGenerator();
     }
 
@@ -171,26 +174,30 @@ public class PrintService : IPrintService
     /// Gets the A4 printer name. 
     /// Override this method to read from settings repository.
     /// </summary>
-    protected virtual Task<string?> GetA4PrinterNameAsync()
+    protected virtual async Task<string?> GetA4PrinterNameAsync()
     {
-        // Default: use system default printer
-        var defaultPrinter = System.Drawing.Printing.PrinterSettings.InstalledPrinters
+        var printerName = await _settingsRepo.GetStringAsync("A4PrinterName");
+        if (!string.IsNullOrWhiteSpace(printerName))
+            return printerName;
+        // Fallback to system default
+        return System.Drawing.Printing.PrinterSettings.InstalledPrinters
             .Cast<string>()
             .FirstOrDefault();
-        return Task.FromResult(defaultPrinter);
     }
 
     /// <summary>
     /// Gets the thermal printer name.
     /// Override this method to read from settings repository.
     /// </summary>
-    protected virtual Task<string?> GetThermalPrinterNameAsync()
+    protected virtual async Task<string?> GetThermalPrinterNameAsync()
     {
-        // Default: use system default printer
-        var defaultPrinter = System.Drawing.Printing.PrinterSettings.InstalledPrinters
+        var printerName = await _settingsRepo.GetStringAsync("ThermalPrinterName");
+        if (!string.IsNullOrWhiteSpace(printerName))
+            return printerName;
+        // Fallback to system default
+        return System.Drawing.Printing.PrinterSettings.InstalledPrinters
             .Cast<string>()
             .FirstOrDefault();
-        return Task.FromResult(defaultPrinter);
     }
 
     /// <summary>

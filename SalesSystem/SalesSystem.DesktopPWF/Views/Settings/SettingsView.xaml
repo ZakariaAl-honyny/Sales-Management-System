@@ -151,6 +151,20 @@
                                     <Button Grid.Column="1" Content="تصفح..." Command="{Binding BrowseLogoCommand}" Margin="8,0,0,0" AutomationProperties.AutomationId="BtnBrowseLogo"/>
                                 </Grid>
                             </StackPanel>
+
+                            <Button Grid.Row="3" Grid.ColumnSpan="2"
+                                    Command="{Binding TestPrintCommand}"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Margin="0,8,0,0"
+                                    Height="36"
+                                    Padding="16,0"
+                                    HorizontalAlignment="Right"
+                                    ToolTip="إرسال أمر طباعة اختبارية للطابعة">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🖨️" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="طباعة اختبارية" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
                         </Grid>
                     </StackPanel>
                 </Border>
