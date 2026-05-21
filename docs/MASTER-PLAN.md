@@ -1,1581 +1,2945 @@
-Implementation Plan: Printing & PDF Generation Engine
+Implementation Plan: Auto-Update System
 📋 Master Rules for AI Agent
-This is a self-contained phase. Complete tasks in order. Never mix printing logic with business logic.
+This is a self-contained module. It must NEVER block app startup. All network calls must be fire-and-forget with silent failure.
 
-🗂️ Phase 0: Setup & Dependencies
-Task 0.1 — Install NuGet Packages
+🗂️ Phase 0: Setup & Version File
+Task 0.1 — Set Assembly Version Format
 XML
 
-<!-- File: YourApp.Infrastructure/YourApp.Infrastructure.csproj -->
-<!-- ADD these package references -->
+<!-- File: YourApp.WPF/YourApp.WPF.csproj -->
+<!-- ADD these properties -->
 
+<PropertyGroup>
+  <!-- Version format: Year.Month.BuildNumber -->
+  <!-- Example: 2026.5.1350 -->
+  <AssemblyVersion>2026.5.1350</AssemblyVersion>
+  <FileVersion>2026.5.1350</FileVersion>
+  <Version>2026.5.1350</Version>
+</PropertyGroup>
+Task 0.2 — Version JSON File (Host on Your Server)
+JSON
+
+// File: version.json
+// Host this file at a stable URL, e.g.:
+// https://your-server.com/updates/version.json
+// UPDATE this file every time you release a new version
+
+{
+  "LatestVersion": "2026.5.1350",
+  "ReleaseDate": "2026-05-20",
+  "DownloadUrl": "https://your-server.com/updates/SalesSystemSetup.exe",
+  "ChecksumSHA256": "a3f8e2c1d4b5a6f7e8c9d0b1a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+  "MinimumRequiredVersion": "2026.1.0",
+  "IsCritical": false,
+  "Changelog": [
+    "✅ إضافة نظام الوحدات الديناميكي المتعدد (UOM)",
+    "✅ دعم تعدد الباركود لنفس الوحدة",
+    "✅ إضافة نظام الصناديق المتعددة",
+    "✅ تحديث الأسعار التلقائي من فواتير المشتريات",
+    "🔧 إصلاح مشكلة التقريب في متوسط التكلفة المرجح",
+    "🔧 إصلاح خطأ الطباعة الحرارية مع الأحرف العربية"
+  ]
+}
+Task 0.3 — Add Skipped Version to Local Settings
+XML
+
+<!-- File: YourApp.WPF/App.config -->
+<!-- ADD this setting -->
+
+<appSettings>
+  <add key="SkippedVersion" value="" />
+  <add key="UpdateCheckUrl" 
+       value="https://your-server.com/updates/version.json" />
+</appSettings>
+Task 0.4 — Install NuGet Package
+XML
+
+<!-- File: YourApp.Infrastructure.csproj -->
 <ItemGroup>
-  <!-- PDF Generation -->
-  <PackageReference Include="QuestPDF" Version="2024.3.0" />
-  
-  <!-- Image processing (logo resize) -->
-  <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
-  
-  <!-- Thermal printing ESC/POS -->
-  <PackageReference Include="ESCPOS.NET" Version="3.0.0" />
+  <!-- For downloading files with progress reporting -->
+  <PackageReference Include="Downloader" Version="3.1.0" />
 </ItemGroup>
-Task 0.2 — QuestPDF License Setup
+✅ Phase 0 Checklist
+ Assembly version set in .csproj
+ version.json uploaded to server and publicly accessible
+ URL is HTTPS (never HTTP for security)
+ SkippedVersion key exists in App.config
+ Downloader NuGet installed
+🏗️ Phase 1: Domain Contracts
+Task 1.1 — Data Models
 csharp
 
-// File: Infrastructure/Printing/PrintingBootstrapper.cs
-// Call this ONCE at application startup (App.xaml.cs or Program.cs)
+// File: Application/Updates/Models/UpdateInfo.cs
 
-public static class PrintingBootstrapper
+public record UpdateInfo
 {
-    public static void Initialize()
+    public string LatestVersion { get; init; } = string.Empty;
+    public string ReleaseDate { get; init; } = string.Empty;
+    public string DownloadUrl { get; init; } = string.Empty;
+    public string ChecksumSHA256 { get; init; } = string.Empty;
+    public string MinimumRequiredVersion { get; init; } = string.Empty;
+    public bool IsCritical { get; init; }
+    public List<string> Changelog { get; init; } = new();
+
+    // ─── Computed properties ──────────────────────
+
+    /// <summary>
+    /// True if server version is higher than running version.
+    /// </summary>
+    public bool IsUpdateAvailable(string currentVersion)
     {
-        // QuestPDF Community license (free for revenue < $1M USD)
-        QuestPDF.Settings.License = LicenseType.Community;
+        if (!Version.TryParse(LatestVersion, out var serverVer))
+            return false;
+        if (!Version.TryParse(currentVersion, out var currentVer))
+            return false;
+
+        return serverVer > currentVer;
+    }
+
+    /// <summary>
+    /// True if running version is below minimum required.
+    /// Forces update — cannot be skipped.
+    /// </summary>
+    public bool IsForceUpdate(string currentVersion)
+    {
+        if (!Version.TryParse(MinimumRequiredVersion, out var minVer))
+            return false;
+        if (!Version.TryParse(currentVersion, out var currentVer))
+            return false;
+
+        return currentVer < minVer;
     }
 }
 
-// In App.xaml.cs:
-// protected override void OnStartup(StartupEventArgs e)
-// {
-//     PrintingBootstrapper.Initialize();
-//     base.OnStartup(e);
-// }
-Task 0.3 — Add Settings Columns for Print Setup
-SQL
+// File: Application/Updates/Models/UpdateCheckResult.cs
 
--- File: Migrations/AddPrintSettings.sql
-
-INSERT INTO SystemSettings (SettingKey, SettingValue, DataType, Category, DisplayName, Description)
-VALUES
-('StoreName',       'اسم المتجر',     'string', 'Print', 'اسم المتجر',      'يظهر في رأس الفاتورة'),
-('StorePhone',      '',                'string', 'Print', 'رقم الهاتف',      'رقم التواصل في الفاتورة'),
-('StoreAddress',    '',                'string', 'Print', 'العنوان',         'عنوان المتجر'),
-('StoreTaxNumber',  '',                'string', 'Print', 'الرقم الضريبي',   'الرقم الضريبي للمتجر'),
-('LogoPath',        '',                'string', 'Print', 'مسار الشعار',     'مسار صورة شعار المتجر'),
-('ThermalPrinterName', '',             'string', 'Print', 'طابعة حرارية',   'اسم الطابعة الحرارية في ويندوز'),
-('A4PrinterName',   '',                'string', 'Print', 'طابعة A4',       'اسم طابعة A4 في ويندوز'),
-('TaxRate',         '15',              'decimal','Print', 'نسبة الضريبة %',  'نسبة ضريبة القيمة المضافة');
-✅ Phase 0 Checklist
- QuestPDF NuGet installed successfully
- ImageSharp NuGet installed
- ESCPOS.NET NuGet installed
- PrintingBootstrapper.Initialize() called at startup
- Settings seeded in database
-🏗️ Phase 1: Core Interfaces & Data Contracts
-Task 1.1 — Print Data Transfer Objects
-csharp
-
-// File: Application/Printing/Contracts/InvoicePrintDto.cs
-// These DTOs carry ALL data needed for printing
-// Printing layer never queries the database directly
-
-public record InvoicePrintDto
-{
-    // ─── Store Info (from Settings) ───────────────
-    public string StoreName { get; init; } = string.Empty;
-    public string StorePhone { get; init; } = string.Empty;
-    public string StoreAddress { get; init; } = string.Empty;
-    public string StoreTaxNumber { get; init; } = string.Empty;
-    public byte[]? LogoBytes { get; init; }          // NULL = no logo, handled gracefully
-
-    // ─── Invoice Header ───────────────────────────
-    public int InvoiceId { get; init; }
-    public string InvoiceNumber { get; init; } = string.Empty;
-    public DateTime InvoiceDate { get; init; }
-    public InvoiceTypePrint InvoiceType { get; init; }
-
-    // ─── Parties ──────────────────────────────────
-    public string CustomerOrSupplierName { get; init; } = string.Empty;
-    public string? CustomerPhone { get; init; }
-    public string? CustomerAddress { get; init; }
-
-    // ─── Items ────────────────────────────────────
-    public List<InvoiceItemPrintDto> Items { get; init; } = new();
-
-    // ─── Financials ───────────────────────────────
-    public decimal SubTotal { get; init; }
-    public decimal DiscountAmount { get; init; }
-    public decimal TaxRate { get; init; }
-    public decimal TaxAmount { get; init; }
-    public decimal GrandTotal { get; init; }
-    public bool IsTaxInclusive { get; init; }
-
-    // ─── Payment ──────────────────────────────────
-    public string PaymentMethod { get; init; } = string.Empty; // "نقدي" / "شبكة"
-    public decimal AmountPaid { get; init; }
-    public decimal ChangeAmount { get; init; }
-    public string? Notes { get; init; }
-}
-
-public record InvoiceItemPrintDto(
-    string ProductName,
-    string UnitName,
-    decimal Quantity,
-    decimal UnitPrice,
-    decimal Discount,
-    decimal Total
-);
-
-public enum InvoiceTypePrint
-{
-    Sales,          // فاتورة مبيعات
-    Purchase,       // فاتورة مشتريات
-    SalesReturn,    // مرتجع مبيعات
-    PurchaseReturn  // مرتجع مشتريات
-}
-Task 1.2 — IPrintService Interface
-csharp
-
-// File: Application/Printing/IPrintService.cs
-
-public interface IPrintService
-{
-    /// <summary>
-    /// Generates PDF and saves to temp path, then opens preview window.
-    /// </summary>
-    Task<PrintResult> ShowPreviewAsync(InvoicePrintDto invoice);
-
-    /// <summary>
-    /// Generates PDF and sends directly to A4 printer.
-    /// </summary>
-    Task<PrintResult> PrintA4Async(InvoicePrintDto invoice);
-
-    /// <summary>
-    /// Sends condensed receipt to 80mm thermal printer.
-    /// </summary>
-    Task<PrintResult> PrintThermalAsync(InvoicePrintDto invoice);
-
-    /// <summary>
-    /// Saves PDF to user-chosen location.
-    /// </summary>
-    Task<PrintResult> SavePdfAsync(InvoicePrintDto invoice, string filePath);
-}
-
-// Result object — never throw exceptions to the ViewModel
-public record PrintResult
+public record UpdateCheckResult
 {
     public bool IsSuccess { get; init; }
+    public UpdateInfo? UpdateInfo { get; init; }
     public string? ErrorMessage { get; init; }
-    public string? OutputFilePath { get; init; }
+    public bool UpdateAvailable { get; init; }
 
-    public static PrintResult Success(string? filePath = null)
-        => new() { IsSuccess = true, OutputFilePath = filePath };
+    public static UpdateCheckResult NoUpdate()
+        => new() { IsSuccess = true, UpdateAvailable = false };
 
-    public static PrintResult Failure(string errorMessage)
-        => new() { IsSuccess = false, ErrorMessage = errorMessage };
+    public static UpdateCheckResult Available(UpdateInfo info)
+        => new() { IsSuccess = true, UpdateAvailable = true, UpdateInfo = info };
+
+    public static UpdateCheckResult Failed(string reason)
+        => new() { IsSuccess = false, ErrorMessage = reason };
 }
-Task 1.3 — Invoice Print Data Builder
+
+// File: Application/Updates/Models/DownloadProgress.cs
+
+public record DownloadProgress(
+    long BytesReceived,
+    long TotalBytes,
+    double Percentage,
+    double SpeedKbps
+);
+Task 1.2 — IUpdaterService Interface
 csharp
 
-// File: Application/Printing/InvoicePrintDtoBuilder.cs
-// Assembles the DTO from domain data + settings
-// This is the ONLY place that touches the database for print data
+// File: Application/Updates/IUpdaterService.cs
 
-public class InvoicePrintDtoBuilder
+public interface IUpdaterService
 {
-    private readonly ISystemSettingsRepository _settings;
-    private readonly ILogger<InvoicePrintDtoBuilder> _logger;
+    /// <summary>
+    /// Checks server for new version. NEVER throws — returns Failed result.
+    /// </summary>
+    Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken ct = default);
 
-    public InvoicePrintDtoBuilder(
-        ISystemSettingsRepository settings,
-        ILogger<InvoicePrintDtoBuilder> logger)
-    {
-        _settings = settings;
-        _logger = logger;
-    }
+    /// <summary>
+    /// Downloads installer to temp folder with progress reporting.
+    /// </summary>
+    Task<string?> DownloadUpdateAsync(
+        string downloadUrl,
+        string expectedChecksum,
+        IProgress<DownloadProgress> progress,
+        CancellationToken ct = default);
 
-    public async Task<InvoicePrintDto> BuildAsync(
-        SalesInvoice invoice,
-        CancellationToken ct = default)
-    {
-        var storeSettings = await _settings.GetPrintSettingsAsync(ct);
-        var logoBytes = await LoadLogoSafelyAsync(storeSettings.LogoPath);
+    /// <summary>
+    /// Launches downloaded installer and shuts down the app.
+    /// </summary>
+    void LaunchInstallerAndExit(string installerPath);
 
-        return new InvoicePrintDto
-        {
-            // Store info
-            StoreName = storeSettings.StoreName,
-            StorePhone = storeSettings.StorePhone,
-            StoreAddress = storeSettings.StoreAddress,
-            StoreTaxNumber = storeSettings.StoreTaxNumber,
-            LogoBytes = logoBytes,         // NULL if not found — handled in printer
+    /// <summary>
+    /// Returns current running assembly version.
+    /// </summary>
+    string GetCurrentVersion();
 
-            // Invoice header
-            InvoiceId = invoice.Id,
-            InvoiceNumber = invoice.InvoiceNumber,
-            InvoiceDate = invoice.CreatedAt,
-            InvoiceType = InvoiceTypePrint.Sales,
+    /// <summary>
+    /// Saves skipped version to local settings.
+    /// </summary>
+    void SkipVersion(string version);
 
-            // Parties
-            CustomerOrSupplierName = invoice.CustomerName ?? "زبون نقدي",
-            CustomerPhone = invoice.CustomerPhone,
-
-            // Items — project to print DTO
-            Items = invoice.Items.Select(item => new InvoiceItemPrintDto(
-                item.ProductName,
-                item.UnitName,
-                item.Quantity,
-                item.UnitPrice,
-                item.Discount,
-                item.TotalPrice
-            )).ToList(),
-
-            // Financials
-            SubTotal = invoice.SubTotal,
-            DiscountAmount = invoice.DiscountAmount,
-            TaxRate = storeSettings.TaxRate,
-            TaxAmount = invoice.TaxAmount,
-            GrandTotal = invoice.GrandTotal,
-            IsTaxInclusive = invoice.IsTaxInclusive,
-
-            // Payment
-            PaymentMethod = invoice.PaymentMethod,
-            AmountPaid = invoice.AmountPaid,
-            ChangeAmount = Math.Max(0, invoice.AmountPaid - invoice.GrandTotal),
-            Notes = invoice.Notes
-        };
-    }
-
-    private async Task<byte[]?> LoadLogoSafelyAsync(string? logoPath)
-    {
-        if (string.IsNullOrWhiteSpace(logoPath))
-            return null;
-
-        if (!File.Exists(logoPath))
-        {
-            _logger.LogWarning("Logo file not found at path: {Path}", logoPath);
-            return null;
-        }
-
-        try
-        {
-            return await File.ReadAllBytesAsync(logoPath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to load logo from {Path}", logoPath);
-            return null;    // Graceful degradation — no crash
-        }
-    }
+    /// <summary>
+    /// Returns the version the user chose to skip (or empty string).
+    /// </summary>
+    string GetSkippedVersion();
 }
 ✅ Phase 1 Checklist
- InvoicePrintDto contains ALL data needed — no DB calls from printers
- PrintResult never throws exceptions (returns failure object instead)
- LoadLogoSafelyAsync returns NULL if file missing (no crash)
- Builder is the ONLY class that touches DB for print data
-⚙️ Phase 2: A4 PDF Generator (QuestPDF)
-Task 2.1 — A4 Invoice Document
+ UpdateInfo.IsUpdateAvailable() uses System.Version comparison (not string)
+ UpdateInfo.IsForceUpdate() computed separately from regular update
+ UpdateCheckResult never contains exceptions — only data
+ IUpdaterService.CheckForUpdatesAsync documented as "NEVER throws"
+⚙️ Phase 2: Infrastructure Implementation
+Task 2.1 — UpdaterService
 csharp
 
-// File: Infrastructure/Printing/A4/A4InvoiceDocument.cs
+// File: Infrastructure/Updates/UpdaterService.cs
 
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
-
-public class A4InvoiceDocument : IDocument
+public class UpdaterService : IUpdaterService
 {
-    private readonly InvoicePrintDto _data;
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<UpdaterService> _logger;
+    private readonly string _versionFileUrl;
 
-    // ─── Design Constants ─────────────────────────
-    private static readonly string FontFamily = "Arial";
-    private static readonly float HeaderFontSize = 20f;
-    private static readonly float SubHeaderFontSize = 13f;
-    private static readonly float BodyFontSize = 10f;
-    private static readonly float SmallFontSize = 8f;
-
-    private static readonly string PrimaryColor = "#1565C0";     // Dark blue
-    private static readonly string AccentColor = "#E3F2FD";      // Light blue
-    private static readonly string TextColor = "#212121";
-    private static readonly string MutedColor = "#757575";
-    private static readonly string SuccessColor = "#2E7D32";
-
-    public A4InvoiceDocument(InvoicePrintDto data)
+    public UpdaterService(
+        HttpClient httpClient,
+        ILogger<UpdaterService> logger,
+        IConfiguration configuration)
     {
-        _data = data;
+        _httpClient = httpClient;
+        _logger = logger;
+        _versionFileUrl = configuration["UpdateCheckUrl"]
+            ?? throw new InvalidOperationException("UpdateCheckUrl not configured");
     }
 
-    public DocumentMetadata GetMetadata() => new DocumentMetadata
+    // ═══════════════════════════════════════════════
+    // CHECK FOR UPDATES
+    // ═══════════════════════════════════════════════
+    public async Task<UpdateCheckResult> CheckForUpdatesAsync(
+        CancellationToken ct = default)
     {
-        Title = $"فاتورة {_data.InvoiceNumber}",
-        Author = _data.StoreName,
-        CreationDate = DateTimeOffset.Now
-    };
-
-    public void Compose(IDocumentContainer container)
-    {
-        container.Page(page =>
+        try
         {
-            page.Size(PageSizes.A4);
-            page.Margin(1.5f, Unit.Centimetre);
-            page.DefaultTextStyle(style =>
-                style.FontFamily(FontFamily).FontSize(BodyFontSize));
-            page.ContentFromRightToLeft(); // Arabic RTL support
+            _logger.LogInformation("Checking for updates at {Url}", _versionFileUrl);
 
-            page.Header().Element(ComposeHeader);
-            page.Content().Element(ComposeContent);
-            page.Footer().Element(ComposeFooter);
-        });
-    }
+            // Short timeout — don't make user wait on slow connection
+            using var cts = CancellationTokenSource
+                .CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(8));
 
-    // ═══════════════════════════════════════════════
-    // HEADER: Logo + Store Info + Invoice Title
-    // ═══════════════════════════════════════════════
-    private void ComposeHeader(IContainer container)
-    {
-        container
-            .BorderBottom(2).BorderColor(PrimaryColor)
-            .PaddingBottom(10)
-            .Row(row =>
+            var response = await _httpClient.GetAsync(_versionFileUrl, cts.Token);
+
+            if (!response.IsSuccessStatusCode)
             {
-                // ─── Left: Logo (conditional) ─────────────────
-                if (_data.LogoBytes != null)
+                _logger.LogWarning(
+                    "Update server returned {Status}", response.StatusCode);
+                return UpdateCheckResult.Failed(
+                    $"Server returned {response.StatusCode}");
+            }
+
+            var json = await response.Content.ReadAsStringAsync(cts.Token);
+
+            var updateInfo = JsonSerializer.Deserialize<UpdateInfo>(json,
+                new JsonSerializerOptions
                 {
-                    row.ConstantItem(80).Height(80)
-                        .Padding(4)
-                        .Image(_data.LogoBytes)
-                        .FitArea();
-                }
-                else
-                {
-                    // No logo — use colored placeholder with store initial
-                    row.ConstantItem(80).Height(80)
-                        .Background(PrimaryColor)
-                        .AlignCenter()
-                        .AlignMiddle()
-                        .Text(_data.StoreName.Length > 0
-                            ? _data.StoreName[0].ToString()
-                            : "م")
-                        .FontSize(36).FontColor(Colors.White).Bold();
-                }
-
-                row.RelativeItem().PaddingHorizontal(12).Column(col =>
-                {
-                    // Store name — largest text
-                    col.Item()
-                        .Text(_data.StoreName)
-                        .FontSize(HeaderFontSize)
-                        .FontColor(PrimaryColor)
-                        .Bold();
-
-                    if (!string.IsNullOrWhiteSpace(_data.StorePhone))
-                        col.Item().Text($"📞 {_data.StorePhone}")
-                            .FontSize(SmallFontSize).FontColor(MutedColor);
-
-                    if (!string.IsNullOrWhiteSpace(_data.StoreAddress))
-                        col.Item().Text($"📍 {_data.StoreAddress}")
-                            .FontSize(SmallFontSize).FontColor(MutedColor);
-
-                    if (!string.IsNullOrWhiteSpace(_data.StoreTaxNumber))
-                        col.Item().Text($"الرقم الضريبي: {_data.StoreTaxNumber}")
-                            .FontSize(SmallFontSize).FontColor(MutedColor);
+                    PropertyNameCaseInsensitive = true
                 });
 
-                // ─── Right: Invoice badge ──────────────────────
-                row.ConstantItem(140).Background(AccentColor)
-                    .Padding(10)
-                    .Column(col =>
-                    {
-                        col.Item().AlignCenter()
-                            .Text(GetInvoiceTypeLabel())
-                            .FontSize(SubHeaderFontSize)
-                            .FontColor(PrimaryColor).Bold();
+            if (updateInfo == null)
+                return UpdateCheckResult.Failed("Invalid version.json format");
 
-                        col.Item().AlignCenter()
-                            .Text(_data.InvoiceNumber)
-                            .FontSize(14).Bold();
+            var currentVersion = GetCurrentVersion();
+            var skippedVersion = GetSkippedVersion();
 
-                        col.Item().AlignCenter()
-                            .Text(_data.InvoiceDate.ToString("dd/MM/yyyy"))
-                            .FontSize(SmallFontSize).FontColor(MutedColor);
+            // User already chose to skip this exact version
+            if (!updateInfo.IsForceUpdate(currentVersion) &&
+                updateInfo.LatestVersion == skippedVersion)
+            {
+                _logger.LogInformation(
+                    "Version {Version} was skipped by user", skippedVersion);
+                return UpdateCheckResult.NoUpdate();
+            }
 
-                        col.Item().AlignCenter()
-                            .Text(_data.InvoiceDate.ToString("HH:mm"))
-                            .FontSize(SmallFontSize).FontColor(MutedColor);
-                    });
-            });
+            if (updateInfo.IsUpdateAvailable(currentVersion))
+            {
+                _logger.LogInformation(
+                    "Update available: {Current} → {Latest}",
+                    currentVersion, updateInfo.LatestVersion);
+                return UpdateCheckResult.Available(updateInfo);
+            }
+
+            _logger.LogInformation("App is up to date ({Version})", currentVersion);
+            return UpdateCheckResult.NoUpdate();
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout or cancellation — silent fail
+            _logger.LogWarning("Update check timed out");
+            return UpdateCheckResult.Failed("Connection timeout");
+        }
+        catch (HttpRequestException ex)
+        {
+            // No internet — silent fail, user never sees this
+            _logger.LogWarning(ex, "No internet connection for update check");
+            return UpdateCheckResult.Failed("No internet connection");
+        }
+        catch (Exception ex)
+        {
+            // Any other error — log and silent fail
+            _logger.LogError(ex, "Unexpected error during update check");
+            return UpdateCheckResult.Failed(ex.Message);
+        }
     }
 
     // ═══════════════════════════════════════════════
-    // CONTENT: Customer Info + Items Table
+    // DOWNLOAD UPDATE
     // ═══════════════════════════════════════════════
-    private void ComposeContent(IContainer container)
+    public async Task<string?> DownloadUpdateAsync(
+        string downloadUrl,
+        string expectedChecksum,
+        IProgress<DownloadProgress> progress,
+        CancellationToken ct = default)
     {
-        container.Column(col =>
+        try
         {
-            // ─── Customer / Supplier info ──────────────────
-            col.Item().PaddingVertical(12).Row(row =>
+            // Save to user's temp folder
+            var fileName = Path.GetFileName(new Uri(downloadUrl).LocalPath);
+            var tempPath = Path.Combine(Path.GetTempPath(), "SalesSystemUpdate", fileName);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(tempPath)!);
+
+            _logger.LogInformation(
+                "Downloading update from {Url} to {Path}", downloadUrl, tempPath);
+
+            // Download with progress tracking
+            using var response = await _httpClient.GetAsync(
+                downloadUrl,
+                HttpCompletionOption.ResponseHeadersRead,
+                ct);
+
+            response.EnsureSuccessStatusCode();
+
+            var totalBytes = response.Content.Headers.ContentLength ?? -1L;
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+            await using var fileStream = new FileStream(
+                tempPath, FileMode.Create, FileAccess.Write,
+                FileShare.None, bufferSize: 81920, useAsync: true);
+
+            var buffer = new byte[81920];
+            long bytesReceived = 0;
+            int bytesRead;
+
+            while ((bytesRead = await contentStream.ReadAsync(buffer, ct)) > 0)
             {
-                row.RelativeItem().Border(1).BorderColor("#E0E0E0")
-                    .Padding(10).Column(c =>
-                    {
-                        c.Item().Text("بيانات العميل")
-                            .FontSize(SmallFontSize).FontColor(MutedColor).Bold();
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                bytesReceived += bytesRead;
 
-                        c.Item().Text(_data.CustomerOrSupplierName)
-                            .FontSize(SubHeaderFontSize).Bold();
+                var elapsed = stopwatch.Elapsed.TotalSeconds;
+                var speedKbps = elapsed > 0
+                    ? bytesReceived / 1024.0 / elapsed
+                    : 0;
 
-                        if (!string.IsNullOrWhiteSpace(_data.CustomerPhone))
-                            c.Item().Text($"📞 {_data.CustomerPhone}")
-                                .FontSize(SmallFontSize);
+                var percentage = totalBytes > 0
+                    ? bytesReceived * 100.0 / totalBytes
+                    : 0;
 
-                        if (!string.IsNullOrWhiteSpace(_data.CustomerAddress))
-                            c.Item().Text($"📍 {_data.CustomerAddress}")
-                                .FontSize(SmallFontSize);
-                    });
-
-                row.ConstantItem(20); // spacer
-
-                row.RelativeItem().Border(1).BorderColor("#E0E0E0")
-                    .Padding(10).Column(c =>
-                    {
-                        c.Item().Text("تفاصيل الدفع")
-                            .FontSize(SmallFontSize).FontColor(MutedColor).Bold();
-                        c.Item().Text($"طريقة الدفع: {_data.PaymentMethod}");
-                        c.Item().Text($"المبلغ المدفوع: {_data.AmountPaid:N2} ر.س");
-                        if (_data.ChangeAmount > 0)
-                            c.Item().Text($"الباقي: {_data.ChangeAmount:N2} ر.س")
-                                .FontColor(SuccessColor);
-                    });
-            });
-
-            // ─── Items Table ───────────────────────────────
-            col.Item().Element(ComposeItemsTable);
-
-            // ─── Totals ────────────────────────────────────
-            col.Item().PaddingTop(12).AlignRight()
-                .Width(280).Element(ComposeTotalsSection);
-
-            // ─── Notes ────────────────────────────────────
-            if (!string.IsNullOrWhiteSpace(_data.Notes))
-            {
-                col.Item().PaddingTop(10)
-                    .Border(1).BorderColor("#FFF9C4")
-                    .Background("#FFFDE7")
-                    .Padding(8)
-                    .Column(c =>
-                    {
-                        c.Item().Text("ملاحظات").Bold().FontSize(SmallFontSize);
-                        c.Item().Text(_data.Notes).FontSize(BodyFontSize);
-                    });
-            }
-        });
-    }
-
-    // ─── Items Table ──────────────────────────────
-    private void ComposeItemsTable(IContainer container)
-    {
-        container.Table(table =>
-        {
-            // Column definitions (widths)
-            table.ColumnsDefinition(cols =>
-            {
-                cols.ConstantColumn(25);    // # (row number)
-                cols.RelativeColumn(4);     // Product Name
-                cols.RelativeColumn(1.5f);  // Unit
-                cols.RelativeColumn(1.5f);  // Qty
-                cols.RelativeColumn(2);     // Unit Price
-                cols.RelativeColumn(1.5f);  // Discount
-                cols.RelativeColumn(2);     // Total
-            });
-
-            // ─── Table Header ─────────────────────────────
-            table.Header(header =>
-            {
-                header.Cell().Element(HeaderCell).Text("#");
-                header.Cell().Element(HeaderCell).Text("المنتج");
-                header.Cell().Element(HeaderCell).AlignCenter().Text("الوحدة");
-                header.Cell().Element(HeaderCell).AlignCenter().Text("الكمية");
-                header.Cell().Element(HeaderCell).AlignCenter().Text("سعر الوحدة");
-                header.Cell().Element(HeaderCell).AlignCenter().Text("الخصم");
-                header.Cell().Element(HeaderCell).AlignCenter().Text("الإجمالي");
-            });
-
-            // ─── Table Rows ───────────────────────────────
-            var rowNumber = 1;
-            foreach (var item in _data.Items)
-            {
-                var isEvenRow = rowNumber % 2 == 0;
-                var rowBackground = isEvenRow ? AccentColor : Colors.White;
-
-                table.Cell().Element(c => DataCell(c, rowBackground))
-                    .Text(rowNumber.ToString()).FontColor(MutedColor);
-
-                table.Cell().Element(c => DataCell(c, rowBackground))
-                    .Column(col =>
-                    {
-                        col.Item().Text(item.ProductName).Bold();
-                    });
-
-                table.Cell().Element(c => DataCell(c, rowBackground))
-                    .AlignCenter().Text(item.UnitName);
-
-                table.Cell().Element(c => DataCell(c, rowBackground))
-                    .AlignCenter().Text(item.Quantity.ToString("N2"));
-
-                table.Cell().Element(c => DataCell(c, rowBackground))
-                    .AlignCenter().Text($"{item.UnitPrice:N2}");
-
-                table.Cell().Element(c => DataCell(c, rowBackground))
-                    .AlignCenter()
-                    .Text(item.Discount > 0 ? $"{item.Discount:N2}" : "-")
-                    .FontColor(item.Discount > 0 ? "#F44336" : MutedColor);
-
-                table.Cell().Element(c => DataCell(c, rowBackground))
-                    .AlignCenter().Text($"{item.Total:N2}").Bold();
-
-                rowNumber++;
-            }
-        });
-    }
-
-    // ─── Totals Section ───────────────────────────
-    private void ComposeTotalsSection(IContainer container)
-    {
-        container.Border(1).BorderColor("#E0E0E0").Table(table =>
-        {
-            table.ColumnsDefinition(cols =>
-            {
-                cols.RelativeColumn();
-                cols.RelativeColumn();
-            });
-
-            // Sub total
-            table.Cell().Padding(6).AlignRight()
-                .Text("المجموع الفرعي:").FontColor(MutedColor);
-            table.Cell().Padding(6).AlignLeft()
-                .Text($"{_data.SubTotal:N2} ر.س");
-
-            // Discount (only if exists)
-            if (_data.DiscountAmount > 0)
-            {
-                table.Cell().Padding(6).AlignRight()
-                    .Text("الخصم الإضافي:").FontColor("#F44336");
-                table.Cell().Padding(6).AlignLeft()
-                    .Text($"- {_data.DiscountAmount:N2} ر.س").FontColor("#F44336");
+                progress.Report(new DownloadProgress(
+                    bytesReceived, totalBytes, percentage, speedKbps));
             }
 
-            // Tax — show calculation method
-            var taxLabel = _data.IsTaxInclusive
-                ? $"ضريبة القيمة المضافة ({_data.TaxRate:N0}%) - شاملة:"
-                : $"ضريبة القيمة المضافة ({_data.TaxRate:N0}%) - مضافة:";
-
-            table.Cell().Padding(6).AlignRight().Text(taxLabel).FontColor(MutedColor);
-            table.Cell().Padding(6).AlignLeft().Text($"{_data.TaxAmount:N2} ر.س");
-
-            // Grand total — highlighted
-            table.Cell().ColumnSpan(2)
-                .Background(PrimaryColor)
-                .Padding(10)
-                .Row(row =>
+            // ─── Verify checksum ───────────────────────────
+            if (!string.IsNullOrWhiteSpace(expectedChecksum))
+            {
+                var isValid = await VerifyChecksumAsync(tempPath, expectedChecksum);
+                if (!isValid)
                 {
-                    row.RelativeItem().AlignRight()
-                        .Text("الإجمالي النهائي:").FontColor(Colors.White).Bold()
-                        .FontSize(SubHeaderFontSize);
-                    row.RelativeItem().AlignLeft()
-                        .Text($"{_data.GrandTotal:N2} ر.س")
-                        .FontColor(Colors.White).Bold()
-                        .FontSize(SubHeaderFontSize);
-                });
+                    File.Delete(tempPath);
+                    _logger.LogError("Checksum verification failed for {File}", tempPath);
+                    return null; // Corrupted download
+                }
+            }
+
+            _logger.LogInformation("Download complete: {Path}", tempPath);
+            return tempPath;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Download cancelled by user");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Download failed");
+            return null;
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // LAUNCH INSTALLER & EXIT
+    // ═══════════════════════════════════════════════
+    public void LaunchInstallerAndExit(string installerPath)
+    {
+        if (!File.Exists(installerPath))
+        {
+            _logger.LogError("Installer not found at {Path}", installerPath);
+            return;
+        }
+
+        _logger.LogInformation("Launching installer: {Path}", installerPath);
+
+        // Launch installer as independent process
+        // /SILENT flag for InnoSetup installers (no UAC prompt dialogs)
+        var startInfo = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = installerPath,
+            Arguments = "/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
+            UseShellExecute = true,   // Required for UAC elevation prompt
+            Verb = "runas"            // Request admin privileges
+        };
+
+        System.Diagnostics.Process.Start(startInfo);
+
+        // Shut down THIS app so installer can replace files
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            System.Windows.Application.Current.Shutdown();
         });
     }
 
-    // ═══════════════════════════════════════════════
-    // FOOTER
-    // ═══════════════════════════════════════════════
-    private void ComposeFooter(IContainer container)
+    // ─── Helper Methods ───────────────────────────
+
+    public string GetCurrentVersion()
     {
-        container
-            .BorderTop(1).BorderColor("#E0E0E0")
-            .PaddingTop(8)
-            .Row(row =>
+        var version = System.Reflection.Assembly
+            .GetExecutingAssembly()
+            .GetName()
+            .Version;
+
+        // Format: Major.Minor.Build (drop Revision)
+        return version != null
+            ? $"{version.Major}.{version.Minor}.{version.Build}"
+            : "0.0.0";
+    }
+
+    public void SkipVersion(string version)
+    {
+        var config = ConfigurationManager.AppSettings;
+        config["SkippedVersion"] = version;
+
+        // Persist to App.config file
+        var configFile = ConfigurationManager.OpenExeConfiguration(
+            ConfigurationUserLevel.None);
+        configFile.AppSettings.Settings["SkippedVersion"].Value = version;
+        configFile.Save(ConfigurationSaveMode.Modified);
+        ConfigurationManager.RefreshSection("appSettings");
+
+        _logger.LogInformation("Version {Version} marked as skipped", version);
+    }
+
+    public string GetSkippedVersion()
+        => ConfigurationManager.AppSettings["SkippedVersion"] ?? string.Empty;
+
+    private async Task<bool> VerifyChecksumAsync(string filePath, string expectedSha256)
+    {
+        await using var stream = File.OpenRead(filePath);
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var hashBytes = await sha256.ComputeHashAsync(stream);
+        var actualHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        return actualHash == expectedSha256.ToLowerInvariant();
+    }
+}
+Task 2.2 — Register Services in DI
+csharp
+
+// File: Infrastructure/DependencyInjection.cs
+// ADD to existing service registration
+
+public static IServiceCollection AddUpdateServices(
+    this IServiceCollection services,
+    IConfiguration configuration)
+{
+    // HttpClient with timeout and user agent
+    services.AddHttpClient<IUpdaterService, UpdaterService>(client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(30);
+        client.DefaultRequestHeaders.Add(
+            "User-Agent",
+            "SalesSystem-UpdateChecker/1.0");
+        // Prevent caching of version file
+        client.DefaultRequestHeaders.CacheControl =
+            new System.Net.Http.Headers.CacheControlHeaderValue
             {
-                row.RelativeItem().AlignRight()
-                    .Text(ctx =>
-                    {
-                        ctx.Span("صفحة ").FontColor(MutedColor).FontSize(SmallFontSize);
-                        ctx.CurrentPageNumber().FontColor(MutedColor).FontSize(SmallFontSize);
-                        ctx.Span(" من ").FontColor(MutedColor).FontSize(SmallFontSize);
-                        ctx.TotalPages().FontColor(MutedColor).FontSize(SmallFontSize);
-                    });
+                NoCache = true,
+                NoStore = true
+            };
+    });
 
-                row.RelativeItem().AlignCenter()
-                    .Text("شكراً لتعاملكم معنا")
-                    .FontSize(SmallFontSize).FontColor(MutedColor).Italic();
-
-                row.RelativeItem().AlignLeft()
-                    .Text($"طُبع: {DateTime.Now:dd/MM/yyyy HH:mm}")
-                    .FontSize(SmallFontSize).FontColor(MutedColor);
-            });
-    }
-
-    // ─── Cell Style Helpers ───────────────────────
-
-    private IContainer HeaderCell(IContainer container)
-    {
-        return container
-            .Background(PrimaryColor)
-            .Padding(8)
-            .DefaultTextStyle(s => s
-                .FontColor(Colors.White)
-                .Bold()
-                .FontSize(BodyFontSize));
-    }
-
-    private IContainer DataCell(IContainer container, string background)
-    {
-        return container
-            .Background(background)
-            .BorderBottom(1).BorderColor("#E0E0E0")
-            .Padding(7);
-    }
-
-    private string GetInvoiceTypeLabel() => _data.InvoiceType switch
-    {
-        InvoiceTypePrint.Sales => "فاتورة مبيعات",
-        InvoiceTypePrint.Purchase => "فاتورة مشتريات",
-        InvoiceTypePrint.SalesReturn => "مرتجع مبيعات",
-        InvoiceTypePrint.PurchaseReturn => "مرتجع مشتريات",
-        _ => "فاتورة"
-    };
+    return services;
 }
 ✅ Phase 2 Checklist
- Logo renders when LogoBytes is not null
- Logo space is OMITTED (not empty box) when LogoBytes is null
- Even/odd row alternating colors work correctly
- Tax label shows "شاملة" vs "مضافة" based on IsTaxInclusive
- Discount row only appears when DiscountAmount > 0
- Page numbers render correctly on multi-page invoices
- RTL direction applied to entire page
-⚙️ Phase 3: Thermal Receipt Printer (80mm)
-Task 3.1 — Thermal Receipt Generator
+ HTTP timeout set to 8 seconds for version check
+ Download has 30 second timeout (longer file)
+ SHA256 checksum verified after download
+ Corrupted download deleted automatically
+ LaunchInstallerAndExit uses runas verb for admin elevation
+ SkipVersion persists to App.config file
+ All catch blocks log but never rethrow
+⚙️ Phase 3: Application Layer — Update ViewModel
+Task 3.1 — UpdateDialogViewModel
 csharp
 
-// File: Infrastructure/Printing/Thermal/ThermalReceiptGenerator.cs
-// Uses monospaced formatting for perfect column alignment
+// File: WPF/ViewModels/Updates/UpdateDialogViewModel.cs
 
-public class ThermalReceiptGenerator
+public class UpdateDialogViewModel : BaseViewModel
 {
-    // 80mm thermal printer = 42 characters per line (at 12pt monospace)
-    private const int LineWidth = 42;
-    private const char Separator = '-';
-    private const char DoubleSeparator = '=';
+    private readonly IUpdaterService _updaterService;
+    private readonly UpdateInfo _updateInfo;
+    private CancellationTokenSource? _downloadCts;
 
-    public byte[] GenerateEscPosCommands(InvoicePrintDto data)
+    // ─── Display Properties ───────────────────────
+    public string SystemName { get; } = "نظام إدارة المبيعات";
+    public string CurrentVersion { get; }
+    public string LatestVersion { get; }
+    public string ReleaseDate { get; }
+    public bool IsCriticalUpdate { get; }
+
+    // Header text — matches Cloudflare WARP style
+    public string HeaderText =>
+        $"يتوفر إصدار جديد من {SystemName}";
+
+    public string SubHeaderText =>
+        $"الإصدار {LatestVersion} متاح الآن  •  لديك الإصدار {CurrentVersion}";
+
+    public List<string> ChangelogItems { get; }
+
+    // ─── Download Progress ────────────────────────
+    private double _downloadProgress;
+    public double DownloadProgress
     {
-        var commands = new List<byte[]>();
+        get => _downloadProgress;
+        set => SetProperty(ref _downloadProgress, value);
+    }
 
-        // ─── ESC/POS: Initialize printer ──────────────
-        commands.Add(EscPos.Initialize());
+    private string _downloadStatusText = string.Empty;
+    public string DownloadStatusText
+    {
+        get => _downloadStatusText;
+        set => SetProperty(ref _downloadStatusText, value);
+    }
 
-        // ─── Header ───────────────────────────────────
-        commands.Add(EscPos.SetAlignment(Alignment.Center));
-        commands.Add(EscPos.SetBold(true));
-        commands.Add(EscPos.SetFontSize(2)); // Double height
-
-        // Store name (truncate if too long)
-        var storeName = TruncateCenter(data.StoreName, LineWidth);
-        commands.Add(EscPos.PrintLine(storeName));
-
-        commands.Add(EscPos.SetFontSize(1));
-        commands.Add(EscPos.SetBold(false));
-
-        if (!string.IsNullOrWhiteSpace(data.StorePhone))
-            commands.Add(EscPos.PrintLine(data.StorePhone));
-
-        if (!string.IsNullOrWhiteSpace(data.StoreAddress))
+    private bool _isDownloading;
+    public bool IsDownloading
+    {
+        get => _isDownloading;
+        set
         {
-            // Wrap address to fit line width
-            foreach (var line in WrapText(data.StoreAddress, LineWidth))
-                commands.Add(EscPos.PrintLine(line));
-        }
-
-        if (!string.IsNullOrWhiteSpace(data.StoreTaxNumber))
-            commands.Add(EscPos.PrintLine($"ض: {data.StoreTaxNumber}"));
-
-        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
-
-        // ─── Invoice info ──────────────────────────────
-        commands.Add(EscPos.SetAlignment(Alignment.Right));
-        commands.Add(EscPos.PrintLine(
-            FormatTwoColumns("رقم الفاتورة:", data.InvoiceNumber)));
-        commands.Add(EscPos.PrintLine(
-            FormatTwoColumns("التاريخ:", data.InvoiceDate.ToString("dd/MM/yyyy HH:mm"))));
-        commands.Add(EscPos.PrintLine(
-            FormatTwoColumns("العميل:", TruncateRight(data.CustomerOrSupplierName, 20))));
-
-        commands.Add(EscPos.PrintLine(new string(Separator, LineWidth)));
-
-        // ─── Column headers ────────────────────────────
-        // Format: "الصنف            الكمية  السعر   المجموع"
-        commands.Add(EscPos.SetBold(true));
-        commands.Add(EscPos.PrintLine(
-            FormatItemHeader()));
-        commands.Add(EscPos.SetBold(false));
-        commands.Add(EscPos.PrintLine(new string(Separator, LineWidth)));
-
-        // ─── Items ────────────────────────────────────
-        foreach (var item in data.Items)
-        {
-            // Line 1: Product name (full width)
-            var name = TruncateRight(item.ProductName, LineWidth - 2);
-            commands.Add(EscPos.PrintLine($"  {name}"));
-
-            // Line 2: Qty × Price = Total (aligned right)
-            var itemLine = FormatItemLine(
-                item.UnitName,
-                item.Quantity,
-                item.UnitPrice,
-                item.Total);
-            commands.Add(EscPos.PrintLine(itemLine));
-
-            // Discount note (only if exists)
-            if (item.Discount > 0)
-                commands.Add(EscPos.PrintLine(
-                    FormatTwoColumns("  خصم:", $"-{item.Discount:N2}")));
-        }
-
-        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
-
-        // ─── Totals ────────────────────────────────────
-        if (data.DiscountAmount > 0)
-            commands.Add(EscPos.PrintLine(
-                FormatTwoColumns("الخصم:", $"-{data.DiscountAmount:N2}")));
-
-        commands.Add(EscPos.PrintLine(
-            FormatTwoColumns($"ض.ق.م ({data.TaxRate:N0}%):", $"{data.TaxAmount:N2}")));
-
-        // Grand total — bold
-        commands.Add(EscPos.SetBold(true));
-        commands.Add(EscPos.SetFontSize(2));
-        commands.Add(EscPos.PrintLine(
-            FormatTwoColumns("الإجمالي:", $"{data.GrandTotal:N2} ر.س")));
-        commands.Add(EscPos.SetFontSize(1));
-        commands.Add(EscPos.SetBold(false));
-
-        // Payment info
-        commands.Add(EscPos.PrintLine(
-            FormatTwoColumns("المدفوع:", $"{data.AmountPaid:N2}")));
-        if (data.ChangeAmount > 0)
-            commands.Add(EscPos.PrintLine(
-                FormatTwoColumns("الباقي:", $"{data.ChangeAmount:N2}")));
-
-        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
-
-        // ─── Footer ────────────────────────────────────
-        commands.Add(EscPos.SetAlignment(Alignment.Center));
-        commands.Add(EscPos.PrintLine("شكراً لتعاملكم معنا"));
-        commands.Add(EscPos.PrintLine(string.Empty));
-        commands.Add(EscPos.PrintLine(string.Empty));
-
-        // ─── Cut paper ────────────────────────────────
-        commands.Add(EscPos.CutPaper());
-
-        // Flatten all byte arrays
-        return commands.SelectMany(b => b).ToArray();
-    }
-
-    // ─── Text Formatting Helpers ──────────────────
-
-    /// <summary>
-    /// "Label:          Value" aligned to fill LineWidth exactly
-    /// </summary>
-    private string FormatTwoColumns(string label, string value)
-    {
-        var totalLength = label.Length + value.Length;
-        var spaces = Math.Max(1, LineWidth - totalLength);
-        return label + new string(' ', spaces) + value;
-    }
-
-    private string FormatItemHeader()
-    {
-        // "الوحدة  الكمية  السعر   المجموع"
-        return "الوحدة".PadLeft(8) +
-               "الكمية".PadLeft(8) +
-               "السعر".PadLeft(9) +
-               "المجموع".PadLeft(9);
-    }
-
-    private string FormatItemLine(
-        string unit, decimal qty, decimal price, decimal total)
-    {
-        return unit.PadLeft(8) +
-               qty.ToString("N1").PadLeft(8) +
-               price.ToString("N2").PadLeft(9) +
-               total.ToString("N2").PadLeft(9);
-    }
-
-    private string TruncateRight(string text, int maxLength)
-        => text.Length <= maxLength ? text : text[..maxLength];
-
-    private string TruncateCenter(string text, int maxLength)
-    {
-        if (text.Length <= maxLength) return text;
-        var half = (maxLength - 3) / 2;
-        return text[..half] + "..." + text[^half..];
-    }
-
-    private IEnumerable<string> WrapText(string text, int lineWidth)
-    {
-        for (int i = 0; i < text.Length; i += lineWidth)
-            yield return text.Substring(i, Math.Min(lineWidth, text.Length - i));
-    }
-}
-
-// ─── ESC/POS Command Builder ───────────────────────────────────
-// Lightweight wrapper — avoids heavy dependencies
-
-public static class EscPos
-{
-    public static byte[] Initialize()
-        => new byte[] { 0x1B, 0x40 };                   // ESC @
-
-    public static byte[] CutPaper()
-        => new byte[] { 0x1D, 0x56, 0x42, 0x00 };       // GS V B 0
-
-    public static byte[] SetBold(bool bold)
-        => bold
-            ? new byte[] { 0x1B, 0x45, 0x01 }           // ESC E 1
-            : new byte[] { 0x1B, 0x45, 0x00 };          // ESC E 0
-
-    public static byte[] SetAlignment(Alignment alignment)
-    {
-        byte code = alignment switch
-        {
-            Alignment.Left => 0x00,
-            Alignment.Center => 0x01,
-            Alignment.Right => 0x02,
-            _ => 0x00
-        };
-        return new byte[] { 0x1B, 0x61, code };          // ESC a n
-    }
-
-    public static byte[] SetFontSize(int multiplier)
-    {
-        // 1 = normal, 2 = double height
-        byte size = multiplier <= 1 ? (byte)0x00 : (byte)0x11;
-        return new byte[] { 0x1D, 0x21, size };          // GS ! n
-    }
-
-    public static byte[] PrintLine(string text)
-    {
-        // Encode in Windows-1256 for Arabic character support
-        var encoding = System.Text.Encoding.GetEncoding(1256);
-        var textBytes = encoding.GetBytes(text);
-        var newLine = new byte[] { 0x0A };               // LF
-        return textBytes.Concat(newLine).ToArray();
-    }
-}
-
-public enum Alignment { Left, Center, Right }
-✅ Phase 3 Checklist
- All lines fit within 42 characters
- FormatTwoColumns fills exactly to LineWidth
- CutPaper() ESC/POS command added at end
- Arabic encoded in Windows-1256 (not UTF-8)
- Logo is NOT included (thermal printers don't need it)
-🔧 Phase 4: Print Service Implementation
-Task 4.1 — Main PrintService
-csharp
-
-// File: Infrastructure/Printing/PrintService.cs
-
-public class PrintService : IPrintService
-{
-    private readonly ISystemSettingsRepository _settings;
-    private readonly ILogger<PrintService> _logger;
-    private readonly ThermalReceiptGenerator _thermalGenerator;
-
-    public PrintService(
-        ISystemSettingsRepository settings,
-        ILogger<PrintService> logger)
-    {
-        _settings = settings;
-        _logger = logger;
-        _thermalGenerator = new ThermalReceiptGenerator();
-    }
-
-    // ═══════════════════════════════════════════════
-    // SHOW PREVIEW (WPF Modal Window)
-    // ═══════════════════════════════════════════════
-    public async Task<PrintResult> ShowPreviewAsync(InvoicePrintDto invoice)
-    {
-        try
-        {
-            var pdfBytes = await GeneratePdfBytesAsync(invoice);
-
-            // Save to temp file for preview
-            var tempPath = Path.Combine(
-                Path.GetTempPath(),
-                $"Invoice_{invoice.InvoiceNumber}_{DateTime.Now:HHmmss}.pdf");
-
-            await File.WriteAllBytesAsync(tempPath, pdfBytes);
-
-            // Open preview window on UI thread
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            if (SetProperty(ref _isDownloading, value))
             {
-                var previewWindow = new PdfPreviewWindow(tempPath, invoice.InvoiceNumber);
-                previewWindow.ShowDialog();
-            });
-
-            // Cleanup temp file after preview closes
-            TryDeleteFile(tempPath);
-
-            return PrintResult.Success();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to show print preview");
-            return PrintResult.Failure(
-                $"تعذر فتح معاينة الطباعة:\n{GetUserFriendlyError(ex)}");
-        }
-    }
-
-    // ═══════════════════════════════════════════════
-    // PRINT A4
-    // ═══════════════════════════════════════════════
-    public async Task<PrintResult> PrintA4Async(InvoicePrintDto invoice)
-    {
-        try
-        {
-            var settings = await _settings.GetPrintSettingsAsync();
-            var printerName = settings.A4PrinterName;
-
-            // Validate printer exists
-            var printerExists = PrinterSettings.InstalledPrinters
-                .Cast<string>()
-                .Any(p => p.Equals(printerName, StringComparison.OrdinalIgnoreCase));
-
-            if (!printerExists)
-            {
-                return PrintResult.Failure(
-                    $"الطابعة '{printerName}' غير موجودة أو غير متصلة.\n" +
-                    $"يرجى:\n" +
-                    $"1. التأكد من توصيل الطابعة\n" +
-                    $"2. التأكد من تثبيت تعريف الطابعة\n" +
-                    $"3. مراجعة اسم الطابعة في الإعدادات");
+                OnPropertyChanged(nameof(IsNotDownloading));
+                OnPropertyChanged(nameof(DownloadButtonText));
             }
+        }
+    }
 
-            var pdfBytes = await GeneratePdfBytesAsync(invoice);
+    public bool IsNotDownloading => !IsDownloading;
 
-            // Save to temp and print
-            var tempPath = Path.GetTempFileName() + ".pdf";
-            await File.WriteAllBytesAsync(tempPath, pdfBytes);
+    public string DownloadButtonText =>
+        IsDownloading ? "جارٍ التحميل..." : "⬇️  تحميل وتثبيت";
 
-            await Task.Run(() =>
+    // Critical updates cannot be skipped
+    public bool CanSkip => !IsCriticalUpdate;
+
+    // Result tells the Window what action was taken
+    public UpdateDialogAction Result { get; private set; }
+        = UpdateDialogAction.RemindLater;
+
+    // ─── Commands ─────────────────────────────────
+    public IAsyncRelayCommand DownloadAndInstallCommand { get; }
+    public IRelayCommand RemindLaterCommand { get; }
+    public IRelayCommand SkipVersionCommand { get; }
+    public IRelayCommand CancelDownloadCommand { get; }
+
+    // Reference to the Window — needed to close it
+    public Action? CloseDialog { get; set; }
+
+    public UpdateDialogViewModel(
+        IUpdaterService updaterService,
+        UpdateInfo updateInfo)
+    {
+        _updaterService = updaterService;
+        _updateInfo = updateInfo;
+
+        CurrentVersion = updaterService.GetCurrentVersion();
+        LatestVersion = updateInfo.LatestVersion;
+        ReleaseDate = updateInfo.ReleaseDate;
+        IsCriticalUpdate = updateInfo.IsCritical;
+        ChangelogItems = updateInfo.Changelog;
+
+        DownloadAndInstallCommand = new AsyncRelayCommand(
+            DownloadAndInstallAsync,
+            () => !IsDownloading);
+
+        RemindLaterCommand = new RelayCommand(RemindLater,
+            () => CanSkip && !IsDownloading);
+
+        SkipVersionCommand = new RelayCommand(SkipThisVersion,
+            () => CanSkip && !IsDownloading);
+
+        CancelDownloadCommand = new RelayCommand(CancelDownload,
+            () => IsDownloading);
+    }
+
+    // ═══════════════════════════════════════════════
+    // DOWNLOAD AND INSTALL
+    // ═══════════════════════════════════════════════
+    private async Task DownloadAndInstallAsync()
+    {
+        IsDownloading = true;
+        DownloadStatusText = "جارٍ تجهيز التحميل...";
+        DownloadProgress = 0;
+        _downloadCts = new CancellationTokenSource();
+
+        var progressReporter = new Progress<DownloadProgress>(p =>
+        {
+            // Progress callback runs on UI thread via Progress<T>
+            DownloadProgress = p.Percentage;
+            DownloadStatusText = FormatDownloadStatus(p);
+        });
+
+        try
+        {
+            var installerPath = await _updaterService.DownloadUpdateAsync(
+                _updateInfo.DownloadUrl,
+                _updateInfo.ChecksumSHA256,
+                progressReporter,
+                _downloadCts.Token);
+
+            if (installerPath == null)
             {
-                // Use Windows print verb to send PDF to printer
-                var startInfo = new System.Diagnostics.ProcessStartInfo
+                // Download failed or was cancelled
+                if (!_downloadCts.Token.IsCancellationRequested)
                 {
-                    FileName = tempPath,
-                    Verb = "printto",
-                    Arguments = $"\"{printerName}\"",
-                    CreateNoWindow = true,
-                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-                    UseShellExecute = true
-                };
-                System.Diagnostics.Process.Start(startInfo);
-            });
-
-            _logger.LogInformation(
-                "A4 invoice {InvoiceNumber} sent to printer {Printer}",
-                invoice.InvoiceNumber, printerName);
-
-            TryDeleteFile(tempPath, delayMs: 3000); // Give print spooler time
-            return PrintResult.Success();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "A4 print failed for invoice {Invoice}",
-                invoice.InvoiceNumber);
-            return PrintResult.Failure(
-                $"فشل إرسال الفاتورة للطابعة:\n{GetUserFriendlyError(ex)}");
-        }
-    }
-
-    // ═══════════════════════════════════════════════
-    // PRINT THERMAL
-    // ═══════════════════════════════════════════════
-    public async Task<PrintResult> PrintThermalAsync(InvoicePrintDto invoice)
-    {
-        try
-        {
-            var settings = await _settings.GetPrintSettingsAsync();
-            var printerName = settings.ThermalPrinterName;
-
-            if (string.IsNullOrWhiteSpace(printerName))
-                return PrintResult.Failure(
-                    "لم يتم تحديد الطابعة الحرارية بعد.\n" +
-                    "يرجى الذهاب إلى الإعدادات → إعداد الطباعة وتحديد الطابعة الحرارية.");
-
-            // Generate ESC/POS byte commands
-            var escPosData = _thermalGenerator.GenerateEscPosCommands(invoice);
-
-            await Task.Run(() => SendRawToPrinter(printerName, escPosData));
-
-            _logger.LogInformation(
-                "Thermal receipt {InvoiceNumber} printed to {Printer}",
-                invoice.InvoiceNumber, printerName);
-
-            return PrintResult.Success();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Thermal print failed");
-            return PrintResult.Failure(
-                $"فشلت طباعة الإيصال الحراري:\n{GetUserFriendlyError(ex)}");
-        }
-    }
-
-    // ═══════════════════════════════════════════════
-    // SAVE PDF
-    // ═══════════════════════════════════════════════
-    public async Task<PrintResult> SavePdfAsync(InvoicePrintDto invoice, string filePath)
-    {
-        try
-        {
-            var pdfBytes = await GeneratePdfBytesAsync(invoice);
-            await File.WriteAllBytesAsync(filePath, pdfBytes);
-
-            _logger.LogInformation("PDF saved to {Path}", filePath);
-            return PrintResult.Success(filePath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to save PDF");
-            return PrintResult.Failure(
-                $"تعذر حفظ ملف PDF:\n{GetUserFriendlyError(ex)}");
-        }
-    }
-
-    // ─── Private Helpers ──────────────────────────
-
-    private Task<byte[]> GeneratePdfBytesAsync(InvoicePrintDto invoice)
-    {
-        return Task.Run(() =>
-        {
-            var document = new A4InvoiceDocument(invoice);
-            return document.GeneratePdf();
-        });
-    }
-
-    /// <summary>
-    /// Sends raw bytes directly to printer bypassing Windows GDI.
-    /// Required for ESC/POS commands.
-    /// </summary>
-    private void SendRawToPrinter(string printerName, byte[] data)
-    {
-        var printerInfo = new DOCINFOA
-        {
-            pDocName = "Thermal Receipt",
-            pDataType = "RAW"
-        };
-
-        var handle = OpenPrinter(printerName, out var printerHandle, IntPtr.Zero);
-
-        if (!handle)
-            throw new PrinterException(
-                $"لا يمكن الاتصال بالطابعة الحرارية '{printerName}'");
-
-        try
-        {
-            StartDocPrinter(printerHandle, 1, ref printerInfo);
-            StartPagePrinter(printerHandle);
-
-            var gcHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
-            WritePrinter(printerHandle, gcHandle.AddrOfPinnedObject(),
-                data.Length, out _);
-            gcHandle.Free();
-
-            EndPagePrinter(printerHandle);
-            EndDocPrinter(printerHandle);
-        }
-        finally
-        {
-            ClosePrinter(printerHandle);
-        }
-    }
-
-    private string GetUserFriendlyError(Exception ex) => ex switch
-    {
-        UnauthorizedAccessException => "ليس لديك صلاحية الوصول للطابعة.",
-        FileNotFoundException => "ملف الطابعة غير موجود.",
-        PrinterException pe => pe.Message,
-        _ when ex.Message.Contains("printer") => "الطابعة غير متصلة أو لا تستجيب.",
-        _ => "حدث خطأ غير متوقع. يرجى إعادة المحاولة."
-    };
-
-    private void TryDeleteFile(string path, int delayMs = 0)
-    {
-        Task.Run(async () =>
-        {
-            if (delayMs > 0) await Task.Delay(delayMs);
-            try { File.Delete(path); }
-            catch { /* Ignore — temp file cleanup is best-effort */ }
-        });
-    }
-
-    // Win32 API for raw printer access
-    [DllImport("winspool.Drv", EntryPoint = "OpenPrinterA")]
-    private static extern bool OpenPrinter(string pPrinterName,
-        out IntPtr phPrinter, IntPtr pDefault);
-    [DllImport("winspool.Drv")] private static extern bool ClosePrinter(IntPtr hPrinter);
-    [DllImport("winspool.Drv")] private static extern bool StartDocPrinter(
-        IntPtr hPrinter, int level, ref DOCINFOA pDocInfo);
-    [DllImport("winspool.Drv")] private static extern bool EndDocPrinter(IntPtr hPrinter);
-    [DllImport("winspool.Drv")] private static extern bool StartPagePrinter(IntPtr hPrinter);
-    [DllImport("winspool.Drv")] private static extern bool EndPagePrinter(IntPtr hPrinter);
-    [DllImport("winspool.Drv")] private static extern bool WritePrinter(
-        IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct DOCINFOA
-    {
-        [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
-        [MarshalAs(UnmanagedType.LPStr)] public string? pOutputFile;
-        [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
-    }
-}
-
-public class PrinterException : Exception
-{
-    public PrinterException(string message) : base(message) { }
-}
-✅ Phase 4 Checklist
- Printer existence validated before attempting to print
- Arabic error messages for each failure scenario
- Temp files cleaned up after printing
- Raw ESC/POS sent via Win32 API (not GDI)
- GetUserFriendlyError() translates technical errors to Arabic
-🖥️ Phase 5: WPF Integration
-Task 5.1 — Invoice ViewModel Print Commands
-csharp
-
-// File: WPF/ViewModels/Invoice/InvoiceViewModel.cs
-// ADD these print commands to existing ViewModel
-
-public class InvoiceViewModel : BaseViewModel
-{
-    private readonly IPrintService _printService;
-    private readonly InvoicePrintDtoBuilder _printDtoBuilder;
-
-    // ─── Print Commands ───────────────────────────
-    public IAsyncRelayCommand PrintA4Command { get; }
-    public IAsyncRelayCommand PrintThermalCommand { get; }
-    public IAsyncRelayCommand ShowPreviewCommand { get; }
-    public IAsyncRelayCommand SavePdfCommand { get; }
-
-    public InvoiceViewModel(IPrintService printService,
-        InvoicePrintDtoBuilder printDtoBuilder)
-    {
-        _printService = printService;
-        _printDtoBuilder = printDtoBuilder;
-
-        PrintA4Command = new AsyncRelayCommand(PrintA4Async,
-            () => CurrentInvoice != null && !IsBusy);
-        PrintThermalCommand = new AsyncRelayCommand(PrintThermalAsync,
-            () => CurrentInvoice != null && !IsBusy);
-        ShowPreviewCommand = new AsyncRelayCommand(ShowPreviewAsync,
-            () => CurrentInvoice != null && !IsBusy);
-        SavePdfCommand = new AsyncRelayCommand(SavePdfAsync,
-            () => CurrentInvoice != null && !IsBusy);
-    }
-
-    private async Task PrintA4Async()
-    {
-        await ExecutePrintAsync(async dto =>
-            await _printService.PrintA4Async(dto));
-    }
-
-    private async Task PrintThermalAsync()
-    {
-        await ExecutePrintAsync(async dto =>
-            await _printService.PrintThermalAsync(dto));
-    }
-
-    private async Task ShowPreviewAsync()
-    {
-        await ExecutePrintAsync(async dto =>
-            await _printService.ShowPreviewAsync(dto));
-    }
-
-    private async Task SavePdfAsync()
-    {
-        var saveDialog = new Microsoft.Win32.SaveFileDialog
-        {
-            Title = "حفظ الفاتورة كـ PDF",
-            Filter = "PDF Files|*.pdf",
-            FileName = $"فاتورة_{CurrentInvoice!.InvoiceNumber}_{DateTime.Now:yyyyMMdd}"
-        };
-
-        if (saveDialog.ShowDialog() != true) return;
-
-        await ExecutePrintAsync(async dto =>
-            await _printService.SavePdfAsync(dto, saveDialog.FileName));
-    }
-
-    /// <summary>
-    /// Shared wrapper: builds DTO, executes print action, handles result.
-    /// </summary>
-    private async Task ExecutePrintAsync(Func<InvoicePrintDto, Task<PrintResult>> printAction)
-    {
-        if (CurrentInvoice == null) return;
-
-        try
-        {
-            IsBusy = true;
-            StatusMessage = "جارٍ تجهيز الفاتورة...";
-
-            var printDto = await _printDtoBuilder.BuildAsync(CurrentInvoice);
-            var result = await printAction(printDto);
-
-            if (result.IsSuccess)
-            {
-                StatusMessage = "✅ تمت الطباعة بنجاح";
-                if (!string.IsNullOrWhiteSpace(result.OutputFilePath))
-                    StatusMessage = $"✅ تم الحفظ: {result.OutputFilePath}";
+                    DownloadStatusText =
+                        "❌ فشل التحميل. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.";
+                }
+                IsDownloading = false;
+                return;
             }
-            else
-            {
-                // Show user-friendly dialog — never just StatusMessage for print errors
-                ShowPrintErrorDialog(result.ErrorMessage!);
-            }
+
+            // Download succeeded
+            DownloadStatusText = "✅ اكتمل التحميل. جارٍ تشغيل المثبّت...";
+            await Task.Delay(800); // Brief pause so user sees success message
+
+            Result = UpdateDialogAction.InstallNow;
+
+            // Launch installer — this also shuts down the app
+            _updaterService.LaunchInstallerAndExit(installerPath);
         }
-        finally
+        catch (Exception ex)
         {
-            IsBusy = false;
+            DownloadStatusText = $"❌ خطأ: {ex.Message}";
+            IsDownloading = false;
         }
     }
 
-    private void ShowPrintErrorDialog(string message)
+    private void RemindLater()
     {
-        System.Windows.MessageBox.Show(
-            message,
-            "خطأ في الطباعة",
-            System.Windows.MessageBoxButton.OK,
-            System.Windows.MessageBoxImage.Warning);
+        Result = UpdateDialogAction.RemindLater;
+        CloseDialog?.Invoke();
+    }
+
+    private void SkipThisVersion()
+    {
+        _updaterService.SkipVersion(_updateInfo.LatestVersion);
+        Result = UpdateDialogAction.SkipVersion;
+        CloseDialog?.Invoke();
+    }
+
+    private void CancelDownload()
+    {
+        _downloadCts?.Cancel();
+        IsDownloading = false;
+        DownloadProgress = 0;
+        DownloadStatusText = "تم إلغاء التحميل.";
+    }
+
+    private string FormatDownloadStatus(DownloadProgress p)
+    {
+        if (p.TotalBytes <= 0)
+            return $"جارٍ التحميل... {p.BytesReceived / 1024.0 / 1024.0:N1} MB";
+
+        var receivedMb = p.BytesReceived / 1024.0 / 1024.0;
+        var totalMb = p.TotalBytes / 1024.0 / 1024.0;
+        var speed = p.SpeedKbps >= 1024
+            ? $"{p.SpeedKbps / 1024.0:N1} MB/s"
+            : $"{p.SpeedKbps:N0} KB/s";
+
+        return $"{receivedMb:N1} / {totalMb:N1} MB  •  {speed}  •  {p.Percentage:N0}%";
     }
 }
-Task 5.2 — Print Setup Settings Screen
-csharp
 
-// File: WPF/ViewModels/Settings/PrintSetupViewModel.cs
-
-public class PrintSetupViewModel : BaseViewModel
+public enum UpdateDialogAction
 {
-    private readonly ISystemSettingsRepository _settings;
-
-    public string StoreName { get; set; } = string.Empty;
-    public string StorePhone { get; set; } = string.Empty;
-    public string StoreAddress { get; set; } = string.Empty;
-    public string StoreTaxNumber { get; set; } = string.Empty;
-    public string LogoPath { get; set; } = string.Empty;
-    public string ThermalPrinterName { get; set; } = string.Empty;
-    public string A4PrinterName { get; set; } = string.Empty;
-
-    public ImageSource? LogoPreview { get; private set; }
-
-    // Installed printers list for ComboBoxes
-    public List<string> InstalledPrinters { get; } =
-        PrinterSettings.InstalledPrinters.Cast<string>().OrderBy(p => p).ToList();
-
-    public IAsyncRelayCommand SaveCommand { get; }
-    public IRelayCommand BrowseLogoCommand { get; }
-    public IAsyncRelayCommand PrintTestPageCommand { get; }
-
-    public PrintSetupViewModel(ISystemSettingsRepository settings)
-    {
-        _settings = settings;
-        SaveCommand = new AsyncRelayCommand(SaveAsync);
-        BrowseLogoCommand = new RelayCommand(BrowseLogo);
-        PrintTestPageCommand = new AsyncRelayCommand(PrintTestPageAsync);
-    }
-
-    private void BrowseLogo()
-    {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "اختر شعار المتجر",
-            Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp",
-            Multiselect = false
-        };
-
-        if (dialog.ShowDialog() != true) return;
-
-        var originalPath = dialog.FileName;
-
-        // Resize and save to app data folder
-        var resizedPath = ResizeAndSaveLogo(originalPath);
-
-        LogoPath = resizedPath;
-        OnPropertyChanged(nameof(LogoPath));
-
-        // Show preview
-        LogoPreview = new BitmapImage(new Uri(resizedPath));
-        OnPropertyChanged(nameof(LogoPreview));
-
-        StatusMessage = "✅ تم تحميل الشعار بنجاح";
-    }
-
-    private string ResizeAndSaveLogo(string sourcePath)
-    {
-        var appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "YourApp", "Assets");
-
-        Directory.CreateDirectory(appDataPath);
-        var destPath = Path.Combine(appDataPath, "store_logo.png");
-
-        // Resize to 200×200 max while preserving aspect ratio
-        using var image = SixLabors.ImageSharp.Image.Load(sourcePath);
-
-        image.Mutate(ctx => ctx.Resize(new ResizeOptions
-        {
-            Size = new SixLabors.ImageSharp.Size(200, 200),
-            Mode = ResizeMode.Max,           // Preserve aspect ratio
-            Sampler = KnownResamplers.Lanczos3 // High quality
-        }));
-
-        image.Save(destPath);
-        return destPath;
-    }
-
-    private async Task SaveAsync()
-    {
-        try
-        {
-            IsBusy = true;
-            await _settings.SavePrintSettingsAsync(new PrintSettings
-            {
-                StoreName = StoreName,
-                StorePhone = StorePhone,
-                StoreAddress = StoreAddress,
-                StoreTaxNumber = StoreTaxNumber,
-                LogoPath = LogoPath,
-                ThermalPrinterName = ThermalPrinterName,
-                A4PrinterName = A4PrinterName
-            });
-            StatusMessage = "✅ تم حفظ إعدادات الطباعة";
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    private async Task PrintTestPageAsync()
-    {
-        // Create sample invoice for testing layout
-        var testDto = CreateTestInvoice();
-        var printService = App.GetService<IPrintService>();
-        var result = await printService.ShowPreviewAsync(testDto);
-
-        if (!result.IsSuccess)
-            StatusMessage = $"❌ {result.ErrorMessage}";
-    }
-
-    private InvoicePrintDto CreateTestInvoice() => new()
-    {
-        StoreName = StoreName,
-        StorePhone = StorePhone,
-        StoreAddress = StoreAddress,
-        StoreTaxNumber = StoreTaxNumber,
-        LogoBytes = File.Exists(LogoPath) ? File.ReadAllBytes(LogoPath) : null,
-        InvoiceNumber = "TEST-001",
-        InvoiceDate = DateTime.Now,
-        InvoiceType = InvoiceTypePrint.Sales,
-        CustomerOrSupplierName = "عميل تجريبي",
-        Items = new List<InvoiceItemPrintDto>
-        {
-            new("منتج تجريبي", "حبة", 2, 50, 0, 100),
-            new("منتج آخر",    "كرتون", 1, 120, 10, 110)
-        },
-        SubTotal = 210,
-        DiscountAmount = 10,
-        TaxRate = 15,
-        TaxAmount = 30,
-        GrandTotal = 230,
-        PaymentMethod = "نقدي",
-        AmountPaid = 250,
-        ChangeAmount = 20
-    };
+    InstallNow,
+    RemindLater,
+    SkipVersion
 }
-Task 5.3 — XAML Print Buttons
+✅ Phase 3 Checklist
+ Progress<T> used (ensures UI thread callback — no Dispatcher.Invoke needed)
+ Cancelled download sets IsDownloading = false correctly
+ CloseDialog is Action delegate (not direct Window reference — keeps ViewModel clean)
+ IsCritical = true disables RemindLater and Skip buttons
+ Download status shows MB received, total, and speed
+🖼️ Phase 4: WPF Update Dialog Window
+Task 4.1 — Update Dialog XAML
 XML
 
-<!-- File: Views/Invoice/InvoiceActionButtons.xaml -->
-<!-- Add to bottom of any invoice view -->
+<!-- File: Views/Updates/UpdateDialog.xaml -->
+<Window x:Class="YourApp.Views.Updates.UpdateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="تحديث البرنامج"
+        Width="520" Height="auto"
+        MinHeight="400"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
 
-<StackPanel Orientation="Horizontal" 
-            HorizontalAlignment="Right"
-            Margin="0,8,0,0">
+    <Window.Resources>
+        <!-- Button Styles -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Padding" Value="20,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Background" Value="#0078D4"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#005A9E"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="#CCCCCC"/>
+                                <Setter Property="Foreground" Value="#888888"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-    <!-- Preview Button -->
-    <Button Command="{Binding ShowPreviewCommand}"
-            ToolTip="معاينة الفاتورة قبل الطباعة"
-            Style="{StaticResource ActionButtonStyle}"
-            Background="#607D8B" Foreground="White"
-            Margin="4,0">
-        <StackPanel Orientation="Horizontal">
-            <TextBlock Text="🔍" FontSize="14"/>
-            <TextBlock Text=" معاينة" Margin="4,0,0,0"/>
-        </StackPanel>
-    </Button>
+        <Style x:Key="GhostButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#555555"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
 
-    <!-- A4 Print Button -->
-    <Button Command="{Binding PrintA4Command}"
-            ToolTip="طباعة فاتورة A4"
-            Style="{StaticResource ActionButtonStyle}"
-            Background="#1976D2" Foreground="White"
-            Margin="4,0">
-        <StackPanel Orientation="Horizontal">
-            <TextBlock Text="🖨️" FontSize="14"/>
-            <TextBlock Text=" A4" Margin="4,0,0,0"/>
-        </StackPanel>
-    </Button>
+        <Style x:Key="ChangelogItemStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,3"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+    </Window.Resources>
 
-    <!-- Thermal Print Button -->
-    <Button Command="{Binding PrintThermalCommand}"
-            ToolTip="طباعة إيصال حراري 80mm"
-            Style="{StaticResource ActionButtonStyle}"
-            Background="#388E3C" Foreground="White"
-            Margin="4,0">
-        <StackPanel Orientation="Horizontal">
-            <TextBlock Text="🧾" FontSize="14"/>
-            <TextBlock Text=" حراري" Margin="4,0,0,0"/>
-        </StackPanel>
-    </Button>
+    <!-- Drop shadow container -->
+    <Border CornerRadius="12"
+            Background="White"
+            Margin="10">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" Opacity="0.2"
+                              ShadowDepth="4" Color="Black"/>
+        </Border.Effect>
 
-    <!-- Save PDF Button -->
-    <Button Command="{Binding SavePdfCommand}"
-            ToolTip="حفظ كملف PDF"
-            Style="{StaticResource ActionButtonStyle}"
-            Background="#E65100" Foreground="White"
-            Margin="4,0">
-        <StackPanel Orientation="Horizontal">
-            <TextBlock Text="💾" FontSize="14"/>
-            <TextBlock Text=" PDF" Margin="4,0,0,0"/>
-        </StackPanel>
-    </Button>
-</StackPanel>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>  <!-- Blue header band -->
+                <RowDefinition Height="Auto"/>  <!-- Version info -->
+                <RowDefinition Height="*"/>     <!-- Changelog -->
+                <RowDefinition Height="Auto"/>  <!-- Progress bar -->
+                <RowDefinition Height="Auto"/>  <!-- Buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- ═══ ROW 0: HEADER BAND ═══ -->
+            <Border Grid.Row="0"
+                    Background="#0078D4"
+                    CornerRadius="12,12,0,0"
+                    Padding="24,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <!-- System icon + name -->
+                        <TextBlock Text="⬆️  تحديث متوفر"
+                                   Foreground="#BBDEFB"
+                                   FontSize="11"
+                                   Margin="0,0,0,4"/>
+
+                        <TextBlock Text="{Binding HeaderText}"
+                                   Foreground="White"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"/>
+
+                        <TextBlock Text="{Binding SubHeaderText}"
+                                   Foreground="#90CAF9"
+                                   FontSize="11"
+                                   Margin="0,6,0,0"/>
+                    </StackPanel>
+
+                    <!-- Critical badge (only for critical updates) -->
+                    <Border Grid.Column="1"
+                            Background="#FF5722"
+                            CornerRadius="4"
+                            Padding="8,4"
+                            VerticalAlignment="Top"
+                            Visibility="{Binding IsCriticalUpdate,
+                                         Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="تحديث إلزامي"
+                                   Foreground="White"
+                                   FontSize="10"
+                                   FontWeight="Bold"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ═══ ROW 1: VERSION COMPARISON ═══ -->
+            <Grid Grid.Row="1" Margin="24,16,24,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Current version -->
+                <Border Background="#F5F5F5" CornerRadius="6" Padding="12,8">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="الإصدار الحالي"
+                                   FontSize="10" Foreground="#888"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding CurrentVersion}"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="#555"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Arrow -->
+                <TextBlock Grid.Column="1"
+                           Text="  →  "
+                           FontSize="20" Foreground="#0078D4"
+                           VerticalAlignment="Center"/>
+
+                <!-- New version -->
+                <Border Grid.Column="2"
+                        Background="#E3F2FD"
+                        BorderBrush="#0078D4"
+                        BorderThickness="2"
+                        CornerRadius="6" Padding="12,8">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="الإصدار الجديد"
+                                   FontSize="10" Foreground="#0078D4"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding LatestVersion}"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="#0078D4"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding ReleaseDate}"
+                                   FontSize="9" Foreground="#888"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ═══ ROW 2: CHANGELOG ═══ -->
+            <Border Grid.Row="2"
+                    Margin="24,0,24,12"
+                    BorderBrush="#EEEEEE"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                <StackPanel>
+                    <TextBlock Text="ما الجديد في هذا الإصدار:"
+                               FontSize="11" FontWeight="Bold"
+                               Foreground="#444"
+                               Margin="12,10,12,6"/>
+
+                    <ScrollViewer MaxHeight="160"
+                                  VerticalScrollBarVisibility="Auto"
+                                  Margin="12,0,12,10">
+                        <ItemsControl ItemsSource="{Binding ChangelogItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
+                                               Style="{StaticResource ChangelogItemStyle}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <!-- ═══ ROW 3: DOWNLOAD PROGRESS ═══ -->
+            <StackPanel Grid.Row="3"
+                        Margin="24,0,24,12"
+                        Visibility="{Binding IsDownloading,
+                                     Converter={StaticResource BoolToVisibility}}">
+
+                <ProgressBar Value="{Binding DownloadProgress}"
+                             Minimum="0" Maximum="100"
+                             Height="8"
+                             Background="#E0E0E0"
+                             Foreground="#0078D4"/>
+
+                <TextBlock Text="{Binding DownloadStatusText}"
+                           FontSize="11" Foreground="#666"
+                           HorizontalAlignment="Center"
+                           Margin="0,6,0,0"/>
+            </StackPanel>
+
+            <!-- ═══ ROW 4: ACTION BUTTONS ═══ -->
+            <Border Grid.Row="4"
+                    BorderBrush="#EEEEEE"
+                    BorderThickness="0,1,0,0"
+                    Padding="24,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Skip This Version (leftmost, subtle) -->
+                    <Button Grid.Column="0"
+                            Content="تخطي هذا الإصدار"
+                            Style="{StaticResource GhostButtonStyle}"
+                            Command="{Binding SkipVersionCommand}"
+                            Visibility="{Binding CanSkip,
+                                         Converter={StaticResource BoolToVisibility}}"/>
+
+                    <!-- Cancel Download (only during download) -->
+                    <Button Grid.Column="1"
+                            Content="إلغاء التحميل"
+                            Style="{StaticResource GhostButtonStyle}"
+                            Command="{Binding CancelDownloadCommand}"
+                            Visibility="{Binding IsDownloading,
+                                         Converter={StaticResource BoolToVisibility}}"
+                            Foreground="#F44336"/>
+
+                    <!-- Spacer -->
+                    <StackPanel Grid.Column="2"/>
+
+                    <!-- Right side buttons -->
+                    <StackPanel Grid.Column="3"
+                                Orientation="Horizontal">
+
+                        <!-- Remind Later -->
+                        <Button Content="تذكيري لاحقاً"
+                                Style="{StaticResource GhostButtonStyle}"
+                                Command="{Binding RemindLaterCommand}"
+                                IsEnabled="{Binding IsNotDownloading}"
+                                Margin="0,0,8,0"
+                                Visibility="{Binding CanSkip,
+                                             Converter={StaticResource BoolToVisibility}}"/>
+
+                        <!-- Download & Install (PRIMARY) -->
+                        <Button Content="{Binding DownloadButtonText}"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding DownloadAndInstallCommand}"
+                                MinWidth="160"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
+Task 4.2 — Update Dialog Code-Behind
+csharp
+
+// File: Views/Updates/UpdateDialog.xaml.cs
+
+public partial class UpdateDialog : Window
+{
+    private bool _allowClose = false;
+
+    public UpdateDialog(UpdateDialogViewModel viewModel)
+    {
+        InitializeComponent();
+        DataContext = viewModel;
+
+        // Allow ViewModel to close the window
+        viewModel.CloseDialog = () =>
+        {
+            _allowClose = true;
+            Close();
+        };
+
+        // Allow dragging the borderless window
+        MouseLeftButtonDown += (_, _) => DragMove();
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        var vm = (UpdateDialogViewModel)DataContext;
+
+        // Prevent closing during download (unless explicitly allowed)
+        if (vm.IsDownloading && !_allowClose)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        base.OnClosing(e);
+    }
+}
+✅ Phase 4 Checklist
+ Window has WindowStyle="None" and AllowsTransparency="True" for custom shape
+ DragMove() enables window dragging by mouse
+ Download progress bar hidden when IsDownloading = false
+ "Skip" and "Remind Later" buttons hidden for critical updates
+ "Cancel Download" button only visible during active download
+ Window cannot be closed (X button) during download
+ Version comparison shows visual difference (grey vs blue border)
+🚀 Phase 5: App Startup Integration
+Task 5.1 — Background Update Check on Startup
+csharp
+
+// File: WPF/App.xaml.cs
+
+public partial class App : System.Windows.Application
+{
+    private IServiceProvider _serviceProvider = null!;
+
+    protected override async void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        // 1. Initialize services
+        _serviceProvider = BuildServiceProvider();
+        PrintingBootstrapper.Initialize();
+
+        // 2. Show main window FIRST — never delay startup for update check
+        var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
+        mainWindow.Show();
+
+        // 3. Check for updates in background — completely non-blocking
+        // Use Task.Run to move off UI thread, with delay to let app load first
+        _ = Task.Run(async () =>
+        {
+            // Wait 3 seconds after startup before checking
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            await CheckForUpdatesInBackgroundAsync();
+        });
+    }
+
+    private async Task CheckForUpdatesInBackgroundAsync()
+    {
+        try
+        {
+            var updaterService = _serviceProvider
+                .GetRequiredService<IUpdaterService>();
+
+            var result = await updaterService.CheckForUpdatesAsync();
+
+            // Only show dialog if update available
+            if (!result.UpdateAvailable || result.UpdateInfo == null)
+                return;
+
+            // Show dialog on UI thread
+            await Dispatcher.InvokeAsync(() =>
+            {
+                ShowUpdateDialog(result.UpdateInfo);
+            });
+        }
+        catch (Exception ex)
+        {
+            // SILENT FAIL — user never sees this error
+            var logger = _serviceProvider
+                .GetRequiredService<ILogger<App>>();
+            logger.LogWarning(ex, "Background update check failed silently");
+        }
+    }
+
+    private void ShowUpdateDialog(UpdateInfo updateInfo)
+    {
+        var updaterService = _serviceProvider
+            .GetRequiredService<IUpdaterService>();
+
+        var viewModel = new UpdateDialogViewModel(updaterService, updateInfo);
+
+        var dialog = new UpdateDialog(viewModel)
+        {
+            Owner = MainWindow  // Centers relative to main window
+        };
+
+        dialog.ShowDialog();
+
+        // Log the user's choice
+        var logger = _serviceProvider
+            .GetRequiredService<ILogger<App>>();
+
+        logger.LogInformation(
+            "User chose: {Action} for version {Version}",
+            viewModel.Result,
+            updateInfo.LatestVersion);
+    }
+
+    private IServiceProvider BuildServiceProvider()
+    {
+        var services = new ServiceCollection();
+
+        // Add update services
+        var config = new ConfigurationBuilder()
+            .AddAppSettings()
+            .Build();
+
+        services.AddSingleton<IConfiguration>(config);
+        services.AddUpdateServices(config);
+        services.AddLogging(builder => builder.AddDebug());
+
+        // ... register all other services
+
+        return services.BuildServiceProvider();
+    }
+}
+Task 5.2 — Manual Update Check (from Menu)
+csharp
+
+// File: WPF/ViewModels/MainViewModel.cs
+// ADD this command to allow user to manually check for updates
+
+public IAsyncRelayCommand CheckForUpdatesManuallyCommand { get; }
+
+private async Task CheckForUpdatesManuallyAsync()
+{
+    try
+    {
+        IsBusy = true;
+        StatusMessage = "جارٍ التحقق من وجود تحديثات...";
+
+        var result = await _updaterService.CheckForUpdatesAsync();
+
+        if (!result.IsSuccess)
+        {
+            System.Windows.MessageBox.Show(
+                "تعذر الاتصال بخادم التحديثات.\n" +
+                "يرجى التحقق من اتصال الإنترنت والمحاولة لاحقاً.",
+                "تعذر التحقق",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!result.UpdateAvailable)
+        {
+            System.Windows.MessageBox.Show(
+                $"برنامجك محدّث! 🎉\n" +
+                $"تعمل على أحدث إصدار: {_updaterService.GetCurrentVersion()}",
+                "لا توجد تحديثات",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+            return;
+        }
+
+        // Show update dialog
+        var vm = new UpdateDialogViewModel(_updaterService, result.UpdateInfo!);
+        var dialog = new UpdateDialog(vm) { Owner = System.Windows.Application.Current.MainWindow };
+        dialog.ShowDialog();
+    }
+    finally
+    {
+        IsBusy = false;
+        StatusMessage = string.Empty;
+    }
+}
 ✅ Phase 5 Checklist
- ExecutePrintAsync is single shared method (no code repetition)
- Print errors shown in MessageBox (not just StatusMessage)
- Logo browse resizes to 200×200 max
- Installed printers loaded from system for ComboBox
- Test page button shows preview with current settings
+ Main window shows BEFORE update check starts
+ 3-second delay before network call (let app fully load)
+ _ = Task.Run(...) — fire and forget, startup never awaits it
+ Dispatcher.InvokeAsync() used to show dialog on UI thread
+ Manual check in menu shows "up to date" message if no updates
+ All exceptions in background check are caught and logged silently
 🧪 Phase 6: Unit Tests
 csharp
 
-// File: Tests/Printing/ThermalFormattingTests.cs
+// File: Tests/Updates/UpdateInfoTests.cs
 
-public class ThermalFormattingTests
+public class UpdateInfoTests
 {
-    private readonly ThermalReceiptGenerator _generator = new();
-
     [Fact]
-    public void FormatTwoColumns_TotalLengthEqualsLineWidth()
+    public void IsUpdateAvailable_ServerHigher_ReturnsTrue()
     {
-        // Use reflection to test private method via accessor
-        var method = typeof(ThermalReceiptGenerator)
-            .GetMethod("FormatTwoColumns",
-                System.Reflection.BindingFlags.NonPublic |
-                System.Reflection.BindingFlags.Instance);
-
-        var result = (string)method!.Invoke(_generator,
-            new object[] { "الإجمالي:", "1,500.00 ر.س" })!;
-
-        Assert.Equal(42, result.Length);
+        var info = new UpdateInfo { LatestVersion = "2026.5.1400" };
+        Assert.True(info.IsUpdateAvailable("2026.5.1350"));
     }
 
     [Fact]
-    public void GenerateEscPosCommands_EmptyNotes_NoNotesSection()
+    public void IsUpdateAvailable_SameVersion_ReturnsFalse()
     {
-        var invoice = CreateMinimalInvoice();
-        var bytes = _generator.GenerateEscPosCommands(invoice);
-
-        // Should not throw and should have content
-        Assert.NotEmpty(bytes);
+        var info = new UpdateInfo { LatestVersion = "2026.5.1350" };
+        Assert.False(info.IsUpdateAvailable("2026.5.1350"));
     }
 
     [Fact]
-    public void GenerateEscPosCommands_AlwaysEndsWithCutCommand()
+    public void IsUpdateAvailable_CurrentHigher_ReturnsFalse()
     {
-        var invoice = CreateMinimalInvoice();
-        var bytes = _generator.GenerateEscPosCommands(invoice);
-
-        // CUT command: GS V B 0 = 0x1D 0x56 0x42 0x00
-        var lastFour = bytes.TakeLast(4).ToArray();
-        Assert.Equal(new byte[] { 0x1D, 0x56, 0x42, 0x00 }, lastFour);
+        var info = new UpdateInfo { LatestVersion = "2026.4.1000" };
+        Assert.False(info.IsUpdateAvailable("2026.5.1350"));
     }
 
-    private InvoicePrintDto CreateMinimalInvoice() => new()
+    [Fact]
+    public void IsForceUpdate_BelowMinimum_ReturnsTrue()
     {
-        StoreName = "متجر الاختبار",
-        InvoiceNumber = "TEST-001",
-        InvoiceDate = DateTime.Now,
-        CustomerOrSupplierName = "عميل",
-        Items = new List<InvoiceItemPrintDto>
-        {
-            new("منتج", "حبة", 1, 10, 0, 10)
-        },
-        SubTotal = 10, TaxRate = 15, TaxAmount = 1.5m, GrandTotal = 11.5m,
-        PaymentMethod = "نقدي", AmountPaid = 11.5m, ChangeAmount = 0
-    };
+        var info = new UpdateInfo { MinimumRequiredVersion = "2026.3.0" };
+        Assert.True(info.IsForceUpdate("2026.2.999"));
+    }
+
+    [Fact]
+    public void IsForceUpdate_AboveMinimum_ReturnsFalse()
+    {
+        var info = new UpdateInfo { MinimumRequiredVersion = "2026.3.0" };
+        Assert.False(info.IsForceUpdate("2026.5.1350"));
+    }
+
+    [Fact]
+    public void IsUpdateAvailable_InvalidVersion_ReturnsFalse()
+    {
+        var info = new UpdateInfo { LatestVersion = "not-a-version" };
+        // Should not throw — graceful handling of bad server data
+        Assert.False(info.IsUpdateAvailable("2026.5.1350"));
+    }
 }
 
-// File: Tests/Printing/PrintResultTests.cs
+// File: Tests/Updates/UpdateCheckResultTests.cs
 
-public class PrintResultTests
+public class UpdateCheckResultTests
 {
     [Fact]
-    public void Success_IsSuccessTrue()
+    public void Failed_IsSuccessFalse_HasMessage()
     {
-        var result = PrintResult.Success("/path/to/file.pdf");
-        Assert.True(result.IsSuccess);
-        Assert.Equal("/path/to/file.pdf", result.OutputFilePath);
-        Assert.Null(result.ErrorMessage);
+        var result = UpdateCheckResult.Failed("No internet");
+        Assert.False(result.IsSuccess);
+        Assert.False(result.UpdateAvailable);
+        Assert.Equal("No internet", result.ErrorMessage);
     }
 
     [Fact]
-    public void Failure_IsSuccessFalse()
+    public void NoUpdate_IsSuccessTrue_UpdateAvailableFalse()
     {
-        var result = PrintResult.Failure("الطابعة غير متصلة");
-        Assert.False(result.IsSuccess);
-        Assert.Equal("الطابعة غير متصلة", result.ErrorMessage);
-        Assert.Null(result.OutputFilePath);
+        var result = UpdateCheckResult.NoUpdate();
+        Assert.True(result.IsSuccess);
+        Assert.False(result.UpdateAvailable);
+        Assert.Null(result.UpdateInfo);
+    }
+
+    [Fact]
+    public void Available_HasUpdateInfo()
+    {
+        var info = new UpdateInfo { LatestVersion = "2026.5.1400" };
+        var result = UpdateCheckResult.Available(info);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.UpdateAvailable);
+        Assert.NotNull(result.UpdateInfo);
     }
 }
 📦 Final Summary
 text
 
 ┌───────────────────────────────────────────────────────────────────┐
-│              PRINTING ENGINE — IMPLEMENTATION ORDER               │
-├──────┬─────────────────────────────────────────────┬─────────────┤
-│ Step │ Deliverable                                 │ Key Rule    │
-├──────┼─────────────────────────────────────────────┼─────────────┤
-│  0   │ 3 NuGet packages + SQL seed                 │ Startup init│
-│  1   │ IPrintService + DTOs + Builder              │ No DB in    │
-│      │                                             │ printers    │
-│  2   │ A4InvoiceDocument (QuestPDF)                │ RTL + logo  │
-│      │                                             │ fallback    │
-│  3   │ ThermalReceiptGenerator + EscPos            │ Windows-1256│
-│      │                                             │ encoding    │
-│  4   │ PrintService (A4 + Thermal + Preview)       │ Arabic      │
-│      │                                             │ errors only │
-│  5   │ ViewModels + XAML buttons + Settings UI     │ Single exec │
-│      │                                             │ wrapper     │
-│  6   │ Unit tests                                  │ Never skip  │
-└──────┴─────────────────────────────────────────────┴─────────────┘
+│              AUTO-UPDATE SYSTEM — IMPLEMENTATION ORDER            │
+├──────┬──────────────────────────────────────────────┬────────────┤
+│ Step │ Deliverable                                  │ Key Rule   │
+├──────┼──────────────────────────────────────────────┼────────────┤
+│  0   │ version.json on server + App.config keys     │ HTTPS only │
+│  1   │ UpdateInfo + UpdateCheckResult DTOs          │ No throws  │
+│  2   │ UpdaterService (check+download+launch)       │ SHA256     │
+│      │                                              │ verify     │
+│  3   │ UpdateDialogViewModel (3 actions)            │ Progress<T>│
+│  4   │ UpdateDialog XAML (borderless window)        │ No close   │
+│      │                                              │ during DL  │
+│  5   │ App.xaml.cs background integration          │ Main window │
+│      │                                              │ first!     │
+│  6   │ Unit tests                                   │ Never skip │
+└──────┴──────────────────────────────────────────────┴────────────┘
 
 CRITICAL RULES — NEVER VIOLATE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Printing classes NEVER query the database directly
-✅ Missing logo = graceful omission, never null reference exception
-✅ PrintResult never throws — always returns Success/Failure object
-✅ Thermal text MUST use Windows-1256 encoding for Arabic
-✅ All thermal lines MUST fit within 42 characters
-✅ ESC/POS cut command ALWAYS added at end of thermal receipt
-✅ Printer error messages in Arabic with actionable steps
-✅ Logo resized to 200×200 max before saving (never raw upload)
-✅ ExecutePrintAsync is ONE shared method — no copy-paste per button
+✅ Main window shows BEFORE update check — startup never blocked
+✅ Network failure = silent log, user never sees error
+✅ Version comparison uses System.Version (not string.Compare)
+✅ SHA256 checksum verified — corrupted file deleted automatically
+✅ Installer launched with "runas" verb for admin elevation
+✅ App.Shutdown() called AFTER installer process starts
+✅ Critical updates disable all skip/remind buttons
+✅ Window cannot be closed during active download
+✅ Progress<T> used (not Dispatcher.Invoke) for thread-safe UI updates
+✅ "Skip Version" persists to config file (not just in-memory)
+
+
+Implementation Plan: Phase 7 — Production Readiness
+📋 Master Rules for AI Agent
+This is the final phase. Every component must be production-grade. No shortcuts. No hardcoded secrets. No plaintext credentials.
+
+🗂️ Phase 0: Project Structure & Dependencies
+Task 0.1 — Install Required NuGet Packages
+XML
+
+<!-- File: YourApp.Infrastructure/YourApp.Infrastructure.csproj -->
+<ItemGroup>
+  <!-- Windows Service hosting -->
+  <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
+  
+  <!-- SQL Server backup via SMO -->
+  <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="170.18.0" />
+  
+  <!-- Data protection (DPAPI) -->
+  <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="8.0.0" />
+</ItemGroup>
+
+<!-- File: YourApp.WPF/YourApp.WPF.csproj -->
+<ItemGroup>
+  <!-- GitHub API client -->
+  <PackageReference Include="Octokit" Version="13.0.1" />
+</ItemGroup>
+Task 0.2 — Environment Configuration
+JSON
+
+// File: appsettings.json
+// NEVER store real credentials here — only structure
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "ENCRYPTED_AT_RUNTIME"
+  },
+  "GitHub": {
+    "Owner": "your-github-username",
+    "Repository": "your-repo-name",
+    "ProductHeaderValue": "SalesSystem-UpdateChecker"
+  },
+  "Backup": {
+    "DefaultBackupPath": "C:\\SalesSystemBackups",
+    "DatabaseName": "SalesSystemDb",
+    "RetentionDays": 30
+  },
+  "WindowsService": {
+    "ServiceName": "SalesSystemService",
+    "DisplayName": "نظام إدارة المبيعات",
+    "Description": "خدمة نظام إدارة المبيعات والمخزون"
+  }
+}
+✅ Phase 0 Checklist
+ All 4 NuGet packages installed
+ appsettings.json has NO real credentials
+ GitHub repo and username configured
+ Backup path exists or will be created programmatically
+🔐 Phase 1: Security — Connection String Encryption
+Task 1.1 — DPAPI Encryption Utility
+csharp
+
+// File: Infrastructure/Security/ConnectionStringProtector.cs
+
+public interface IConnectionStringProtector
+{
+    string Encrypt(string plainConnectionString);
+    string Decrypt(string encryptedConnectionString);
+    bool IsEncrypted(string value);
+}
+
+public class ConnectionStringProtector : IConnectionStringProtector
+{
+    // Unique purpose string — ties encryption to THIS application
+    private const string Purpose = "SalesSystem.ConnectionString.v1";
+    private readonly IDataProtector _protector;
+
+    public ConnectionStringProtector(IDataProtectionProvider provider)
+    {
+        _protector = provider.CreateProtector(Purpose);
+    }
+
+    public string Encrypt(string plainConnectionString)
+    {
+        if (string.IsNullOrWhiteSpace(plainConnectionString))
+            throw new ArgumentException("Connection string cannot be empty");
+
+        if (IsEncrypted(plainConnectionString))
+            return plainConnectionString; // Already encrypted
+
+        var encrypted = _protector.Protect(plainConnectionString);
+        return $"DPAPI:{encrypted}"; // Prefix marks it as encrypted
+    }
+
+    public string Decrypt(string encryptedConnectionString)
+    {
+        if (string.IsNullOrWhiteSpace(encryptedConnectionString))
+            throw new ArgumentException("Encrypted value cannot be empty");
+
+        if (!IsEncrypted(encryptedConnectionString))
+            return encryptedConnectionString; // Plain text — return as-is
+
+        var encryptedPart = encryptedConnectionString["DPAPI:".Length..];
+        return _protector.Unprotect(encryptedPart);
+    }
+
+    public bool IsEncrypted(string value)
+        => value.StartsWith("DPAPI:", StringComparison.Ordinal);
+}
+Task 1.2 — First-Run Setup (Encrypt and Save)
+csharp
+
+// File: Infrastructure/Security/FirstRunSetupService.cs
+// Called ONCE on first launch — encrypts and saves the connection string
+
+public class FirstRunSetupService
+{
+    private readonly IConnectionStringProtector _protector;
+    private readonly ILogger<FirstRunSetupService> _logger;
+    private const string ConfigKey = "ConnectionStrings:DefaultConnection";
+
+    public FirstRunSetupService(
+        IConnectionStringProtector protector,
+        ILogger<FirstRunSetupService> logger)
+    {
+        _protector = protector;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Call this in Program.cs before building the app.
+    /// Encrypts the connection string if it's still plaintext.
+    /// </summary>
+    public void EnsureConnectionStringEncrypted(IConfiguration configuration)
+    {
+        var currentValue = configuration[ConfigKey];
+
+        if (string.IsNullOrWhiteSpace(currentValue))
+        {
+            _logger.LogWarning("Connection string is empty — check appsettings.json");
+            return;
+        }
+
+        if (_protector.IsEncrypted(currentValue))
+        {
+            _logger.LogInformation("Connection string is already encrypted");
+            return;
+        }
+
+        // First run: encrypt and overwrite in appsettings.json
+        var encrypted = _protector.Encrypt(currentValue);
+        UpdateAppSettings(ConfigKey, encrypted);
+
+        _logger.LogInformation(
+            "Connection string encrypted and saved on first run");
+    }
+
+    private void UpdateAppSettings(string key, string value)
+    {
+        var appSettingsPath = Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory,
+            "appsettings.json");
+
+        var json = File.ReadAllText(appSettingsPath);
+        var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
+
+        // Parse, update, and re-serialize
+        var dict = System.Text.Json.JsonSerializer
+            .Deserialize<Dictionary<string, object>>(json)!;
+
+        // Navigate to ConnectionStrings key and update
+        if (dict.TryGetValue("ConnectionStrings", out var csObj))
+        {
+            var csDict = System.Text.Json.JsonSerializer
+                .Deserialize<Dictionary<string, string>>(csObj.ToString()!)!;
+            csDict["DefaultConnection"] = value;
+            dict["ConnectionStrings"] = csDict;
+        }
+
+        var newJson = System.Text.Json.JsonSerializer.Serialize(dict,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+        File.WriteAllText(appSettingsPath, newJson);
+    }
+}
+Task 1.3 — Secure DbContext Factory
+csharp
+
+// File: Infrastructure/Persistence/SecureDbContextFactory.cs
+
+public class SecureDbContextFactory
+{
+    private readonly IConnectionStringProtector _protector;
+    private readonly IConfiguration _configuration;
+
+    public SecureDbContextFactory(
+        IConnectionStringProtector protector,
+        IConfiguration configuration)
+    {
+        _protector = protector;
+        _configuration = configuration;
+    }
+
+    public string GetDecryptedConnectionString()
+    {
+        var rawValue = _configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException(
+                "Connection string 'DefaultConnection' not found in configuration");
+
+        // Decrypt if encrypted, return as-is if plaintext
+        return _protector.Decrypt(rawValue);
+    }
+}
+✅ Phase 1 Checklist
+ DPAPI: prefix distinguishes encrypted from plain text
+ First-run encryption happens before app.Run()
+ appsettings.json is updated in-place on first run
+ SecureDbContextFactory always decrypts before use
+ appsettings.json added to .gitignore (see Phase 6)
+💾 Phase 2: Backup & Restore Service
+Task 2.1 — BackupService
+csharp
+
+// File: Infrastructure/Backup/BackupService.cs
+
+public interface IBackupService
+{
+    Task<BackupResult> CreateBackupAsync(
+        string? destinationPath = null,
+        CancellationToken ct = default);
+
+    Task<RestoreResult> RestoreDatabaseAsync(
+        string backupFilePath,
+        CancellationToken ct = default);
+
+    Task<bool> DeleteOldBackupsAsync(int retentionDays, CancellationToken ct = default);
+}
+
+public record BackupResult(bool IsSuccess, string? FilePath, string? ErrorMessage, long FileSizeBytes = 0);
+public record RestoreResult(bool IsSuccess, string? ErrorMessage);
+
+public class BackupService : IBackupService
+{
+    private readonly SecureDbContextFactory _dbFactory;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<BackupService> _logger;
+
+    public BackupService(
+        SecureDbContextFactory dbFactory,
+        IConfiguration configuration,
+        ILogger<BackupService> logger)
+    {
+        _dbFactory = dbFactory;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    // ═══════════════════════════════════════════════
+    // CREATE BACKUP
+    // ═══════════════════════════════════════════════
+    public async Task<BackupResult> CreateBackupAsync(
+        string? destinationPath = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var dbName = _configuration["Backup:DatabaseName"]
+                ?? throw new InvalidOperationException("DatabaseName not configured");
+
+            var backupDir = destinationPath
+                ?? _configuration["Backup:DefaultBackupPath"]
+                ?? Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "SalesSystemBackups");
+
+            Directory.CreateDirectory(backupDir);
+
+            // Filename: SalesSystem_2026-05-20_143022.bak
+            var fileName = $"{dbName}_{DateTime.Now:yyyy-MM-dd_HHmmss}.bak";
+            var fullPath = Path.Combine(backupDir, fileName);
+
+            _logger.LogInformation(
+                "Starting backup of {Database} to {Path}", dbName, fullPath);
+
+            var connectionString = _dbFactory.GetDecryptedConnectionString();
+
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(ct);
+
+            // SQL Server native backup command
+            var backupSql = $"""
+                BACKUP DATABASE [{dbName}]
+                TO DISK = @BackupPath
+                WITH FORMAT,
+                     MEDIANAME = 'SalesSystemBackup',
+                     NAME = 'Full Database Backup - {DateTime.Now:yyyy-MM-dd HH:mm}',
+                     COMPRESSION,
+                     STATS = 10;
+                """;
+
+            await using var command = new SqlCommand(backupSql, connection);
+            command.CommandTimeout = 300; // 5 minutes for large DBs
+            command.Parameters.AddWithValue("@BackupPath", fullPath);
+
+            await command.ExecuteNonQueryAsync(ct);
+
+            var fileInfo = new FileInfo(fullPath);
+
+            _logger.LogInformation(
+                "Backup completed successfully. Size: {Size:N0} bytes", fileInfo.Length);
+
+            return new BackupResult(true, fullPath, null, fileInfo.Length);
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "SQL error during backup");
+            return new BackupResult(false, null,
+                $"خطأ في قاعدة البيانات: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during backup");
+            return new BackupResult(false, null,
+                $"خطأ غير متوقع: {ex.Message}");
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // RESTORE DATABASE
+    // ═══════════════════════════════════════════════
+    public async Task<RestoreResult> RestoreDatabaseAsync(
+        string backupFilePath,
+        CancellationToken ct = default)
+    {
+        if (!File.Exists(backupFilePath))
+            return new RestoreResult(false, $"ملف النسخة الاحتياطية غير موجود: {backupFilePath}");
+
+        var dbName = _configuration["Backup:DatabaseName"]
+            ?? throw new InvalidOperationException("DatabaseName not configured");
+
+        try
+        {
+            _logger.LogWarning(
+                "RESTORE INITIATED for {Database} from {File}", dbName, backupFilePath);
+
+            // Connect to MASTER database — not the target DB
+            var connectionString = _dbFactory.GetDecryptedConnectionString();
+            var masterConnection = new SqlConnectionStringBuilder(connectionString)
+            {
+                InitialCatalog = "master"
+            }.ConnectionString;
+
+            await using var connection = new SqlConnection(masterConnection);
+            await connection.OpenAsync(ct);
+
+            // Step 1: Force all other connections to disconnect
+            var singleUserSql = $"""
+                ALTER DATABASE [{dbName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                """;
+
+            await using (var cmd1 = new SqlCommand(singleUserSql, connection))
+            {
+                cmd1.CommandTimeout = 60;
+                await cmd1.ExecuteNonQueryAsync(ct);
+            }
+
+            _logger.LogInformation("Database set to SINGLE_USER mode");
+
+            // Step 2: Restore
+            var restoreSql = $"""
+                RESTORE DATABASE [{dbName}]
+                FROM DISK = @BackupPath
+                WITH REPLACE,
+                     RECOVERY,
+                     STATS = 10;
+                """;
+
+            await using (var cmd2 = new SqlCommand(restoreSql, connection))
+            {
+                cmd2.CommandTimeout = 600; // 10 minutes
+                cmd2.Parameters.AddWithValue("@BackupPath", backupFilePath);
+                await cmd2.ExecuteNonQueryAsync(ct);
+            }
+
+            _logger.LogInformation("Database restored successfully");
+
+            // Step 3: Return to multi-user
+            var multiUserSql = $"ALTER DATABASE [{dbName}] SET MULTI_USER;";
+            await using (var cmd3 = new SqlCommand(multiUserSql, connection))
+                await cmd3.ExecuteNonQueryAsync(ct);
+
+            return new RestoreResult(true, null);
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "SQL error during restore");
+
+            // Attempt to return to multi-user even if restore failed
+            await TrySetMultiUserAsync(dbName, ct);
+
+            return new RestoreResult(false,
+                $"خطأ أثناء الاسترجاع: {ex.Message}");
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // CLEANUP OLD BACKUPS
+    // ═══════════════════════════════════════════════
+    public async Task<bool> DeleteOldBackupsAsync(
+        int retentionDays,
+        CancellationToken ct = default)
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+                var backupDir = _configuration["Backup:DefaultBackupPath"]!;
+                if (!Directory.Exists(backupDir)) return true;
+
+                var cutoffDate = DateTime.Now.AddDays(-retentionDays);
+                var oldFiles = Directory.GetFiles(backupDir, "*.bak")
+                    .Select(f => new FileInfo(f))
+                    .Where(f => f.CreationTime < cutoffDate)
+                    .ToList();
+
+                foreach (var file in oldFiles)
+                {
+                    file.Delete();
+                    _logger.LogInformation("Deleted old backup: {File}", file.Name);
+                }
+
+                _logger.LogInformation(
+                    "Cleanup complete. Deleted {Count} old backups", oldFiles.Count);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Backup cleanup failed");
+                return false;
+            }
+        }, ct);
+    }
+
+    private async Task TrySetMultiUserAsync(string dbName, CancellationToken ct)
+    {
+        try
+        {
+            var connectionString = _dbFactory.GetDecryptedConnectionString();
+            var masterConnection = new SqlConnectionStringBuilder(connectionString)
+            {
+                InitialCatalog = "master"
+            }.ConnectionString;
+
+            await using var conn = new SqlConnection(masterConnection);
+            await conn.OpenAsync(ct);
+            await using var cmd = new SqlCommand(
+                $"ALTER DATABASE [{dbName}] SET MULTI_USER;", conn);
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to restore MULTI_USER mode — manual intervention required");
+        }
+    }
+}
+Task 2.2 — Scheduled Backup Background Service
+csharp
+
+// File: Infrastructure/Backup/ScheduledBackupWorker.cs
+
+public class ScheduledBackupWorker : BackgroundService
+{
+    private readonly IBackupService _backupService;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<ScheduledBackupWorker> _logger;
+
+    public ScheduledBackupWorker(
+        IBackupService backupService,
+        IConfiguration configuration,
+        ILogger<ScheduledBackupWorker> logger)
+    {
+        _backupService = backupService;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Scheduled backup worker started");
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            // Run backup once daily at 2:00 AM
+            var now = DateTime.Now;
+            var nextRun = DateTime.Today.AddDays(now.Hour >= 2 ? 1 : 0).AddHours(2);
+            var delay = nextRun - now;
+
+            _logger.LogInformation(
+                "Next automatic backup scheduled at {Time}", nextRun);
+
+            await Task.Delay(delay, stoppingToken);
+
+            if (stoppingToken.IsCancellationRequested) break;
+
+            var result = await _backupService.CreateBackupAsync(ct: stoppingToken);
+
+            if (result.IsSuccess)
+            {
+                _logger.LogInformation(
+                    "Automatic backup completed: {File} ({Size:N0} bytes)",
+                    result.FilePath, result.FileSizeBytes);
+
+                // Clean up old backups
+                var retentionDays = int.Parse(
+                    _configuration["Backup:RetentionDays"] ?? "30");
+                await _backupService.DeleteOldBackupsAsync(retentionDays, stoppingToken);
+            }
+            else
+            {
+                _logger.LogError(
+                    "Automatic backup FAILED: {Error}", result.ErrorMessage);
+            }
+        }
+    }
+}
+✅ Phase 2 Checklist
+ Backup uses parameterized SQL (no string injection risk)
+ Restore sets SINGLE_USER before and MULTI_USER after
+ MULTI_USER restored even if restore fails (try/catch)
+ Backup timeout set to 5 minutes, restore to 10 minutes
+ Scheduled backup runs at 2:00 AM daily
+ Old backups deleted based on retention days
+🐙 Phase 3: GitHub Releases Updater
+Task 3.1 — GitHub API Response Models
+csharp
+
+// File: Infrastructure/Updates/GitHub/GitHubReleaseDto.cs
+
+public record GitHubReleaseDto
+{
+    [JsonPropertyName("tag_name")]
+    public string TagName { get; init; } = string.Empty;        // "v2026.5.1350"
+
+    [JsonPropertyName("name")]
+    public string Name { get; init; } = string.Empty;
+
+    [JsonPropertyName("body")]
+    public string Body { get; init; } = string.Empty;           // Changelog markdown
+
+    [JsonPropertyName("published_at")]
+    public string PublishedAt { get; init; } = string.Empty;
+
+    [JsonPropertyName("prerelease")]
+    public bool IsPrerelease { get; init; }
+
+    [JsonPropertyName("draft")]
+    public bool IsDraft { get; init; }
+
+    [JsonPropertyName("assets")]
+    public List<GitHubAssetDto> Assets { get; init; } = new();
+}
+
+public record GitHubAssetDto
+{
+    [JsonPropertyName("name")]
+    public string Name { get; init; } = string.Empty;
+
+    [JsonPropertyName("browser_download_url")]
+    public string BrowserDownloadUrl { get; init; } = string.Empty;
+
+    [JsonPropertyName("size")]
+    public long Size { get; init; }
+
+    [JsonPropertyName("content_type")]
+    public string ContentType { get; init; } = string.Empty;
+}
+Task 3.2 — GitHub Updater Service
+csharp
+
+// File: Infrastructure/Updates/GitHub/GitHubUpdaterService.cs
+
+public class GitHubUpdaterService : IUpdaterService
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<GitHubUpdaterService> _logger;
+    private readonly string _owner;
+    private readonly string _repository;
+
+    public GitHubUpdaterService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<GitHubUpdaterService> logger)
+    {
+        _httpClient = httpClient;
+        _logger = logger;
+        _owner = configuration["GitHub:Owner"]
+            ?? throw new InvalidOperationException("GitHub:Owner not configured");
+        _repository = configuration["GitHub:Repository"]
+            ?? throw new InvalidOperationException("GitHub:Repository not configured");
+    }
+
+    // ═══════════════════════════════════════════════
+    // CHECK FOR UPDATES VIA GITHUB API
+    // ═══════════════════════════════════════════════
+    public async Task<UpdateCheckResult> CheckForUpdatesAsync(
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var apiUrl = $"https://api.github.com/repos/{_owner}/{_repository}/releases/latest";
+
+            _logger.LogInformation("Checking GitHub for updates: {Url}", apiUrl);
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
+
+            var response = await _httpClient.GetAsync(apiUrl, cts.Token);
+
+            // Handle GitHub rate limiting (60 req/hour unauthenticated)
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                var rateLimitReset = response.Headers
+                    .FirstOrDefault(h => h.Key == "X-RateLimit-Reset").Value?
+                    .FirstOrDefault();
+
+                _logger.LogWarning(
+                    "GitHub API rate limit exceeded. Reset at: {Reset}", rateLimitReset);
+                return UpdateCheckResult.Failed("GitHub rate limit reached");
+            }
+
+            // 404 = no releases published yet
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogInformation("No releases found on GitHub yet");
+                return UpdateCheckResult.NoUpdate();
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync(cts.Token);
+
+            var release = JsonSerializer.Deserialize<GitHubReleaseDto>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (release == null || release.IsDraft || release.IsPrerelease)
+                return UpdateCheckResult.NoUpdate();
+
+            // Map GitHub release to our UpdateInfo model
+            var updateInfo = MapToUpdateInfo(release);
+
+            var currentVersion = GetCurrentVersion();
+            var skippedVersion = GetSkippedVersion();
+
+            // Check skip preference
+            if (updateInfo.LatestVersion == skippedVersion &&
+                !updateInfo.IsForceUpdate(currentVersion))
+            {
+                return UpdateCheckResult.NoUpdate();
+            }
+
+            if (updateInfo.IsUpdateAvailable(currentVersion))
+                return UpdateCheckResult.Available(updateInfo);
+
+            return UpdateCheckResult.NoUpdate();
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("GitHub update check timed out");
+            return UpdateCheckResult.Failed("Connection timeout");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Network error checking for updates");
+            return UpdateCheckResult.Failed("No internet connection");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in update check");
+            return UpdateCheckResult.Failed(ex.Message);
+        }
+    }
+
+    private UpdateInfo MapToUpdateInfo(GitHubReleaseDto release)
+    {
+        // Strip "v" prefix from tag: "v2026.5.1350" → "2026.5.1350"
+        var version = release.TagName.TrimStart('v');
+
+        // Find the .exe installer in assets
+        var installerAsset = release.Assets
+            .FirstOrDefault(a =>
+                a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+                a.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase));
+
+        // Parse changelog: GitHub body is markdown, split by newlines
+        var changelogLines = release.Body
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Take(20) // Max 20 lines in dialog
+            .ToList();
+
+        return new UpdateInfo
+        {
+            LatestVersion = version,
+            ReleaseDate = release.PublishedAt[..10], // "2026-05-20"
+            DownloadUrl = installerAsset?.BrowserDownloadUrl ?? string.Empty,
+            ChecksumSHA256 = string.Empty, // GitHub doesn't provide this natively
+            MinimumRequiredVersion = "2026.1.0",
+            IsCritical = release.Body.Contains("[CRITICAL]",
+                StringComparison.OrdinalIgnoreCase),
+            Changelog = changelogLines
+        };
+    }
+
+    // ─── Other interface methods ───────────────────
+    // (DownloadUpdateAsync, LaunchInstallerAndExit, etc.)
+    // These remain identical to Phase 2 implementation above
+
+    public string GetCurrentVersion()
+    {
+        var version = System.Reflection.Assembly
+            .GetExecutingAssembly()
+            .GetName()
+            .Version;
+        return version != null
+            ? $"{version.Major}.{version.Minor}.{version.Build}"
+            : "0.0.0";
+    }
+
+    public void SkipVersion(string version)
+    {
+        var configFile = ConfigurationManager.OpenExeConfiguration(
+            ConfigurationUserLevel.None);
+        configFile.AppSettings.Settings["SkippedVersion"].Value = version;
+        configFile.Save(ConfigurationSaveMode.Modified);
+        ConfigurationManager.RefreshSection("appSettings");
+    }
+
+    public string GetSkippedVersion()
+        => ConfigurationManager.AppSettings["SkippedVersion"] ?? string.Empty;
+
+    // DownloadUpdateAsync and LaunchInstallerAndExit
+    // are identical to the implementation in Phase 2 of the previous plan
+    // Copy them here without modification
+    public Task<string?> DownloadUpdateAsync(string downloadUrl, string expectedChecksum,
+        IProgress<DownloadProgress> progress, CancellationToken ct = default)
+        => throw new NotImplementedException("Copy from previous UpdaterService");
+
+    public void LaunchInstallerAndExit(string installerPath)
+        => throw new NotImplementedException("Copy from previous UpdaterService");
+}
+Task 3.3 — HttpClient Registration with Required Headers
+csharp
+
+// File: Infrastructure/DependencyInjection.cs
+
+services.AddHttpClient<IUpdaterService, GitHubUpdaterService>(client =>
+{
+    // GitHub API requires User-Agent — returns 403 without it
+    client.DefaultRequestHeaders.Add(
+        "User-Agent",
+        configuration["GitHub:ProductHeaderValue"] ?? "SalesSystem");
+
+    // Request JSON response
+    client.DefaultRequestHeaders.Accept.Add(
+        new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue(
+            "application/vnd.github+json"));
+
+    // GitHub API version header (recommended)
+    client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.BaseAddress = new Uri("https://api.github.com/");
+});
+✅ Phase 3 Checklist
+ User-Agent header always included (GitHub returns 403 without it)
+ X-GitHub-Api-Version header set
+ Rate limit (403) handled with specific message
+ 404 (no releases) handled gracefully
+ Draft and prerelease versions ignored
+ [CRITICAL] tag in release body marks update as mandatory
+ "v" prefix stripped from tag_name before version comparison
+🏭 Phase 4: Windows Service Deployment
+Task 4.1 — Program.cs Configuration
+csharp
+
+// File: YourApp.API/Program.cs (or Worker project)
+
+var builder = Host.CreateDefaultBuilder(args)
+    // ⭐ KEY: Makes this app run as a Windows Service
+    .UseWindowsService(options =>
+    {
+        options.ServiceName = "SalesSystemService";
+    })
+    .ConfigureAppConfiguration((context, config) =>
+    {
+        config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        config.AddJsonFile(
+            $"appsettings.{context.HostingEnvironment.EnvironmentName}.json",
+            optional: true);
+        config.AddEnvironmentVariables(); // Override from env vars in production
+    })
+    .ConfigureServices((context, services) =>
+    {
+        var configuration = context.Configuration;
+
+        // Data Protection (DPAPI)
+        services.AddDataProtection()
+            .PersistKeysToFileSystem(new DirectoryInfo(
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DataProtection-Keys")))
+            .SetApplicationName("SalesSystem");
+
+        // Security services
+        services.AddScoped<IConnectionStringProtector, ConnectionStringProtector>();
+        services.AddScoped<SecureDbContextFactory>();
+        services.AddScoped<FirstRunSetupService>();
+
+        // Database
+        services.AddDbContext<AppDbContext>((sp, options) =>
+        {
+            var factory = sp.GetRequiredService<SecureDbContextFactory>();
+            var connectionString = factory.GetDecryptedConnectionString();
+            options.UseSqlServer(connectionString, sql =>
+            {
+                sql.CommandTimeout(60);
+                sql.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorNumbersToAdd: null);
+            });
+        });
+
+        // Backup services
+        services.AddScoped<IBackupService, BackupService>();
+        services.AddHostedService<ScheduledBackupWorker>();
+
+        // Update services
+        services.AddUpdateServices(configuration);
+
+        // All other application services...
+        services.AddApplicationServices();
+        services.AddInfrastructureServices(configuration);
+    })
+    .ConfigureLogging((context, logging) =>
+    {
+        logging.ClearProviders();
+        logging.AddConsole();
+        logging.AddEventLog(settings =>
+        {
+            settings.SourceName = "SalesSystem";  // Windows Event Log
+        });
+    });
+
+var host = builder.Build();
+
+// ─── First Run: Encrypt connection string ─────────
+using (var scope = host.Services.CreateScope())
+{
+    var setupService = scope.ServiceProvider
+        .GetRequiredService<FirstRunSetupService>();
+    var config = scope.ServiceProvider
+        .GetRequiredService<IConfiguration>();
+    setupService.EnsureConnectionStringEncrypted(config);
+
+    // Run EF migrations automatically
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
+
+await host.RunAsync();
+Task 4.2 — Windows Service Install/Uninstall Scripts
+batch
+
+:: File: Scripts/Install-Service.bat
+:: Run as Administrator
+
+@echo off
+echo Installing SalesSystem Windows Service...
+
+:: Stop if already running
+sc stop "SalesSystemService" 2>nul
+
+:: Delete if already exists  
+sc delete "SalesSystemService" 2>nul
+
+timeout /t 2 /nobreak >nul
+
+:: Install new service
+sc create "SalesSystemService" ^
+    binPath= "%~dp0..\publish\SalesSystem.Service.exe" ^
+    DisplayName= "نظام إدارة المبيعات" ^
+    start= auto ^
+    obj= LocalSystem
+
+:: Set description
+sc description "SalesSystemService" "خدمة نظام إدارة المبيعات والمخزون"
+
+:: Set recovery options (auto-restart on failure)
+sc failure "SalesSystemService" reset= 86400 actions= restart/5000/restart/10000/restart/30000
+
+:: Start service
+sc start "SalesSystemService"
+
+echo Service installed and started successfully.
+pause
+batch
+
+:: File: Scripts/Uninstall-Service.bat
+:: Run as Administrator
+
+@echo off
+echo Uninstalling SalesSystem Windows Service...
+
+sc stop "SalesSystemService"
+timeout /t 3 /nobreak >nul
+sc delete "SalesSystemService"
+
+echo Service uninstalled successfully.
+pause
+✅ Phase 4 Checklist
+ .UseWindowsService() called in CreateDefaultBuilder
+ Windows Event Log configured for service logging
+ EF migrations run automatically on startup
+ Service recovery set to auto-restart on failure (3 attempts)
+ Install script stops existing service before reinstalling
+ First-run encryption happens before host.RunAsync()
+🖥️ Phase 5: WPF Admin Screens
+Task 5.1 — Role Guard Base Class
+csharp
+
+// File: WPF/ViewModels/Base/AdminOnlyViewModel.cs
+// ALL admin screens inherit from this
+
+public abstract class AdminOnlyViewModel : BaseViewModel
+{
+    protected readonly ICurrentUserService _currentUser;
+
+    protected AdminOnlyViewModel(ICurrentUserService currentUser)
+    {
+        _currentUser = currentUser;
+        EnforceAdminRole();
+    }
+
+    private void EnforceAdminRole()
+    {
+        if (!_currentUser.IsInRole("Admin"))
+        {
+            throw new UnauthorizedAccessException(
+                "⛔ هذه الشاشة مخصصة للمسؤولين فقط.\n" +
+                "تواصل مع مدير النظام للحصول على الصلاحيات.");
+        }
+    }
+}
+Task 5.2 — User Management ViewModel
+csharp
+
+// File: WPF/ViewModels/Admin/UserManagementViewModel.cs
+
+public class UserManagementViewModel : AdminOnlyViewModel
+{
+    private readonly IMediator _mediator;
+
+    public ObservableCollection<UserRowViewModel> Users { get; } = new();
+
+    private UserRowViewModel? _selectedUser;
+    public UserRowViewModel? SelectedUser
+    {
+        get => _selectedUser;
+        set => SetProperty(ref _selectedUser, value);
+    }
+
+    // Commands
+    public IAsyncRelayCommand LoadUsersCommand { get; }
+    public IAsyncRelayCommand CreateUserCommand { get; }
+    public IAsyncRelayCommand<UserRowViewModel> EditUserCommand { get; }
+    public IAsyncRelayCommand<UserRowViewModel> ToggleUserStatusCommand { get; }
+    public IAsyncRelayCommand<UserRowViewModel> ResetPasswordCommand { get; }
+
+    public UserManagementViewModel(
+        ICurrentUserService currentUser,
+        IMediator mediator) : base(currentUser)
+    {
+        _mediator = mediator;
+
+        LoadUsersCommand = new AsyncRelayCommand(LoadUsersAsync);
+        CreateUserCommand = new AsyncRelayCommand(CreateUserAsync);
+        EditUserCommand = new AsyncRelayCommand<UserRowViewModel>(EditUserAsync);
+        ToggleUserStatusCommand = new AsyncRelayCommand<UserRowViewModel>(ToggleUserStatusAsync);
+        ResetPasswordCommand = new AsyncRelayCommand<UserRowViewModel>(ResetPasswordAsync);
+
+        // Auto-load on creation
+        _ = LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            var users = await _mediator.Send(new GetAllUsersQuery());
+            Users.Clear();
+            foreach (var user in users)
+                Users.Add(new UserRowViewModel(user));
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task CreateUserAsync()
+    {
+        var dialog = new CreateUserDialog();
+        if (dialog.ShowDialog() != true) return;
+
+        var result = await _mediator.Send(new CreateUserCommand
+        {
+            Username = dialog.Username,
+            Password = dialog.Password,
+            FullName = dialog.FullName,
+            Role = dialog.SelectedRole
+        });
+
+        if (result.IsSuccess)
+        {
+            StatusMessage = $"✅ تم إنشاء المستخدم '{dialog.Username}' بنجاح";
+            await LoadUsersAsync();
+        }
+        else
+        {
+            StatusMessage = $"❌ {result.ErrorMessage}";
+        }
+    }
+
+    private async Task ToggleUserStatusAsync(UserRowViewModel user)
+    {
+        // Prevent admin from disabling their own account
+        if (user.UserId == _currentUser.UserId)
+        {
+            StatusMessage = "⚠️ لا يمكنك تعطيل حسابك الخاص";
+            return;
+        }
+
+        var action = user.IsActive ? "تعطيل" : "تفعيل";
+        var confirm = System.Windows.MessageBox.Show(
+            $"هل تريد {action} المستخدم '{user.Username}'؟",
+            "تأكيد",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Question);
+
+        if (confirm != System.Windows.MessageBoxResult.Yes) return;
+
+        await _mediator.Send(new ToggleUserStatusCommand(user.UserId));
+        await LoadUsersAsync();
+        StatusMessage = $"✅ تم {action} المستخدم '{user.Username}'";
+    }
+
+    private async Task ResetPasswordAsync(UserRowViewModel user)
+    {
+        var dialog = new ResetPasswordDialog(user.Username);
+        if (dialog.ShowDialog() != true) return;
+
+        await _mediator.Send(new ResetPasswordCommand(user.UserId, dialog.NewPassword));
+        StatusMessage = $"✅ تم تعيين كلمة مرور جديدة للمستخدم '{user.Username}'";
+    }
+
+    private async Task EditUserAsync(UserRowViewModel user)
+    {
+        var dialog = new EditUserDialog(user);
+        if (dialog.ShowDialog() != true) return;
+
+        await _mediator.Send(new UpdateUserCommand
+        {
+            UserId = user.UserId,
+            FullName = dialog.FullName,
+            Role = dialog.SelectedRole
+        });
+
+        await LoadUsersAsync();
+        StatusMessage = "✅ تم تحديث بيانات المستخدم";
+    }
+}
+
+public class UserRowViewModel : BaseViewModel
+{
+    public int UserId { get; init; }
+    public string Username { get; init; } = string.Empty;
+    public string FullName { get; init; } = string.Empty;
+    public string Role { get; init; } = string.Empty;
+    public bool IsActive { get; set; }
+
+    public string RoleDisplay => Role == "Admin" ? "🔑 مسؤول" : "👤 كاشير";
+    public string StatusDisplay => IsActive ? "✅ نشط" : "🔴 معطل";
+    public string StatusColor => IsActive ? "#4CAF50" : "#F44336";
+
+    public UserRowViewModel(UserDto dto)
+    {
+        UserId = dto.Id;
+        Username = dto.Username;
+        FullName = dto.FullName;
+        Role = dto.Role;
+        IsActive = dto.IsActive;
+    }
+}
+Task 5.3 — User Management XAML
+XML
+
+<!-- File: Views/Admin/UserManagementView.xaml -->
+<UserControl FlowDirection="RightToLeft">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Toolbar -->
+            <RowDefinition Height="*"/>      <!-- DataGrid -->
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="👥 إدارة المستخدمين"
+                       FontSize="18" FontWeight="Bold"
+                       VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+            <Button Content="+ إضافة مستخدم جديد"
+                    Command="{Binding CreateUserCommand}"
+                    Background="#1976D2" Foreground="White"
+                    BorderThickness="0" Padding="16,8"/>
+        </StackPanel>
+
+        <!-- Users DataGrid -->
+        <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding Users}"
+                  SelectedItem="{Binding SelectedUser}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="Horizontal"
+                  HeadersVisibility="Column">
+
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="اسم المستخدم"
+                    Binding="{Binding Username}" Width="150"/>
+
+                <DataGridTextColumn Header="الاسم الكامل"
+                    Binding="{Binding FullName}" Width="*"/>
+
+                <DataGridTemplateColumn Header="الدور" Width="120">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding RoleDisplay}"
+                                       FontWeight="Bold"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="الحالة" Width="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding StatusDisplay}"
+                                       Foreground="{Binding StatusColor}"
+                                       FontWeight="Bold"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Action buttons column -->
+                <DataGridTemplateColumn Header="إجراءات" Width="220">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="✏️ تعديل" Margin="2"
+                                    Command="{Binding DataContext.EditUserCommand,
+                                              RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Background="#607D8B" Foreground="White"
+                                    BorderThickness="0" Padding="8,4"/>
+
+                                <Button Content="🔑 كلمة المرور" Margin="2"
+                                    Command="{Binding DataContext.ResetPasswordCommand,
+                                              RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Background="#FF9800" Foreground="White"
+                                    BorderThickness="0" Padding="8,4"/>
+
+                                <Button Margin="2"
+                                    Content="{Binding IsActive,
+                                              Converter={StaticResource BoolToActivateText}}"
+                                    Command="{Binding DataContext.ToggleUserStatusCommand,
+                                              RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"
+                                    Background="{Binding IsActive,
+                                                 Converter={StaticResource BoolToStatusColor}}"
+                                    Foreground="White"
+                                    BorderThickness="0" Padding="8,4"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>
+✅ Phase 5 Checklist
+ AdminOnlyViewModel base class throws if non-admin accesses
+ Admin cannot disable their own account
+ Confirmation dialog shown before toggling user status
+ Role displayed as Arabic label (not raw "Admin" string)
+ All commands check IsBusy before executing
+📦 Phase 6: Inno Setup Installer Script
+Task 6.1 — Complete .iss Script
+pascal
+
+; File: Installer/SalesSystem.iss
+; Build: Run with Inno Setup Compiler
+
+#define MyAppName "نظام إدارة المبيعات"
+#define MyAppNameEn "SalesSystem"
+#define MyAppVersion "2026.5.1350"
+#define MyAppPublisher "Your Company Name"
+#define MyAppURL "https://your-website.com"
+#define MyAppExeName "SalesSystem.DesktopWPF.exe"
+#define MyAppServiceExe "SalesSystem.Service.exe"
+#define DotNetVersion "8.0"
+
+[Setup]
+; Basic info
+AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}/support
+AppUpdatesURL={#MyAppURL}/updates
+
+; Install directory
+DefaultDirName={autopf}\{#MyAppNameEn}
+DefaultGroupName={#MyAppName}
+DisableProgramGroupPage=yes
+
+; Output
+OutputDir=..\Release
+OutputBaseFilename=SalesSystem_Setup_v{#MyAppVersion}
+Compression=lzma2/ultra64
+SolidCompression=yes
+InternalCompressLevel=ultra64
+
+; UI
+WizardStyle=modern
+WizardResizable=no
+ShowLanguageDialog=no
+
+; Privileges — needs admin for Program Files
+PrivilegesRequired=admin
+PrivilegesRequiredOverridesAllowed=commandline
+
+; Minimum Windows version: Windows 10
+MinVersion=10.0.17763
+
+; Uninstall
+UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayName={#MyAppName} {#MyAppVersion}
+
+; Create uninstaller
+CreateUninstallRegKey=yes
+
+[Languages]
+Name: "arabic"; MessagesFile: "compiler:Languages\Arabic.isl"
+
+[CustomMessages]
+arabic.CheckingDotNet=جارٍ التحقق من متطلبات النظام...
+arabic.DotNetMissing=يتطلب هذا البرنامج .NET Runtime {#DotNetVersion} أو أحدث.%nيرجى تثبيته أولاً من موقع Microsoft ثم إعادة تشغيل المثبّت.
+arabic.InstallingService=جارٍ تثبيت خدمة النظام...
+arabic.StoppingService=جارٍ إيقاف الخدمة القديمة...
+
+[Tasks]
+; Optional tasks shown to user
+Name: "desktopicon"; Description: "إنشاء اختصار على سطح المكتب"; GroupDescription: "اختصارات:"; Flags: checked
+Name: "startupicon"; Description: "تشغيل البرنامج مع بدء تشغيل Windows"; GroupDescription: "اختصارات:"; Flags: unchecked
+
+[Files]
+; Main WPF application
+Source: "..\publish\wpf\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Windows Service
+Source: "..\publish\service\*"; DestDir: "{app}\Service"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Default appsettings (will be encrypted on first run)
+Source: "..\publish\wpf\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
+
+; Visual C++ Redistributable (if needed)
+; Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+
+[Icons]
+; Start Menu
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\إلغاء تثبيت {#MyAppName}"; Filename: "{uninstallexe}"
+
+; Desktop (conditional on task)
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+; Startup (conditional on task)
+Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startupicon
+
+[Run]
+; Install Windows Service
+Filename: "{sys}\sc.exe"; \
+    Parameters: "create SalesSystemService binPath= ""{app}\Service\{#MyAppServiceExe}"" DisplayName= ""{#MyAppName} Service"" start= auto"; \
+    StatusMsg: "{cm:InstallingService}"; \
+    Flags: runhidden waituntilterminated; \
+    Check: not ServiceExists('SalesSystemService')
+
+; Set service description
+Filename: "{sys}\sc.exe"; \
+    Parameters: "description SalesSystemService ""خدمة إدارة المبيعات والمخزون"""; \
+    Flags: runhidden waituntilterminated
+
+; Configure service recovery (auto-restart on failure)
+Filename: "{sys}\sc.exe"; \
+    Parameters: "failure SalesSystemService reset= 86400 actions= restart/5000/restart/10000/restart/30000"; \
+    Flags: runhidden waituntilterminated
+
+; Start service
+Filename: "{sys}\sc.exe"; \
+    Parameters: "start SalesSystemService"; \
+    StatusMsg: "جارٍ تشغيل الخدمة..."; \
+    Flags: runhidden waituntilterminated
+
+; Launch app after install (optional)
+Filename: "{app}\{#MyAppExeName}"; \
+    Description: "تشغيل {#MyAppName} الآن"; \
+    Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+; Stop and remove Windows Service on uninstall
+Filename: "{sys}\sc.exe"; Parameters: "stop SalesSystemService"; Flags: runhidden waituntilterminated
+Filename: "{sys}\sc.exe"; Parameters: "delete SalesSystemService"; Flags: runhidden waituntilterminated
+
+[Code]
+// Check for .NET Runtime before installing
+function IsDotNetInstalled(): Boolean;
+var
+  RuntimePath: String;
+begin
+  // Check if .NET 8 runtime exists
+  RuntimePath := ExpandConstant('{pf}\dotnet\shared\Microsoft.NETCore.App');
+  Result := DirExists(RuntimePath) and
+            FileExists(RuntimePath + '\8.0.0\coreclr.dll') or
+            RegKeyExists(HKLM, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost');
+end;
+
+function ServiceExists(ServiceName: String): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\sc.exe'),
+       'query ' + ServiceName,
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := (ResultCode = 0);
+end;
+
+function StopExistingService(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\sc.exe'),
+       'stop SalesSystemService',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(2000); // Wait for service to stop
+  Result := True;
+end;
+
+procedure InitializeWizard();
+begin
+  WizardForm.WelcomeLabel2.Caption :=
+    'سيتم تثبيت ' + '{#MyAppName}' + ' الإصدار ' + '{#MyAppVersion}' +
+    ' على جهازك.' + #13#10 + #13#10 +
+    'يُرجى إغلاق جميع التطبيقات الأخرى قبل المتابعة.';
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  // Check .NET requirement
+  WizardForm.StatusLabel.Caption := CustomMessage('CheckingDotNet');
+
+  if not IsDotNetInstalled() then
+  begin
+    MsgBox(CustomMessage('DotNetMissing'), mbError, MB_OK);
+    Result := False;
+    Exit;
+  end;
+
+  // Stop old service if upgrading
+  if ServiceExists('SalesSystemService') then
+    StopExistingService();
+
+  Result := True;
+end;
+✅ Phase 6 Checklist
+ .NET 8 presence checked before install proceeds
+ Service stops before file replacement (upgrade safety)
+ Service auto-restarts on failure (3 attempts with increasing delays)
+ Desktop shortcut is optional (checked by default)
+ Startup shortcut is optional (unchecked by default)
+ Service removed on uninstall
+ AppId GUID is unique — never reuse between different apps
+🔒 Phase 7: Security Hardening & .gitignore
+Task 7.1 — Critical .gitignore Entries
+gitignore
+
+# File: .gitignore (ADD these entries)
+
+# NEVER commit these files
+appsettings.Production.json
+appsettings.Staging.json
+*.bak
+*.pfx
+*.p12
+DataProtection-Keys/
+Secrets/
+
+# Build outputs — commit publish scripts, not binaries
+publish/
+Release/
+*.exe
+*.dll
+*.pdb
+
+# IDE files
+.vs/
+*.user
+*.suo
+
+# Logs
+logs/
+*.log
+Task 7.2 — Final Security Checklist
+csharp
+
+// File: Infrastructure/Security/SecurityAudit.cs
+// Run this check at startup in Debug mode only
+
+#if DEBUG
+public static class SecurityAudit
+{
+    public static void RunChecks(IConfiguration configuration)
+    {
+        var issues = new List<string>();
+
+        // Check 1: Connection string is encrypted
+        var cs = configuration.GetConnectionString("DefaultConnection") ?? "";
+        if (!cs.StartsWith("DPAPI:") && cs.Contains("Password"))
+            issues.Add("⚠️ Connection string contains plaintext password!");
+
+        // Check 2: No hardcoded secrets in config
+        var allConfig = configuration.AsEnumerable();
+        foreach (var item in allConfig)
+        {
+            if (item.Value?.Contains("password123") == true ||
+                item.Value?.Contains("admin123") == true ||
+                item.Value?.Contains("secret") == true)
+                issues.Add($"⚠️ Potential hardcoded secret in: {item.Key}");
+        }
+
+        // Check 3: GitHub token not committed
+        var githubToken = configuration["GitHub:PersonalAccessToken"];
+        if (!string.IsNullOrWhiteSpace(githubToken))
+            issues.Add("⚠️ GitHub PAT found in config — use environment variable instead!");
+
+        if (issues.Any())
+        {
+            var message = string.Join("\n", issues);
+            System.Diagnostics.Debug.WriteLine(
+                $"SECURITY AUDIT FAILED:\n{message}");
+            // Throw in Debug to force developer attention
+            throw new InvalidOperationException(
+                $"Security issues detected:\n{message}");
+        }
+
+        System.Diagnostics.Debug.WriteLine("✅ Security audit passed");
+    }
+}
+#endif
+📊 Phase 8: Performance Seeding Script
+Task 8.1 — SQL Data Seeding for Load Testing
+SQL
+
+-- File: Scripts/SeedPerformanceData.sql
+-- Seeds 1 year of enterprise-volume transactions
+-- WARNING: Takes 5-15 minutes to run. Use on test environment only.
+
+SET NOCOUNT ON;
+DECLARE @StartDate DATE = DATEADD(YEAR, -1, GETDATE());
+DECLARE @EndDate DATE = GETDATE();
+DECLARE @CurrentDate DATE = @StartDate;
+DECLARE @InvoiceId INT;
+DECLARE @CustomerId INT;
+DECLARE @ProductId INT;
+DECLARE @DailyInvoices INT;
+
+-- ─── Seed Customers (500 customers) ───────────────
+PRINT 'Seeding customers...';
+DECLARE @i INT = 1;
+WHILE @i <= 500
+BEGIN
+    INSERT INTO Customers (Name, Phone, Address, CreatedAt)
+    VALUES (
+        N'عميل تجريبي رقم ' + CAST(@i AS NVARCHAR),
+        '05' + RIGHT('00000000' + CAST((@i * 7 + 10000000) AS VARCHAR), 8),
+        N'الرياض - حي رقم ' + CAST((@i % 20) + 1 AS NVARCHAR),
+        DATEADD(DAY, -(@i % 365), GETDATE())
+    );
+    SET @i = @i + 1;
+END;
+
+-- ─── Seed Products (200 products with units) ──────
+PRINT 'Seeding products...';
+SET @i = 1;
+WHILE @i <= 200
+BEGIN
+    INSERT INTO Products (Name, CategoryId, IsActive)
+    VALUES (N'منتج تجريبي ' + CAST(@i AS NVARCHAR), (@i % 10) + 1, 1);
+
+    DECLARE @ProductId INT = SCOPE_IDENTITY();
+
+    -- Base unit (piece)
+    INSERT INTO ProductUnits
+        (ProductId, UnitName, BaseConversionFactor, IsBaseUnit, SalesPrice, PurchaseCost, SortOrder)
+    VALUES (@ProductId, N'حبة', 1, 1, (@i % 50) + 10, (@i % 30) + 5, 0);
+
+    -- Box unit (12 pieces)
+    INSERT INTO ProductUnits
+        (ProductId, UnitName, BaseConversionFactor, IsBaseUnit, SalesPrice, PurchaseCost, SortOrder)
+    VALUES (@ProductId, N'كرتون', 12, 0, ((@i % 50) + 10) * 12 * 0.95, ((@i % 30) + 5) * 12, 1);
+
+    -- Initial stock
+    INSERT INTO Stocks (ProductId, CurrentQuantityInPieces)
+    VALUES (@ProductId, (@i * 37) % 1000 + 100);
+
+    SET @i = @i + 1;
+END;
+
+-- ─── Seed 1 Year of Invoices ───────────────────────
+PRINT 'Seeding invoices (this may take several minutes)...';
+
+WHILE @CurrentDate <= @EndDate
+BEGIN
+    -- 5-20 invoices per day (more on weekends)
+    SET @DailyInvoices = CASE DATEPART(WEEKDAY, @CurrentDate)
+        WHEN 6 THEN 20  -- Thursday (busy)
+        WHEN 7 THEN 25  -- Friday (busiest)
+        ELSE 10
+    END;
+
+    DECLARE @j INT = 1;
+    WHILE @j <= @DailyInvoices
+    BEGIN
+        -- Random customer
+        SET @CustomerId = (ABS(CHECKSUM(NEWID())) % 500) + 1;
+
+        INSERT INTO SalesInvoices
+            (InvoiceNumber, CustomerId, SubTotal, TaxAmount, GrandTotal,
+             PaymentMethod, Status, CreatedAt, CashBoxId)
+        VALUES (
+            'INV-' + FORMAT(@CurrentDate, 'yyyyMMdd') + '-' + RIGHT('000' + CAST(@j AS VARCHAR), 3),
+            @CustomerId,
+            0, 0, 0,  -- Will be updated after items
+            CASE ABS(CHECKSUM(NEWID())) % 2 WHEN 0 THEN 'نقدي' ELSE 'شبكة' END,
+            1,
+            DATEADD(MINUTE, @j * 30, CAST(@CurrentDate AS DATETIME)),
+            1
+        );
+
+        SET @InvoiceId = SCOPE_IDENTITY();
+
+        -- Add 1-5 items per invoice
+        DECLARE @ItemCount INT = (ABS(CHECKSUM(NEWID())) % 5) + 1;
+        DECLARE @k INT = 1;
+        DECLARE @InvoiceTotal DECIMAL(18,4) = 0;
+
+        WHILE @k <= @ItemCount
+        BEGIN
+            SET @ProductId = (ABS(CHECKSUM(NEWID())) % 200) + 1;
+            DECLARE @Qty DECIMAL(18,4) = (ABS(CHECKSUM(NEWID())) % 10) + 1;
+            DECLARE @Price DECIMAL(18,4) = (ABS(CHECKSUM(NEWID())) % 100) + 10;
+            DECLARE @ItemTotal DECIMAL(18,4) = @Qty * @Price;
+
+            INSERT INTO SalesInvoiceItems
+                (InvoiceId, ProductId, ProductName, UnitName, Quantity, UnitPrice, TotalPrice, CategoryId)
+            VALUES (
+                @InvoiceId, @ProductId,
+                N'منتج ' + CAST(@ProductId AS NVARCHAR),
+                N'حبة', @Qty, @Price, @ItemTotal, (@ProductId % 10) + 1
+            );
+
+            SET @InvoiceTotal = @InvoiceTotal + @ItemTotal;
+            SET @k = @k + 1;
+        END;
+
+        -- Update invoice totals
+        UPDATE SalesInvoices SET
+            SubTotal = @InvoiceTotal,
+            TaxAmount = @InvoiceTotal * 0.15,
+            GrandTotal = @InvoiceTotal * 1.15
+        WHERE Id = @InvoiceId;
+
+        SET @j = @j + 1;
+    END;
+
+    SET @CurrentDate = DATEADD(DAY, 1, @CurrentDate);
+END;
+
+PRINT 'Data seeding complete!';
+
+-- ─── Verify counts ─────────────────────────────────
+SELECT
+    (SELECT COUNT(*) FROM Customers) AS Customers,
+    (SELECT COUNT(*) FROM Products) AS Products,
+    (SELECT COUNT(*) FROM SalesInvoices) AS Invoices,
+    (SELECT COUNT(*) FROM SalesInvoiceItems) AS InvoiceItems;
+📦 Final Summary
+text
+
+┌────────────────────────────────────────────────────────────────────┐
+│           PHASE 7: PRODUCTION READINESS — COMPLETE PLAN            │
+├──────┬────────────────────────────────────────────┬───────────────┤
+│ Step │ Deliverable                                │ Critical Rule │
+├──────┼────────────────────────────────────────────┼───────────────┤
+│  0   │ NuGet packages + appsettings structure     │ No secrets    │
+│  1   │ DPAPI encryption + first-run setup         │ Encrypt once  │
+│  2   │ Backup/Restore + scheduled worker          │ MULTI_USER    │
+│      │                                            │ always reset  │
+│  3   │ GitHub Releases API integration            │ User-Agent    │
+│      │                                            │ required      │
+│  4   │ Windows Service + install scripts          │ Main window   │
+│      │                                            │ first!        │
+│  5   │ Admin screens + role guard                 │ Base class    │
+│      │                                            │ enforces role │
+│  6   │ Inno Setup .iss script                     │ .NET check    │
+│      │                                            │ before install│
+│  7   │ .gitignore + security audit                │ Run in Debug  │
+│  8   │ SQL seeding for performance testing        │ Test env only │
+└──────┴────────────────────────────────────────────┴───────────────┘
+
+ABSOLUTE RULES — ZERO TOLERANCE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ appsettings.json in .gitignore — NEVER committed with real credentials
+✅ Connection string encrypted with DPAPI on first run
+✅ Restore ALWAYS returns DB to MULTI_USER — even if restore fails
+✅ GitHub API User-Agent header is MANDATORY (403 without it)
+✅ Admin screens throw UnauthorizedAccessException for non-admins
+✅ Service set to SINGLE_USER only during restore — never longer
+✅ .NET Runtime checked in installer BEFORE extraction begins
+✅ SecurityAudit.RunChecks() throws in DEBUG if secrets found
+✅ Seeding script runs on TEST environment ONLY — never production

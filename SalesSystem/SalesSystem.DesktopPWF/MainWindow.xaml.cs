@@ -1,10 +1,13 @@
 using System.Windows;
 using System.Windows.Controls;
+using SalesSystem.DesktopPWF.Models.Updates;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.DesktopPWF.ViewModels.Inventory;
+using SalesSystem.DesktopPWF.ViewModels.Updates;
+using SalesSystem.DesktopPWF.Views.Updates;
 
 namespace SalesSystem.DesktopPWF;
 
@@ -148,6 +151,49 @@ public partial class MainWindow : Window
         if (page != null)
         {
             ContentFrame.Navigate(page);
+        }
+    }
+
+    private async void CheckForUpdatesMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var updaterService = App.GetService<IUpdaterService>();
+            IsEnabled = false;
+
+            var result = await updaterService.CheckForUpdatesAsync();
+
+            if (!result.IsSuccess)
+            {
+                System.Windows.MessageBox.Show(
+                    "تعذر الاتصال بخادم التحديثات.\nيرجى التحقق من اتصال الإنترنت والمحاولة لاحقاً.",
+                    "تعذر التحقق",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.OK,
+                    MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+                return;
+            }
+
+            if (!result.UpdateAvailable || result.UpdateInfo == null)
+            {
+                System.Windows.MessageBox.Show(
+                    $"برنامجك محدّث!\nتعمل على أحدث إصدار: {updaterService.GetCurrentVersion()}",
+                    "لا توجد تحديثات",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information,
+                    MessageBoxResult.OK,
+                    MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+                return;
+            }
+
+            var vm = new UpdateDialogViewModel(updaterService, result.UpdateInfo);
+            var dialog = new UpdateDialog(vm) { Owner = this };
+            dialog.ShowDialog();
+        }
+        finally
+        {
+            IsEnabled = true;
         }
     }
 

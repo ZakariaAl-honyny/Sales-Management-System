@@ -24,6 +24,8 @@
             <MenuItem Header="ملف">
                 <MenuItem Header="الملف الشخصي" Click="ProfileMenuItem_Click"/>
                 <Separator/>
+                <MenuItem Header="فحص التحديثات" Click="CheckForUpdatesMenuItem_Click"/>
+                <Separator/>
                 <MenuItem Header="تسجيل الخروج" Click="BtnLogout_Click"/>
             </MenuItem>
             <MenuItem Header="المبيعات">
