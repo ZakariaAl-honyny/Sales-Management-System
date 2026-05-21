@@ -19,6 +19,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     private readonly Mock<IPurchaseInvoiceApiService> _mockInvoiceService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
+    private readonly Mock<IPrintApiService> _mockPrintService;
     private readonly PurchaseInvoiceListViewModel _viewModel;
 
     public PurchaseInvoiceListViewModelTests()
@@ -26,11 +27,13 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         _mockInvoiceService = new Mock<IPurchaseInvoiceApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
+        _mockPrintService = new Mock<IPrintApiService>();
 
         _viewModel = new PurchaseInvoiceListViewModel(
             _mockInvoiceService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockPrintService.Object);
     }
 
     public void Dispose()

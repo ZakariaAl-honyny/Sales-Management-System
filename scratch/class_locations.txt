@@ -1,0 +1,350 @@
+3151:**EF Core Entity Classes**
+3159:هنا تجد قائمة بجميع **Entity Classes**.
+3167:سيتضمن هذا **مخطط SQL Server وبناء الجداول الأساسية** لنظام الـ MVP، هنا تجد قائمة بجميع **Entity Classes** في C#.
+3791:# 11) تفاصيل فنية حول الكيانات Entity Classes
+3819:## **Entity Classes في C#**
+3830:# **Entity Classes الأساسية**
+3865:public class CreateProductRequest
+3873:تعد **Entity Classes كيانات** برمجية مدعومة بـ EF attributes.
+3935:    public abstract class AuditableEntity
+3945:# 3) الـ Entity Classes الأساسية
+3953:    public class Category : AuditableEntity
+3971:    public class Unit : AuditableEntity
+3989:    public class Product : AuditableEntity
+4021:    public class Warehouse : AuditableEntity
+4041:    public class WarehouseStock : AuditableEntity
+4062:    public class Customer : AuditableEntity
+4087:    public class Supplier : AuditableEntity
+4113:    public class User : AuditableEntity
+4129:    public class StoreSettings
+4155:    public class PurchaseInvoice : AuditableEntity
+4192:    public class PurchaseInvoiceItem
+4219:    public class SalesInvoice : AuditableEntity
+4256:    public class SalesInvoiceItem
+4287:    public class PurchaseReturn : AuditableEntity
+4321:    public class PurchaseReturnItem
+4345:    public class SalesReturn : AuditableEntity
+4379:    public class SalesReturnItem
+4403:    public class StockTransfer : AuditableEntity
+4431:    public class StockTransferItem
+4458:    public class CustomerPayment : AuditableEntity
+4488:    public class SupplierPayment : AuditableEntity
+4519:    public class InventoryMovement
+4573:    public class ProductConfiguration : IEntityTypeConfiguration<Product>
+4803:    public static class ModelBuilderSeedExtensions
+4928:    public class DatabaseInitializer : IDatabaseInitializer
+5002:    public static class DependencyInjection
+5298:    public static class ModelBuilderSeedExtensions
+5423:    public class DatabaseInitializer : IDatabaseInitializer
+5497:    public static class DependencyInjection
+5676:    public class PagedQueryRequestDto
+5689:    public class PagedResultDto<T>
+5703:    public class ApiResponseDto<T>
+5726:    public class ProductDto
+5756:    public class ProductLookupDto
+5775:    public class CreateProductRequestDto
+5813:    public class UpdateProductRequestDto
+5897:    public class PurchaseInvoiceItemDto
+5918:    public class PurchaseInvoiceDto
+5958:    public class PurchaseInvoiceListDto
+5980:    public class CreatePurchaseInvoiceItemRequestDto
+6006:    public class CreatePurchaseInvoiceRequestDto
+6046:    public class SalesInvoiceItemDto
+6067:    public class SalesInvoiceDto
+6107:    public class SalesInvoiceListDto
+6129:    public class CreateSalesInvoiceItemRequestDto
+6155:    public class CreateSalesInvoiceRequestDto
+6296:    public class ProductMappingProfile : Profile
+6346:    public class PurchaseInvoiceMappingProfile : Profile
+6422:    public class SalesInvoiceMappingProfile : Profile
+6562:    public class ProductService : IProductService
+6859:    public class SalesSummaryRequestDto
+6872:    public class SalesSummaryDto
+7054:    public class SalesService : ISalesService
+7547:    public abstract class BaseApiController : ControllerBase
+7589:    public class ProductsController : BaseApiController
+7718:    public class SalesController : BaseApiController
+7847:    public static class DependencyInjection
+8092:    internal static class Program
+8184:    public class ProductApiService : IProductApiService
+8302:    public class ProductsListControl : UserControl
+8578:    public class MainForm : Form
+8745:    public class ProductEditorForm : Form
+9303:    public class CategoryLookupDto
+9319:    public class UnitLookupDto
+9411:    public class CategoryService : ICategoryService
+9450:    public class UnitService : IUnitService
+9494:    public class CategoryRepository : ICategoryRepository
+9535:    public class UnitRepository : IUnitRepository
+9581:    public class CategoriesController : BaseApiController
+9616:    public class UnitsController : BaseApiController
+9670:    public abstract class ApiServiceBase
+9740:    public class CategoryApiService : ApiServiceBase, ICategoryApiService
+9779:    public class UnitApiService : ApiServiceBase, IUnitApiService
+10171:    public class CategoryDto
+10189:    public class CategoryLookupDto
+10205:    public class CreateCategoryRequestDto
+10227:    public class UpdateCategoryRequestDto
+10339:    public class CategoryMappingProfile : Profile
+10376:    public class CategoryService : ICategoryService
+10536:    public class CategoryRepository : ICategoryRepository
+10653:    public class CategoriesController : BaseApiController
+10819:    public class CategoryApiService : ApiServiceBase, ICategoryApiService
+10913:    public class CategoriesListControl : UserControl
+11195:    public class CategoryEditorForm : Form
+11818:    public class CategoryDto
+11834:    public class CategoryLookupDto
+11848:    public class CreateCategoryRequestDto
+11868:    public class UpdateCategoryRequestDto
+11965:    public class CategoryMappingProfile : Profile
+11999:    public class CategoryService : ICategoryService
+12152:    public class CategoryRepository : ICategoryRepository
+12261:    public class CategoriesController : BaseApiController
+12411:    public class CategoryApiService : ApiServiceBase, ICategoryApiService
+12488:    public class CategoriesListControl : UserControl
+12741:    public class CategoryEditorForm : Form
+13062:    public class UnitDto
+13077:    public class UnitLookupDto
+13092:    public class CreateUnitRequestDto
+13112:    public class UpdateUnitRequestDto
+13220:    public class UnitMappingProfile : Profile
+13252:    public class UnitService : IUnitService
+13409:    public class UnitRepository : IUnitRepository
+13524:    public class UnitsController : BaseApiController
+13684:    public class UnitApiService : ApiServiceBase, IUnitApiService
+13761:    public class UnitsListControl : UserControl
+14010:    public class UnitEditorForm : Form
+14334:    public class WarehouseDto
+14354:    public class WarehouseLookupDto
+14372:    public class CreateWarehouseRequestDto
+14398:    public class UpdateWarehouseRequestDto
+14532:    public class WarehouseMappingProfile : Profile
+14568:    public class WarehouseService : IWarehouseService
+14833:    public class WarehouseRepository : IWarehouseRepository
+14974:    public class WarehousesController : BaseApiController
+15168:    public class WarehouseApiService : ApiServiceBase, IWarehouseApiService
+15260:    public class WarehousesListControl : UserControl
+15547:    public class WarehouseEditorForm : Form
+15921:    public class CustomerDto
+15942:    public class CustomerLookupDto
+15958:    public class CreateCustomerRequestDto
+15990:    public class UpdateCustomerRequestDto
+16115:    public class CustomerMappingProfile : Profile
+16156:    public class CustomerService : ICustomerService
+16350:    public class CustomerRepository : ICustomerRepository
+16470:    public class CustomersController : BaseApiController
+16649:    public class CustomerApiService : ApiServiceBase, ICustomerApiService
+16734:    public class CustomersListControl : UserControl
+17021:    public class CustomerEditorForm : Form
+17391:    public class SupplierDto
+17414:    public class SupplierLookupDto
+17432:    public class CreateSupplierRequestDto
+17466:    public class UpdateSupplierRequestDto
+17591:    public class SupplierMappingProfile : Profile
+17632:    public class SupplierService : ISupplierService
+17826:    public class SupplierRepository : ISupplierRepository
+17946:    public class SuppliersController : BaseApiController
+18125:    public class SupplierApiService : ApiServiceBase, ISupplierApiService
+18210:    public class SuppliersListControl : UserControl
+18497:    public class SupplierEditorForm : Form
+18879:    public class PurchaseInvoiceItemDto
+18901:    public class PurchaseInvoiceDto
+18943:    public class PurchaseInvoiceListDto
+18967:    public class CreatePurchaseInvoiceItemRequestDto
+18995:    public class CreatePurchaseInvoiceRequestDto
+19114:    public class PurchaseSummaryRequestDto
+19129:    public class PurchaseSummaryDto
+19151:    public class PurchaseMappingProfile : Profile
+19229:    public class PurchaseService : IPurchaseService
+19630:    public class PurchaseInvoiceRepository : IPurchaseInvoiceRepository
+19742:    public class PurchasesController : BaseApiController
+19885:    public class PurchaseApiService : ApiServiceBase, IPurchaseApiService
+19962:    public class PurchasesListControl : UserControl
+20239:    public class PurchaseEditorForm : Form
+20657:        private sealed class PurchaseItemRowVm
+20773:    public class SalesInvoiceItemDto
+20795:    public class SalesInvoiceDto
+20837:    public class SalesInvoiceListDto
+20861:    public class CreateSalesInvoiceItemRequestDto
+20889:    public class CreateSalesInvoiceRequestDto
+20925:    public class SalesSummaryRequestDto
+20940:    public class SalesSummaryDto
+21044:    public class SalesMappingProfile : Profile
+21118:    public class SalesInvoiceRepository : ISalesInvoiceRepository
+21228:    public class SalesController : BaseApiController
+21371:    public class SalesApiService : ApiServiceBase, ISalesApiService
+21448:    public class SalesListControl : UserControl
+21761:    public class SalesEditorForm : Form
+22212:        private sealed class SalesItemRowVm
+22333:    public class CustomerPaymentDto
+22363:    public class CustomerPaymentListDto
+22384:    public class CreateCustomerPaymentRequestDto
+22414:    public class CustomerPaymentSummaryDto
+22428:    public class CustomerPaymentSummaryRequestDto
+22529:    public class CustomerPaymentMappingProfile : Profile
+22574:    public class CustomerPaymentService : ICustomerPaymentService
+22748:    public class CustomerPaymentRepository : ICustomerPaymentRepository
+22848:    public class CustomerPaymentsController : BaseApiController
+22974:    public class CustomerPaymentApiService : ApiServiceBase, ICustomerPaymentApiService
+23044:    public class CustomerPaymentsListControl : UserControl
+23265:    public class CustomerPaymentEditorForm : Form
+23599:    public class SupplierPaymentDto
+23629:    public class SupplierPaymentListDto
+23650:    public class CreateSupplierPaymentRequestDto
+23680:    public class SupplierPaymentSummaryDto
+23694:    public class SupplierPaymentSummaryRequestDto
+23791:    public class SupplierPaymentMappingProfile : Profile
+23836:    public class SupplierPaymentService : ISupplierPaymentService
+23984:    public class SupplierPaymentRepository : ISupplierPaymentRepository
+24092:    public class SupplierPaymentsController : BaseApiController
+24218:    public class SupplierPaymentApiService : ApiServiceBase, ISupplierPaymentApiService
+24287:    public class SupplierPaymentsListControl : UserControl
+24508:    public class SupplierPaymentEditorForm : Form
+24902:    public class SalesReturnItemDto
+24920:    public class SalesReturnDto
+24956:    public class SalesReturnListDto
+24976:    public class CreateSalesReturnItemRequestDto
+24998:    public class CreateSalesReturnRequestDto
+25023:    public class SalesReturnSummaryRequestDto
+25036:    public class SalesReturnSummaryDto
+25058:    public class PurchaseReturnItemDto
+25076:    public class PurchaseReturnDto
+25112:    public class PurchaseReturnListDto
+25132:    public class CreatePurchaseReturnItemRequestDto
+25154:    public class CreatePurchaseReturnRequestDto
+25179:    public class PurchaseReturnSummaryRequestDto
+25192:    public class PurchaseReturnSummaryDto
+25278:    public class SalesReturnMappingProfile : Profile
+25347:    public class SalesReturnService : ISalesReturnService
+25685:    public class PurchaseReturnMappingProfile : Profile
+25754:    public class PurchaseReturnService : IPurchaseReturnService
+26103:    public class SalesReturnRepository : ISalesReturnRepository
+26197:    public class PurchaseReturnRepository : IPurchaseReturnRepository
+26297:    public class SalesReturnsController : BaseApiController
+26391:    public class PurchaseReturnsController : BaseApiController
+26662:    public class CustomerMappingProfile : Profile
+26704:    public class CustomerService : ICustomerService
+26865:    public class CustomerRepository : ICustomerRepository
+26977:    public class CustomersController : BaseApiController
+27106:    public class CustomerApiService : ApiServiceBase, ICustomerApiService
+27172:    public class CustomersListControl : UserControl
+27349:    public class CustomerEditorForm : Form
+27558:    public class SupplierDto
+27577:    public class SupplierLookupDto
+27591:    public class CreateSupplierRequestDto
+27621:    public class UpdateSupplierRequestDto
+27692:    public class SupplierMappingProfile : Profile
+27729:    public class SupplierService : ISupplierService
+27845:    public class SupplierRepository : ISupplierRepository
+27926:    public class SuppliersController : BaseApiController
+28015:    public class SupplierApiService : ApiServiceBase, ISupplierApiService
+28069:    public class SuppliersListControl : UserControl
+28224:    public class SupplierEditorForm : Form
+28410:    public class SupplierDto
+28430:    public class SupplierLookupDto
+28445:    public class CreateSupplierRequestDto
+28476:    public class UpdateSupplierRequestDto
+28550:    public class SupplierMappingProfile : Profile
+28588:    public class SupplierService : ISupplierService
+28706:    public class SupplierRepository : ISupplierRepository
+28788:    public class SuppliersController : BaseApiController
+28878:    public class SupplierApiService : ApiServiceBase, ISupplierApiService
+28933:    public class SuppliersListControl : UserControl
+29089:    public class SupplierEditorForm : Form
+29331:    public class PurchaseService : IPurchaseService
+29610:    public class PurchaseInvoiceRepository : IPurchaseInvoiceRepository
+29676:    public class PurchasesController : BaseApiController
+29789:    public class PurchaseApiService : ApiServiceBase, IPurchaseApiService
+29838:    public class PurchasesListControl : UserControl
+29991:    public class PurchaseEditorForm : Form
+30341:    public class SalesApiService : ApiServiceBase, ISalesApiService
+30409:    public class SalesListControl : UserControl
+30564:    public class SaleEditorForm : Form
+30898:    public class CustomerPaymentDto
+30913:    public class CreateCustomerPaymentRequestDto
+30936:    public class SupplierPaymentDto
+30951:    public class CreateSupplierPaymentRequestDto
+31019:    public class PaymentMappingProfile : Profile
+31046:    public class CustomerPaymentService : ICustomerPaymentService
+31125:    public class SupplierPaymentService : ISupplierPaymentService
+31202:    public class CustomerPaymentRepository : ICustomerPaymentRepository
+31229:    public class SupplierPaymentRepository : ISupplierPaymentRepository
+31270:    public class CustomerPaymentsController : BaseApiController
+31308:    public class SupplierPaymentsController : BaseApiController
+31359:    public class CustomerPaymentApiService : ApiServiceBase, ICustomerPaymentApiService
+31378:    public class SupplierPaymentApiService : ApiServiceBase, ISupplierPaymentApiService
+31406:    public class CustomerPaymentsListControl : UserControl
+31481:    public class CustomerPaymentEditorForm : Form
+31607:    public class StockTransferItemDto
+31616:    public class StockTransferDto
+31637:    public class CreateStockTransferItemRequestDto
+31646:    public class CreateStockTransferRequestDto
+31702:    public class TransferMappingProfile : Profile
+31728:    public class StockTransferService : IStockTransferService
+31857:    public class StockTransferRepository : IStockTransferRepository
+31913:    public class StockTransfersController : BaseApiController
+31964:    public class TransferApiService : ApiServiceBase, ITransferApiService
+31994:    public class TransferEditorForm : Form
+32138:    public class SalesReturnItemDto
+32147:    public class SalesReturnDto
+32161:    public class CreateSalesReturnItemRequestDto
+32170:    public class CreateSalesReturnRequestDto
+32224:    public class ReturnMappingProfile : Profile
+32251:    public class SalesReturnService : ISalesReturnService
+32378:    public class SalesReturnRepository : ISalesReturnRepository
+32434:    public class SalesReturnsController : BaseApiController
+32527:    public class MainForm : Form
+32742:    internal class SubscriptionToken : IDisposable
+32764:    public class EventBus : IEventBus
+32982:    public class SalesReturnApiService : ApiServiceBase, ISalesReturnApiService
+33021:    public class SalesReturnsListControl : UserControl
+33131:    public class SalesReturnEditorForm : Form
+33366:    public class MainForm : Form
+33594:    public class SalesReportDto
+33610:    public class InventoryReportDto
+33624:    public class CustomerBalanceDto
+33657:    public class ReportRepository : IReportRepository
+33754:    public class ReportService : IReportService
+33794:    public class ReportsController : BaseApiController
+33847:    public class ReportApiService : ApiServiceBase, IReportApiService
+33879:    public class ReportsMainControl : UserControl
+34062:    public class DashboardSummaryDto
+34125:    public class DashboardService : IDashboardService
+34186:    public class DashboardController : BaseApiController
+34213:    public class DashboardControl : UserControl
+34337:    public class StoreSettingsDto
+34352:    public class SettingsService : ISettingsService
+34425:    public class SettingsController : BaseApiController
+34468:    public class SettingsControl : UserControl
+34662:    public class SalesSystemDbContext : DbContext
+34710:    public class EfTransaction : ITransaction
+34743:    public class UnitOfWork : IUnitOfWork
+34774:    public class InvoiceNumberGenerator : IInvoiceNumberGenerator
+34844:    public class CustomerPaymentService : ICustomerPaymentService
+34946:    public class SupplierPaymentService : ISupplierPaymentService
+35042:    public class PurchaseReturnService : IPurchaseReturnService
+35152:    public class PurchaseReturnsController : BaseApiController
+35183:    public class LoginRequestDto
+35192:    public class AuthResponseDto
+35232:    public class AuthService : IAuthService
+35302:    public class UserRepository : IUserRepository
+35333:    public class AuthController : BaseApiController
+35389:    public static class TokenStore
+35403:    public class AuthApiService
+35435:    public class LoginForm : Form
+35509:public class JwtAuthorizationHandler : DelegatingHandler
+35557:    public class CustomerLedgerEntryDto
+35633:    public class CustomerLedgerForm : Form
+35701:    public class SalesInvoiceViewForm : Form
+35930:    public class SupplierLedgerForm : Form
+35999:    public class PurchaseReturnsListControl : UserControl
+36086:    public class TransfersListControl : UserControl
+36191:public class ChangePasswordRequestDto
+36279:    public class ChangePasswordForm : Form
+36407:    public class InvoicePrinter
+36614:    public class ReceiptPrinter
+36786:    public abstract class ApiServiceBase
+36844:    public static class FormExtensions
+36987:    public static class TokenStore
+37051:    public class CreateProductValidator : AbstractValidator<CreateProductRequestDto>
+37075:    public class CreateSalesInvoiceValidator : AbstractValidator<CreateSalesInvoiceRequestDto>
