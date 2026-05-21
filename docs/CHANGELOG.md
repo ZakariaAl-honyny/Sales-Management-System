@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-05-21
+
+### Added
+- **Printing & PDF Generation Engine (Phase 7)**: Complete A4 + Thermal printing subsystem.
+  - **A4 PDF generation** via QuestPDF (`A4InvoiceDocument`) with RTL Arabic, store logo, alternating rows, tax breakdown, page numbers.
+  - **80mm thermal receipts** via Win32 raw printing (`OpenPrinter`/`WritePrinter`) with custom `EscPos` builder — no external NuGet packages.
+  - 42-character monospaced column layout, Windows-1256 encoding for Arabic, cutter + cash drawer commands.
+  - **`InvoicePrintDtoBuilder`** with 4 overloads (Sales, Purchase, SalesReturn, PurchaseReturn).
+  - **`PrintController`** (API) with 11 endpoints: preview, A4 print, thermal print, save PDF, preview-data, test page.
+  - **`IPrintApiService`/`PrintApiService`** Desktop HTTP client for all print endpoints.
+  - **`PdfPreviewWindow`** WPF control using WebBrowser for PDF preview.
+  - **Print settings** persisted in `SystemSetting` table (`Category = "Print"`): `ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber`, `TaxRate`.
+  - **Test print page** (`POST /api/v1/print/test`) with button in WPF Settings view.
+  - **Print buttons** in Sales and Purchase invoice list views (toolbar + context menu).
+  - **`PrintService`** injects `ISystemSettingsRepository` for printer name resolution from DB.
+  - **`PrintResult`** pattern — never throw from printing code.
+  - **254+ tests** across Domain, Application, Infrastructure, API test projects (PrintControllerTests, PrintServiceTests, InvoicePrintDtoBuilderTests).
+- **Print-related infrastructure**:
+  - `net10.0-windows` target framework for Infrastructure, Api, and Infra.Tests (required for Win32 `DllImport`).
+  - `QuestPDF` 2024.3.0, `SixLabors.ImageSharp` 3.1.4, `System.Drawing.Common` 10.0.0 packages in Infrastructure.
+  - `PrintingBootstrapper.Initialize()` for QuestPDF Community license.
+
+### Changed
+- **`ISystemSettingsRepository`** extended with `GetStringAsync`/`SetStringAsync` methods.
+- **`PrintController`** now reads store info (name, phone, address, tax) from `SystemSetting` table.
+- **`SettingsController`** now exposes `GET/PUT /api/v1/settings/print` endpoints.
+- **`SettingsViewModel`** (Desktop) loads/saves print settings via API.
+- **`SalesInvoiceListViewModel`** and **`PurchaseInvoiceListViewModel`** inject `IPrintApiService` for print commands.
+- **API test csproj** — re-excluded 17 pre-existing broken controller test files; only PrintControllerTests active.
+- **All 7 projects** build with 0 errors; 1,342 tests pass (2 printer-dependent skipped).
+
 ## [1.1.0] - 2026-05-21
 
 ### Added

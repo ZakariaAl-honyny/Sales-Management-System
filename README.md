@@ -94,6 +94,12 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - `ProductPriceQuery` — Price history audit trail
 - `DialogService` — Modal dialogs (Error, Success, Warning, Confirm, Delete)
 - `ToastNotificationService` — Auto-dismissing notifications
+- **`InvoicePrintDtoBuilder`** — Builds print DTOs for Sales, Purchase, SalesReturn, PurchaseReturn invoices
+- **`IPrintService` / `PrintService`** — QuestPDF A4 generation + Win32 raw ESC/POS thermal printing
+- **`PrintApiService`** (Desktop) — HTTP client wrapper for `PrintController` endpoints
+- **`A4InvoiceDocument`** — QuestPDF document template (RTL Arabic, logo, tax breakdown)
+- **`ThermalReceiptGenerator`** — ESC/POS receipt builder (42-char columns, Windows-1256)
+- **`EscPos`** — Static class for ESC/POS command byte sequences
 
 ---
 
@@ -129,10 +135,24 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - Customer debt tracking
 - Supplier payment tracking
 
-### 🖨️ Printing
-- A4 invoice printing with store branding
-- 80mm thermal receipt printing
-- Print preview support
+### 🖨️ Printing Engine (v4.3)
+- **A4 invoice PDF generation** via QuestPDF with RTL Arabic support
+  - Store logo, name, phone, address, tax number in header
+  - Alternating-row item table with line totals
+  - Tax breakdown (VAT rate configurable in SystemSettings)
+  - Page numbers and footer
+- **80mm thermal receipt printing** via Win32 raw ESC/POS
+  - 42-character monospaced column layout
+  - Windows-1256 encoding for Arabic text
+  - Cutter command, cash drawer kick-out
+  - Built-in `EscPos` static class (no external packages)
+- **Preview** in WPF `PdfPreviewWindow` (WebBrowser control) before printing
+- **API-first architecture**: Desktop → `IPrintApiService` → `PrintController` → `IPrintService`
+- **Print settings persisted** in `SystemSetting` table (`Category = "Print"`):
+  - `ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber`, `TaxRate`
+- **Test page** for printer alignment verification
+- **11 API endpoints** covering sales/purchase/return A4 + thermal + preview + save
+- **254+ unit tests** across Domain, Application, Infrastructure, and API layers
 
 ### 📐 Dynamic Unit of Measure (v4.3)
 - Multiple units per product (Piece, Box, Carton, etc.)
@@ -212,6 +232,10 @@ The following features are **not included** in the current MVP but are planned f
 | **Validation** | FluentValidation | 11.x |
 | **Logging** | Serilog | 8.x |
 | **API Docs** | Swashbuckle (Swagger) | 6.x |
+| **PDF Generation** | QuestPDF | 2024.3.x |
+| **Image Processing** | SixLabors.ImageSharp | 3.1.x |
+| **Thermal Printing** | Win32 raw (OpenPrinter/WritePrinter) | — |
+| **Reports (Excel)** | ClosedXML | 0.102.x |
 
 ---
 
@@ -317,9 +341,21 @@ dotnet run
 | Phase 4 | API — Controllers, Validation, JWT Auth, Swagger | ✅ Completed |
 | Phase 5 | Desktop Shell — MainForm, Navigation, EventBus, Login | ✅ Completed |
 | Phase 6 | Desktop Modules — Products, Customers, Sales, Purchases, Returns, Reports | ✅ Completed |
-| **Phase 7** | Printing — A4 Invoices, 80mm Thermal Receipts | ✅ Completed |
+| **Phase 7** | **Printing Engine** — A4 PDF (QuestPDF), 80mm Thermal (ESC/POS Win32), Preview, API Endpoints, WPF Integration, Print Settings Persistence | ✅ **Completed** |
 | **Phase 8** | Dynamic UOM + Costing + Cash Boxes | ✅ Completed |
 | **Phase 9** | Production — Backup, Windows Service, Installer | 🔲 Planned |
+
+### Printing Engine — Phase 7 Breakdown
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 0 — Setup | NuGet packages (QuestPDF, ImageSharp, Drawing.Common), QuestPDF license init | ✅ |
+| 1 — Contracts | DTOs (`InvoicePrintDto`, `InvoiceItemPrintDto`, `PrintResult`), `IPrintService` interface, `InvoicePrintDtoBuilder` (4 overloads) | ✅ |
+| 2 — A4 PDF | `A4InvoiceDocument` — RTL Arabic, logo, alternating rows, tax breakdown, page numbers, footer | ✅ |
+| 3 — Thermal | `ThermalReceiptGenerator`, `EscPos` static builder — 42-char columns, Windows-1256, cutter, cash drawer | ✅ |
+| 4 — PrintService | Win32 raw printing (`OpenPrinter`/`WritePrinter`), temp-file cleanup, Arabic error messages | ✅ |
+| 5 — API + Desktop | `PrintController` (11 endpoints), `IPrintApiService`/`PrintApiService`, `PdfPreviewWindow`, WPF print buttons, DI registrations | ✅ |
+| 6 — Production | Print settings in `SystemSetting` table, `IPrintApiService` injection into ViewModels, test print endpoint, 254+ tests | ✅ |
 
 ---
 
@@ -337,6 +373,10 @@ dotnet run
 | **System Settings** | Configurable costing method, store info |
 | **Backup Service** | Database backup automation via API |
 | **New Controllers** | Backup, Settings, Users, Dashboard, Logs, Returns, Payments |
+| **Printing Engine** | A4 PDF (QuestPDF) + 80mm Thermal (ESC/POS Win32) printing engine |
+| **PrintController** | 11 API endpoints for preview, print, save, and test page |
+| **Print Settings** | Persisted in `SystemSetting` table — printer names, logo, tax info |
+| **254+ Tests** | Full test coverage across all 5 test projects |
 
 ---
 
@@ -344,7 +384,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 92+ non-negotiable rules (RULE-001 to RULE-092)
+1. Read [`AGENTS.md`](AGENTS.md) — all 102+ non-negotiable rules (RULE-001 to RULE-102)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 
