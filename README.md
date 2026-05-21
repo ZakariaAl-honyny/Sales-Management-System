@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.0%20Expansion-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.3%20Expansion-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -31,21 +31,31 @@ The API-first architecture is designed to support **future web and mobile client
 ### Why This Project?
 
 - 🏪 **Purpose-built for retail** — Sales invoices, purchase orders, returns, and stock transfers
-- 🔄 **Wholesale & Retail Flex** — Sell by box or piece simultaneously with intelligent inventory conversion
-  - Separate `WholesalePrice` and `RetailPrice` per product
-  - `ConversionFactor` for box↔piece conversion (e.g., 1 box = 12 pieces)
-  - `UnitType` enum (Retail=0, Wholesale=1) for pricing mode
-- 🔍 **Multi-barcode support** — Multiple barcodes per product (retail, wholesale, custom)
-  - `ProductBarcodes` table for additional barcodes
-  - Auto-detect unit type from scanned barcode
+- 🔄 **Dynamic Unit of Measure** — Each product has multiple units (Piece, Box, Carton) with configurable conversion factors
+  - Per-unit pricing: separate `RetailPrice` and `WholesalePrice` per `ProductUnit`
+  - Barcodes stored in `UnitBarcode` table — one barcode per unit
+  - `SmartUnitFormatter` selects best display unit based on quantity
+  - Base unit always has `ConversionFactor = 1`
+- 🔍 **Multi-barcode support** — Barcodes stored per product-unit combination in `UnitBarcode` table
+  - Auto-detect unit from scanned barcode
   - Fallback to legacy `Products.Barcode` column
+- 💰 **Costing Strategy** — Three costing methods: WeightedAverage, LastPurchasePrice, SupplierPrice
+  - Configurable via `SystemSettings` table (seeded as WeightedAverage)
+  - `UpdateProductPricingService` handles all three methods
+  - Cost cascade: ALL product units recalculate from base unit cost × conversion factor
+  - `ProductPriceHistory` audit trail on EVERY cost change
+- 🏦 **Cash Box Management** — Track physical cash across multiple boxes
+  - `CashBox` with opening/current balance
+  - `CashTransaction` immutable entries (Opening, Income, Expense, Transfer, Refund, Payment)
+  - `CashBox.CurrentBalance` NEVER negative — validated before dispensing
+  - `DailyClosure` for end-of-day reconciliation
 - 🔌 **Hardware Integration** — Built-in barcode scanner support (Keyboard Emulation) with mobile camera scanning planned
 - 🔒 **Financial integrity** — All money calculations use `decimal` precision, never floating-point
 - 📦 **Multi-warehouse & Low Stock AI** — Track inventory across branches with auto-calculated reorder suggestions
   - `ReorderLevel` on each product
   - Smart low-stock reporting (e.g., "1 box + 3 pieces")
 - 👥 **Role-based access** — Admin, Manager, and Cashier with granular permissions
-- 📊 **Full audit trail** — Every stock change and financial transaction is tracked
+- 📊 **Full audit trail** — Every stock change, price change, and financial transaction is tracked
 - 🌐 **API-first design** — RESTful API ready for web/mobile clients in future phases
 
 ---
@@ -74,9 +84,16 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 
 > **Key Principle:** The Desktop app **never** connects to the database directly. All communication goes through the Web API.
 
-### New Services (v4.2)
-- `DialogService` - Modal dialogs (Error, Success, Warning, Confirm, Delete)
-- `ToastNotificationService` - Auto-dismissing notifications
+### New Services (v4.3)
+- `UpdateProductPricingService` — WeightedAverage / LastPurchasePrice / SupplierPrice costing
+- `BarcodeLookupService` — Unit-aware barcode scanning
+- `SmartUnitFormatter` — Best-display-unit selection based on quantity
+- `SystemSettingsRepository` — Application-level settings
+- `StoreSettingsService` — Store configuration management
+- `BackupService` — Database backup automation
+- `ProductPriceQuery` — Price history audit trail
+- `DialogService` — Modal dialogs (Error, Success, Warning, Confirm, Delete)
+- `ToastNotificationService` — Auto-dismissing notifications
 
 ---
 
@@ -116,6 +133,28 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - A4 invoice printing with store branding
 - 80mm thermal receipt printing
 - Print preview support
+
+### 📐 Dynamic Unit of Measure (v4.3)
+- Multiple units per product (Piece, Box, Carton, etc.)
+- Per-unit pricing (RetailPrice + WholesalePrice per ProductUnit)
+- Conversion factors (Base=1, Box=24, Carton=144)
+- Unit-specific barcodes via `UnitBarcode` table
+- `SmartUnitFormatter` for quantity-based display unit selection
+- Enforced: at least one unit per product (Domain rule)
+
+### 💰 Costing Strategy (v4.3)
+- Three methods: WeightedAverage, LastPurchasePrice, SupplierPrice
+- Configurable via `SystemSettings` table
+- Cost cascade: ALL product units update from base × conversion factor
+- `ProductPriceHistory` audit on every change
+- Seeded as WeightedAverage by default
+
+### 🏦 Cash Box Management (v4.3)
+- Multiple cash boxes with opening/current balance
+- Immutable cash transactions (Open, Income, Expense, Transfer, Refund, Payment)
+- `CashBox.CurrentBalance` never negative
+- Cash transfers require TWO transactions (Out + In)
+- `DailyClosure` for end-of-day reconciliation
 
 ### 🔒 Defensive Programming (v4.2)
 - Guard Clauses on ALL Domain entities
@@ -178,19 +217,21 @@ The following features are **not included** in the current MVP but are planned f
 
 ## 📐 Database Schema
 
-**24 tables** covering the full retail domain:
+**30+ tables** covering the full retail domain:
 
 | Category | Tables |
 |----------|--------|
 | **Core** | Users, Units, Categories, Products, Warehouses, WarehouseStocks |
-| **Products** | ProductBarcodes (multi-barcode support) |
+| **Products** | ProductUnits (dynamic UOM), UnitBarcodes (unit-specific barcodes) |
 | **Trading Partners** | Customers, Suppliers |
 | **Purchases** | PurchaseInvoices, PurchaseInvoiceItems |
 | **Sales** | SalesInvoices, SalesInvoiceItems |
 | **Returns** | PurchaseReturns, PurchaseReturnItems, SalesReturns, SalesReturnItems |
 | **Transfers** | StockTransfers, StockTransferItems |
 | **Payments** | CustomerPayments, SupplierPayments |
-| **System** | StoreSettings, DocumentSequences, InventoryMovements |
+| **Cash Management** | CashBoxes, CashTransactions |
+| **Pricing & Costing** | ProductPriceHistory (price audit trail) |
+| **System** | SystemSettings (costing method), StoreSettings, DocumentSequences, InventoryMovements, SystemLog
 
 ### Key Constraints
 - `decimal(18,2)` for all money fields — **never** `float` or `double`
@@ -221,7 +262,7 @@ The following features are **not included** in the current MVP but are planned f
 | [`AGENTS.md`](AGENTS.md) | Master rules for AI-assisted development |
 | [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) | Non-negotiable architectural rules |
 | [`docs/PRD-MVP-v3.0.md`](docs/PRD-MVP-v3.0.md) | Full product requirements document |
-| [`docs/database-schema.md`](docs/database-schema.md) | SQL Server schema (22 tables) |
+| [`docs/database-schema.md`](docs/database-schema.md) | SQL Server schema (30+ tables) |
 | [`docs/ui-screens.md`](docs/ui-screens.md) | UI/UX flows and EventBus patterns |
 
 ---
@@ -269,22 +310,33 @@ dotnet run
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| Phase 1-5 | Foundation → Desktop Modules | ✅ Completed |
-| **Phase 6** | Printing — A4 Invoices, 80mm Thermal Receipts | 🔲 In Progress |
-| **Phase 7** | Production — Backup, Windows Service, Installer | 🔲 Planned |
+| Phase 0 | Database — Migrations, Seed Data, Constraints | ✅ Completed |
+| Phase 1 | Domain — Entities, Business Rules, Guards | ✅ Completed |
+| Phase 2 | Infrastructure — DbContext, Repositories, UoW | ✅ Completed |
+| Phase 3 | Application — Services (Product → Customer → Sales → Purchases → Returns) | ✅ Completed |
+| Phase 4 | API — Controllers, Validation, JWT Auth, Swagger | ✅ Completed |
+| Phase 5 | Desktop Shell — MainForm, Navigation, EventBus, Login | ✅ Completed |
+| Phase 6 | Desktop Modules — Products, Customers, Sales, Purchases, Returns, Reports | ✅ Completed |
+| **Phase 7** | Printing — A4 Invoices, 80mm Thermal Receipts | ✅ Completed |
+| **Phase 8** | Dynamic UOM + Costing + Cash Boxes | ✅ Completed |
+| **Phase 9** | Production — Backup, Windows Service, Installer | 🔲 Planned |
 
 ---
 
-## 🆕 What's New in v4.2
+## 🆕 What's New in v4.3
 
 | Feature | Description |
 |---------|-------------|
-| **DeleteStrategy** | Conditional soft/hard delete with 3-option dialog |
-| **Guard Clauses** | Domain entities protected from invalid states |
-| **Styled Dialogs** | Modern RTL modal dialogs with Arabic text |
-| **Toast Notifications** | Non-blocking success/error notifications |
-| **Real-Time Validation** | INotifyDataErrorInfo with red border feedback |
-| **CanExecute Logic** | Save buttons disabled until form is valid |
+| **Dynamic UOM** | ProductUnits with per-unit pricing, barcodes, conversion factors |
+| **Costing Strategy** | WeightedAverage / LastPurchasePrice / SupplierPrice methods |
+| **Cash Boxes** | Multi-box cash management with immutable transactions |
+| **Price History** | ProductPriceHistory audit on every cost/price change |
+| **WPF DesktopPWF** | Full MVVM rewrite — EventBus, DialogService, printing subsystem |
+| **Barcode Lookup** | Unit-aware barcode scanning via BarcodeLookupService |
+| **Smart Formatter** | Quantity-based display unit selection |
+| **System Settings** | Configurable costing method, store info |
+| **Backup Service** | Database backup automation via API |
+| **New Controllers** | Backup, Settings, Users, Dashboard, Logs, Returns, Payments |
 
 ---
 
@@ -292,7 +344,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 44+ non-negotiable rules
+1. Read [`AGENTS.md`](AGENTS.md) — all 92+ non-negotiable rules (RULE-001 to RULE-092)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

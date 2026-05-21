@@ -1,7 +1,7 @@
 # Database Schema Design
-# Sales Management System — MVP v3.0
+# Sales Management System — v4.3 (Dynamic UOM + Costing + Cash Boxes)
 # Platform: SQL Server 2019+
-# 22 Tables | decimal-only financials | nvarchar text | Soft delete
+# 30+ Tables | decimal-only financials | nvarchar text | Soft delete
 
 ---
 
@@ -80,16 +80,12 @@ Default schema: **`dbo`**
 ### Columns
 - `Id` int PK
 - `Code` nvarchar(30) null unique
-- `Barcode` nvarchar(50) null unique
+- `Barcode` nvarchar(50) null unique (legacy — prefer UnitBarcodes)
 - `Name` nvarchar(150) not null
 - `CategoryId` int null FK
-- `WholesaleUnitId` int null FK
-- `RetailUnitId` int null FK
-- `ConversionFactor` decimal(18,3) not null default 1
-- `PurchasePrice` decimal(18,2) not null default 0
-- `WholesalePrice` decimal(18,2) not null default 0
-- `RetailPrice` decimal(18,2) not null default 0
-- `ReorderLevel` decimal(18,3) not null default 0  -- Minimum stock level for low-stock alerts
+- `SupplierPrice` decimal(18,2) not null default 0 (catalog price for SupplierPrice costing method)
+- `AvgCost` decimal(18,2) not null default 0 (computed by UpdateProductPricingService)
+- `ReorderLevel` decimal(18,3) not null default 0
 - `MinStock` decimal(18,3) not null default 0
 - `Description` nvarchar(500) null
 - `CreatedByUserId` int null FK
@@ -98,12 +94,34 @@ Default schema: **`dbo`**
 - `CreatedAt` datetime2 not null
 - `UpdatedAt` datetime2 null
 
-## D2) ProductBarcodes (NEW - Multi-barcode support)
+> **v4.3 Change:** Pricing (RetailPrice, WholesalePrice) and ConversionFactor moved to `ProductUnits` table.
+> Barcodes moved to `UnitBarcodes` table (one per product-unit combination).
+
+## D2) ProductUnits (v4.3 — Dynamic Unit of Measure)
 ### Columns
 - `Id` int PK
 - `ProductId` int not null FK → Products(Id)
+- `UnitName` nvarchar(50) not null  -- e.g., "Piece", "Box", "Carton"
+- `ConversionFactor` decimal(18,3) not null default 1  -- Base=1, Box=24, Carton=144
+- `RetailPrice` decimal(18,2) not null default 0
+- `WholesalePrice` decimal(18,2) not null default 0
+- `IsBaseUnit` bit not null default 0  -- Exactly one per product
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+### Constraints
+- `UNIQUE(ProductId, UnitName)` — no duplicate unit names per product
+- `UNIQUE(ProductId, IsBaseUnit)` filter where IsBaseUnit=1 — exactly one base unit per product
+- `CHECK (ConversionFactor > 0)`
+
+## D3) UnitBarcodes (v4.3 — Replaces ProductBarcodes)
+### Columns
+- `Id` int PK
+- `ProductUnitId` int not null FK → ProductUnits(Id)
 - `BarcodeValue` nvarchar(100) not null unique
-- `UnitType` tinyint not null default 0  -- 0=Retail, 1=Wholesale
 - `IsDefault` bit not null default 0
 - `CreatedAt` datetime2 not null
 - `IsActive` bit not null default 1
@@ -418,7 +436,63 @@ Default schema: **`dbo`**
 
 ---
 
-# 9) Store Settings
+# 8b) Cash Box Management (v4.3)
+
+## U2) CashBoxes
+### Columns
+- `Id` int PK
+- `Name` nvarchar(100) not null
+- `OpeningBalance` decimal(18,2) not null default 0
+- `CurrentBalance` decimal(18,2) not null default 0 (computed from CashTransaction sum)
+- `IsDefault` bit not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+### Constraints
+- `CHECK (CurrentBalance >= 0)` — never negative
+
+## U3) CashTransactions (v4.3)
+### Columns
+- `Id` int PK
+- `CashBoxId` int not null FK → CashBoxes(Id)
+- `TransactionType` tinyint not null (1=OpeningBalance, 2=SalesIncome, 3=Expense, 4=TransferOut, 5=TransferIn, 6=RefundOut, 7=SupplierPayment, 8=CustomerPayment)
+- `Amount` decimal(18,2) not null (positive=IN, negative=OUT)
+- `BalanceBefore` decimal(18,2) not null
+- `BalanceAfter` decimal(18,2) not null
+- `ReferenceType` nvarchar(30) null  -- e.g., "SalesInvoice", "PurchaseInvoice"
+- `ReferenceId` int null
+- `Notes` nvarchar(500) null
+- `CreatedByUserId` int null FK
+- `CreatedAt` datetime2 not null
+
+### Constraints
+- Immutable — no UPDATE, no DELETE. Cancellations use offsetting entries.
+
+# 8c) Product Price History (v4.3)
+
+## U4) ProductPriceHistory
+### Columns
+- `Id` int PK
+- `ProductUnitId` int not null FK → ProductUnits(Id)
+- `OldRetailPrice` decimal(18,2) not null
+- `NewRetailPrice` decimal(18,2) not null
+- `OldWholesalePrice` decimal(18,2) not null
+- `NewWholesalePrice` decimal(18,2) not null
+- `OldCost` decimal(18,2) not null
+- `NewCost` decimal(18,2) not null
+- `ChangeReason` nvarchar(250) null
+- `ChangedByUserId` int not null FK → Users(Id)
+- `CreatedAt` datetime2 not null
+
+### Triggers
+- Purchase invoice posting (cost update via WeightedAverage/LastPurchasePrice/SupplierPrice)
+- Manual price adjustment in product editor
+- Supplier price sync
+
+# 9) Store Settings & System Settings
 
 ## U) StoreSettings
 ### Columns
@@ -428,7 +502,7 @@ Default schema: **`dbo`**
 - `Address` nvarchar(250) null
 - `LogoPath` nvarchar(255) null
 - `CurrencyCode` nvarchar(10) not null default 'SAR'
-- `DefaultTaxRate` decimal(5,2) not null default 0
+- `DefaultTaxRate` decimal(18,2) not null default 0
 - `IsTaxEnabled` bit not null default 0
 - `TaxNumber` nvarchar(50) null
 - `CreatedByUserId` int null FK
@@ -436,6 +510,21 @@ Default schema: **`dbo`**
 - `IsActive` bit not null default 1
 - `CreatedAt` datetime2 not null
 - `UpdatedAt` datetime2 null
+
+## U5) SystemSettings (v4.3)
+### Columns
+- `Id` int PK
+- `Key` nvarchar(100) not null unique
+- `Value` nvarchar(500) not null
+- `Description` nvarchar(250) null
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+### Seed Data
+| Key | Value | Description |
+|-----|-------|-------------|
+| `CostingMethod` | `1` | 1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice |
+| `DefaultCashBoxId` | `1` | Default cash box for invoice payments |
 
 ---
 
@@ -540,15 +629,11 @@ CREATE TABLE dbo.Products
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Products PRIMARY KEY,
     Code            NVARCHAR(30)  NULL,
-    Barcode         NVARCHAR(50)  NULL,
+    Barcode         NVARCHAR(50)  NULL,  -- Legacy — prefer UnitBarcodes
     Name            NVARCHAR(150) NOT NULL,
     CategoryId      INT           NULL REFERENCES dbo.Categories(Id),
-    WholesaleUnitId INT           NULL REFERENCES dbo.Units(Id),
-    RetailUnitId    INT           NULL REFERENCES dbo.Units(Id),
-    ConversionFactor DECIMAL(18,3) NOT NULL DEFAULT 1,
-    PurchasePrice   DECIMAL(18,2) NOT NULL DEFAULT 0,
-    WholesalePrice  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    RetailPrice     DECIMAL(18,2) NOT NULL DEFAULT 0,
+    SupplierPrice   DECIMAL(18,2) NOT NULL DEFAULT 0,  -- Catalog price for SupplierPrice costing
+    AvgCost         DECIMAL(18,2) NOT NULL DEFAULT 0,  -- Computed by UpdateProductPricingService
     ReorderLevel    DECIMAL(18,3) NOT NULL DEFAULT 0,
     MinStock        DECIMAL(18,3) NOT NULL DEFAULT 0,
     Description     NVARCHAR(500) NULL,
@@ -558,24 +643,43 @@ CREATE TABLE dbo.Products
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Products_CreatedAt DEFAULT(SYSDATETIME()),
     UpdatedAt       DATETIME2     NULL,
 
-    CONSTRAINT UQ_Products_Code UNIQUE (Code),
-    CONSTRAINT UQ_Products_Barcode UNIQUE (Barcode)
+    CONSTRAINT UQ_Products_Code UNIQUE (Code)
 );
 
--- 5b. ProductBarcodes (Multi-barcode support)
-CREATE TABLE dbo.ProductBarcodes
+-- 5b. ProductUnits (v4.3 — Dynamic Unit of Measure)
+CREATE TABLE dbo.ProductUnits
 (
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductBarcodes PRIMARY KEY,
-    ProductId       INT NOT NULL REFERENCES dbo.Products(Id),
-    BarcodeValue    NVARCHAR(100) NOT NULL,
-    UnitType        TINYINT NOT NULL DEFAULT 0,  -- 0=Retail, 1=Wholesale
-    IsDefault       BIT NOT NULL DEFAULT 0,
-    CreatedAt       DATETIME2 NOT NULL CONSTRAINT DF_ProductBarcodes_CreatedAt DEFAULT(SYSDATETIME()),
-    IsActive        BIT NOT NULL CONSTRAINT DF_ProductBarcodes_IsActive DEFAULT(1),
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductUnits PRIMARY KEY,
+    ProductId         INT           NOT NULL REFERENCES dbo.Products(Id),
+    UnitName          NVARCHAR(50)  NOT NULL,
+    ConversionFactor  DECIMAL(18,3) NOT NULL CONSTRAINT DF_ProductUnits_ConversionFactor DEFAULT(1),
+    RetailPrice       DECIMAL(18,2) NOT NULL CONSTRAINT DF_ProductUnits_RetailPrice DEFAULT(0),
+    WholesalePrice    DECIMAL(18,2) NOT NULL CONSTRAINT DF_ProductUnits_WholesalePrice DEFAULT(0),
+    IsBaseUnit        BIT           NOT NULL CONSTRAINT DF_ProductUnits_IsBaseUnit DEFAULT(0),
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL CONSTRAINT DF_ProductUnits_IsActive DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL CONSTRAINT DF_ProductUnits_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt         DATETIME2     NULL,
 
-    CONSTRAINT UQ_ProductBarcodes_BarcodeValue UNIQUE (BarcodeValue)
+    CONSTRAINT UQ_ProductUnits_Product_UnitName UNIQUE (ProductId, UnitName),
+    CONSTRAINT CK_ProductUnits_ConversionFactor CHECK (ConversionFactor > 0)
 );
-CREATE INDEX IX_ProductBarcodes_ProductId ON dbo.ProductBarcodes(ProductId);
+CREATE INDEX IX_ProductUnits_ProductId ON dbo.ProductUnits(ProductId);
+
+-- 5c. UnitBarcodes (v4.3 — Replaces ProductBarcodes)
+CREATE TABLE dbo.UnitBarcodes
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_UnitBarcodes PRIMARY KEY,
+    ProductUnitId   INT NOT NULL REFERENCES dbo.ProductUnits(Id),
+    BarcodeValue    NVARCHAR(100) NOT NULL,
+    IsDefault       BIT NOT NULL DEFAULT 0,
+    CreatedAt       DATETIME2 NOT NULL CONSTRAINT DF_UnitBarcodes_CreatedAt DEFAULT(SYSDATETIME()),
+    IsActive        BIT NOT NULL CONSTRAINT DF_UnitBarcodes_IsActive DEFAULT(1),
+
+    CONSTRAINT UQ_UnitBarcodes_BarcodeValue UNIQUE (BarcodeValue)
+);
+CREATE INDEX IX_UnitBarcodes_ProductUnitId ON dbo.UnitBarcodes(ProductUnitId);
 
 -- 6. WarehouseStocks
 CREATE TABLE dbo.WarehouseStocks
@@ -915,5 +1019,90 @@ CREATE TABLE dbo.DocumentSequences
     LastNumber      INT           NOT NULL CONSTRAINT DF_DocumentSequences_LastNumber DEFAULT(0),
     UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_DocumentSequences_UpdatedAt DEFAULT(SYSDATETIME())
 );
+
+-- 24. CashBoxes (v4.3)
+CREATE TABLE dbo.CashBoxes
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashBoxes PRIMARY KEY,
+    Name            NVARCHAR(100) NOT NULL,
+    OpeningBalance  DECIMAL(18,2) NOT NULL CONSTRAINT DF_CashBoxes_OpeningBalance DEFAULT(0),
+    CurrentBalance  DECIMAL(18,2) NOT NULL CONSTRAINT DF_CashBoxes_CurrentBalance DEFAULT(0),
+    IsDefault       BIT           NOT NULL CONSTRAINT DF_CashBoxes_IsDefault DEFAULT(0),
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_CashBoxes_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_CashBoxes_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
+
+    CONSTRAINT CK_CashBoxes_CurrentBalance CHECK (CurrentBalance >= 0)
+);
+
+-- 25. CashTransactions (v4.3)
+CREATE TABLE dbo.CashTransactions
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashTransactions PRIMARY KEY,
+    CashBoxId         INT           NOT NULL REFERENCES dbo.CashBoxes(Id),
+    TransactionType   TINYINT       NOT NULL,
+    Amount            DECIMAL(18,2) NOT NULL,
+    BalanceBefore     DECIMAL(18,2) NOT NULL,
+    BalanceAfter      DECIMAL(18,2) NOT NULL,
+    ReferenceType     NVARCHAR(30)  NULL,
+    ReferenceId       INT           NULL,
+    Notes             NVARCHAR(500) NULL,
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    CreatedAt         DATETIME2     NOT NULL CONSTRAINT DF_CashTransactions_CreatedAt DEFAULT(SYSDATETIME()),
+
+    CONSTRAINT CK_CashTransactions_TransactionType CHECK (TransactionType IN (1,2,3,4,5,6,7,8))
+);
+CREATE INDEX IX_CashTransactions_CashBoxId ON dbo.CashTransactions(CashBoxId, CreatedAt DESC);
+
+-- 26. ProductPriceHistory (v4.3)
+CREATE TABLE dbo.ProductPriceHistory
+(
+    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductPriceHistory PRIMARY KEY,
+    ProductUnitId       INT           NOT NULL REFERENCES dbo.ProductUnits(Id),
+    OldRetailPrice      DECIMAL(18,2) NOT NULL,
+    NewRetailPrice      DECIMAL(18,2) NOT NULL,
+    OldWholesalePrice   DECIMAL(18,2) NOT NULL,
+    NewWholesalePrice   DECIMAL(18,2) NOT NULL,
+    OldCost             DECIMAL(18,2) NOT NULL,
+    NewCost             DECIMAL(18,2) NOT NULL,
+    ChangeReason        NVARCHAR(250) NULL,
+    ChangedByUserId     INT           NOT NULL REFERENCES dbo.Users(Id),
+    CreatedAt           DATETIME2     NOT NULL CONSTRAINT DF_ProductPriceHistory_CreatedAt DEFAULT(SYSDATETIME())
+);
+CREATE INDEX IX_ProductPriceHistory_ProductUnitId ON dbo.ProductPriceHistory(ProductUnitId, CreatedAt DESC);
+
+-- 27. SystemSettings (v4.3)
+CREATE TABLE dbo.SystemSettings
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemSettings PRIMARY KEY,
+    [Key]           NVARCHAR(100) NOT NULL,
+    [Value]         NVARCHAR(500) NOT NULL,
+    [Description]   NVARCHAR(250) NULL,
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_SystemSettings_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
+
+    CONSTRAINT UQ_SystemSettings_Key UNIQUE ([Key])
+);
+
+-- 28. SystemLog (v4.3)
+CREATE TABLE dbo.SystemLog
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemLog PRIMARY KEY,
+    [Level]         NVARCHAR(20)  NOT NULL,
+    [Source]        NVARCHAR(100) NULL,
+    [Message]       NVARCHAR(MAX) NOT NULL,
+    [Exception]     NVARCHAR(MAX) NULL,
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_SystemLog_CreatedAt DEFAULT(SYSDATETIME())
+);
+CREATE INDEX IX_SystemLog_Level ON dbo.SystemLog([Level], CreatedAt DESC);
+
+-- Seed Data for SystemSettings
+INSERT INTO dbo.SystemSettings ([Key], [Value], [Description])
+VALUES
+    (N'CostingMethod', N'1', N'1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice'),
+    (N'DefaultCashBoxId', N'1', N'Default cash box for invoice payments');
+GO
 
 ```

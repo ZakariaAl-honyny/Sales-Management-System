@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.0 Expansion)
+# AGENTS.md — Sales Management System (v4.3 Expansion)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -469,6 +469,108 @@ public bool HasErrors { get; }
 - `"الكمية يجب أن تكون أكبر من صفر"` (Quantity must be > 0)
 - `"السعر لا يمكن أن يكون سالباً"` (Price cannot be negative)
 
+### 2.24 Dynamic Unit of Measure (v4.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-060 | `ProductUnit` stores conversion factor from base unit — use `ConvertToUnit(decimal quantity, int fromUnitId, int toUnitId)` for all unit conversions |
+| RULE-061 | Base unit always has `ConversionFactor = 1` (represents the smallest/foundational unit) |
+| RULE-062 | Derived units `ConversionFactor > 1` (e.g., Box=24 means 1 Box = 24 Base units) |
+| RULE-063 | `UnitBarcode` stores ALL barcodes per product-unit combination — never embed barcode in Unit entity |
+| RULE-064 | `SmartUnitFormatter` selects best display unit based on quantity threshold — use in UI only |
+| RULE-065 | Pricing: `RetailPrice` and `WholesalePrice` stored per `ProductUnit` (not per Product) — use `ProductUnit.GetPriceByUnit(UnitType)` |
+| RULE-066 | Cost cascade: When purchase cost updates via WeightedAverage, ALL product units recalculate from base unit cost × conversion factor |
+| RULE-067 | `ProductMustHaveAtLeastOneUnit` rule enforced in Domain — throw `DomainException` if deleting last unit |
+
+**ProductUnit Entity pattern:**
+```csharp
+public class ProductUnit
+{
+    public int Id { get; private set; }
+    public int ProductId { get; private set; }
+    public string UnitName { get; private set; }      // e.g., "Piece", "Box", "Carton"
+    public decimal ConversionFactor { get; private set; } // Base=1, Box=24, Carton=144
+    public decimal RetailPrice { get; private set; }   // Price for retail sales
+    public decimal WholesalePrice { get; private set; } // Price for wholesale sales
+    public bool IsBaseUnit { get; private set; }      // Exactly one per product
+    public ICollection<UnitBarcode> Barcodes { get; private set; }
+
+    public decimal ConvertToUnit(decimal quantity, decimal targetFactor)
+    {
+        var baseQty = quantity * ConversionFactor;
+        return baseQty / targetFactor;
+    }
+}
+```
+
+### 2.25 Costing Strategy (v4.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-068 | Costing method stored in `SystemSettings` table — seeded as `WeightedAverage` (1) |
+| RULE-069 | Three methods: WeightedAverage (1), LastPurchasePrice (2), SupplierPrice (3) |
+| RULE-070 | Costing update fires AFTER purchase invoice is saved and has an ID |
+| RULE-071 | WeightedAverage = `(OldStock * OldAvgCost + NewQty * NewUnitCost) / (OldStock + NewQty)` |
+| RULE-072 | LastPurchasePrice = overwrite `AvgCost` with incoming `UnitCost` directly |
+| RULE-073 | SupplierPrice = use `Product.SupplierPrice` (catalog price) — no cost calculation |
+| RULE-074 | Cost cascade: ALL product units updated from base unit cost × conversion factor |
+| RULE-075 | `UpdateProductPricingService` handles all three methods — NEVER write costing logic outside this service |
+| RULE-076 | Add audit entry in `ProductPriceHistory` on EVERY cost change |
+
+**WeightedAverage formula (C#):**
+```csharp
+var totalOldValue = oldStock * oldAvgCost;
+var totalNewValue = newQty * newUnitCost;
+var newAvgCost = (totalOldValue + totalNewValue) / (oldStock + newQty);
+// Result: decimal with precision (18,2)
+```
+
+### 2.26 Cash Boxes (v4.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-077 | CashBox has `OpeningBalance`, `CurrentBalance` — computed from `CashTransaction` sum |
+| RULE-078 | `CashTransaction` records: OpeningBalance, Income, Expense, Transfer, Refund, Payment |
+| RULE-079 | Every invoice payment references `CashBoxId` — link between invoice and cash box |
+| RULE-080 | `CashBox.CurrentBalance` NEVER goes negative — validate before dispensing |
+| RULE-081 | Cash transfer between boxes requires TWO transactions (Out from source, In to destination) |
+| RULE-082 | Cash transactions are immutable once created — no editing, cancellation via offsetting entry |
+| RULE-083 | `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance |
+
+**CashTransactionType enum:**
+```csharp
+public enum CashTransactionType : byte
+{
+    OpeningBalance = 1,  // Initial opening
+    SalesIncome = 2,     // From sales invoices
+    Expense = 3,         // Cash outflow
+    TransferOut = 4,     // Transfer to another box
+    TransferIn = 5,      // Transfer from another box
+    RefundOut = 6,       // Sales return refund
+    SupplierPayment = 7, // Payment to supplier
+    CustomerPayment = 8  // Payment from customer
+}
+```
+
+### 2.27 Product Price History (v4.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-084 | `ProductPriceHistory` records EVERY price/cost change — NEVER update price without audit |
+| RULE-085 | Record fields: `ProductUnitId`, `OldRetailPrice`, `NewRetailPrice`, `OldWholesalePrice`, `NewWholesalePrice`, `OldCost`, `NewCost`, `ChangedByUserId`, `ChangeReason` |
+| RULE-086 | Price change triggers: Purchase invoice (cost update), manual price adjustment, supplier sync |
+| RULE-087 | History query available in Reports for audit trail — kept indefinitely |
+
+### 2.28 Print Engine (v4.3 — Spec)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-088 | Print engine uses WPF `FixedDocument` for all invoice/receipt printing |
+| RULE-089 | Print templates stored in `Printing/Templates/` — one XAML per document type |
+| RULE-090 | Preview shows in `PrintPreviewWindow.xaml` before sending to printer |
+| RULE-091 | Print queue managed by `IPrintService` with background thread — never block UI |
+| RULE-092 | Supports: 80mm thermal receipt, A4 invoice, A5 invoice — configurable per printer |
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -485,6 +587,13 @@ public enum MovementType : byte
 public enum UnitType : byte { Retail = 0, Wholesale = 1 }  // For wholesale/retail pricing
 public enum SaleMode : byte { Retail = 1, Wholesale = 2 }  // Invoice line item mode
 public enum DeleteStrategy { Cancel = 0, Deactivate = 1, Permanent = 2 }
+public enum CostingMethod : byte { WeightedAverage = 1, LastPurchasePrice = 2, SupplierPrice = 3 }
+public enum CashTransactionType : byte
+{
+    OpeningBalance = 1, SalesIncome = 2, Expense = 3,
+    TransferOut = 4, TransferIn = 5, RefundOut = 6,
+    SupplierPayment = 7, CustomerPayment = 8
+}
 ```
 
 ---
@@ -506,6 +615,13 @@ public enum DeleteStrategy { Cancel = 0, Deactivate = 1, Permanent = 2 }
 ❌ Hard-deleting Users (soft delete only — invoices reference them)
 ❌ Duplicating business logic outside of the Domain layer
 ❌ Direct property modification on Entities from outside the class (use Domain methods instead)
+❌ Storing price/cost on `Product` instead of `ProductUnit` (use per-unit pricing)
+❌ Embedding barcodes in Unit entity (use UnitBarcode table)
+❌ Computing unit conversion outside Domain (use `ProductUnit.ConvertToUnit`)
+❌ Hard-coding costing logic outside `UpdateProductPricingService`
+❌ Allowing `CashBox.CurrentBalance` to go negative
+❌ Editing CashTransaction entries (immutable — use offsetting entry)
+❌ Updating price/cost without recording in `ProductPriceHistory`
 ```
 
 ---
@@ -574,6 +690,8 @@ Supplier Payments:SP-{YYYY}-{000001}
 | Security details | `.opencode/agent/security-auditor.md` |
 | Print specs | `.opencode/agent/printing.md` |
 | Code patterns | `.opencode/agent/implement-agent.md` |
+| Implementation plan | `docs/MASTER-PLAN.md` |
+| Costing & UOM specs | `docs/CONSTITUTION.md` sections 2.24–2.27 |
 
 ---
 
@@ -604,3 +722,11 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Toast notifications for minor success messages?
 - [ ] INotifyDataErrorInfo implemented with red border styles?
 - [ ] Save buttons disabled when form has errors (CanExecute)?
+- [ ] Pricing stored per ProductUnit (not on Product)?
+- [ ] Unit conversions computed in Domain (not UI or Service)?
+- [ ] Barcodes stored in UnitBarcode table (not embedded in Unit)?
+- [ ] Costing update uses UpdateProductPricingService (not custom logic)?
+- [ ] CashBox.CurrentBalance validated before dispensing?
+- [ ] CashTransaction entries immutable (no direct editing)?
+- [ ] ProductPriceHistory recorded on EVERY price/cost change?
+- [ ] At least one ProductUnit per product enforced in Domain?

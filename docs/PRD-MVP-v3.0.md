@@ -1,5 +1,5 @@
 # Product Requirements Document
-# Sales Management System — MVP v3.0
+# Sales Management System — Expanded v4.3
 # Platform: .NET 10 LTS | Year: 2026
 
 ---
@@ -16,7 +16,11 @@ Built on Clean Architecture + CQRS with WPF Desktop (MVVM) + ASP.NET Core 10 API
 
 ### In Scope
 - User authentication with role-based access (Admin/Manager/Cashier)
-- Product management with categories and units
+- Product management with categories and **dynamic units** (per-product units with conversion factors)
+- **Dynamic Unit of Measure (v4.3)**: ProductUnits with per-unit pricing, unit-specific barcodes, SmartUnitFormatter
+- **Costing Strategy (v4.3)**: WeightedAverage, LastPurchasePrice, SupplierPrice — configurable via SystemSettings
+- **Cash Box Management (v4.3)**: Multi-box cash tracking, immutable transactions, daily closure
+- **Product Price History (v4.3)**: Audit trail for every price/cost change
 - Multi-warehouse inventory management
 - Purchase invoices (Cash/Credit/Mixed)
 - Sales invoices (Cash/Credit/Mixed)
@@ -25,7 +29,7 @@ Built on Clean Architecture + CQRS with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Customer and supplier balance tracking
 - Customer and supplier payments
 - Basic reports (daily sales, stock, balances)
-- Invoice printing with store logo
+- Invoice printing with store logo (A4 + 80mm thermal)
 - Database backup and restore
 - Audit logging (who did what and when)
 
@@ -137,9 +141,89 @@ Built on Clean Architecture + CQRS with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Default warehouse selection
 
 ### 3.12 Backup
-- Manual backup: creates .bak file with timestamp
-- Restore from .bak file
-- Backup location configurable
+- Backup database via SQL Server BACKUP DATABASE command
+- Restore database via API endpoint (requires restart)
+- Only Admin can perform backup/restore
+- Backup creates timestamped `.bak` file
+- Restore confirmation requires re-login
+
+### 3.13 Dynamic Unit of Measure (v4.3)
+
+**ProductUnits:**
+- Each product can have multiple units (e.g., "Piece", "Box", "Carton")
+- One unit must be marked as `IsBaseUnit = true` (the smallest/foundational unit)
+- Base unit always has `ConversionFactor = 1`
+- Derived units have `ConversionFactor > 1` (e.g., Box=24 means 1 Box = 24 base units)
+- Per-unit pricing: `RetailPrice` and `WholesalePrice` stored on each ProductUnit
+- **Enforced**: `ProductMustHaveAtLeastOneUnit` — throw DomainException if deleting last unit
+
+**UnitBarcodes:**
+- Barcodes stored in `UnitBarcode` table (FK → ProductUnits)
+- One barcode uniquely identifies one specific product unit
+- Replaces the old `ProductBarcodes` multi-barcode approach
+
+**SmartUnitFormatter:**
+- UI-only service that selects best display unit based on quantity threshold
+- Example: 48 pieces → "2 Boxes" (if Box factor = 24)
+
+**Conversion Math (Domain-Only):**
+```csharp
+var baseQty = quantity * sourceUnit.ConversionFactor;
+var targetQty = baseQty / targetUnit.ConversionFactor;
+```
+
+### 3.14 Costing Strategy (v4.3)
+
+**Three Methods (configurable):**
+
+| Method | Enum | Formula | Use Case |
+|--------|------|---------|----------|
+| WeightedAverage | 1 | `(OldStock*OldCost + NewQty*NewCost) / TotalQty` | Default — smooths cost fluctuations |
+| LastPurchasePrice | 2 | Direct overwrite: `AvgCost = NewUnitCost` | When latest price is most relevant |
+| SupplierPrice | 3 | Use `Product.SupplierPrice` | Catalog pricing, no calculation |
+
+**Flow:**
+1. Costing method stored in `SystemSettings` table (seeded as `WeightedAverage`)
+2. When purchase invoice is **Posted**: `UpdateProductPricingService` fires
+3. Service reads costing method from settings
+4. Calculates new cost using the selected formula
+5. Updates `Product.AvgCost` and cascades to ALL product units
+6. Records change in `ProductPriceHistory`
+7. NEVER write costing logic outside `UpdateProductPricingService`
+
+**Cost Cascade:**
+```csharp
+// After base unit cost is updated:
+foreach (var unit in product.Units)
+    unit.Cost = baseUnitCost * unit.ConversionFactor;
+```
+
+### 3.15 Cash Box Management (v4.3)
+
+**CashBox Entities:**
+- Multiple cash boxes with `OpeningBalance` and `CurrentBalance`
+- `CurrentBalance` is computed from `CashTransaction` sum
+- One cash box flagged as `IsDefault`
+- **Constraint**: `CurrentBalance >= 0` (never negative)
+
+**CashTransaction Types:**
+| Type | Enum | Direction |
+|------|------|-----------|
+| OpeningBalance | 1 | Initial |
+| SalesIncome | 2 | IN |
+| Expense | 3 | OUT |
+| TransferOut | 4 | OUT (to another box) |
+| TransferIn | 5 | IN (from another box) |
+| RefundOut | 6 | OUT (sales return refund) |
+| SupplierPayment | 7 | OUT |
+| CustomerPayment | 8 | IN |
+
+**Rules:**
+- Cash transactions are **immutable** — no editing, no deletion
+- Cancellations done via **offsetting entry**
+- Transfer between boxes requires TWO entries (Out from source, In to destination)
+- `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance
+- Every invoice payment references `CashBoxId`
 
 ---
 
@@ -204,6 +288,13 @@ SupplierPayments → Payments made to suppliers
 InventoryMovements → Complete audit trail of stock changes ⚠️ Critical
 StoreSettings → Store configuration (single row)
 DocumentSequences → Auto-increment invoice numbers
+ProductUnits → Per-product dynamic units with pricing and conversion (v4.3)
+UnitBarcodes → Unit-specific barcodes (replaces ProductBarcodes) (v4.3)
+CashBoxes → Cash box management (v4.3)
+CashTransactions → Immutable cash transaction log (v4.3)
+ProductPriceHistory → Audit trail for price/cost changes (v4.3)
+SystemSettings → Application-level settings (costing method, etc.) (v4.3)
+SystemLog → Application/system log entries (v4.3)
 
 text
 
@@ -218,11 +309,12 @@ text
 
 ```text
 SalesSystem/
-├── SalesSystem.Contracts/
-│   ├── DTOs/
-│   ├── Requests/
-│   ├── Responses/
-│   └── Common/
+├── SalesSystem.Contracts/       ← DTOs + Requests + Responses + Result<T>
+├── SalesSystem.Domain/          ← Entities + Business Rules + Exceptions
+├── SalesSystem.Application/     ← Services + Interfaces + Use Cases + CQRS
+├── SalesSystem.Infrastructure/  ← EF Core + DbContext + Repositories + UoW
+├── SalesSystem.Api/             ← Controllers + FluentValidation + Middleware + JWT
+└── SalesSystem.DesktopPWF/     ← WPF UI + MVVM + EventBus + Printing
 │       ├── Result.cs
 │       ├── PagedResult.cs
 │       └── ErrorCodes.cs
@@ -544,14 +636,14 @@ RETURN FLOW: (reverse of original operation)
 TRANSFER FLOW: (decrease source, increase destination — same transaction)
 PAYMENT FLOW: (decrease balance, no stock change)
 
-Sales Management System — PRD MVP v3.0 (النسخة النهائية الشاملة)
+Sales Management System — PRD Expanded v4.3 (النسخة النهائية الشاملة)
 1. معلومات المشروع
 text
 
 الاسم:     Sales Management System
-الإصدار:   MVP v3.0
-التاريخ:   2025
-المعمارية: Clean Architecture + WinForms Desktop + ASP.NET Core API
+الإصدار:   v4.3
+التاريخ:   2026
+المعمارية: Clean Architecture + WPF Desktop (MVVM) + ASP.NET Core API
 قاعدة البيانات: SQL Server
 2. وصف المشروع
 نظام إدارة مبيعات لمحل صغير يعمل على Desktop محلياً عبر ASP.NET Core Web API وقاعدة بيانات SQL Server. يشمل إدارة المنتجات، المخازن المتع5. قاعدة البيانات — Schema الكامل
