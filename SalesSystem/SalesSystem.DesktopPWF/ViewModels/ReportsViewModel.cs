@@ -18,13 +18,13 @@ namespace SalesSystem.DesktopPWF.ViewModels;
 /// </summary>
 public enum ReportType
 {
-    Sales,           // مبيعات
-    Purchases,       // مشتريات
-    Inventory,       // مخزون
-    Customers,       // عملاء
-    Suppliers,       // موردين
-    ProfitLoss,      // أرباح/خسائر
-    LowStock         // مخزون منخفض
+    Sales,
+    Purchases,
+    Inventory,
+    Customers,
+    Suppliers,
+    ProfitLoss,
+    LowStock
 }
 
 /// <summary>
@@ -50,9 +50,8 @@ public class ReportsViewModel : ViewModelBase
     private DateTime _dateTo;
     private decimal _reportTotal;
     private bool _isEmpty = true;
-    private bool _isLoading;
     private bool _hasSearched;
-    private int? _selectedWarehouseId; // null = all warehouses
+    private int? _selectedWarehouseId;
     private ObservableCollection<WarehouseDto> _warehouses = new();
 
     public ReportsViewModel()
@@ -72,19 +71,16 @@ public class ReportsViewModel : ViewModelBase
             new() { Type = ReportType.LowStock, DisplayName = "تقرير النواقص (المخزون المنخفض)" }
         };
 
-        // Default to first report type
         _selectedReportType = ReportType.Sales;
-
-        // Default date range: last 30 days
         _dateTo = DateTime.Today;
         _dateFrom = DateTime.Today.AddDays(-30);
 
         ReportData = new DataTable();
         ReportColumns = new ObservableCollection<DataColumn>();
 
-        GenerateReportCommand = new AsyncRelayCommand(async _ => await GenerateReportAsync(), _ => CanGenerateReport());
-        ExportExcelCommand = new AsyncRelayCommand(async _ => await ExportToExcelAsync(), _ => ReportData != null && ReportData.Rows.Count > 0);
-        ExportCsvCommand = new AsyncRelayCommand(async _ => await ExportToCsvAsync(), _ => ReportData != null && ReportData.Rows.Count > 0);
+        GenerateReportCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(GenerateReportOperationAsync, ex => ShowReportError(ex))), () => CanGenerateReport());
+        ExportExcelCommand = new AsyncRelayCommand(async () => await ExportToExcelAsync(), () => ReportData != null && ReportData.Rows.Count > 0);
+        ExportCsvCommand = new AsyncRelayCommand(async () => await ExportToCsvAsync(), () => ReportData != null && ReportData.Rows.Count > 0);
         ClearReportCommand = new RelayCommand(_ => ClearReport());
 
         _ = LoadWarehousesAsync();
@@ -100,12 +96,10 @@ public class ReportsViewModel : ViewModelBase
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Warehouses.Clear();
-                    // Add "All Warehouses" sentinel
                     Warehouses.Add(new WarehouseDto(0, null, "كل المخازن", string.Empty, true, true));
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
                     
-                    // Auto-select first non-default warehouse or default one
                     var defaultOrFirst = result.Value.FirstOrDefault(w => w.IsDefault) ?? result.Value.FirstOrDefault();
                     if (defaultOrFirst != null)
                     {
@@ -113,7 +107,7 @@ public class ReportsViewModel : ViewModelBase
                     }
                     else
                     {
-                        SelectedWarehouseId = null; // default = all
+                        SelectedWarehouseId = null;
                     }
                 });
             }
@@ -138,7 +132,6 @@ public class ReportsViewModel : ViewModelBase
         set => SetProperty(ref _selectedWarehouseId, value == 0 ? null : value);
     }
 
-    /// <summary>Whether the current report type supports warehouse filtering</summary>
     public bool WarehouseFilterVisible => SelectedReportType is
         ReportType.Sales or ReportType.Purchases or
         ReportType.Inventory or ReportType.LowStock;
@@ -166,12 +159,6 @@ public class ReportsViewModel : ViewModelBase
     {
         get => _dateTo;
         set => SetProperty(ref _dateTo, value);
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
     }
 
     private string? _errorMessage;
@@ -238,7 +225,7 @@ public class ReportsViewModel : ViewModelBase
 
     private bool CanGenerateReport()
     {
-        return !IsLoading && DateFrom <= DateTo;
+        return !IsBusy && DateFrom <= DateTo;
     }
     #endregion
 
@@ -250,61 +237,46 @@ public class ReportsViewModel : ViewModelBase
     #endregion
 
     #region Report Generation
-    private async Task GenerateReportAsync()
+    private void ShowReportError(Exception ex)
     {
-        if (IsLoading) return;
+        var userMsg = HandleException(ex, "ReportsViewModel.GenerateReportAsync", $"[ReportsViewModel.GenerateReportAsync] Failed to generate report of type {SelectedReportType}.");
+        _ = _dialogService.ShowErrorAsync("خطأ", userMsg);
+    }
 
-        IsLoading = true;
+    private async Task GenerateReportOperationAsync()
+    {
         ErrorMessage = null;
-        HasSearched = false; // Reset search state during loading
+        HasSearched = false;
 
-        try
+        Log.Information("Generating report: {ReportType} from {DateFrom} to {DateTo}", SelectedReportType, DateFrom, DateTo);
+
+        DataTable table = new DataTable();
+        
+        System.Windows.Application.Current.Dispatcher.Invoke(() => ReportColumns.Clear());
+
+        switch (SelectedReportType)
         {
-            Log.Information("Generating report: {ReportType} from {DateFrom} to {DateTo}", SelectedReportType, DateFrom, DateTo);
+            case ReportType.Sales: await GenerateSalesReportAsync(table); break;
+            case ReportType.Purchases: await GeneratePurchasesReportAsync(table); break;
+            case ReportType.Inventory: await GenerateInventoryReportAsync(table); break;
+            case ReportType.Customers: await GenerateCustomersReportAsync(table); break;
+            case ReportType.Suppliers: await GenerateSuppliersReportAsync(table); break;
+            case ReportType.ProfitLoss: await GenerateProfitLossReportAsync(table); break;
+            case ReportType.LowStock: await GenerateLowStockReportAsync(table); break;
+        }
 
-            // 1. Create a fresh DataTable locally
-            DataTable table = new DataTable();
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            ReportData = table;
+            HasSearched = true;
+            IsEmpty = table.Rows.Count == 0;
             
-            // 2. Clear current collection of columns (if used)
-            System.Windows.Application.Current.Dispatcher.Invoke(() => ReportColumns.Clear());
+            GenerateReportCommand.RaiseCanExecuteChanged();
+            ExportExcelCommand.RaiseCanExecuteChanged();
+            ExportCsvCommand.RaiseCanExecuteChanged();
+        });
 
-            // 3. Fill the local table based on report type
-            switch (SelectedReportType)
-            {
-                case ReportType.Sales: await GenerateSalesReportAsync(table); break;
-                case ReportType.Purchases: await GeneratePurchasesReportAsync(table); break;
-                case ReportType.Inventory: await GenerateInventoryReportAsync(table); break;
-                case ReportType.Customers: await GenerateCustomersReportAsync(table); break;
-                case ReportType.Suppliers: await GenerateSuppliersReportAsync(table); break;
-                case ReportType.ProfitLoss: await GenerateProfitLossReportAsync(table); break;
-                case ReportType.LowStock: await GenerateLowStockReportAsync(table); break;
-            }
-
-            // 4. Update the bound property once data is ready
-            // This ensures DataGrid with AutoGenerateColumns="True" sees the columns immediately
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
-            {
-                ReportData = table;
-                HasSearched = true;
-                IsEmpty = table.Rows.Count == 0;
-                
-                GenerateReportCommand.RaiseCanExecuteChanged();
-                ExportExcelCommand.RaiseCanExecuteChanged();
-                ExportCsvCommand.RaiseCanExecuteChanged();
-            });
-
-            Log.Information("Report generated successfully. Total rows: {RowCount}", table.Rows.Count);
-        }
-        catch (Exception ex)
-        {
-            IsLoading = false;
-            var userMsg = HandleException(ex, "ReportsViewModel.GenerateReportAsync", $"[ReportsViewModel.GenerateReportAsync] Failed to generate report of type {SelectedReportType}.");
-            await _dialogService.ShowErrorAsync("خطأ", userMsg);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        Log.Information("Report generated successfully. Total rows: {RowCount}", table.Rows.Count);
     }
 
     private void ClearReport()
@@ -628,7 +600,7 @@ public class ReportsViewModel : ViewModelBase
         {
             try
             {
-                IsLoading = true;
+                IsBusy = true;
                 await Task.Run(() =>
                 {
                     using var workbook = new XLWorkbook();
@@ -678,7 +650,6 @@ public class ReportsViewModel : ViewModelBase
                 });
 
                 Log.Information("Report exported to Excel: {FileName}", dialog.FileName);
-                IsLoading = false;
                 await _dialogService.ShowSuccessAsync("نجاح", "تم التصدير بنجاح");
             }
             catch (Exception ex)
@@ -687,7 +658,7 @@ public class ReportsViewModel : ViewModelBase
             }
             finally
             {
-                IsLoading = false;
+                IsBusy = false;
             }
         }
     }
@@ -707,7 +678,7 @@ public class ReportsViewModel : ViewModelBase
         {
             try
             {
-                IsLoading = true;
+                IsBusy = true;
                 await Task.Run(() =>
                 {
                     using var writer = new StreamWriter(dialog.FileName, false, System.Text.Encoding.UTF8);
@@ -734,7 +705,6 @@ public class ReportsViewModel : ViewModelBase
                 });
 
                 Log.Information("Report exported to CSV: {FileName}", dialog.FileName);
-                IsLoading = false;
                 await _dialogService.ShowSuccessAsync("نجاح", "تم التصدير بنجاح");
             }
             catch (Exception ex)
@@ -743,7 +713,7 @@ public class ReportsViewModel : ViewModelBase
             }
             finally
             {
-                IsLoading = false;
+                IsBusy = false;
             }
         }
     }

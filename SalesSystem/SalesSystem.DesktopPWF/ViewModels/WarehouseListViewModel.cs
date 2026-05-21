@@ -26,7 +26,6 @@ public class WarehouseListViewModel : ViewModelBase
     private ICollectionView? _warehousesView;
     private WarehouseDto? _selectedWarehouse;
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
@@ -38,15 +37,13 @@ public class WarehouseListViewModel : ViewModelBase
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
 
-        // Initialize commands
-        RefreshCommand = new AsyncRelayCommand(LoadWarehousesAsync);
+        RefreshCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadWarehousesOperationAsync)));
         AddCommand = new RelayCommand(AddWarehouse);
         EditCommand = new RelayCommand(EditWarehouse, () => SelectedWarehouse != null);
-        DeleteCommand = new AsyncRelayCommand(DeleteWarehouseAsync, () => SelectedWarehouse != null && SelectedWarehouse.IsActive);
-        RestoreCommand = new AsyncRelayCommand(RestoreWarehouseAsync, () => SelectedWarehouse != null && !SelectedWarehouse.IsActive);
+        DeleteCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(DeleteWarehouseOperationAsync, ex => ErrorMessage = HandleException(ex, "WarehouseListViewModel.DeleteWarehouseAsync"))), () => SelectedWarehouse != null && SelectedWarehouse.IsActive);
+        RestoreCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(RestoreWarehouseOperationAsync, ex => ErrorMessage = HandleException(ex, "WarehouseListViewModel.RestoreWarehouseAsync"))), () => SelectedWarehouse != null && !SelectedWarehouse.IsActive);
         SearchCommand = new RelayCommand(Search);
 
-        // Subscribe to warehouse changes
         _eventBus.Subscribe<WarehouseChangedMessage>(OnWarehouseChanged);
     }
 
@@ -70,7 +67,6 @@ public class WarehouseListViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedWarehouse, value))
             {
-                // Update command's CanExecute
                 (EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 (DeleteCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (RestoreCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
@@ -88,12 +84,6 @@ public class WarehouseListViewModel : ViewModelBase
                 WarehousesView?.Refresh();
             }
         }
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
     }
 
     public string? ErrorMessage
@@ -115,7 +105,7 @@ public class WarehouseListViewModel : ViewModelBase
         {
             if (SetProperty(ref _includeInactive, value))
             {
-                _ = LoadWarehousesAsync();
+                _ = ExecuteAsync(LoadWarehousesOperationAsync);
             }
         }
     }
@@ -133,42 +123,30 @@ public class WarehouseListViewModel : ViewModelBase
     #endregion
 
     #region Methods
-    public async Task LoadWarehousesAsync()
+    private async Task LoadWarehousesOperationAsync()
     {
-        IsLoading = true;
         ErrorMessage = null;
 
-        try
-        {
-            var result = await _warehouseService.GetAllAsync(IncludeInactive);
+        var result = await _warehouseService.GetAllAsync(IncludeInactive);
 
-            if (result.IsSuccess && result.Value != null)
+        if (result.IsSuccess && result.Value != null)
+        {
+            await InvokeOnUIThreadAsync(async () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Warehouses.Clear();
+                foreach (var item in result.Value)
                 {
-                    Warehouses.Clear();
-                    foreach (var item in result.Value)
-                    {
-                        Warehouses.Add(item);
-                    }
-                    SetupCollectionView();
-                    IsEmpty = Warehouses.Count == 0;
-                    OnPropertyChanged(nameof(WarehousesCount));
-                });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستودعات", "WarehouseListViewModel.LoadWarehousesAsync", "[WarehouseListViewModel.LoadWarehousesAsync] Failed to load warehouses list.");
+                    Warehouses.Add(item);
+                }
+                SetupCollectionView();
                 IsEmpty = Warehouses.Count == 0;
-            }
+                OnPropertyChanged(nameof(WarehousesCount));
+            });
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "WarehouseListViewModel.LoadWarehousesAsync", "[WarehouseListViewModel.LoadWarehousesAsync] Failed to load warehouses list.");
-        }
-        finally
-        {
-            IsLoading = false;
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستودعات", "WarehouseListViewModel.LoadWarehousesAsync", "[WarehouseListViewModel.LoadWarehousesAsync] Failed to load warehouses list.");
+            IsEmpty = Warehouses.Count == 0;
         }
     }
 
@@ -195,8 +173,7 @@ public class WarehouseListViewModel : ViewModelBase
         var editorVm = new WarehouseEditorViewModel();
         if (_dialogService.ShowDialog(editorVm))
         {
-            // Warehouse was saved successfully - refresh list
-            _ = LoadWarehousesAsync();
+            _ = ExecuteAsync(LoadWarehousesOperationAsync);
         }
     }
 
@@ -207,7 +184,7 @@ public class WarehouseListViewModel : ViewModelBase
         var editorVm = new WarehouseEditorViewModel(SelectedWarehouse);
         if (_dialogService.ShowDialog(editorVm))
         {
-            _ = LoadWarehousesAsync();
+            _ = ExecuteAsync(LoadWarehousesOperationAsync);
         }
     }
 
@@ -219,7 +196,7 @@ public class WarehouseListViewModel : ViewModelBase
         }
     }
 
-private async Task DeleteWarehouseAsync()
+    private async Task DeleteWarehouseOperationAsync()
     {
         if (SelectedWarehouse == null) return;
 
@@ -227,90 +204,64 @@ private async Task DeleteWarehouseAsync()
 
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsLoading = true;
         ErrorMessage = null;
 
-        try
+        if (strategy == DeleteStrategy.Deactivate)
         {
-            if (strategy == DeleteStrategy.Deactivate)
-            {
-                var deleteResult = await _warehouseService.DeleteAsync(SelectedWarehouse.Id);
-                if (deleteResult.IsSuccess)
-                {
-                    _eventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
-                    await LoadWarehousesAsync();
-                    _toastService.ShowSuccess("تم إلغاء تنشيط المستودع بنجاح");
-                }
-                else
-                {
-                    ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط المستودع";
-                }
-            }
-            else if (strategy == DeleteStrategy.Permanent)
-            {
-                var deleteResult = await _warehouseService.DeletePermanentlyAsync(SelectedWarehouse.Id);
-                if (deleteResult.IsSuccess)
-                {
-                    _eventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
-                    await LoadWarehousesAsync();
-                    _toastService.ShowSuccess("تم حذف المستودع نهائياً");
-                }
-                else
-                {
-                    ErrorMessage = deleteResult.Error ?? "فشل في حذف المستودع";
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
-            HandleException(ex, "WarehouseListViewModel.DeleteWarehouseAsync", $"[WarehouseListViewModel.DeleteWarehouseAsync] Failed to delete warehouse with ID {SelectedWarehouse?.Id}.");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
-    public async Task RestoreWarehouseAsync()
-    {
-        if (SelectedWarehouse == null) return;
-
-        IsLoading = true;
-        ErrorMessage = null;
-
-        try
-        {
-            var request = new UpdateWarehouseRequest(
-                Name: SelectedWarehouse.Name,
-                Code: SelectedWarehouse.Code,
-                Location: SelectedWarehouse.Location,
-                IsDefault: SelectedWarehouse.IsDefault,
-                IsActive: true
-            );
-
-            var result = await _warehouseService.UpdateAsync(SelectedWarehouse.Id, request);
-
-            if (result.IsSuccess)
+            var deleteResult = await _warehouseService.DeleteAsync(SelectedWarehouse.Id);
+            if (deleteResult.IsSuccess)
             {
                 _eventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
-                await LoadWarehousesAsync();
-                await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة المستودع بنجاح");
+                await LoadWarehousesOperationAsync();
+                _toastService.ShowSuccess("تم إلغاء تنشيط المستودع بنجاح");
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في استعادة المستودع";
-                await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
+                ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط المستودع";
             }
         }
-        catch (Exception ex)
+        else if (strategy == DeleteStrategy.Permanent)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
-            HandleException(ex, "WarehouseListViewModel.RestoreWarehouseAsync", $"[WarehouseListViewModel.RestoreWarehouseAsync] Failed to restore warehouse with ID {SelectedWarehouse?.Id}.");
+            var deleteResult = await _warehouseService.DeletePermanentlyAsync(SelectedWarehouse.Id);
+            if (deleteResult.IsSuccess)
+            {
+                _eventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
+                await LoadWarehousesOperationAsync();
+                _toastService.ShowSuccess("تم حذف المستودع نهائياً");
+            }
+            else
+            {
+                ErrorMessage = deleteResult.Error ?? "فشل في حذف المستودع";
+            }
         }
-finally
+    }
+
+    private async Task RestoreWarehouseOperationAsync()
+    {
+        if (SelectedWarehouse == null) return;
+
+        ErrorMessage = null;
+
+        var request = new UpdateWarehouseRequest(
+            Name: SelectedWarehouse.Name,
+            Code: SelectedWarehouse.Code,
+            Location: SelectedWarehouse.Location,
+            IsDefault: SelectedWarehouse.IsDefault,
+            IsActive: true
+        );
+
+        var result = await _warehouseService.UpdateAsync(SelectedWarehouse.Id, request);
+
+        if (result.IsSuccess)
         {
-            IsLoading = false;
+            _eventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
+            await LoadWarehousesOperationAsync();
+            await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة المستودع بنجاح");
+        }
+        else
+        {
+            ErrorMessage = result.Error ?? "فشل في استعادة المستودع";
+            await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
         }
     }
 
@@ -321,11 +272,7 @@ finally
 
     private void OnWarehouseChanged(WarehouseChangedMessage msg)
     {
-        // Reload warehouses when any change happens (from other modules or this module)
-        System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
-        {
-            await LoadWarehousesAsync();
-        });
+        System.Windows.Application.Current.Dispatcher.InvokeAsync((Func<Task>)(async () => await ExecuteAsync(LoadWarehousesOperationAsync)));
     }
 
     public override void Cleanup()

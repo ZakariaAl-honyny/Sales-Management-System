@@ -23,7 +23,6 @@ public class WarehouseEditorViewModel : ViewModelBase
     private string _location = string.Empty;
     private bool _isDefault;
     private bool _isActive = true;
-    private bool _isLoading;
     private bool _isEditMode;
     private string? _errorMessage;
 
@@ -38,7 +37,7 @@ public class WarehouseEditorViewModel : ViewModelBase
         _warehouseService = warehouseService;
         _eventBus = eventBus;
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, ex => ShowSaveError(ex))), () => CanSave);
         CancelCommand = new RelayCommand(Cancel);
     }
 
@@ -100,19 +99,12 @@ public class WarehouseEditorViewModel : ViewModelBase
         set => SetProperty(ref _isActive, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
-
     public string? ErrorMessage
     {
         get => _errorMessage;
         set => SetProperty(ref _errorMessage, value);
     }
 
-    // Validation
     private bool _hasNameError;
     public bool HasNameError
     {
@@ -143,7 +135,13 @@ public class WarehouseEditorViewModel : ViewModelBase
         return !HasNameError;
     }
 
-    private async Task SaveAsync()
+    private void ShowSaveError(Exception ex)
+    {
+        ErrorMessage = HandleException(ex, "WarehouseEditorViewModel.SaveAsync", "[WarehouseEditorViewModel.SaveAsync] Failed to save warehouse.");
+        System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
+    private async Task SaveOperationAsync()
     {
         if (!Validate())
         {
@@ -155,62 +153,48 @@ public class WarehouseEditorViewModel : ViewModelBase
             return;
         }
 
-        IsLoading = true;
         ErrorMessage = null;
 
-        try
+        Result<WarehouseDto> result;
+
+        if (IsEditMode)
         {
-            Result<WarehouseDto> result;
+            var updateRequest = new UpdateWarehouseRequest(
+                Name,
+                string.IsNullOrWhiteSpace(Code) ? null : Code,
+                string.IsNullOrWhiteSpace(Location) ? null : Location,
+                IsDefault,
+                IsActive);
 
-            if (IsEditMode)
-            {
-                var updateRequest = new UpdateWarehouseRequest(
-                    Name,
-                    string.IsNullOrWhiteSpace(Code) ? null : Code,
-                    string.IsNullOrWhiteSpace(Location) ? null : Location,
-                    IsDefault,
-                    IsActive);
-
-                result = await _warehouseService.UpdateAsync(_warehouseId, updateRequest);
-            }
-            else
-            {
-                var createRequest = new CreateWarehouseRequest(
-                    Name,
-                    string.IsNullOrWhiteSpace(Code) ? null : Code,
-                    string.IsNullOrWhiteSpace(Location) ? null : Location,
-                    IsDefault);
-
-                result = await _warehouseService.CreateAsync(createRequest);
-            }
-
-            if (result.IsSuccess && result.Value != null)
-            {
-                // Publish event to notify other modules
-                _eventBus.Publish(new WarehouseChangedMessage(result.Value.Id));
-
-                System.Windows.MessageBox.Show(
-                    IsEditMode ? "تم تحديث المستودع بنجاح" : "تم إضافة المستودع بنجاح",
-                    "نجاح",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المستودع", "WarehouseEditorViewModel.SaveAsync", "[WarehouseEditorViewModel.SaveAsync] Failed to save warehouse.");
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            result = await _warehouseService.UpdateAsync(_warehouseId, updateRequest);
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "WarehouseEditorViewModel.SaveAsync", "[WarehouseEditorViewModel.SaveAsync] Failed to save warehouse.");
+            var createRequest = new CreateWarehouseRequest(
+                Name,
+                string.IsNullOrWhiteSpace(Code) ? null : Code,
+                string.IsNullOrWhiteSpace(Location) ? null : Location,
+                IsDefault);
+
+            result = await _warehouseService.CreateAsync(createRequest);
+        }
+
+        if (result.IsSuccess && result.Value != null)
+        {
+            _eventBus.Publish(new WarehouseChangedMessage(result.Value.Id));
+
+            System.Windows.MessageBox.Show(
+                IsEditMode ? "تم تحديث المستودع بنجاح" : "تم إضافة المستودع بنجاح",
+                "نجاح",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            RequestClose();
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المستودع", "WarehouseEditorViewModel.SaveAsync", "[WarehouseEditorViewModel.SaveAsync] Failed to save warehouse.");
             System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            IsLoading = false;
         }
     }
 

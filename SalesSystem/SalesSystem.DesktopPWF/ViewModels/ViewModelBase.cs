@@ -1,3 +1,4 @@
+using SalesSystem.Contracts.Common;
 using System.Collections;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -142,6 +143,104 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
         catch
         {
             // Ignore failure to send log to prevent infinite loop or app crash
+        }
+    }
+
+    private bool _isBusy;
+    private string _statusMessage = string.Empty;
+
+    /// <summary>
+    /// Indicates whether an async operation is currently running.
+    /// Bind UI elements (Loading indicators, IsEnabled) to this.
+    /// </summary>
+    public bool IsBusy
+    {
+        get => _isBusy;
+        protected set => SetProperty(ref _isBusy, value);
+    }
+
+    /// <summary>
+    /// Status message displayed during async operations.
+    /// </summary>
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        protected set => SetProperty(ref _statusMessage, value);
+    }
+
+    /// <summary>
+    /// Wraps async operations with loading state and error handling.
+    /// Use this instead of manual try/catch in every command.
+    /// </summary>
+    protected async Task ExecuteAsync(Func<Task> operation, string? busyMessage = null)
+    {
+        try
+        {
+            IsBusy = true;
+            ClearAllErrors();
+            if (busyMessage != null) StatusMessage = busyMessage;
+            await operation();
+        }
+        catch (Exception ex)
+        {
+            HandleException(ex, "ExecuteAsync");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Wraps async operations with loading state, error handling, and a custom error callback.
+    /// Use when you need to display the error message to the user.
+    /// </summary>
+    protected async Task ExecuteAsync(Func<Task> operation, Action<Exception> onError, string? busyMessage = null)
+    {
+        try
+        {
+            IsBusy = true;
+            ClearAllErrors();
+            if (busyMessage != null) StatusMessage = busyMessage;
+            await operation();
+        }
+        catch (Exception ex)
+        {
+            onError(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Wraps async operations that return Result&lt;T&gt;.
+    /// Returns null if the operation failed.
+    /// </summary>
+    protected async Task<T?> ExecuteResultAsync<T>(Func<Task<Result<T>>> operation, string? busyMessage = null) where T : class
+    {
+        try
+        {
+            IsBusy = true;
+            ClearAllErrors();
+            if (busyMessage != null) StatusMessage = busyMessage;
+            var result = await operation();
+            if (!result.IsSuccess)
+            {
+                HandleFailure(result.Error, "ExecuteResultAsync");
+                return null;
+            }
+            return result.Value;
+        }
+        catch (Exception ex)
+        {
+            HandleException(ex, "ExecuteResultAsync");
+            return null;
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 

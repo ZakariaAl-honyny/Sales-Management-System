@@ -129,7 +129,7 @@
                 </Grid>
 
                 <!-- Loading Overlay -->
-                <Border Background="#CCFFFFFF" Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
+                <Border Background="#CCFFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <ProgressBar IsIndeterminate="True" Width="240" Height="6" Background="#E2E8F0" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
                         <TextBlock Text="جاري تحليل البيانات وتوليد التقرير..." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>

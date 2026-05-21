@@ -29,12 +29,9 @@ public class SettingsViewModel : ViewModelBase
     private bool _enableStockAlerts = true;
     private bool _allowNegativeStock;
     private bool _autoUpdatePrices;
-    private bool _isLoading;
-    private string _statusMessage = string.Empty;
     private ObservableCollection<string> _backups = new();
     private string? _selectedBackup;
 
-    // Print settings
     private string _thermalPrinterName = string.Empty;
     private string _a4PrinterName = string.Empty;
     private string _logoPath = string.Empty;
@@ -47,14 +44,14 @@ public class SettingsViewModel : ViewModelBase
         _backupService = App.GetService<IBackupApiService>();
         _dialogService = App.GetService<IDialogService>();
 
-        LoadCommand = new AsyncRelayCommand(async _ => await LoadSettingsAsync());
-        SaveCommand = new AsyncRelayCommand(async _ => await SaveSettingsAsync());
-        CreateBackupCommand = new AsyncRelayCommand(async _ => await CreateBackupAsync());
-        RestoreBackupCommand = new AsyncRelayCommand(async _ => await RestoreBackupAsync(), _ => !string.IsNullOrEmpty(SelectedBackup));
+        LoadCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadSettingsOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.LoadSettingsAsync", "[SettingsViewModel.LoadSettingsAsync] Failed to load system settings."))));
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveSettingsOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Unexpected error during save."))));
+        CreateBackupCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(CreateBackupOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.CreateBackupAsync", "[SettingsViewModel.CreateBackupAsync] Unexpected error."))));
+        RestoreBackupCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(RestoreBackupOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.RestoreBackupAsync", "[SettingsViewModel.RestoreBackupAsync] Unexpected error."))), () => !string.IsNullOrEmpty(SelectedBackup));
         BrowseLogoCommand = new RelayCommand(_ => BrowseLogo());
-        TestPrintCommand = new AsyncRelayCommand(async _ => await TestPrintAsync());
+        TestPrintCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(TestPrintOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.TestPrintAsync", "[SettingsViewModel.TestPrintAsync] Test print failed."))));
 
-        _ = LoadSettingsAsync();
+        _ = ExecuteAsync(LoadSettingsOperationAsync);
         _ = RefreshBackupListAsync();
     }
 
@@ -117,18 +114,6 @@ public class SettingsViewModel : ViewModelBase
     {
         get => _autoUpdatePrices;
         set => SetProperty(ref _autoUpdatePrices, value);
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
-
-    public string StatusMessage
-    {
-        get => _statusMessage;
-        set => SetProperty(ref _statusMessage, value);
     }
 
     public ObservableCollection<string> Backups
@@ -215,94 +200,65 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    private async Task TestPrintAsync()
+    private async Task TestPrintOperationAsync()
     {
-        IsLoading = true;
         StatusMessage = string.Empty;
+
+        var httpClient = App.GetService<System.Net.Http.HttpClient>();
+        var response = await httpClient.PostAsync("api/v1/print/test", null);
+        if (response.IsSuccessStatusCode)
+        {
+            StatusMessage = "✅ تمت طباعة الاختبار بنجاح";
+        }
+        else
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            StatusMessage = "❌ فشلت طباعة الاختبار";
+            await _dialogService.ShowErrorAsync("خطأ في الطباعة", errorBody);
+        }
+    }
+
+    private async Task LoadSettingsOperationAsync()
+    {
+        StatusMessage = string.Empty;
+
+        var result = await _settingsService.GetSettingsAsync();
+        if (result.IsSuccess && result.Value != null)
+        {
+            var s = result.Value;
+            CompanyName = s.StoreName;
+            Phone = s.Phone;
+            Address = s.Address;
+            TaxNumber = s.TaxNumber;
+            Email = s.Email;
+            DefaultTaxRate = s.DefaultTaxRate;
+            EnableStockAlerts = s.EnableStockAlerts;
+            AllowNegativeStock = s.AllowNegativeStock;
+            AutoUpdatePrices = s.AutoUpdatePrices;
+            InvoicePrefix = s.InvoicePrefix;
+        }
+
         try
         {
-            // Use the existing HttpClient — call the API test endpoint
-            var httpClient = App.GetService<System.Net.Http.HttpClient>();
-            var response = await httpClient.PostAsync("api/v1/print/test", null);
-            if (response.IsSuccessStatusCode)
+            var printResult = await _settingsService.GetPrintSettingsAsync();
+            if (printResult.IsSuccess && printResult.Value != null)
             {
-                StatusMessage = "✅ تمت طباعة الاختبار بنجاح";
-            }
-            else
-            {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                StatusMessage = "❌ فشلت طباعة الاختبار";
-                await _dialogService.ShowErrorAsync("خطأ في الطباعة", errorBody);
+                var p = printResult.Value;
+                ThermalPrinterName = p.ThermalPrinterName;
+                A4PrinterName = p.A4PrinterName;
+                LogoPath = p.LogoPath;
+                StoreTaxNumber = p.StoreTaxNumber;
+                PrintTaxRate = p.TaxRate;
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = HandleException(ex, "SettingsViewModel.TestPrintAsync",
-                "[SettingsViewModel.TestPrintAsync] Test print failed.");
-        }
-        finally
-        {
-            IsLoading = false;
+            Serilog.Log.Warning(ex, "Failed to load print settings");
         }
     }
 
-    private async Task LoadSettingsAsync()
+    private async Task SaveSettingsOperationAsync()
     {
-        if (IsLoading) return;
-        IsLoading = true;
-        StatusMessage = string.Empty;
-
-        try
-        {
-            var result = await _settingsService.GetSettingsAsync();
-            if (result.IsSuccess && result.Value != null)
-            {
-                var s = result.Value;
-                CompanyName = s.StoreName;
-                Phone = s.Phone;
-                Address = s.Address;
-                TaxNumber = s.TaxNumber;
-                Email = s.Email;
-                DefaultTaxRate = s.DefaultTaxRate;
-                EnableStockAlerts = s.EnableStockAlerts;
-                AllowNegativeStock = s.AllowNegativeStock;
-                AutoUpdatePrices = s.AutoUpdatePrices;
-                InvoicePrefix = s.InvoicePrefix;
-            }
-
-            // Load print settings
-            try
-            {
-                var printResult = await _settingsService.GetPrintSettingsAsync();
-                if (printResult.IsSuccess && printResult.Value != null)
-                {
-                    var p = printResult.Value;
-                    ThermalPrinterName = p.ThermalPrinterName;
-                    A4PrinterName = p.A4PrinterName;
-                    LogoPath = p.LogoPath;
-                    StoreTaxNumber = p.StoreTaxNumber;
-                    PrintTaxRate = p.TaxRate;
-                }
-            }
-            catch (Exception ex)
-            {
-                Serilog.Log.Warning(ex, "Failed to load print settings");
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = HandleException(ex, "SettingsViewModel.LoadSettingsAsync", "[SettingsViewModel.LoadSettingsAsync] Failed to load system settings.");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
-    }
-
-    private async Task SaveSettingsAsync()
-    {
-        if (IsLoading) return;
-
         if (string.IsNullOrWhiteSpace(CompanyName))
         {
             var errors = new List<string>
@@ -322,87 +278,61 @@ public class SettingsViewModel : ViewModelBase
             return;
         }
 
-        IsLoading = true;
         StatusMessage = string.Empty;
 
-        try
+        var request = new UpdateSettingsRequest(
+            CompanyName,
+            Address,
+            Phone,
+            Email,
+            null,
+            "SAR",
+            DefaultTaxRate,
+            DefaultTaxRate > 0,
+            TaxNumber,
+            EnableStockAlerts,
+            AllowNegativeStock,
+            AutoUpdatePrices,
+            InvoicePrefix
+        );
+
+        var result = await _settingsService.UpdateSettingsAsync(request);
+        if (result.IsSuccess)
         {
-            var request = new UpdateSettingsRequest(
-                CompanyName,
-                Address,
-                Phone,
-                Email,
-                null,
-                "SAR",
-                DefaultTaxRate,
-                DefaultTaxRate > 0,
-                TaxNumber,
-                EnableStockAlerts,
-                AllowNegativeStock,
-                AutoUpdatePrices,
-                InvoicePrefix
-            );
+            _settingsService.RefreshCache();
 
-            var result = await _settingsService.UpdateSettingsAsync(request);
-            if (result.IsSuccess)
-            {
-                _settingsService.RefreshCache();
+            var printRequest = new UpdatePrintSettingsRequest(
+                ThermalPrinterName,
+                A4PrinterName,
+                LogoPath,
+                StoreTaxNumber,
+                PrintTaxRate);
+            await _settingsService.UpdatePrintSettingsAsync(printRequest);
 
-                // Save print settings
-                var printRequest = new UpdatePrintSettingsRequest(
-                    ThermalPrinterName,
-                    A4PrinterName,
-                    LogoPath,
-                    StoreTaxNumber,
-                    PrintTaxRate);
-                await _settingsService.UpdatePrintSettingsAsync(printRequest);
-
-                StatusMessage = "✅ تم حفظ الإعدادات بنجاح";
-                _ = Task.Delay(3000).ContinueWith(_ => StatusMessage = string.Empty);
-            }
-            else
-            {
-                StatusMessage = HandleFailure(result.Error ?? "فشل في حفظ الإعدادات", "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Failed to update system settings.");
-                await _dialogService.ShowErrorAsync("خطأ في الحفظ", StatusMessage);
-            }
+            StatusMessage = "✅ تم حفظ الإعدادات بنجاح";
+            _ = Task.Delay(3000).ContinueWith(_ => StatusMessage = string.Empty);
         }
-        catch (Exception ex)
+        else
         {
-            StatusMessage = HandleException(ex, "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Unexpected error during save.");
-        }
-        finally
-        {
-            IsLoading = false;
+            StatusMessage = HandleFailure(result.Error ?? "فشل في حفظ الإعدادات", "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Failed to update system settings.");
+            await _dialogService.ShowErrorAsync("خطأ في الحفظ", StatusMessage);
         }
     }
 
-    private async Task CreateBackupAsync()
+    private async Task CreateBackupOperationAsync()
     {
-        if (IsLoading) return;
-        IsLoading = true;
         StatusMessage = "جاري إنشاء نسخة احتياطية...";
 
-        try
+        var result = await _backupService.CreateBackupAsync();
+        if (result.IsSuccess)
         {
-            var result = await _backupService.CreateBackupAsync();
-            if (result.IsSuccess)
-            {
-                StatusMessage = "✅ تم إنشاء النسخة الاحتياطية بنجاح";
-                await RefreshBackupListAsync();
-            }
-            else
-            {
-                StatusMessage = result.Error ?? "فشل في إنشاء النسخة الاحتياطية";
-                await _dialogService.ShowErrorAsync("خطأ في النسخ الاحتياطي", StatusMessage);
-            }
+            StatusMessage = "✅ تم إنشاء النسخة الاحتياطية بنجاح";
+            await RefreshBackupListAsync();
         }
-        catch (Exception ex)
+        else
         {
-            StatusMessage = HandleException(ex, "SettingsViewModel.CreateBackupAsync", "[SettingsViewModel.CreateBackupAsync] Unexpected error.");
-        }
-        finally
-        {
-            IsLoading = false;
+            StatusMessage = result.Error ?? "فشل في إنشاء النسخة الاحتياطية";
+            await _dialogService.ShowErrorAsync("خطأ في النسخ الاحتياطي", StatusMessage);
         }
     }
 
@@ -422,40 +352,28 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    private async Task RestoreBackupAsync()
+    private async Task RestoreBackupOperationAsync()
     {
-        if (string.IsNullOrEmpty(SelectedBackup) || IsLoading) return;
+        if (string.IsNullOrEmpty(SelectedBackup)) return;
 
         var confirm = await _dialogService.ShowConfirmationAsync("تأكيد استعادة النسخة الاحتياطية", $"⚠️ تنبيه: استعادة النسخة الاحتياطية '{SelectedBackup}' سيؤدي إلى استبدال قاعدة البيانات الحالية تماماً وإغلاق جميع الاتصالات النشطة.\n\nهل تريد الاستمرار؟");
 
         if (!confirm) return;
 
-        IsLoading = true;
         StatusMessage = "جاري استعادة النسخة الاحتياطية... قد يستغرق هذا وقتاً.";
 
-        try
+        var result = await _backupService.RestoreBackupAsync(SelectedBackup);
+        if (result.IsSuccess)
         {
-            var result = await _backupService.RestoreBackupAsync(SelectedBackup);
-            if (result.IsSuccess)
-            {
-                StatusMessage = "✅ تم استعادة قاعدة البيانات بنجاح. سيتم إغلاق النظام لإعادة التحميل.";
-                await _dialogService.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
+            StatusMessage = "✅ تم استعادة قاعدة البيانات بنجاح. سيتم إغلاق النظام لإعادة التحميل.";
+            await _dialogService.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
 
-                System.Windows.Application.Current.Shutdown();
-            }
-            else
-            {
-                StatusMessage = result.Error ?? "فشل في استعادة النسخة الاحتياطية";
-                await _dialogService.ShowErrorAsync("خطأ في الاستعادة", StatusMessage);
-            }
+            System.Windows.Application.Current.Shutdown();
         }
-        catch (Exception ex)
+        else
         {
-            StatusMessage = HandleException(ex, "SettingsViewModel.RestoreBackupAsync", "[SettingsViewModel.RestoreBackupAsync] Unexpected error.");
-        }
-        finally
-        {
-            IsLoading = false;
+            StatusMessage = result.Error ?? "فشل في استعادة النسخة الاحتياطية";
+            await _dialogService.ShowErrorAsync("خطأ في الاستعادة", StatusMessage);
         }
     }
     #endregion

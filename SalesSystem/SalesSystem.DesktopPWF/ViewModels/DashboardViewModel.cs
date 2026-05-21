@@ -33,10 +33,9 @@ public class DashboardViewModel : ViewModelBase
     private decimal _monthSales;
     private decimal _monthPurchases;
     private decimal _netProfit;
-    private bool _isLoading;
-    private bool _lowStockWarningShown; // Track if warning was shown this session
+    private bool _lowStockWarningShown;
 
-public DashboardViewModel()
+    public DashboardViewModel()
         : this(
             App.GetService<IEventBus>(),
             App.GetService<IDashboardApiService>(),
@@ -69,7 +68,7 @@ public DashboardViewModel()
         RecentInvoices = new ObservableCollection<RecentInvoiceItem>();
         LowStockItems = new ObservableCollection<LowStockItem>();
 
-RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
+        RefreshCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadDataOperationAsync)));
     }
 
     #region Properties
@@ -145,12 +144,6 @@ RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
         set => SetProperty(ref _netProfit, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
-
     private string? _errorMessage;
     public string? ErrorMessage
     {
@@ -201,126 +194,106 @@ RefreshCommand = new AsyncRelayCommand(async _ => await LoadDataAsync());
     {
         if (System.Windows.Application.Current?.Dispatcher != null)
         {
-            System.Windows.Application.Current.Dispatcher.BeginInvoke(async () => await LoadDataAsync());
+            System.Windows.Application.Current.Dispatcher.BeginInvoke((Func<Task>)(async () => await ExecuteAsync(LoadDataOperationAsync)));
         }
         else
         {
-            _ = LoadDataAsync();
+            _ = ExecuteAsync(LoadDataOperationAsync);
         }
     }
     #endregion
 
     #region Data Loading
-    public async Task LoadDataAsync()
+    private async Task LoadDataOperationAsync()
     {
-        if (IsLoading) return;
-
-        IsLoading = true;
-
-        try
+        var summaryResult = await _dashboardService.GetSummaryAsync();
+        if (summaryResult.IsSuccess && summaryResult.Value != null)
         {
-            var summaryResult = await _dashboardService.GetSummaryAsync();
-            if (summaryResult.IsSuccess && summaryResult.Value != null)
-            {
-                var summary = summaryResult.Value;
-                TodaySales = summary.TotalSalesToday;
-                TodaySalesCount = summary.NumberOfSalesToday;
-                TodayPurchases = summary.TotalPurchasesToday;
-                LowStockCount = summary.LowStockItemsCount;
-                TotalCustomers = summary.ActiveCustomersCount;
-                TotalSuppliers = summary.ActiveSuppliersCount;
-                TotalProducts = summary.TotalProductsCount;
-                TotalReceivables = summary.TotalReceivables;
-                TotalPayables = summary.TotalPayables;
-                MonthSales = summary.TotalSalesMonth;
-                MonthPurchases = summary.TotalPurchasesMonth;
-                NetProfit = MonthSales - MonthPurchases;
+            var summary = summaryResult.Value;
+            TodaySales = summary.TotalSalesToday;
+            TodaySalesCount = summary.NumberOfSalesToday;
+            TodayPurchases = summary.TotalPurchasesToday;
+            LowStockCount = summary.LowStockItemsCount;
+            TotalCustomers = summary.ActiveCustomersCount;
+            TotalSuppliers = summary.ActiveSuppliersCount;
+            TotalProducts = summary.TotalProductsCount;
+            TotalReceivables = summary.TotalReceivables;
+            TotalPayables = summary.TotalPayables;
+            MonthSales = summary.TotalSalesMonth;
+            MonthPurchases = summary.TotalPurchasesMonth;
+            NetProfit = MonthSales - MonthPurchases;
 
-                OnPropertyChanged(nameof(FormattedTodaySales));
-                OnPropertyChanged(nameof(FormattedTodayPurchases));
-                OnPropertyChanged(nameof(FormattedMonthSales));
-                OnPropertyChanged(nameof(FormattedMonthPurchases));
-                OnPropertyChanged(nameof(FormattedNetProfit));
-                OnPropertyChanged(nameof(FormattedReceivables));
-                OnPropertyChanged(nameof(FormattedPayables));
-                ErrorMessage = null;
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(summaryResult.Error ?? "فشل في تحميل ملخص البيانات", "DashboardViewModel.LoadDataAsync", "[DashboardViewModel.LoadDataAsync] Failed to load dashboard summary.");
-            }
+            OnPropertyChanged(nameof(FormattedTodaySales));
+            OnPropertyChanged(nameof(FormattedTodayPurchases));
+            OnPropertyChanged(nameof(FormattedMonthSales));
+            OnPropertyChanged(nameof(FormattedMonthPurchases));
+            OnPropertyChanged(nameof(FormattedNetProfit));
+            OnPropertyChanged(nameof(FormattedReceivables));
+            OnPropertyChanged(nameof(FormattedPayables));
+            ErrorMessage = null;
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(summaryResult.Error ?? "فشل في تحميل ملخص البيانات", "DashboardViewModel.LoadDataAsync", "[DashboardViewModel.LoadDataAsync] Failed to load dashboard summary.");
+        }
 
-            // Load recent sales
-            var recentSalesResult = await _salesInvoiceService.GetAllAsync(pageSize: 5);
-            if (recentSalesResult.IsSuccess && recentSalesResult.Value != null)
+        var recentSalesResult = await _salesInvoiceService.GetAllAsync(pageSize: 5);
+        if (recentSalesResult.IsSuccess && recentSalesResult.Value != null)
+        {
+            RecentInvoices.Clear();
+            foreach (var inv in recentSalesResult.Value.OrderByDescending(x => x.InvoiceDate).Take(5))
             {
-                RecentInvoices.Clear();
-                foreach (var inv in recentSalesResult.Value.OrderByDescending(x => x.InvoiceDate).Take(5))
+                RecentInvoices.Add(new RecentInvoiceItem
                 {
-                    RecentInvoices.Add(new RecentInvoiceItem
-                    {
-                        Id = inv.Id,
-                        CustomerName = inv.CustomerName ?? "عميل نقدي",
-                        Date = inv.InvoiceDate,
-                        Amount = inv.TotalAmount,
-                        Status = inv.Status
-                    });
-                }
+                    Id = inv.Id,
+                    CustomerName = inv.CustomerName ?? "عميل نقدي",
+                    Date = inv.InvoiceDate,
+                    Amount = inv.TotalAmount,
+                    Status = inv.Status
+                });
             }
-            else if (!recentSalesResult.IsSuccess)
-            {
-                // We don't necessarily want to override the main ErrorMessage if summary worked, 
-                // but we SHOULD log it.
-                HandleFailure(recentSalesResult.Error ?? "فشل في تحميل الفواتير الأخيرة", "DashboardViewModel.LoadDataAsync", "[DashboardViewModel.LoadDataAsync] Failed to load recent invoices.");
-            }
+        }
+        else if (!recentSalesResult.IsSuccess)
+        {
+            HandleFailure(recentSalesResult.Error ?? "فشل في تحميل الفواتير الأخيرة", "DashboardViewModel.LoadDataAsync", "[DashboardViewModel.LoadDataAsync] Failed to load recent invoices.");
+        }
 
-            // Load low stock items (only if stock alerts are enabled)
-            var settingsResult = await _settingsService.GetSettingsAsync();
-            bool enableStockAlerts = settingsResult.IsSuccess && settingsResult.Value?.EnableStockAlerts == true;
+        var settingsResult = await _settingsService.GetSettingsAsync();
+        bool enableStockAlerts = settingsResult.IsSuccess && settingsResult.Value?.EnableStockAlerts == true;
 
-            if (enableStockAlerts)
-            {
-                var lowStockResult = await _reportService.GetLowStockReportAsync();
-                if (lowStockResult.IsSuccess && lowStockResult.Value != null)
-                {
-                    LowStockItems.Clear();
-                    foreach (var item in lowStockResult.Value.Take(10))
-                    {
-                        LowStockItems.Add(new LowStockItem
-                        {
-                            ProductCode = item.ProductCode ?? string.Empty,
-                            ProductName = item.ProductName,
-                            CurrentStock = item.CurrentRetailQty,
-                            MinStock = item.ReorderLevelRetailQty
-                        });
-                    }
-
-                    // Show warning dialog if there are low stock items and not shown before
-                    var totalLowStock = lowStockResult.Value.Count();
-                    if (totalLowStock > 0 && !_lowStockWarningShown)
-                    {
-                        _lowStockWarningShown = true;
-                        await _dialogService.ShowWarningAsync("تنبيه المخزون", $"⚠️ تنبيه: يوجد {totalLowStock} منتج في المخزون أقل من حد الطلب!\n\n" +
-                            "للاطلاع على التفاصيل قم بزيارة قائمة 'نواقص المخزون' من القائمة الجانبية.");
-                    }
-                }
-                else if (!lowStockResult.IsSuccess)
-                {
-                    HandleFailure(lowStockResult.Error ?? "فشل في تحميل الأصناف منخفضة المخزون", "DashboardViewModel.LoadDataAsync", "[DashboardViewModel.LoadDataAsync] Failed to load low stock items.");
-                }
-            }
-            else
+        if (enableStockAlerts)
+        {
+            var lowStockResult = await _reportService.GetLowStockReportAsync();
+            if (lowStockResult.IsSuccess && lowStockResult.Value != null)
             {
                 LowStockItems.Clear();
+                foreach (var item in lowStockResult.Value.Take(10))
+                {
+                    LowStockItems.Add(new LowStockItem
+                    {
+                        ProductCode = item.ProductCode ?? string.Empty,
+                        ProductName = item.ProductName,
+                        CurrentStock = item.CurrentRetailQty,
+                        MinStock = item.ReorderLevelRetailQty
+                    });
+                }
+
+                var totalLowStock = lowStockResult.Value.Count();
+                if (totalLowStock > 0 && !_lowStockWarningShown)
+                {
+                    _lowStockWarningShown = true;
+                    await _dialogService.ShowWarningAsync("تنبيه المخزون", $"⚠️ تنبيه: يوجد {totalLowStock} منتج في المخزون أقل من حد الطلب!\n\n" +
+                        "للاطلاع على التفاصيل قم بزيارة قائمة 'نواقص المخزون' من القائمة الجانبية.");
+                }
+            }
+            else if (!lowStockResult.IsSuccess)
+            {
+                HandleFailure(lowStockResult.Error ?? "فشل في تحميل الأصناف منخفضة المخزون", "DashboardViewModel.LoadDataAsync", "[DashboardViewModel.LoadDataAsync] Failed to load low stock items.");
             }
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "DashboardViewModel.LoadDataAsync", "[DashboardViewModel.LoadDataAsync] Failed to load dashboard summary and recent invoices.");
-        }
-        finally
-        {
-            IsLoading = false;
+            LowStockItems.Clear();
         }
     }
     #endregion
