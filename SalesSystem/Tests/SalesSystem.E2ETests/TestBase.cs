@@ -19,7 +19,7 @@ public abstract class TestBase : IDisposable
     protected const int RetryDelayMs = 500;
     protected const int MaxRetries = 10;
 
-    private Application? _application;
+    private FlaUI.Core.Application? _application;
     private UIA2Automation? _automation;
     private bool _disposed;
 
@@ -74,7 +74,7 @@ public abstract class TestBase : IDisposable
                 "or set the SALESSYSTEM_EXE_PATH environment variable.");
         }
 
-        _application = Application.Launch(exePath);
+        _application = FlaUI.Core.Application.Launch(exePath);
         _automation = new UIA2Automation();
 
         // Wait for application to be ready - give it more time
