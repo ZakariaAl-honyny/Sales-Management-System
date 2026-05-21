@@ -1,0 +1,66 @@
+<Window x:Class="SalesSystem.DesktopPWF.Views.Common.PdfPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="معاينة الفاتورة"
+        Height="750"
+        Width="900"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        Icon="/Resources/print.ico">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- PDF WebBrowser control (uses system PDF viewer) -->
+        <WebBrowser Grid.Row="0" x:Name="PdfViewer"
+                    Margin="0,0,0,12"/>
+
+        <!-- Bottom toolbar -->
+        <Border Grid.Row="1"
+                Background="#F5F5F5"
+                Padding="12,8"
+                CornerRadius="4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           x:Name="InvoiceNumberText"
+                           VerticalAlignment="Center"
+                           FontWeight="SemiBold"
+                           Foreground="#424242"/>
+
+                <TextBlock Grid.Column="1" Text=""/>
+
+                <Button Grid.Column="2"
+                        Content="🖨️ طباعة A4"
+                        Padding="16,8"
+                        Margin="4,0"
+                        Click="PrintA4_Click"
+                        ToolTip="إرسال الفاتورة إلى طابعة A4"/>
+
+                <Button Grid.Column="3"
+                        Content="🧾 طباعة حراري"
+                        Padding="16,8"
+                        Margin="4,0"
+                        Click="PrintThermal_Click"
+                        ToolTip="طباعة إيصال حراري 80mm"/>
+
+                <Button Grid.Column="4"
+                        Content="❌ إغلاق"
+                        Padding="16,8"
+                        Margin="4,0"
+                        Click="Close_Click"
+                        ToolTip="إغلاق المعاينة"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

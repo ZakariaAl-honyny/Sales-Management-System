@@ -7,9 +7,11 @@ using SalesSystem.Api.Middleware;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Application.Printing;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Infrastructure.Data;
+using SalesSystem.Infrastructure.Printing;
 using SalesSystem.Infrastructure.Repositories;
 using SalesSystem.Infrastructure.Services;
 using SalesSystem.Domain.Entities;
@@ -97,6 +99,8 @@ builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ISystemSettingsRepository, SystemSettingsRepository>();
 builder.Services.AddScoped<IUpdateProductPricingService, UpdateProductPricingService>();
+builder.Services.AddScoped<IPrintService, PrintService>();
+builder.Services.AddScoped<InvoicePrintDtoBuilder>();
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================
@@ -165,8 +169,11 @@ builder.Services.AddOpenApi(options =>
 
 
 // ============================================
+// Initialize QuestPDF license (must be done before any PDF generation)
+PrintingBootstrapper.Initialize();
+
 // Build Application
-// ============================================
+
 var app = builder.Build();
 
 // ============================================

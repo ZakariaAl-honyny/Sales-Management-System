@@ -105,6 +105,56 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Print Settings -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Text="🖨️ إعدادات الطباعة" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,16">
+                                <TextBlock Text="طابعة A4" Style="{StaticResource LabelStyle}"/>
+                                <ComboBox ItemsSource="{Binding InstalledPrinters}"
+                                          SelectedItem="{Binding A4PrinterName}"
+                                          AutomationProperties.AutomationId="CmbA4Printer"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="0" Grid.Column="1" Margin="12,0,0,16">
+                                <TextBlock Text="الطابعة الحرارية (80mm)" Style="{StaticResource LabelStyle}"/>
+                                <ComboBox ItemsSource="{Binding InstalledPrinters}"
+                                          SelectedItem="{Binding ThermalPrinterName}"
+                                          AutomationProperties.AutomationId="CmbThermalPrinter"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,16">
+                                <TextBlock Text="الرقم الضريبي (للفاتورة)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding StoreTaxNumber}" AutomationProperties.AutomationId="TxtStoreTaxNumber"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,12,0">
+                                <TextBlock Text="شعار المتجر" Style="{StaticResource LabelStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding LogoPath}" IsReadOnly="True" AutomationProperties.AutomationId="TxtLogoPath"/>
+                                    <Button Grid.Column="1" Content="تصفح..." Command="{Binding BrowseLogoCommand}" Margin="8,0,0,0" AutomationProperties.AutomationId="BtnBrowseLogo"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
                 <!-- Database Maintenance -->
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>

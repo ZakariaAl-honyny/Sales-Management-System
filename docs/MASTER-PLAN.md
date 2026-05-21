@@ -1,1783 +1,1581 @@
-Implementation Plan: Dynamic UOM + Multi-Barcode + Costing Strategy + Cash Boxes
+Implementation Plan: Printing & PDF Generation Engine
 📋 Master Rules for AI Agent
-This plan has 7 phases. Complete and test each phase before starting the next. Never mix phases.
+This is a self-contained phase. Complete tasks in order. Never mix printing logic with business logic.
 
-🗂️ Phase 0: Database Schema — Complete Migration
-Agent Rule: Run ALL scripts in order. Do not skip any table.
+🗂️ Phase 0: Setup & Dependencies
+Task 0.1 — Install NuGet Packages
+XML
 
-Task 0.1 — Remove Old Columns, Add Dynamic UOM Tables
+<!-- File: YourApp.Infrastructure/YourApp.Infrastructure.csproj -->
+<!-- ADD these package references -->
+
+<ItemGroup>
+  <!-- PDF Generation -->
+  <PackageReference Include="QuestPDF" Version="2024.3.0" />
+  
+  <!-- Image processing (logo resize) -->
+  <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
+  
+  <!-- Thermal printing ESC/POS -->
+  <PackageReference Include="ESCPOS.NET" Version="3.0.0" />
+</ItemGroup>
+Task 0.2 — QuestPDF License Setup
+csharp
+
+// File: Infrastructure/Printing/PrintingBootstrapper.cs
+// Call this ONCE at application startup (App.xaml.cs or Program.cs)
+
+public static class PrintingBootstrapper
+{
+    public static void Initialize()
+    {
+        // QuestPDF Community license (free for revenue < $1M USD)
+        QuestPDF.Settings.License = LicenseType.Community;
+    }
+}
+
+// In App.xaml.cs:
+// protected override void OnStartup(StartupEventArgs e)
+// {
+//     PrintingBootstrapper.Initialize();
+//     base.OnStartup(e);
+// }
+Task 0.3 — Add Settings Columns for Print Setup
 SQL
 
--- =============================================
--- STEP 1: Backup first (ALWAYS)
--- =============================================
--- Run on staging environment first
+-- File: Migrations/AddPrintSettings.sql
 
--- =============================================
--- STEP 2: Create ProductUnits (Dynamic UOM)
--- =============================================
-CREATE TABLE ProductUnits (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    ProductId       INT NOT NULL,
-    UnitName        NVARCHAR(100) NOT NULL,      -- e.g., "حبة", "طبق", "كرتون"
-    BaseConversionFactor DECIMAL(18,6) NOT NULL, -- Pieces per this unit
-    IsBaseUnit      BIT NOT NULL DEFAULT 0,       -- TRUE for exactly ONE unit per product
-    SalesPrice      DECIMAL(18,4) NOT NULL DEFAULT 0,
-    PurchaseCost    DECIMAL(18,4) NOT NULL DEFAULT 0,
-    SupplierPrice   DECIMAL(18,4) NOT NULL DEFAULT 0, -- Catalog price from supplier
-    LastPurchasePrice DECIMAL(18,4) NOT NULL DEFAULT 0,-- Last actual invoice price
-    SortOrder       INT NOT NULL DEFAULT 0,        -- Display order in UI
-    IsActive        BIT NOT NULL DEFAULT 1,
-    CreatedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-    UpdatedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_ProductUnits_Products
-        FOREIGN KEY (ProductId) REFERENCES Products(Id)
-            ON DELETE CASCADE,
-
-    CONSTRAINT CHK_BaseUnitFactor
-        CHECK (IsBaseUnit = 0 OR BaseConversionFactor = 1)
-);
-
-CREATE INDEX IX_ProductUnits_ProductId ON ProductUnits(ProductId);
-
--- =============================================
--- STEP 3: Unit Barcodes (Many per Unit)
--- =============================================
-CREATE TABLE UnitBarcodes (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    ProductUnitId   INT NOT NULL,
-    BarcodeValue    NVARCHAR(100) NOT NULL,
-    IsDefault       BIT NOT NULL DEFAULT 0,
-    SupplierCode    NVARCHAR(100) NULL, -- Optional: which supplier uses this code
-    CreatedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_UnitBarcodes_ProductUnits
-        FOREIGN KEY (ProductUnitId) REFERENCES ProductUnits(Id)
-            ON DELETE CASCADE,
-
-    CONSTRAINT UQ_UnitBarcodes_Value
-        UNIQUE (BarcodeValue)
-);
-
-CREATE INDEX IX_UnitBarcodes_Value ON UnitBarcodes(BarcodeValue);
-
--- =============================================
--- STEP 4: Cash Boxes
--- =============================================
-CREATE TABLE CashBoxes (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    BoxName         NVARCHAR(100) NOT NULL,
-    CurrentBalance  DECIMAL(18,4) NOT NULL DEFAULT 0,
-    BranchId        INT NULL,
-    CurrencyCode    NVARCHAR(10) NOT NULL DEFAULT 'SAR',
-    AssignedUserId  INT NULL,         -- NULL = shared box
-    IsActive        BIT NOT NULL DEFAULT 1,
-    Notes           NVARCHAR(500) NULL,
-    CreatedAt       DATETIME2 NOT NULL DEFAULT GETDATE()
-);
-
--- =============================================
--- STEP 5: Cash Transactions Log
--- =============================================
-CREATE TABLE CashTransactions (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    CashBoxId       INT NOT NULL,
-    TransactionType INT NOT NULL, -- 0=SaleIn, 1=PurchaseOut, 2=TransferIn, 3=TransferOut, 4=Manual
-    Amount          DECIMAL(18,4) NOT NULL,
-    BalanceBefore   DECIMAL(18,4) NOT NULL,  -- Snapshot for audit
-    BalanceAfter    DECIMAL(18,4) NOT NULL,  -- Snapshot for audit
-    ReferenceType   NVARCHAR(50) NULL,       -- "SalesInvoice", "PurchaseInvoice"
-    ReferenceId     INT NULL,
-    Notes           NVARCHAR(500) NULL,
-    CreatedBy       INT NOT NULL,
-    CreatedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_CashTransactions_CashBoxes
-        FOREIGN KEY (CashBoxId) REFERENCES CashBoxes(Id)
-);
-
-CREATE INDEX IX_CashTransactions_CashBoxId ON CashTransactions(CashBoxId);
-CREATE INDEX IX_CashTransactions_Reference ON CashTransactions(ReferenceType, ReferenceId);
-
--- =============================================
--- STEP 6: System Settings (Costing Strategy)
--- =============================================
-CREATE TABLE SystemSettings (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    SettingKey      NVARCHAR(100) NOT NULL UNIQUE,
-    SettingValue    NVARCHAR(500) NOT NULL,
-    DataType        NVARCHAR(50) NOT NULL DEFAULT 'string', -- 'string','int','bool','decimal'
-    Category        NVARCHAR(100) NOT NULL,
-    DisplayName     NVARCHAR(200) NOT NULL,
-    Description     NVARCHAR(1000) NULL,
-    UpdatedBy       INT NULL,
-    UpdatedAt       DATETIME2 NOT NULL DEFAULT GETDATE()
-);
-
--- Seed costing strategy default
 INSERT INTO SystemSettings (SettingKey, SettingValue, DataType, Category, DisplayName, Description)
-VALUES (
-    'CostingMethod',
-    'WeightedAverage',
-    'string',
-    'Inventory',
-    'طريقة احتساب التكلفة',
-    'تحدد كيف يحتسب النظام تكلفة البضاعة في المخزن'
-);
-
--- =============================================
--- STEP 7: Add CashBoxId to invoices
--- =============================================
-ALTER TABLE SalesInvoices    ADD CashBoxId INT NULL;
-ALTER TABLE PurchaseInvoices ADD CashBoxId INT NULL;
-
-ALTER TABLE SalesInvoices    ADD CONSTRAINT FK_Sales_CashBox
-    FOREIGN KEY (CashBoxId) REFERENCES CashBoxes(Id);
-ALTER TABLE PurchaseInvoices ADD CONSTRAINT FK_Purchase_CashBox
-    FOREIGN KEY (CashBoxId) REFERENCES CashBoxes(Id);
-
--- =============================================
--- STEP 8: Price History Log (Audit Trail)
--- =============================================
-CREATE TABLE ProductPriceHistory (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    ProductUnitId   INT NOT NULL,
-    ChangeType      NVARCHAR(50) NOT NULL, -- 'PurchaseCost','SalesPrice','SupplierPrice'
-    OldValue        DECIMAL(18,4) NOT NULL,
-    NewValue        DECIMAL(18,4) NOT NULL,
-    CostingMethod   NVARCHAR(50) NULL,
-    InvoiceId       INT NULL,
-    ChangedBy       INT NOT NULL,
-    ChangedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_PriceHistory_ProductUnits
-        FOREIGN KEY (ProductUnitId) REFERENCES ProductUnits(Id)
-);
+VALUES
+('StoreName',       'اسم المتجر',     'string', 'Print', 'اسم المتجر',      'يظهر في رأس الفاتورة'),
+('StorePhone',      '',                'string', 'Print', 'رقم الهاتف',      'رقم التواصل في الفاتورة'),
+('StoreAddress',    '',                'string', 'Print', 'العنوان',         'عنوان المتجر'),
+('StoreTaxNumber',  '',                'string', 'Print', 'الرقم الضريبي',   'الرقم الضريبي للمتجر'),
+('LogoPath',        '',                'string', 'Print', 'مسار الشعار',     'مسار صورة شعار المتجر'),
+('ThermalPrinterName', '',             'string', 'Print', 'طابعة حرارية',   'اسم الطابعة الحرارية في ويندوز'),
+('A4PrinterName',   '',                'string', 'Print', 'طابعة A4',       'اسم طابعة A4 في ويندوز'),
+('TaxRate',         '15',              'decimal','Print', 'نسبة الضريبة %',  'نسبة ضريبة القيمة المضافة');
 ✅ Phase 0 Checklist
- All 8 SQL blocks executed without errors
- ProductUnits has CHECK constraint on base unit factor
- UnitBarcodes has UNIQUE constraint on barcode value
- CashBoxes linked to invoices tables
- SystemSettings seeded with default costing method
- ProductPriceHistory created for audit trail
-🏗️ Phase 1: Domain Layer — Entities & Enums
-Task 1.1 — New Enums
+ QuestPDF NuGet installed successfully
+ ImageSharp NuGet installed
+ ESCPOS.NET NuGet installed
+ PrintingBootstrapper.Initialize() called at startup
+ Settings seeded in database
+🏗️ Phase 1: Core Interfaces & Data Contracts
+Task 1.1 — Print Data Transfer Objects
 csharp
 
-// File: Domain/Enums/CostingMethod.cs
-public enum CostingMethod
+// File: Application/Printing/Contracts/InvoicePrintDto.cs
+// These DTOs carry ALL data needed for printing
+// Printing layer never queries the database directly
+
+public record InvoicePrintDto
 {
-    WeightedAverage = 0,    // متوسط التكلفة المرجح
-    LastPurchasePrice = 1,  // آخر سعر توريد
-    SupplierPrice = 2       // سعر المورد
+    // ─── Store Info (from Settings) ───────────────
+    public string StoreName { get; init; } = string.Empty;
+    public string StorePhone { get; init; } = string.Empty;
+    public string StoreAddress { get; init; } = string.Empty;
+    public string StoreTaxNumber { get; init; } = string.Empty;
+    public byte[]? LogoBytes { get; init; }          // NULL = no logo, handled gracefully
+
+    // ─── Invoice Header ───────────────────────────
+    public int InvoiceId { get; init; }
+    public string InvoiceNumber { get; init; } = string.Empty;
+    public DateTime InvoiceDate { get; init; }
+    public InvoiceTypePrint InvoiceType { get; init; }
+
+    // ─── Parties ──────────────────────────────────
+    public string CustomerOrSupplierName { get; init; } = string.Empty;
+    public string? CustomerPhone { get; init; }
+    public string? CustomerAddress { get; init; }
+
+    // ─── Items ────────────────────────────────────
+    public List<InvoiceItemPrintDto> Items { get; init; } = new();
+
+    // ─── Financials ───────────────────────────────
+    public decimal SubTotal { get; init; }
+    public decimal DiscountAmount { get; init; }
+    public decimal TaxRate { get; init; }
+    public decimal TaxAmount { get; init; }
+    public decimal GrandTotal { get; init; }
+    public bool IsTaxInclusive { get; init; }
+
+    // ─── Payment ──────────────────────────────────
+    public string PaymentMethod { get; init; } = string.Empty; // "نقدي" / "شبكة"
+    public decimal AmountPaid { get; init; }
+    public decimal ChangeAmount { get; init; }
+    public string? Notes { get; init; }
 }
 
-// File: Domain/Enums/CashTransactionType.cs
-public enum CashTransactionType
-{
-    SaleIn = 0,         // مبيعات (وارد)
-    PurchaseOut = 1,    // مشتريات (صادر)
-    TransferIn = 2,     // تحويل وارد
-    TransferOut = 3,    // تحويل صادر
-    ManualIn = 4,       // إيداع يدوي
-    ManualOut = 5       // سحب يدوي
-}
-Task 1.2 — ProductUnit Entity
-csharp
-
-// File: Domain/Entities/ProductUnit.cs
-
-public class ProductUnit : BaseEntity
-{
-    // ─── Properties ───────────────────────────────
-    public int ProductId { get; private set; }
-    public string UnitName { get; private set; }
-
-    /// <summary>
-    /// How many BASE UNITS does this unit contain?
-    /// Base unit itself = 1. Box of 12 = 12. Pallet of 360 = 360.
-    /// </summary>
-    public decimal BaseConversionFactor { get; private set; }
-
-    public bool IsBaseUnit { get; private set; }
-    public decimal SalesPrice { get; private set; }
-    public decimal PurchaseCost { get; private set; }
-    public decimal SupplierPrice { get; private set; }
-    public decimal LastPurchasePrice { get; private set; }
-    public int SortOrder { get; private set; }
-    public bool IsActive { get; private set; }
-
-    // Navigation
-    public Product Product { get; private set; }
-
-    private readonly List<UnitBarcode> _barcodes = new();
-    public IReadOnlyCollection<UnitBarcode> Barcodes => _barcodes.AsReadOnly();
-
-    private ProductUnit() { } // EF Core
-
-    // ─── Factory ──────────────────────────────────
-    public static ProductUnit CreateBaseUnit(
-        int productId,
-        string unitName)
-    {
-        if (string.IsNullOrWhiteSpace(unitName))
-            throw new DomainException("Unit name cannot be empty");
-
-        return new ProductUnit
-        {
-            ProductId = productId,
-            UnitName = unitName.Trim(),
-            BaseConversionFactor = 1,
-            IsBaseUnit = true,
-            IsActive = true,
-            SortOrder = 0
-        };
-    }
-
-    public static ProductUnit CreateDerivedUnit(
-        int productId,
-        string unitName,
-        decimal baseConversionFactor,
-        int sortOrder = 1)
-    {
-        if (string.IsNullOrWhiteSpace(unitName))
-            throw new DomainException("Unit name cannot be empty");
-
-        if (baseConversionFactor <= 1)
-            throw new DomainException(
-                $"وحدة '{unitName}' يجب أن تحتوي على أكثر من وحدة صغرى واحدة. " +
-                $"أدخل كم وحدة صغرى بداخلها (مثال: الكرتون يحتوي على 12 حبة، ادخل 12).");
-
-        return new ProductUnit
-        {
-            ProductId = productId,
-            UnitName = unitName.Trim(),
-            BaseConversionFactor = baseConversionFactor,
-            IsBaseUnit = false,
-            IsActive = true,
-            SortOrder = sortOrder
-        };
-    }
-
-    // ─── Domain Methods ───────────────────────────
-
-    /// <summary>
-    /// Converts quantity in this unit to base unit quantity.
-    /// ALWAYS use this before touching stock.
-    /// </summary>
-    public decimal ToBaseUnitQuantity(decimal quantity)
-        => quantity * BaseConversionFactor;
-
-    /// <summary>
-    /// Updates cost after purchase. Returns old cost for history logging.
-    /// </summary>
-    public decimal UpdatePurchaseCost(decimal newCost)
-    {
-        if (newCost < 0)
-            throw new DomainException("التكلفة لا يمكن أن تكون سالبة");
-
-        var oldCost = PurchaseCost;
-        LastPurchasePrice = newCost;
-        PurchaseCost = newCost;
-        return oldCost;
-    }
-
-    public decimal UpdateSalesPrice(decimal newPrice)
-    {
-        if (newPrice < 0)
-            throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
-
-        var oldPrice = SalesPrice;
-        SalesPrice = newPrice;
-        return oldPrice;
-    }
-
-    public void UpdateSupplierPrice(decimal supplierPrice)
-    {
-        if (supplierPrice < 0)
-            throw new DomainException("سعر المورد لا يمكن أن يكون سالباً");
-        SupplierPrice = supplierPrice;
-    }
-
-    public void AddBarcode(string barcodeValue, bool isDefault = false, 
-        string? supplierCode = null)
-    {
-        if (string.IsNullOrWhiteSpace(barcodeValue))
-            throw new DomainException("قيمة الباركود لا يمكن أن تكون فارغة");
-
-        // If this is default, unmark others
-        if (isDefault)
-        {
-            foreach (var b in _barcodes)
-                b.UnmarkDefault();
-        }
-
-        _barcodes.Add(UnitBarcode.Create(Id, barcodeValue, isDefault, supplierCode));
-    }
-
-    /// <summary>
-    /// Calculates cost for this unit based on base unit cost.
-    /// e.g., if base unit costs 1 SAR and this unit = 12 pieces → cost = 12 SAR
-    /// </summary>
-    public decimal CalculateCostFromBaseUnitCost(decimal baseUnitCost)
-        => baseUnitCost * BaseConversionFactor;
-}
-Task 1.3 — UnitBarcode Entity
-csharp
-
-// File: Domain/Entities/UnitBarcode.cs
-
-public class UnitBarcode : BaseEntity
-{
-    public int ProductUnitId { get; private set; }
-    public string BarcodeValue { get; private set; }
-    public bool IsDefault { get; private set; }
-    public string? SupplierCode { get; private set; }
-
-    private UnitBarcode() { }
-
-    public static UnitBarcode Create(
-        int productUnitId,
-        string barcodeValue,
-        bool isDefault = false,
-        string? supplierCode = null)
-    {
-        return new UnitBarcode
-        {
-            ProductUnitId = productUnitId,
-            BarcodeValue = barcodeValue.Trim().ToUpperInvariant(),
-            IsDefault = isDefault,
-            SupplierCode = supplierCode?.Trim()
-        };
-    }
-
-    public void UnmarkDefault() => IsDefault = false;
-}
-Task 1.4 — CashBox Entity
-csharp
-
-// File: Domain/Entities/CashBox.cs
-
-public class CashBox : BaseEntity
-{
-    public string BoxName { get; private set; }
-    public decimal CurrentBalance { get; private set; }
-    public int? BranchId { get; private set; }
-    public string CurrencyCode { get; private set; }
-    public int? AssignedUserId { get; private set; }    // NULL = shared
-    public bool IsActive { get; private set; }
-    public string? Notes { get; private set; }
-
-    private readonly List<CashTransaction> _transactions = new();
-    public IReadOnlyCollection<CashTransaction> Transactions 
-        => _transactions.AsReadOnly();
-
-    private CashBox() { }
-
-    public static CashBox Create(
-        string boxName,
-        int? branchId = null,
-        int? assignedUserId = null,
-        string currencyCode = "SAR",
-        decimal initialBalance = 0)
-    {
-        if (string.IsNullOrWhiteSpace(boxName))
-            throw new DomainException("اسم الصندوق مطلوب");
-
-        return new CashBox
-        {
-            BoxName = boxName.Trim(),
-            BranchId = branchId,
-            AssignedUserId = assignedUserId,
-            CurrencyCode = currencyCode,
-            CurrentBalance = initialBalance,
-            IsActive = true
-        };
-    }
-
-    // ─── Domain Methods ───────────────────────────
-
-    public CashTransaction Deposit(
-        decimal amount,
-        CashTransactionType type,
-        string? referenceType = null,
-        int? referenceId = null,
-        int createdBy = 0,
-        string? notes = null)
-    {
-        if (amount <= 0)
-            throw new DomainException("مبلغ الإيداع يجب أن يكون أكبر من صفر");
-
-        var balanceBefore = CurrentBalance;
-        CurrentBalance += amount;
-
-        var transaction = CashTransaction.Create(
-            Id, type, amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes);
-
-        _transactions.Add(transaction);
-        return transaction;
-    }
-
-    public CashTransaction Withdraw(
-        decimal amount,
-        CashTransactionType type,
-        string? referenceType = null,
-        int? referenceId = null,
-        int createdBy = 0,
-        string? notes = null)
-    {
-        if (amount <= 0)
-            throw new DomainException("مبلغ السحب يجب أن يكون أكبر من صفر");
-
-        if (CurrentBalance < amount)
-            throw new DomainException(
-                $"رصيد الصندوق غير كافٍ. الرصيد الحالي: {CurrentBalance:N2}، " +
-                $"المبلغ المطلوب: {amount:N2}");
-
-        var balanceBefore = CurrentBalance;
-        CurrentBalance -= amount;
-
-        var transaction = CashTransaction.Create(
-            Id, type, -amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes);
-
-        _transactions.Add(transaction);
-        return transaction;
-    }
-
-    public void CanUserAccess(int userId)
-    {
-        if (AssignedUserId.HasValue && AssignedUserId.Value != userId)
-            throw new DomainException(
-                $"ليس لديك صلاحية الوصول إلى الصندوق '{BoxName}'. " +
-                $"تواصل مع المدير لتغيير الصلاحيات.");
-    }
-}
-Task 1.5 — CashTransaction Entity
-csharp
-
-// File: Domain/Entities/CashTransaction.cs
-
-public class CashTransaction : BaseEntity
-{
-    public int CashBoxId { get; private set; }
-    public CashTransactionType TransactionType { get; private set; }
-    public decimal Amount { get; private set; }
-    public decimal BalanceBefore { get; private set; }
-    public decimal BalanceAfter { get; private set; }
-    public string? ReferenceType { get; private set; }
-    public int? ReferenceId { get; private set; }
-    public string? Notes { get; private set; }
-    public int CreatedBy { get; private set; }
-    public DateTime CreatedAt { get; private set; }
-
-    private CashTransaction() { }
-
-    internal static CashTransaction Create(
-        int cashBoxId,
-        CashTransactionType type,
-        decimal amount,
-        decimal balanceBefore,
-        decimal balanceAfter,
-        string? referenceType,
-        int? referenceId,
-        int createdBy,
-        string? notes)
-    {
-        return new CashTransaction
-        {
-            CashBoxId = cashBoxId,
-            TransactionType = type,
-            Amount = amount,
-            BalanceBefore = balanceBefore,
-            BalanceAfter = balanceAfter,
-            ReferenceType = referenceType,
-            ReferenceId = referenceId,
-            CreatedBy = createdBy,
-            Notes = notes,
-            CreatedAt = DateTime.UtcNow
-        };
-    }
-}
-Task 1.6 — Update Product Entity
-csharp
-
-// File: Domain/Entities/Product.cs
-// MODIFY existing Product — remove old price fields, add Units collection
-
-public class Product : BaseEntity
-{
-    // ─── Keep existing fields ─────────────────────
-    public string Name { get; private set; }
-    public string? Description { get; private set; }
-    public int CategoryId { get; private set; }
-    public bool IsActive { get; private set; }
-
-    // ─── REMOVED: WholesalePrice, RetailPrice, ConversionFactor ───
-    // These now live in ProductUnits
-
-    // Navigation
-    private readonly List<ProductUnit> _units = new();
-    public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
-
-    // ─── Domain Methods ───────────────────────────
-
-    /// <summary>
-    /// Returns the base unit (Piece/Egg/etc). ALWAYS exists.
-    /// Throws if not found — product data is corrupted.
-    /// </summary>
-    public ProductUnit GetBaseUnit()
-    {
-        return _units.FirstOrDefault(u => u.IsBaseUnit)
-            ?? throw new DomainException(
-                $"المنتج '{Name}' لا يحتوي على وحدة أساسية. " +
-                $"يرجى تعريف وحدة صغرى أولاً (مثال: حبة) من شاشة إدارة المنتجات.");
-    }
-
-    public ProductUnit GetUnitById(int unitId)
-    {
-        return _units.FirstOrDefault(u => u.Id == unitId)
-            ?? throw new DomainException(
-                $"الوحدة المحددة غير موجودة في المنتج '{Name}'");
-    }
-
-    /// <summary>
-    /// Validates product has exactly ONE base unit before saving.
-    /// Call this in the Command Handler before persisting.
-    /// </summary>
-    public void ValidateUnits()
-    {
-        var baseUnits = _units.Where(u => u.IsBaseUnit).ToList();
-
-        if (baseUnits.Count == 0)
-            throw new DomainException(
-                "⚠️ يجب تعريف وحدة صغرى واحدة على الأقل.\n" +
-                "مثال: أضف وحدة باسم 'حبة' واجعل معامل التحويل = 1");
-
-        if (baseUnits.Count > 1)
-            throw new DomainException(
-                "⚠️ لا يمكن تعريف أكثر من وحدة صغرى واحدة للمنتج الواحد.\n" +
-                $"الوحدات المعرّفة كأساسية: {string.Join(", ", baseUnits.Select(u => u.UnitName))}");
-
-        var invalidDerived = _units
-            .Where(u => !u.IsBaseUnit && u.BaseConversionFactor <= 1)
-            .ToList();
-
-        if (invalidDerived.Any())
-            throw new DomainException(
-                $"⚠️ الوحدات التالية لها معامل تحويل غير صحيح:\n" +
-                $"{string.Join("\n", invalidDerived.Select(u => $"- {u.UnitName}: يجب أن يكون أكبر من 1"))}\n" +
-                $"أدخل كم وحدة صغرى بداخل كل وحدة أكبر.");
-    }
-}
-✅ Phase 1 Checklist
- ProductUnit.CreateBaseUnit() sets factor to 1 automatically
- ProductUnit.CreateDerivedUnit() rejects factor <= 1 with Arabic message
- Product.ValidateUnits() catches 0 base units, >1 base units, and invalid factors
- CashBox.Withdraw() rejects insufficient balance with Arabic message
- CashBox.CanUserAccess() enforces user-box assignment
- All error messages are in Arabic and user-friendly
-⚙️ Phase 2: Infrastructure — EF Core & Services
-Task 2.1 — EF Configurations
-csharp
-
-// File: Infrastructure/Persistence/Configurations/ProductUnitConfiguration.cs
-
-public class ProductUnitConfiguration : IEntityTypeConfiguration<ProductUnit>
-{
-    public void Configure(EntityTypeBuilder<ProductUnit> builder)
-    {
-        builder.ToTable("ProductUnits");
-        builder.HasKey(x => x.Id);
-
-        builder.Property(x => x.UnitName).IsRequired().HasMaxLength(100);
-        builder.Property(x => x.BaseConversionFactor).HasPrecision(18, 6);
-        builder.Property(x => x.SalesPrice).HasPrecision(18, 4);
-        builder.Property(x => x.PurchaseCost).HasPrecision(18, 4);
-        builder.Property(x => x.SupplierPrice).HasPrecision(18, 4);
-        builder.Property(x => x.LastPurchasePrice).HasPrecision(18, 4);
-
-        // Enforce: base unit must have factor = 1
-        builder.ToTable(t => t.HasCheckConstraint(
-            "CHK_BaseUnitFactor",
-            "IsBaseUnit = 0 OR BaseConversionFactor = 1"));
-
-        builder.HasMany(x => x.Barcodes)
-            .WithOne()
-            .HasForeignKey(x => x.ProductUnitId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasOne(x => x.Product)
-            .WithMany(x => x.Units)
-            .HasForeignKey(x => x.ProductId)
-            .OnDelete(DeleteBehavior.Cascade);
-    }
-}
-
-// File: Infrastructure/Persistence/Configurations/CashBoxConfiguration.cs
-
-public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
-{
-    public void Configure(EntityTypeBuilder<CashBox> builder)
-    {
-        builder.ToTable("CashBoxes");
-        builder.HasKey(x => x.Id);
-
-        builder.Property(x => x.BoxName).IsRequired().HasMaxLength(100);
-        builder.Property(x => x.CurrentBalance).HasPrecision(18, 4);
-        builder.Property(x => x.CurrencyCode).HasMaxLength(10);
-
-        builder.HasMany(x => x.Transactions)
-            .WithOne()
-            .HasForeignKey(x => x.CashBoxId)
-            .OnDelete(DeleteBehavior.Restrict); // Keep history if box deleted
-    }
-}
-Task 2.2 — Barcode Lookup Service (Updated)
-csharp
-
-// File: Infrastructure/Services/BarcodeLookupService.cs
-
-public interface IBarcodeLookupService
-{
-    Task<BarcodeSearchResult?> LookupAsync(string barcode, CancellationToken ct = default);
-}
-
-public record BarcodeSearchResult(
-    int ProductId,
+public record InvoiceItemPrintDto(
     string ProductName,
-    int ProductUnitId,
     string UnitName,
-    decimal BaseConversionFactor,
-    bool IsBaseUnit,
-    decimal SalesPrice,
-    decimal PurchaseCost,
-    decimal CurrentStockInBaseUnits
+    decimal Quantity,
+    decimal UnitPrice,
+    decimal Discount,
+    decimal Total
 );
 
-public class BarcodeLookupService : IBarcodeLookupService
+public enum InvoiceTypePrint
 {
-    private readonly AppDbContext _context;
-    private readonly ILogger<BarcodeLookupService> _logger;
-
-    public BarcodeLookupService(AppDbContext context, ILogger<BarcodeLookupService> logger)
-    {
-        _context = context;
-        _logger = logger;
-    }
-
-    public async Task<BarcodeSearchResult?> LookupAsync(
-        string barcode,
-        CancellationToken ct = default)
-    {
-        if (string.IsNullOrWhiteSpace(barcode)) return null;
-
-        var normalized = barcode.Trim().ToUpperInvariant();
-
-        // Search in UnitBarcodes table (new multi-barcode system)
-        var result = await _context.UnitBarcodes
-            .Where(b => b.BarcodeValue == normalized)
-            .Select(b => new BarcodeSearchResult(
-                b.ProductUnit.ProductId,
-                b.ProductUnit.Product.Name,
-                b.ProductUnitId,
-                b.ProductUnit.UnitName,
-                b.ProductUnit.BaseConversionFactor,
-                b.ProductUnit.IsBaseUnit,
-                b.ProductUnit.SalesPrice,
-                b.ProductUnit.PurchaseCost,
-                b.ProductUnit.Product.Stock.CurrentQuantityInPieces
-            ))
-            .FirstOrDefaultAsync(ct);
-
-        if (result == null)
-            _logger.LogWarning("Barcode not found: {Barcode}", normalized);
-
-        return result;
-    }
+    Sales,          // فاتورة مبيعات
+    Purchase,       // فاتورة مشتريات
+    SalesReturn,    // مرتجع مبيعات
+    PurchaseReturn  // مرتجع مشتريات
 }
-Task 2.3 — Settings Repository
+Task 1.2 — IPrintService Interface
 csharp
 
-// File: Infrastructure/Repositories/SystemSettingsRepository.cs
+// File: Application/Printing/IPrintService.cs
 
-public interface ISystemSettingsRepository
+public interface IPrintService
 {
-    Task<CostingMethod> GetCostingMethodAsync(CancellationToken ct = default);
-    Task SetCostingMethodAsync(CostingMethod method, CancellationToken ct = default);
+    /// <summary>
+    /// Generates PDF and saves to temp path, then opens preview window.
+    /// </summary>
+    Task<PrintResult> ShowPreviewAsync(InvoicePrintDto invoice);
+
+    /// <summary>
+    /// Generates PDF and sends directly to A4 printer.
+    /// </summary>
+    Task<PrintResult> PrintA4Async(InvoicePrintDto invoice);
+
+    /// <summary>
+    /// Sends condensed receipt to 80mm thermal printer.
+    /// </summary>
+    Task<PrintResult> PrintThermalAsync(InvoicePrintDto invoice);
+
+    /// <summary>
+    /// Saves PDF to user-chosen location.
+    /// </summary>
+    Task<PrintResult> SavePdfAsync(InvoicePrintDto invoice, string filePath);
 }
 
-public class SystemSettingsRepository : ISystemSettingsRepository
+// Result object — never throw exceptions to the ViewModel
+public record PrintResult
 {
-    private readonly AppDbContext _context;
+    public bool IsSuccess { get; init; }
+    public string? ErrorMessage { get; init; }
+    public string? OutputFilePath { get; init; }
 
-    public SystemSettingsRepository(AppDbContext context)
-    {
-        _context = context;
-    }
+    public static PrintResult Success(string? filePath = null)
+        => new() { IsSuccess = true, OutputFilePath = filePath };
 
-    public async Task<CostingMethod> GetCostingMethodAsync(CancellationToken ct = default)
-    {
-        var setting = await _context.SystemSettings
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.SettingKey == "CostingMethod", ct);
-
-        if (setting == null) return CostingMethod.WeightedAverage; // Safe default
-
-        return Enum.TryParse<CostingMethod>(setting.SettingValue, out var method)
-            ? method
-            : CostingMethod.WeightedAverage;
-    }
-
-    public async Task SetCostingMethodAsync(CostingMethod method, CancellationToken ct = default)
-    {
-        var setting = await _context.SystemSettings
-            .FirstOrDefaultAsync(s => s.SettingKey == "CostingMethod", ct);
-
-        if (setting != null)
-            setting.UpdateValue(method.ToString());
-
-        await _context.SaveChangesAsync(ct);
-    }
+    public static PrintResult Failure(string errorMessage)
+        => new() { IsSuccess = false, ErrorMessage = errorMessage };
 }
-✅ Phase 2 Checklist
- EF Core configurations registered in AppDbContext.OnModelCreating()
- BarcodeLookupService searches UnitBarcodes (not old Barcode column)
- SystemSettingsRepository returns safe default if setting missing
- All repositories registered in DI container
-⚙️ Phase 3: Application Layer — Pricing Service
-Task 3.1 — UpdateProductPricingService
+Task 1.3 — Invoice Print Data Builder
 csharp
 
-// File: Application/Services/UpdateProductPricingService.cs
+// File: Application/Printing/InvoicePrintDtoBuilder.cs
+// Assembles the DTO from domain data + settings
+// This is the ONLY place that touches the database for print data
 
-public interface IUpdateProductPricingService
+public class InvoicePrintDtoBuilder
 {
-    Task UpdateFromPurchaseAsync(
-        UpdatePricingRequest request,
-        CancellationToken ct = default);
-}
-
-public record UpdatePricingRequest(
-    int ProductUnitId,
-    decimal NewPurchaseCost,
-    decimal NewQuantityPurchased,
-    decimal? NewSalesPrice,          // Optional — user may override
-    int InvoiceId,
-    int ChangedBy
-);
-
-public class UpdateProductPricingService : IUpdateProductPricingService
-{
-    private readonly AppDbContext _context;
     private readonly ISystemSettingsRepository _settings;
-    private readonly ILogger<UpdateProductPricingService> _logger;
+    private readonly ILogger<InvoicePrintDtoBuilder> _logger;
 
-    public UpdateProductPricingService(
-        AppDbContext context,
+    public InvoicePrintDtoBuilder(
         ISystemSettingsRepository settings,
-        ILogger<UpdateProductPricingService> logger)
+        ILogger<InvoicePrintDtoBuilder> logger)
     {
-        _context = context;
         _settings = settings;
         _logger = logger;
     }
 
-    public async Task UpdateFromPurchaseAsync(
-        UpdatePricingRequest request,
+    public async Task<InvoicePrintDto> BuildAsync(
+        SalesInvoice invoice,
         CancellationToken ct = default)
     {
-        // ─── 1. Load the purchased unit and ALL units for this product ───
-        var purchasedUnit = await _context.ProductUnits
-            .Include(u => u.Product)
-                .ThenInclude(p => p.Units)
-            .FirstOrDefaultAsync(u => u.Id == request.ProductUnitId, ct)
-            ?? throw new NotFoundException("ProductUnit", request.ProductUnitId);
+        var storeSettings = await _settings.GetPrintSettingsAsync(ct);
+        var logoBytes = await LoadLogoSafelyAsync(storeSettings.LogoPath);
 
-        var product = purchasedUnit.Product;
-        var allUnits = product.Units.Where(u => u.IsActive).ToList();
-        var baseUnit = product.GetBaseUnit();
-
-        // ─── 2. Calculate new BASE UNIT cost ─────────────────────────────
-        var costingMethod = await _settings.GetCostingMethodAsync(ct);
-
-        var newBaseUnitCost = await CalculateNewBaseUnitCostAsync(
-            costingMethod,
-            baseUnit,
-            purchasedUnit,
-            request.NewPurchaseCost,
-            request.NewQuantityPurchased,
-            ct);
-
-        _logger.LogInformation(
-            "Updating costs for Product {ProductId} using {Method}. " +
-            "New base unit cost: {Cost}",
-            product.Id, costingMethod, newBaseUnitCost);
-
-        // ─── 3. Cascade cost update to ALL units ─────────────────────────
-        var historyEntries = new List<ProductPriceHistory>();
-
-        foreach (var unit in allUnits)
+        return new InvoicePrintDto
         {
-            var newUnitCost = unit.CalculateCostFromBaseUnitCost(newBaseUnitCost);
-            var oldCost = unit.UpdatePurchaseCost(newUnitCost);
+            // Store info
+            StoreName = storeSettings.StoreName,
+            StorePhone = storeSettings.StorePhone,
+            StoreAddress = storeSettings.StoreAddress,
+            StoreTaxNumber = storeSettings.StoreTaxNumber,
+            LogoBytes = logoBytes,         // NULL if not found — handled in printer
 
-            historyEntries.Add(new ProductPriceHistory
-            {
-                ProductUnitId = unit.Id,
-                ChangeType = "PurchaseCost",
-                OldValue = oldCost,
-                NewValue = newUnitCost,
-                CostingMethod = costingMethod.ToString(),
-                InvoiceId = request.InvoiceId,
-                ChangedBy = request.ChangedBy,
-                ChangedAt = DateTime.UtcNow
-            });
-        }
+            // Invoice header
+            InvoiceId = invoice.Id,
+            InvoiceNumber = invoice.InvoiceNumber,
+            InvoiceDate = invoice.CreatedAt,
+            InvoiceType = InvoiceTypePrint.Sales,
 
-        // ─── 4. Update sales price if user provided one ──────────────────
-        if (request.NewSalesPrice.HasValue && request.NewSalesPrice.Value > 0)
-        {
-            var oldSalesPrice = purchasedUnit.UpdateSalesPrice(request.NewSalesPrice.Value);
+            // Parties
+            CustomerOrSupplierName = invoice.CustomerName ?? "زبون نقدي",
+            CustomerPhone = invoice.CustomerPhone,
 
-            historyEntries.Add(new ProductPriceHistory
-            {
-                ProductUnitId = purchasedUnit.Id,
-                ChangeType = "SalesPrice",
-                OldValue = oldSalesPrice,
-                NewValue = request.NewSalesPrice.Value,
-                InvoiceId = request.InvoiceId,
-                ChangedBy = request.ChangedBy,
-                ChangedAt = DateTime.UtcNow
-            });
-        }
+            // Items — project to print DTO
+            Items = invoice.Items.Select(item => new InvoiceItemPrintDto(
+                item.ProductName,
+                item.UnitName,
+                item.Quantity,
+                item.UnitPrice,
+                item.Discount,
+                item.TotalPrice
+            )).ToList(),
 
-        // ─── 5. Save history ──────────────────────────────────────────────
-        _context.ProductPriceHistory.AddRange(historyEntries);
-        await _context.SaveChangesAsync(ct);
-    }
+            // Financials
+            SubTotal = invoice.SubTotal,
+            DiscountAmount = invoice.DiscountAmount,
+            TaxRate = storeSettings.TaxRate,
+            TaxAmount = invoice.TaxAmount,
+            GrandTotal = invoice.GrandTotal,
+            IsTaxInclusive = invoice.IsTaxInclusive,
 
-    private async Task<decimal> CalculateNewBaseUnitCostAsync(
-        CostingMethod method,
-        ProductUnit baseUnit,
-        ProductUnit purchasedUnit,
-        decimal invoiceCostForPurchasedUnit,
-        decimal quantityPurchased,
-        CancellationToken ct)
-    {
-        // Convert invoice cost to base unit cost first
-        var newBaseCostFromInvoice = purchasedUnit.IsBaseUnit
-            ? invoiceCostForPurchasedUnit
-            : invoiceCostForPurchasedUnit / purchasedUnit.BaseConversionFactor;
-
-        return method switch
-        {
-            CostingMethod.LastPurchasePrice =>
-                // Simple: just use the new price
-                newBaseCostFromInvoice,
-
-            CostingMethod.SupplierPrice =>
-                // Use the supplier catalog price (don't change cost from invoice)
-                baseUnit.SupplierPrice > 0
-                    ? baseUnit.SupplierPrice
-                    : newBaseCostFromInvoice,
-
-            CostingMethod.WeightedAverage =>
-                // Weighted average: [(OldStock × OldCost) + (NewQty × NewCost)] / TotalQty
-                await CalculateWeightedAverageAsync(
-                    baseUnit,
-                    newBaseCostFromInvoice,
-                    quantityPurchased * purchasedUnit.BaseConversionFactor,
-                    ct),
-
-            _ => newBaseCostFromInvoice
+            // Payment
+            PaymentMethod = invoice.PaymentMethod,
+            AmountPaid = invoice.AmountPaid,
+            ChangeAmount = Math.Max(0, invoice.AmountPaid - invoice.GrandTotal),
+            Notes = invoice.Notes
         };
     }
 
-    private async Task<decimal> CalculateWeightedAverageAsync(
-        ProductUnit baseUnit,
-        decimal newBaseUnitCost,
-        decimal newQuantityInBaseUnits,
-        CancellationToken ct)
+    private async Task<byte[]?> LoadLogoSafelyAsync(string? logoPath)
     {
-        // Get current stock in base units
-        var currentStock = await _context.Stocks
-            .AsNoTracking()
-            .Where(s => s.ProductId == baseUnit.ProductId)
-            .Select(s => s.CurrentQuantityInPieces)
-            .FirstOrDefaultAsync(ct);
+        if (string.IsNullOrWhiteSpace(logoPath))
+            return null;
 
-        var oldCost = baseUnit.PurchaseCost;
-
-        // If no existing stock, just use new cost
-        if (currentStock <= 0) return newBaseUnitCost;
-
-        // Weighted Average Formula
-        var weightedAverage =
-            ((currentStock * oldCost) + (newQuantityInBaseUnits * newBaseUnitCost))
-            / (currentStock + newQuantityInBaseUnits);
-
-        return Math.Round(weightedAverage, 4);
-    }
-}
-Task 3.2 — Purchase Invoice Command (Updated)
-csharp
-
-// File: Application/Commands/CreatePurchaseInvoice/CreatePurchaseInvoiceCommand.cs
-
-public record CreatePurchaseInvoiceCommand : IRequest<int>
-{
-    public int SupplierId { get; init; }
-    public int CashBoxId { get; init; }     // NEW: Which cash box pays
-    public int CashierId { get; init; }
-    public string? Notes { get; init; }
-    public List<PurchaseInvoiceItemRequest> Items { get; init; } = new();
-}
-
-public record PurchaseInvoiceItemRequest(
-    int ProductUnitId,
-    decimal Quantity,
-    decimal UnitCost,
-    decimal? NewSalesPrice,     // Optional: override sales price from invoice screen
-    decimal Discount
-);
-csharp
-
-// File: Application/Commands/CreatePurchaseInvoice/CreatePurchaseInvoiceCommandHandler.cs
-
-public class CreatePurchaseInvoiceCommandHandler
-    : IRequestHandler<CreatePurchaseInvoiceCommand, int>
-{
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IUpdateProductPricingService _pricingService;
-    private readonly AppDbContext _context;
-
-    public CreatePurchaseInvoiceCommandHandler(
-        IUnitOfWork unitOfWork,
-        IUpdateProductPricingService pricingService,
-        AppDbContext context)
-    {
-        _unitOfWork = unitOfWork;
-        _pricingService = pricingService;
-        _context = context;
-    }
-
-    public async Task<int> Handle(
-        CreatePurchaseInvoiceCommand command,
-        CancellationToken cancellationToken)
-    {
-        // ─── 1. Validate CashBox access ──────────────────────────────────
-        var cashBox = await _unitOfWork.CashBoxes
-            .GetByIdAsync(command.CashBoxId, cancellationToken)
-            ?? throw new NotFoundException("CashBox", command.CashBoxId);
-
-        cashBox.CanUserAccess(command.CashierId); // Throws if no permission
-
-        // ─── 2. Create invoice ────────────────────────────────────────────
-        var invoice = PurchaseInvoice.Create(
-            command.SupplierId,
-            command.CashBoxId,
-            command.CashierId,
-            command.Notes);
-
-        decimal totalAmount = 0;
-
-        foreach (var itemRequest in command.Items)
+        if (!File.Exists(logoPath))
         {
-            // Load unit with product
-            var productUnit = await _context.ProductUnits
-                .Include(u => u.Product)
-                    .ThenInclude(p => p.Units)
-                .Include(u => u.Product)
-                    .ThenInclude(p => p.Stock)
-                .FirstOrDefaultAsync(u => u.Id == itemRequest.ProductUnitId, cancellationToken)
-                ?? throw new NotFoundException("ProductUnit", itemRequest.ProductUnitId);
-
-            // Add to invoice
-            invoice.AddItem(
-                productUnit.Id,
-                productUnit.Product.Name,
-                productUnit.UnitName,
-                itemRequest.Quantity,
-                itemRequest.UnitCost,
-                itemRequest.Discount);
-
-            // Add stock — Domain converts to base units internally
-            productUnit.Product.Stock.AddStock(
-                itemRequest.Quantity,
-                productUnit.BaseConversionFactor);
-
-            totalAmount += (itemRequest.Quantity * itemRequest.UnitCost) - itemRequest.Discount;
+            _logger.LogWarning("Logo file not found at path: {Path}", logoPath);
+            return null;
         }
 
-        // ─── 3. Deduct from cash box ──────────────────────────────────────
-        cashBox.Withdraw(
-            totalAmount,
-            CashTransactionType.PurchaseOut,
-            referenceType: "PurchaseInvoice",
-            referenceId: invoice.Id,
-            createdBy: command.CashierId,
-            notes: $"دفع فاتورة مشتريات رقم {invoice.Id}");
-
-        // ─── 4. Save invoice and stock ────────────────────────────────────
-        _unitOfWork.PurchaseInvoices.Add(invoice);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        // ─── 5. Update product pricing (AFTER save so invoice.Id exists) ──
-        foreach (var itemRequest in command.Items)
+        try
         {
-            await _pricingService.UpdateFromPurchaseAsync(
-                new UpdatePricingRequest(
-                    itemRequest.ProductUnitId,
-                    itemRequest.UnitCost,
-                    itemRequest.Quantity,
-                    itemRequest.NewSalesPrice,
-                    invoice.Id,
-                    command.CashierId),
-                cancellationToken);
+            return await File.ReadAllBytesAsync(logoPath);
         }
-
-        return invoice.Id;
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load logo from {Path}", logoPath);
+            return null;    // Graceful degradation — no crash
+        }
     }
 }
-Task 3.3 — Cash Transfer Command
+✅ Phase 1 Checklist
+ InvoicePrintDto contains ALL data needed — no DB calls from printers
+ PrintResult never throws exceptions (returns failure object instead)
+ LoadLogoSafelyAsync returns NULL if file missing (no crash)
+ Builder is the ONLY class that touches DB for print data
+⚙️ Phase 2: A4 PDF Generator (QuestPDF)
+Task 2.1 — A4 Invoice Document
 csharp
 
-// File: Application/Commands/TransferCash/TransferCashCommand.cs
+// File: Infrastructure/Printing/A4/A4InvoiceDocument.cs
 
-public record TransferCashCommand(
-    int FromCashBoxId,
-    int ToCashBoxId,
-    decimal Amount,
-    int TransferredBy,
-    string? Notes
-) : IRequest<Unit>;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
-public class TransferCashCommandHandler
-    : IRequestHandler<TransferCashCommand, Unit>
+public class A4InvoiceDocument : IDocument
 {
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly InvoicePrintDto _data;
 
-    public TransferCashCommandHandler(IUnitOfWork unitOfWork)
+    // ─── Design Constants ─────────────────────────
+    private static readonly string FontFamily = "Arial";
+    private static readonly float HeaderFontSize = 20f;
+    private static readonly float SubHeaderFontSize = 13f;
+    private static readonly float BodyFontSize = 10f;
+    private static readonly float SmallFontSize = 8f;
+
+    private static readonly string PrimaryColor = "#1565C0";     // Dark blue
+    private static readonly string AccentColor = "#E3F2FD";      // Light blue
+    private static readonly string TextColor = "#212121";
+    private static readonly string MutedColor = "#757575";
+    private static readonly string SuccessColor = "#2E7D32";
+
+    public A4InvoiceDocument(InvoicePrintDto data)
     {
-        _unitOfWork = unitOfWork;
+        _data = data;
     }
 
-    public async Task<Unit> Handle(
-        TransferCashCommand command,
-        CancellationToken cancellationToken)
+    public DocumentMetadata GetMetadata() => new DocumentMetadata
     {
-        if (command.FromCashBoxId == command.ToCashBoxId)
-            throw new DomainException("لا يمكن التحويل من الصندوق إلى نفسه");
+        Title = $"فاتورة {_data.InvoiceNumber}",
+        Author = _data.StoreName,
+        CreationDate = DateTimeOffset.Now
+    };
 
-        var fromBox = await _unitOfWork.CashBoxes
-            .GetByIdAsync(command.FromCashBoxId, cancellationToken)
-            ?? throw new NotFoundException("CashBox", command.FromCashBoxId);
+    public void Compose(IDocumentContainer container)
+    {
+        container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(1.5f, Unit.Centimetre);
+            page.DefaultTextStyle(style =>
+                style.FontFamily(FontFamily).FontSize(BodyFontSize));
+            page.ContentFromRightToLeft(); // Arabic RTL support
 
-        var toBox = await _unitOfWork.CashBoxes
-            .GetByIdAsync(command.ToCashBoxId, cancellationToken)
-            ?? throw new NotFoundException("CashBox", command.ToCashBoxId);
+            page.Header().Element(ComposeHeader);
+            page.Content().Element(ComposeContent);
+            page.Footer().Element(ComposeFooter);
+        });
+    }
 
-        fromBox.CanUserAccess(command.TransferredBy);
+    // ═══════════════════════════════════════════════
+    // HEADER: Logo + Store Info + Invoice Title
+    // ═══════════════════════════════════════════════
+    private void ComposeHeader(IContainer container)
+    {
+        container
+            .BorderBottom(2).BorderColor(PrimaryColor)
+            .PaddingBottom(10)
+            .Row(row =>
+            {
+                // ─── Left: Logo (conditional) ─────────────────
+                if (_data.LogoBytes != null)
+                {
+                    row.ConstantItem(80).Height(80)
+                        .Padding(4)
+                        .Image(_data.LogoBytes)
+                        .FitArea();
+                }
+                else
+                {
+                    // No logo — use colored placeholder with store initial
+                    row.ConstantItem(80).Height(80)
+                        .Background(PrimaryColor)
+                        .AlignCenter()
+                        .AlignMiddle()
+                        .Text(_data.StoreName.Length > 0
+                            ? _data.StoreName[0].ToString()
+                            : "م")
+                        .FontSize(36).FontColor(Colors.White).Bold();
+                }
 
-        // These two domain calls maintain balance integrity
-        fromBox.Withdraw(command.Amount, CashTransactionType.TransferOut,
-            notes: $"تحويل إلى: {toBox.BoxName} | {command.Notes}",
-            createdBy: command.TransferredBy);
+                row.RelativeItem().PaddingHorizontal(12).Column(col =>
+                {
+                    // Store name — largest text
+                    col.Item()
+                        .Text(_data.StoreName)
+                        .FontSize(HeaderFontSize)
+                        .FontColor(PrimaryColor)
+                        .Bold();
 
-        toBox.Deposit(command.Amount, CashTransactionType.TransferIn,
-            notes: $"تحويل من: {fromBox.BoxName} | {command.Notes}",
-            createdBy: command.TransferredBy);
+                    if (!string.IsNullOrWhiteSpace(_data.StorePhone))
+                        col.Item().Text($"📞 {_data.StorePhone}")
+                            .FontSize(SmallFontSize).FontColor(MutedColor);
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Unit.Value;
+                    if (!string.IsNullOrWhiteSpace(_data.StoreAddress))
+                        col.Item().Text($"📍 {_data.StoreAddress}")
+                            .FontSize(SmallFontSize).FontColor(MutedColor);
+
+                    if (!string.IsNullOrWhiteSpace(_data.StoreTaxNumber))
+                        col.Item().Text($"الرقم الضريبي: {_data.StoreTaxNumber}")
+                            .FontSize(SmallFontSize).FontColor(MutedColor);
+                });
+
+                // ─── Right: Invoice badge ──────────────────────
+                row.ConstantItem(140).Background(AccentColor)
+                    .Padding(10)
+                    .Column(col =>
+                    {
+                        col.Item().AlignCenter()
+                            .Text(GetInvoiceTypeLabel())
+                            .FontSize(SubHeaderFontSize)
+                            .FontColor(PrimaryColor).Bold();
+
+                        col.Item().AlignCenter()
+                            .Text(_data.InvoiceNumber)
+                            .FontSize(14).Bold();
+
+                        col.Item().AlignCenter()
+                            .Text(_data.InvoiceDate.ToString("dd/MM/yyyy"))
+                            .FontSize(SmallFontSize).FontColor(MutedColor);
+
+                        col.Item().AlignCenter()
+                            .Text(_data.InvoiceDate.ToString("HH:mm"))
+                            .FontSize(SmallFontSize).FontColor(MutedColor);
+                    });
+            });
+    }
+
+    // ═══════════════════════════════════════════════
+    // CONTENT: Customer Info + Items Table
+    // ═══════════════════════════════════════════════
+    private void ComposeContent(IContainer container)
+    {
+        container.Column(col =>
+        {
+            // ─── Customer / Supplier info ──────────────────
+            col.Item().PaddingVertical(12).Row(row =>
+            {
+                row.RelativeItem().Border(1).BorderColor("#E0E0E0")
+                    .Padding(10).Column(c =>
+                    {
+                        c.Item().Text("بيانات العميل")
+                            .FontSize(SmallFontSize).FontColor(MutedColor).Bold();
+
+                        c.Item().Text(_data.CustomerOrSupplierName)
+                            .FontSize(SubHeaderFontSize).Bold();
+
+                        if (!string.IsNullOrWhiteSpace(_data.CustomerPhone))
+                            c.Item().Text($"📞 {_data.CustomerPhone}")
+                                .FontSize(SmallFontSize);
+
+                        if (!string.IsNullOrWhiteSpace(_data.CustomerAddress))
+                            c.Item().Text($"📍 {_data.CustomerAddress}")
+                                .FontSize(SmallFontSize);
+                    });
+
+                row.ConstantItem(20); // spacer
+
+                row.RelativeItem().Border(1).BorderColor("#E0E0E0")
+                    .Padding(10).Column(c =>
+                    {
+                        c.Item().Text("تفاصيل الدفع")
+                            .FontSize(SmallFontSize).FontColor(MutedColor).Bold();
+                        c.Item().Text($"طريقة الدفع: {_data.PaymentMethod}");
+                        c.Item().Text($"المبلغ المدفوع: {_data.AmountPaid:N2} ر.س");
+                        if (_data.ChangeAmount > 0)
+                            c.Item().Text($"الباقي: {_data.ChangeAmount:N2} ر.س")
+                                .FontColor(SuccessColor);
+                    });
+            });
+
+            // ─── Items Table ───────────────────────────────
+            col.Item().Element(ComposeItemsTable);
+
+            // ─── Totals ────────────────────────────────────
+            col.Item().PaddingTop(12).AlignRight()
+                .Width(280).Element(ComposeTotalsSection);
+
+            // ─── Notes ────────────────────────────────────
+            if (!string.IsNullOrWhiteSpace(_data.Notes))
+            {
+                col.Item().PaddingTop(10)
+                    .Border(1).BorderColor("#FFF9C4")
+                    .Background("#FFFDE7")
+                    .Padding(8)
+                    .Column(c =>
+                    {
+                        c.Item().Text("ملاحظات").Bold().FontSize(SmallFontSize);
+                        c.Item().Text(_data.Notes).FontSize(BodyFontSize);
+                    });
+            }
+        });
+    }
+
+    // ─── Items Table ──────────────────────────────
+    private void ComposeItemsTable(IContainer container)
+    {
+        container.Table(table =>
+        {
+            // Column definitions (widths)
+            table.ColumnsDefinition(cols =>
+            {
+                cols.ConstantColumn(25);    // # (row number)
+                cols.RelativeColumn(4);     // Product Name
+                cols.RelativeColumn(1.5f);  // Unit
+                cols.RelativeColumn(1.5f);  // Qty
+                cols.RelativeColumn(2);     // Unit Price
+                cols.RelativeColumn(1.5f);  // Discount
+                cols.RelativeColumn(2);     // Total
+            });
+
+            // ─── Table Header ─────────────────────────────
+            table.Header(header =>
+            {
+                header.Cell().Element(HeaderCell).Text("#");
+                header.Cell().Element(HeaderCell).Text("المنتج");
+                header.Cell().Element(HeaderCell).AlignCenter().Text("الوحدة");
+                header.Cell().Element(HeaderCell).AlignCenter().Text("الكمية");
+                header.Cell().Element(HeaderCell).AlignCenter().Text("سعر الوحدة");
+                header.Cell().Element(HeaderCell).AlignCenter().Text("الخصم");
+                header.Cell().Element(HeaderCell).AlignCenter().Text("الإجمالي");
+            });
+
+            // ─── Table Rows ───────────────────────────────
+            var rowNumber = 1;
+            foreach (var item in _data.Items)
+            {
+                var isEvenRow = rowNumber % 2 == 0;
+                var rowBackground = isEvenRow ? AccentColor : Colors.White;
+
+                table.Cell().Element(c => DataCell(c, rowBackground))
+                    .Text(rowNumber.ToString()).FontColor(MutedColor);
+
+                table.Cell().Element(c => DataCell(c, rowBackground))
+                    .Column(col =>
+                    {
+                        col.Item().Text(item.ProductName).Bold();
+                    });
+
+                table.Cell().Element(c => DataCell(c, rowBackground))
+                    .AlignCenter().Text(item.UnitName);
+
+                table.Cell().Element(c => DataCell(c, rowBackground))
+                    .AlignCenter().Text(item.Quantity.ToString("N2"));
+
+                table.Cell().Element(c => DataCell(c, rowBackground))
+                    .AlignCenter().Text($"{item.UnitPrice:N2}");
+
+                table.Cell().Element(c => DataCell(c, rowBackground))
+                    .AlignCenter()
+                    .Text(item.Discount > 0 ? $"{item.Discount:N2}" : "-")
+                    .FontColor(item.Discount > 0 ? "#F44336" : MutedColor);
+
+                table.Cell().Element(c => DataCell(c, rowBackground))
+                    .AlignCenter().Text($"{item.Total:N2}").Bold();
+
+                rowNumber++;
+            }
+        });
+    }
+
+    // ─── Totals Section ───────────────────────────
+    private void ComposeTotalsSection(IContainer container)
+    {
+        container.Border(1).BorderColor("#E0E0E0").Table(table =>
+        {
+            table.ColumnsDefinition(cols =>
+            {
+                cols.RelativeColumn();
+                cols.RelativeColumn();
+            });
+
+            // Sub total
+            table.Cell().Padding(6).AlignRight()
+                .Text("المجموع الفرعي:").FontColor(MutedColor);
+            table.Cell().Padding(6).AlignLeft()
+                .Text($"{_data.SubTotal:N2} ر.س");
+
+            // Discount (only if exists)
+            if (_data.DiscountAmount > 0)
+            {
+                table.Cell().Padding(6).AlignRight()
+                    .Text("الخصم الإضافي:").FontColor("#F44336");
+                table.Cell().Padding(6).AlignLeft()
+                    .Text($"- {_data.DiscountAmount:N2} ر.س").FontColor("#F44336");
+            }
+
+            // Tax — show calculation method
+            var taxLabel = _data.IsTaxInclusive
+                ? $"ضريبة القيمة المضافة ({_data.TaxRate:N0}%) - شاملة:"
+                : $"ضريبة القيمة المضافة ({_data.TaxRate:N0}%) - مضافة:";
+
+            table.Cell().Padding(6).AlignRight().Text(taxLabel).FontColor(MutedColor);
+            table.Cell().Padding(6).AlignLeft().Text($"{_data.TaxAmount:N2} ر.س");
+
+            // Grand total — highlighted
+            table.Cell().ColumnSpan(2)
+                .Background(PrimaryColor)
+                .Padding(10)
+                .Row(row =>
+                {
+                    row.RelativeItem().AlignRight()
+                        .Text("الإجمالي النهائي:").FontColor(Colors.White).Bold()
+                        .FontSize(SubHeaderFontSize);
+                    row.RelativeItem().AlignLeft()
+                        .Text($"{_data.GrandTotal:N2} ر.س")
+                        .FontColor(Colors.White).Bold()
+                        .FontSize(SubHeaderFontSize);
+                });
+        });
+    }
+
+    // ═══════════════════════════════════════════════
+    // FOOTER
+    // ═══════════════════════════════════════════════
+    private void ComposeFooter(IContainer container)
+    {
+        container
+            .BorderTop(1).BorderColor("#E0E0E0")
+            .PaddingTop(8)
+            .Row(row =>
+            {
+                row.RelativeItem().AlignRight()
+                    .Text(ctx =>
+                    {
+                        ctx.Span("صفحة ").FontColor(MutedColor).FontSize(SmallFontSize);
+                        ctx.CurrentPageNumber().FontColor(MutedColor).FontSize(SmallFontSize);
+                        ctx.Span(" من ").FontColor(MutedColor).FontSize(SmallFontSize);
+                        ctx.TotalPages().FontColor(MutedColor).FontSize(SmallFontSize);
+                    });
+
+                row.RelativeItem().AlignCenter()
+                    .Text("شكراً لتعاملكم معنا")
+                    .FontSize(SmallFontSize).FontColor(MutedColor).Italic();
+
+                row.RelativeItem().AlignLeft()
+                    .Text($"طُبع: {DateTime.Now:dd/MM/yyyy HH:mm}")
+                    .FontSize(SmallFontSize).FontColor(MutedColor);
+            });
+    }
+
+    // ─── Cell Style Helpers ───────────────────────
+
+    private IContainer HeaderCell(IContainer container)
+    {
+        return container
+            .Background(PrimaryColor)
+            .Padding(8)
+            .DefaultTextStyle(s => s
+                .FontColor(Colors.White)
+                .Bold()
+                .FontSize(BodyFontSize));
+    }
+
+    private IContainer DataCell(IContainer container, string background)
+    {
+        return container
+            .Background(background)
+            .BorderBottom(1).BorderColor("#E0E0E0")
+            .Padding(7);
+    }
+
+    private string GetInvoiceTypeLabel() => _data.InvoiceType switch
+    {
+        InvoiceTypePrint.Sales => "فاتورة مبيعات",
+        InvoiceTypePrint.Purchase => "فاتورة مشتريات",
+        InvoiceTypePrint.SalesReturn => "مرتجع مبيعات",
+        InvoiceTypePrint.PurchaseReturn => "مرتجع مشتريات",
+        _ => "فاتورة"
+    };
+}
+✅ Phase 2 Checklist
+ Logo renders when LogoBytes is not null
+ Logo space is OMITTED (not empty box) when LogoBytes is null
+ Even/odd row alternating colors work correctly
+ Tax label shows "شاملة" vs "مضافة" based on IsTaxInclusive
+ Discount row only appears when DiscountAmount > 0
+ Page numbers render correctly on multi-page invoices
+ RTL direction applied to entire page
+⚙️ Phase 3: Thermal Receipt Printer (80mm)
+Task 3.1 — Thermal Receipt Generator
+csharp
+
+// File: Infrastructure/Printing/Thermal/ThermalReceiptGenerator.cs
+// Uses monospaced formatting for perfect column alignment
+
+public class ThermalReceiptGenerator
+{
+    // 80mm thermal printer = 42 characters per line (at 12pt monospace)
+    private const int LineWidth = 42;
+    private const char Separator = '-';
+    private const char DoubleSeparator = '=';
+
+    public byte[] GenerateEscPosCommands(InvoicePrintDto data)
+    {
+        var commands = new List<byte[]>();
+
+        // ─── ESC/POS: Initialize printer ──────────────
+        commands.Add(EscPos.Initialize());
+
+        // ─── Header ───────────────────────────────────
+        commands.Add(EscPos.SetAlignment(Alignment.Center));
+        commands.Add(EscPos.SetBold(true));
+        commands.Add(EscPos.SetFontSize(2)); // Double height
+
+        // Store name (truncate if too long)
+        var storeName = TruncateCenter(data.StoreName, LineWidth);
+        commands.Add(EscPos.PrintLine(storeName));
+
+        commands.Add(EscPos.SetFontSize(1));
+        commands.Add(EscPos.SetBold(false));
+
+        if (!string.IsNullOrWhiteSpace(data.StorePhone))
+            commands.Add(EscPos.PrintLine(data.StorePhone));
+
+        if (!string.IsNullOrWhiteSpace(data.StoreAddress))
+        {
+            // Wrap address to fit line width
+            foreach (var line in WrapText(data.StoreAddress, LineWidth))
+                commands.Add(EscPos.PrintLine(line));
+        }
+
+        if (!string.IsNullOrWhiteSpace(data.StoreTaxNumber))
+            commands.Add(EscPos.PrintLine($"ض: {data.StoreTaxNumber}"));
+
+        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
+
+        // ─── Invoice info ──────────────────────────────
+        commands.Add(EscPos.SetAlignment(Alignment.Right));
+        commands.Add(EscPos.PrintLine(
+            FormatTwoColumns("رقم الفاتورة:", data.InvoiceNumber)));
+        commands.Add(EscPos.PrintLine(
+            FormatTwoColumns("التاريخ:", data.InvoiceDate.ToString("dd/MM/yyyy HH:mm"))));
+        commands.Add(EscPos.PrintLine(
+            FormatTwoColumns("العميل:", TruncateRight(data.CustomerOrSupplierName, 20))));
+
+        commands.Add(EscPos.PrintLine(new string(Separator, LineWidth)));
+
+        // ─── Column headers ────────────────────────────
+        // Format: "الصنف            الكمية  السعر   المجموع"
+        commands.Add(EscPos.SetBold(true));
+        commands.Add(EscPos.PrintLine(
+            FormatItemHeader()));
+        commands.Add(EscPos.SetBold(false));
+        commands.Add(EscPos.PrintLine(new string(Separator, LineWidth)));
+
+        // ─── Items ────────────────────────────────────
+        foreach (var item in data.Items)
+        {
+            // Line 1: Product name (full width)
+            var name = TruncateRight(item.ProductName, LineWidth - 2);
+            commands.Add(EscPos.PrintLine($"  {name}"));
+
+            // Line 2: Qty × Price = Total (aligned right)
+            var itemLine = FormatItemLine(
+                item.UnitName,
+                item.Quantity,
+                item.UnitPrice,
+                item.Total);
+            commands.Add(EscPos.PrintLine(itemLine));
+
+            // Discount note (only if exists)
+            if (item.Discount > 0)
+                commands.Add(EscPos.PrintLine(
+                    FormatTwoColumns("  خصم:", $"-{item.Discount:N2}")));
+        }
+
+        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
+
+        // ─── Totals ────────────────────────────────────
+        if (data.DiscountAmount > 0)
+            commands.Add(EscPos.PrintLine(
+                FormatTwoColumns("الخصم:", $"-{data.DiscountAmount:N2}")));
+
+        commands.Add(EscPos.PrintLine(
+            FormatTwoColumns($"ض.ق.م ({data.TaxRate:N0}%):", $"{data.TaxAmount:N2}")));
+
+        // Grand total — bold
+        commands.Add(EscPos.SetBold(true));
+        commands.Add(EscPos.SetFontSize(2));
+        commands.Add(EscPos.PrintLine(
+            FormatTwoColumns("الإجمالي:", $"{data.GrandTotal:N2} ر.س")));
+        commands.Add(EscPos.SetFontSize(1));
+        commands.Add(EscPos.SetBold(false));
+
+        // Payment info
+        commands.Add(EscPos.PrintLine(
+            FormatTwoColumns("المدفوع:", $"{data.AmountPaid:N2}")));
+        if (data.ChangeAmount > 0)
+            commands.Add(EscPos.PrintLine(
+                FormatTwoColumns("الباقي:", $"{data.ChangeAmount:N2}")));
+
+        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
+
+        // ─── Footer ────────────────────────────────────
+        commands.Add(EscPos.SetAlignment(Alignment.Center));
+        commands.Add(EscPos.PrintLine("شكراً لتعاملكم معنا"));
+        commands.Add(EscPos.PrintLine(string.Empty));
+        commands.Add(EscPos.PrintLine(string.Empty));
+
+        // ─── Cut paper ────────────────────────────────
+        commands.Add(EscPos.CutPaper());
+
+        // Flatten all byte arrays
+        return commands.SelectMany(b => b).ToArray();
+    }
+
+    // ─── Text Formatting Helpers ──────────────────
+
+    /// <summary>
+    /// "Label:          Value" aligned to fill LineWidth exactly
+    /// </summary>
+    private string FormatTwoColumns(string label, string value)
+    {
+        var totalLength = label.Length + value.Length;
+        var spaces = Math.Max(1, LineWidth - totalLength);
+        return label + new string(' ', spaces) + value;
+    }
+
+    private string FormatItemHeader()
+    {
+        // "الوحدة  الكمية  السعر   المجموع"
+        return "الوحدة".PadLeft(8) +
+               "الكمية".PadLeft(8) +
+               "السعر".PadLeft(9) +
+               "المجموع".PadLeft(9);
+    }
+
+    private string FormatItemLine(
+        string unit, decimal qty, decimal price, decimal total)
+    {
+        return unit.PadLeft(8) +
+               qty.ToString("N1").PadLeft(8) +
+               price.ToString("N2").PadLeft(9) +
+               total.ToString("N2").PadLeft(9);
+    }
+
+    private string TruncateRight(string text, int maxLength)
+        => text.Length <= maxLength ? text : text[..maxLength];
+
+    private string TruncateCenter(string text, int maxLength)
+    {
+        if (text.Length <= maxLength) return text;
+        var half = (maxLength - 3) / 2;
+        return text[..half] + "..." + text[^half..];
+    }
+
+    private IEnumerable<string> WrapText(string text, int lineWidth)
+    {
+        for (int i = 0; i < text.Length; i += lineWidth)
+            yield return text.Substring(i, Math.Min(lineWidth, text.Length - i));
     }
 }
+
+// ─── ESC/POS Command Builder ───────────────────────────────────
+// Lightweight wrapper — avoids heavy dependencies
+
+public static class EscPos
+{
+    public static byte[] Initialize()
+        => new byte[] { 0x1B, 0x40 };                   // ESC @
+
+    public static byte[] CutPaper()
+        => new byte[] { 0x1D, 0x56, 0x42, 0x00 };       // GS V B 0
+
+    public static byte[] SetBold(bool bold)
+        => bold
+            ? new byte[] { 0x1B, 0x45, 0x01 }           // ESC E 1
+            : new byte[] { 0x1B, 0x45, 0x00 };          // ESC E 0
+
+    public static byte[] SetAlignment(Alignment alignment)
+    {
+        byte code = alignment switch
+        {
+            Alignment.Left => 0x00,
+            Alignment.Center => 0x01,
+            Alignment.Right => 0x02,
+            _ => 0x00
+        };
+        return new byte[] { 0x1B, 0x61, code };          // ESC a n
+    }
+
+    public static byte[] SetFontSize(int multiplier)
+    {
+        // 1 = normal, 2 = double height
+        byte size = multiplier <= 1 ? (byte)0x00 : (byte)0x11;
+        return new byte[] { 0x1D, 0x21, size };          // GS ! n
+    }
+
+    public static byte[] PrintLine(string text)
+    {
+        // Encode in Windows-1256 for Arabic character support
+        var encoding = System.Text.Encoding.GetEncoding(1256);
+        var textBytes = encoding.GetBytes(text);
+        var newLine = new byte[] { 0x0A };               // LF
+        return textBytes.Concat(newLine).ToArray();
+    }
+}
+
+public enum Alignment { Left, Center, Right }
 ✅ Phase 3 Checklist
- WeightedAverage formula is correct: (OldQty×OldCost + NewQty×NewCost) / TotalQty
- LastPurchasePrice just overwrites — no formula
- Cost cascade goes to ALL units (base and derived)
- Derived unit cost = baseUnitCost × ConversionFactor
- Pricing update happens AFTER invoice saved (so ID exists for history)
- Cash transfer uses domain methods (not direct property assignment)
-🖥️ Phase 4: WPF ViewModels
-Task 4.1 — Product Unit Builder ViewModel
+ All lines fit within 42 characters
+ FormatTwoColumns fills exactly to LineWidth
+ CutPaper() ESC/POS command added at end
+ Arabic encoded in Windows-1256 (not UTF-8)
+ Logo is NOT included (thermal printers don't need it)
+🔧 Phase 4: Print Service Implementation
+Task 4.1 — Main PrintService
 csharp
 
-// File: WPF/ViewModels/Products/ProductUnitBuilderViewModel.cs
+// File: Infrastructure/Printing/PrintService.cs
 
-public class ProductUnitBuilderViewModel : BaseViewModel
+public class PrintService : IPrintService
 {
-    private bool _hasShownOnboarding = false;
+    private readonly ISystemSettingsRepository _settings;
+    private readonly ILogger<PrintService> _logger;
+    private readonly ThermalReceiptGenerator _thermalGenerator;
 
-    public ObservableCollection<ProductUnitRowViewModel> Units { get; } = new();
-
-    // Validation summary shown in UI
-    public string ValidationSummary { get; private set; } = string.Empty;
-    public bool HasValidationError { get; private set; }
-
-    // Commands
-    public IRelayCommand AddUnitCommand { get; }
-    public IRelayCommand<ProductUnitRowViewModel> RemoveUnitCommand { get; }
-    public IRelayCommand ShowHelpCommand { get; }
-
-    public ProductUnitBuilderViewModel()
+    public PrintService(
+        ISystemSettingsRepository settings,
+        ILogger<PrintService> logger)
     {
-        AddUnitCommand = new RelayCommand(AddNewUnit);
-        RemoveUnitCommand = new RelayCommand<ProductUnitRowViewModel>(RemoveUnit);
-        ShowHelpCommand = new RelayCommand(ShowOnboarding);
-
-        Units.CollectionChanged += (_, _) => Validate();
+        _settings = settings;
+        _logger = logger;
+        _thermalGenerator = new ThermalReceiptGenerator();
     }
 
-    public void Initialize(List<ProductUnitRowViewModel>? existingUnits = null)
+    // ═══════════════════════════════════════════════
+    // SHOW PREVIEW (WPF Modal Window)
+    // ═══════════════════════════════════════════════
+    public async Task<PrintResult> ShowPreviewAsync(InvoicePrintDto invoice)
     {
-        Units.Clear();
+        try
+        {
+            var pdfBytes = await GeneratePdfBytesAsync(invoice);
 
-        if (existingUnits?.Any() == true)
-        {
-            foreach (var unit in existingUnits.OrderBy(u => u.SortOrder))
-                AddUnitWithChangeTracking(unit);
+            // Save to temp file for preview
+            var tempPath = Path.Combine(
+                Path.GetTempPath(),
+                $"Invoice_{invoice.InvoiceNumber}_{DateTime.Now:HHmmss}.pdf");
+
+            await File.WriteAllBytesAsync(tempPath, pdfBytes);
+
+            // Open preview window on UI thread
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var previewWindow = new PdfPreviewWindow(tempPath, invoice.InvoiceNumber);
+                previewWindow.ShowDialog();
+            });
+
+            // Cleanup temp file after preview closes
+            TryDeleteFile(tempPath);
+
+            return PrintResult.Success();
         }
-        else
+        catch (Exception ex)
         {
-            // New product — show onboarding and pre-add base unit row
-            ShowOnboarding();
-            AddBaseUnitRow();
+            _logger.LogError(ex, "Failed to show print preview");
+            return PrintResult.Failure(
+                $"تعذر فتح معاينة الطباعة:\n{GetUserFriendlyError(ex)}");
         }
     }
 
-    private void AddBaseUnitRow()
+    // ═══════════════════════════════════════════════
+    // PRINT A4
+    // ═══════════════════════════════════════════════
+    public async Task<PrintResult> PrintA4Async(InvoicePrintDto invoice)
     {
-        var baseRow = new ProductUnitRowViewModel
+        try
         {
-            IsBaseUnit = true,
-            BaseConversionFactor = 1,
-            SortOrder = 0,
-            Placeholder_UnitName = "مثال: حبة، قطعة، بيضة"
+            var settings = await _settings.GetPrintSettingsAsync();
+            var printerName = settings.A4PrinterName;
+
+            // Validate printer exists
+            var printerExists = PrinterSettings.InstalledPrinters
+                .Cast<string>()
+                .Any(p => p.Equals(printerName, StringComparison.OrdinalIgnoreCase));
+
+            if (!printerExists)
+            {
+                return PrintResult.Failure(
+                    $"الطابعة '{printerName}' غير موجودة أو غير متصلة.\n" +
+                    $"يرجى:\n" +
+                    $"1. التأكد من توصيل الطابعة\n" +
+                    $"2. التأكد من تثبيت تعريف الطابعة\n" +
+                    $"3. مراجعة اسم الطابعة في الإعدادات");
+            }
+
+            var pdfBytes = await GeneratePdfBytesAsync(invoice);
+
+            // Save to temp and print
+            var tempPath = Path.GetTempFileName() + ".pdf";
+            await File.WriteAllBytesAsync(tempPath, pdfBytes);
+
+            await Task.Run(() =>
+            {
+                // Use Windows print verb to send PDF to printer
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = tempPath,
+                    Verb = "printto",
+                    Arguments = $"\"{printerName}\"",
+                    CreateNoWindow = true,
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(startInfo);
+            });
+
+            _logger.LogInformation(
+                "A4 invoice {InvoiceNumber} sent to printer {Printer}",
+                invoice.InvoiceNumber, printerName);
+
+            TryDeleteFile(tempPath, delayMs: 3000); // Give print spooler time
+            return PrintResult.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "A4 print failed for invoice {Invoice}",
+                invoice.InvoiceNumber);
+            return PrintResult.Failure(
+                $"فشل إرسال الفاتورة للطابعة:\n{GetUserFriendlyError(ex)}");
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // PRINT THERMAL
+    // ═══════════════════════════════════════════════
+    public async Task<PrintResult> PrintThermalAsync(InvoicePrintDto invoice)
+    {
+        try
+        {
+            var settings = await _settings.GetPrintSettingsAsync();
+            var printerName = settings.ThermalPrinterName;
+
+            if (string.IsNullOrWhiteSpace(printerName))
+                return PrintResult.Failure(
+                    "لم يتم تحديد الطابعة الحرارية بعد.\n" +
+                    "يرجى الذهاب إلى الإعدادات → إعداد الطباعة وتحديد الطابعة الحرارية.");
+
+            // Generate ESC/POS byte commands
+            var escPosData = _thermalGenerator.GenerateEscPosCommands(invoice);
+
+            await Task.Run(() => SendRawToPrinter(printerName, escPosData));
+
+            _logger.LogInformation(
+                "Thermal receipt {InvoiceNumber} printed to {Printer}",
+                invoice.InvoiceNumber, printerName);
+
+            return PrintResult.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Thermal print failed");
+            return PrintResult.Failure(
+                $"فشلت طباعة الإيصال الحراري:\n{GetUserFriendlyError(ex)}");
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // SAVE PDF
+    // ═══════════════════════════════════════════════
+    public async Task<PrintResult> SavePdfAsync(InvoicePrintDto invoice, string filePath)
+    {
+        try
+        {
+            var pdfBytes = await GeneratePdfBytesAsync(invoice);
+            await File.WriteAllBytesAsync(filePath, pdfBytes);
+
+            _logger.LogInformation("PDF saved to {Path}", filePath);
+            return PrintResult.Success(filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save PDF");
+            return PrintResult.Failure(
+                $"تعذر حفظ ملف PDF:\n{GetUserFriendlyError(ex)}");
+        }
+    }
+
+    // ─── Private Helpers ──────────────────────────
+
+    private Task<byte[]> GeneratePdfBytesAsync(InvoicePrintDto invoice)
+    {
+        return Task.Run(() =>
+        {
+            var document = new A4InvoiceDocument(invoice);
+            return document.GeneratePdf();
+        });
+    }
+
+    /// <summary>
+    /// Sends raw bytes directly to printer bypassing Windows GDI.
+    /// Required for ESC/POS commands.
+    /// </summary>
+    private void SendRawToPrinter(string printerName, byte[] data)
+    {
+        var printerInfo = new DOCINFOA
+        {
+            pDocName = "Thermal Receipt",
+            pDataType = "RAW"
         };
-        baseRow.PropertyChanged += (_, _) => Validate();
-        Units.Add(baseRow);
-    }
 
-    private void AddNewUnit()
-    {
-        var row = new ProductUnitRowViewModel
+        var handle = OpenPrinter(printerName, out var printerHandle, IntPtr.Zero);
+
+        if (!handle)
+            throw new PrinterException(
+                $"لا يمكن الاتصال بالطابعة الحرارية '{printerName}'");
+
+        try
         {
-            IsBaseUnit = false,
-            SortOrder = Units.Count,
-            Placeholder_UnitName = "مثال: طبق، كرتون"
-        };
-        row.PropertyChanged += (_, _) => Validate();
-        Units.Add(row);
-    }
+            StartDocPrinter(printerHandle, 1, ref printerInfo);
+            StartPagePrinter(printerHandle);
 
-    private void AddUnitWithChangeTracking(ProductUnitRowViewModel unit)
-    {
-        unit.PropertyChanged += (_, _) => Validate();
-        Units.Add(unit);
-    }
+            var gcHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
+            WritePrinter(printerHandle, gcHandle.AddrOfPinnedObject(),
+                data.Length, out _);
+            gcHandle.Free();
 
-    private void RemoveUnit(ProductUnitRowViewModel unit)
-    {
-        if (unit.IsBaseUnit && Units.Count > 1)
-        {
-            ValidationSummary = "⚠️ لا يمكن حذف الوحدة الأساسية إذا كانت هناك وحدات أخرى مرتبطة بها.";
-            HasValidationError = true;
-            OnPropertyChanged(nameof(ValidationSummary));
-            OnPropertyChanged(nameof(HasValidationError));
-            return;
+            EndPagePrinter(printerHandle);
+            EndDocPrinter(printerHandle);
         }
-
-        Units.Remove(unit);
-        Validate();
-    }
-
-    public bool Validate()
-    {
-        var errors = new List<string>();
-
-        var baseUnits = Units.Where(u => u.IsBaseUnit).ToList();
-
-        if (baseUnits.Count == 0)
-            errors.Add("⚠️ أضف وحدة صغرى واحدة (مثال: حبة) واجعل معامل التحويل = 1");
-
-        if (baseUnits.Count > 1)
-            errors.Add("⚠️ لا يمكن تعريف أكثر من وحدة صغرى واحدة");
-
-        foreach (var unit in Units)
+        finally
         {
-            if (string.IsNullOrWhiteSpace(unit.UnitName))
-                errors.Add($"⚠️ الصف {unit.SortOrder + 1}: اسم الوحدة مطلوب");
-
-            if (!unit.IsBaseUnit && unit.BaseConversionFactor <= 1)
-                errors.Add(
-                    $"⚠️ '{unit.UnitName}': معامل التحويل يجب أن يكون أكبر من 1 " +
-                    $"(كم وحدة صغرى بداخلها؟)");
+            ClosePrinter(printerHandle);
         }
-
-        ValidationSummary = errors.Any()
-            ? string.Join("\n", errors)
-            : "✅ وحدات المنتج صحيحة";
-
-        HasValidationError = errors.Any();
-
-        OnPropertyChanged(nameof(ValidationSummary));
-        OnPropertyChanged(nameof(HasValidationError));
-
-        return !errors.Any();
     }
 
-    private void ShowOnboarding()
+    private string GetUserFriendlyError(Exception ex) => ex switch
     {
-        var dialog = new OnboardingDialog
+        UnauthorizedAccessException => "ليس لديك صلاحية الوصول للطابعة.",
+        FileNotFoundException => "ملف الطابعة غير موجود.",
+        PrinterException pe => pe.Message,
+        _ when ex.Message.Contains("printer") => "الطابعة غير متصلة أو لا تستجيب.",
+        _ => "حدث خطأ غير متوقع. يرجى إعادة المحاولة."
+    };
+
+    private void TryDeleteFile(string path, int delayMs = 0)
+    {
+        Task.Run(async () =>
         {
-            Message =
-                "💡 كيف تبني وحدات المنتج؟\n\n" +
-                "1️⃣  ابدأ دائماً بإضافة الوحدة الصغرى\n" +
-                "     التي لا يمكن تجزئتها (مثل: حبة)\n" +
-                "     واجعل معامل التحويل = 1\n\n" +
-                "2️⃣  ثم أضف الوحدات الأكبر\n" +
-                "     (مثل: طبق، كرتون)\n" +
-                "     واكتب كم (حبة) بداخلها.\n\n" +
-                "     مثال: طبق البيض = 30 حبة\n" +
-                "              كرتون = 12 طبق = 360 حبة\n\n" +
-                "✅  النظام سيحسب كل شيء تلقائياً!"
-        };
-        dialog.ShowDialog();
+            if (delayMs > 0) await Task.Delay(delayMs);
+            try { File.Delete(path); }
+            catch { /* Ignore — temp file cleanup is best-effort */ }
+        });
+    }
+
+    // Win32 API for raw printer access
+    [DllImport("winspool.Drv", EntryPoint = "OpenPrinterA")]
+    private static extern bool OpenPrinter(string pPrinterName,
+        out IntPtr phPrinter, IntPtr pDefault);
+    [DllImport("winspool.Drv")] private static extern bool ClosePrinter(IntPtr hPrinter);
+    [DllImport("winspool.Drv")] private static extern bool StartDocPrinter(
+        IntPtr hPrinter, int level, ref DOCINFOA pDocInfo);
+    [DllImport("winspool.Drv")] private static extern bool EndDocPrinter(IntPtr hPrinter);
+    [DllImport("winspool.Drv")] private static extern bool StartPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.Drv")] private static extern bool EndPagePrinter(IntPtr hPrinter);
+    [DllImport("winspool.Drv")] private static extern bool WritePrinter(
+        IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DOCINFOA
+    {
+        [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+        [MarshalAs(UnmanagedType.LPStr)] public string? pOutputFile;
+        [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
     }
 }
-Task 4.2 — Purchase Invoice ViewModel (with Price Sync Indicator)
+
+public class PrinterException : Exception
+{
+    public PrinterException(string message) : base(message) { }
+}
+✅ Phase 4 Checklist
+ Printer existence validated before attempting to print
+ Arabic error messages for each failure scenario
+ Temp files cleaned up after printing
+ Raw ESC/POS sent via Win32 API (not GDI)
+ GetUserFriendlyError() translates technical errors to Arabic
+🖥️ Phase 5: WPF Integration
+Task 5.1 — Invoice ViewModel Print Commands
 csharp
 
-// File: WPF/ViewModels/Invoice/PurchaseInvoiceItemViewModel.cs
+// File: WPF/ViewModels/Invoice/InvoiceViewModel.cs
+// ADD these print commands to existing ViewModel
 
-public class PurchaseInvoiceItemViewModel : BaseViewModel
+public class InvoiceViewModel : BaseViewModel
 {
-    private readonly IMediator _mediator;
+    private readonly IPrintService _printService;
+    private readonly InvoicePrintDtoBuilder _printDtoBuilder;
 
-    private int _productUnitId;
-    private decimal _quantity = 1;
-    private decimal _unitCost;
-    private decimal _newSalesPrice;
-    private decimal _oldCostInDatabase;
-    private string _unitName = string.Empty;
+    // ─── Print Commands ───────────────────────────
+    public IAsyncRelayCommand PrintA4Command { get; }
+    public IAsyncRelayCommand PrintThermalCommand { get; }
+    public IAsyncRelayCommand ShowPreviewCommand { get; }
+    public IAsyncRelayCommand SavePdfCommand { get; }
 
-    // ─── Properties ───────────────────────────────
-
-    public int ProductUnitId
+    public InvoiceViewModel(IPrintService printService,
+        InvoicePrintDtoBuilder printDtoBuilder)
     {
-        get => _productUnitId;
-        set => SetProperty(ref _productUnitId, value);
+        _printService = printService;
+        _printDtoBuilder = printDtoBuilder;
+
+        PrintA4Command = new AsyncRelayCommand(PrintA4Async,
+            () => CurrentInvoice != null && !IsBusy);
+        PrintThermalCommand = new AsyncRelayCommand(PrintThermalAsync,
+            () => CurrentInvoice != null && !IsBusy);
+        ShowPreviewCommand = new AsyncRelayCommand(ShowPreviewAsync,
+            () => CurrentInvoice != null && !IsBusy);
+        SavePdfCommand = new AsyncRelayCommand(SavePdfAsync,
+            () => CurrentInvoice != null && !IsBusy);
     }
 
-    public decimal Quantity
+    private async Task PrintA4Async()
     {
-        get => _quantity;
-        set
-        {
-            if (SetProperty(ref _quantity, value))
-                OnPropertyChanged(nameof(TotalCost));
-        }
+        await ExecutePrintAsync(async dto =>
+            await _printService.PrintA4Async(dto));
     }
 
-    public decimal UnitCost
+    private async Task PrintThermalAsync()
     {
-        get => _unitCost;
-        set
+        await ExecutePrintAsync(async dto =>
+            await _printService.PrintThermalAsync(dto));
+    }
+
+    private async Task ShowPreviewAsync()
+    {
+        await ExecutePrintAsync(async dto =>
+            await _printService.ShowPreviewAsync(dto));
+    }
+
+    private async Task SavePdfAsync()
+    {
+        var saveDialog = new Microsoft.Win32.SaveFileDialog
         {
-            if (SetProperty(ref _unitCost, value))
+            Title = "حفظ الفاتورة كـ PDF",
+            Filter = "PDF Files|*.pdf",
+            FileName = $"فاتورة_{CurrentInvoice!.InvoiceNumber}_{DateTime.Now:yyyyMMdd}"
+        };
+
+        if (saveDialog.ShowDialog() != true) return;
+
+        await ExecutePrintAsync(async dto =>
+            await _printService.SavePdfAsync(dto, saveDialog.FileName));
+    }
+
+    /// <summary>
+    /// Shared wrapper: builds DTO, executes print action, handles result.
+    /// </summary>
+    private async Task ExecutePrintAsync(Func<InvoicePrintDto, Task<PrintResult>> printAction)
+    {
+        if (CurrentInvoice == null) return;
+
+        try
+        {
+            IsBusy = true;
+            StatusMessage = "جارٍ تجهيز الفاتورة...";
+
+            var printDto = await _printDtoBuilder.BuildAsync(CurrentInvoice);
+            var result = await printAction(printDto);
+
+            if (result.IsSuccess)
             {
-                OnPropertyChanged(nameof(TotalCost));
-                OnPropertyChanged(nameof(CostChangedFromDatabase));
-                OnPropertyChanged(nameof(PriceDifferenceIndicator));
+                StatusMessage = "✅ تمت الطباعة بنجاح";
+                if (!string.IsNullOrWhiteSpace(result.OutputFilePath))
+                    StatusMessage = $"✅ تم الحفظ: {result.OutputFilePath}";
+            }
+            else
+            {
+                // Show user-friendly dialog — never just StatusMessage for print errors
+                ShowPrintErrorDialog(result.ErrorMessage!);
             }
         }
-    }
-
-    public decimal NewSalesPrice
-    {
-        get => _newSalesPrice;
-        set => SetProperty(ref _newSalesPrice, value);
-    }
-
-    public decimal TotalCost => (Quantity * UnitCost) - Discount;
-    public decimal Discount { get; set; }
-
-    // ⭐ KEY: Shows sync warning icon when cost differs from DB
-    public bool CostChangedFromDatabase =>
-        _oldCostInDatabase > 0 &&
-        Math.Abs(UnitCost - _oldCostInDatabase) > 0.0001m;
-
-    public string PriceDifferenceIndicator
-    {
-        get
+        finally
         {
-            if (!CostChangedFromDatabase) return string.Empty;
-
-            var diff = UnitCost - _oldCostInDatabase;
-            var direction = diff > 0 ? "↑ ارتفع" : "↓ انخفض";
-            return $"🔄 {direction} عن السعر القديم ({_oldCostInDatabase:N2}) " +
-                   $"| سيتم تحديث التكلفة في بطاقة الصنف عند الحفظ";
+            IsBusy = false;
         }
     }
 
-    // ─── Available units for ComboBox ─────────────
-    public ObservableCollection<ProductUnitOption> AvailableUnits { get; } = new();
-
-    private ProductUnitOption? _selectedUnit;
-    public ProductUnitOption? SelectedUnit
+    private void ShowPrintErrorDialog(string message)
     {
-        get => _selectedUnit;
-        set
-        {
-            if (SetProperty(ref _selectedUnit, value) && value != null)
-                _ = OnUnitChangedAsync(value);
-        }
-    }
-
-    private async Task OnUnitChangedAsync(ProductUnitOption unit)
-    {
-        ProductUnitId = unit.UnitId;
-
-        // Load current cost from DB for comparison
-        var currentData = await _mediator.Send(
-            new GetProductUnitPricingQuery(unit.UnitId));
-
-        _oldCostInDatabase = currentData.PurchaseCost;
-        UnitCost = currentData.PurchaseCost;         // Pre-fill with DB cost
-        NewSalesPrice = currentData.SalesPrice;      // Pre-fill sales price
-
-        OnPropertyChanged(nameof(CostChangedFromDatabase));
-        OnPropertyChanged(nameof(PriceDifferenceIndicator));
-    }
-
-    public void SetProduct(BarcodeSearchResult result, List<ProductUnitOption> units)
-    {
-        AvailableUnits.Clear();
-        foreach (var unit in units)
-            AvailableUnits.Add(unit);
-
-        _selectedUnit = units.First(u => u.UnitId == result.ProductUnitId);
-        ProductUnitId = result.ProductUnitId;
-        _oldCostInDatabase = result.PurchaseCost;
-        UnitCost = result.PurchaseCost;
-        NewSalesPrice = result.SalesPrice;
-
-        OnPropertyChanged(nameof(SelectedUnit));
-        OnPropertyChanged(nameof(TotalCost));
-        OnPropertyChanged(nameof(CostChangedFromDatabase));
+        System.Windows.MessageBox.Show(
+            message,
+            "خطأ في الطباعة",
+            System.Windows.MessageBoxButton.OK,
+            System.Windows.MessageBoxImage.Warning);
     }
 }
+Task 5.2 — Print Setup Settings Screen
+csharp
 
-public record ProductUnitOption(int UnitId, string UnitName, decimal ConversionFactor);
-✅ Phase 4 Checklist
- ProductUnitBuilderViewModel.Validate() shows Arabic error messages
- Onboarding dialog shows automatically for new products
- CostChangedFromDatabase triggers when user edits cost field
- PriceDifferenceIndicator shows direction (↑/↓) and old value
- Unit ComboBox in purchase invoice pre-fills cost from DB
-🖼️ Phase 5: WPF XAML
-Task 5.1 — Unit Hierarchy Builder XAML
+// File: WPF/ViewModels/Settings/PrintSetupViewModel.cs
+
+public class PrintSetupViewModel : BaseViewModel
+{
+    private readonly ISystemSettingsRepository _settings;
+
+    public string StoreName { get; set; } = string.Empty;
+    public string StorePhone { get; set; } = string.Empty;
+    public string StoreAddress { get; set; } = string.Empty;
+    public string StoreTaxNumber { get; set; } = string.Empty;
+    public string LogoPath { get; set; } = string.Empty;
+    public string ThermalPrinterName { get; set; } = string.Empty;
+    public string A4PrinterName { get; set; } = string.Empty;
+
+    public ImageSource? LogoPreview { get; private set; }
+
+    // Installed printers list for ComboBoxes
+    public List<string> InstalledPrinters { get; } =
+        PrinterSettings.InstalledPrinters.Cast<string>().OrderBy(p => p).ToList();
+
+    public IAsyncRelayCommand SaveCommand { get; }
+    public IRelayCommand BrowseLogoCommand { get; }
+    public IAsyncRelayCommand PrintTestPageCommand { get; }
+
+    public PrintSetupViewModel(ISystemSettingsRepository settings)
+    {
+        _settings = settings;
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        BrowseLogoCommand = new RelayCommand(BrowseLogo);
+        PrintTestPageCommand = new AsyncRelayCommand(PrintTestPageAsync);
+    }
+
+    private void BrowseLogo()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "اختر شعار المتجر",
+            Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp",
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog() != true) return;
+
+        var originalPath = dialog.FileName;
+
+        // Resize and save to app data folder
+        var resizedPath = ResizeAndSaveLogo(originalPath);
+
+        LogoPath = resizedPath;
+        OnPropertyChanged(nameof(LogoPath));
+
+        // Show preview
+        LogoPreview = new BitmapImage(new Uri(resizedPath));
+        OnPropertyChanged(nameof(LogoPreview));
+
+        StatusMessage = "✅ تم تحميل الشعار بنجاح";
+    }
+
+    private string ResizeAndSaveLogo(string sourcePath)
+    {
+        var appDataPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "YourApp", "Assets");
+
+        Directory.CreateDirectory(appDataPath);
+        var destPath = Path.Combine(appDataPath, "store_logo.png");
+
+        // Resize to 200×200 max while preserving aspect ratio
+        using var image = SixLabors.ImageSharp.Image.Load(sourcePath);
+
+        image.Mutate(ctx => ctx.Resize(new ResizeOptions
+        {
+            Size = new SixLabors.ImageSharp.Size(200, 200),
+            Mode = ResizeMode.Max,           // Preserve aspect ratio
+            Sampler = KnownResamplers.Lanczos3 // High quality
+        }));
+
+        image.Save(destPath);
+        return destPath;
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            await _settings.SavePrintSettingsAsync(new PrintSettings
+            {
+                StoreName = StoreName,
+                StorePhone = StorePhone,
+                StoreAddress = StoreAddress,
+                StoreTaxNumber = StoreTaxNumber,
+                LogoPath = LogoPath,
+                ThermalPrinterName = ThermalPrinterName,
+                A4PrinterName = A4PrinterName
+            });
+            StatusMessage = "✅ تم حفظ إعدادات الطباعة";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task PrintTestPageAsync()
+    {
+        // Create sample invoice for testing layout
+        var testDto = CreateTestInvoice();
+        var printService = App.GetService<IPrintService>();
+        var result = await printService.ShowPreviewAsync(testDto);
+
+        if (!result.IsSuccess)
+            StatusMessage = $"❌ {result.ErrorMessage}";
+    }
+
+    private InvoicePrintDto CreateTestInvoice() => new()
+    {
+        StoreName = StoreName,
+        StorePhone = StorePhone,
+        StoreAddress = StoreAddress,
+        StoreTaxNumber = StoreTaxNumber,
+        LogoBytes = File.Exists(LogoPath) ? File.ReadAllBytes(LogoPath) : null,
+        InvoiceNumber = "TEST-001",
+        InvoiceDate = DateTime.Now,
+        InvoiceType = InvoiceTypePrint.Sales,
+        CustomerOrSupplierName = "عميل تجريبي",
+        Items = new List<InvoiceItemPrintDto>
+        {
+            new("منتج تجريبي", "حبة", 2, 50, 0, 100),
+            new("منتج آخر",    "كرتون", 1, 120, 10, 110)
+        },
+        SubTotal = 210,
+        DiscountAmount = 10,
+        TaxRate = 15,
+        TaxAmount = 30,
+        GrandTotal = 230,
+        PaymentMethod = "نقدي",
+        AmountPaid = 250,
+        ChangeAmount = 20
+    };
+}
+Task 5.3 — XAML Print Buttons
 XML
 
-<!-- File: Views/Products/UnitHierarchyBuilderControl.xaml -->
-<UserControl x:Class="YourApp.Views.Products.UnitHierarchyBuilderControl"
-             FlowDirection="RightToLeft">
-    <StackPanel>
+<!-- File: Views/Invoice/InvoiceActionButtons.xaml -->
+<!-- Add to bottom of any invoice view -->
 
-        <!-- Help Box (always visible) -->
-        <Border Background="#E8F5E9" BorderBrush="#4CAF50"
-                BorderThickness="1" CornerRadius="6"
-                Padding="12" Margin="0,0,0,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#2E7D32">
-                    <Run FontWeight="Bold">💡 كيف تبني وحدات المنتج؟  </Run>
-                    <LineBreak/>
-                    <Run>1. ابدأ بالوحدة الصغرى (مثال: حبة) — معامل التحويل = 1</Run>
-                    <LineBreak/>
-                    <Run>2. أضف الوحدات الأكبر واكتب كم وحدة صغرى بداخلها</Run>
-                </TextBlock>
-                <Button Grid.Column="1"
-                        Content="تفاصيل أكثر ؟"
-                        Command="{Binding ShowHelpCommand}"
-                        Background="Transparent"
-                        Foreground="#4CAF50"
-                        BorderThickness="0"
-                        FontSize="11"/>
-            </Grid>
-        </Border>
+<StackPanel Orientation="Horizontal" 
+            HorizontalAlignment="Right"
+            Margin="0,8,0,0">
 
-        <!-- Validation Summary -->
-        <Border Background="#FFEBEE"
-                BorderBrush="#F44336"
-                BorderThickness="1"
-                CornerRadius="4"
-                Padding="10"
-                Margin="0,0,0,8"
-                Visibility="{Binding HasValidationError,
-                             Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Text="{Binding ValidationSummary}"
-                       Foreground="#C62828"
-                       TextWrapping="Wrap"/>
-        </Border>
-
-        <!-- Units DataGrid -->
-        <DataGrid ItemsSource="{Binding Units}"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  HeadersVisibility="Column"
-                  GridLinesVisibility="Horizontal">
-            <DataGrid.Columns>
-
-                <!-- Unit Name -->
-                <DataGridTemplateColumn Header="اسم الوحدة" Width="140">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBox Text="{Binding UnitName, UpdateSourceTrigger=PropertyChanged}"
-                                     PlaceholderText="{Binding Placeholder_UnitName}"
-                                     BorderThickness="0" Padding="4"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-
-                <!-- Conversion Factor -->
-                <DataGridTemplateColumn Header="يساوي كم وحدة صغرى؟" Width="160">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <!-- Show "1 (أساسية)" for base unit -->
-                                <TextBlock
-                                    Text="1  ✅ (وحدة أساسية)"
-                                    Foreground="#4CAF50"
-                                    VerticalAlignment="Center"
-                                    Padding="4"
-                                    Visibility="{Binding IsBaseUnit,
-                                                 Converter={StaticResource BoolToVisibility}}"/>
-
-                                <!-- Editable for derived units -->
-                                <TextBox
-                                    Text="{Binding BaseConversionFactor,
-                                                   UpdateSourceTrigger=PropertyChanged}"
-                                    Visibility="{Binding IsBaseUnit,
-                                                 Converter={StaticResource InverseBoolToVisibility}}"
-                                    BorderThickness="0"
-                                    Padding="4"/>
-                            </Grid>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-
-                <!-- Sales Price -->
-                <DataGridTextColumn Header="سعر البيع"
-                    Binding="{Binding SalesPrice, UpdateSourceTrigger=PropertyChanged}"
-                    Width="90"/>
-
-                <!-- Purchase Cost -->
-                <DataGridTextColumn Header="تكلفة الشراء"
-                    Binding="{Binding PurchaseCost, UpdateSourceTrigger=PropertyChanged}"
-                    Width="90"/>
-
-                <!-- Supplier Price -->
-                <DataGridTextColumn Header="سعر المورد"
-                    Binding="{Binding SupplierPrice, UpdateSourceTrigger=PropertyChanged}"
-                    Width="90"/>
-
-                <!-- Last Purchase Price (Read Only) -->
-                <DataGridTextColumn Header="آخر سعر توريد"
-                    Binding="{Binding LastPurchasePrice, StringFormat=N2}"
-                    Width="110"
-                    IsReadOnly="True">
-                    <DataGridTextColumn.ElementStyle>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="#1565C0"/>
-                            <Setter Property="FontWeight" Value="Bold"/>
-                        </Style>
-                    </DataGridTextColumn.ElementStyle>
-                </DataGridTextColumn>
-
-                <!-- Barcode Count -->
-                <DataGridTextColumn Header="عدد الباركودات"
-                    Binding="{Binding BarcodesCount}"
-                    Width="110"
-                    IsReadOnly="True"/>
-
-                <!-- Delete Button -->
-                <DataGridTemplateColumn Header="" Width="40">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <Button Content="🗑"
-                                    Command="{Binding DataContext.RemoveUnitCommand,
-                                              RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    CommandParameter="{Binding}"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Foreground="#EF5350"
-                                    FontSize="14"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-            </DataGrid.Columns>
-        </DataGrid>
-
-        <!-- Add Unit Button -->
-        <Button Content="+ إضافة وحدة جديدة"
-                Command="{Binding AddUnitCommand}"
-                HorizontalAlignment="Left"
-                Margin="0,8,0,0"
-                Padding="12,6"
-                Background="#E3F2FD"
-                Foreground="#1565C0"
-                BorderThickness="1"
-                BorderBrush="#90CAF9"/>
-    </StackPanel>
-</UserControl>
-Task 5.2 — Purchase Invoice Item Row (Price Sync Indicator)
-XML
-
-<!-- Inside Purchase Invoice DataGrid -->
-<!-- Add these two columns to existing DataGrid -->
-
-<!-- Unit Cost with sync indicator -->
-<DataGridTemplateColumn Header="تكلفة الوحدة" Width="130">
-    <DataGridTemplateColumn.CellTemplate>
-        <DataTemplate>
-            <StackPanel>
-                <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged}"
-                         BorderThickness="0"/>
-                <!-- Sync warning — only shows when cost differs from DB -->
-                <TextBlock Text="{Binding PriceDifferenceIndicator}"
-                           FontSize="10"
-                           Foreground="#E65100"
-                           TextWrapping="Wrap"
-                           Visibility="{Binding CostChangedFromDatabase,
-                                        Converter={StaticResource BoolToVisibility}}"/>
-            </StackPanel>
-        </DataTemplate>
-    </DataGridTemplateColumn.CellTemplate>
-</DataGridTemplateColumn>
-
-<!-- New Sales Price (optional override) -->
-<DataGridTemplateColumn Header="سعر البيع الجديد" Width="120">
-    <DataGridTemplateColumn.CellTemplate>
-        <DataTemplate>
-            <TextBox Text="{Binding NewSalesPrice, UpdateSourceTrigger=PropertyChanged}"
-                     PlaceholderText="اختياري"
-                     BorderThickness="0"
-                     ToolTip="إذا أدخلت سعراً جديداً، سيتم تحديث سعر بيع الصنف فور حفظ الفاتورة"/>
-        </DataTemplate>
-    </DataGridTemplateColumn.CellTemplate>
-</DataGridTemplateColumn>
-Task 5.3 — Settings Screen (Costing Method Selector)
-XML
-
-<!-- File: Views/Settings/CostingMethodSettingView.xaml -->
-<StackPanel Margin="16" FlowDirection="RightToLeft">
-
-    <TextBlock Text="طريقة احتساب تكلفة المخزون"
-               FontSize="16" FontWeight="Bold" Margin="0,0,0,12"/>
-
-    <!-- Option 1: Weighted Average -->
-    <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
-            Padding="16" Margin="0,4">
-        <StackPanel>
-            <RadioButton Content="متوسط التكلفة المرجح  (Weighted Average)"
-                         IsChecked="{Binding IsWeightedAverageSelected}"
-                         FontSize="14" FontWeight="Bold"/>
-            <TextBlock Margin="24,6,0,0" TextWrapping="Wrap" Foreground="#555"
-                       Text="يجمع بين سعر البضاعة القديمة في المخزن والجديدة ليعطيك تكلفة موحدة ومتوازنة. ✅ الأنسب للتقارير الضريبية الدقيقة وللمحاسبة القياسية."/>
+    <!-- Preview Button -->
+    <Button Command="{Binding ShowPreviewCommand}"
+            ToolTip="معاينة الفاتورة قبل الطباعة"
+            Style="{StaticResource ActionButtonStyle}"
+            Background="#607D8B" Foreground="White"
+            Margin="4,0">
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="🔍" FontSize="14"/>
+            <TextBlock Text=" معاينة" Margin="4,0,0,0"/>
         </StackPanel>
-    </Border>
+    </Button>
 
-    <!-- Option 2: Last Purchase Price -->
-    <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
-            Padding="16" Margin="0,4">
-        <StackPanel>
-            <RadioButton Content="آخر سعر توريد  (Last Purchase Price)"
-                         IsChecked="{Binding IsLastPriceSelected}"
-                         FontSize="14" FontWeight="Bold"/>
-            <TextBlock Margin="24,6,0,0" TextWrapping="Wrap" Foreground="#555"
-                       Text="يستبدل تكلفة المنتج بسعر آخر فاتورة شراء مباشرةً. ✅ مناسب للأسواق المتقلبة حيث تريد دائماً أن يعكس السعر الواقع الحالي."/>
+    <!-- A4 Print Button -->
+    <Button Command="{Binding PrintA4Command}"
+            ToolTip="طباعة فاتورة A4"
+            Style="{StaticResource ActionButtonStyle}"
+            Background="#1976D2" Foreground="White"
+            Margin="4,0">
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="🖨️" FontSize="14"/>
+            <TextBlock Text=" A4" Margin="4,0,0,0"/>
         </StackPanel>
-    </Border>
+    </Button>
 
-    <!-- Option 3: Supplier Price -->
-    <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
-            Padding="16" Margin="0,4">
-        <StackPanel>
-            <RadioButton Content="سعر المورد  (Supplier Catalog Price)"
-                         IsChecked="{Binding IsSupplierPriceSelected}"
-                         FontSize="14" FontWeight="Bold"/>
-            <TextBlock Margin="24,6,0,0" TextWrapping="Wrap" Foreground="#555"
-                       Text="يعتمد على السعر المدخل في بطاقة الصنف من قائمة المورد ولا يتغير تلقائياً عند الشراء. ✅ مناسب عندما تتفاوض على سعر ثابت مع المورد لفترة طويلة."/>
+    <!-- Thermal Print Button -->
+    <Button Command="{Binding PrintThermalCommand}"
+            ToolTip="طباعة إيصال حراري 80mm"
+            Style="{StaticResource ActionButtonStyle}"
+            Background="#388E3C" Foreground="White"
+            Margin="4,0">
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="🧾" FontSize="14"/>
+            <TextBlock Text=" حراري" Margin="4,0,0,0"/>
         </StackPanel>
-    </Border>
+    </Button>
 
-    <Button Content="💾  حفظ الإعداد"
-            Command="{Binding SaveCostingMethodCommand}"
-            HorizontalAlignment="Left"
-            Margin="0,16,0,0"
-            Padding="20,10"
-            Background="#1976D2" Foreground="White" BorderThickness="0"/>
+    <!-- Save PDF Button -->
+    <Button Command="{Binding SavePdfCommand}"
+            ToolTip="حفظ كملف PDF"
+            Style="{StaticResource ActionButtonStyle}"
+            Background="#E65100" Foreground="White"
+            Margin="4,0">
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="💾" FontSize="14"/>
+            <TextBlock Text=" PDF" Margin="4,0,0,0"/>
+        </StackPanel>
+    </Button>
 </StackPanel>
 ✅ Phase 5 Checklist
- Help box always visible (not just on first open)
- Validation error box only shows when HasValidationError = true
- Base unit row shows "✅ وحدة أساسية" and factor is read-only
- Sync warning shows correct direction (↑/↓) with old price
- Each costing method has Arabic explanation text
- All interactive elements minimum 36px height (touch-friendly)
+ ExecutePrintAsync is single shared method (no code repetition)
+ Print errors shown in MessageBox (not just StatusMessage)
+ Logo browse resizes to 200×200 max
+ Installed printers loaded from system for ComboBox
+ Test page button shows preview with current settings
 🧪 Phase 6: Unit Tests
 csharp
 
-// File: Tests/Domain/ProductUnitTests.cs
+// File: Tests/Printing/ThermalFormattingTests.cs
 
-public class ProductUnitTests
+public class ThermalFormattingTests
 {
+    private readonly ThermalReceiptGenerator _generator = new();
+
     [Fact]
-    public void CreateBaseUnit_AlwaysHasFactorOne()
+    public void FormatTwoColumns_TotalLengthEqualsLineWidth()
     {
-        var unit = ProductUnit.CreateBaseUnit(productId: 1, unitName: "حبة");
-        Assert.Equal(1, unit.BaseConversionFactor);
-        Assert.True(unit.IsBaseUnit);
+        // Use reflection to test private method via accessor
+        var method = typeof(ThermalReceiptGenerator)
+            .GetMethod("FormatTwoColumns",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance);
+
+        var result = (string)method!.Invoke(_generator,
+            new object[] { "الإجمالي:", "1,500.00 ر.س" })!;
+
+        Assert.Equal(42, result.Length);
     }
 
     [Fact]
-    public void CreateDerivedUnit_WithFactorOne_ThrowsDomainException()
+    public void GenerateEscPosCommands_EmptyNotes_NoNotesSection()
     {
-        var ex = Assert.Throws<DomainException>(() =>
-            ProductUnit.CreateDerivedUnit(1, "كرتون", baseConversionFactor: 1));
+        var invoice = CreateMinimalInvoice();
+        var bytes = _generator.GenerateEscPosCommands(invoice);
 
-        Assert.Contains("أكبر من وحدة صغرى واحدة", ex.Message);
+        // Should not throw and should have content
+        Assert.NotEmpty(bytes);
     }
 
     [Fact]
-    public void ToBaseUnitQuantity_MultipliesCorrectly()
+    public void GenerateEscPosCommands_AlwaysEndsWithCutCommand()
     {
-        var box = ProductUnit.CreateDerivedUnit(1, "كرتون", 12);
-        var baseQty = box.ToBaseUnitQuantity(3); // 3 boxes × 12 = 36 pieces
-        Assert.Equal(36, baseQty);
+        var invoice = CreateMinimalInvoice();
+        var bytes = _generator.GenerateEscPosCommands(invoice);
+
+        // CUT command: GS V B 0 = 0x1D 0x56 0x42 0x00
+        var lastFour = bytes.TakeLast(4).ToArray();
+        Assert.Equal(new byte[] { 0x1D, 0x56, 0x42, 0x00 }, lastFour);
     }
 
-    [Fact]
-    public void CalculateCostFromBaseUnitCost_ScalesCorrectly()
+    private InvoicePrintDto CreateMinimalInvoice() => new()
     {
-        var box = ProductUnit.CreateDerivedUnit(1, "كرتون", 12);
-        var boxCost = box.CalculateCostFromBaseUnitCost(baseUnitCost: 2m);
-        Assert.Equal(24m, boxCost); // 2 SAR/piece × 12 pieces = 24 SAR/box
-    }
+        StoreName = "متجر الاختبار",
+        InvoiceNumber = "TEST-001",
+        InvoiceDate = DateTime.Now,
+        CustomerOrSupplierName = "عميل",
+        Items = new List<InvoiceItemPrintDto>
+        {
+            new("منتج", "حبة", 1, 10, 0, 10)
+        },
+        SubTotal = 10, TaxRate = 15, TaxAmount = 1.5m, GrandTotal = 11.5m,
+        PaymentMethod = "نقدي", AmountPaid = 11.5m, ChangeAmount = 0
+    };
 }
 
-// File: Tests/Application/WeightedAverageCostingTests.cs
+// File: Tests/Printing/PrintResultTests.cs
 
-public class WeightedAverageCostingTests
+public class PrintResultTests
 {
     [Fact]
-    public async Task WeightedAverage_CalculatesCorrectly()
+    public void Success_IsSuccessTrue()
     {
-        // Old stock: 10 pieces at 100 SAR each
-        // New stock: 10 pieces at 150 SAR each
-        // Expected: (10×100 + 10×150) / 20 = 125 SAR
-
-        var mockContext = CreateMockContextWithStock(currentPieces: 10, currentCost: 100);
-        var service = CreateService(mockContext, CostingMethod.WeightedAverage);
-
-        var result = await service.CalculateNewCostAsync(
-            currentCost: 100,
-            currentStock: 10,
-            newCost: 150,
-            newQuantity: 10);
-
-        Assert.Equal(125m, result);
+        var result = PrintResult.Success("/path/to/file.pdf");
+        Assert.True(result.IsSuccess);
+        Assert.Equal("/path/to/file.pdf", result.OutputFilePath);
+        Assert.Null(result.ErrorMessage);
     }
 
     [Fact]
-    public async Task WeightedAverage_ZeroOldStock_ReturnsNewCost()
+    public void Failure_IsSuccessFalse()
     {
-        var result = await CalculateWeightedAverage(
-            currentStock: 0, currentCost: 100,
-            newCost: 150, newQuantity: 10);
-
-        Assert.Equal(150m, result); // No old stock to average with
-    }
-}
-
-// File: Tests/Domain/CashBoxTests.cs
-
-public class CashBoxTests
-{
-    [Fact]
-    public void Withdraw_InsufficientBalance_ThrowsDomainException()
-    {
-        var box = CashBox.Create("صندوق الكاشير");
-        box.Deposit(100, CashTransactionType.ManualIn, createdBy: 1);
-
-        var ex = Assert.Throws<DomainException>(() =>
-            box.Withdraw(200, CashTransactionType.PurchaseOut, createdBy: 1));
-
-        Assert.Contains("رصيد الصندوق غير كافٍ", ex.Message);
-    }
-
-    [Fact]
-    public void Deposit_UpdatesBalanceAndCreatesTransaction()
-    {
-        var box = CashBox.Create("صندوق الكاشير");
-        box.Deposit(500, CashTransactionType.SaleIn, createdBy: 1);
-
-        Assert.Equal(500, box.CurrentBalance);
-        Assert.Single(box.Transactions);
-        Assert.Equal(0, box.Transactions.First().BalanceBefore);
-        Assert.Equal(500, box.Transactions.First().BalanceAfter);
-    }
-
-    [Fact]
-    public void CanUserAccess_WrongUser_ThrowsDomainException()
-    {
-        var box = CashBox.Create("صندوق كاشير 1", assignedUserId: 5);
-
-        Assert.Throws<DomainException>(() => box.CanUserAccess(userId: 99));
-    }
-
-    [Fact]
-    public void CanUserAccess_SharedBox_AllowsAnyUser()
-    {
-        var sharedBox = CashBox.Create("الصندوق الرئيسي"); // No assigned user
-
-        // Should NOT throw for any user
-        var exception = Record.Exception(() => sharedBox.CanUserAccess(userId: 99));
-        Assert.Null(exception);
+        var result = PrintResult.Failure("الطابعة غير متصلة");
+        Assert.False(result.IsSuccess);
+        Assert.Equal("الطابعة غير متصلة", result.ErrorMessage);
+        Assert.Null(result.OutputFilePath);
     }
 }
 📦 Final Summary
 text
 
-┌──────────────────────────────────────────────────────────────────┐
-│         DYNAMIC UOM + COSTING + CASH BOXES — IMPLEMENTATION      │
-├──────┬──────────────────────────────────────────┬────────────────┤
-│ Step │ Deliverable                              │ Key Rule       │
-├──────┼──────────────────────────────────────────┼────────────────┤
-│  0   │ 8 SQL migrations                         │ Run in order   │
-│  1   │ 6 Domain entities + 2 enums              │ No DB in Domain│
-│  2   │ EF configs + Barcode + Settings repos    │ Register in DI │
-│  3   │ Pricing service + Commands               │ Save then price│
-│  4   │ ViewModels (Builder + Invoice)           │ Arabic errors  │
-│  5   │ XAML (Builder + Settings + Invoice)      │ 36px min touch │
-│  6   │ 7 Unit tests                             │ Never skip     │
-└──────┴──────────────────────────────────────────┴────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│              PRINTING ENGINE — IMPLEMENTATION ORDER               │
+├──────┬─────────────────────────────────────────────┬─────────────┤
+│ Step │ Deliverable                                 │ Key Rule    │
+├──────┼─────────────────────────────────────────────┼─────────────┤
+│  0   │ 3 NuGet packages + SQL seed                 │ Startup init│
+│  1   │ IPrintService + DTOs + Builder              │ No DB in    │
+│      │                                             │ printers    │
+│  2   │ A4InvoiceDocument (QuestPDF)                │ RTL + logo  │
+│      │                                             │ fallback    │
+│  3   │ ThermalReceiptGenerator + EscPos            │ Windows-1256│
+│      │                                             │ encoding    │
+│  4   │ PrintService (A4 + Thermal + Preview)       │ Arabic      │
+│      │                                             │ errors only │
+│  5   │ ViewModels + XAML buttons + Settings UI     │ Single exec │
+│      │                                             │ wrapper     │
+│  6   │ Unit tests                                  │ Never skip  │
+└──────┴─────────────────────────────────────────────┴─────────────┘
 
 CRITICAL RULES — NEVER VIOLATE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Stock ALWAYS stored in base units (pieces) — never in boxes/trays
-✅ Cost cascade: base unit cost × ConversionFactor = derived unit cost
-✅ Pricing update runs AFTER invoice.Id is persisted
-✅ WeightedAverage: zero old stock → return new cost (no division by zero)
-✅ CashBox.Withdraw() uses domain method — never subtract balance directly
-✅ Product.ValidateUnits() called in command handler before ANY save
-✅ All user-facing errors in Arabic with actionable guidance
-✅ Price history logged for EVERY cost change (audit trail)
+✅ Printing classes NEVER query the database directly
+✅ Missing logo = graceful omission, never null reference exception
+✅ PrintResult never throws — always returns Success/Failure object
+✅ Thermal text MUST use Windows-1256 encoding for Arabic
+✅ All thermal lines MUST fit within 42 characters
+✅ ESC/POS cut command ALWAYS added at end of thermal receipt
+✅ Printer error messages in Arabic with actionable steps
+✅ Logo resized to 200×200 max before saving (never raw upload)
+✅ ExecutePrintAsync is ONE shared method — no copy-paste per button

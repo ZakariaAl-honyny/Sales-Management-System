@@ -85,6 +85,27 @@
                             <TextBlock Text="ترحيل" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+                    <Button Command="{Binding PrintPreviewCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                            ToolTip="معاينة فاتورة الشراء قبل الطباعة (للمرحّلة فقط)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🖨️" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="معاينة" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding PrintA4Command}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                            ToolTip="طباعة A4 (للمرحّلة فقط)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🖨️" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="طباعة A4" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding PrintThermalCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                            ToolTip="طباعة حرارية (للمرحّلة فقط)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🧾" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="طباعة حرارية" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                     <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0"
                             ToolTip="تحديث قائمة الفواتير من الخادم">
                         <StackPanel Orientation="Horizontal">
@@ -140,6 +161,23 @@
                             <MenuItem Header="ترحيل الفاتورة" Command="{Binding PostCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="✅"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator/>
+                            <Separator/>
+                            <MenuItem Header="معاينة الطباعة" Command="{Binding PrintPreviewCommand}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="🖨️"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="طباعة A4" Command="{Binding PrintA4Command}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="🖨️"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="طباعة حرارية" Command="{Binding PrintThermalCommand}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="🧾"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
