@@ -11,7 +11,7 @@ public partial class DeleteConfirmationDialog : Window
     {
         InitializeComponent();
         ItemNameText.Text = itemName;
-        Owner = Application.Current.MainWindow;
+        Owner = System.Windows.Application.Current.MainWindow;
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)

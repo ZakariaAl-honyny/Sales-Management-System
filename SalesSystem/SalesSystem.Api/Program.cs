@@ -1,6 +1,7 @@
 using System.Text;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SalesSystem.Api.Middleware;
@@ -10,18 +11,19 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Infrastructure;
+using SalesSystem.Infrastructure.Backup;
 using SalesSystem.Infrastructure.Data;
+using SalesSystem.Infrastructure.Persistence;
 using SalesSystem.Infrastructure.Printing;
 using SalesSystem.Infrastructure.Repositories;
+using SalesSystem.Infrastructure.Security;
 using SalesSystem.Infrastructure.Services;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Common;
 using Serilog;
 using Scalar.AspNetCore;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,13 +33,31 @@ using Microsoft.Extensions.Hosting;
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================
-// 1. Serilog Configuration
+// 0. Windows Service + Event Log
 // ============================================
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.File("logs/salessystem-.log", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
+builder.Host.UseWindowsService(options =>
+{
+    options.ServiceName = "SalesSystemService";
+});
 
-builder.Host.UseSerilog();
+builder.Host.UseSerilog((context, config) =>
+{
+    config.ReadFrom.Configuration(context.Configuration)
+        .WriteTo.File("logs/salessystem-.log", rollingInterval: RollingInterval.Day)
+        .WriteTo.EventLog("SalesSystemService", manageEventSource: true);
+});
+
+// ============================================
+// 1. Data Protection (DPAPI)
+// ============================================
+var keyDir = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+    "SalesSystem", "DataProtectionKeys");
+Directory.CreateDirectory(keyDir);
+
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keyDir))
+    .ProtectKeysWithDpapi();
 
 // ============================================
 // 2. Read Configuration
@@ -46,7 +66,9 @@ var connectionString = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNEC
     ?? "Server=.;Database=SalesSystemDb;Trusted_Connection=true;TrustServerCertificate=true;";
 
 var jwtSecret = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_SECRET")
-    ?? "ThisIsASecretKeyThatIsLongEnoughForHS256Algorithm!";
+    ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
+        ? "ThisIsASecretKeyThatIsLongEnoughForHS256Algorithm!"
+        : throw new InvalidOperationException("SALESSYSTEM_JWT_SECRET is required in production"));
 var jwtIssuer = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_ISSUER") ?? "SalesSystem";
 var jwtAudience = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_AUDIENCE") ?? "SalesSystem";
 var jwtExpirationHours = int.TryParse(Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_EXPIRATION_HOURS"), out var hours) ? hours : 8;
@@ -60,18 +82,28 @@ var jwtSettings = new JwtSettings
 };
 
 // ============================================
-// 3. DbContext
+// 3. DbContext with retry on failure
 // ============================================
 builder.Services.AddDbContext<SalesDbContext>(options =>
     options.UseSqlServer(connectionString, sqlOptions =>
     {
         sqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(30),
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
             errorNumbersToAdd: new[] { 2, 233, 233 }
         );
         sqlOptions.CommandTimeout(30);
     }));
+
+// ============================================
+// 3b. Security & Backup DI Registrations
+// ============================================
+builder.Services.AddScoped<IConnectionStringProtector, ConnectionStringProtector>();
+builder.Services.AddScoped<FirstRunSetupService>();
+builder.Services.AddScoped<SecureDbContextFactory>();
+builder.Services.AddScoped<IBackupService, BackupService>();
+builder.Services.AddHostedService<ScheduledBackupWorker>();
+builder.Services.AddUpdateServices(builder.Configuration);
 
 // ============================================
 // 4. DI Registrations
@@ -133,7 +165,7 @@ builder.Services.AddAuthorization(opts =>
 });
 
 // ============================================
-// 8. Other Services
+// 7. Other Services
 // ============================================
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
@@ -177,13 +209,17 @@ PrintingBootstrapper.Initialize();
 var app = builder.Build();
 
 // ============================================
-// 8. Database Initialization & Seed
+// 8. Database Initialization, Seed & First-Run Encryption
 // ============================================
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<SalesDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Program>>();
     await InitializeDatabaseAsync(dbContext, logger);
+
+    // First-run: encrypt connection string if plaintext
+    var firstRun = scope.ServiceProvider.GetRequiredService<FirstRunSetupService>();
+    firstRun.EnsureConnectionStringEncrypted(app.Configuration);
 }
 
 async Task InitializeDatabaseAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger logger)
@@ -250,12 +286,10 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
     }
     catch
     {
-        // Table might not exist
     }
 
     try
     {
-        // Seed admin user (password: admin123) - CreatedByUserId = null for system seed
         var adminUser = User.Create(
             userName: "admin",
             passwordHash: BCrypt.Net.BCrypt.HashPassword("admin123", workFactor: 12),
@@ -265,7 +299,6 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
         );
         db.Users.Add(adminUser);
 
-        // Seed default warehouse - CreatedByUserId = null for system seed
         var warehouse = Warehouse.Create(
             name: "المخزن الرئيسي",
             code: "WH-001",
@@ -275,7 +308,6 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
         );
         db.Warehouses.Add(warehouse);
 
-        // Seed cash customer - CreatedByUserId = null for system seed
         var cashCustomer = Customer.Create(
             name: "عميل نقدي",
             code: "CASH",
@@ -284,14 +316,12 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
         );
         db.Customers.Add(cashCustomer);
 
-        // Seed 5 units - CreatedByUserId = null for system seed
         db.Units.Add(Unit.Create("قطعة", "pcs", null));
         db.Units.Add(Unit.Create("كيلو", "kg", null));
         db.Units.Add(Unit.Create("لتر", "ltr", null));
         db.Units.Add(Unit.Create("متر", "m", null));
         db.Units.Add(Unit.Create("صندوق", "box", null));
 
-        // Seed document sequences
         db.DocumentSequences.Add(DocumentSequence.Create("INV", "INV", 2026));
         db.DocumentSequences.Add(DocumentSequence.Create("PUR", "PUR", 2026));
         db.DocumentSequences.Add(DocumentSequence.Create("SR", "SR", 2026));
@@ -334,7 +364,7 @@ if (app.Environment.IsDevelopment())
         options.WithTitle("Sales Management API");
         options.WithTheme(ScalarTheme.Mars);
         options.WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
-        options.AddPreferredSecuritySchemes("Bearer"); // Auto-select JWT scheme
+        options.AddPreferredSecuritySchemes("Bearer");
     });
 }
 

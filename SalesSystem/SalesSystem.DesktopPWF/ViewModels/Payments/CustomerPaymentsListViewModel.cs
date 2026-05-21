@@ -131,7 +131,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
 
             if (result.IsSuccess && result.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Payments.Clear();
                     foreach (var item in result.Value)

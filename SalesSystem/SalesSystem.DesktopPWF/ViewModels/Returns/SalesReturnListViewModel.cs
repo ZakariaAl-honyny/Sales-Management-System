@@ -169,7 +169,7 @@ public class SalesReturnListViewModel : ViewModelBase
 
             if (result.IsSuccess && result.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Returns.Clear();
                     foreach (var item in result.Value)

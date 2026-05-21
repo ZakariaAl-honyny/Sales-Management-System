@@ -106,7 +106,7 @@ get;
             var movementsResult = await _inventoryService.GetMovementsAsync(page: _currentPage, pageSize: _pageSize);
             if (movementsResult.IsSuccess && movementsResult.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Movements.Clear();
                     foreach (var item in movementsResult.Value)
@@ -121,7 +121,7 @@ get;
             var stocksResult = await _inventoryService.GetWarehouseStocksAsync(page: _currentPage, pageSize: _pageSize);
             if (stocksResult.IsSuccess && stocksResult.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Stocks.Clear();
                     foreach (var item in stocksResult.Value)

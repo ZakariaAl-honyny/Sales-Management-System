@@ -26,7 +26,7 @@
         <Border Grid.Row="0" Grid.RowSpan="2"
                 Background="#80FFFFFF" 
                 Panel.ZIndex="1000" 
-                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                 <ProgressBar IsIndeterminate="True" Width="200" Height="4" Background="{StaticResource BorderBrush}" Foreground="{StaticResource PrimaryBrush}"/>
                 <TextBlock Text="جاري تحديث البيانات..." 

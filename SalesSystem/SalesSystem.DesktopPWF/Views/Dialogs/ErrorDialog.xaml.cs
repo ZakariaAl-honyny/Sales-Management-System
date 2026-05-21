@@ -8,7 +8,7 @@ public partial class ErrorDialog : Window
     {
         InitializeComponent();
         MessageText.Text = message;
-        Owner = Application.Current.MainWindow;
+        Owner = System.Windows.Application.Current.MainWindow;
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();

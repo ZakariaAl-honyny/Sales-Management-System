@@ -1,32 +1,33 @@
 using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
-using System.Data;
+using SalesSystem.Infrastructure.Persistence;
 
 namespace SalesSystem.Infrastructure.Services;
 
 public sealed class BackupService : IBackupService
 {
-    private readonly string _connectionString;
-    private readonly string _databaseName;
+    private readonly SecureDbContextFactory _dbFactory;
     private readonly ILogger<BackupService> _logger;
+    private readonly string _databaseName;
     private readonly string _defaultBackupFolder;
 
-    public BackupService(IConfiguration configuration, ILogger<BackupService> logger)
+    public BackupService(
+        SecureDbContextFactory dbFactory,
+        IConfiguration configuration,
+        ILogger<BackupService> logger)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION")
-            ?? throw new InvalidOperationException("Connection string not found.");
-
-        var builder = new SqlConnectionStringBuilder(_connectionString);
-        _databaseName = builder.InitialCatalog;
+        _dbFactory = dbFactory;
         _logger = logger;
 
-        // Default backup folder in application directory
-        _defaultBackupFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
+        var connectionString = _dbFactory.GetDecryptedConnectionString();
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        _databaseName = builder.InitialCatalog;
+        _defaultBackupFolder = configuration["Backup:DefaultBackupPath"]
+            ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
+
         if (!Directory.Exists(_defaultBackupFolder))
         {
             Directory.CreateDirectory(_defaultBackupFolder);
@@ -43,11 +44,22 @@ public sealed class BackupService : IBackupService
             var fileName = $"{_databaseName}_{DateTime.Now:yyyyMMdd_HHmmss}.bak";
             var filePath = Path.Combine(folderPath, fileName);
 
-            using var connection = new SqlConnection(_connectionString);
+            var connectionString = _dbFactory.GetDecryptedConnectionString();
+            await using var connection = new SqlConnection(connectionString);
             await connection.OpenAsync(ct);
 
-            var query = $"BACKUP DATABASE [{_databaseName}] TO DISK = @path WITH FORMAT, MEDIANAME = 'SalesSystemBackup', NAME = 'Full Backup of {_databaseName}'";
-            using var command = new SqlCommand(query, connection);
+            var backupSql = $"""
+                BACKUP DATABASE [{_databaseName}]
+                TO DISK = @path
+                WITH FORMAT,
+                     MEDIANAME = 'SalesSystemBackup',
+                     NAME = 'Full Database Backup - {DateTime.Now:yyyy-MM-dd HH:mm}',
+                     COMPRESSION,
+                     STATS = 10;
+                """;
+
+            await using var command = new SqlCommand(backupSql, connection);
+            command.CommandTimeout = 300;
             command.Parameters.AddWithValue("@path", filePath);
 
             await command.ExecuteNonQueryAsync(ct);
@@ -69,35 +81,41 @@ public sealed class BackupService : IBackupService
             if (!File.Exists(filePath))
                 return Result.Failure("ملف النسخة الاحتياطية غير موجود");
 
-            // To restore, we need to connect to 'master' database to close connections to our DB
-            var builder = new SqlConnectionStringBuilder(_connectionString)
+            var connectionString = _dbFactory.GetDecryptedConnectionString();
+            var builder = new SqlConnectionStringBuilder(connectionString)
             {
                 InitialCatalog = "master"
             };
 
-            using var connection = new SqlConnection(builder.ConnectionString);
+            await using var connection = new SqlConnection(builder.ConnectionString);
             await connection.OpenAsync(ct);
 
-            // 1. Set to single user mode to kick everyone out
-            var sqlSetSingle = $"ALTER DATABASE [{_databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE";
-            using (var cmd = new SqlCommand(sqlSetSingle, connection))
+            var singleUserSql = $"ALTER DATABASE [{_databaseName}] SET SINGLE_USER WITH ROLLBACK AFTER 30;";
+            await using (var cmd1 = new SqlCommand(singleUserSql, connection))
             {
-                await cmd.ExecuteNonQueryAsync(ct);
+                cmd1.CommandTimeout = 60;
+                await cmd1.ExecuteNonQueryAsync(ct);
             }
 
-            // 2. Restore
-            var sqlRestore = $"RESTORE DATABASE [{_databaseName}] FROM DISK = @path WITH REPLACE";
-            using (var cmd = new SqlCommand(sqlRestore, connection))
+            var restoreSql = $"""
+                RESTORE DATABASE [{_databaseName}]
+                FROM DISK = @path
+                WITH REPLACE,
+                     RECOVERY,
+                     STATS = 10;
+                """;
+
+            await using (var cmd2 = new SqlCommand(restoreSql, connection))
             {
-                cmd.Parameters.AddWithValue("@path", filePath);
-                await cmd.ExecuteNonQueryAsync(ct);
+                cmd2.CommandTimeout = 600;
+                cmd2.Parameters.AddWithValue("@path", filePath);
+                await cmd2.ExecuteNonQueryAsync(ct);
             }
 
-            // 3. Set back to multi user mode
-            var sqlSetMulti = $"ALTER DATABASE [{_databaseName}] SET MULTI_USER";
-            using (var cmd = new SqlCommand(sqlSetMulti, connection))
+            var multiUserSql = $"ALTER DATABASE [{_databaseName}] SET MULTI_USER;";
+            await using (var cmd3 = new SqlCommand(multiUserSql, connection))
             {
-                await cmd.ExecuteNonQueryAsync(ct);
+                await cmd3.ExecuteNonQueryAsync(ct);
             }
 
             _logger.LogInformation("Database restored successfully from {FilePath}", filePath);
@@ -106,6 +124,9 @@ public sealed class BackupService : IBackupService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error restoring database");
+
+            await TrySetMultiUserAsync(ct);
+
             return Result.Failure("حدث خطأ أثناء استعادة النسخة الاحتياطية: " + ex.Message);
         }
     }
@@ -127,6 +148,57 @@ public sealed class BackupService : IBackupService
         {
             _logger.LogError(ex, "Error getting backup list");
             return Task.FromResult(Result<List<string>>.Failure("حدث خطأ أثناء جلب قائمة النسخ الاحتياطية"));
+        }
+    }
+
+    public async Task<Result> DeleteOldBackupsAsync(int retentionDays, CancellationToken ct = default)
+    {
+        try
+        {
+            if (!Directory.Exists(_defaultBackupFolder))
+                return Result.Success();
+
+            var cutoffDate = DateTime.Now.AddDays(-retentionDays);
+            var oldFiles = Directory.GetFiles(_defaultBackupFolder, "*.bak")
+                .Select(f => new FileInfo(f))
+                .Where(f => f.CreationTime < cutoffDate)
+                .ToList();
+
+            foreach (var file in oldFiles)
+            {
+                file.Delete();
+                _logger.LogInformation("Deleted old backup: {File}", file.Name);
+            }
+
+            _logger.LogInformation("Cleanup complete. Deleted {Count} old backups", oldFiles.Count);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Backup cleanup failed");
+            return Result.Failure("حدث خطأ أثناء تنظيف النسخ الاحتياطية القديمة: " + ex.Message);
+        }
+    }
+
+    private async Task TrySetMultiUserAsync(CancellationToken ct)
+    {
+        try
+        {
+            var connectionString = _dbFactory.GetDecryptedConnectionString();
+            var builder = new SqlConnectionStringBuilder(connectionString)
+            {
+                InitialCatalog = "master"
+            };
+
+            await using var conn = new SqlConnection(builder.ConnectionString);
+            await conn.OpenAsync(ct);
+            await using var cmd = new SqlCommand(
+                $"ALTER DATABASE [{_databaseName}] SET MULTI_USER;", conn);
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to restore MULTI_USER mode — manual intervention required");
         }
     }
 }

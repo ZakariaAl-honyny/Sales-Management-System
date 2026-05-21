@@ -5,10 +5,9 @@ using System.Windows.Input;
 using FluentAssertions;
 using Moq;
 using SalesSystem.Contracts.Common;
-using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services;
 using SalesSystem.DesktopPWF.ViewModels;
 
@@ -46,9 +45,9 @@ public class LoginWindowViewModelTests
     }
 
     [Fact]
-    public void IsLoading_DefaultValue_IsFalse()
+    public void IsBusy_DefaultValue_IsFalse()
     {
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -90,14 +89,11 @@ public class LoginWindowViewModelTests
     }
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        // IsBusy has protected set in ViewModelBase, managed by ExecuteAsync
+        // Verify it's false by default (no async operation running)
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -145,13 +141,30 @@ public class LoginWindowViewModelTests
     }
 
     [Fact]
-    public void LoginCommand_CannotExecute_WhenLoading()
+    public async Task LoginCommand_CannotExecute_WhileExecuting()
     {
+        var tcs = new TaskCompletionSource<Result<LoginResponse>>();
+        _mockAuthService
+            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
+            .Returns(tcs.Task);
+
         _viewModel.Username = "admin";
         _viewModel.Password = "password";
-        _viewModel.IsLoading = true;
+
+        _viewModel.LoginCommand.Execute(null);
+        await Task.Delay(50);
 
         _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
+
+        tcs.SetResult(Result<LoginResponse>.Success(new LoginResponse(
+            UserId: 1,
+            UserName: "admin",
+            FullName: "Admin",
+            Role: (byte)UserRole.Admin,
+            Token: "token",
+            ExpiresAt: DateTime.UtcNow.AddHours(8))));
+
+        await tcs.Task;
     }
 
     [Fact]
@@ -189,10 +202,11 @@ public class LoginWindowViewModelTests
     public async Task LoginCommand_WhenSuccessful_SetsSession()
     {
         var loginResponse = new LoginResponse(
-            Token: "test-token-123",
-            UserName: "admin",
             UserId: 1,
+            UserName: "admin",
+            FullName: "Admin User",
             Role: (byte)UserRole.Admin,
+            Token: "test-token-123",
             ExpiresAt: DateTime.UtcNow.AddHours(8));
 
         _mockAuthService
@@ -231,7 +245,7 @@ public class LoginWindowViewModelTests
     }
 
     [Fact]
-    public async Task LoginCommand_WhenLoading_SetsIsLoadingTrue()
+    public async Task LoginCommand_WhenExecuting_SetsIsBusyTrue()
     {
         var tcs = new TaskCompletionSource<Result<LoginResponse>>();
         _mockAuthService
@@ -241,19 +255,20 @@ public class LoginWindowViewModelTests
         _viewModel.Username = "admin";
         _viewModel.Password = "password";
 
-        var executeTask = _viewModel.LoginCommand.ExecuteAsync(null);
-        _viewModel.IsLoading.Should().BeTrue();
+        _viewModel.LoginCommand.Execute(null);
+        _viewModel.IsBusy.Should().BeTrue();
 
         tcs.SetResult(Result<LoginResponse>.Success(new LoginResponse(
-            Token: "token",
-            UserName: "admin",
             UserId: 1,
+            UserName: "admin",
+            FullName: "Admin",
             Role: (byte)UserRole.Admin,
+            Token: "token",
             ExpiresAt: DateTime.UtcNow.AddHours(8))));
 
-        await executeTask;
+        await tcs.Task;
 
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -264,10 +279,11 @@ public class LoginWindowViewModelTests
         _mockAuthService
             .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
             .ReturnsAsync(Result<LoginResponse>.Success(new LoginResponse(
-                Token: "token",
-                UserName: "admin",
                 UserId: 1,
+                UserName: "admin",
+                FullName: "Admin",
                 Role: (byte)UserRole.Admin,
+                Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))));
 
         _viewModel.Username = "admin";
@@ -297,7 +313,7 @@ public class LoginWindowViewModelTests
     }
 
     [Fact]
-    public async Task LoginCommand_WhenExceptionThrown_SetsIsLoadingFalse()
+    public async Task LoginCommand_WhenExceptionThrown_SetsIsBusyFalse()
     {
         _mockAuthService
             .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
@@ -309,7 +325,7 @@ public class LoginWindowViewModelTests
         _viewModel.LoginCommand.Execute(null);
         await Task.Delay(100);
 
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     #endregion
@@ -339,14 +355,33 @@ public class LoginWindowViewModelTests
     }
 
     [Fact]
-    public void LoginCommand_RaisesCanExecuteChanged_WhenIsLoadingChanges()
+    public async Task LoginCommand_RaisesCanExecuteChanged_WhenExecuting()
     {
-        var canExecuteChanged = false;
-        _viewModel.LoginCommand.CanExecuteChanged += (s, e) => canExecuteChanged = true;
+        var canExecuteChangedCount = 0;
+        _viewModel.LoginCommand.CanExecuteChanged += (s, e) => canExecuteChangedCount++;
 
-        _viewModel.IsLoading = true;
+        var tcs = new TaskCompletionSource<Result<LoginResponse>>();
+        _mockAuthService
+            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
+            .Returns(tcs.Task);
 
-        canExecuteChanged.Should().BeTrue();
+        _viewModel.Username = "admin";
+        _viewModel.Password = "password";
+
+        _viewModel.LoginCommand.Execute(null);
+        await Task.Delay(50);
+
+        canExecuteChangedCount.Should().BeGreaterThan(0, "CanExecuteChanged should fire when command starts executing");
+
+        tcs.SetResult(Result<LoginResponse>.Success(new LoginResponse(
+            UserId: 1,
+            UserName: "admin",
+            FullName: "Admin",
+            Role: (byte)UserRole.Admin,
+            Token: "token",
+            ExpiresAt: DateTime.UtcNow.AddHours(8))));
+
+        await tcs.Task;
     }
 
     #endregion

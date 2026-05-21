@@ -8,9 +8,6 @@ using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Tests.Controllers;
 
-/// <summary>
-/// Base class for API Controller tests providing common mocks and helper methods
-/// </summary>
 public abstract class ControllerTestBase
 {
     #region Mocks
@@ -26,12 +23,18 @@ public abstract class ControllerTestBase
     protected Mock<IUnitService> UnitServiceMock { get; }
     protected Mock<IWarehouseService> WarehouseServiceMock { get; }
     protected Mock<IInventoryService> InventoryServiceMock { get; }
+    protected Mock<IPaymentService> PaymentServiceMock { get; }
+    protected Mock<IReportService> ReportServiceMock { get; }
+    protected Mock<IStoreSettingsService> StoreSettingsServiceMock { get; }
+    protected Mock<IBackupService> BackupServiceMock { get; }
+    protected Mock<IUserService> UserServiceMock { get; }
+    protected Mock<IAuthService> AuthServiceMock { get; }
 
     #endregion
 
     protected ControllerTestBase()
     {
-SalesServiceMock = new Mock<ISalesService>();
+        SalesServiceMock = new Mock<ISalesService>();
         PurchaseServiceMock = new Mock<IPurchaseService>();
         SalesReturnServiceMock = new Mock<ISalesReturnService>();
         PurchaseReturnServiceMock = new Mock<IPurchaseReturnService>();
@@ -42,6 +45,12 @@ SalesServiceMock = new Mock<ISalesService>();
         UnitServiceMock = new Mock<IUnitService>();
         WarehouseServiceMock = new Mock<IWarehouseService>();
         InventoryServiceMock = new Mock<IInventoryService>();
+        PaymentServiceMock = new Mock<IPaymentService>();
+        ReportServiceMock = new Mock<IReportService>();
+        StoreSettingsServiceMock = new Mock<IStoreSettingsService>();
+        BackupServiceMock = new Mock<IBackupService>();
+        UserServiceMock = new Mock<IUserService>();
+        AuthServiceMock = new Mock<IAuthService>();
     }
 
     #region Helper Methods
@@ -58,22 +67,23 @@ SalesServiceMock = new Mock<ISalesService>();
     protected static Result CreateFailureResult(string error)
         => Result.Failure(error);
 
-    /// <summary>
-    /// Sets User.Id via reflection for controller testing
-    /// </summary>
-    protected static void SetupUserId(object controller, int userId)
+    protected static void SetupUserId(ControllerBase controller, int userId)
     {
-        var controllerWithUser = controller as ControllerBase;
-        controllerWithUser?.ControllerContext.HttpContext.Items["UserId"] = userId;
+        var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
+        var identity = new ClaimsIdentity(claims);
+        var principal = new ClaimsPrincipal(identity);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = principal }
+        };
     }
 
-    /// <summary>
-    /// Sets controller without UserId
-    /// </summary>
-    protected static void SetupUserWithoutId(object controller)
+    protected static void SetupUserWithoutId(ControllerBase controller)
     {
-        var controllerWithUser = controller as ControllerBase;
-        controllerWithUser?.ControllerContext.HttpContext.Items.Remove("UserId");
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = new ClaimsPrincipal() }
+        };
     }
 
     #endregion

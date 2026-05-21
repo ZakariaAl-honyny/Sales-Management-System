@@ -10,7 +10,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>SalesSystem.DesktopPWF</AssemblyName>
     <RootNamespace>SalesSystem.DesktopPWF</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>2026.5.1350</Version>
+    <AssemblyVersion>2026.5.1350</AssemblyVersion>
+    <FileVersion>2026.5.1350</FileVersion>
     <Company>Sales System</Company>
     <Product>Sales Management System WPF</Product>
     <Description>WPF Desktop Application for Sales Management</Description>
@@ -22,6 +24,7 @@
   <!-- Project References -->
   <ItemGroup>
     <ProjectReference Include="..\SalesSystem.Contracts\SalesSystem.Contracts.csproj" />
+    <ProjectReference Include="..\SalesSystem.Application\SalesSystem.Application.csproj" />
   </ItemGroup>
 
   <!-- NuGet Packages -->

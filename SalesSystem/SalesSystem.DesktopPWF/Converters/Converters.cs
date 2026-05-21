@@ -177,9 +177,9 @@ public class InvoiceStatusToBrushConverter : IValueConverter
         {
             return (byte)value switch
             {
-                1 => Application.Current.Resources["WarningBrush"] ?? System.Windows.Media.Brushes.Orange,  // Draft
-                2 => Application.Current.Resources["SuccessBrush"] ?? System.Windows.Media.Brushes.Green,   // Posted
-                3 => Application.Current.Resources["ErrorBrush"] ?? System.Windows.Media.Brushes.Red,       // Cancelled
+                1 => System.Windows.Application.Current.Resources["WarningBrush"] ?? System.Windows.Media.Brushes.Orange,  // Draft
+                2 => System.Windows.Application.Current.Resources["SuccessBrush"] ?? System.Windows.Media.Brushes.Green,   // Posted
+                3 => System.Windows.Application.Current.Resources["ErrorBrush"] ?? System.Windows.Media.Brushes.Red,       // Cancelled
                 _ => System.Windows.Media.Brushes.Gray
             };
         }
@@ -229,8 +229,8 @@ public class SaleModeToBrushConverter : IValueConverter
         {
             return mode switch
             {
-                1 => Application.Current.Resources["PrimaryBrush"] ?? System.Windows.Media.Brushes.Blue,    // Retail
-                2 => Application.Current.Resources["SecondaryBrush"] ?? System.Windows.Media.Brushes.Purple, // Wholesale
+                1 => System.Windows.Application.Current.Resources["PrimaryBrush"] ?? System.Windows.Media.Brushes.Blue,    // Retail
+                2 => System.Windows.Application.Current.Resources["SecondaryBrush"] ?? System.Windows.Media.Brushes.Purple, // Wholesale
                 _ => System.Windows.Media.Brushes.Gray
             };
         }

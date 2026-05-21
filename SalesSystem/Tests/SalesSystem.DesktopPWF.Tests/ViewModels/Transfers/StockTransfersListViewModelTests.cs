@@ -1,13 +1,15 @@
 namespace SalesSystem.DesktopPWF.Tests.ViewModels.Transfers;
 
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using FluentAssertions;
 using Moq;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
+using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.Api;
+using SalesSystem.DesktopPWF.ViewModels.Transfers;
 
 /// <summary>
 /// Tests for StockTransfersListViewModel
@@ -16,68 +18,46 @@ public class StockTransfersListViewModelTests
 {
     private readonly Mock<IStockTransferApiService> _mockTransferService;
     private readonly Mock<IDialogService> _mockDialogService;
+    private readonly Mock<ITransferPrinter> _mockTransferPrinter;
+    private readonly Mock<ISettingsApiService> _mockSettingsService;
     private readonly StockTransfersListViewModel _viewModel;
 
     public StockTransfersListViewModelTests()
     {
         _mockTransferService = new Mock<IStockTransferApiService>();
         _mockDialogService = new Mock<IDialogService>();
+        _mockTransferPrinter = new Mock<ITransferPrinter>();
+        _mockSettingsService = new Mock<ISettingsApiService>();
 
         _viewModel = new StockTransfersListViewModel();
-        
-        // Inject mocks via reflection
-        var transferServiceField = typeof(StockTransfersListViewModel).GetField("_transferService",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        transferServiceField?.SetValue(_viewModel, _mockTransferService.Object);
 
-        var dialogServiceField = typeof(StockTransfersListViewModel).GetField("_dialogService",
+        SetField("_transferService", _mockTransferService.Object);
+        SetField("_dialogService", _mockDialogService.Object);
+        SetField("_transferPrinter", _mockTransferPrinter.Object);
+        SetField("_settingsService", _mockSettingsService.Object);
+    }
+
+    private void SetField(string fieldName, object value)
+    {
+        var field = typeof(StockTransfersListViewModel).GetField(fieldName,
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        dialogServiceField?.SetValue(_viewModel, _mockDialogService.Object);
+        field?.SetValue(_viewModel, value);
+    }
+
+    private static StockTransferDto CreateTransfer(int id, byte status)
+    {
+        return new StockTransferDto(id, $"TRF-{id:000}", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, status, new List<StockTransferItemDto>());
     }
 
     #region Property Tests
 
-    [Fact]
-    public void SearchText_DefaultValue_IsEmpty()
-    {
-        _viewModel.SearchText.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void DateFrom_DefaultValue_IsNull()
-    {
-        _viewModel.DateFrom.Should().BeNull();
-    }
-
-    [Fact]
-    public void DateTo_DefaultValue_IsNull()
-    {
-        _viewModel.DateTo.Should().BeNull();
-    }
-
-    [Fact]
-    public void StatusFilter_DefaultValue_IsNull()
-    {
-        _viewModel.StatusFilter.Should().BeNull();
-    }
-
-    [Fact]
-    public void IsLoading_DefaultValue_IsFalse()
-    {
-        _viewModel.IsLoading.Should().BeFalse();
-    }
-
-    [Fact]
-    public void ErrorMessage_DefaultValue_IsEmpty()
-    {
-        _viewModel.ErrorMessage.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void SelectedTransfer_DefaultValue_IsNull()
-    {
-        _viewModel.SelectedTransfer.Should().BeNull();
-    }
+    [Fact] public void SearchText_DefaultValue_IsEmpty() => _viewModel.SearchText.Should().BeEmpty();
+    [Fact] public void DateFrom_DefaultValue_IsNull() => _viewModel.DateFrom.Should().BeNull();
+    [Fact] public void DateTo_DefaultValue_IsNull() => _viewModel.DateTo.Should().BeNull();
+    [Fact] public void StatusFilter_DefaultValue_IsNull() => _viewModel.StatusFilter.Should().BeNull();
+    [Fact] public void IsLoading_DefaultValue_IsFalse() => _viewModel.IsLoading.Should().BeFalse();
+    [Fact] public void ErrorMessage_DefaultValue_IsEmpty() => _viewModel.ErrorMessage.Should().BeEmpty();
+    [Fact] public void SelectedTransfer_DefaultValue_IsNull() => _viewModel.SelectedTransfer.Should().BeNull();
 
     [Fact]
     public void Transfers_InitializesWithEmptyCollection()
@@ -86,11 +66,7 @@ public class StockTransfersListViewModelTests
         _viewModel.Transfers.Should().BeEmpty();
     }
 
-    [Fact]
-    public void TotalCount_DefaultValue_IsZero()
-    {
-        _viewModel.TotalCount.Should().Be(0);
-    }
+    [Fact] public void TotalCount_DefaultValue_IsZero() => _viewModel.TotalCount.Should().Be(0);
 
     #endregion
 
@@ -99,90 +75,72 @@ public class StockTransfersListViewModelTests
     [Fact]
     public void SearchText_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.SearchText = "بحث";
-
-        propertyChangedEvents.Should().Contain("SearchText");
+        events.Should().Contain("SearchText");
     }
 
     [Fact]
     public void DateFrom_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.DateFrom = DateTime.Today;
-
-        propertyChangedEvents.Should().Contain("DateFrom");
+        events.Should().Contain("DateFrom");
     }
 
     [Fact]
     public void DateTo_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.DateTo = DateTime.Today;
-
-        propertyChangedEvents.Should().Contain("DateTo");
+        events.Should().Contain("DateTo");
     }
 
     [Fact]
     public void StatusFilter_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.StatusFilter = (byte)InvoiceStatus.Draft;
-
-        propertyChangedEvents.Should().Contain("StatusFilter");
+        events.Should().Contain("StatusFilter");
     }
 
     [Fact]
     public void IsLoading_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        events.Should().Contain("IsLoading");
     }
 
     [Fact]
     public void ErrorMessage_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.ErrorMessage = "خطأ";
-
-        propertyChangedEvents.Should().Contain("ErrorMessage");
+        events.Should().Contain("ErrorMessage");
     }
 
     [Fact]
     public void SelectedTransfer_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        var transfer = new StockTransferDto(1, "TRF-001", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, 1, 0m, null, 1);
-        _viewModel.SelectedTransfer = transfer;
-
-        propertyChangedEvents.Should().Contain("SelectedTransfer");
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
+        _viewModel.SelectedTransfer = CreateTransfer(1, (byte)InvoiceStatus.Draft);
+        events.Should().Contain("SelectedTransfer");
     }
 
     #endregion
 
     #region Commands Tests
 
-    [Fact]
-    public void NewCommand_IsInitialized()
-    {
-        _viewModel.NewCommand.Should().NotBeNull();
-    }
+    [Fact] public void AddCommand_IsInitialized() => _viewModel.AddCommand.Should().NotBeNull();
+    [Fact] public void RefreshCommand_IsInitialized() => _viewModel.RefreshCommand.Should().NotBeNull();
 
     [Fact]
     public void ViewCommand_CannotExecute_WhenNoSelection()
@@ -194,9 +152,7 @@ public class StockTransfersListViewModelTests
     [Fact]
     public void ViewCommand_CanExecute_WhenTransferSelected()
     {
-        var transfer = new StockTransferDto(1, "TRF-001", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, 1, 0m, null, 1);
-        _viewModel.SelectedTransfer = transfer;
-        
+        _viewModel.SelectedTransfer = CreateTransfer(1, (byte)InvoiceStatus.Draft);
         _viewModel.ViewCommand.CanExecute(null).Should().BeTrue();
     }
 
@@ -210,9 +166,7 @@ public class StockTransfersListViewModelTests
     [Fact]
     public void EditCommand_CanExecute_WhenDraftTransferSelected()
     {
-        var transfer = new StockTransferDto(1, "TRF-001", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, 1, 0m, null, (byte)InvoiceStatus.Draft);
-        _viewModel.SelectedTransfer = transfer;
-        
+        _viewModel.SelectedTransfer = CreateTransfer(1, (byte)InvoiceStatus.Draft);
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
 
@@ -226,9 +180,7 @@ public class StockTransfersListViewModelTests
     [Fact]
     public void PostCommand_CanExecute_WhenDraftTransferSelected()
     {
-        var transfer = new StockTransferDto(1, "TRF-001", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, 1, 0m, null, (byte)InvoiceStatus.Draft);
-        _viewModel.SelectedTransfer = transfer;
-        
+        _viewModel.SelectedTransfer = CreateTransfer(1, (byte)InvoiceStatus.Draft);
         _viewModel.PostCommand.CanExecute(null).Should().BeTrue();
     }
 
@@ -242,16 +194,8 @@ public class StockTransfersListViewModelTests
     [Fact]
     public void CancelCommand_CanExecute_WhenPostedTransferSelected()
     {
-        var transfer = new StockTransferDto(1, "TRF-001", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, 1, 0m, null, (byte)InvoiceStatus.Posted);
-        _viewModel.SelectedTransfer = transfer;
-        
+        _viewModel.SelectedTransfer = CreateTransfer(1, (byte)InvoiceStatus.Posted);
         _viewModel.CancelCommand.CanExecute(null).Should().BeTrue();
-    }
-
-    [Fact]
-    public void RefreshCommand_IsInitialized()
-    {
-        _viewModel.RefreshCommand.Should().NotBeNull();
     }
 
     #endregion
@@ -263,16 +207,12 @@ public class StockTransfersListViewModelTests
     {
         var transfers = new List<StockTransferDto>
         {
-            new(1, "TRF-001", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, 1, 0m, null, (byte)InvoiceStatus.Draft),
-            new(2, "TRF-002", 1, "مستودع ج", 2, "مستودع د", DateTime.Today, null, 1, 0m, null, (byte)InvoiceStatus.Posted)
+            CreateTransfer(1, (byte)InvoiceStatus.Draft),
+            CreateTransfer(2, (byte)InvoiceStatus.Posted)
         };
 
         _mockTransferService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<byte?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<byte?>(), It.IsAny<bool>()))
             .ReturnsAsync(Result<List<StockTransferDto>>.Success(transfers));
 
         await _viewModel.LoadTransfersAsync();
@@ -285,11 +225,7 @@ public class StockTransfersListViewModelTests
     public async Task LoadTransfersAsync_WhenApiFails_SetsErrorMessage()
     {
         _mockTransferService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<byte?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<byte?>(), It.IsAny<bool>()))
             .ReturnsAsync(Result<List<StockTransferDto>>.Failure("فشل في الاتصال"));
 
         await _viewModel.LoadTransfersAsync();
@@ -303,11 +239,7 @@ public class StockTransfersListViewModelTests
     {
         var tcs = new TaskCompletionSource<Result<List<StockTransferDto>>>();
         _mockTransferService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<byte?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<byte?>(), It.IsAny<bool>()))
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadTransfersAsync();
@@ -322,17 +254,10 @@ public class StockTransfersListViewModelTests
     [Fact]
     public async Task LoadTransfersAsync_UpdatesTotalCount()
     {
-        var transfers = new List<StockTransferDto>
-        {
-            new(1, "TRF-001", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, 1, 0m, null, (byte)InvoiceStatus.Draft)
-        };
+        var transfers = new List<StockTransferDto> { CreateTransfer(1, (byte)InvoiceStatus.Draft) };
 
         _mockTransferService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<byte?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<byte?>(), It.IsAny<bool>()))
             .ReturnsAsync(Result<List<StockTransferDto>>.Success(transfers));
 
         await _viewModel.LoadTransfersAsync();

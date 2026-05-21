@@ -23,7 +23,7 @@ public class ToastNotificationService : IToastNotificationService
 
     private void ShowToast(string message, ToastType type, TimeSpan duration)
     {
-        Application.Current.Dispatcher.BeginInvoke(() =>
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(() =>
         {
             lock (_lock)
             {

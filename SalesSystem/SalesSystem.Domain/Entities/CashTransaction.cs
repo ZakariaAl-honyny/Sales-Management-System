@@ -23,7 +23,6 @@ public class CashTransaction : BaseEntity
     public int? ReferenceId { get; private set; }
     public string? Notes { get; private set; }
     public int CreatedBy { get; private set; }
-    public DateTime CreatedAt { get; private set; }
 
     // Navigation
     public CashBox CashBox { get; private set; } = null!;

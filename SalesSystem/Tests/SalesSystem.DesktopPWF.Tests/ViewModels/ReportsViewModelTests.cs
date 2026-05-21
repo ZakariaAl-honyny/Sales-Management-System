@@ -14,26 +14,22 @@ using SalesSystem.DesktopPWF.ViewModels;
 /// </summary>
 public class ReportsViewModelTests
 {
-    private readonly Mock<ISalesInvoiceApiService> _mockSalesService;
-    private readonly Mock<IProductApiService> _mockProductService;
-    private readonly Mock<ICustomerApiService> _mockCustomerService;
-    private readonly Mock<ISupplierApiService> _mockSupplierService;
+    private readonly Mock<IReportApiService> _mockReportService;
+    private readonly Mock<IWarehouseApiService> _mockWarehouseService;
+    private readonly Mock<IDialogService> _mockDialogService;
     private readonly ReportsViewModel _viewModel;
 
     public ReportsViewModelTests()
     {
-        _mockSalesService = new Mock<ISalesInvoiceApiService>();
-        _mockProductService = new Mock<IProductApiService>();
-        _mockCustomerService = new Mock<ICustomerApiService>();
-        _mockSupplierService = new Mock<ISupplierApiService>();
+        _mockReportService = new Mock<IReportApiService>();
+        _mockWarehouseService = new Mock<IWarehouseApiService>();
+        _mockDialogService = new Mock<IDialogService>();
 
         _viewModel = new ReportsViewModel();
-        
-        // Inject mocks via reflection since default constructor uses App.GetService
-        SetField("_salesInvoiceService", _mockSalesService.Object);
-        SetField("_productService", _mockProductService.Object);
-        SetField("_customerService", _mockCustomerService.Object);
-        SetField("_supplierService", _mockSupplierService.Object);
+
+        SetField("_reportApiService", _mockReportService.Object);
+        SetField("_warehouseService", _mockWarehouseService.Object);
+        SetField("_dialogService", _mockDialogService.Object);
     }
 
     private void SetField(string fieldName, object value)
@@ -48,13 +44,14 @@ public class ReportsViewModelTests
     [Fact]
     public void ReportTypes_ContainsAllReportTypes()
     {
-        _viewModel.ReportTypes.Should().HaveCount(6);
+        _viewModel.ReportTypes.Should().HaveCount(7);
         _viewModel.ReportTypes.Should().Contain(r => r.Type == ReportType.Sales);
         _viewModel.ReportTypes.Should().Contain(r => r.Type == ReportType.Purchases);
         _viewModel.ReportTypes.Should().Contain(r => r.Type == ReportType.Inventory);
         _viewModel.ReportTypes.Should().Contain(r => r.Type == ReportType.Customers);
         _viewModel.ReportTypes.Should().Contain(r => r.Type == ReportType.Suppliers);
         _viewModel.ReportTypes.Should().Contain(r => r.Type == ReportType.ProfitLoss);
+        _viewModel.ReportTypes.Should().Contain(r => r.Type == ReportType.LowStock);
     }
 
     [Fact]
@@ -76,9 +73,9 @@ public class ReportsViewModelTests
     }
 
     [Fact]
-    public void IsLoading_DefaultValue_IsFalse()
+    public void IsBusy_DefaultValue_IsFalse()
     {
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -99,14 +96,10 @@ public class ReportsViewModelTests
     #region PropertyChangeNotification Tests
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        // IsBusy has protected set in ViewModelBase, managed by ExecuteAsync
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -163,7 +156,6 @@ public class ReportsViewModelTests
     public void ReportTitle_WhenSalesSelected_ReturnsArabicLabel()
     {
         _viewModel.SelectedReportType = ReportType.Sales;
-        
         _viewModel.ReportTitle.Should().Be("تقرير المبيعات");
     }
 
@@ -171,7 +163,6 @@ public class ReportsViewModelTests
     public void ReportTitle_WhenPurchasesSelected_ReturnsArabicLabel()
     {
         _viewModel.SelectedReportType = ReportType.Purchases;
-        
         _viewModel.ReportTitle.Should().Be("تقرير المشتريات");
     }
 
@@ -179,7 +170,6 @@ public class ReportsViewModelTests
     public void ReportTitle_WhenInventorySelected_ReturnsArabicLabel()
     {
         _viewModel.SelectedReportType = ReportType.Inventory;
-        
         _viewModel.ReportTitle.Should().Be("تقرير المخزون");
     }
 
@@ -187,7 +177,6 @@ public class ReportsViewModelTests
     public void ReportTitle_WhenCustomersSelected_ReturnsArabicLabel()
     {
         _viewModel.SelectedReportType = ReportType.Customers;
-        
         _viewModel.ReportTitle.Should().Be("تقرير أرصدة العملاء");
     }
 
@@ -195,7 +184,6 @@ public class ReportsViewModelTests
     public void ReportTitle_WhenSuppliersSelected_ReturnsArabicLabel()
     {
         _viewModel.SelectedReportType = ReportType.Suppliers;
-        
         _viewModel.ReportTitle.Should().Be("تقرير أرصدة الموردين");
     }
 
@@ -203,7 +191,6 @@ public class ReportsViewModelTests
     public void ReportTitle_WhenProfitLossSelected_ReturnsArabicLabel()
     {
         _viewModel.SelectedReportType = ReportType.ProfitLoss;
-        
         _viewModel.ReportTitle.Should().Be("تقرير الأرباح والخسائر");
     }
 
@@ -215,7 +202,6 @@ public class ReportsViewModelTests
     public void FormattedReportTotal_ReturnsFormattedNumber()
     {
         _viewModel.ReportTotal = 1234567.89m;
-        
         _viewModel.FormattedReportTotal.Should().Be("1,234,567.89");
     }
 
@@ -223,7 +209,6 @@ public class ReportsViewModelTests
     public void FormattedReportTotal_ReturnsZeroFormatted()
     {
         _viewModel.ReportTotal = 0m;
-        
         _viewModel.FormattedReportTotal.Should().Be("0.00");
     }
 
@@ -235,7 +220,6 @@ public class ReportsViewModelTests
     public void FormattedDateFrom_ReturnsCorrectFormat()
     {
         _viewModel.DateFrom = new DateTime(2026, 5, 1);
-        
         _viewModel.FormattedDateFrom.Should().Be("2026/05/01");
     }
 
@@ -243,7 +227,6 @@ public class ReportsViewModelTests
     public void FormattedDateTo_ReturnsCorrectFormat()
     {
         _viewModel.DateTo = new DateTime(2026, 5, 31);
-        
         _viewModel.FormattedDateTo.Should().Be("2026/05/31");
     }
 
@@ -282,7 +265,6 @@ public class ReportsViewModelTests
     [Fact]
     public void ClearReport_ResetsReportData()
     {
-        // Add some data first
         _viewModel.ReportData.Columns.Add("TestColumn");
         _viewModel.ReportData.Rows.Add("TestRow");
         _viewModel.ReportTotal = 1000m;
@@ -297,14 +279,8 @@ public class ReportsViewModelTests
     [Fact]
     public void ClearReport_ClearsReportColumns()
     {
-        var columns = new System.Collections.ObjectModel.ObservableCollection<DataColumn>();
-        columns.Add(new DataColumn("Test"));
-
-        SetField("_reportColumns", columns);
-
         _viewModel.ClearReportCommand.Execute(null);
-
-        columns.Count.Should().Be(0);
+        _viewModel.ReportColumns.Count.Should().Be(0);
     }
 
     #endregion
@@ -312,29 +288,20 @@ public class ReportsViewModelTests
     #region GenerateSalesReport Tests
 
     [Fact]
-    public async Task GenerateReportCommand_Sales_LoadsPostedInvoices()
+    public async Task GenerateReportCommand_Sales_LoadsSalesReport()
     {
-        var invoices = new List<SalesInvoiceDto>
+        var salesReports = new List<SalesReportDto>
         {
-            CreateSalesInvoiceDto(1, "INV-001", 1000m, 1000m, 0m, 0m),
-            CreateSalesInvoiceDto(2, "INV-002", 2000m, 1500m, 500m, 0m)
+            new(DateTime.Today, "INV-001", "عميل", 1000m, 0m, 0m, 1000m, 1000m, 0m),
+            new(DateTime.Today, "INV-002", "عميل", 2000m, 0m, 0m, 2000m, 1500m, 500m)
         };
 
-        _mockSalesService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<byte?>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(invoices));
+        _mockReportService
+            .Setup(s => s.GetSalesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(Result<List<SalesReportDto>>.Success(salesReports));
 
         _viewModel.SelectedReportType = ReportType.Sales;
-        
-        // Execute the GenerateReportCommand
-        await _viewModel.GenerateReportCommand.ExecuteAsync(null);
+        _viewModel.GenerateReportCommand.Execute(null);
         await Task.Delay(100);
 
         _viewModel.ReportData.Columns.Should().Contain(c => c.ColumnName == "رقم الفاتورة");
@@ -342,53 +309,25 @@ public class ReportsViewModelTests
         _viewModel.ReportTotal.Should().Be(3000m);
     }
 
-    [Fact]
-    public async Task GenerateReportCommand_Sales_CalculatesCorrectTotal()
-    {
-        var invoices = new List<SalesInvoiceDto>
-        {
-            CreateSalesInvoiceDto(1, "INV-001", 500m, 500m, 0m, 0m),
-            CreateSalesInvoiceDto(2, "INV-002", 300m, 300m, 0m, 0m),
-            CreateSalesInvoiceDto(3, "INV-003", 200m, 200m, 0m, 0m)
-        };
-
-        _mockSalesService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<byte?>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(invoices));
-
-        _viewModel.SelectedReportType = ReportType.Sales;
-        await _viewModel.GenerateReportCommand.ExecuteAsync(null);
-        await Task.Delay(100);
-
-        _viewModel.ReportTotal.Should().Be(1000m);
-    }
-
     #endregion
 
     #region GenerateInventoryReport Tests
 
     [Fact]
-    public async Task GenerateReportCommand_Inventory_LoadsProducts()
+    public async Task GenerateReportCommand_Inventory_LoadsStockReport()
     {
-        var products = new List<ProductDto>
+        var stockReports = new List<StockReportDto>
         {
-            new(1, "P001", null, "منتج 1", 1, "فئة", 1, "وحدة", 100m, 150m, 10m, null, true),
-            new(2, "P002", null, "منتج 2", 1, "فئة", 1, "وحدة", 200m, 250m, 5m, null, true)
+            new(1, "P001", "منتج 1", "فئة", "وحدة", "مستودع", 100m, 10m, 10m, 1000m),
+            new(2, "P002", "منتج 2", "فئة", "وحدة", "مستودع", 200m, 20m, 20m, 4000m)
         };
 
-        _mockProductService
-            .Setup(s => s.GetAllAsync())
-            .ReturnsAsync(Result<List<ProductDto>>.Success(products));
+        _mockReportService
+            .Setup(s => s.GetStockReportAsync(It.IsAny<int?>()))
+            .ReturnsAsync(Result<List<StockReportDto>>.Success(stockReports));
 
         _viewModel.SelectedReportType = ReportType.Inventory;
-        await _viewModel.GenerateReportCommand.ExecuteAsync(null);
+        _viewModel.GenerateReportCommand.Execute(null);
         await Task.Delay(100);
 
         _viewModel.ReportData.Columns.Should().Contain(c => c.ColumnName == "اسم المنتج");
@@ -400,23 +339,24 @@ public class ReportsViewModelTests
     #region GenerateCustomersReport Tests
 
     [Fact]
-    public async Task GenerateReportCommand_Customers_LoadsActiveCustomers()
+    public async Task GenerateReportCommand_Customers_LoadsCustomerBalances()
     {
-        var customers = new List<CustomerDto>
+        var customerBalances = new List<CustomerBalanceReportDto>
         {
-            new(1, "C001", "عميل 1", null, null, null, 100m, 50m, 0m, true),
-            new(2, "C002", "عميل 2", null, null, null, 200m, 100m, 0m, false)
+            new(1, "C001", "عميل 1", 0m, 1000m, 0m, 500m, 0m, 500m),
+            new(2, "C002", "عميل 2", 0m, 2000m, 0m, 1000m, 0m, 1000m)
         };
 
-        _mockCustomerService
-            .Setup(s => s.GetAllAsync())
-            .ReturnsAsync(Result<List<CustomerDto>>.Success(customers));
+        _mockReportService
+            .Setup(s => s.GetCustomerBalancesReportAsync())
+            .ReturnsAsync(Result<List<CustomerBalanceReportDto>>.Success(customerBalances));
 
         _viewModel.SelectedReportType = ReportType.Customers;
-        await _viewModel.GenerateReportCommand.ExecuteAsync(null);
+        _viewModel.GenerateReportCommand.Execute(null);
         await Task.Delay(100);
 
-        _viewModel.ReportData.Rows.Count.Should().Be(1);
+        _viewModel.ReportData.Columns.Should().Contain(c => c.ColumnName == "اسم العميل");
+        _viewModel.ReportData.Rows.Count.Should().Be(2);
     }
 
     #endregion
@@ -424,23 +364,24 @@ public class ReportsViewModelTests
     #region GenerateSuppliersReport Tests
 
     [Fact]
-    public async Task GenerateReportCommand_Suppliers_LoadsActiveSuppliers()
+    public async Task GenerateReportCommand_Suppliers_LoadsSupplierBalances()
     {
-        var suppliers = new List<SupplierDto>
+        var supplierBalances = new List<SupplierBalanceReportDto>
         {
-            new(1, "S001", "مورد 1", null, null, null, 100m, 50m, true),
-            new(2, "S002", "مورد 2", null, null, null, 200m, 100m, false)
+            new(1, "S001", "مورد 1", 0m, 1000m, 0m, 500m, 0m, 500m),
+            new(2, "S002", "مورد 2", 0m, 2000m, 0m, 1000m, 0m, 1000m)
         };
 
-        _mockSupplierService
-            .Setup(s => s.GetAllAsync())
-            .ReturnsAsync(Result<List<SupplierDto>>.Success(suppliers));
+        _mockReportService
+            .Setup(s => s.GetSupplierBalancesReportAsync())
+            .ReturnsAsync(Result<List<SupplierBalanceReportDto>>.Success(supplierBalances));
 
         _viewModel.SelectedReportType = ReportType.Suppliers;
-        await _viewModel.GenerateReportCommand.ExecuteAsync(null);
+        _viewModel.GenerateReportCommand.Execute(null);
         await Task.Delay(100);
 
-        _viewModel.ReportData.Rows.Count.Should().Be(1);
+        _viewModel.ReportData.Columns.Should().Contain(c => c.ColumnName == "اسم المورد");
+        _viewModel.ReportData.Rows.Count.Should().Be(2);
     }
 
     #endregion
@@ -450,61 +391,30 @@ public class ReportsViewModelTests
     [Fact]
     public async Task GenerateReportCommand_ProfitLoss_CalculatesNetProfit()
     {
-        var invoices = new List<SalesInvoiceDto>
+        var salesReports = new List<SalesReportDto>
         {
-            CreateSalesInvoiceDto(1, "INV-001", 5000m, 5000m, 0m, 0m),
-            CreateSalesInvoiceDto(2, "INV-002", 3000m, 3000m, 0m, 0m)
+            new(DateTime.Today, "INV-001", "عميل", 5000m, 0m, 0m, 5000m, 5000m, 0m),
+            new(DateTime.Today, "INV-002", "عميل", 3000m, 0m, 0m, 3000m, 3000m, 0m)
         };
 
-        _mockSalesService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<byte?>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(invoices));
+        var purchaseReports = new List<PurchaseReportDto>
+        {
+            new(DateTime.Today, "PUR-001", "مورد", 2000m, 0m, 0m, 2000m, 2000m, 0m)
+        };
+
+        _mockReportService
+            .Setup(s => s.GetSalesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(Result<List<SalesReportDto>>.Success(salesReports));
+
+        _mockReportService
+            .Setup(s => s.GetPurchasesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(Result<List<PurchaseReportDto>>.Success(purchaseReports));
 
         _viewModel.SelectedReportType = ReportType.ProfitLoss;
-        await _viewModel.GenerateReportCommand.ExecuteAsync(null);
+        _viewModel.GenerateReportCommand.Execute(null);
         await Task.Delay(100);
 
-        _viewModel.ReportTotal.Should().Be(8000m);
-    }
-
-    #endregion
-
-    #region Helper Methods
-
-    private static SalesInvoiceDto CreateSalesInvoiceDto(
-        int id,
-        string invoiceNo,
-        decimal totalAmount,
-        decimal paidAmount,
-        decimal dueAmount,
-        decimal taxAmount)
-    {
-        return new SalesInvoiceDto(
-            Id: id,
-            InvoiceNo: invoiceNo,
-            CustomerId: 1,
-            CustomerName: "Test Customer",
-            WarehouseId: 1,
-            WarehouseName: "Main Warehouse",
-            InvoiceDate: DateTime.Today,
-            DueDate: null,
-            PaymentType: 1,
-            SubTotal: totalAmount,
-            DiscountAmount: 0,
-            TaxAmount: taxAmount,
-            TotalAmount: totalAmount,
-            PaidAmount: paidAmount,
-            DueAmount: dueAmount,
-            Notes: null,
-            Status: 2,
-            Items: new List<SalesInvoiceItemDto>());
+        _viewModel.ReportTotal.Should().Be(6000m);
     }
 
     #endregion

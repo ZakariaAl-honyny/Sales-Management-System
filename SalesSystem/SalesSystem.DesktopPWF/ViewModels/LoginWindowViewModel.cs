@@ -18,15 +18,15 @@ public class LoginWindowViewModel : ViewModelBase
     private string _username = string.Empty;
     private string _password = string.Empty;
     private bool _rememberMe;
-    private bool _isLoading;
-    private string? _errorMessage;
 
     public LoginWindowViewModel(IAuthApiService authService, ISessionService sessionService)
     {
         _authService = authService;
         _sessionService = sessionService;
 
-        LoginCommand = new AsyncRelayCommand(LoginAsync, () => !IsLoading && !string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password));
+        LoginCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(LoginOperationAsync, ex => ErrorMessage = HandleException(ex, "LoginWindowViewModel.LoginAsync"), "جاري تسجيل الدخول...")),
+            () => !string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password));
     }
 
     public string Username
@@ -59,18 +59,7 @@ public class LoginWindowViewModel : ViewModelBase
         set => SetProperty(ref _rememberMe, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set
-        {
-            if (SetProperty(ref _isLoading, value))
-            {
-                ((AsyncRelayCommand)LoginCommand).RaiseCanExecuteChanged();
-            }
-        }
-    }
-
+    private string? _errorMessage;
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -79,57 +68,42 @@ public class LoginWindowViewModel : ViewModelBase
 
     public AsyncRelayCommand LoginCommand { get; }
 
-    private async Task LoginAsync()
+    private async Task LoginOperationAsync()
     {
-        try
+        ErrorMessage = null;
+
+        var request = new LoginRequest(Username, Password);
+        var result = await _authService.LoginAsync(request);
+
+        if (result.IsSuccess)
         {
-            IsLoading = true;
-            ErrorMessage = null;
+            var response = result.Value;
 
-            var request = new LoginRequest(Username, Password);
-            var result = await _authService.LoginAsync(request);
+            _sessionService.SetSession(
+                response!.Token,
+                response.UserName,
+                response.UserId,
+                (UserRole)response.Role);
 
-            if (result.IsSuccess)
+            await InvokeOnUIThreadAsync(async () =>
             {
-                var response = result.Value;
+                var mainWindow = new MainWindow();
+                mainWindow.Show();
+                System.Windows.Application.Current.MainWindow = mainWindow;
 
-                // Store session
-                _sessionService.SetSession(
-                    response!.Token,
-                    response.UserName,
-                    response.UserId,
-                    (UserRole)response.Role);
-
-                // Open main window and close login
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                foreach (Window window in System.Windows.Application.Current.Windows)
                 {
-                    var mainWindow = new MainWindow();
-                    mainWindow.Show();
-                    System.Windows.Application.Current.MainWindow = mainWindow;
-
-                    // Close this login window
-                    foreach (Window window in System.Windows.Application.Current.Windows)
+                    if (window is LoginWindow)
                     {
-                        if (window is LoginWindow)
-                        {
-                            window.Close();
-                            break;
-                        }
+                        window.Close();
+                        break;
                     }
-                });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "اسم المستخدم أو كلمة المرور غير صحيحة", "LoginWindowViewModel.LoginAsync");
-            }
+                }
+            });
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "LoginWindowViewModel.LoginAsync", $"[LoginWindowViewModel.LoginAsync] Unexpected error during login process for user {Username}");
-        }
-        finally
-        {
-            IsLoading = false;
+            ErrorMessage = HandleFailure(result.Error ?? "اسم المستخدم أو كلمة المرور غير صحيحة", "LoginWindowViewModel.LoginAsync");
         }
     }
 }

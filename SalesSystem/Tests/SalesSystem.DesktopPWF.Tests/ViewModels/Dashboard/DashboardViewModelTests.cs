@@ -95,14 +95,15 @@ public class DashboardViewModelTests : IDisposable
 
         var viewModel = CreateViewModel();
 
-        await viewModel.LoadDataAsync();
+        viewModel.RefreshCommand.Execute(null);
+        await Task.Delay(200);
 
         viewModel.TotalCustomers.Should().Be(10, "should use dashboard summary value");
         viewModel.LowStockCount.Should().Be(3, "should use dashboard summary value");
     }
 
     [Fact]
-    public async Task RefreshCommand_WhenAlreadyLoading_DoesNotReload()
+    public async Task RefreshCommand_WhenAlreadyExecuting_DoesNotReload()
     {
         var callCount = 0;
 
@@ -143,11 +144,15 @@ public class DashboardViewModelTests : IDisposable
 
         var viewModel = CreateViewModel();
 
-        viewModel.IsLoading = true;
+        // First execution
+        viewModel.RefreshCommand.Execute(null);
+        await Task.Delay(50);
 
-        await viewModel.LoadDataAsync();
+        // Second execution while first is still running should be ignored by AsyncRelayCommand
+        viewModel.RefreshCommand.Execute(null);
+        await Task.Delay(200);
 
-        callCount.Should().Be(0, "loading should prevent API calls");
+        callCount.Should().Be(1, "concurrent execution should be prevented by AsyncRelayCommand");
     }
 
     #endregion
@@ -336,7 +341,8 @@ public class DashboardViewModelTests : IDisposable
 
         var viewModel = CreateViewModel();
 
-        await viewModel.LoadDataAsync();
+        viewModel.RefreshCommand.Execute(null);
+        await Task.Delay(200);
 
         // Verify TodaySales and TodayPurchases are populated from dashboard summary
         viewModel.TodaySales.Should().Be(5000m);
@@ -348,11 +354,11 @@ public class DashboardViewModelTests : IDisposable
     #region Property Tests
 
     [Fact]
-    public void IsLoading_DefaultIsFalse()
+    public void IsBusy_DefaultIsFalse()
     {
         var viewModel = CreateViewModel();
 
-        viewModel.IsLoading.Should().BeFalse("IsLoading should be false by default");
+        viewModel.IsBusy.Should().BeFalse("IsBusy should be false by default");
     }
 
     [Fact]

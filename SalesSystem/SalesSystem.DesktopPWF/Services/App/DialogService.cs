@@ -10,6 +10,7 @@ public interface IDialogService
     void ShowError(string message, string title = "خطأ");
     bool ShowConfirmation(string message, string title = "تأكيد");
     bool ShowDialog(object viewModel);
+    Task ShowInfoAsync(string title, string message);
     Task ShowErrorAsync(string title, string message);
     Task ShowSuccessAsync(string title, string message);
     Task ShowWarningAsync(string title, string message);
@@ -21,23 +22,43 @@ public class DialogService : IDialogService
 {
     public void ShowInfo(string message, string title = "معلومات")
     {
-        MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK, MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            var dialog = new InfoDialog(message, title);
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.ShowDialog();
+        });
     }
 
     public void ShowWarning(string message, string title = "تنبيه")
     {
-        MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Warning, MessageBoxResult.OK, MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            var dialog = new WarningDialog(message);
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.ShowDialog();
+        });
     }
 
     public void ShowError(string message, string title = "خطأ")
     {
-        MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Error, MessageBoxResult.OK, MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            var dialog = new ErrorDialog(message);
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.ShowDialog();
+        });
     }
 
     public bool ShowConfirmation(string message, string title = "تأكيد")
     {
-        var result = MessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No, MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
-        return result == MessageBoxResult.Yes;
+        return System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            var dialog = new ConfirmationDialog(message);
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.ShowDialog();
+            return dialog.Confirmed;
+        });
     }
 
     public bool ShowDialog(object viewModel)
@@ -76,9 +97,9 @@ public class DialogService : IDialogService
                     };
                 }
 
-                if (Application.Current.MainWindow != null && Application.Current.MainWindow != window)
+                if (System.Windows.Application.Current.MainWindow != null && System.Windows.Application.Current.MainWindow != window)
                 {
-                    window.Owner = Application.Current.MainWindow;
+                    window.Owner = System.Windows.Application.Current.MainWindow;
                 }
                 var result = window.ShowDialog();
                 var drProp = viewModel.GetType().GetProperty("DialogResult");
@@ -92,42 +113,52 @@ public class DialogService : IDialogService
         return false;
     }
 
+    public Task ShowInfoAsync(string title, string message)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new InfoDialog(message, title);
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.ShowDialog();
+        }).Task;
+    }
+
     public Task ShowErrorAsync(string title, string message)
     {
-        return Application.Current.Dispatcher.InvokeAsync(() =>
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new ErrorDialog(message);
-            dialog.Owner = Application.Current.MainWindow;
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
             dialog.ShowDialog();
         }).Task;
     }
 
     public Task ShowSuccessAsync(string title, string message)
     {
-        return Application.Current.Dispatcher.InvokeAsync(() =>
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new SuccessDialog(message);
-            dialog.Owner = Application.Current.MainWindow;
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
             dialog.ShowDialog();
         }).Task;
     }
 
     public Task ShowWarningAsync(string title, string message)
     {
-        return Application.Current.Dispatcher.InvokeAsync(() =>
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new WarningDialog(message);
-            dialog.Owner = Application.Current.MainWindow;
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
             dialog.ShowDialog();
         }).Task;
     }
 
 public Task<bool> ShowConfirmationAsync(string title, string message)
     {
-        return Application.Current.Dispatcher.InvokeAsync(() =>
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new ConfirmationDialog(message);
-            dialog.Owner = Application.Current.MainWindow;
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
             dialog.ShowDialog();
             return dialog.Confirmed;
         }).Task;
@@ -135,10 +166,10 @@ public Task<bool> ShowConfirmationAsync(string title, string message)
 
     public Task<DeleteStrategy> ShowDeleteConfirmationAsync(string itemDescription)
     {
-        return Application.Current.Dispatcher.InvokeAsync(() =>
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new DeleteConfirmationDialog(itemDescription);
-            dialog.Owner = Application.Current.MainWindow;
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
             dialog.ShowDialog();
             return dialog.SelectedStrategy;
         }).Task;

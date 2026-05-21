@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.3%20Expansion-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.5%20Refactored-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -83,6 +83,16 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 ```
 
 > **Key Principle:** The Desktop app **never** connects to the database directly. All communication goes through the Web API.
+
+### New Services (v4.4)
+- `IUpdaterService` / `UpdaterService` / `GitHubUpdaterService` — Auto-update with SHA256 verification
+- `IConnectionStringProtector` / `ConnectionStringProtector` — DPAPI encryption for connection strings
+- `FirstRunSetupService` — Auto-encrypts plaintext connection string on first run
+- `SecureDbContextFactory` — Decrypts connection string before creating DbContext
+- `ScheduledBackupWorker` — BackgroundService for daily 2:00 AM backups
+- `SecurityAudit` — DEBUG-only pre-build security checks
+- `AdminOnlyViewModel` — Base class enforcing Admin role for admin screens
+- `UpdateDialogViewModel` — WPF update dialog with IDisposable (dispose CTS)
 
 ### New Services (v4.3)
 - `UpdateProductPricingService` — WeightedAverage / LastPurchasePrice / SupplierPrice costing
@@ -176,6 +186,56 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - Cash transfers require TWO transactions (Out + In)
 - `DailyClosure` for end-of-day reconciliation
 
+### 🔄 Auto-Update System (v4.4)
+- Background update check 3 seconds after startup — NEVER blocks app
+- SHA256 checksum verification before launching installer
+- Borderless RTL WPF dialog with version comparison, changelog, progress bar
+- Skip version / Remind Later / Install Now actions
+- Manual update check from Help menu
+- GitHub API release check as alternative to custom server
+- `IUpdaterService` returns `Result<T>` — never throws exceptions
+- 8-second timeout on update check — silent failure on network issues
+
+### 🔒 Security & DPAPI (v4.4)
+- Connection strings encrypted via DPAPI (`IDataProtector`) with `"DPAPI:"` prefix
+- `FirstRunSetupService` auto-encrypts plaintext connection string on first run
+- `SecureDbContextFactory` decrypts connection string before creating DbContext
+- DataProtection keys stored in `%ProgramData%\SalesSystem\DataProtectionKeys`
+- `SecurityAudit.cs` — DEBUG-only pre-build security checks
+- Atomic file writes (`.tmp` → `File.Replace()` → `.bak`) for config files
+- JWT secret from environment variable — throws in production if missing
+
+### 💾 Backup System (v4.4)
+- `BackupService` — raw SQL `BACKUP DATABASE` / `RESTORE DATABASE` (no SMO)
+- Restore uses `SINGLE_USER WITH ROLLBACK AFTER 30` — safe for active transactions
+- `TrySetMultiUserAsync` recovery on restore failure — NEVER leaves DB in SINGLE_USER
+- `ScheduledBackupWorker` — `BackgroundService` running daily at 2:00 AM
+- Configurable retention days (default 30) — old backups auto-deleted
+- `int.TryParse` for all config values — no exceptions on bad config
+
+### 🖥️ Windows Service (v4.4)
+- API runs as Windows Service via `UseWindowsService()`
+- Service name: `SalesSystemService` with Arabic display name
+- Auto-recovery: 3 restarts on failure (1min, 5min, 15min delays)
+- Serilog EventLog sink for Windows Service logging
+- SQL retry on startup: 3 attempts × 5 second delay
+- Database migration runs on service startup (auto-migrate)
+- `Install-Service.bat` / `Uninstall-Service.bat` scripts
+
+### 👑 Admin Screens (v4.4)
+- `AdminOnlyViewModel` base class enforces Admin role
+- Non-admin users get `UnauthorizedAccessException` — admin UI hidden
+- `UserListViewModel` with Toggle Status (soft delete) and Reset Password
+- `UsersListView` DataGrid with Arabic labels and action buttons
+- Constructor injection — no service locator anti-pattern
+
+### 📦 Installer (v4.4)
+- Inno Setup script (`SalesSystem.iss`) — admin install required
+- .NET 10 runtime check before installation
+- Windows Service auto-start configured during install
+- Creates backup directory and sets permissions
+- Arabic UI throughout installer
+
 ### 🔒 Defensive Programming (v4.2)
 - Guard Clauses on ALL Domain entities
 - Arabic error messages for validation failures
@@ -236,6 +296,10 @@ The following features are **not included** in the current MVP but are planned f
 | **Image Processing** | SixLabors.ImageSharp | 3.1.x |
 | **Thermal Printing** | Win32 raw (OpenPrinter/WritePrinter) | — |
 | **Reports (Excel)** | ClosedXML | 0.102.x |
+| **Data Protection** | ASP.NET Core DataProtection | 10.x |
+| **Windows Service** | Microsoft.Extensions.Hosting.WindowsServices | 10.x |
+| **Event Log** | Serilog.Sinks.EventLog | 8.x |
+| **Installer** | Inno Setup | 6.x |
 
 ---
 
@@ -255,7 +319,7 @@ The following features are **not included** in the current MVP but are planned f
 | **Payments** | CustomerPayments, SupplierPayments |
 | **Cash Management** | CashBoxes, CashTransactions |
 | **Pricing & Costing** | ProductPriceHistory (price audit trail) |
-| **System** | SystemSettings (costing method), StoreSettings, DocumentSequences, InventoryMovements, SystemLog
+| **System** | SystemSettings (costing method), StoreSettings, DocumentSequences, InventoryMovements, SystemLog |
 
 ### Key Constraints
 - `decimal(18,2)` for all money fields — **never** `float` or `double`
@@ -263,6 +327,7 @@ The following features are **not included** in the current MVP but are planned f
 - `nvarchar` for all text (Arabic + English support)
 - `CHECK (Quantity >= 0)` on warehouse stock
 - Soft delete pattern (`IsActive` flag) — no hard deletes
+- DPAPI-encrypted connection strings with `"DPAPI:"` prefix
 
 ---
 
@@ -274,7 +339,11 @@ The following features are **not included** in the current MVP but are planned f
 | Password Storage | BCrypt hash (work factor: 12) |
 | Authorization | Policy-based (`AdminOnly`, `ManagerAndAbove`, `AllStaff`) |
 | Token Storage | In-memory only (Desktop) — never persisted to disk |
-| Connection Strings | Environment variables — never in source code |
+| Connection Strings | DPAPI-encrypted with `"DPAPI:"` prefix — `FirstRunSetupService` auto-encrypts |
+| Data Protection Keys | `%ProgramData%\SalesSystem\DataProtectionKeys` — DPAPI-encrypted |
+| JWT Secret | Environment variable only — throws in production if missing |
+| Config File Writes | Atomic pattern: `.tmp` → `File.Replace()` → `.bak` |
+| Security Audit | `SecurityAudit.cs` — DEBUG-only checks for unencrypted strings, hardcoded passwords |
 | User Deletion | Soft delete only — FK integrity preserved |
 
 ---
@@ -343,7 +412,8 @@ dotnet run
 | Phase 6 | Desktop Modules — Products, Customers, Sales, Purchases, Returns, Reports | ✅ Completed |
 | **Phase 7** | **Printing Engine** — A4 PDF (QuestPDF), 80mm Thermal (ESC/POS Win32), Preview, API Endpoints, WPF Integration, Print Settings Persistence | ✅ **Completed** |
 | **Phase 8** | Dynamic UOM + Costing + Cash Boxes | ✅ Completed |
-| **Phase 9** | Production — Backup, Windows Service, Installer | 🔲 Planned |
+| **Phase 9** | **Production Readiness** — Auto-Update, DPAPI Security, Backup System, Windows Service, Admin Screens, Inno Setup Installer | ✅ **Completed** |
+| **Phase 10** | **Code Quality & Refactoring** — ExecuteAsync() wrapper, MediatR removal, Legacy deletion, Test updates, MASTER-PLAN.md rewrite | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -356,6 +426,36 @@ dotnet run
 | 4 — PrintService | Win32 raw printing (`OpenPrinter`/`WritePrinter`), temp-file cleanup, Arabic error messages | ✅ |
 | 5 — API + Desktop | `PrintController` (11 endpoints), `IPrintApiService`/`PrintApiService`, `PdfPreviewWindow`, WPF print buttons, DI registrations | ✅ |
 | 6 — Production | Print settings in `SystemSetting` table, `IPrintApiService` injection into ViewModels, test print endpoint, 254+ tests | ✅ |
+
+---
+
+## 🆕 What's New in v4.5
+
+| Feature | Description |
+|---------|-------------|
+| **ExecuteAsync() Pattern** | Centralized error handling wrapper in ViewModelBase — eliminates manual try/catch in all ViewModels |
+| **IsBusy Property** | Replaces IsLoading — automatically managed by ExecuteAsync() |
+| **MediatR Removed** | Unused package removed — replaced ProductPriceQuery with IProductPriceService (Service Layer) |
+| **Legacy WinForms Deleted** | Abandoned SalesSystem.Desktop/ directory removed — all functionality rebuilt in WPF |
+| **MASTER-PLAN.md Rewritten** | Now reflects actual Clean Architecture (Layered) — NOT aspirational Vertical Slices |
+| **Test Files Updated** | Application.Tests, Api.Tests, DesktopPWF.Tests, E2ETests — all updated to match current API signatures |
+| **E2ETests Fixed** | CS0118 namespace conflict resolved (FlaUI.Core.Application vs System.Windows.Application) |
+| **AGENTS.md Updated** | v4.5 with RULE-141 to RULE-150 (ExecuteAsync, MediatR removal, Legacy deletion) |
+
+---
+
+## 🆕 What's New in v4.4
+
+| Feature | Description |
+|---------|-------------|
+| **Auto-Update System** | Background update check, SHA256 verification, RTL WPF dialog, GitHub API support |
+| **DPAPI Security** | Connection string encryption, FirstRunSetupService, SecurityAudit |
+| **Backup System** | Raw SQL backup/restore, scheduled daily backups, auto-recovery from SINGLE_USER |
+| **Windows Service** | UseWindowsService(), auto-recovery, EventLog logging, install scripts |
+| **Admin Screens** | AdminOnlyViewModel, User management (toggle status, reset password) |
+| **Inno Setup Installer** | .NET 10 runtime check, service auto-start, Arabic UI |
+| **Dialog Service Enhanced** | ShowInfoAsync (blue theme), styled dialogs replace all MessageBox.Show |
+| **Atomic File Writes** | .tmp → File.Replace() → .bak pattern for all config file writes |
 
 ---
 
@@ -384,7 +484,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 102+ non-negotiable rules (RULE-001 to RULE-102)
+1. Read [`AGENTS.md`](AGENTS.md) — all 140+ non-negotiable rules (RULE-001 to RULE-140)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

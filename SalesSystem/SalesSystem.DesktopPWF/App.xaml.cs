@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Serilog;
+using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels;
@@ -20,6 +21,8 @@ using SalesSystem.DesktopPWF.ViewModels.Returns;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
 using SalesSystem.DesktopPWF.ViewModels.Categories;
 using SalesSystem.DesktopPWF.ViewModels.Units;
+using SalesSystem.DesktopPWF.ViewModels.Updates;
+using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF;
@@ -67,6 +70,9 @@ public partial class App : System.Windows.Application
             var mainWindow = new MainWindow();
             mainWindow.Show();
             MainWindow = mainWindow;
+
+            // Background update check - never block startup
+            _ = ScheduleBackgroundUpdateCheckAsync();
         }
         else
         {
@@ -112,6 +118,9 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ISoundService, SoundService>();
         services.AddSingleton<IBarcodeInputService, BarcodeInputService>();
         services.AddSingleton<IToastNotificationService, ToastNotificationService>();
+
+        // Update services
+        services.AddSingleton<IUpdaterService, UpdaterService>();
 
         // API Services
         services.AddSingleton<IAuthApiService, AuthApiService>();
@@ -252,5 +261,63 @@ public partial class App : System.Windows.Application
         var errorMessage = $"[ASYNC TASK EXCEPTION] Location: {e.Exception.Source}. Context: TaskScheduler Unobserved Exception.";
         Log.Error(e.Exception, errorMessage);
         e.SetObserved();
+    }
+
+    // ═══════════════════════════════════════════════
+    // UPDATE CHECK
+    // ═══════════════════════════════════════════════
+
+    private async Task ScheduleBackgroundUpdateCheckAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            await CheckForUpdatesInBackgroundAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Background update check failed silently");
+        }
+    }
+
+    private async Task CheckForUpdatesInBackgroundAsync()
+    {
+        try
+        {
+            var updaterService = _serviceProvider!.GetRequiredService<IUpdaterService>();
+
+            var result = await updaterService.CheckForUpdatesAsync();
+
+            if (!result.IsSuccess || !result.Value.UpdateAvailable || result.Value.UpdateInfo == null)
+                return;
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                ShowUpdateDialog(result.Value.UpdateInfo);
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Background update check failed silently");
+        }
+    }
+
+    private void ShowUpdateDialog(UpdateInfo updateInfo)
+    {
+        var updaterService = _serviceProvider!.GetRequiredService<IUpdaterService>();
+
+        var viewModel = new UpdateDialogViewModel(updaterService, updateInfo);
+
+        var dialog = new UpdateDialog(viewModel)
+        {
+            Owner = Current.MainWindow
+        };
+
+        dialog.ShowDialog();
+
+        Log.Information(
+            "User chose: {Action} for version {Version}",
+            viewModel.Result,
+            updateInfo.LatestVersion);
     }
 }

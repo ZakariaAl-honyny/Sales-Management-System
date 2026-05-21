@@ -27,21 +27,4 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!-- Exclude broken test files - need updates to match current ViewModel APIs -->
-  <ItemGroup>
-    <Compile Remove="ViewModels\WarehouseListViewModelTests.cs" />
-    <Compile Remove="ViewModels\LoginWindowViewModelTests.cs" />
-    <Compile Remove="ViewModels\Suppliers\SupplierListViewModelTests.cs" />
-    <Compile Remove="ViewModels\ReportsViewModelTests.cs" />
-    <Compile Remove="ViewModels\WarehouseEditorViewModelTests.cs" />
-    <Compile Remove="ViewModels\Payments\CustomerPaymentEditorViewModelTests.cs" />
-    <Compile Remove="ViewModels\Payments\CustomerPaymentsListViewModelTests.cs" />
-    <Compile Remove="ViewModels\Payments\SupplierPaymentEditorViewModelTests.cs" />
-    <Compile Remove="ViewModels\Payments\SupplierPaymentsListViewModelTests.cs" />
-    <Compile Remove="ViewModels\Transfers\StockTransferEditorViewModelTests.cs" />
-    <Compile Remove="ViewModels\Transfers\StockTransfersListViewModelTests.cs" />
-    <Compile Remove="ViewModels\Returns\SalesReturnListViewModelTests.cs" />
-    <Compile Remove="ViewModels\Returns\PurchaseReturnListViewModelTests.cs" />
-  </ItemGroup>
-
 </Project>
