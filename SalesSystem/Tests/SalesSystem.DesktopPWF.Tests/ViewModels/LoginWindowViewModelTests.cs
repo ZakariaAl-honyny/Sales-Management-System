@@ -5,10 +5,9 @@ using System.Windows.Input;
 using FluentAssertions;
 using Moq;
 using SalesSystem.Contracts.Common;
-using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services;
 using SalesSystem.DesktopPWF.ViewModels;
 
@@ -189,10 +188,11 @@ public class LoginWindowViewModelTests
     public async Task LoginCommand_WhenSuccessful_SetsSession()
     {
         var loginResponse = new LoginResponse(
-            Token: "test-token-123",
-            UserName: "admin",
             UserId: 1,
+            UserName: "admin",
+            FullName: "Admin User",
             Role: (byte)UserRole.Admin,
+            Token: "test-token-123",
             ExpiresAt: DateTime.UtcNow.AddHours(8));
 
         _mockAuthService
@@ -241,17 +241,18 @@ public class LoginWindowViewModelTests
         _viewModel.Username = "admin";
         _viewModel.Password = "password";
 
-        var executeTask = _viewModel.LoginCommand.ExecuteAsync(null);
+        _viewModel.LoginCommand.Execute(null);
         _viewModel.IsLoading.Should().BeTrue();
 
         tcs.SetResult(Result<LoginResponse>.Success(new LoginResponse(
-            Token: "token",
-            UserName: "admin",
             UserId: 1,
+            UserName: "admin",
+            FullName: "Admin",
             Role: (byte)UserRole.Admin,
+            Token: "token",
             ExpiresAt: DateTime.UtcNow.AddHours(8))));
 
-        await executeTask;
+        await tcs.Task;
 
         _viewModel.IsLoading.Should().BeFalse();
     }
@@ -264,10 +265,11 @@ public class LoginWindowViewModelTests
         _mockAuthService
             .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
             .ReturnsAsync(Result<LoginResponse>.Success(new LoginResponse(
-                Token: "token",
-                UserName: "admin",
                 UserId: 1,
+                UserName: "admin",
+                FullName: "Admin",
                 Role: (byte)UserRole.Admin,
+                Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))));
 
         _viewModel.Username = "admin";

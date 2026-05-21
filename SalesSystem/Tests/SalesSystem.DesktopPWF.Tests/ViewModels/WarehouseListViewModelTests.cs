@@ -7,7 +7,9 @@ using FluentAssertions;
 using Moq;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Enums;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels;
 
 /// <summary>
@@ -18,6 +20,7 @@ public class WarehouseListViewModelTests : IDisposable
     private readonly Mock<IWarehouseApiService> _mockWarehouseService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
+    private readonly Mock<IToastNotificationService> _mockToastService;
     private readonly WarehouseListViewModel _viewModel;
 
     public WarehouseListViewModelTests()
@@ -25,6 +28,7 @@ public class WarehouseListViewModelTests : IDisposable
         _mockWarehouseService = new Mock<IWarehouseApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
+        _mockToastService = new Mock<IToastNotificationService>();
 
         _viewModel = CreateViewModel();
     }
@@ -33,8 +37,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var viewModel = (WarehouseListViewModel)FormatterServices.GetUninitializedObject(typeof(WarehouseListViewModel));
 
-        var fieldNames = new[] { "_warehouseService", "_eventBus", "_dialogService" };
-        var mockObjects = new object[] { _mockWarehouseService.Object, _mockEventBus.Object, _mockDialogService.Object };
+        var fieldNames = new[] { "_warehouseService", "_eventBus", "_dialogService", "_toastService" };
+        var mockObjects = new object[] { _mockWarehouseService.Object, _mockEventBus.Object, _mockDialogService.Object, _mockToastService.Object };
 
         for (int i = 0; i < fieldNames.Length; i++)
         {
@@ -43,14 +47,13 @@ public class WarehouseListViewModelTests : IDisposable
             field?.SetValue(viewModel, mockObjects[i]);
         }
 
-        // Initialize Warehouses property
         var warehousesField = typeof(WarehouseListViewModel).GetField("<Warehouses>k__BackingField",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         warehousesField?.SetValue(viewModel, new ObservableCollection<WarehouseDto>());
 
-        var subscribeMethod = typeof(WarehouseListViewModel).GetMethod("InitializeCommands",
+        var initMethod = typeof(WarehouseListViewModel).GetMethod("InitializeCommands",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        subscribeMethod?.Invoke(viewModel, null);
+        initMethod?.Invoke(viewModel, null);
 
         return viewModel;
     }
@@ -72,7 +75,7 @@ public class WarehouseListViewModelTests : IDisposable
         };
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(warehouses));
 
         await _viewModel.LoadWarehousesAsync();
@@ -86,7 +89,7 @@ public class WarehouseListViewModelTests : IDisposable
     public async Task LoadWarehousesAsync_WhenApiFails_SetsErrorMessage()
     {
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Failure("فشل في الاتصال"));
 
         await _viewModel.LoadWarehousesAsync();
@@ -100,7 +103,7 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var tcs = new TaskCompletionSource<Result<List<WarehouseDto>>>();
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadWarehousesAsync();
@@ -116,7 +119,7 @@ public class WarehouseListViewModelTests : IDisposable
     public async Task LoadWarehousesAsync_SetsUpCollectionView()
     {
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto>
             {
                 new(1, "W001", "مستودع تجريبي", null, true, true)
@@ -137,21 +140,25 @@ public class WarehouseListViewModelTests : IDisposable
         var warehouseToDelete = new WarehouseDto(5, "W005", "مستودع للحذف", null, true, true);
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto> { warehouseToDelete }));
 
         await _viewModel.LoadWarehousesAsync();
         _viewModel.SelectedWarehouse = warehouseToDelete;
+
+        _mockDialogService
+            .Setup(d => d.ShowDeleteConfirmationAsync(It.IsAny<string>()))
+            .ReturnsAsync(DeleteStrategy.Deactivate);
 
         _mockWarehouseService
             .Setup(s => s.DeleteAsync(warehouseToDelete.Id))
             .ReturnsAsync(Result.Success());
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto>()));
 
-        _viewModel.DeleteCommand.Execute(null);
+        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
         await Task.Delay(100);
 
         _mockWarehouseService.Verify(
@@ -165,17 +172,21 @@ public class WarehouseListViewModelTests : IDisposable
         var warehouseToDelete = new WarehouseDto(5, "W005", "مستودع", null, true, true);
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto> { warehouseToDelete }));
 
         await _viewModel.LoadWarehousesAsync();
         _viewModel.SelectedWarehouse = warehouseToDelete;
 
+        _mockDialogService
+            .Setup(d => d.ShowDeleteConfirmationAsync(It.IsAny<string>()))
+            .ReturnsAsync(DeleteStrategy.Deactivate);
+
         _mockWarehouseService
             .Setup(s => s.DeleteAsync(warehouseToDelete.Id))
             .ReturnsAsync(Result.Failure("فشل في الحذف"));
 
-        _viewModel.DeleteCommand.Execute(null);
+        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
         await Task.Delay(100);
 
         _viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
@@ -187,17 +198,21 @@ public class WarehouseListViewModelTests : IDisposable
         var warehouseToDelete = new WarehouseDto(5, "W005", "مستودع", null, true, true);
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto> { warehouseToDelete }));
 
         await _viewModel.LoadWarehousesAsync();
         _viewModel.SelectedWarehouse = warehouseToDelete;
 
+        _mockDialogService
+            .Setup(d => d.ShowDeleteConfirmationAsync(It.IsAny<string>()))
+            .ReturnsAsync(DeleteStrategy.Deactivate);
+
         _mockWarehouseService
             .Setup(s => s.DeleteAsync(It.IsAny<int>()))
             .ReturnsAsync(Result.Success());
 
-        _viewModel.DeleteCommand.Execute(null);
+        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
         await Task.Delay(100);
 
         _mockEventBus.Verify(
@@ -220,7 +235,7 @@ public class WarehouseListViewModelTests : IDisposable
         };
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(warehouses));
 
         await _viewModel.LoadWarehousesAsync();
@@ -252,7 +267,7 @@ public class WarehouseListViewModelTests : IDisposable
         };
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(warehouses));
 
         await _viewModel.LoadWarehousesAsync();
@@ -281,7 +296,7 @@ public class WarehouseListViewModelTests : IDisposable
         };
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(warehouses));
 
         await _viewModel.LoadWarehousesAsync();
@@ -361,7 +376,7 @@ public class WarehouseListViewModelTests : IDisposable
     }
 
     [Fact]
-    public void DeleteCommand_CanExecute_WhenWarehouseSelected()
+    public void DeleteCommand_CanExecute_WhenActiveWarehouseSelected()
     {
         var warehouse = new WarehouseDto(1, "W001", "مستودع", null, true, true);
         _viewModel.SelectedWarehouse = warehouse;
@@ -434,7 +449,7 @@ public class WarehouseListViewModelTests : IDisposable
         };
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(warehouses));
 
         _viewModel.RefreshCommand.Execute(null);
@@ -457,7 +472,7 @@ public class WarehouseListViewModelTests : IDisposable
         };
 
         _mockWarehouseService
-            .Setup(s => s.GetAllAsync())
+            .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(warehouses));
 
         await _viewModel.LoadWarehousesAsync();

@@ -1,12 +1,14 @@
 namespace SalesSystem.DesktopPWF.Tests.ViewModels.Payments;
 
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using FluentAssertions;
 using Moq;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.Api;
+using SalesSystem.DesktopPWF.ViewModels.Payments;
 
 /// <summary>
 /// Tests for CustomerPaymentsListViewModel
@@ -17,6 +19,8 @@ public class CustomerPaymentsListViewModelTests
     private readonly Mock<ICustomerApiService> _mockCustomerService;
     private readonly Mock<IDialogService> _mockDialogService;
     private readonly Mock<INavigationService> _mockNavigationService;
+    private readonly Mock<IPaymentPrinter> _mockPaymentPrinter;
+    private readonly Mock<ISettingsApiService> _mockSettingsService;
     private readonly CustomerPaymentsListViewModel _viewModel;
 
     public CustomerPaymentsListViewModelTests()
@@ -25,64 +29,50 @@ public class CustomerPaymentsListViewModelTests
         _mockCustomerService = new Mock<ICustomerApiService>();
         _mockDialogService = new Mock<IDialogService>();
         _mockNavigationService = new Mock<INavigationService>();
+        _mockPaymentPrinter = new Mock<IPaymentPrinter>();
+        _mockSettingsService = new Mock<ISettingsApiService>();
 
         _viewModel = new CustomerPaymentsListViewModel();
-        
-        // Inject mocks via reflection
-        var paymentServiceField = typeof(CustomerPaymentsListViewModel).GetField("_paymentService",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        paymentServiceField?.SetValue(_viewModel, _mockPaymentService.Object);
 
-        var customerServiceField = typeof(CustomerPaymentsListViewModel).GetField("_customerService",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        customerServiceField?.SetValue(_viewModel, _mockCustomerService.Object);
+        SetField("_paymentService", _mockPaymentService.Object);
+        SetField("_customerService", _mockCustomerService.Object);
+        SetField("_dialogService", _mockDialogService.Object);
+        SetField("_navigationService", _mockNavigationService.Object);
+        SetField("_paymentPrinter", _mockPaymentPrinter.Object);
+        SetField("_settingsService", _mockSettingsService.Object);
+    }
 
-        var dialogServiceField = typeof(CustomerPaymentsListViewModel).GetField("_dialogService",
+    private void SetField(string fieldName, object value)
+    {
+        var field = typeof(CustomerPaymentsListViewModel).GetField(fieldName,
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        dialogServiceField?.SetValue(_viewModel, _mockDialogService.Object);
+        field?.SetValue(_viewModel, value);
+    }
 
-        var navigationServiceField = typeof(CustomerPaymentsListViewModel).GetField("_navigationService",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        navigationServiceField?.SetValue(_viewModel, _mockNavigationService.Object);
+    private static CustomerPaymentDto CreatePayment(int id, string customerName, decimal amount)
+    {
+        return new CustomerPaymentDto(id, $"CP-{id:000}", 1, customerName, amount, 1, DateTime.Today, null, null);
     }
 
     #region Property Tests
 
     [Fact]
-    public void SearchText_DefaultValue_IsEmpty()
-    {
-        _viewModel.SearchText.Should().BeEmpty();
-    }
+    public void SearchText_DefaultValue_IsEmpty() => _viewModel.SearchText.Should().BeEmpty();
 
     [Fact]
-    public void DateFrom_DefaultValue_IsNull()
-    {
-        _viewModel.DateFrom.Should().BeNull();
-    }
+    public void DateFrom_DefaultValue_IsNull() => _viewModel.DateFrom.Should().BeNull();
 
     [Fact]
-    public void DateTo_DefaultValue_IsNull()
-    {
-        _viewModel.DateTo.Should().BeNull();
-    }
+    public void DateTo_DefaultValue_IsNull() => _viewModel.DateTo.Should().BeNull();
 
     [Fact]
-    public void IsLoading_DefaultValue_IsFalse()
-    {
-        _viewModel.IsLoading.Should().BeFalse();
-    }
+    public void IsLoading_DefaultValue_IsFalse() => _viewModel.IsLoading.Should().BeFalse();
 
     [Fact]
-    public void ErrorMessage_DefaultValue_IsEmpty()
-    {
-        _viewModel.ErrorMessage.Should().BeEmpty();
-    }
+    public void ErrorMessage_DefaultValue_IsEmpty() => _viewModel.ErrorMessage.Should().BeEmpty();
 
     [Fact]
-    public void SelectedPayment_DefaultValue_IsNull()
-    {
-        _viewModel.SelectedPayment.Should().BeNull();
-    }
+    public void SelectedPayment_DefaultValue_IsNull() => _viewModel.SelectedPayment.Should().BeNull();
 
     [Fact]
     public void Payments_InitializesWithEmptyCollection()
@@ -92,10 +82,7 @@ public class CustomerPaymentsListViewModelTests
     }
 
     [Fact]
-    public void TotalCount_DefaultValue_IsZero()
-    {
-        _viewModel.TotalCount.Should().Be(0);
-    }
+    public void PaymentsCount_DefaultValue_IsZero() => _viewModel.PaymentsCount.Should().Be(0);
 
     #endregion
 
@@ -104,79 +91,64 @@ public class CustomerPaymentsListViewModelTests
     [Fact]
     public void SearchText_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.SearchText = "بحث";
-
-        propertyChangedEvents.Should().Contain("SearchText");
+        events.Should().Contain("SearchText");
     }
 
     [Fact]
     public void DateFrom_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.DateFrom = DateTime.Today;
-
-        propertyChangedEvents.Should().Contain("DateFrom");
+        events.Should().Contain("DateFrom");
     }
 
     [Fact]
     public void DateTo_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.DateTo = DateTime.Today;
-
-        propertyChangedEvents.Should().Contain("DateTo");
+        events.Should().Contain("DateTo");
     }
 
     [Fact]
     public void IsLoading_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        events.Should().Contain("IsLoading");
     }
 
     [Fact]
     public void ErrorMessage_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
         _viewModel.ErrorMessage = "خطأ";
-
-        propertyChangedEvents.Should().Contain("ErrorMessage");
+        events.Should().Contain("ErrorMessage");
     }
 
     [Fact]
     public void SelectedPayment_Set_NotifiesPropertyChanged()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        var payment = new CustomerPaymentDto(1, 1, "عميل", 100m, DateTime.Today, 1, "نقدي", "ملاحظات", DateTime.Today);
-        _viewModel.SelectedPayment = payment;
-
-        propertyChangedEvents.Should().Contain("SelectedPayment");
+        var events = new List<string>();
+        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
+        _viewModel.SelectedPayment = CreatePayment(1, "عميل", 100m);
+        events.Should().Contain("SelectedPayment");
     }
 
     #endregion
 
     #region Commands Tests
 
-    [Fact]
-    public void NewCommand_IsInitialized()
-    {
-        _viewModel.NewCommand.Should().NotBeNull();
-    }
+    [Fact] public void NewCommand_IsInitialized() => _viewModel.NewCommand.Should().NotBeNull();
+    [Fact] public void RefreshCommand_IsInitialized() => _viewModel.RefreshCommand.Should().NotBeNull();
+    [Fact] public void SearchCommand_IsInitialized() => _viewModel.SearchCommand.Should().NotBeNull();
 
     [Fact]
     public void ViewCommand_CannotExecute_WhenNoSelection()
@@ -188,9 +160,7 @@ public class CustomerPaymentsListViewModelTests
     [Fact]
     public void ViewCommand_CanExecute_WhenPaymentSelected()
     {
-        var payment = new CustomerPaymentDto(1, 1, "عميل", 100m, DateTime.Today, 1, "نقدي", "ملاحظات", DateTime.Today);
-        _viewModel.SelectedPayment = payment;
-        
+        _viewModel.SelectedPayment = CreatePayment(1, "عميل", 100m);
         _viewModel.ViewCommand.CanExecute(null).Should().BeTrue();
     }
 
@@ -204,9 +174,7 @@ public class CustomerPaymentsListViewModelTests
     [Fact]
     public void EditCommand_CanExecute_WhenPaymentSelected()
     {
-        var payment = new CustomerPaymentDto(1, 1, "عميل", 100m, DateTime.Today, 1, "نقدي", "ملاحظات", DateTime.Today);
-        _viewModel.SelectedPayment = payment;
-        
+        _viewModel.SelectedPayment = CreatePayment(1, "عميل", 100m);
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
 
@@ -220,22 +188,8 @@ public class CustomerPaymentsListViewModelTests
     [Fact]
     public void DeleteCommand_CanExecute_WhenPaymentSelected()
     {
-        var payment = new CustomerPaymentDto(1, 1, "عميل", 100m, DateTime.Today, 1, "نقدي", "ملاحظات", DateTime.Today);
-        _viewModel.SelectedPayment = payment;
-        
+        _viewModel.SelectedPayment = CreatePayment(1, "عميل", 100m);
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
-    }
-
-    [Fact]
-    public void RefreshCommand_IsInitialized()
-    {
-        _viewModel.RefreshCommand.Should().NotBeNull();
-    }
-
-    [Fact]
-    public void SearchCommand_IsInitialized()
-    {
-        _viewModel.SearchCommand.Should().NotBeNull();
     }
 
     #endregion
@@ -247,15 +201,12 @@ public class CustomerPaymentsListViewModelTests
     {
         var payments = new List<CustomerPaymentDto>
         {
-            new(1, 1, "عميل 1", 100m, DateTime.Today, 1, "نقدي", null, DateTime.Today),
-            new(2, 2, "عميل 2", 200m, DateTime.Today, 1, "نقدي", null, DateTime.Today)
+            CreatePayment(1, "عميل 1", 100m),
+            CreatePayment(2, "عميل 2", 200m)
         };
 
         _mockPaymentService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
             .ReturnsAsync(Result<List<CustomerPaymentDto>>.Success(payments));
 
         await _viewModel.LoadPaymentsAsync();
@@ -268,10 +219,7 @@ public class CustomerPaymentsListViewModelTests
     public async Task LoadPaymentsAsync_WhenApiFails_SetsErrorMessage()
     {
         _mockPaymentService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
             .ReturnsAsync(Result<List<CustomerPaymentDto>>.Failure("فشل في الاتصال"));
 
         await _viewModel.LoadPaymentsAsync();
@@ -285,10 +233,7 @@ public class CustomerPaymentsListViewModelTests
     {
         var tcs = new TaskCompletionSource<Result<List<CustomerPaymentDto>>>();
         _mockPaymentService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadPaymentsAsync();
@@ -301,23 +246,17 @@ public class CustomerPaymentsListViewModelTests
     }
 
     [Fact]
-    public async Task LoadPaymentsAsync_UpdatesTotalCount()
+    public async Task LoadPaymentsAsync_UpdatesPaymentsCount()
     {
-        var payments = new List<CustomerPaymentDto>
-        {
-            new(1, 1, "عميل", 100m, DateTime.Today, 1, "نقدي", null, DateTime.Today)
-        };
+        var payments = new List<CustomerPaymentDto> { CreatePayment(1, "عميل", 100m) };
 
         _mockPaymentService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
             .ReturnsAsync(Result<List<CustomerPaymentDto>>.Success(payments));
 
         await _viewModel.LoadPaymentsAsync();
 
-        _viewModel.TotalCount.Should().Be(1);
+        _viewModel.PaymentsCount.Should().Be(1);
     }
 
     #endregion
@@ -327,24 +266,24 @@ public class CustomerPaymentsListViewModelTests
     [Fact]
     public async Task OnDelete_WhenConfirmed_CallsDeleteApi()
     {
-        var paymentToDelete = new CustomerPaymentDto(1, 1, "عميل", 100m, DateTime.Today, 1, "نقدي", null, DateTime.Today);
-        
+        var payment = CreatePayment(1, "عميل", 100m);
+
+        _mockDialogService
+            .Setup(d => d.ShowConfirmationAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(true);
+
         _mockPaymentService
             .Setup(s => s.DeleteAsync(It.IsAny<int>()))
             .ReturnsAsync(Result.Success());
 
         _mockPaymentService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>()))
+            .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>()))
             .ReturnsAsync(Result<List<CustomerPaymentDto>>.Success(new List<CustomerPaymentDto>()));
 
-        // Execute via command
-        _viewModel.SelectedPayment = paymentToDelete;
-        await _viewModel.DeleteCommand.ExecuteAsync(null);
+        _viewModel.SelectedPayment = payment;
+        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
 
-        _mockPaymentService.Verify(s => s.DeleteAsync(paymentToDelete.Id), Times.Once);
+        _mockPaymentService.Verify(s => s.DeleteAsync(payment.Id), Times.Once);
     }
 
     #endregion
