@@ -123,6 +123,11 @@ public class WarehouseListViewModel : ViewModelBase
     #endregion
 
     #region Methods
+    /// <summary>
+    /// Public method for loading warehouses (used by RefreshCommand and tests).
+    /// </summary>
+    public Task LoadWarehousesAsync() => ExecuteAsync(LoadWarehousesOperationAsync);
+
     private async Task LoadWarehousesOperationAsync()
     {
         ErrorMessage = null;
