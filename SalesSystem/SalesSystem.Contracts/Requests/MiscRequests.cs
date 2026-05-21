@@ -12,3 +12,10 @@ public record UpdateSettingsRequest(
     bool IsTaxEnabled, string? TaxNumber,
     bool EnableStockAlerts, bool AllowNegativeStock, bool AutoUpdatePrices,
     string InvoicePrefix);
+
+public record UpdatePrintSettingsRequest(
+    string ThermalPrinterName,
+    string A4PrinterName,
+    string LogoPath,
+    string StoreTaxNumber,
+    decimal TaxRate);

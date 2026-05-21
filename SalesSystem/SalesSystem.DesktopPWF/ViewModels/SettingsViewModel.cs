@@ -6,6 +6,7 @@ using SalesSystem.DesktopPWF.Services.App;
 using Serilog;
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Input;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -33,6 +34,13 @@ public class SettingsViewModel : ViewModelBase
     private ObservableCollection<string> _backups = new();
     private string? _selectedBackup;
 
+    // Print settings
+    private string _thermalPrinterName = string.Empty;
+    private string _a4PrinterName = string.Empty;
+    private string _logoPath = string.Empty;
+    private string _storeTaxNumber = string.Empty;
+    private decimal _printTaxRate;
+
     public SettingsViewModel()
     {
         _settingsService = App.GetService<ISettingsApiService>();
@@ -43,6 +51,8 @@ public class SettingsViewModel : ViewModelBase
         SaveCommand = new AsyncRelayCommand(async _ => await SaveSettingsAsync());
         CreateBackupCommand = new AsyncRelayCommand(async _ => await CreateBackupAsync());
         RestoreBackupCommand = new AsyncRelayCommand(async _ => await RestoreBackupAsync(), _ => !string.IsNullOrEmpty(SelectedBackup));
+        BrowseLogoCommand = new RelayCommand(_ => BrowseLogo());
+        TestPrintCommand = new AsyncRelayCommand(async _ => await TestPrintAsync());
 
         _ = LoadSettingsAsync();
         _ = RefreshBackupListAsync();
@@ -140,15 +150,103 @@ public class SettingsViewModel : ViewModelBase
     }
     #endregion
 
+    #region Print Properties
+    public string ThermalPrinterName
+    {
+        get => _thermalPrinterName;
+        set => SetProperty(ref _thermalPrinterName, value);
+    }
+
+    public string A4PrinterName
+    {
+        get => _a4PrinterName;
+        set => SetProperty(ref _a4PrinterName, value);
+    }
+
+    public string LogoPath
+    {
+        get => _logoPath;
+        set => SetProperty(ref _logoPath, value);
+    }
+
+    public string StoreTaxNumber
+    {
+        get => _storeTaxNumber;
+        set => SetProperty(ref _storeTaxNumber, value);
+    }
+
+    public decimal PrintTaxRate
+    {
+        get => _printTaxRate;
+        set => SetProperty(ref _printTaxRate, value);
+    }
+
+    public List<string> InstalledPrinters { get; } =
+        System.Drawing.Printing.PrinterSettings.InstalledPrinters
+            .Cast<string>()
+            .OrderBy(p => p)
+            .ToList();
+    #endregion
+
     #region Commands
     public AsyncRelayCommand LoadCommand { get; }
     public AsyncRelayCommand SaveCommand { get; }
     public AsyncRelayCommand CreateBackupCommand { get; }
     public AsyncRelayCommand RestoreBackupCommand { get; }
+    public ICommand BrowseLogoCommand { get; }
+    public ICommand TestPrintCommand { get; }
     #endregion
 
     #region Logic
-private async Task LoadSettingsAsync()
+
+    private void BrowseLogo()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "اختر شعار المتجر",
+            Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp",
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            LogoPath = dialog.FileName;
+            StatusMessage = "✅ تم اختيار الشعار";
+        }
+    }
+
+    private async Task TestPrintAsync()
+    {
+        IsLoading = true;
+        StatusMessage = string.Empty;
+        try
+        {
+            // Use the existing HttpClient — call the API test endpoint
+            var httpClient = App.GetService<System.Net.Http.HttpClient>();
+            var response = await httpClient.PostAsync("api/v1/print/test", null);
+            if (response.IsSuccessStatusCode)
+            {
+                StatusMessage = "✅ تمت طباعة الاختبار بنجاح";
+            }
+            else
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                StatusMessage = "❌ فشلت طباعة الاختبار";
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة", errorBody);
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = HandleException(ex, "SettingsViewModel.TestPrintAsync",
+                "[SettingsViewModel.TestPrintAsync] Test print failed.");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadSettingsAsync()
     {
         if (IsLoading) return;
         IsLoading = true;
@@ -170,6 +268,25 @@ private async Task LoadSettingsAsync()
                 AllowNegativeStock = s.AllowNegativeStock;
                 AutoUpdatePrices = s.AutoUpdatePrices;
                 InvoicePrefix = s.InvoicePrefix;
+            }
+
+            // Load print settings
+            try
+            {
+                var printResult = await _settingsService.GetPrintSettingsAsync();
+                if (printResult.IsSuccess && printResult.Value != null)
+                {
+                    var p = printResult.Value;
+                    ThermalPrinterName = p.ThermalPrinterName;
+                    A4PrinterName = p.A4PrinterName;
+                    LogoPath = p.LogoPath;
+                    StoreTaxNumber = p.StoreTaxNumber;
+                    PrintTaxRate = p.TaxRate;
+                }
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "Failed to load print settings");
             }
         }
         catch (Exception ex)
@@ -230,6 +347,16 @@ private async Task LoadSettingsAsync()
             if (result.IsSuccess)
             {
                 _settingsService.RefreshCache();
+
+                // Save print settings
+                var printRequest = new UpdatePrintSettingsRequest(
+                    ThermalPrinterName,
+                    A4PrinterName,
+                    LogoPath,
+                    StoreTaxNumber,
+                    PrintTaxRate);
+                await _settingsService.UpdatePrintSettingsAsync(printRequest);
+
                 StatusMessage = "✅ تم حفظ الإعدادات بنجاح";
                 _ = Task.Delay(3000).ContinueWith(_ => StatusMessage = string.Empty);
             }

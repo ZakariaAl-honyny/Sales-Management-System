@@ -57,3 +57,22 @@ public class UpdateSettingsRequestValidator : AbstractValidator<UpdateSettingsRe
             .MaximumLength(10).WithMessage("بادئة الفاتورة لا يمكن أن تتجاوز 10 أحرف");
     }
 }
+
+public class UpdatePrintSettingsRequestValidator : AbstractValidator<UpdatePrintSettingsRequest>
+{
+    public UpdatePrintSettingsRequestValidator()
+    {
+        RuleFor(x => x.ThermalPrinterName)
+            .MaximumLength(200).WithMessage("اسم الطابعة الحرارية لا يمكن أن يتجاوز 200 حرف");
+
+        RuleFor(x => x.A4PrinterName)
+            .MaximumLength(200).WithMessage("اسم طابعة A4 لا يمكن أن يتجاوز 200 حرف");
+
+        RuleFor(x => x.StoreTaxNumber)
+            .MaximumLength(50).WithMessage("الرقم الضريبي لا يمكن أن يتجاوز 50 حرف");
+
+        RuleFor(x => x.TaxRate)
+            .GreaterThanOrEqualTo(0).WithMessage("نسبة الضريبة لا يمكن أن تكون سالبة")
+            .LessThanOrEqualTo(100).WithMessage("نسبة الضريبة لا يمكن أن تتجاوز 100%");
+    }
+}

@@ -17,6 +17,7 @@
     <PackageReference Include="FluentAssertions" Version="6.12.2" />
     <PackageReference Include="FluentValidation" Version="11.11.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
   </ItemGroup>
 
   <!-- Project References -->
@@ -26,9 +27,26 @@
     <ProjectReference Include="..\..\SalesSystem.Application\SalesSystem.Application.csproj" />
   </ItemGroup>
 
-  <!-- Exclude broken controller tests -->
   <ItemGroup>
-    <Compile Remove="Controllers\**\*.cs" />
+    <!-- Exclude pre-existing broken controller tests (old API signatures) -->
+    <Compile Remove="Controllers\AuthControllerTests.cs" />
+    <Compile Remove="Controllers\ControllerTestBase.cs" />
+    <Compile Remove="Controllers\UsersControllerTests.cs" />
+    <Compile Remove="Controllers\Backup\**\*.cs" />
+    <Compile Remove="Controllers\Categories\**\*.cs" />
+    <Compile Remove="Controllers\Customers\**\*.cs" />
+    <Compile Remove="Controllers\Inventory\**\*.cs" />
+    <Compile Remove="Controllers\Payments\**\*.cs" />
+    <Compile Remove="Controllers\Products\**\*.cs" />
+    <Compile Remove="Controllers\Purchases\**\*.cs" />
+    <Compile Remove="Controllers\Reports\**\*.cs" />
+    <Compile Remove="Controllers\Returns\**\*.cs" />
+    <Compile Remove="Controllers\Sales\**\*.cs" />
+    <Compile Remove="Controllers\Settings\**\*.cs" />
+    <Compile Remove="Controllers\StockTransfers\**\*.cs" />
+    <Compile Remove="Controllers\Suppliers\**\*.cs" />
+    <Compile Remove="Controllers\Units\**\*.cs" />
+    <Compile Remove="Controllers\Warehouses\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

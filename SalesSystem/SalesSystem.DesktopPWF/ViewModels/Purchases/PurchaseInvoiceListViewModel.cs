@@ -20,6 +20,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
     private readonly IPurchaseInvoiceApiService _invoiceService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IPrintApiService _printService;
 
     private ObservableCollection<PurchaseInvoiceDto> _invoices = new();
     private ICollectionView? _invoicesView;
@@ -35,18 +36,21 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         : this(
             App.GetService<IPurchaseInvoiceApiService>(),
             App.GetService<IEventBus>(),
-            App.GetService<IDialogService>())
+            App.GetService<IDialogService>(),
+            App.GetService<IPrintApiService>())
     {
     }
 
     public PurchaseInvoiceListViewModel(
         IPurchaseInvoiceApiService invoiceService,
         IEventBus eventBus,
-        IDialogService dialogService)
+        IDialogService dialogService,
+        IPrintApiService printService)
     {
         _invoiceService = invoiceService ?? throw new ArgumentNullException(nameof(invoiceService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+        _printService = printService ?? throw new ArgumentNullException(nameof(printService));
 
         // Initialize commands
         RefreshCommand = new AsyncRelayCommand(LoadInvoicesAsync);
@@ -56,6 +60,9 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         EditCommand = new RelayCommand(EditInvoice, () => SelectedInvoice != null && SelectedInvoice.Status == (byte)InvoiceStatus.Draft);
         PostCommand = new AsyncRelayCommand(PostInvoiceAsync, () => SelectedInvoice != null && SelectedInvoice.Status == (byte)InvoiceStatus.Draft);
         CancelCommand = new AsyncRelayCommand(CancelInvoiceAsync, () => SelectedInvoice != null && SelectedInvoice.Status == (byte)InvoiceStatus.Posted);
+        PrintPreviewCommand = new AsyncRelayCommand(PrintPreviewAsync, () => IsPrintAllowed());
+        PrintA4Command = new AsyncRelayCommand(PrintA4Async, () => IsPrintAllowed());
+        PrintThermalCommand = new AsyncRelayCommand(PrintThermalAsync, () => IsPrintAllowed());
 
         // Default date range (last 30 days)
         DateFrom = DateTime.Today.AddDays(-30);
@@ -188,6 +195,9 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
     public ICommand EditCommand { get; }
     public ICommand PostCommand { get; }
     public ICommand CancelCommand { get; }
+    public ICommand PrintPreviewCommand { get; }
+    public ICommand PrintA4Command { get; }
+    public ICommand PrintThermalCommand { get; }
     #endregion
 
     #region Methods
@@ -371,12 +381,83 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         }
     }
 
+    // ─── Print Methods ────────────────────────────
+
+    private bool IsPrintAllowed() => SelectedInvoice != null
+        && SelectedInvoice.Status == (byte)InvoiceStatus.Posted
+        && !IsLoading;
+
+    private async Task PrintPreviewAsync()
+    {
+        if (SelectedInvoice == null) return;
+        try
+        {
+            IsLoading = true;
+            var result = await _printService.GetPurchasePreviewDataAsync(SelectedInvoice.Id);
+            if (result.IsSuccess && result.Value != null)
+            {
+                var preview = new Views.Common.PdfPreviewWindow(result.Value.TempFilePath, result.Value.InvoiceNumber);
+                preview.ShowDialog();
+            }
+            else
+            {
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
+                    result.Error ?? "تعذر فتح معاينة الطباعة");
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task PrintA4Async()
+    {
+        if (SelectedInvoice == null) return;
+        try
+        {
+            IsLoading = true;
+            var result = await _printService.PrintPurchaseA4Async(SelectedInvoice.Id);
+            if (!result.IsSuccess)
+            {
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
+                    result.Error ?? "فشلت الطباعة");
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task PrintThermalAsync()
+    {
+        if (SelectedInvoice == null) return;
+        try
+        {
+            IsLoading = true;
+            var result = await _printService.PrintPurchaseThermalAsync(SelectedInvoice.Id);
+            if (!result.IsSuccess)
+            {
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
+                    result.Error ?? "فشلت الطباعة الحرارية");
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
     private void UpdateCommandStates()
     {
         (ViewCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (PostCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (CancelCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (PrintPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (PrintA4Command as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (PrintThermalCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private void OnInvoiceChanged(PurchaseInvoiceChangedMessage msg)

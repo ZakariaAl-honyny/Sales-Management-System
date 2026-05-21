@@ -141,6 +141,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<Services.App.IReceiptPrinter, Services.Printing.ReceiptPrinter>();
         services.AddSingleton<Services.App.IPaymentPrinter, Services.Printing.PaymentPrinter>();
         services.AddSingleton<Services.App.ITransferPrinter, Services.Printing.TransferPrinter>();
+        services.AddSingleton<IPrintApiService, PrintApiService>();
 
         // ViewModels
         services.AddTransient<LoginWindowViewModel>();

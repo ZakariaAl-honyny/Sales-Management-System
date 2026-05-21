@@ -58,6 +58,20 @@ public class SettingsApiService : ApiServiceBase, ISettingsApiService
         return result;
     }
 
+    public async Task<Result<PrintSettingsDto>> GetPrintSettingsAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync<PrintSettingsDto>(
+            () => _httpClient.GetAsync("api/v1/settings/print", ct),
+            "SettingsApiService.GetPrintSettingsAsync");
+    }
+
+    public async Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default)
+    {
+        return await ExecuteCommandAsync(
+            () => _httpClient.PutAsJsonAsync("api/v1/settings/print", request, ct),
+            "SettingsApiService.UpdatePrintSettingsAsync");
+    }
+
     public void RefreshCache()
     {
         lock (_cacheLock)

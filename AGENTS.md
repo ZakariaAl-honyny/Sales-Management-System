@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.0 Expansion)
+# AGENTS.md — Sales Management System (v4.3 Expansion)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -469,6 +469,166 @@ public bool HasErrors { get; }
 - `"الكمية يجب أن تكون أكبر من صفر"` (Quantity must be > 0)
 - `"السعر لا يمكن أن يكون سالباً"` (Price cannot be negative)
 
+### 2.24 Dynamic Unit of Measure (v4.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-060 | `ProductUnit` stores conversion factor from base unit — use `ConvertToUnit(decimal quantity, int fromUnitId, int toUnitId)` for all unit conversions |
+| RULE-061 | Base unit always has `ConversionFactor = 1` (represents the smallest/foundational unit) |
+| RULE-062 | Derived units `ConversionFactor > 1` (e.g., Box=24 means 1 Box = 24 Base units) |
+| RULE-063 | `UnitBarcode` stores ALL barcodes per product-unit combination — never embed barcode in Unit entity |
+| RULE-064 | `SmartUnitFormatter` selects best display unit based on quantity threshold — use in UI only |
+| RULE-065 | Pricing: `RetailPrice` and `WholesalePrice` stored per `ProductUnit` (not per Product) — use `ProductUnit.GetPriceByUnit(UnitType)` |
+| RULE-066 | Cost cascade: When purchase cost updates via WeightedAverage, ALL product units recalculate from base unit cost × conversion factor |
+| RULE-067 | `ProductMustHaveAtLeastOneUnit` rule enforced in Domain — throw `DomainException` if deleting last unit |
+
+**ProductUnit Entity pattern:**
+```csharp
+public class ProductUnit
+{
+    public int Id { get; private set; }
+    public int ProductId { get; private set; }
+    public string UnitName { get; private set; }      // e.g., "Piece", "Box", "Carton"
+    public decimal ConversionFactor { get; private set; } // Base=1, Box=24, Carton=144
+    public decimal RetailPrice { get; private set; }   // Price for retail sales
+    public decimal WholesalePrice { get; private set; } // Price for wholesale sales
+    public bool IsBaseUnit { get; private set; }      // Exactly one per product
+    public ICollection<UnitBarcode> Barcodes { get; private set; }
+
+    public decimal ConvertToUnit(decimal quantity, decimal targetFactor)
+    {
+        var baseQty = quantity * ConversionFactor;
+        return baseQty / targetFactor;
+    }
+}
+```
+
+### 2.25 Costing Strategy (v4.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-068 | Costing method stored in `SystemSettings` table — seeded as `WeightedAverage` (1) |
+| RULE-069 | Three methods: WeightedAverage (1), LastPurchasePrice (2), SupplierPrice (3) |
+| RULE-070 | Costing update fires AFTER purchase invoice is saved and has an ID |
+| RULE-071 | WeightedAverage = `(OldStock * OldAvgCost + NewQty * NewUnitCost) / (OldStock + NewQty)` |
+| RULE-072 | LastPurchasePrice = overwrite `AvgCost` with incoming `UnitCost` directly |
+| RULE-073 | SupplierPrice = use `Product.SupplierPrice` (catalog price) — no cost calculation |
+| RULE-074 | Cost cascade: ALL product units updated from base unit cost × conversion factor |
+| RULE-075 | `UpdateProductPricingService` handles all three methods — NEVER write costing logic outside this service |
+| RULE-076 | Add audit entry in `ProductPriceHistory` on EVERY cost change |
+
+**WeightedAverage formula (C#):**
+```csharp
+var totalOldValue = oldStock * oldAvgCost;
+var totalNewValue = newQty * newUnitCost;
+var newAvgCost = (totalOldValue + totalNewValue) / (oldStock + newQty);
+// Result: decimal with precision (18,2)
+```
+
+### 2.26 Cash Boxes (v4.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-077 | CashBox has `OpeningBalance`, `CurrentBalance` — computed from `CashTransaction` sum |
+| RULE-078 | `CashTransaction` records: OpeningBalance, Income, Expense, Transfer, Refund, Payment |
+| RULE-079 | Every invoice payment references `CashBoxId` — link between invoice and cash box |
+| RULE-080 | `CashBox.CurrentBalance` NEVER goes negative — validate before dispensing |
+| RULE-081 | Cash transfer between boxes requires TWO transactions (Out from source, In to destination) |
+| RULE-082 | Cash transactions are immutable once created — no editing, cancellation via offsetting entry |
+| RULE-083 | `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance |
+
+**CashTransactionType enum:**
+```csharp
+public enum CashTransactionType : byte
+{
+    OpeningBalance = 1,  // Initial opening
+    SalesIncome = 2,     // From sales invoices
+    Expense = 3,         // Cash outflow
+    TransferOut = 4,     // Transfer to another box
+    TransferIn = 5,      // Transfer from another box
+    RefundOut = 6,       // Sales return refund
+    SupplierPayment = 7, // Payment to supplier
+    CustomerPayment = 8  // Payment from customer
+}
+```
+
+### 2.27 Product Price History (v4.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-084 | `ProductPriceHistory` records EVERY price/cost change — NEVER update price without audit |
+| RULE-085 | Record fields: `ProductUnitId`, `OldRetailPrice`, `NewRetailPrice`, `OldWholesalePrice`, `NewWholesalePrice`, `OldCost`, `NewCost`, `ChangedByUserId`, `ChangeReason` |
+| RULE-086 | Price change triggers: Purchase invoice (cost update), manual price adjustment, supplier sync |
+| RULE-087 | History query available in Reports for audit trail — kept indefinitely |
+
+### 2.28 Print Engine (v4.3 — Implemented)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-088 | A4 PDF generation uses **QuestPDF** (`A4InvoiceDocument`) — NOT WPF FixedDocument |
+| RULE-089 | Thermal receipts use **Win32 raw printing** (`OpenPrinter`/`WritePrinter`) with custom `EscPos` builder — NOT WPF print APIs |
+| RULE-090 | Print templates stored in `Application/Printing/Contracts/` (DTOs) and `Infrastructure/Printing/` (documents) |
+| RULE-091 | All printing goes through `PrintController` API — Desktop NEVER prints directly |
+| RULE-092 | Desktop calls `IPrintApiService` (HTTP client) → API `PrintController` → `IPrintService` |
+| RULE-093 | Preview shows in WPF `PdfPreviewWindow` (WebBrowser control) before sending to printer |
+| RULE-094 | PrintService returns `PrintResult` — NEVER throw from printing code |
+| RULE-095 | Supports: 80mm thermal receipt, A4 invoice — configurable per printer via SystemSettings |
+| RULE-096 | Thermal output: 42-char monospaced columns, Windows-1256 encoding for Arabic |
+| RULE-097 | ESC/POS commands built using `EscPos` static class — NOT external NuGet packages |
+| RULE-098 | A4 documents use QuestPDF `Community` license (free for < $1M revenue) |
+| RULE-099 | Prerequisite: All 3 target frameworks must be `net10.0-windows` (Infrastructure + Api + Infra.Tests) for Win32 `DllImport` |
+| RULE-100 | Print settings (`ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber`, `TaxRate`) stored in `SystemSetting` table with `Category = "Print"` |
+| RULE-101 | Missing logo = graceful omission (null) — NEVER crash on missing logo |
+| RULE-102 | `IPrintService` methods: `PreviewA4Async`, `PrintA4Async`, `PrintThermalAsync`, `SavePdfAsync` — each returns `PrintResult` |
+
+**Project structure:**
+```text
+SalesSystem.Application/Printing/
+├── Contracts/
+│   ├── InvoicePrintDto.cs            # Full invoice data for printing
+│   ├── InvoiceItemPrintDto.cs        # Line item
+│   ├── InvoiceTypePrint.cs           # Enum: Sales, Purchase, SalesReturn, PurchaseReturn, Test
+│   └── PrintResult.cs                # Success/error with messages
+├── InvoicePrintDtoBuilder.cs         # 4 builder overloads (sales/purchase/return)
+└── IPrintService.cs                  # Interface (4 methods)
+
+SalesSystem.Infrastructure/Printing/
+├── A4InvoiceDocument.cs              # QuestPDF A4 document (RTL, logo, tax breakdown)
+├── ThermalReceiptGenerator.cs        # ESC/POS receipt builder
+├── EscPos.cs                         # Static ESC/POS command builder
+├── PrintService.cs                   # Win32 raw printing implementation
+├── PrinterException.cs               # Printing-specific exception
+└── PrintingBootstrapper.cs           # QuestPDF license init
+```
+
+**DI Registration (Program.cs):**
+```csharp
+// API
+builder.Services.AddScoped<IPrintService, PrintService>();
+builder.Services.AddScoped<InvoicePrintDtoBuilder>();
+PrintingBootstrapper.Initialize(); // QuestPDF license
+
+// Desktop
+builder.Services.AddHttpClient<IPrintApiService, PrintApiService>(client => {
+    client.BaseAddress = new Uri("http://localhost:5221");
+});
+```
+
+**API Endpoints (PrintController):**
+```text
+GET    /api/v1/print/sales/{id}/preview        → A4 preview HTML
+POST   /api/v1/print/sales/{id}/a4             → Print A4 invoice
+POST   /api/v1/print/sales/{id}/thermal        → Print thermal receipt
+POST   /api/v1/print/sales/{id}/save           → Save PDF to file
+GET    /api/v1/print/purchases/{id}/preview    → Purchase A4 preview
+POST   /api/v1/print/purchases/{id}/a4         → Print purchase A4
+POST   /api/v1/print/purchases/{id}/thermal    → Print purchase thermal
+POST   /api/v1/print/purchases/{id}/save       → Save purchase PDF
+GET    /api/v1/print/sales/{id}/preview-data   → Preview JSON data
+GET    /api/v1/print/purchases/{id}/preview-data
+POST   /api/v1/print/test                      → Test page print
+```
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -485,6 +645,17 @@ public enum MovementType : byte
 public enum UnitType : byte { Retail = 0, Wholesale = 1 }  // For wholesale/retail pricing
 public enum SaleMode : byte { Retail = 1, Wholesale = 2 }  // Invoice line item mode
 public enum DeleteStrategy { Cancel = 0, Deactivate = 1, Permanent = 2 }
+public enum CostingMethod : byte { WeightedAverage = 1, LastPurchasePrice = 2, SupplierPrice = 3 }
+public enum CashTransactionType : byte
+{
+    OpeningBalance = 1, SalesIncome = 2, Expense = 3,
+    TransferOut = 4, TransferIn = 5, RefundOut = 6,
+    SupplierPayment = 7, CustomerPayment = 8
+}
+public enum InvoiceTypePrint : byte
+{
+    Sales = 1, Purchase = 2, SalesReturn = 3, PurchaseReturn = 4, Test = 5
+}
 ```
 
 ---
@@ -506,6 +677,19 @@ public enum DeleteStrategy { Cancel = 0, Deactivate = 1, Permanent = 2 }
 ❌ Hard-deleting Users (soft delete only — invoices reference them)
 ❌ Duplicating business logic outside of the Domain layer
 ❌ Direct property modification on Entities from outside the class (use Domain methods instead)
+❌ Storing price/cost on `Product` instead of `ProductUnit` (use per-unit pricing)
+❌ Embedding barcodes in Unit entity (use UnitBarcode table)
+❌ Computing unit conversion outside Domain (use `ProductUnit.ConvertToUnit`)
+❌ Hard-coding costing logic outside `UpdateProductPricingService`
+❌ Allowing `CashBox.CurrentBalance` to go negative
+❌ Editing CashTransaction entries (immutable — use offsetting entry)
+❌ Updating price/cost without recording in `ProductPriceHistory`
+❌ Using WPF `FixedDocument`/`PrintDialog` for printing (use QuestPDF + Win32 raw printing instead)
+❌ Throwing exceptions from `IPrintService` (return `PrintResult` instead)
+❌ Desktop calling printer directly (always go through `PrintController` API)
+❌ Using external ESC/POS NuGet packages (use custom `EscPos` builder)
+❌ Crashes on missing logo (omit gracefully — null checks)
+❌ Storing print settings outside `SystemSetting` table (use `Category = "Print"`)
 ```
 
 ---
@@ -525,6 +709,9 @@ public enum DeleteStrategy { Cancel = 0, Deactivate = 1, Permanent = 2 }
 | `Microsoft.Extensions.Http` 10.x | Desktop |
 | `System.Text.Json` 10.x | Desktop |
 | `ClosedXML` 0.102.x | Desktop (Excel report export — FR-021) |
+| `QuestPDF` 2024.3.x | Infrastructure (A4 PDF generation) |
+| `SixLabors.ImageSharp` 3.1.x | Infrastructure (logo image resize for print) |
+| `System.Drawing.Common` 10.x | Infrastructure (Win32 printer interop) |
 
 **Any package not listed here requires human approval.**
 
@@ -572,8 +759,10 @@ Supplier Payments:SP-{YYYY}-{000001}
 | Database schema | `docs/database-schema.md` |
 | UI/UX flows | `docs/ui-screens.md` |
 | Security details | `.opencode/agent/security-auditor.md` |
-| Print specs | `.opencode/agent/printing.md` |
+| Print specs | `specs/006-printing/plan.md` |
 | Code patterns | `.opencode/agent/implement-agent.md` |
+| Implementation plan | `docs/MASTER-PLAN.md` |
+| Costing & UOM specs | `docs/CONSTITUTION.md` sections 2.24–2.27 |
 
 ---
 
@@ -604,3 +793,19 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Toast notifications for minor success messages?
 - [ ] INotifyDataErrorInfo implemented with red border styles?
 - [ ] Save buttons disabled when form has errors (CanExecute)?
+- [ ] Pricing stored per ProductUnit (not on Product)?
+- [ ] Unit conversions computed in Domain (not UI or Service)?
+- [ ] Barcodes stored in UnitBarcode table (not embedded in Unit)?
+- [ ] Costing update uses UpdateProductPricingService (not custom logic)?
+- [ ] CashBox.CurrentBalance validated before dispensing?
+- [ ] CashTransaction entries immutable (no direct editing)?
+- [ ] ProductPriceHistory recorded on EVERY price/cost change?
+- [ ] At least one ProductUnit per product enforced in Domain?
+- [ ] Printing uses QuestPDF for A4 (not WPF FixedDocument)?
+- [ ] Thermal receipts use Win32 raw printing (not WPF PrintDialog)?
+- [ ] PrintService returns `PrintResult` (never throws exceptions)?
+- [ ] Desktop calls PrintController API (never prints directly)?
+- [ ] Logo is optional — missing logo handled gracefully (null check)?
+- [ ] Print settings stored in `SystemSetting` table with `Category = "Print"`?
+- [ ] ESC/POS commands built with custom `EscPos` class (not external package)?
+- [ ] Infrastructure + Api + Infra.Tests target `net10.0-windows`? (required for Win32 DllImport)

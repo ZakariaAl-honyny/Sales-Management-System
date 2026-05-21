@@ -285,6 +285,8 @@ public interface ISettingsApiService
 {
     Task<Result<StoreSettingsDto>> GetSettingsAsync(CancellationToken ct = default);
     Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, CancellationToken ct = default);
+    Task<Result<PrintSettingsDto>> GetPrintSettingsAsync(CancellationToken ct = default);
+    Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default);
     void RefreshCache();
 }
 
@@ -368,3 +370,17 @@ public interface IBackupApiService
     Task<Result<List<string>>> GetBackupListAsync(CancellationToken ct = default);
     Task<Result> RestoreBackupAsync(string fileName, CancellationToken ct = default);
 }
+
+public interface IPrintApiService
+{
+    Task<Result> PreviewSalesAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result> PrintSalesA4Async(int invoiceId, CancellationToken ct = default);
+    Task<Result> PrintSalesThermalAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result<PrintPreviewData>> GetSalesPreviewDataAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result> PreviewPurchaseAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result> PrintPurchaseA4Async(int invoiceId, CancellationToken ct = default);
+    Task<Result> PrintPurchaseThermalAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result<PrintPreviewData>> GetPurchasePreviewDataAsync(int invoiceId, CancellationToken ct = default);
+}
+
+public record PrintPreviewData(string TempFilePath, string InvoiceNumber);

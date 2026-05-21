@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.0%20Expansion-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.3%20Expansion-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -31,21 +31,31 @@ The API-first architecture is designed to support **future web and mobile client
 ### Why This Project?
 
 - 🏪 **Purpose-built for retail** — Sales invoices, purchase orders, returns, and stock transfers
-- 🔄 **Wholesale & Retail Flex** — Sell by box or piece simultaneously with intelligent inventory conversion
-  - Separate `WholesalePrice` and `RetailPrice` per product
-  - `ConversionFactor` for box↔piece conversion (e.g., 1 box = 12 pieces)
-  - `UnitType` enum (Retail=0, Wholesale=1) for pricing mode
-- 🔍 **Multi-barcode support** — Multiple barcodes per product (retail, wholesale, custom)
-  - `ProductBarcodes` table for additional barcodes
-  - Auto-detect unit type from scanned barcode
+- 🔄 **Dynamic Unit of Measure** — Each product has multiple units (Piece, Box, Carton) with configurable conversion factors
+  - Per-unit pricing: separate `RetailPrice` and `WholesalePrice` per `ProductUnit`
+  - Barcodes stored in `UnitBarcode` table — one barcode per unit
+  - `SmartUnitFormatter` selects best display unit based on quantity
+  - Base unit always has `ConversionFactor = 1`
+- 🔍 **Multi-barcode support** — Barcodes stored per product-unit combination in `UnitBarcode` table
+  - Auto-detect unit from scanned barcode
   - Fallback to legacy `Products.Barcode` column
+- 💰 **Costing Strategy** — Three costing methods: WeightedAverage, LastPurchasePrice, SupplierPrice
+  - Configurable via `SystemSettings` table (seeded as WeightedAverage)
+  - `UpdateProductPricingService` handles all three methods
+  - Cost cascade: ALL product units recalculate from base unit cost × conversion factor
+  - `ProductPriceHistory` audit trail on EVERY cost change
+- 🏦 **Cash Box Management** — Track physical cash across multiple boxes
+  - `CashBox` with opening/current balance
+  - `CashTransaction` immutable entries (Opening, Income, Expense, Transfer, Refund, Payment)
+  - `CashBox.CurrentBalance` NEVER negative — validated before dispensing
+  - `DailyClosure` for end-of-day reconciliation
 - 🔌 **Hardware Integration** — Built-in barcode scanner support (Keyboard Emulation) with mobile camera scanning planned
 - 🔒 **Financial integrity** — All money calculations use `decimal` precision, never floating-point
 - 📦 **Multi-warehouse & Low Stock AI** — Track inventory across branches with auto-calculated reorder suggestions
   - `ReorderLevel` on each product
   - Smart low-stock reporting (e.g., "1 box + 3 pieces")
 - 👥 **Role-based access** — Admin, Manager, and Cashier with granular permissions
-- 📊 **Full audit trail** — Every stock change and financial transaction is tracked
+- 📊 **Full audit trail** — Every stock change, price change, and financial transaction is tracked
 - 🌐 **API-first design** — RESTful API ready for web/mobile clients in future phases
 
 ---
@@ -74,9 +84,22 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 
 > **Key Principle:** The Desktop app **never** connects to the database directly. All communication goes through the Web API.
 
-### New Services (v4.2)
-- `DialogService` - Modal dialogs (Error, Success, Warning, Confirm, Delete)
-- `ToastNotificationService` - Auto-dismissing notifications
+### New Services (v4.3)
+- `UpdateProductPricingService` — WeightedAverage / LastPurchasePrice / SupplierPrice costing
+- `BarcodeLookupService` — Unit-aware barcode scanning
+- `SmartUnitFormatter` — Best-display-unit selection based on quantity
+- `SystemSettingsRepository` — Application-level settings
+- `StoreSettingsService` — Store configuration management
+- `BackupService` — Database backup automation
+- `ProductPriceQuery` — Price history audit trail
+- `DialogService` — Modal dialogs (Error, Success, Warning, Confirm, Delete)
+- `ToastNotificationService` — Auto-dismissing notifications
+- **`InvoicePrintDtoBuilder`** — Builds print DTOs for Sales, Purchase, SalesReturn, PurchaseReturn invoices
+- **`IPrintService` / `PrintService`** — QuestPDF A4 generation + Win32 raw ESC/POS thermal printing
+- **`PrintApiService`** (Desktop) — HTTP client wrapper for `PrintController` endpoints
+- **`A4InvoiceDocument`** — QuestPDF document template (RTL Arabic, logo, tax breakdown)
+- **`ThermalReceiptGenerator`** — ESC/POS receipt builder (42-char columns, Windows-1256)
+- **`EscPos`** — Static class for ESC/POS command byte sequences
 
 ---
 
@@ -112,10 +135,46 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - Customer debt tracking
 - Supplier payment tracking
 
-### 🖨️ Printing
-- A4 invoice printing with store branding
-- 80mm thermal receipt printing
-- Print preview support
+### 🖨️ Printing Engine (v4.3)
+- **A4 invoice PDF generation** via QuestPDF with RTL Arabic support
+  - Store logo, name, phone, address, tax number in header
+  - Alternating-row item table with line totals
+  - Tax breakdown (VAT rate configurable in SystemSettings)
+  - Page numbers and footer
+- **80mm thermal receipt printing** via Win32 raw ESC/POS
+  - 42-character monospaced column layout
+  - Windows-1256 encoding for Arabic text
+  - Cutter command, cash drawer kick-out
+  - Built-in `EscPos` static class (no external packages)
+- **Preview** in WPF `PdfPreviewWindow` (WebBrowser control) before printing
+- **API-first architecture**: Desktop → `IPrintApiService` → `PrintController` → `IPrintService`
+- **Print settings persisted** in `SystemSetting` table (`Category = "Print"`):
+  - `ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber`, `TaxRate`
+- **Test page** for printer alignment verification
+- **11 API endpoints** covering sales/purchase/return A4 + thermal + preview + save
+- **254+ unit tests** across Domain, Application, Infrastructure, and API layers
+
+### 📐 Dynamic Unit of Measure (v4.3)
+- Multiple units per product (Piece, Box, Carton, etc.)
+- Per-unit pricing (RetailPrice + WholesalePrice per ProductUnit)
+- Conversion factors (Base=1, Box=24, Carton=144)
+- Unit-specific barcodes via `UnitBarcode` table
+- `SmartUnitFormatter` for quantity-based display unit selection
+- Enforced: at least one unit per product (Domain rule)
+
+### 💰 Costing Strategy (v4.3)
+- Three methods: WeightedAverage, LastPurchasePrice, SupplierPrice
+- Configurable via `SystemSettings` table
+- Cost cascade: ALL product units update from base × conversion factor
+- `ProductPriceHistory` audit on every change
+- Seeded as WeightedAverage by default
+
+### 🏦 Cash Box Management (v4.3)
+- Multiple cash boxes with opening/current balance
+- Immutable cash transactions (Open, Income, Expense, Transfer, Refund, Payment)
+- `CashBox.CurrentBalance` never negative
+- Cash transfers require TWO transactions (Out + In)
+- `DailyClosure` for end-of-day reconciliation
 
 ### 🔒 Defensive Programming (v4.2)
 - Guard Clauses on ALL Domain entities
@@ -173,24 +232,30 @@ The following features are **not included** in the current MVP but are planned f
 | **Validation** | FluentValidation | 11.x |
 | **Logging** | Serilog | 8.x |
 | **API Docs** | Swashbuckle (Swagger) | 6.x |
+| **PDF Generation** | QuestPDF | 2024.3.x |
+| **Image Processing** | SixLabors.ImageSharp | 3.1.x |
+| **Thermal Printing** | Win32 raw (OpenPrinter/WritePrinter) | — |
+| **Reports (Excel)** | ClosedXML | 0.102.x |
 
 ---
 
 ## 📐 Database Schema
 
-**24 tables** covering the full retail domain:
+**30+ tables** covering the full retail domain:
 
 | Category | Tables |
 |----------|--------|
 | **Core** | Users, Units, Categories, Products, Warehouses, WarehouseStocks |
-| **Products** | ProductBarcodes (multi-barcode support) |
+| **Products** | ProductUnits (dynamic UOM), UnitBarcodes (unit-specific barcodes) |
 | **Trading Partners** | Customers, Suppliers |
 | **Purchases** | PurchaseInvoices, PurchaseInvoiceItems |
 | **Sales** | SalesInvoices, SalesInvoiceItems |
 | **Returns** | PurchaseReturns, PurchaseReturnItems, SalesReturns, SalesReturnItems |
 | **Transfers** | StockTransfers, StockTransferItems |
 | **Payments** | CustomerPayments, SupplierPayments |
-| **System** | StoreSettings, DocumentSequences, InventoryMovements |
+| **Cash Management** | CashBoxes, CashTransactions |
+| **Pricing & Costing** | ProductPriceHistory (price audit trail) |
+| **System** | SystemSettings (costing method), StoreSettings, DocumentSequences, InventoryMovements, SystemLog
 
 ### Key Constraints
 - `decimal(18,2)` for all money fields — **never** `float` or `double`
@@ -221,7 +286,7 @@ The following features are **not included** in the current MVP but are planned f
 | [`AGENTS.md`](AGENTS.md) | Master rules for AI-assisted development |
 | [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) | Non-negotiable architectural rules |
 | [`docs/PRD-MVP-v3.0.md`](docs/PRD-MVP-v3.0.md) | Full product requirements document |
-| [`docs/database-schema.md`](docs/database-schema.md) | SQL Server schema (22 tables) |
+| [`docs/database-schema.md`](docs/database-schema.md) | SQL Server schema (30+ tables) |
 | [`docs/ui-screens.md`](docs/ui-screens.md) | UI/UX flows and EventBus patterns |
 
 ---
@@ -269,22 +334,49 @@ dotnet run
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| Phase 1-5 | Foundation → Desktop Modules | ✅ Completed |
-| **Phase 6** | Printing — A4 Invoices, 80mm Thermal Receipts | 🔲 In Progress |
-| **Phase 7** | Production — Backup, Windows Service, Installer | 🔲 Planned |
+| Phase 0 | Database — Migrations, Seed Data, Constraints | ✅ Completed |
+| Phase 1 | Domain — Entities, Business Rules, Guards | ✅ Completed |
+| Phase 2 | Infrastructure — DbContext, Repositories, UoW | ✅ Completed |
+| Phase 3 | Application — Services (Product → Customer → Sales → Purchases → Returns) | ✅ Completed |
+| Phase 4 | API — Controllers, Validation, JWT Auth, Swagger | ✅ Completed |
+| Phase 5 | Desktop Shell — MainForm, Navigation, EventBus, Login | ✅ Completed |
+| Phase 6 | Desktop Modules — Products, Customers, Sales, Purchases, Returns, Reports | ✅ Completed |
+| **Phase 7** | **Printing Engine** — A4 PDF (QuestPDF), 80mm Thermal (ESC/POS Win32), Preview, API Endpoints, WPF Integration, Print Settings Persistence | ✅ **Completed** |
+| **Phase 8** | Dynamic UOM + Costing + Cash Boxes | ✅ Completed |
+| **Phase 9** | Production — Backup, Windows Service, Installer | 🔲 Planned |
+
+### Printing Engine — Phase 7 Breakdown
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 0 — Setup | NuGet packages (QuestPDF, ImageSharp, Drawing.Common), QuestPDF license init | ✅ |
+| 1 — Contracts | DTOs (`InvoicePrintDto`, `InvoiceItemPrintDto`, `PrintResult`), `IPrintService` interface, `InvoicePrintDtoBuilder` (4 overloads) | ✅ |
+| 2 — A4 PDF | `A4InvoiceDocument` — RTL Arabic, logo, alternating rows, tax breakdown, page numbers, footer | ✅ |
+| 3 — Thermal | `ThermalReceiptGenerator`, `EscPos` static builder — 42-char columns, Windows-1256, cutter, cash drawer | ✅ |
+| 4 — PrintService | Win32 raw printing (`OpenPrinter`/`WritePrinter`), temp-file cleanup, Arabic error messages | ✅ |
+| 5 — API + Desktop | `PrintController` (11 endpoints), `IPrintApiService`/`PrintApiService`, `PdfPreviewWindow`, WPF print buttons, DI registrations | ✅ |
+| 6 — Production | Print settings in `SystemSetting` table, `IPrintApiService` injection into ViewModels, test print endpoint, 254+ tests | ✅ |
 
 ---
 
-## 🆕 What's New in v4.2
+## 🆕 What's New in v4.3
 
 | Feature | Description |
 |---------|-------------|
-| **DeleteStrategy** | Conditional soft/hard delete with 3-option dialog |
-| **Guard Clauses** | Domain entities protected from invalid states |
-| **Styled Dialogs** | Modern RTL modal dialogs with Arabic text |
-| **Toast Notifications** | Non-blocking success/error notifications |
-| **Real-Time Validation** | INotifyDataErrorInfo with red border feedback |
-| **CanExecute Logic** | Save buttons disabled until form is valid |
+| **Dynamic UOM** | ProductUnits with per-unit pricing, barcodes, conversion factors |
+| **Costing Strategy** | WeightedAverage / LastPurchasePrice / SupplierPrice methods |
+| **Cash Boxes** | Multi-box cash management with immutable transactions |
+| **Price History** | ProductPriceHistory audit on every cost/price change |
+| **WPF DesktopPWF** | Full MVVM rewrite — EventBus, DialogService, printing subsystem |
+| **Barcode Lookup** | Unit-aware barcode scanning via BarcodeLookupService |
+| **Smart Formatter** | Quantity-based display unit selection |
+| **System Settings** | Configurable costing method, store info |
+| **Backup Service** | Database backup automation via API |
+| **New Controllers** | Backup, Settings, Users, Dashboard, Logs, Returns, Payments |
+| **Printing Engine** | A4 PDF (QuestPDF) + 80mm Thermal (ESC/POS Win32) printing engine |
+| **PrintController** | 11 API endpoints for preview, print, save, and test page |
+| **Print Settings** | Persisted in `SystemSetting` table — printer names, logo, tax info |
+| **254+ Tests** | Full test coverage across all 5 test projects |
 
 ---
 
@@ -292,7 +384,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 44+ non-negotiable rules
+1. Read [`AGENTS.md`](AGENTS.md) — all 102+ non-negotiable rules (RULE-001 to RULE-102)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

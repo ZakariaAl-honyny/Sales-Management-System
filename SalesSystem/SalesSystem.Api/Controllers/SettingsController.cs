@@ -1,56 +1,79 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
 
-/// <summary>
-/// Store settings management API
-/// </summary>
 [ApiController]
 [Route("api/v1/settings")]
 [Authorize]
 public class SettingsController : ControllerBase
 {
     private readonly IStoreSettingsService _settingsService;
+    private readonly ISystemSettingsRepository _systemSettings;
 
-    public SettingsController(IStoreSettingsService settingsService)
+    public SettingsController(IStoreSettingsService settingsService, ISystemSettingsRepository systemSettings)
     {
         _settingsService = settingsService;
+        _systemSettings = systemSettings;
     }
 
-    /// <summary>
-    /// Gets current store settings
-    /// </summary>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Store settings</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(StoreSettingsDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Get(CancellationToken ct)
     {
         var result = await _settingsService.GetSettingsAsync(ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Updates store settings
-    /// </summary>
-    /// <param name="request">Settings update request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Updated settings</returns>
     [HttpPut]
     [Authorize(Policy = "AdminOnly")]
-    [ProducesResponseType(typeof(StoreSettingsDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update([FromBody] UpdateSettingsRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
-
         var result = await _settingsService.UpdateSettingsAsync(request, userId, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    // ─── Print Settings Endpoints ────────────
+
+    [HttpGet("print")]
+    public async Task<IActionResult> GetPrintSettings(CancellationToken ct)
+    {
+        var thermalPrinter = await _systemSettings.GetStringAsync("ThermalPrinterName", "", ct);
+        var a4Printer = await _systemSettings.GetStringAsync("A4PrinterName", "", ct);
+        var logoPath = await _systemSettings.GetStringAsync("LogoPath", "", ct);
+        var storeTaxNumber = await _systemSettings.GetStringAsync("StoreTaxNumber", "", ct);
+        var taxRateStr = await _systemSettings.GetStringAsync("TaxRate", "15", ct);
+        decimal.TryParse(taxRateStr, out var taxRate);
+
+        var dto = new PrintSettingsDto(
+            thermalPrinter ?? "",
+            a4Printer ?? "",
+            logoPath ?? "",
+            storeTaxNumber ?? "",
+            taxRate);
+
+        return Ok(dto);
+    }
+
+    [HttpPut("print")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> UpdatePrintSettings([FromBody] UpdatePrintSettingsRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? userId = int.TryParse(userIdStr, out var uid) ? uid : null;
+
+        await _systemSettings.SetStringAsync("ThermalPrinterName", request.ThermalPrinterName ?? "", userId, ct);
+        await _systemSettings.SetStringAsync("A4PrinterName", request.A4PrinterName ?? "", userId, ct);
+        await _systemSettings.SetStringAsync("LogoPath", request.LogoPath ?? "", userId, ct);
+        await _systemSettings.SetStringAsync("StoreTaxNumber", request.StoreTaxNumber ?? "", userId, ct);
+        await _systemSettings.SetStringAsync("TaxRate", request.TaxRate.ToString(), userId, ct);
+
+        return Ok(new { message = "تم حفظ إعدادات الطباعة بنجاح" });
     }
 }

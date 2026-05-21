@@ -23,6 +23,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     private readonly Mock<IWarehouseApiService> _mockWarehouseService;
     private readonly Mock<IProductApiService> _mockProductService;
     private readonly Mock<IDialogService> _mockDialogService;
+    private readonly Mock<IPrintApiService> _mockPrintService;
     private readonly SalesInvoiceListViewModel _viewModel;
 
     public SalesInvoiceListViewModelTests()
@@ -33,6 +34,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
         _mockWarehouseService = new Mock<IWarehouseApiService>();
         _mockProductService = new Mock<IProductApiService>();
         _mockDialogService = new Mock<IDialogService>();
+        _mockPrintService = new Mock<IPrintApiService>();
 
         _viewModel = new SalesInvoiceListViewModel(
             _mockInvoiceService.Object,
@@ -40,7 +42,8 @@ public class SalesInvoiceListViewModelTests : IDisposable
             _mockCustomerService.Object,
             _mockWarehouseService.Object,
             _mockProductService.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockPrintService.Object);
     }
 
     public void Dispose()
