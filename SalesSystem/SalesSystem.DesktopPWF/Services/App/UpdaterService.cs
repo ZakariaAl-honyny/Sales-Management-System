@@ -1,7 +1,9 @@
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
-using SalesSystem.DesktopPWF.Models.Updates;
+using SalesSystem.Application.Updates;
+using SalesSystem.Application.Updates.Models;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.DesktopPWF.Services.App;
 
@@ -37,7 +39,7 @@ public class UpdaterService : IUpdaterService
         return "https://your-server.com/updates/version.json";
     }
 
-    public async Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken ct = default)
+    public async Task<Result<UpdateCheckResult>> CheckForUpdatesAsync(CancellationToken ct = default)
     {
         try
         {
@@ -51,7 +53,7 @@ public class UpdaterService : IUpdaterService
             if (!response.IsSuccessStatusCode)
             {
                 Serilog.Log.Warning("Update server returned {Status}", response.StatusCode);
-                return UpdateCheckResult.Failed($"Server returned {response.StatusCode}");
+                return Result<UpdateCheckResult>.Failure($"Server returned {response.StatusCode}");
             }
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);
@@ -60,46 +62,46 @@ public class UpdaterService : IUpdaterService
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (updateInfo == null)
-                return UpdateCheckResult.Failed("Invalid version.json format");
+                return Result<UpdateCheckResult>.Failure("Invalid version.json format");
 
-            var currentVersion = GetCurrentVersion();
-            var skippedVersion = GetSkippedVersion();
+            var currentVersion = GetCurrentVersion().Value;
+            var skippedVersion = GetSkippedVersion().Value;
 
             if (!updateInfo.IsForceUpdate(currentVersion) &&
                 updateInfo.LatestVersion == skippedVersion)
             {
                 Serilog.Log.Information("Version {Version} was skipped by user", skippedVersion);
-                return UpdateCheckResult.NoUpdate();
+                return Result<UpdateCheckResult>.Success(UpdateCheckResult.NoUpdate());
             }
 
             if (updateInfo.IsUpdateAvailable(currentVersion))
             {
                 Serilog.Log.Information("Update available: {Current} → {Latest}",
                     currentVersion, updateInfo.LatestVersion);
-                return UpdateCheckResult.Available(updateInfo);
+                return Result<UpdateCheckResult>.Success(UpdateCheckResult.Available(updateInfo));
             }
 
             Serilog.Log.Information("App is up to date ({Version})", currentVersion);
-            return UpdateCheckResult.NoUpdate();
+            return Result<UpdateCheckResult>.Success(UpdateCheckResult.NoUpdate());
         }
         catch (OperationCanceledException)
         {
             Serilog.Log.Warning("Update check timed out");
-            return UpdateCheckResult.Failed("Connection timeout");
+            return Result<UpdateCheckResult>.Failure("Connection timeout");
         }
         catch (HttpRequestException ex)
         {
             Serilog.Log.Warning(ex, "No internet connection for update check");
-            return UpdateCheckResult.Failed("No internet connection");
+            return Result<UpdateCheckResult>.Failure("No internet connection");
         }
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "Unexpected error during update check");
-            return UpdateCheckResult.Failed(ex.Message);
+            return Result<UpdateCheckResult>.Failure(ex.Message);
         }
     }
 
-    public async Task<string?> DownloadUpdateAsync(
+    public async Task<Result<string>> DownloadUpdateAsync(
         string downloadUrl,
         string expectedChecksum,
         IProgress<DownloadProgress> progress,
@@ -158,31 +160,31 @@ public class UpdaterService : IUpdaterService
                 {
                     File.Delete(tempPath);
                     Serilog.Log.Error("Checksum verification failed for {File}", tempPath);
-                    return null;
+                    return Result<string>.Failure("Checksum verification failed");
                 }
             }
 
             Serilog.Log.Information("Download complete: {Path}", tempPath);
-            return tempPath;
+            return Result<string>.Success(tempPath);
         }
         catch (OperationCanceledException)
         {
             Serilog.Log.Information("Download cancelled by user");
-            return null;
+            return Result<string>.Failure("Download cancelled");
         }
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "Download failed");
-            return null;
+            return Result<string>.Failure($"Download failed: {ex.Message}");
         }
     }
 
-    public void LaunchInstallerAndExit(string installerPath)
+    public Task<Result<bool>> LaunchInstallerAndExitAsync(string installerPath)
     {
         if (!File.Exists(installerPath))
         {
             Serilog.Log.Error("Installer not found at {Path}", installerPath);
-            return;
+            return Task.FromResult(Result<bool>.Failure("Installer file not found"));
         }
 
         Serilog.Log.Information("Launching installer: {Path}", installerPath);
@@ -197,50 +199,61 @@ public class UpdaterService : IUpdaterService
 
         System.Diagnostics.Process.Start(startInfo);
 
-        System.Windows.Application.Current.Dispatcher.Invoke(() =>
-        {
-            System.Windows.Application.Current.Shutdown();
-        });
+        // Signal caller to shut down. The WPF app should handle graceful shutdown.
+        return Task.FromResult(Result<bool>.Success(true));
     }
 
-    public string GetCurrentVersion()
+    public Result<string> GetCurrentVersion()
     {
-        var version = System.Reflection.Assembly
-            .GetExecutingAssembly()
-            .GetName()
-            .Version;
+        try
+        {
+            var version = System.Reflection.Assembly
+                .GetExecutingAssembly()
+                .GetName()
+                .Version;
 
-        return version != null
-            ? $"{version.Major}.{version.Minor}.{version.Build}"
-            : "0.0.0";
+            var versionString = version != null
+                ? $"{version.Major}.{version.Minor}.{version.Build}"
+                : "0.0.0";
+            return Result<string>.Success(versionString);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Failed to read assembly version");
+            return Result<string>.Failure("Unable to determine version");
+        }
     }
 
-    public void SkipVersion(string version)
+    public Result SkipVersion(string version)
     {
         try
         {
             var settings = LoadLocalSettings();
             settings["SkippedVersion"] = version;
             SaveLocalSettings(settings);
+            Serilog.Log.Information("Version {Version} marked as skipped", version);
+            return Result.Success();
         }
         catch (Exception ex)
         {
             Serilog.Log.Warning(ex, "Failed to persist skipped version");
+            return Result.Failure("Failed to save skipped version");
         }
-
-        Serilog.Log.Information("Version {Version} marked as skipped", version);
     }
 
-    public string GetSkippedVersion()
+    public Result<string> GetSkippedVersion()
     {
         try
         {
             var settings = LoadLocalSettings();
-            return settings.TryGetValue("SkippedVersion", out var v) ? v : string.Empty;
+            return settings.TryGetValue("SkippedVersion", out var v)
+                ? Result<string>.Success(v)
+                : Result<string>.Success(string.Empty);
         }
-        catch
+        catch (Exception ex)
         {
-            return string.Empty;
+            Serilog.Log.Warning(ex, "Failed to read skipped version");
+            return Result<string>.Failure("Failed to read skipped version");
         }
     }
 

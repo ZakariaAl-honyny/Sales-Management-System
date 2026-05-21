@@ -15,7 +15,6 @@ public class CashBox : BaseEntity
     public int? BranchId { get; private set; }
     public string CurrencyCode { get; private set; } = "SAR";
     public int? AssignedUserId { get; private set; } // NULL = shared box
-    public bool IsActive { get; private set; }
     public string? Notes { get; private set; }
 
     // Navigation

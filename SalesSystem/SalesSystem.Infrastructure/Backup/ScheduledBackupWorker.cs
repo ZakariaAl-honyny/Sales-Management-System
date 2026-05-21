@@ -52,8 +52,8 @@ public sealed class ScheduledBackupWorker : BackgroundService
                     "Automatic backup completed: {File}",
                     result.Value);
 
-                var retentionDays = int.Parse(
-                    _configuration["Backup:RetentionDays"] ?? "30");
+                var retentionDays = int.TryParse(
+                    _configuration["Backup:RetentionDays"], out var days) ? days : 30;
 
                 await backupService.DeleteOldBackupsAsync(retentionDays, stoppingToken);
             }

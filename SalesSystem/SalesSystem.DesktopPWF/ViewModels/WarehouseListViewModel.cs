@@ -144,7 +144,7 @@ public class WarehouseListViewModel : ViewModelBase
 
             if (result.IsSuccess && result.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Warehouses.Clear();
                     foreach (var item in result.Value)
@@ -322,7 +322,7 @@ finally
     private void OnWarehouseChanged(WarehouseChangedMessage msg)
     {
         // Reload warehouses when any change happens (from other modules or this module)
-        Application.Current.Dispatcher.InvokeAsync(async () =>
+        System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
         {
             await LoadWarehousesAsync();
         });

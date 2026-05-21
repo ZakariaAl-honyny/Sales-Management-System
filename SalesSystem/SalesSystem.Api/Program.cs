@@ -11,6 +11,7 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Infrastructure;
 using SalesSystem.Infrastructure.Backup;
 using SalesSystem.Infrastructure.Data;
 using SalesSystem.Infrastructure.Persistence;
@@ -65,7 +66,9 @@ var connectionString = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNEC
     ?? "Server=.;Database=SalesSystemDb;Trusted_Connection=true;TrustServerCertificate=true;";
 
 var jwtSecret = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_SECRET")
-    ?? "ThisIsASecretKeyThatIsLongEnoughForHS256Algorithm!";
+    ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
+        ? "ThisIsASecretKeyThatIsLongEnoughForHS256Algorithm!"
+        : throw new InvalidOperationException("SALESSYSTEM_JWT_SECRET is required in production"));
 var jwtIssuer = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_ISSUER") ?? "SalesSystem";
 var jwtAudience = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_AUDIENCE") ?? "SalesSystem";
 var jwtExpirationHours = int.TryParse(Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_EXPIRATION_HOURS"), out var hours) ? hours : 8;
@@ -100,6 +103,7 @@ builder.Services.AddScoped<FirstRunSetupService>();
 builder.Services.AddScoped<SecureDbContextFactory>();
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddHostedService<ScheduledBackupWorker>();
+builder.Services.AddUpdateServices(builder.Configuration);
 
 // ============================================
 // 4. DI Registrations

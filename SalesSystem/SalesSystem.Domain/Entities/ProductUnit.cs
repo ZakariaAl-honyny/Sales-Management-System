@@ -25,7 +25,6 @@ public class ProductUnit : BaseEntity
     public decimal SupplierPrice { get; private set; }
     public decimal LastPurchasePrice { get; private set; }
     public int SortOrder { get; private set; }
-    public bool IsActive { get; private set; }
 
     // Navigation
     public Product Product { get; private set; } = null!;

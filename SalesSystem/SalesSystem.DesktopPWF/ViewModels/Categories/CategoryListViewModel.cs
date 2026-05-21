@@ -148,7 +148,7 @@ public class CategoryListViewModel : ViewModelBase
 
             if (result.IsSuccess && result.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Categories.Clear();
                     foreach (var item in result.Value)
@@ -310,7 +310,7 @@ finally
 
     private void OnCategoryChanged(CategoryChangedMessage msg)
     {
-        Application.Current.Dispatcher.InvokeAsync(async () =>
+        System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
         {
             await LoadCategoriesAsync();
         });

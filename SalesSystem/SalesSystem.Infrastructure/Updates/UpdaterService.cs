@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Infrastructure.Updates;
 
@@ -26,7 +27,7 @@ public class UpdaterService : IUpdaterService
         _configuration = configuration;
     }
 
-    public async Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken ct = default)
+    public async Task<Result<UpdateCheckResult>> CheckForUpdatesAsync(CancellationToken ct = default)
     {
         try
         {
@@ -34,7 +35,7 @@ public class UpdaterService : IUpdaterService
             if (string.IsNullOrWhiteSpace(versionFileUrl))
             {
                 _logger.LogWarning("UpdateCheckUrl not configured");
-                return UpdateCheckResult.Failed("UpdateCheckUrl not configured");
+                return Result<UpdateCheckResult>.Failure("UpdateCheckUrl not configured");
             }
 
             _logger.LogInformation("Checking for updates at {Url}", versionFileUrl);
@@ -47,7 +48,7 @@ public class UpdaterService : IUpdaterService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Update server returned {Status}", response.StatusCode);
-                return UpdateCheckResult.Failed($"Server returned {response.StatusCode}");
+                return Result<UpdateCheckResult>.Failure($"Server returned {response.StatusCode}");
             }
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);
@@ -56,46 +57,46 @@ public class UpdaterService : IUpdaterService
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (updateInfo == null)
-                return UpdateCheckResult.Failed("Invalid version.json format");
+                return Result<UpdateCheckResult>.Failure("Invalid version.json format");
 
-            var currentVersion = GetCurrentVersion();
-            var skippedVersion = GetSkippedVersion();
+            var currentVersion = GetCurrentVersion().Value ?? "0.0.0";
+            var skippedVersion = GetSkippedVersion().Value ?? string.Empty;
 
             if (!updateInfo.IsForceUpdate(currentVersion) &&
                 updateInfo.LatestVersion == skippedVersion)
             {
                 _logger.LogInformation("Version {Version} was skipped by user", skippedVersion);
-                return UpdateCheckResult.NoUpdate();
+                return Result<UpdateCheckResult>.Success(UpdateCheckResult.NoUpdate());
             }
 
             if (updateInfo.IsUpdateAvailable(currentVersion))
             {
                 _logger.LogInformation("Update available: {Current} -> {Latest}",
                     currentVersion, updateInfo.LatestVersion);
-                return UpdateCheckResult.Available(updateInfo);
+                return Result<UpdateCheckResult>.Success(UpdateCheckResult.Available(updateInfo));
             }
 
             _logger.LogInformation("App is up to date ({Version})", currentVersion);
-            return UpdateCheckResult.NoUpdate();
+            return Result<UpdateCheckResult>.Success(UpdateCheckResult.NoUpdate());
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("Update check timed out");
-            return UpdateCheckResult.Failed("Connection timeout");
+            return Result<UpdateCheckResult>.Failure("Connection timeout");
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "No internet connection for update check");
-            return UpdateCheckResult.Failed("No internet connection");
+            return Result<UpdateCheckResult>.Failure("No internet connection");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error during update check");
-            return UpdateCheckResult.Failed(ex.Message);
+            return Result<UpdateCheckResult>.Failure(ex.Message);
         }
     }
 
-    public async Task<string?> DownloadUpdateAsync(
+    public async Task<Result<string>> DownloadUpdateAsync(
         string downloadUrl,
         string expectedChecksum,
         IProgress<DownloadProgress> progress,
@@ -154,31 +155,31 @@ public class UpdaterService : IUpdaterService
                 {
                     File.Delete(tempPath);
                     _logger.LogError("Checksum verification failed for {File}", tempPath);
-                    return null;
+                    return Result<string>.Failure("Checksum verification failed");
                 }
             }
 
             _logger.LogInformation("Download complete: {Path}", tempPath);
-            return tempPath;
+            return Result<string>.Success(tempPath);
         }
         catch (OperationCanceledException)
         {
             _logger.LogInformation("Download cancelled by user");
-            return null;
+            return Result<string>.Failure("Download cancelled");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Download failed");
-            return null;
+            return Result<string>.Failure($"Download failed: {ex.Message}");
         }
     }
 
-    public void LaunchInstallerAndExit(string installerPath)
+    public Task<Result<bool>> LaunchInstallerAndExitAsync(string installerPath)
     {
         if (!File.Exists(installerPath))
         {
             _logger.LogError("Installer not found at {Path}", installerPath);
-            return;
+            return Task.FromResult(Result<bool>.Failure("Installer file not found"));
         }
 
         _logger.LogInformation("Launching installer: {Path}", installerPath);
@@ -193,25 +194,28 @@ public class UpdaterService : IUpdaterService
 
         Process.Start(startInfo);
 
+        // Return true to signal caller should exit the application
+        return Task.FromResult(Result<bool>.Success(true));
+    }
+
+    public Result<string> GetCurrentVersion()
+    {
         try
         {
-            Environment.Exit(0);
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            var versionString = version != null
+                ? $"{version.Major}.{version.Minor}.{version.Build}"
+                : "0.0.0";
+            return Result<string>.Success(versionString);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to shut down application");
+            _logger.LogWarning(ex, "Failed to read assembly version");
+            return Result<string>.Failure("Unable to determine version");
         }
     }
 
-    public string GetCurrentVersion()
-    {
-        var version = Assembly.GetExecutingAssembly().GetName().Version;
-        return version != null
-            ? $"{version.Major}.{version.Minor}.{version.Build}"
-            : "0.0.0";
-    }
-
-    public void SkipVersion(string version)
+    public Result SkipVersion(string version)
     {
         try
         {
@@ -231,23 +235,25 @@ public class UpdaterService : IUpdaterService
             }
 
             _logger.LogInformation("Version {Version} marked as skipped", version);
+            return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to persist skipped version");
+            return Result.Failure("Failed to save skipped version");
         }
     }
 
-    public string GetSkippedVersion()
+    public Result<string> GetSkippedVersion()
     {
         try
         {
-            return _configuration["SkippedVersion"] ?? string.Empty;
+            return Result<string>.Success(_configuration["SkippedVersion"] ?? string.Empty);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to read skipped version");
-            return string.Empty;
+            return Result<string>.Failure("Failed to read skipped version");
         }
     }
 

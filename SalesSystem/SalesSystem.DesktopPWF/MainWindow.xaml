@@ -46,10 +46,10 @@
                 <MenuItem Header="نقل المخزون" Click="StockTransfersMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="التقارير">
-                <MenuItem Header="تقرير المبيعات" Click="ProfitLossReportMenuItem_Click"/>
-                <MenuItem Header="تقرير المشتريات" Click="ProfitLossReportMenuItem_Click"/>
-                <MenuItem Header="تقرير المخزون" Click="ProfitLossReportMenuItem_Click"/>
-                <MenuItem Header="تقرير الأرباح والخسائر" Click="ProfitLossReportMenuItem_Click"/>
+                <MenuItem Header="تقرير المبيعات" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="تقرير المشتريات" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="تقرير المخزون" Tag="Inventory" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="تقرير الأرباح والخسائر" Tag="Reports" Click="ReportMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="الإعدادات" x:Name="SettingsMenuItem">
                 <MenuItem Header="إدارة المنتجات" Click="ProductsMenuItem_Click"/>

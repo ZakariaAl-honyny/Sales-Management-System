@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
-using SalesSystem.DesktopPWF.Models.Updates;
+using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
@@ -14,11 +14,13 @@ namespace SalesSystem.DesktopPWF;
 public partial class MainWindow : Window
 {
     private readonly ISessionService _session;
+    private readonly IDialogService _dialogService;
 
     public MainWindow()
     {
         InitializeComponent();
         _session = App.GetService<ISessionService>();
+        _dialogService = App.GetService<IDialogService>();
 
         UpdateUserInfo();
         ApplyPermissions();
@@ -113,13 +115,7 @@ public partial class MainWindow : Window
         // الحماية الثانوية — منع التنقل البرمجي بدون صلاحية
         if (!CanNavigateTo(tag))
         {
-            System.Windows.MessageBox.Show(
-                "ليس لديك صلاحية للوصول إلى هذه الشاشة.",
-                "وصول مقيّد",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning,
-                MessageBoxResult.OK,
-                MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+            _ = _dialogService.ShowWarningAsync("تنبيه", "ليس لديك صلاحية للوصول إلى هذه الشاشة.");
             NavigationList.SelectedItem = null;
             return;
         }
@@ -165,29 +161,17 @@ public partial class MainWindow : Window
 
             if (!result.IsSuccess)
             {
-                System.Windows.MessageBox.Show(
-                    "تعذر الاتصال بخادم التحديثات.\nيرجى التحقق من اتصال الإنترنت والمحاولة لاحقاً.",
-                    "تعذر التحقق",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning,
-                    MessageBoxResult.OK,
-                    MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+                _ = _dialogService.ShowErrorAsync("خطأ", $"تعذر الاتصال بخادم التحديثات.\n{result.Error}");
                 return;
             }
 
-            if (!result.UpdateAvailable || result.UpdateInfo == null)
+            if (!result.Value.UpdateAvailable || result.Value.UpdateInfo == null)
             {
-                System.Windows.MessageBox.Show(
-                    $"برنامجك محدّث!\nتعمل على أحدث إصدار: {updaterService.GetCurrentVersion()}",
-                    "لا توجد تحديثات",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information,
-                    MessageBoxResult.OK,
-                    MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+                _ = _dialogService.ShowSuccessAsync("تحديث", $"برنامجك محدّث!\nتعمل على أحدث إصدار: {updaterService.GetCurrentVersion().Value}");
                 return;
             }
 
-            var vm = new UpdateDialogViewModel(updaterService, result.UpdateInfo);
+            var vm = new UpdateDialogViewModel(updaterService, result.Value.UpdateInfo);
             var dialog = new UpdateDialog(vm) { Owner = this };
             dialog.ShowDialog();
         }
@@ -199,13 +183,13 @@ public partial class MainWindow : Window
 
     private void ProfileMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        System.Windows.MessageBox.Show($"مرحباً {_session.GetUserName()}", "الملف الشخصي", MessageBoxButton.OK, MessageBoxImage.Information);
+        _ = _dialogService.ShowInfoAsync("الملف الشخصي", $"مرحباً {_session.GetUserName()}");
     }
 
-    private void BtnLogout_Click(object sender, RoutedEventArgs e)
+    private async void BtnLogout_Click(object sender, RoutedEventArgs e)
     {
-        var result = System.Windows.MessageBox.Show("هل أنت متأكد من تسجيل الخروج؟", "تأكيد", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (result == MessageBoxResult.Yes)
+        var confirmed = await _dialogService.ShowConfirmationAsync("تسجيل الخروج", "هل أنت متأكد من تسجيل الخروج؟");
+        if (confirmed)
         {
             _session.ClearSession();
             var loginWindow = new LoginWindow();
@@ -214,7 +198,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ProfitLossReportMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Reports");
+    private void ReportMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.Tag is string tag)
+        {
+            NavigateTo(tag);
+        }
+    }
+
     private void ProductsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Products");
     private void CustomersMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Customers");
     private void SuppliersMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Suppliers");

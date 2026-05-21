@@ -24,6 +24,7 @@
   <!-- Project References -->
   <ItemGroup>
     <ProjectReference Include="..\SalesSystem.Contracts\SalesSystem.Contracts.csproj" />
+    <ProjectReference Include="..\SalesSystem.Application\SalesSystem.Application.csproj" />
   </ItemGroup>
 
   <!-- NuGet Packages -->

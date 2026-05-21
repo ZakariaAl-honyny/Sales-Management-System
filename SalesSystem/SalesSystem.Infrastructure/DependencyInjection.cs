@@ -11,6 +11,9 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Default updater: checks a custom version.json endpoint (configured via UpdateCheckUrl).
+        // Alternative: GitHubUpdaterService checks GitHub releases instead.
+        // To switch, replace UpdaterService with GitHubUpdaterService and configure GitHub:Owner + GitHub:Repository.
         services.AddHttpClient<IUpdaterService, UpdaterService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);

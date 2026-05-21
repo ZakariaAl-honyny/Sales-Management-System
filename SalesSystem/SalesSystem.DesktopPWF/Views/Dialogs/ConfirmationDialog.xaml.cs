@@ -10,7 +10,7 @@ public partial class ConfirmationDialog : Window
     {
         InitializeComponent();
         MessageText.Text = message;
-        Owner = Application.Current.MainWindow;
+        Owner = System.Windows.Application.Current.MainWindow;
     }
 
     private void YesButton_Click(object sender, RoutedEventArgs e)

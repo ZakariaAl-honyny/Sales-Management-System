@@ -32,12 +32,18 @@ public class UserListViewModel : AdminOnlyViewModel
     private bool _includeInactive;
 
     public UserListViewModel()
+        : this(App.GetService<ISessionService>())
+    {
+    }
+
+    public UserListViewModel(ISessionService sessionService)
+        : base(sessionService)
     {
         _userService = App.GetService<IUserApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
-        _sessionService = App.GetService<ISessionService>();
+        _sessionService = sessionService;
 
         InitializeCommands();
     }
@@ -147,7 +153,7 @@ public class UserListViewModel : AdminOnlyViewModel
 
             if (result.IsSuccess && result.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Users.Clear();
                     foreach (var item in result.Value)
@@ -344,7 +350,7 @@ public class UserListViewModel : AdminOnlyViewModel
 
     private void OnUserChanged(UserChangedMessage msg)
     {
-        Application.Current.Dispatcher.InvokeAsync(async () =>
+        System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
         {
             await LoadUsersAsync();
         });

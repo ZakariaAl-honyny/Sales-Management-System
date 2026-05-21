@@ -1,22 +1,23 @@
 using SalesSystem.Application.Updates.Models;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Application.Updates;
 
 public interface IUpdaterService
 {
-    Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken ct = default);
+    Task<Result<UpdateCheckResult>> CheckForUpdatesAsync(CancellationToken ct = default);
 
-    Task<string?> DownloadUpdateAsync(
+    Task<Result<string>> DownloadUpdateAsync(
         string downloadUrl,
         string expectedChecksum,
         IProgress<DownloadProgress> progress,
         CancellationToken ct = default);
 
-    void LaunchInstallerAndExit(string installerPath);
+    Task<Result<bool>> LaunchInstallerAndExitAsync(string installerPath);
 
-    string GetCurrentVersion();
+    Result<string> GetCurrentVersion();
 
-    void SkipVersion(string version);
+    Result SkipVersion(string version);
 
-    string GetSkippedVersion();
+    Result<string> GetSkippedVersion();
 }

@@ -12,7 +12,6 @@ public class SystemSetting : BaseEntity
     public string DisplayName { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public int? UpdatedBy { get; private set; }
-    public DateTime UpdatedAt { get; private set; }
 
     private SystemSetting() : base() { } // EF Core - calls base constructor to init CreatedAt
 

@@ -1,9 +1,9 @@
-using SalesSystem.DesktopPWF.Models.Updates;
+using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.Services.App;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Updates;
 
-public class UpdateDialogViewModel : ViewModelBase
+public class UpdateDialogViewModel : ViewModelBase, IDisposable
 {
     private readonly IUpdaterService _updaterService;
     private readonly UpdateInfo _updateInfo;
@@ -73,7 +73,7 @@ public class UpdateDialogViewModel : ViewModelBase
         _updaterService = updaterService;
         _updateInfo = updateInfo;
 
-        CurrentVersion = updaterService.GetCurrentVersion();
+        CurrentVersion = updaterService.GetCurrentVersion().Value;
         LatestVersion = updateInfo.LatestVersion;
         ReleaseDate = updateInfo.ReleaseDate;
         IsCriticalUpdate = updateInfo.IsCritical;
@@ -111,27 +111,34 @@ public class UpdateDialogViewModel : ViewModelBase
 
         try
         {
-            var installerPath = await _updaterService.DownloadUpdateAsync(
+            var downloadResult = await _updaterService.DownloadUpdateAsync(
                 _updateInfo.DownloadUrl,
                 _updateInfo.ChecksumSHA256,
                 progressReporter,
                 _downloadCts.Token);
 
-            if (installerPath == null)
+            if (!downloadResult.IsSuccess || string.IsNullOrEmpty(downloadResult.Value))
             {
                 if (!_downloadCts.Token.IsCancellationRequested)
                 {
-                    DownloadStatusText = "فشل التحميل. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.";
+                    DownloadStatusText = $"فشل التحميل: {downloadResult.Error ?? "تحقق من اتصال الإنترنت والمحاولة مرة أخرى."}";
                 }
                 IsDownloading = false;
                 return;
             }
 
+            var installerPath = downloadResult.Value;
+
             DownloadStatusText = "اكتمل التحميل. جارٍ تشغيل المثبّت...";
             await Task.Delay(800);
 
             Result = UpdateDialogAction.InstallNow;
-            _updaterService.LaunchInstallerAndExit(installerPath);
+            var launchResult = await _updaterService.LaunchInstallerAndExitAsync(installerPath);
+            if (launchResult.IsSuccess && launchResult.Value)
+            {
+                // Caller should exit — close the dialog
+                CloseDialog?.Invoke();
+            }
         }
         catch (Exception ex)
         {
@@ -173,6 +180,12 @@ public class UpdateDialogViewModel : ViewModelBase
             : $"{p.SpeedKbps:N0} KB/s";
 
         return $"{receivedMb:N1} / {totalMb:N1} MB  •  {speed}  •  {p.Percentage:N0}%";
+    }
+
+    public void Dispose()
+    {
+        _downloadCts?.Cancel();
+        _downloadCts?.Dispose();
     }
 }
 

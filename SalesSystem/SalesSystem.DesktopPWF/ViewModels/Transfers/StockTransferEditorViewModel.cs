@@ -529,7 +529,7 @@ public class StockTransferEditorViewModel : ViewModelBase
             }
             UpdateCommandStates();
 
-            Application.Current.Dispatcher.Invoke(() => vm.CloseDialog());
+            System.Windows.Application.Current.Dispatcher.Invoke(() => vm.CloseDialog());
         };
 
         _dialogService.ShowDialog(vm);

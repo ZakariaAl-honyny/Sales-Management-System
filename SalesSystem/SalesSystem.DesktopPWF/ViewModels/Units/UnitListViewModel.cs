@@ -148,7 +148,7 @@ public class UnitListViewModel : ViewModelBase
 
             if (result.IsSuccess && result.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Units.Clear();
                     foreach (var item in result.Value)
@@ -310,7 +310,7 @@ finally
 
     private void OnUnitChanged(UnitChangedMessage msg)
     {
-        Application.Current.Dispatcher.InvokeAsync(async () =>
+        System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
         {
             await LoadUnitsAsync();
         });

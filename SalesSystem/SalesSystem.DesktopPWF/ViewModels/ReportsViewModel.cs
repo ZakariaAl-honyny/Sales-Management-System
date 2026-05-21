@@ -97,7 +97,7 @@ public class ReportsViewModel : ViewModelBase
             var result = await _warehouseService.GetAllAsync();
             if (result.IsSuccess && result.Value != null)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Warehouses.Clear();
                     // Add "All Warehouses" sentinel
@@ -266,7 +266,7 @@ public class ReportsViewModel : ViewModelBase
             DataTable table = new DataTable();
             
             // 2. Clear current collection of columns (if used)
-            Application.Current.Dispatcher.Invoke(() => ReportColumns.Clear());
+            System.Windows.Application.Current.Dispatcher.Invoke(() => ReportColumns.Clear());
 
             // 3. Fill the local table based on report type
             switch (SelectedReportType)
@@ -282,7 +282,7 @@ public class ReportsViewModel : ViewModelBase
 
             // 4. Update the bound property once data is ready
             // This ensures DataGrid with AutoGenerateColumns="True" sees the columns immediately
-            Application.Current.Dispatcher.Invoke(() =>
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
                 ReportData = table;
                 HasSearched = true;
@@ -608,7 +608,7 @@ public class ReportsViewModel : ViewModelBase
     private void AddColumn(DataTable table, string columnName)
     {
         table.Columns.Add(columnName);
-        Application.Current.Dispatcher.Invoke(() => ReportColumns.Add(table.Columns[columnName]!));
+        System.Windows.Application.Current.Dispatcher.Invoke(() => ReportColumns.Add(table.Columns[columnName]!));
     }
     #endregion
 

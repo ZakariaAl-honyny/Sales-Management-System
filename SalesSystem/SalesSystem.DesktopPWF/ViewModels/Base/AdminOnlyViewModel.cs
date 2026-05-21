@@ -5,15 +5,17 @@ namespace SalesSystem.DesktopPWF.ViewModels.Base;
 
 public abstract class AdminOnlyViewModel : ViewModelBase
 {
-    protected AdminOnlyViewModel()
+    private readonly ISessionService _sessionService;
+
+    protected AdminOnlyViewModel(ISessionService sessionService)
     {
+        _sessionService = sessionService;
         EnsureAdminRole();
     }
 
     protected void EnsureAdminRole()
     {
-        var session = App.GetService<ISessionService>();
-        var role = session.GetUserRole();
+        var role = _sessionService.GetUserRole();
 
         if (role != UserRole.Admin)
             throw new UnauthorizedAccessException(

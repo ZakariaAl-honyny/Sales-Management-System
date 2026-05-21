@@ -1114,7 +1114,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             }
 
             // Close the dialog after picking
-            Application.Current.Dispatcher.Invoke(() => vm.CloseDialog());
+            System.Windows.Application.Current.Dispatcher.Invoke(() => vm.CloseDialog());
         };
 
         _dialogService.ShowDialog(vm);

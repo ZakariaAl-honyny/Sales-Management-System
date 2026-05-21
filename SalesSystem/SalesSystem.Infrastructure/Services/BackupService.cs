@@ -90,7 +90,7 @@ public sealed class BackupService : IBackupService
             await using var connection = new SqlConnection(builder.ConnectionString);
             await connection.OpenAsync(ct);
 
-            var singleUserSql = $"ALTER DATABASE [{_databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;";
+            var singleUserSql = $"ALTER DATABASE [{_databaseName}] SET SINGLE_USER WITH ROLLBACK AFTER 30;";
             await using (var cmd1 = new SqlCommand(singleUserSql, connection))
             {
                 cmd1.CommandTimeout = 60;

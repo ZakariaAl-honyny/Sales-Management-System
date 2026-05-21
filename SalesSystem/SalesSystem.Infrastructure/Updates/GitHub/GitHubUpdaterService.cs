@@ -6,9 +6,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Infrastructure.Updates.GitHub;
 
+/// <summary>
+/// Alternative updater service that checks GitHub releases instead of a custom version.json endpoint.
+/// To use: register in DI instead of UpdaterService, and configure GitHub:Owner + GitHub:Repository.
+/// </summary>
 public class GitHubUpdaterService : IUpdaterService
 {
     private readonly HttpClient _httpClient;
@@ -30,14 +35,14 @@ public class GitHubUpdaterService : IUpdaterService
         _repo = configuration["GitHub:Repository"] ?? string.Empty;
     }
 
-    public async Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken ct = default)
+    public async Task<Result<UpdateCheckResult>> CheckForUpdatesAsync(CancellationToken ct = default)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(_owner) || string.IsNullOrWhiteSpace(_repo))
             {
                 _logger.LogWarning("GitHub owner or repository not configured");
-                return UpdateCheckResult.Failed("GitHub configuration missing");
+                return Result<UpdateCheckResult>.Failure("GitHub configuration missing");
             }
 
             var url = $"{GitHubApiBase}/repos/{_owner}/{_repo}/releases/latest";
@@ -51,19 +56,19 @@ public class GitHubUpdaterService : IUpdaterService
             if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 _logger.LogWarning("GitHub API rate limit exceeded");
-                return UpdateCheckResult.Failed("API rate limit exceeded - try again later");
+                return Result<UpdateCheckResult>.Failure("API rate limit exceeded - try again later");
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 _logger.LogWarning("No GitHub releases found for {Owner}/{Repo}", _owner, _repo);
-                return UpdateCheckResult.Failed("No releases found");
+                return Result<UpdateCheckResult>.Failure("No releases found");
             }
 
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("GitHub API returned {Status}", response.StatusCode);
-                return UpdateCheckResult.Failed($"GitHub API returned {response.StatusCode}");
+                return Result<UpdateCheckResult>.Failure($"GitHub API returned {response.StatusCode}");
             }
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);
@@ -71,7 +76,7 @@ public class GitHubUpdaterService : IUpdaterService
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (release == null || release.Draft)
-                return UpdateCheckResult.Failed("No valid release found");
+                return Result<UpdateCheckResult>.Failure("No valid release found");
 
             var installerAsset = release.Assets.Find(a =>
                 a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
@@ -80,7 +85,7 @@ public class GitHubUpdaterService : IUpdaterService
             if (installerAsset == null)
             {
                 _logger.LogWarning("No installer asset found in release {Tag}", release.TagName);
-                return UpdateCheckResult.Failed("No installer asset in release");
+                return Result<UpdateCheckResult>.Failure("No installer asset in release");
             }
 
             var versionTag = release.TagName.TrimStart('v', 'V');
@@ -97,44 +102,44 @@ public class GitHubUpdaterService : IUpdaterService
                 Changelog = changelog
             };
 
-            var currentVersion = GetCurrentVersion();
-            var skippedVersion = GetSkippedVersion();
+            var currentVersion = GetCurrentVersion().Value ?? "0.0.0";
+            var skippedVersion = GetSkippedVersion().Value ?? string.Empty;
 
             if (!updateInfo.IsForceUpdate(currentVersion) &&
                 updateInfo.LatestVersion == skippedVersion)
             {
                 _logger.LogInformation("Version {Version} was skipped by user", skippedVersion);
-                return UpdateCheckResult.NoUpdate();
+                return Result<UpdateCheckResult>.Success(UpdateCheckResult.NoUpdate());
             }
 
             if (updateInfo.IsUpdateAvailable(currentVersion))
             {
                 _logger.LogInformation("Update available: {Current} -> {Latest}",
                     currentVersion, updateInfo.LatestVersion);
-                return UpdateCheckResult.Available(updateInfo);
+                return Result<UpdateCheckResult>.Success(UpdateCheckResult.Available(updateInfo));
             }
 
             _logger.LogInformation("App is up to date ({Version})", currentVersion);
-            return UpdateCheckResult.NoUpdate();
+            return Result<UpdateCheckResult>.Success(UpdateCheckResult.NoUpdate());
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("GitHub update check timed out");
-            return UpdateCheckResult.Failed("Connection timeout");
+            return Result<UpdateCheckResult>.Failure("Connection timeout");
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "No internet connection for GitHub update check");
-            return UpdateCheckResult.Failed("No internet connection");
+            return Result<UpdateCheckResult>.Failure("No internet connection");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error during GitHub update check");
-            return UpdateCheckResult.Failed(ex.Message);
+            return Result<UpdateCheckResult>.Failure(ex.Message);
         }
     }
 
-    public async Task<string?> DownloadUpdateAsync(
+    public async Task<Result<string>> DownloadUpdateAsync(
         string downloadUrl,
         string expectedChecksum,
         IProgress<DownloadProgress> progress,
@@ -193,31 +198,31 @@ public class GitHubUpdaterService : IUpdaterService
                 {
                     File.Delete(tempPath);
                     _logger.LogError("Checksum verification failed for {File}", tempPath);
-                    return null;
+                    return Result<string>.Failure("Checksum verification failed");
                 }
             }
 
             _logger.LogInformation("Download complete: {Path}", tempPath);
-            return tempPath;
+            return Result<string>.Success(tempPath);
         }
         catch (OperationCanceledException)
         {
             _logger.LogInformation("Download cancelled by user");
-            return null;
+            return Result<string>.Failure("Download cancelled");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Download failed");
-            return null;
+            return Result<string>.Failure($"Download failed: {ex.Message}");
         }
     }
 
-    public void LaunchInstallerAndExit(string installerPath)
+    public Task<Result<bool>> LaunchInstallerAndExitAsync(string installerPath)
     {
         if (!File.Exists(installerPath))
         {
             _logger.LogError("Installer not found at {Path}", installerPath);
-            return;
+            return Task.FromResult(Result<bool>.Failure("Installer file not found"));
         }
 
         _logger.LogInformation("Launching installer: {Path}", installerPath);
@@ -232,25 +237,30 @@ public class GitHubUpdaterService : IUpdaterService
 
         Process.Start(startInfo);
 
+        // Return true to signal caller should exit the application.
+        // The caller (Desktop app) is responsible for shutting down gracefully.
+        // This avoids Environment.Exit(0) which would kill Windows Service hosts.
+        return Task.FromResult(Result<bool>.Success(true));
+    }
+
+    public Result<string> GetCurrentVersion()
+    {
         try
         {
-            Environment.Exit(0);
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            var versionString = version != null
+                ? $"{version.Major}.{version.Minor}.{version.Build}"
+                : "0.0.0";
+            return Result<string>.Success(versionString);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to shut down application");
+            _logger.LogWarning(ex, "Failed to read assembly version");
+            return Result<string>.Failure("Unable to determine version");
         }
     }
 
-    public string GetCurrentVersion()
-    {
-        var version = Assembly.GetExecutingAssembly().GetName().Version;
-        return version != null
-            ? $"{version.Major}.{version.Minor}.{version.Build}"
-            : "0.0.0";
-    }
-
-    public void SkipVersion(string version)
+    public Result SkipVersion(string version)
     {
         try
         {
@@ -270,23 +280,25 @@ public class GitHubUpdaterService : IUpdaterService
             }
 
             _logger.LogInformation("Version {Version} marked as skipped", version);
+            return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to persist skipped version");
+            return Result.Failure("Failed to save skipped version");
         }
     }
 
-    public string GetSkippedVersion()
+    public Result<string> GetSkippedVersion()
     {
         try
         {
-            return _configuration["SkippedVersion"] ?? string.Empty;
+            return Result<string>.Success(_configuration["SkippedVersion"] ?? string.Empty);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to read skipped version");
-            return string.Empty;
+            return Result<string>.Failure("Failed to read skipped version");
         }
     }
 

@@ -5,7 +5,7 @@ using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Serilog;
-using SalesSystem.DesktopPWF.Models.Updates;
+using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels;
@@ -288,12 +288,12 @@ public partial class App : System.Windows.Application
 
             var result = await updaterService.CheckForUpdatesAsync();
 
-            if (!result.UpdateAvailable || result.UpdateInfo == null)
+            if (!result.IsSuccess || !result.Value.UpdateAvailable || result.Value.UpdateInfo == null)
                 return;
 
             await Dispatcher.InvokeAsync(() =>
             {
-                ShowUpdateDialog(result.UpdateInfo);
+                ShowUpdateDialog(result.Value.UpdateInfo);
             });
         }
         catch (Exception ex)

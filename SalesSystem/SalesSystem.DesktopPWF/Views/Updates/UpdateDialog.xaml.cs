@@ -32,6 +32,7 @@ public partial class UpdateDialog : Window
             return;
         }
 
+        vm.Dispose();
         base.OnClosing(e);
     }
 }

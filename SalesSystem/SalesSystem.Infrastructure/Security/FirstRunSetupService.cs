@@ -67,6 +67,9 @@ public sealed class FirstRunSetupService
         var newJson = JsonSerializer.Serialize(dict,
             new JsonSerializerOptions { WriteIndented = true });
 
-        File.WriteAllText(appSettingsPath, newJson);
+        // Atomic write: write to temp file first, then replace
+        var tempPath = appSettingsPath + ".tmp";
+        File.WriteAllText(tempPath, newJson, System.Text.Encoding.UTF8);
+        File.Replace(tempPath, appSettingsPath, appSettingsPath + ".bak");
     }
 }
