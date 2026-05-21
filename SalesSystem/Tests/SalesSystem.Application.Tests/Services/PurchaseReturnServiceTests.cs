@@ -400,6 +400,12 @@ public class PurchaseReturnServiceTests : IDisposable
         public Task SoftDeleteAsync(int id, CancellationToken ct = default)
             => throw new NotImplementedException();
 
+        public Task HardDeleteAsync(int id, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public void DeleteRange(IEnumerable<T> entities)
+            => throw new NotImplementedException();
+
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }
 
