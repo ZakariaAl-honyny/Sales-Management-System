@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.3 Expansion)
+# AGENTS.md — Sales Management System (v4.4 Production)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -629,6 +629,139 @@ GET    /api/v1/print/purchases/{id}/preview-data
 POST   /api/v1/print/test                      → Test page print
 ```
 
+### 2.29 Auto-Update System (v4.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-103 | Auto-Update NEVER blocks startup — fire-and-forget with silent failure |
+| RULE-104 | ALL service methods return `Result<T>` or `Result` — NEVER throw |
+| RULE-105 | SHA256 checksum verification required before launching installer |
+| RULE-106 | Skipped version persisted to `%AppData%\SalesSystem\settings.json` — NEVER `appsettings.json` |
+| RULE-107 | Desktop calls API for updates — NEVER implements its own HTTP download logic |
+| RULE-108 | `Environment.Exit(0)` is FORBIDDEN — return `Result<bool>` and let caller handle shutdown |
+| RULE-109 | Update check timeout = 8 seconds — NEVER make user wait |
+| RULE-110 | Version comparison uses `System.Version` — NEVER string comparison |
+
+**IUpdaterService Interface:**
+```csharp
+public interface IUpdaterService
+{
+    Task<Result<UpdateCheckResult>> CheckForUpdatesAsync(CancellationToken ct = default);
+    Task<Result<string>> DownloadUpdateAsync(string downloadUrl, string expectedChecksum,
+        IProgress<DownloadProgress> progress, CancellationToken ct = default);
+    Task<Result<bool>> LaunchInstallerAndExitAsync(string installerPath);
+    Result<string> GetCurrentVersion();
+    Result SkipVersion(string version);
+    Result<string> GetSkippedVersion();
+}
+```
+
+**DI Registration (Program.cs):**
+```csharp
+builder.Services.AddUpdateServices(builder.Configuration);
+// To use GitHub API instead: replace UpdaterService with GitHubUpdaterService in DependencyInjection.cs
+```
+
+### 2.30 Security & DPAPI (v4.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-111 | Connection strings encrypted via DPAPI (`IDataProtector`) with `"DPAPI:"` prefix |
+| RULE-112 | `FirstRunSetupService` encrypts plaintext connection string on first run — idempotent |
+| RULE-113 | `SecureDbContextFactory` decrypts connection string before creating DbContext |
+| RULE-114 | DataProtection keys stored in `%ProgramData%\SalesSystem\DataProtectionKeys` |
+| RULE-115 | `SecurityAudit.cs` runs in DEBUG only — checks for unencrypted strings, hardcoded passwords |
+| RULE-116 | JWT secret from environment variable — throws `InvalidOperationException` in production if missing |
+| RULE-117 | `appsettings.json` writes use atomic pattern: write to `.tmp` → `File.Replace()` → creates `.bak` |
+
+**ConnectionStringProtector Pattern:**
+```csharp
+public class ConnectionStringProtector : IConnectionStringProtector
+{
+    private const string Prefix = "DPAPI:";
+    private const string Purpose = "SalesSystem.ConnectionString.v1";
+    // Encrypt: checks IsEncrypted() first → prevents double-encryption
+    // Decrypt: validates prefix → unwraps via IDataProtector
+}
+```
+
+### 2.31 Backup System (v4.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-118 | Backup uses raw SQL `BACKUP DATABASE` — NEVER SMO dependency |
+| RULE-119 | Restore uses `SINGLE_USER WITH ROLLBACK AFTER 30` — gives active transactions 30s |
+| RULE-120 | `ScheduledBackupWorker` runs daily at 2:00 AM as `BackgroundService` |
+| RULE-121 | Backup retention = configurable days (default 30) — old backups auto-deleted |
+| RULE-122 | Restore failure triggers `TrySetMultiUserAsync` recovery — NEVER leave DB in SINGLE_USER |
+| RULE-123 | Config parsing uses `int.TryParse` — NEVER `int.Parse` on config values |
+
+**ScheduledBackupWorker Pattern:**
+```csharp
+public class ScheduledBackupWorker : BackgroundService
+{
+    // Uses IServiceScopeFactory for scoped service resolution
+    // Respects CancellationToken for graceful shutdown
+    // Runs backup at 2:00 AM daily → then cleanup old backups
+}
+```
+
+### 2.32 Windows Service (v4.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-124 | API runs as Windows Service via `UseWindowsService()` |
+| RULE-125 | Service name: `SalesSystemService` — Arabic display name |
+| RULE-126 | Auto-recovery: 3 restarts on failure (1min, 5min, 15min delays) |
+| RULE-127 | Serilog EventLog sink for Windows Service logging |
+| RULE-128 | SQL retry on startup: 3 attempts × 5 second delay |
+| RULE-129 | Database migration runs on service startup (auto-migrate) |
+
+**Program.cs Integration:**
+```csharp
+builder.Host.UseWindowsService(options => options.ServiceName = "SalesSystemService");
+// + Serilog EventLog sink + SQL retry + FirstRunSetupService
+```
+
+### 2.33 Admin Screens (v4.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-130 | `AdminOnlyViewModel` base class enforces Admin role via `ISessionService` |
+| RULE-131 | Non-admin users get `UnauthorizedAccessException` — NEVER show admin UI |
+| RULE-132 | Constructor injection required — NEVER `App.GetService<T>()` in base class |
+| RULE-133 | User management: Toggle Status (soft delete), Reset Password — all via API |
+
+**AdminOnlyViewModel Pattern:**
+```csharp
+public abstract class AdminOnlyViewModel : ViewModelBase
+{
+    protected AdminOnlyViewModel(ISessionService sessionService)
+    {
+        var role = sessionService.GetUserRole();
+        if (role != UserRole.Admin)
+            throw new UnauthorizedAccessException("صلاحية Admin مطلوبة");
+    }
+}
+```
+
+### 2.34 Installer (v4.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-134 | Inno Setup script (`SalesSystem.iss`) — admin install required |
+| RULE-135 | .NET 10 runtime check before installation |
+| RULE-136 | Windows Service auto-start configured during install |
+| RULE-137 | Installer creates backup directory, sets permissions |
+
+### 2.35 Dialog Service Enhancement (v4.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-138 | `IDialogService` has `ShowInfoAsync` method — blue theme, info icon |
+| RULE-139 | ALL sync dialog methods use styled dialogs — NEVER raw `MessageBox.Show` |
+| RULE-140 | `UpdateDialogViewModel` implements `IDisposable` — disposes `_downloadCts` |
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -690,6 +823,17 @@ public enum InvoiceTypePrint : byte
 ❌ Using external ESC/POS NuGet packages (use custom `EscPos` builder)
 ❌ Crashes on missing logo (omit gracefully — null checks)
 ❌ Storing print settings outside `SystemSetting` table (use `Category = "Print"`)
+❌ Using external ESC/POS NuGet packages (use custom `EscPos` builder)
+❌ Crashes on missing logo (omit gracefully — null checks)
+❌ Blocking startup for update checks (fire-and-forget only)
+❌ Using `Environment.Exit(0)` in services (return `Result<bool>` instead)
+❌ Storing skipped version in `appsettings.json` (use `%AppData%`)
+❌ Using `int.Parse` on config values (use `int.TryParse`)
+❌ Leaving database in SINGLE_USER mode after restore failure
+❌ Using SMO for backup (use raw SQL `BACKUP DATABASE`)
+❌ Hardcoding JWT secret (use environment variable — throw in production)
+❌ Writing `appsettings.json` without atomic pattern (use `.tmp` → `File.Replace()`)
+❌ Allowing `CashBox.CurrentBalance` to go negative
 ```
 
 ---
@@ -712,6 +856,9 @@ public enum InvoiceTypePrint : byte
 | `QuestPDF` 2024.3.x | Infrastructure (A4 PDF generation) |
 | `SixLabors.ImageSharp` 3.1.x | Infrastructure (logo image resize for print) |
 | `System.Drawing.Common` 10.x | Infrastructure (Win32 printer interop) |
+| `Microsoft.Extensions.Hosting.WindowsServices` 10.x | Api (Windows Service hosting) |
+| `Microsoft.AspNetCore.DataProtection` 10.x | Infrastructure (DPAPI encryption) |
+| `Serilog.Sinks.EventLog` 8.x | Api (Windows Service logging) |
 
 **Any package not listed here requires human approval.**
 
@@ -809,3 +956,19 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Print settings stored in `SystemSetting` table with `Category = "Print"`?
 - [ ] ESC/POS commands built with custom `EscPos` class (not external package)?
 - [ ] Infrastructure + Api + Infra.Tests target `net10.0-windows`? (required for Win32 DllImport)
+- [ ] Auto-Update NEVER blocks startup (fire-and-forget with 3s delay)?
+- [ ] All update service methods return `Result<T>` (not raw exceptions)?
+- [ ] SHA256 checksum verified before launching installer?
+- [ ] Skipped version stored in `%AppData%` (not `appsettings.json`)?
+- [ ] Connection strings encrypted via DPAPI with `"DPAPI:"` prefix?
+- [ ] `FirstRunSetupService` uses atomic file write (`.tmp` → `File.Replace()`)?
+- [ ] Backup uses raw SQL `BACKUP DATABASE` (not SMO)?
+- [ ] Restore uses `ROLLBACK AFTER 30` (not `ROLLBACK IMMEDIATE`)?
+- [ ] `ScheduledBackupWorker` uses `int.TryParse` for config values?
+- [ ] Windows Service uses `UseWindowsService()` with recovery policy?
+- [ ] JWT secret from env var — throws in production if missing?
+- [ ] Admin screens use `AdminOnlyViewModel` with constructor injection?
+- [ ] `UpdateDialogViewModel` implements `IDisposable` (dispose CTS)?
+- [ ] NO `MessageBox.Show` anywhere — use `IDialogService` with styled dialogs?
+- [ ] `IDialogService` has `ShowInfoAsync` (blue theme, info icon)?
+- [ ] Inno Setup script includes .NET 10 runtime check?
