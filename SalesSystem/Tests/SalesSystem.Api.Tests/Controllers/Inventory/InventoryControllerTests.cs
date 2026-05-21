@@ -15,44 +15,31 @@ public class InventoryControllerTests : ControllerTestBase
         _controller = new InventoryController(InventoryServiceMock.Object);
     }
 
-    #region GetStock Tests
-
     [Fact]
     public async Task GetStock_WhenCalled_ReturnsOkWithQuantity()
     {
-        // Arrange
         InventoryServiceMock.Setup(x => x.GetStockAsync(1, 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(100m));
 
-        // Act
-        var result = await _controller.GetStock(1, 1);
+        var result = await _controller.GetStock(1, 1, CancellationToken.None);
 
-        // Assert
         result.Should().BeOfType<OkObjectResult>();
     }
 
     [Fact]
     public async Task GetStock_WhenServiceFails_ReturnsBadRequest()
     {
-        // Arrange
         InventoryServiceMock.Setup(x => x.GetStockAsync(999, 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<decimal>("المنتج غير موجود"));
 
-        // Act
-        var result = await _controller.GetStock(999, 1);
+        var result = await _controller.GetStock(999, 1, CancellationToken.None);
 
-        // Assert
         result.Should().BeOfType<BadRequestObjectResult>();
     }
-
-    #endregion
-
-    #region GetMovements Tests
 
     [Fact]
     public async Task GetMovements_WhenCalled_ReturnsOkWithPagedResult()
     {
-        // Arrange
         var movements = new PagedResult<InventoryMovementDto>
         {
             Items = new List<InventoryMovementDto> { CreateMovementDto(1), CreateMovementDto(2) },
@@ -62,31 +49,25 @@ public class InventoryControllerTests : ControllerTestBase
         InventoryServiceMock.Setup(x => x.GetMovementsAsync(null, null, null, 1, 10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(movements));
 
-        // Act
-        var result = await _controller.GetMovements(null, null, null, 1, 10);
+        var result = await _controller.GetMovements(null, null, null, 1, 10, CancellationToken.None);
 
-        // Assert
         result.Should().BeOfType<OkObjectResult>();
     }
 
     [Fact]
     public async Task GetMovements_WhenServiceFails_ReturnsBadRequest()
     {
-        // Arrange
         InventoryServiceMock.Setup(x => x.GetMovementsAsync(null, null, null, 1, 10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<PagedResult<InventoryMovementDto>>("فشل في استرجاع حركات المخزون"));
 
-        // Act
-        var result = await _controller.GetMovements(null, null, null, 1, 10);
+        var result = await _controller.GetMovements(null, null, null, 1, 10, CancellationToken.None);
 
-        // Assert
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
     public async Task GetMovements_WithProductFilter_ReturnsFilteredResults()
     {
-        // Arrange
         var movements = new PagedResult<InventoryMovementDto>
         {
             Items = new List<InventoryMovementDto> { CreateMovementDto(1) },
@@ -96,21 +77,14 @@ public class InventoryControllerTests : ControllerTestBase
         InventoryServiceMock.Setup(x => x.GetMovementsAsync(1, null, null, 1, 10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(movements));
 
-        // Act
-        var result = await _controller.GetMovements(1, null, null, 1, 10);
+        var result = await _controller.GetMovements(1, null, null, 1, 10, CancellationToken.None);
 
-        // Assert
         result.Should().BeOfType<OkObjectResult>();
     }
-
-    #endregion
-
-    #region GetWarehouseStocks Tests
 
     [Fact]
     public async Task GetWarehouseStocks_WhenCalled_ReturnsOkWithPagedResult()
     {
-        // Arrange
         var stocks = new PagedResult<WarehouseStockDto>
         {
             Items = new List<WarehouseStockDto> { CreateStockDto(1), CreateStockDto(2) },
@@ -120,31 +94,25 @@ public class InventoryControllerTests : ControllerTestBase
         InventoryServiceMock.Setup(x => x.GetWarehouseStocksAsync(null, null, 1, 10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(stocks));
 
-        // Act
-        var result = await _controller.GetWarehouseStocks(null, null, 1, 10);
+        var result = await _controller.GetWarehouseStocks(null, null, 1, 10, CancellationToken.None);
 
-        // Assert
         result.Should().BeOfType<OkObjectResult>();
     }
 
     [Fact]
     public async Task GetWarehouseStocks_WhenServiceFails_ReturnsBadRequest()
     {
-        // Arrange
         InventoryServiceMock.Setup(x => x.GetWarehouseStocksAsync(null, null, 1, 10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<PagedResult<WarehouseStockDto>>("فشل في استرجاع مخزون المستودع"));
 
-        // Act
-        var result = await _controller.GetWarehouseStocks(null, null, 1, 10);
+        var result = await _controller.GetWarehouseStocks(null, null, 1, 10, CancellationToken.None);
 
-        // Assert
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
     public async Task GetWarehouseStocks_WithWarehouseFilter_ReturnsFilteredResults()
     {
-        // Arrange
         var stocks = new PagedResult<WarehouseStockDto>
         {
             Items = new List<WarehouseStockDto> { CreateStockDto(1) },
@@ -154,16 +122,10 @@ public class InventoryControllerTests : ControllerTestBase
         InventoryServiceMock.Setup(x => x.GetWarehouseStocksAsync(1, null, 1, 10, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(stocks));
 
-        // Act
-        var result = await _controller.GetWarehouseStocks(1, null, 1, 10);
+        var result = await _controller.GetWarehouseStocks(1, null, 1, 10, CancellationToken.None);
 
-        // Assert
         result.Should().BeOfType<OkObjectResult>();
     }
-
-    #endregion
-
-    #region Helper Methods
 
     private static InventoryMovementDto CreateMovementDto(int id) => new(
         Id: id,
@@ -188,6 +150,4 @@ public class InventoryControllerTests : ControllerTestBase
         UnitName: "قطعة",
         Quantity: 100.00m,
         ReorderLevel: 10.00m);
-
-    #endregion
 }
