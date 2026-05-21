@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Validators;
@@ -8,11 +8,11 @@ public class CreateCategoryRequestValidator : AbstractValidator<CreateCategoryRe
     public CreateCategoryRequestValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("ط§ط³ظ… ط§ظ„ظپط¦ط© ظ…ط·ظ„ظˆط¨")
-            .MaximumLength(100).WithMessage("ط§ط³ظ… ط§ظ„ظپط¦ط© ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 100 ط­ط±ظپ");
+            .NotEmpty().WithMessage("اسم الفئة مطلوب")
+            .MaximumLength(100).WithMessage("اسم الفئة لا يمكن أن يتجاوز 100 حرف");
 
         RuleFor(x => x.Description)
-            .MaximumLength(500).WithMessage("ط§ظ„ظˆطµظپ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 500 ط­ط±ظپ");
+            .MaximumLength(500).WithMessage("الوصف لا يمكن أن يتجاوز 500 حرف");
     }
 }
 
@@ -21,11 +21,11 @@ public class UpdateCategoryRequestValidator : AbstractValidator<UpdateCategoryRe
     public UpdateCategoryRequestValidator()
     {
         RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("ط§ط³ظ… ط§ظ„ظپط¦ط© ظ…ط·ظ„ظˆط¨")
-            .MaximumLength(100).WithMessage("ط§ط³ظ… ط§ظ„ظپط¦ط© ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 100 ط­ط±ظپ");
+            .NotEmpty().WithMessage("اسم الفئة مطلوب")
+            .MaximumLength(100).WithMessage("اسم الفئة لا يمكن أن يتجاوز 100 حرف");
 
         RuleFor(x => x.Description)
-            .MaximumLength(500).WithMessage("ط§ظ„ظˆطµظپ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² 500 ط­ط±ظپ");
+            .MaximumLength(500).WithMessage("الوصف لا يمكن أن يتجاوز 500 حرف");
     }
 }
 

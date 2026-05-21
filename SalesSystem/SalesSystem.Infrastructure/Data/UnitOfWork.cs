@@ -1,8 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Infrastructure.Data.Repositories;
+using SalesSystem.Infrastructure.Repositories;
 
 using AppTransaction = SalesSystem.Application.Interfaces.IDbContextTransaction;
 using EfTransaction = Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction;
@@ -33,6 +34,17 @@ public class UnitOfWork : IUnitOfWork
     private IGenericRepository<CustomerPayment>? _customerPayments;
     private IGenericRepository<SupplierPayment>? _supplierPayments;
     private IGenericRepository<StoreSettings>? _storeSettings;
+    private IGenericRepository<SystemLog>? _systemLogs;
+    private IGenericRepository<StockTransferItem>? _stockTransferItems;
+    private IGenericRepository<SalesInvoiceItem>? _salesInvoiceItems;
+    private IGenericRepository<PurchaseInvoiceItem>? _purchaseInvoiceItems;
+private IGenericRepository<ProductBarcode>? _productBarcodes;
+    private IGenericRepository<ProductUnit>? _productUnits;
+    private IGenericRepository<CashBox>? _cashBoxes;
+    private IGenericRepository<CashTransaction>? _cashTransactions;
+    private IGenericRepository<SystemSetting>? _systemSettings;
+    private IGenericRepository<UnitBarcode>? _unitBarcodes;
+    private IGenericRepository<ProductPriceHistory>? _productPriceHistory;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -57,6 +69,17 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<CustomerPayment> CustomerPayments => _customerPayments ??= new GenericRepository<CustomerPayment>(_context);
     public IGenericRepository<SupplierPayment> SupplierPayments => _supplierPayments ??= new GenericRepository<SupplierPayment>(_context);
     public IGenericRepository<StoreSettings> StoreSettings => _storeSettings ??= new GenericRepository<StoreSettings>(_context);
+    public IGenericRepository<SystemLog> SystemLogs => _systemLogs ??= new GenericRepository<SystemLog>(_context);
+    public IGenericRepository<StockTransferItem> StockTransferItems => _stockTransferItems ??= new GenericRepository<StockTransferItem>(_context);
+    public IGenericRepository<SalesInvoiceItem> SalesInvoiceItems => _salesInvoiceItems ??= new GenericRepository<SalesInvoiceItem>(_context);
+    public IGenericRepository<PurchaseInvoiceItem> PurchaseInvoiceItems => _purchaseInvoiceItems ??= new GenericRepository<PurchaseInvoiceItem>(_context);
+public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??= new GenericRepository<ProductBarcode>(_context);
+    public IGenericRepository<ProductUnit> ProductUnits => _productUnits ??= new GenericRepository<ProductUnit>(_context);
+    public IGenericRepository<CashBox> CashBoxes => _cashBoxes ??= new GenericRepository<CashBox>(_context);
+    public IGenericRepository<CashTransaction> CashTransactions => _cashTransactions ??= new GenericRepository<CashTransaction>(_context);
+    public IGenericRepository<SystemSetting> SystemSettings => _systemSettings ??= new GenericRepository<SystemSetting>(_context);
+    public IGenericRepository<UnitBarcode> UnitBarcodes => _unitBarcodes ??= new GenericRepository<UnitBarcode>(_context);
+    public IGenericRepository<ProductPriceHistory> ProductPriceHistory => _productPriceHistory ??= new GenericRepository<ProductPriceHistory>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
@@ -67,6 +90,12 @@ public class UnitOfWork : IUnitOfWork
     {
         var transaction = await _context.Database.BeginTransactionAsync(ct);
         return new DbContextTransactionWrapper(transaction);
+    }
+    
+    public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken ct = default)
+    {
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(operation);
     }
 
     /// <summary>

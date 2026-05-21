@@ -29,13 +29,18 @@ public class UnitService : IUnitService
         return Result<UnitDto>.Success(MapToDto(unit));
     }
 
-    public async Task<Result<PagedResult<UnitDto>>> GetAllAsync(string? search, int page, int pageSize, CancellationToken ct)
+    public async Task<Result<PagedResult<UnitDto>>> GetAllAsync(string? search, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
         var query = _uow.Units.Query();
+        
+        if (includeInactive)
+        {
+            query = query.IgnoreQueryFilters();
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(u => u.Name.Contains(search) || 
+            query = query.Where(u => u.Name.Contains(search) ||
                                     (u.Symbol != null && u.Symbol.Contains(search)));
         }
 
@@ -53,39 +58,63 @@ public class UnitService : IUnitService
 
     public async Task<Result<UnitDto>> CreateAsync(CreateUnitRequest request, CancellationToken ct)
     {
-        if (await _uow.Units.Query().AnyAsync(u => u.Name == request.Name, ct))
-            return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", ErrorCodes.DuplicateCode);
+        try
+        {
+            if (await _uow.Units.Query().AnyAsync(u => u.Name == request.Name, ct))
+                return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", ErrorCodes.DuplicateCode);
 
-        var unit = Unit.Create(request.Name, request.Symbol, null);
-        
-        await _uow.Units.AddAsync(unit, ct);
-        await _uow.SaveChangesAsync(ct);
+            var unit = Unit.Create(request.Name, request.Symbol, null);
 
-        _logger.LogInformation("Unit created: {UnitName} (ID: {UnitId})", unit.Name, unit.Id);
+            await _uow.Units.AddAsync(unit, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        return Result<UnitDto>.Success(MapToDto(unit));
+            _logger.LogInformation("Unit created: {UnitName} (ID: {UnitId})", unit.Name, unit.Id);
+
+            return Result<UnitDto>.Success(MapToDto(unit));
+        }
+        catch (DomainException ex)
+        {
+            return Result<UnitDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while creating unit");
+            return Result<UnitDto>.Failure("حدث خطأ أثناء إضافة الوحدة.");
+        }
     }
 
     public async Task<Result<UnitDto>> UpdateAsync(int id, UpdateUnitRequest request, CancellationToken ct)
     {
-        var unit = await _uow.Units.GetByIdAsync(id, ct);
-        if (unit == null)
-            return Result<UnitDto>.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
+        try
+        {
+            var unit = await _uow.Units.Query().IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id, ct);
+            if (unit == null)
+                return Result<UnitDto>.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-        if (await _uow.Units.Query().AnyAsync(u => u.Name == request.Name && u.Id != id, ct))
-            return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", ErrorCodes.DuplicateCode);
+            if (await _uow.Units.Query().AnyAsync(u => u.Name == request.Name && u.Id != id, ct))
+                return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", ErrorCodes.DuplicateCode);
 
-        unit.Update(request.Name, request.Symbol, null);
-        
-        if (request.IsActive && !unit.IsActive) unit.Restore();
-        else if (!request.IsActive && unit.IsActive) unit.MarkAsDeleted();
+            unit.Update(request.Name, request.Symbol, null);
 
-        await _uow.Units.UpdateAsync(unit, ct);
-        await _uow.SaveChangesAsync(ct);
+            if (request.IsActive && !unit.IsActive) unit.Restore();
+            else if (!request.IsActive && unit.IsActive) unit.MarkAsDeleted();
 
-        _logger.LogInformation("Unit updated: {UnitName} (ID: {UnitId})", unit.Name, unit.Id);
+            await _uow.Units.UpdateAsync(unit, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        return Result<UnitDto>.Success(MapToDto(unit));
+            _logger.LogInformation("Unit updated: {UnitName} (ID: {UnitId})", unit.Name, unit.Id);
+
+            return Result<UnitDto>.Success(MapToDto(unit));
+        }
+        catch (DomainException ex)
+        {
+            return Result<UnitDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while updating unit {Id}", id);
+            return Result<UnitDto>.Failure("حدث خطأ أثناء تحديث بيانات الوحدة.");
+        }
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct)
@@ -94,7 +123,6 @@ public class UnitService : IUnitService
         if (unit == null)
             return Result.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-        // Optional: Check if products are linked to this unit
         if (await _uow.Products.Query().AnyAsync(p => p.UnitId == id, ct))
             return Result.Failure("لا يمكن حذف الوحدة لأنها مرتبطة بمنتجات");
 
@@ -102,6 +130,22 @@ public class UnitService : IUnitService
         await _uow.SaveChangesAsync(ct);
 
         _logger.LogInformation("Unit soft-deleted: {UnitId}", id);
+        return Result.Success();
+    }
+
+    public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
+    {
+        var unit = await _uow.Units.Query().IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id, ct);
+        if (unit == null)
+            return Result.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
+
+        if (await _uow.Products.Query().AnyAsync(p => p.UnitId == id || p.RetailUnitId == id || p.WholesaleUnitId == id, ct))
+            return Result.Failure("لا يمكن حذف الوحدة نهائياً لأنها مرتبطة بمنتجات");
+
+        await _uow.Units.HardDeleteAsync(id, ct);
+        await _uow.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Unit permanently deleted: {UnitId}", id);
         return Result.Success();
     }
 

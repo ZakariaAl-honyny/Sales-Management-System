@@ -7,7 +7,7 @@
 ## 1. Executive Summary
 
 A local desktop sales management system for small retail shops.
-Built on Clean Architecture with WinForms Desktop + ASP.NET Core 10 API
+Built on Clean Architecture + CQRS with WPF Desktop (MVVM) + ASP.NET Core 10 API
 + SQL Server. Designed for future expansion to Web and Mobile.
 
 ---
@@ -32,7 +32,7 @@ Built on Clean Architecture with WinForms Desktop + ASP.NET Core 10 API
 ### Out of Scope (Future Phases)
 - Web interface
 - Mobile application
-- Multi-branch management
+- Multi-branch management (full ERP-level branch P&L — future)
 - Full accounting system
 - External integrations
 
@@ -48,10 +48,12 @@ Built on Clean Architecture with WinForms Desktop + ASP.NET Core 10 API
 - Failed login attempts logged
 - Logout clears token from Desktop memory
 
-### 3.2 Product Management
+### 3.2 Product Management (Updated)
 - Add / Edit / Deactivate products (no hard delete)
-- Fields: Code, Barcode, Name, Category, Unit,
-          PurchasePrice, SalePrice, MinStock, Description
+- Fields: Code, Barcode, Name, Category, Description
+- **[NEW]** Units: Support `WholesaleUnitId`, `RetailUnitId`, and `ConversionFactor` (e.g., 1 Box = 12 Pieces).
+- Prices: `WholesalePrice`, `RetailPrice` (Replaces generic Sale/Purchase prices).
+- **[NEW]** Inventory Base Rule: All stock math and `MinStock` alerts strictly use the Retail Unit (Smallest Unit).
 - Search by: Name, Code, Barcode
 - Filter by: Category, Active status
 - Barcode scanner support (keyboard input simulation)
@@ -123,7 +125,10 @@ Built on Clean Architecture with WinForms Desktop + ASP.NET Core 10 API
 - Customer balance report (all or specific customer)
 - Supplier balance report (all or specific supplier)
 - Product movement report (history for one product)
-- Low stock alert report (below MinStock)
+- **[UPDATED]** Intelligent Low Stock Alert Report (below MinStock):
+  - Dedicated screen filtered by Warehouse/Branch.
+  - Automatically calculates and displays suggested reorder amounts in "Wholesale Units + Remaining Retail Units" (e.g., 2 Boxes and 5 Pieces) based on the Conversion Factor.
+  - Professional PDF export capability grouped by Warehouse.
 
 ### 3.11 Settings
 - Store name, phone, address
@@ -159,7 +164,14 @@ Built on Clean Architecture with WinForms Desktop + ASP.NET Core 10 API
 - Serilog file logging for all errors and critical operations
 - Database constraints as final validation layer
 
-### 4.4 Deployment
+### 4.4 Hardware Integration (New)
+- **Desktop Version**: 
+  - Barcode scanner support via Keyboard Emulator.
+  - Automatic `Enter` key trigger to fetch and add products to the POS invoice instantly.
+- **Mobile Version (Future Phase)**: 
+  - Support for device camera barcode scanning using image processing libraries (e.g., ZXing or Google ML Kit) for rapid sales and inventory audits.
+
+### 4.5 Deployment
 - API runs as Windows Service (no console window)
 - Desktop distributed as MSI installer
 - .NET 10 runtime bundled in installer (self-contained)
@@ -174,6 +186,7 @@ Categories → Product categories
 Products → Product catalog
 Warehouses → Storage locations
 WarehouseStocks → Stock per product per warehouse ⚠️ Critical
+            (includes: Quantity, ReorderLevel for low-stock alerts)
 Suppliers → Supplier master data with balance
 Customers → Customer master data with balance
 PurchaseInvoices → Purchase invoice headers
@@ -198,88 +211,160 @@ text
 ---
 
 ## 6. Solution Architecture
+
+> ⚠️ The Desktop project is **WPF (Windows Presentation Foundation)** with MVVM pattern.
+> Project name: `SalesSystem.DesktopPWF` — NOT WinForms. All UI files are `.xaml`.
+> Data Flow: `Desktop → (HttpClient) → Api → Application → Infrastructure → SQL Server`
+
+```text
 SalesSystem/
 ├── SalesSystem.Contracts/
-│ ├── DTOs/
-│ ├── Requests/
-│ ├── Responses/
-│ └── Common/
-│ ├── Result.cs
-│ ├── PagedResult.cs
-│ └── ErrorCodes.cs
+│   ├── DTOs/
+│   ├── Requests/
+│   ├── Responses/
+│   └── Common/
+│       ├── Result.cs
+│       ├── PagedResult.cs
+│       └── ErrorCodes.cs
 │
 ├── SalesSystem.Domain/
-│ ├── Entities/
-│ ├── Enums/
-│ ├── Exceptions/
-│ └── Common/
-│ └── BaseEntity.cs
+│   ├── Entities/
+│   ├── Enums/
+│   ├── Exceptions/
+│   └── Common/
+│       └── BaseEntity.cs
 │
 ├── SalesSystem.Application/
-│ ├── Interfaces/
-│ │ ├── Repositories/
-│ │ ├── Services/
-│ │ └── IUnitOfWork.cs
-│ └── Services/
-│ ├── ProductService.cs
-│ ├── SalesService.cs ⚠️ Critical
-│ ├── PurchaseService.cs ⚠️ Critical
-│ ├── SalesReturnService.cs ⚠️ Critical
-│ ├── PurchaseReturnService.cs ⚠️ Critical
-│ ├── InventoryService.cs ⚠️ Critical
-│ ├── StockTransferService.cs ⚠️ Critical
-│ ├── PaymentService.cs
-│ ├── ReportService.cs
-│ ├── AuthService.cs
-│ ├── BackupService.cs
-│ └── DocumentSequenceService.cs ⚠️ Thread-safe
+│   ├── Interfaces/
+│   │   ├── Repositories/
+│   │   ├── Services/
+│   │   └── IUnitOfWork.cs
+│   ├── Services/
+│   │   ├── ProductService.cs
+│   │   ├── SalesService.cs ⚠️ Critical
+│   │   ├── PurchaseService.cs ⚠️ Critical
+│   │   ├── SalesReturnService.cs ⚠️ Critical
+│   │   ├── PurchaseReturnService.cs ⚠️ Critical
+│   │   ├── InventoryService.cs ⚠️ Critical
+│   │   ├── StockTransferService.cs ⚠️ Critical
+│   │   ├── PaymentService.cs
+│   │   ├── ReportService.cs
+│   │   ├── AuthService.cs
+│   │   ├── BackupService.cs
+│   │   └── DocumentSequenceService.cs ⚠️ Thread-safe
+│   └── Queries/                        ← [NEW] CQRS Read models (SPEC-009)
+│       └── GetLowStockReportQuery.cs
 │
 ├── SalesSystem.Infrastructure/
-│ ├── Data/
-│ │ ├── SalesDbContext.cs
-│ │ └── Configurations/
-│ ├── Repositories/
-│ ├── Migrations/
-│ └── Services/
-│ └── BackupService.cs
+│   ├── Data/
+│   │   ├── SalesDbContext.cs
+│   │   └── Configurations/
+│   ├── Repositories/
+│   ├── Migrations/
+│   └── Services/
+│       └── BackupService.cs
 │
 ├── SalesSystem.Api/
-│ ├── Controllers/
-│ ├── Validators/ ← FluentValidation
-│ ├── Middleware/
-│ │ ├── ExceptionMiddleware.cs
-│ │ └── RequestLoggingMiddleware.cs
-│ └── Extensions/
-│ ├── AuthExtensions.cs
-│ └── ValidationExtensions.cs
+│   ├── Controllers/
+│   ├── Validators/               ← FluentValidation
+│   ├── Middleware/
+│   │   ├── ExceptionMiddleware.cs
+│   │   └── RequestLoggingMiddleware.cs
+│   └── Extensions/
+│       ├── AuthExtensions.cs
+│       └── ValidationExtensions.cs
 │
-└── SalesSystem.Desktop/
-├── Forms/
-├── Controls/
-│ ├── Common/
-│ ├── Products/
-│ ├── Sales/
-│ ├── Purchases/
-│ ├── Returns/
-│ ├── Warehouses/
-│ ├── Customers/
-│ ├── Suppliers/
-│ └── Reports/
-├── Services/
-│ ├── Api/
-│ ├── Navigation/
-│ ├── Auth/
-│ ├── Dialogs/
-│ ├── Notifications/
-│ └── Printing/
-├── Messaging/
-│ ├── EventBus.cs
-│ └── Messages/
-└── AppHost/
-├── DependencyInjection.cs
-└── AppSettings.cs
-
-text
+└── SalesSystem.DesktopPWF/       ← WPF + MVVM (NOT WinForms)
+    │
+    ├── MainWindow.xaml            ← Shell / main layout
+    ├── LoginWindow.xaml           ← Login screen
+    ├── App.xaml                   ← Application entry point
+    ├── App.xaml.cs                ← DI registration (App.GetService<T>())
+    ├── appsettings.json
+    │
+    ├── Views/                     ← .xaml UI files (no logic)
+    │   ├── Categories/
+    │   ├── Common/                ← Shared controls / dialogs
+    │   ├── Customers/
+    │   ├── Dashboard/
+    │   ├── Inventory/
+    │   ├── Invoices/              ← Selection dialogs for invoices
+    │   ├── Login/
+    │   ├── Payments/
+    │   ├── Products/
+    │   ├── Purchases/
+    │   ├── Reports/
+    │   │   └── LowStockView.xaml  ← [NEW] SPEC-009
+    │   ├── Returns/
+    │   ├── Sales/
+    │   ├── Settings/
+    │   ├── Suppliers/
+    │   ├── Transfers/
+    │   ├── Units/
+    │   ├── Users/
+    │   └── Warehouses/
+    │
+    ├── ViewModels/                ← MVVM binding logic
+    │   ├── ViewModelBase.cs
+    │   ├── DashboardViewModel.cs
+    │   ├── LoginWindowViewModel.cs
+    │   ├── ReportsViewModel.cs
+    │   ├── SettingsViewModel.cs
+    │   ├── WarehouseListViewModel.cs
+    │   ├── WarehouseEditorViewModel.cs
+    │   ├── Categories/
+    │   ├── Customers/
+    │   ├── Inventory/
+    │   ├── Invoices/
+    │   ├── Payments/
+    │   ├── Products/
+    │   ├── Purchases/
+    │   ├── Returns/
+    │   ├── Sales/
+    │   ├── Suppliers/
+    │   ├── Transfers/
+    │   ├── Units/
+    │   └── Users/
+    │
+    ├── Services/
+    │   ├── Api/                   ← HttpClient wrappers → API calls
+    │   │   ├── IApiService.cs     ← All API interfaces in one file
+    │   │   ├── AuthApiService.cs
+    │   │   ├── ProductApiService.cs
+    │   │   ├── SalesInvoiceApiService.cs
+    │   │   ├── PurchaseInvoiceApiService.cs
+    │   │   ├── SalesReturnApiService.cs
+    │   │   ├── PurchaseReturnApiService.cs
+    │   │   ├── InventoryApiService.cs
+    │   │   ├── StockTransferApiService.cs
+    │   │   ├── CustomerApiService.cs
+    │   │   ├── SupplierWarehouseApiService.cs
+    │   │   ├── CustomerPaymentApiService.cs
+    │   │   ├── SupplierPaymentApiService.cs
+    │   │   ├── ReportApiService.cs
+    │   │   ├── DashboardApiService.cs
+    │   │   ├── SettingsApiService.cs
+    │   │   ├── CategoryApiService.cs
+    │   │   ├── UnitApiService.cs
+    │   │   ├── UserApiService.cs
+    │   │   └── LogsApiService.cs
+    │   └── App/                   ← App-level services (DI singletons)
+    │       ├── EventBus.cs        ← Pub/Sub event bus
+    │       ├── NavigationService.cs
+    │       ├── SessionService.cs  ← JWT token storage (in-memory only)
+    │       ├── DialogService.cs
+    │       ├── ISoundService.cs
+    │       ├── SoundService.cs
+    │       └── IPrinterService.cs ← [NEW] SPEC-006 print contract
+    │
+    ├── Messaging/
+    │   └── Messages/              ← EventBus message types (ID only, no payload)
+    │
+    ├── Converters/                ← WPF IValueConverter implementations
+    ├── Helpers/                   ← UI helpers / ThemeHelper etc.
+    ├── Models/                    ← Local view models / display models
+    └── Resources/                 ← Styles, brushes, icons, themes
+```
 
 
 ---
@@ -543,17 +628,20 @@ Default schema: **`dbo`**
 
 ---
 
-## D) Products
+## D) Products (Updated for Wholesale/Retail)
 ### Columns
 - `Id` int PK
 - `Code` nvarchar(30) null unique
 - `Barcode` nvarchar(50) null unique
 - `Name` nvarchar(150) not null
 - `CategoryId` int null FK
-- `UnitId` int null FK
+- `WholesaleUnitId` int null FK
+- `RetailUnitId` int null FK
+- `ConversionFactor` decimal(18,3) not null default 1
+- `WholesalePrice` decimal(18,2) not null default 0
+- `RetailPrice` decimal(18,2) not null default 0
 - `PurchasePrice` decimal(18,2) not null default 0
-- `SalePrice` decimal(18,2) not null default 0
-- `MinStock` decimal(18,3) not null default 0
+- `MinStock` decimal(18,3) not null default 0  -- Tracks by Retail Unit
 - `Description` nvarchar(500) null
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK

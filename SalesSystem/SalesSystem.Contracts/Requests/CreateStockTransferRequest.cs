@@ -9,4 +9,5 @@ public record CreateStockTransferRequest(
 public record CreateStockTransferItemRequest(
     int ProductId,
     decimal Quantity,
-    string? Notes);
+    string? Notes = null,
+    byte Mode = 1); // 1 = Retail, 2 = Wholesale

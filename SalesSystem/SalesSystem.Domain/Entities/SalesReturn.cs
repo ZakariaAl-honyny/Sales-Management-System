@@ -1,17 +1,18 @@
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SalesReturnItem
+public class SalesReturnItem : BaseEntity
 {
-    public int SalesReturnItemId { get; private set; }
     public int SalesReturnId { get; private set; }
     public int ProductId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal LineTotal { get; private set; }
+    public SaleMode Mode { get; private set; }
     public string? Notes { get; private set; }
 
     public virtual SalesReturn? SalesReturn { get; private set; }
@@ -19,14 +20,14 @@ public class SalesReturnItem
 
     private SalesReturnItem() { }
 
-    public static SalesReturnItem Create(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, string? notes = null)
+    public static SalesReturnItem Create(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, SaleMode mode = SaleMode.Retail, string? notes = null)
     {
         if (productId <= 0)
-            throw new ArgumentException("ProductId is required.", nameof(productId));
+            throw new DomainException("المنتج مطلوب.");
         if (quantity <= 0)
-            throw new ArgumentException("Quantity must be positive.", nameof(quantity));
+            throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
         if (unitPrice < 0)
-            throw new ArgumentException("UnitPrice cannot be negative.", nameof(unitPrice));
+            throw new DomainException("سعر الوحدة لا يمكن أن يكون سالباً.");
 
         var item = new SalesReturnItem
         {
@@ -34,6 +35,7 @@ public class SalesReturnItem
             Quantity = quantity,
             UnitPrice = unitPrice,
             DiscountAmount = discountAmount,
+            Mode = mode,
             Notes = notes
         };
         item.RecalculateLineTotal();
@@ -72,9 +74,9 @@ public class SalesReturn : BaseEntity
         int? userId = null)
     {
         if (string.IsNullOrWhiteSpace(returnNo))
-            throw new ArgumentException("ReturnNo is required.", nameof(returnNo));
+            throw new DomainException("رقم الإرجاع مطلوب.");
         if (warehouseId <= 0)
-            throw new ArgumentException("WarehouseId is required.", nameof(warehouseId));
+            throw new DomainException("المستودع مطلوب.");
 
         var sr = new SalesReturn
         {
@@ -90,9 +92,9 @@ public class SalesReturn : BaseEntity
         return sr;
     }
 
-    public void AddItem(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, string? notes = null)
+    public void AddItem(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, SaleMode mode = SaleMode.Retail, string? notes = null)
     {
-        var item = SalesReturnItem.Create(productId, quantity, unitPrice, discountAmount, notes);
+        var item = SalesReturnItem.Create(productId, quantity, unitPrice, discountAmount, mode, notes);
         Items.Add(item);
         RecalculateTotals();
     }
@@ -106,17 +108,17 @@ public class SalesReturn : BaseEntity
     public void Post()
     {
         if (Status != InvoiceStatus.Draft)
-            throw new InvalidOperationException("Only draft returns can be posted.");
+            throw new DomainException("فقط المرتجعات المسودة يمكن ترحيلها.");
         if (!Items.Any())
-            throw new InvalidOperationException("Cannot post a return with no items.");
-        
+            throw new DomainException("لا يمكن ترحيل مرتجع بدون أصناف.");
+
         Status = InvoiceStatus.Posted;
     }
 
     public void Cancel()
     {
         if (Status == InvoiceStatus.Cancelled)
-            throw new InvalidOperationException("Already cancelled.");
+            throw new DomainException("المرتجع ملغى بالفعل.");
         Status = InvoiceStatus.Cancelled;
     }
 }

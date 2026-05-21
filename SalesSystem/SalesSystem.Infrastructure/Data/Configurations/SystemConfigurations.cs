@@ -57,15 +57,15 @@ public class InventoryMovementConfiguration : IEntityTypeConfiguration<Inventory
         builder.Property(im => im.ReferenceId).IsRequired();
         builder.Property(im => im.UnitCost).HasPrecision(18, 2);
         builder.Property(im => im.Notes).HasMaxLength(500);
-        
+
         builder.HasIndex(im => new { im.ProductId, im.MovementDate });
         builder.HasIndex(im => new { im.ReferenceType, im.ReferenceId });
-        
+
         builder.HasOne(im => im.Product)
             .WithMany()
             .HasForeignKey(im => im.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
-            
+
         builder.HasOne(im => im.Warehouse)
             .WithMany()
             .HasForeignKey(im => im.WarehouseId)
@@ -83,8 +83,11 @@ public class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreSettings
         builder.Property(ss => ss.Phone).HasMaxLength(20);
         builder.Property(ss => ss.Address).HasMaxLength(250);
         builder.Property(ss => ss.LogoPath).HasMaxLength(255);
+        builder.Property(ss => ss.Email).HasMaxLength(100);
         builder.Property(ss => ss.CurrencyCode).IsRequired().HasMaxLength(10);
         builder.Property(ss => ss.DefaultTaxRate).HasPrecision(5, 2);
+        builder.Property(ss => ss.TaxNumber).HasMaxLength(50);
+        builder.Property(ss => ss.InvoicePrefix).HasMaxLength(20).HasDefaultValue("INV");
     }
 }
 

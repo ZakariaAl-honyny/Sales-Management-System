@@ -1,0 +1,239 @@
+<Window x:Class="SalesSystem.DesktopPWF.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SalesSystem.DesktopPWF"
+        mc:Ignorable="d"
+        Title="نظام إدارة المبيعات"
+        Height="700" Width="1200"
+        MinHeight="600" MinWidth="900"
+        FlowDirection="RightToLeft"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- شريط القوائم Menu Bar -->
+        <Menu Grid.Row="0" Background="White" Padding="5">
+            <MenuItem Header="ملف">
+                <MenuItem Header="الملف الشخصي" Click="ProfileMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="تسجيل الخروج" Click="BtnLogout_Click"/>
+            </MenuItem>
+            <MenuItem Header="المبيعات">
+                <MenuItem Header="فواتير البيع" Click="SalesInvoicesMenuItem_Click"/>
+                <MenuItem Header="إرجاع المبيعات" Click="SalesReturnsMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="تسديد ديون العملاء" Click="CustomerPaymentsMenuItem_Click"/>
+            </MenuItem>
+            <MenuItem Header="المشتريات">
+                <MenuItem Header="فواتير الشراء" Click="PurchaseInvoicesMenuItem_Click"/>
+                <MenuItem Header="إرجاع المشتريات" Click="PurchaseReturnsMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="تسديد ديون الموردين" Click="SupplierPaymentsMenuItem_Click"/>
+            </MenuItem>
+            <MenuItem Header="المستودعات">
+                <MenuItem Header="إدارة المستودعات" Click="WarehousesMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="نقل المخزون" Click="StockTransfersMenuItem_Click"/>
+            </MenuItem>
+            <MenuItem Header="التقارير">
+                <MenuItem Header="تقرير المبيعات" Click="ProfitLossReportMenuItem_Click"/>
+                <MenuItem Header="تقرير المشتريات" Click="ProfitLossReportMenuItem_Click"/>
+                <MenuItem Header="تقرير المخزون" Click="ProfitLossReportMenuItem_Click"/>
+                <MenuItem Header="تقرير الأرباح والخسائر" Click="ProfitLossReportMenuItem_Click"/>
+            </MenuItem>
+            <MenuItem Header="الإعدادات" x:Name="SettingsMenuItem">
+                <MenuItem Header="إدارة المنتجات" Click="ProductsMenuItem_Click"/>
+                <MenuItem Header="إدارة العملاء" Click="CustomersMenuItem_Click"/>
+                <MenuItem Header="إدارة الموردين" Click="SuppliersMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="إدارة المستخدمين" Click="UsersMenuItem_Click"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- المحتوى الرئيسي -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- الجانب الأيمن - قائمة التنقل (Sidebar) -->
+            <Border Grid.Column="0" Background="{StaticResource PrimaryBrush}" BorderThickness="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- App Brand/Logo Area -->
+                        <RowDefinition Height="*"/>    <!-- Navigation Items -->
+                        <RowDefinition Height="Auto"/> <!-- Footer Area -->
+                    </Grid.RowDefinitions>
+
+                    <!-- App Branding -->
+                    <Border Grid.Row="0" Padding="16,20">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🚀" FontSize="24" Margin="0,0,12,0"/>
+                            <TextBlock Text="نظام المبيعات" 
+                                       FontSize="18" 
+                                       FontWeight="Bold" 
+                                       Foreground="White"
+                                       VerticalAlignment="Center"
+                                       AutomationProperties.AutomationId="SidebarBrandText"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Navigation Menu -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <ListBox x:Name="NavigationList" 
+                                 BorderThickness="0" 
+                                 Background="Transparent"
+                                 Margin="6,0"
+                                 SelectionChanged="NavigationList_SelectionChanged"
+                                 ItemContainerStyle="{StaticResource SidebarListBoxItem}"
+                                 AutomationProperties.AutomationId="MainNavigationList">
+                            <ListBoxItem Tag="Dashboard" AutomationProperties.AutomationId="NavDashboard" ToolTip="عرض ملخص سريع للمبيعات، الأرباح، وأداء المخزون الحالي.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🏠" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="لوحة التحكم" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavSalesItem" Tag="Sales" AutomationProperties.AutomationId="NavSales" ToolTip="إدارة فواتير البيع، مرتجعات المبيعات، ومتابعة ديون العملاء.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🛒" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="المبيعات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavPurchasesItem" Tag="Purchases" AutomationProperties.AutomationId="NavPurchases" ToolTip="إدارة فواتير المشتريات، الموردين، ومرتجعات الشراء.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="📦" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="المشتريات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavProductsItem" Tag="Products" AutomationProperties.AutomationId="NavProducts" ToolTip="إدارة قائمة الأصناف، الأسعار، الباركود، والكميات.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="📋" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="المنتجات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavCustomersItem" Tag="Customers" AutomationProperties.AutomationId="NavCustomers" ToolTip="إدارة بيانات العملاء، الحسابات، وتاريخ المعاملات.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="👥" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="العملاء" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavSuppliersItem" Tag="Suppliers" AutomationProperties.AutomationId="NavSuppliers" ToolTip="إدارة بيانات الموردين ومتابعة المستحقات المالية.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🚚" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="الموردين" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavWarehousesItem" Tag="Warehouses" AutomationProperties.AutomationId="NavWarehouses" ToolTip="إدارة الفروع والمستودعات ومواقع تخزين المنتجات.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🏭" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="المستودعات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavLowStockItem" Tag="LowStock" AutomationProperties.AutomationId="NavLowStock" ToolTip="عرض الأصناف التي وصلت للحد الأدنى للمخزون مع مقترحات الطلب.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="📉" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="نواقص المخزون" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavCustomerPaymentsItem" Tag="CustomerPayments" AutomationProperties.AutomationId="NavCustomerPayments" ToolTip="تسجيل المبالغ المستلمة من العملاء لتسوية المديونيات.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="💰" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="سداد العملاء" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavSupplierPaymentsItem" Tag="SupplierPayments" AutomationProperties.AutomationId="NavSupplierPayments" ToolTip="تسجيل المبالغ المدفوعة للموردين لتسوية الحسابات.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="💵" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="سداد الموردين" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavStockTransfersItem" Tag="StockTransfers" AutomationProperties.AutomationId="NavTransfers" ToolTip="عمليات نقل البضائع بين المستودعات المختلفة.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🔄" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="نقل المخزون" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavReportsItem" Tag="Reports" AutomationProperties.AutomationId="NavReports" ToolTip="توليد التقارير المالية، تقارير المبيعات، وحركة الأصناف.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="📊" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="التقارير" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavSalesReturnsItem" Tag="SalesReturns" AutomationProperties.AutomationId="NavSalesReturns" ToolTip="إدارة بضائع المبيعات المرتجعة وإعادة المبالغ للعملاء.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⏪" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="مرتجعات المبيعات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavPurchaseReturnsItem" Tag="PurchaseReturns" AutomationProperties.AutomationId="NavPurchaseReturns">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⏩" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="مرتجعات المشتريات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavCategoriesItem" Tag="Categories" AutomationProperties.AutomationId="NavCategories">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="📁" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="التصنيفات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavUnitsItem" Tag="Units" AutomationProperties.AutomationId="NavUnits">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⚖️" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="الوحدات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavUsersItem" Tag="Users" AutomationProperties.AutomationId="NavUsers" ToolTip="إدارة حسابات الموظفين، الصلاحيات، وبيانات الدخول.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="👤" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="المستخدمين" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavSettingsItem" Tag="Settings" AutomationProperties.AutomationId="NavSettings" ToolTip="إعدادات النظام، العملات، الضرائب، وتهيئة الطابعات.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⚙️" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="الإعدادات" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                        </ListBox>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- المنطقة الرئيسية - إطار المحتوى -->
+            <Frame x:Name="ContentFrame" 
+                   Grid.Column="1" 
+                   NavigationUIVisibility="Hidden"
+                   Background="{StaticResource BackgroundBrush}"/>
+        </Grid>
+
+        <!-- شريط الحالة Status Bar -->
+        <StatusBar Grid.Row="2" Style="{StaticResource StatusBarStyle}">
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="المستخدم: " Margin="0,0,5,0"/>
+                    <TextBlock x:Name="TxtUserName" FontWeight="Bold"/>
+                </StackPanel>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="الدور: " Margin="0,0,5,0"/>
+                    <TextBlock x:Name="TxtUserRole" FontWeight="Bold"/>
+                </StackPanel>
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock x:Name="CurrentDateText"/>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>

@@ -1,5 +1,6 @@
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
@@ -37,13 +38,13 @@ public class InventoryMovement : BaseEntity
         int? createdByUserId = null)
     {
         if (productId <= 0)
-            throw new ArgumentException("ProductId is required.", nameof(productId));
+            throw new DomainException("المنتج مطلوب.");
         if (warehouseId <= 0)
-            throw new ArgumentException("WarehouseId is required.", nameof(warehouseId));
+            throw new DomainException("المستودع مطلوب.");
         if (string.IsNullOrWhiteSpace(referenceType))
-            throw new ArgumentException("ReferenceType is required.", nameof(referenceType));
+            throw new DomainException("نوع المرجع مطلوب.");
         if (referenceId <= 0)
-            throw new ArgumentException("ReferenceId is required.", nameof(referenceId));
+            throw new DomainException("معرف المرجع مطلوب.");
 
         var movement = new InventoryMovement
         {

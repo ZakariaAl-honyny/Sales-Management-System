@@ -10,5 +10,16 @@ public interface ISalesService
     Task<Result<SalesInvoiceDto>> PostAsync(int id, int userId, CancellationToken ct);
     Task<Result<SalesInvoiceDto>> CancelAsync(int id, int userId, CancellationToken ct);
     Task<Result<SalesInvoiceDto>> GetByIdAsync(int id, CancellationToken ct);
-    Task<Result<PagedResult<SalesInvoiceDto>>> GetAllAsync(int? customerId, int? status, int page, int pageSize, CancellationToken ct);
+    Task<Result<SalesInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> UpdateAsync(int id, UpdateSalesInvoiceRequest request, int userId, CancellationToken ct);
+    Task<Result<PagedResult<SalesInvoiceDto>>> GetAllAsync(
+        int? customerId, 
+        int? status, 
+        string? search = null, 
+        DateTime? from = null, 
+        DateTime? to = null, 
+        int page = 1, 
+        int pageSize = 10, 
+        bool includeInactive = false, 
+        CancellationToken ct = default);
 }

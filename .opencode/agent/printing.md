@@ -1,12 +1,16 @@
+
+
 # Print Engine Specification
 # Sales Management System — v1.0
+# Platform: WPF Desktop (SalesSystem.DesktopPWF)
+# Note: Printing uses System.Drawing.Printing (compatible with WPF via interop)
 
 ---
 
 ## 1. Invoice Printer (A4)
 
 ```csharp
-// Desktop/Services/Printing/InvoicePrinter.cs
+// SalesSystem.DesktopPWF/Services/Printing/InvoicePrinter.cs
 public class InvoicePrinter
 {
     private readonly StoreSettings _settings;
@@ -142,7 +146,7 @@ public class InvoicePrinter
 ## 2. Receipt Printer (80mm Thermal)
 
 ```csharp
-// Desktop/Services/Printing/ReceiptPrinter.cs
+// SalesSystem.DesktopPWF/Services/Printing/ReceiptPrinter.cs
 public class ReceiptPrinter
 {
     private const float PageWidth = 227f; // 80mm in points

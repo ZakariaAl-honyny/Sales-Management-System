@@ -1,16 +1,18 @@
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class PurchaseInvoiceItem
+public class PurchaseInvoiceItem : BaseEntity
 {
-    public int PurchaseInvoiceItemId { get; private set; }
     public int PurchaseInvoiceId { get; private set; }
     public int ProductId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal UnitCost { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal LineTotal { get; private set; }
+    public SaleMode Mode { get; private set; } = SaleMode.Retail;
     public string? Notes { get; private set; }
 
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
@@ -23,16 +25,17 @@ public class PurchaseInvoiceItem
         decimal quantity,
         decimal unitCost,
         decimal discountAmount = 0,
+        SaleMode mode = SaleMode.Retail,
         string? notes = null)
     {
         if (productId <= 0)
-            throw new ArgumentException("ProductId is required.", nameof(productId));
+            throw new DomainException("المنتج مطلوب.");
         if (quantity <= 0)
-            throw new ArgumentException("Quantity must be positive.", nameof(quantity));
+            throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
         if (unitCost < 0)
-            throw new ArgumentException("UnitCost cannot be negative.", nameof(unitCost));
+            throw new DomainException("تكلفة الوحدة لا يمكن أن تكون سالبة.");
         if (discountAmount < 0)
-            throw new ArgumentException("DiscountAmount cannot be negative.", nameof(discountAmount));
+            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
 
         var item = new PurchaseInvoiceItem
         {
@@ -40,6 +43,7 @@ public class PurchaseInvoiceItem
             Quantity = quantity,
             UnitCost = unitCost,
             DiscountAmount = discountAmount,
+            Mode = mode,
             Notes = notes
         };
 

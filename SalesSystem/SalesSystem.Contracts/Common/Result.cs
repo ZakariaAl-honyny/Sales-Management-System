@@ -9,7 +9,7 @@ public class Result
     protected Result() { }
 
     public static Result Success() => new Result { IsSuccess = true };
-    
+
     public static Result Failure(string error, string? errorCode = null) => new Result
     {
         IsSuccess = false,
@@ -25,7 +25,7 @@ public class Result<T> : Result
     protected Result() { }
 
     public static Result<T> Success(T value) => new Result<T> { IsSuccess = true, Value = value };
-    
+
     public static new Result<T> Failure(string error, string? errorCode = null) => new Result<T>
     {
         IsSuccess = false,

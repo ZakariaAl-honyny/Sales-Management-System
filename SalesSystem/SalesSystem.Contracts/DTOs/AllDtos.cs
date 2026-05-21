@@ -1,6 +1,6 @@
-﻿namespace SalesSystem.Contracts.DTOs;
+namespace SalesSystem.Contracts.DTOs;
 
-public record UserDto(int Id, string UserName, string FullName, byte Role);
+public record UserDto(int Id, string UserName, string FullName, byte Role, bool IsActive);
 
 public record UnitDto(int Id, string Name, string? Symbol, bool IsActive);
 
@@ -13,10 +13,17 @@ public record ProductDto(
     string Name,
     int? CategoryId,
     string? CategoryName,
-    int? UnitId,
-    string? UnitName,
+    int? UnitId, // Legacy
+    string? UnitName, // Legacy
+    int? WholesaleUnitId,
+    string? WholesaleUnitName,
+    int? RetailUnitId,
+    string? RetailUnitName,
+    decimal ConversionFactor,
     decimal PurchasePrice,
-    decimal SalePrice,
+    decimal SalePrice, // Legacy
+    decimal WholesalePrice,
+    decimal RetailPrice,
     decimal MinStock,
     string? Description,
     bool IsActive);
@@ -24,17 +31,23 @@ public record ProductDto(
 public record WarehouseDto(int Id, string? Code, string Name, string? Location, bool IsDefault, bool IsActive);
 
 public record WarehouseStockDto(
-    int WarehouseId, 
-    string? WarehouseName, 
-    int ProductId, 
-    string ProductName, 
-    string? UnitName, 
-    decimal Quantity, 
+    int WarehouseId,
+    string? WarehouseName,
+    int ProductId,
+    string ProductName,
+    string? UnitName,
+    decimal Quantity,
     decimal ReorderLevel);
 
-public record SupplierDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance, bool IsActive);
+public record SupplierDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive);
 
-public record CustomerDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive);
+public record CustomerDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive)
+{
+    public bool IsBalanceNegative 
+    { 
+        get => CurrentBalance > 0; 
+    }
+}
 
 public record SalesInvoiceDto(
     int Id,
@@ -54,13 +67,31 @@ public record SalesInvoiceDto(
     decimal DueAmount,
     string? Notes,
     byte Status,
-    IReadOnlyList<SalesInvoiceItemDto> Items);
+    IReadOnlyList<SalesInvoiceItemDto> Items)
+{
+    public string PaymentTypeDisplay => PaymentType switch
+    {
+        1 => "نقدي",
+        2 => "آجل",
+        3 => "مختلط",
+        _ => "غير معروف"
+    };
+
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "تم الترحيل",
+        3 => "ملغي",
+        _ => "غير معروف"
+    };
+}
 
 public record SalesInvoiceItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
     decimal Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
-    decimal LineTotal);
+    decimal LineTotal,
+    byte Mode);
 
 public record PurchaseInvoiceDto(
     int Id,
@@ -78,15 +109,34 @@ public record PurchaseInvoiceDto(
     decimal TotalAmount,
     decimal PaidAmount,
     decimal DueAmount,
+    string? SupplierInvoiceNo,
     string? Notes,
     byte Status,
-    IReadOnlyList<PurchaseInvoiceItemDto> Items);
+    IReadOnlyList<PurchaseInvoiceItemDto> Items)
+{
+    public string PaymentTypeDisplay => PaymentType switch
+    {
+        1 => "نقدي",
+        2 => "آجل",
+        3 => "مختلط",
+        _ => "غير معروف"
+    };
+
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "تم الترحيل",
+        3 => "ملغي",
+        _ => "غير معروف"
+    };
+}
 
 public record PurchaseInvoiceItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
     decimal Quantity,
     decimal UnitCost,
     decimal DiscountAmount,
-    decimal LineTotal);
+    decimal LineTotal,
+    byte Mode);
 
 public record SalesReturnDto(
     int Id,
@@ -97,15 +147,28 @@ public record SalesReturnDto(
     string CustomerName,
     int? SalesInvoiceId,
     DateTime ReturnDate,
+    decimal SubTotal,
+    decimal TaxAmount,
+    decimal DiscountAmount,
     decimal TotalAmount,
     string? Notes,
-    byte Status, IReadOnlyList<SalesReturnItemDto> Items);
+    byte Status, IReadOnlyList<SalesReturnItemDto> Items)
+{
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "تم الترحيل",
+        3 => "ملغي",
+        _ => "غير معروف"
+    };
+}
 
-public record SalesReturnItemDto(int Id, int ProductId, string? ProductCode, string ProductName, 
-    decimal Quantity, 
-    decimal UnitPrice, 
-    decimal DiscountAmount, 
-    decimal LineTotal);
+public record SalesReturnItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
+    decimal Quantity,
+    decimal UnitPrice,
+    decimal DiscountAmount,
+    decimal LineTotal,
+    byte Mode);
 
 public record PurchaseReturnDto(
     int Id,
@@ -116,15 +179,28 @@ public record PurchaseReturnDto(
     string SupplierName,
     int? PurchaseInvoiceId,
     DateTime ReturnDate,
+    decimal SubTotal,
+    decimal TaxAmount,
+    decimal DiscountAmount,
     decimal TotalAmount,
     string? Notes,
-    byte Status, IReadOnlyList<PurchaseReturnItemDto> Items);
+    byte Status, IReadOnlyList<PurchaseReturnItemDto> Items)
+{
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "تم الترحيل",
+        3 => "ملغي",
+        _ => "غير معروف"
+    };
+}
 
-public record PurchaseReturnItemDto(int Id, int ProductId, string? ProductCode, string ProductName, 
-    decimal Quantity, 
-    decimal UnitCost, 
-    decimal DiscountAmount, 
-    decimal LineTotal);
+public record PurchaseReturnItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
+    decimal Quantity,
+    decimal UnitCost,
+    decimal DiscountAmount,
+    decimal LineTotal,
+    byte Mode);
 
 public record StockTransferDto(
     int Id,
@@ -135,9 +211,18 @@ public record StockTransferDto(
     string ToWarehouseName,
     DateTime TransferDate,
     string? Notes,
-    byte Status, IReadOnlyList<StockTransferItemDto> Items);
+    byte Status, IReadOnlyList<StockTransferItemDto> Items)
+{
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "تم الترحيل",
+        3 => "ملغي",
+        _ => "غير معروف"
+    };
+}
 
-public record StockTransferItemDto(int Id, int ProductId, string? ProductCode, string ProductName, decimal Quantity, string? Notes);
+public record StockTransferItemDto(int Id, int ProductId, string? ProductCode, string ProductName, decimal Quantity, byte Mode, string? Notes);
 
 public record CustomerPaymentDto(
     int Id,
@@ -148,7 +233,16 @@ public record CustomerPaymentDto(
     byte PaymentMethod,
     DateTime PaymentDate,
     int? SalesInvoiceId,
-    string? Notes);
+    string? Notes)
+{
+    public string PaymentTypeDisplay => PaymentMethod switch
+    {
+        1 => "نقدي",
+        2 => "آجل",
+        3 => "مختلط",
+        _ => "غير معروف"
+    };
+}
 
 public record SupplierPaymentDto(
     int Id,
@@ -159,7 +253,16 @@ public record SupplierPaymentDto(
     byte PaymentMethod,
     DateTime PaymentDate,
     int? PurchaseInvoiceId,
-    string? Notes);
+    string? Notes)
+{
+    public string PaymentTypeDisplay => PaymentMethod switch
+    {
+        1 => "نقدي",
+        2 => "آجل",
+        3 => "مختلط",
+        _ => "غير معروف"
+    };
+}
 
 public record InventoryMovementDto(
     long Id,
@@ -182,9 +285,15 @@ public record StoreSettingsDto(
     string? Phone,
     string? Address,
     string? LogoPath,
+    string? Email,
     string CurrencyCode,
     decimal DefaultTaxRate,
-    bool IsTaxEnabled);
+    bool IsTaxEnabled,
+    string? TaxNumber,
+    bool EnableStockAlerts,
+    bool AllowNegativeStock,
+    bool AutoUpdatePrices,
+    string InvoicePrefix);
 
 public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
 
@@ -194,8 +303,12 @@ public record DashboardSummaryDto(
     decimal TotalPurchasesToday,
     int LowStockItemsCount,
     int ActiveCustomersCount,
+    int ActiveSuppliersCount,
+    int TotalProductsCount,
     decimal TotalReceivables,
-    decimal TotalPayables);
+    decimal TotalPayables,
+    decimal TotalSalesMonth,
+    decimal TotalPurchasesMonth);
 
 public record SalesReportDto(
     DateTime InvoiceDate,
@@ -268,14 +381,19 @@ public record ProductMovementReportDto(
 );
 
 public record LowStockReportDto(
-    int ProductId,
+    int     ProductId,
     string? ProductCode,
-    string ProductName,
+    string  ProductName,
     string? CategoryName,
-    string? UnitName,
-    string WarehouseName,
-    decimal Quantity,
-    decimal ReorderLevel
+    string  WarehouseName,
+    decimal CurrentRetailQty,
+    decimal ReorderLevelRetailQty,
+    decimal DeficitRetailQty,
+    decimal SuggestedWholesaleBoxes,   // Product.ConvertRetailToWholesaleBoxes()
+    decimal SuggestedRetailRemainder,  // Product.GetRemainingRetailAfterWholesale()
+    string  WholesaleUnitName,
+    string  RetailUnitName,
+    decimal ConversionFactor
 );
 
 

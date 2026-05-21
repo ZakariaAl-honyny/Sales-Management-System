@@ -1,4 +1,5 @@
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
@@ -12,7 +13,7 @@ public class Category : BaseEntity
     public static Category Create(string name, string? description = null, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Name is required.", nameof(name));
+            throw new DomainException("اسم التصنيف مطلوب.");
 
         var category = new Category
         {
@@ -25,6 +26,9 @@ public class Category : BaseEntity
 
     public void Update(string name, string? description, int? updatedByUserId = null)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم التصنيف مطلوب.");
+
         Name = name;
         Description = description;
         SetUpdatedBy(updatedByUserId);

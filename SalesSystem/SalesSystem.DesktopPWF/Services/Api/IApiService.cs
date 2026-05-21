@@ -1,0 +1,370 @@
+using System.Net.Http;
+using System.Net.Http.Json;
+using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Enums;
+using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
+using SalesSystem.DesktopPWF.Enums;
+using System.Text.Json.Serialization;
+
+namespace SalesSystem.DesktopPWF.Services.Api;
+
+/// <summary>
+/// Error response from API
+/// </summary>
+public record ErrorResponse(
+    [property: JsonPropertyName("error")] string Error, 
+    [property: JsonPropertyName("errorCode")] string? ErrorCode);
+
+/// <summary>
+/// Base class for all API services in WPF
+/// </summary>
+public abstract class ApiServiceBase
+{
+    protected readonly HttpClient _httpClient;
+    protected readonly ISessionService _session;
+
+    protected ApiServiceBase(HttpClient httpClient, ISessionService session)
+    {
+        _httpClient = httpClient;
+        _session = session;
+    }
+
+    protected void AddAuthHeader()
+    {
+        var token = _session.GetToken();
+        if (!string.IsNullOrEmpty(token))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        }
+    }
+
+    protected async Task<Result<T>> HandleResponseAsync<T>(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            var data = await response.Content.ReadFromJsonAsync<T>();
+            return Result<T>.Success(data!);
+        }
+
+        try
+        {
+            if (response.Content.Headers.ContentType?.MediaType == "application/json")
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                Serilog.Log.Warning("API failure: {StatusCode} - {Error} ({ErrorCode})", response.StatusCode, error?.Error, error?.ErrorCode);
+                return Result<T>.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
+            }
+            
+            var content = await response.Content.ReadAsStringAsync();
+            Serilog.Log.Warning("API failure (non-JSON): {StatusCode} - {Content}", response.StatusCode, content);
+            return Result<T>.Failure($"خطأ في الخادم: {response.StatusCode}", response.StatusCode.ToString());
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Unexpected error parsing API error response. StatusCode: {StatusCode}", response.StatusCode);
+            return Result<T>.Failure("حدث خطأ غير متوقع", "Unknown");
+        }
+    }
+
+    protected async Task<Result<List<T>>> HandlePagedResponseAsync<T>(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            var data = await response.Content.ReadFromJsonAsync<PagedResult<T>>();
+            return Result<List<T>>.Success(data?.Items?.ToList() ?? new List<T>());
+        }
+
+        try
+        {
+            if (response.Content.Headers.ContentType?.MediaType == "application/json")
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                Serilog.Log.Warning("API Paged failure: {StatusCode} - {Error} ({ErrorCode})", response.StatusCode, error?.Error, error?.ErrorCode);
+                return Result<List<T>>.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            Serilog.Log.Warning("API Paged failure (non-JSON): {StatusCode} - {Content}", response.StatusCode, content);
+            return Result<List<T>>.Failure($"خطأ في الخادم: {response.StatusCode}", response.StatusCode.ToString());
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Unexpected error parsing API paged error response. StatusCode: {StatusCode}", response.StatusCode);
+            return Result<List<T>>.Failure("حدث خطأ غير متوقع", "Unknown");
+        }
+    }
+
+    protected async Task<Result> HandleResponseAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return Result.Success();
+        }
+
+        try
+        {
+            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+            Serilog.Log.Warning("API Command failure: {StatusCode} - {Error} ({ErrorCode})", response.StatusCode, error?.Error, error?.ErrorCode);
+            return Result.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Unexpected error parsing API command error response. StatusCode: {StatusCode}", response.StatusCode);
+            return Result.Failure("حدث خطأ غير متوقع", "Unknown");
+        }
+    }
+
+    protected Result<T> HandleConnectionError<T>(Exception ex, string context)
+    {
+        Serilog.Log.Error(ex, "Connection error in {Context}", context);
+        return Result<T>.Failure("فشل في الاتصال بالخادم. يرجى التحقق من الشبكة.", "ConnectionError");
+    }
+
+    protected Result HandleConnectionError(Exception ex, string context)
+    {
+        Serilog.Log.Error(ex, "Connection error in {Context}", context);
+        return Result.Failure("فشل في الاتصال بالخادم. يرجى التحقق من الشبكة.", "ConnectionError");
+    }
+
+    protected async Task<Result<T>> ExecuteAsync<T>(Func<Task<HttpResponseMessage>> action, string context)
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await action();
+            return await HandleResponseAsync<T>(response);
+        }
+        catch (Exception ex)
+        {
+            return HandleConnectionError<T>(ex, context);
+        }
+    }
+
+    protected async Task<Result<List<T>>> ExecutePagedAsync<T>(Func<Task<HttpResponseMessage>> action, string context)
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await action();
+            return await HandlePagedResponseAsync<T>(response);
+        }
+        catch (Exception ex)
+        {
+            return HandleConnectionError<List<T>>(ex, context);
+        }
+    }
+
+    protected async Task<Result> ExecuteCommandAsync(Func<Task<HttpResponseMessage>> action, string context)
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await action();
+            return await HandleResponseAsync(response);
+        }
+        catch (Exception ex)
+        {
+            return HandleConnectionError(ex, context);
+        }
+    }
+}
+
+public interface ISessionService
+{
+    string? GetToken();
+    string? GetUserName();
+    int? GetUserId();
+    UserRole? GetUserRole();
+    void SetSession(string token, string userName, int userId, UserRole role);
+    void ClearSession();
+    bool IsAuthenticated { get; }
+    bool CanAccess(Permission permission);
+    Permission GetPermissions();
+}
+
+public interface ILogsApiService
+{
+    Task<Result> SendLogAsync(CreateLogRequest request);
+}
+
+public interface IProductApiService
+{
+    Task<Result<List<ProductDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<ProductDto>> GetByIdAsync(int id);
+    Task<Result<ProductDto>> CreateAsync(CreateProductRequest request);
+    Task<Result<ProductDto>> UpdateAsync(int id, UpdateProductRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+    Task<Result<List<ProductDto>>> SearchAsync(string searchTerm);
+    Task<Result<ProductDto>> GetByBarcodeAsync(string barcode);
+}
+
+public interface ICategoryApiService
+{
+    Task<Result<List<CategoryDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<CategoryDto>> CreateAsync(CreateCategoryRequest request);
+    Task<Result<CategoryDto>> UpdateAsync(int id, UpdateCategoryRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+}
+
+public interface IUnitApiService
+{
+    Task<Result<List<UnitDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<UnitDto>> CreateAsync(CreateUnitRequest request);
+    Task<Result<UnitDto>> UpdateAsync(int id, UpdateUnitRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+}
+
+public interface ICustomerApiService
+{
+    Task<Result<List<CustomerDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<CustomerDto>> GetByIdAsync(int id);
+    Task<Result<CustomerDto>> CreateAsync(CreateCustomerRequest request);
+    Task<Result<CustomerDto>> UpdateAsync(int id, UpdateCustomerRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+}
+
+public interface ISupplierApiService
+{
+    Task<Result<List<SupplierDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<SupplierDto>> GetByIdAsync(int id);
+    Task<Result<SupplierDto>> CreateAsync(CreateSupplierRequest request);
+    Task<Result<SupplierDto>> UpdateAsync(int id, UpdateSupplierRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+}
+
+public interface IWarehouseApiService
+{
+    Task<Result<List<WarehouseDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<WarehouseDto>> GetByIdAsync(int id);
+    Task<Result<WarehouseDto>> CreateAsync(CreateWarehouseRequest request);
+    Task<Result<WarehouseDto>> UpdateAsync(int id, UpdateWarehouseRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+}
+
+public interface IUserApiService
+{
+    Task<Result<List<UserDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<UserDto>> GetByIdAsync(int id);
+    Task<Result<UserDto>> CreateAsync(CreateUserRequest request);
+    Task<Result<UserDto>> UpdateAsync(int id, UpdateUserRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+}
+
+public interface IAuthApiService
+{
+    Task<Result<LoginResponse>> LoginAsync(LoginRequest request);
+}
+
+public interface IDashboardApiService
+{
+    Task<Result<DashboardSummaryDto>> GetSummaryAsync(CancellationToken ct = default);
+}
+
+public interface IReportApiService
+{
+    Task<Result<List<SalesReportDto>>> GetSalesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct = default);
+    Task<Result<List<PurchaseReportDto>>> GetPurchasesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct = default);
+    Task<Result<List<StockReportDto>>> GetStockReportAsync(int? warehouseId = null, CancellationToken ct = default);
+    Task<Result<List<CustomerBalanceReportDto>>> GetCustomerBalancesReportAsync(int? customerId = null, CancellationToken ct = default);
+    Task<Result<List<SupplierBalanceReportDto>>> GetSupplierBalancesReportAsync(int? supplierId = null, CancellationToken ct = default);
+    Task<Result<List<ProductMovementReportDto>>> GetProductMovementsReportAsync(int productId, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
+    Task<Result<List<LowStockReportDto>>> GetLowStockReportAsync(int? warehouseId = null, CancellationToken ct = default);
+}
+
+public interface ISettingsApiService
+{
+    Task<Result<StoreSettingsDto>> GetSettingsAsync(CancellationToken ct = default);
+    Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, CancellationToken ct = default);
+    void RefreshCache();
+}
+
+public interface IInventoryApiService
+{
+    Task<Result<decimal>> GetStockAsync(int productId, int warehouseId, CancellationToken ct = default);
+    Task<Result<List<InventoryMovementDto>>> GetMovementsAsync(int? productId = null, int? warehouseId = null, int? movementType = null, int page = 1, int pageSize = 50, CancellationToken ct = default);
+    Task<Result<List<WarehouseStockDto>>> GetWarehouseStocksAsync(int? warehouseId = null, int? productId = null, int page = 1, int pageSize = 50, CancellationToken ct = default);
+}
+
+public interface ISalesInvoiceApiService
+{
+    Task<Result<List<SalesInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> UpdateAsync(int id, CreateSalesInvoiceRequest request, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> CancelAsync(int id, CancellationToken ct = default);
+}
+
+public interface IPurchaseInvoiceApiService
+{
+    Task<Result<List<PurchaseInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<PurchaseInvoiceDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<PurchaseInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default);
+    Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
+    Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
+    Task<Result<PurchaseInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<PurchaseInvoiceDto>> CancelAsync(int id, CancellationToken ct = default);
+}
+
+public interface ISalesReturnApiService
+{
+    Task<Result<List<SalesReturnDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<SalesReturnDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesReturnDto>> CreateAsync(CreateSalesReturnRequest request, CancellationToken ct = default);
+    Task<Result<SalesReturnDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesReturnDto>> CancelAsync(int id, CancellationToken ct = default);
+}
+
+public interface IPurchaseReturnApiService
+{
+    Task<Result<List<PurchaseReturnDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<PurchaseReturnDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<PurchaseReturnDto>> CreateAsync(CreatePurchaseReturnRequest request, CancellationToken ct = default);
+    Task<Result<PurchaseReturnDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<PurchaseReturnDto>> CancelAsync(int id, CancellationToken ct = default);
+}
+
+public interface IStockTransferApiService
+{
+    Task<Result<List<StockTransferDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<StockTransferDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<StockTransferDto>> CreateAsync(CreateStockTransferRequest request, CancellationToken ct = default);
+    Task<Result<StockTransferDto>> UpdateAsync(int id, UpdateStockTransferRequest request, CancellationToken ct = default);
+    Task<Result<StockTransferDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<StockTransferDto>> CancelAsync(int id, CancellationToken ct = default);
+}
+
+public interface ISupplierPaymentApiService
+{
+    Task<Result<List<SupplierPaymentDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<SupplierPaymentDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<SupplierPaymentDto>> CreateAsync(CreateSupplierPaymentRequest request, CancellationToken ct = default);
+    Task<Result<SupplierPaymentDto>> UpdateAsync(int id, UpdateSupplierPaymentRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+}
+
+public interface ICustomerPaymentApiService
+{
+    Task<Result<List<CustomerPaymentDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<CustomerPaymentDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<CustomerPaymentDto>> CreateAsync(CreateCustomerPaymentRequest request, CancellationToken ct = default);
+    Task<Result<CustomerPaymentDto>> UpdateAsync(int id, UpdateCustomerPaymentRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+}
+public interface IBackupApiService
+{
+    Task<Result<string>> CreateBackupAsync(CancellationToken ct = default);
+    Task<Result<List<string>>> GetBackupListAsync(CancellationToken ct = default);
+    Task<Result> RestoreBackupAsync(string fileName, CancellationToken ct = default);
+}

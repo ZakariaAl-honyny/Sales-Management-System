@@ -36,13 +36,14 @@ public class StockTransfersController : ControllerBase
     [ProducesResponseType(typeof(PagedResult<StockTransferDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetAll(
-        [FromQuery] int? fromWarehouseId, 
-        [FromQuery] int? toWarehouseId, 
-        [FromQuery] int page = 1, 
-        [FromQuery] int pageSize = 10, 
+        [FromQuery] int? fromWarehouseId,
+        [FromQuery] int? toWarehouseId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] bool includeInactive = false,
         CancellationToken ct = default)
     {
-        var result = await _inventoryService.GetAllTransfersAsync(fromWarehouseId, toWarehouseId, page, pageSize, ct);
+        var result = await _inventoryService.GetAllTransfersAsync(fromWarehouseId, toWarehouseId, page, pageSize, includeInactive, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -76,8 +77,44 @@ public class StockTransfersController : ControllerBase
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
         var result = await _inventoryService.CreateTransferAsync(request, userId, ct);
-        return result.IsSuccess 
-            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) 
+        return result.IsSuccess
+            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
             : BadRequest(new { error = result.Error });
+    }
+
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(StockTransferDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateStockTransferRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _inventoryService.UpdateTransferAsync(id, request, userId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    [HttpPost("{id:int}/post")]
+    [ProducesResponseType(typeof(StockTransferDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Post(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _inventoryService.PostTransferAsync(id, userId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    [HttpPost("{id:int}/cancel")]
+    [ProducesResponseType(typeof(StockTransferDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Cancel(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _inventoryService.CancelTransferAsync(id, userId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 }

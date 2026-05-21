@@ -1,0 +1,376 @@
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
+using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Repositories;
+using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Application.Services;
+using SalesSystem.Contracts.Common;
+using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Entities;
+using Xunit.Abstractions;
+
+namespace SalesSystem.Application.Tests.Services;
+
+/// <summary>
+/// Unit tests for PaymentService business logic.
+/// </summary>
+public class PaymentServiceTests : IDisposable
+{
+    private readonly ITestOutputHelper _output;
+    private readonly TestDbContext _dbContext;
+    private readonly Mock<IUnitOfWork> _mockUow;
+    private readonly Mock<IDocumentSequenceService> _mockSequenceService;
+    private readonly Mock<ILogger<PaymentService>> _mockLogger;
+
+    private readonly PaymentService _sut;
+
+    public PaymentServiceTests(ITestOutputHelper output)
+    {
+        _output = output;
+        _output.WriteLine("[TEST] PaymentServiceTests initialized");
+
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        _dbContext = new TestDbContext(options);
+
+        _mockUow = new Mock<IUnitOfWork>();
+        _mockSequenceService = new Mock<IDocumentSequenceService>();
+        _mockLogger = new Mock<ILogger<PaymentService>>();
+
+        _mockUow.Setup(u => u.Customers).Returns(new InMemoryEfCoreRepository<Customer>(_dbContext));
+        _mockUow.Setup(u => u.Suppliers).Returns(new InMemoryEfCoreRepository<Supplier>(_dbContext));
+        _mockUow.Setup(u => u.CustomerPayments).Returns(new InMemoryEfCoreRepository<CustomerPayment>(_dbContext));
+        _mockUow.Setup(u => u.SupplierPayments).Returns(new InMemoryEfCoreRepository<SupplierPayment>(_dbContext));
+
+        _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                await _dbContext.SaveChangesAsync();
+                return 1;
+            });
+
+        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MockDbContextTransaction());
+
+        _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<string>.Success("CP-2026-000001"));
+
+        _sut = new PaymentService(
+            _mockUow.Object,
+            _mockSequenceService.Object,
+            _mockLogger.Object);
+    }
+
+    public void Dispose()
+    {
+        _dbContext?.Dispose();
+    }
+
+    #region CreateCustomerPaymentAsync Tests
+
+    [Fact]
+    public async Task CreateCustomerPaymentAsync_ValidRequest_CreatesPaymentAndDecreasesBalance()
+    {
+        _output.WriteLine("[TEST] CreateCustomerPaymentAsync_ValidRequest_CreatesPaymentAndDecreasesBalance");
+
+        var customer = Customer.Create("Test Customer", openingBalance: 1000m, code: "C001", phone: null, email: null, address: null, createdByUserId: null);
+        _dbContext.Customers.Add(customer);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest
+        {
+            CustomerId = 1,
+            Amount = 500m,
+            PaymentMethod = SalesSystem.Domain.Enums.PaymentMethod.Cash,
+            SalesInvoiceId = null,
+            Notes = "Payment received",
+            PaymentDate = DateTime.Now
+        };
+
+        var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        customer.CurrentBalance.Should().Be(500m, "Customer owed 1000, paid 500, now owes 500");
+
+        _output.WriteLine("[PASS] Customer payment creates payment and decreases balance");
+    }
+
+    [Fact]
+    public async Task CreateCustomerPaymentAsync_ZeroAmount_ReturnsFailure()
+    {
+        _output.WriteLine("[TEST] CreateCustomerPaymentAsync_ZeroAmount_ReturnsFailure");
+
+        var customer = Customer.Create("Test Customer", openingBalance: 1000m, code: "C001", phone: null, email: null, address: null, createdByUserId: null);
+        _dbContext.Customers.Add(customer);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest
+        {
+            CustomerId = 1,
+            Amount = 0m,
+            PaymentMethod = SalesSystem.Domain.Enums.PaymentMethod.Cash,
+            SalesInvoiceId = null,
+            Notes = null,
+            PaymentDate = DateTime.Now
+        };
+
+        var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("أكبر من صفر");
+
+        _output.WriteLine("[PASS] Zero amount returns failure");
+    }
+
+    [Fact]
+    public async Task CreateCustomerPaymentAsync_NegativeAmount_ReturnsFailure()
+    {
+        _output.WriteLine("[TEST] CreateCustomerPaymentAsync_NegativeAmount_ReturnsFailure");
+
+        var customer = Customer.Create("Test Customer", openingBalance: 1000m, code: "C001", phone: null, email: null, address: null, createdByUserId: null);
+        _dbContext.Customers.Add(customer);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest
+        {
+            CustomerId = 1,
+            Amount = -100m,
+            PaymentMethod = SalesSystem.Domain.Enums.PaymentMethod.Cash,
+            SalesInvoiceId = null,
+            Notes = null,
+            PaymentDate = DateTime.Now
+        };
+
+        var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("أكبر من صفر");
+
+        _output.WriteLine("[PASS] Negative amount returns failure");
+    }
+
+    [Fact]
+    public async Task CreateCustomerPaymentAsync_NonExistentCustomer_ReturnsNotFound()
+    {
+        _output.WriteLine("[TEST] CreateCustomerPaymentAsync_NonExistentCustomer_ReturnsNotFound");
+
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest
+        {
+            CustomerId = 999,
+            Amount = 500m,
+            PaymentMethod = SalesSystem.Domain.Enums.PaymentMethod.Cash,
+            SalesInvoiceId = null,
+            Notes = null,
+            PaymentDate = DateTime.Now
+        };
+
+        var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("العميل غير موجود");
+
+        _output.WriteLine("[PASS] Non-existent customer returns NotFound");
+    }
+
+    #endregion
+
+    #region CreateSupplierPaymentAsync Tests
+
+    [Fact]
+    public async Task CreateSupplierPaymentAsync_ValidRequest_CreatesPaymentAndDecreasesBalance()
+    {
+        _output.WriteLine("[TEST] CreateSupplierPaymentAsync_ValidRequest_CreatesPaymentAndDecreasesBalance");
+
+        var supplier = Supplier.Create("Test Supplier", openingBalance: 5000m, code: "S001", phone: null, email: null, address: null, createdByUserId: null);
+        _dbContext.Suppliers.Add(supplier);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest
+        {
+            SupplierId = 1,
+            Amount = 1000m,
+            PaymentMethod = SalesSystem.Domain.Enums.PaymentMethod.Cash,
+            PurchaseInvoiceId = null,
+            Notes = "Payment made",
+            PaymentDate = DateTime.Now
+        };
+
+        var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        supplier.CurrentBalance.Should().Be(4000m, "We owed supplier 5000, paid 1000, now owe 4000");
+
+        _output.WriteLine("[PASS] Supplier payment creates payment and decreases balance");
+    }
+
+    [Fact]
+    public async Task CreateSupplierPaymentAsync_ZeroAmount_ReturnsFailure()
+    {
+        _output.WriteLine("[TEST] CreateSupplierPaymentAsync_ZeroAmount_ReturnsFailure");
+
+        var supplier = Supplier.Create("Test Supplier", openingBalance: 5000m, code: "S001", phone: null, email: null, address: null, createdByUserId: null);
+        _dbContext.Suppliers.Add(supplier);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest
+        {
+            SupplierId = 1,
+            Amount = 0m,
+            PaymentMethod = SalesSystem.Domain.Enums.PaymentMethod.Cash,
+            PurchaseInvoiceId = null,
+            Notes = null,
+            PaymentDate = DateTime.Now
+        };
+
+        var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("أكبر من صفر");
+
+        _output.WriteLine("[PASS] Zero amount returns failure");
+    }
+
+    [Fact]
+    public async Task CreateSupplierPaymentAsync_NonExistentSupplier_ReturnsNotFound()
+    {
+        _output.WriteLine("[TEST] CreateSupplierPaymentAsync_NonExistentSupplier_ReturnsNotFound");
+
+        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest
+        {
+            SupplierId = 999,
+            Amount = 1000m,
+            PaymentMethod = SalesSystem.Domain.Enums.PaymentMethod.Cash,
+            PurchaseInvoiceId = null,
+            Notes = null,
+            PaymentDate = DateTime.Now
+        };
+
+        var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("المورد غير موجود");
+
+        _output.WriteLine("[PASS] Non-existent supplier returns NotFound");
+    }
+
+    #endregion
+
+    #region GetCustomerPaymentsAsync Tests
+
+    [Fact]
+    public async Task GetCustomerPaymentsAsync_WithFilter_ReturnsFilteredResults()
+    {
+        _output.WriteLine("[TEST] GetCustomerPaymentsAsync_WithFilter_ReturnsFilteredResults");
+
+        var customer1 = Customer.Create("Customer 1", openingBalance: 0m, code: "C001", phone: null, email: null, address: null, createdByUserId: null);
+        var customer2 = Customer.Create("Customer 2", openingBalance: 0m, code: "C002", phone: null, email: null, address: null, createdByUserId: null);
+        _dbContext.Customers.Add(customer1);
+        _dbContext.Customers.Add(customer2);
+        await _dbContext.SaveChangesAsync();
+
+        var payment1 = CustomerPayment.Create("CP-2026-000001", customerId: 1, amount: 100m, paymentMethod: (byte)SalesSystem.Domain.Enums.PaymentMethod.Cash, salesInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
+        var payment2 = CustomerPayment.Create("CP-2026-000002", customerId: 2, amount: 200m, paymentMethod: (byte)SalesSystem.Domain.Enums.PaymentMethod.Cash, salesInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
+        _dbContext.CustomerPayments.Add(payment1);
+        _dbContext.CustomerPayments.Add(payment2);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _sut.GetCustomerPaymentsAsync(customerId: 1, page: 1, pageSize: 10, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Items.Should().HaveCount(1);
+        result.Value.Items.First().Amount.Should().Be(100m);
+
+        _output.WriteLine("[PASS] Customer payments filtered correctly");
+    }
+
+    #endregion
+
+    #region GetSupplierPaymentsAsync Tests
+
+    [Fact]
+    public async Task GetSupplierPaymentsAsync_WithFilter_ReturnsFilteredResults()
+    {
+        _output.WriteLine("[TEST] GetSupplierPaymentsAsync_WithFilter_ReturnsFilteredResults");
+
+        var supplier1 = Supplier.Create("Supplier 1", openingBalance: 0m, code: "S001", phone: null, email: null, address: null, createdByUserId: null);
+        var supplier2 = Supplier.Create("Supplier 2", openingBalance: 0m, code: "S002", phone: null, email: null, address: null, createdByUserId: null);
+        _dbContext.Suppliers.Add(supplier1);
+        _dbContext.Suppliers.Add(supplier2);
+        await _dbContext.SaveChangesAsync();
+
+        var payment1 = SupplierPayment.Create("SP-2026-000001", supplierId: 1, amount: 500m, paymentMethod: (byte)SalesSystem.Domain.Enums.PaymentMethod.Cash, purchaseInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
+        var payment2 = SupplierPayment.Create("SP-2026-000002", supplierId: 2, amount: 600m, paymentMethod: (byte)SalesSystem.Domain.Enums.PaymentMethod.Cash, purchaseInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
+        _dbContext.SupplierPayments.Add(payment1);
+        _dbContext.SupplierPayments.Add(payment2);
+        await _dbContext.SaveChangesAsync();
+
+        var result = await _sut.GetSupplierPaymentsAsync(supplierId: 2, page: 1, pageSize: 10, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Items.Should().HaveCount(1);
+        result.Value.Items.First().Amount.Should().Be(600m);
+
+        _output.WriteLine("[PASS] Supplier payments filtered correctly");
+    }
+
+    #endregion
+
+    #region Helper Classes
+
+    private class MockDbContextTransaction : IDbContextTransaction
+    {
+        public Task CommitAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task RollbackAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public void Dispose() { }
+    }
+
+    private class TestDbContext : DbContext
+    {
+        public TestDbContext(DbContextOptions<TestDbContext> options) : base(options) { }
+
+        public DbSet<Customer> Customers => Set<Customer>();
+        public DbSet<Supplier> Suppliers => Set<Supplier>();
+        public DbSet<CustomerPayment> CustomerPayments => Set<CustomerPayment>();
+        public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
+    }
+
+    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity
+    {
+        private readonly DbContext _context;
+
+        public InMemoryEfCoreRepository(DbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<T?> GetByIdAsync(int id, CancellationToken ct = default)
+            => await _context.Set<T>().FindAsync(new object[] { id }, ct);
+
+        public Task<IReadOnlyList<T>> GetAllAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<T>>(_context.Set<T>().ToList());
+
+        public async Task<T> AddAsync(T entity, CancellationToken ct = default)
+        {
+            await _context.Set<T>().AddAsync(entity, ct);
+            return entity;
+        }
+
+        public Task UpdateAsync(T entity, CancellationToken ct = default)
+        {
+            _context.Set<T>().Update(entity);
+            return Task.CompletedTask;
+        }
+
+        public Task SoftDeleteAsync(int id, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
+    }
+
+    #endregion
+}

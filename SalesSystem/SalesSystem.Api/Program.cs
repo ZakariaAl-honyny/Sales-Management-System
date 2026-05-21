@@ -10,8 +10,8 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Infrastructure.Data;
-using SalesSystem.Infrastructure.Data.Repositories;
-using SalesSystem.Infrastructure.Security;
+using SalesSystem.Infrastructure.Repositories;
+using SalesSystem.Infrastructure.Services;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Common;
@@ -91,6 +91,12 @@ builder.Services.AddScoped<ISalesReturnService, SalesReturnService>();
 builder.Services.AddScoped<IPurchaseReturnService, PurchaseReturnService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IStoreSettingsService, StoreSettingsService>();
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<ISystemSettingsRepository, SystemSettingsRepository>();
+builder.Services.AddScoped<IUpdateProductPricingService, UpdateProductPricingService>();
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================
@@ -168,9 +174,9 @@ var app = builder.Build();
 // ============================================
 using (var scope = app.Services.CreateScope())
 {
-var dbContext = scope.ServiceProvider.GetRequiredService<SalesDbContext>();
-        var logger = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Program>>();
-        await InitializeDatabaseAsync(dbContext, logger);
+    var dbContext = scope.ServiceProvider.GetRequiredService<SalesDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Program>>();
+    await InitializeDatabaseAsync(dbContext, logger);
 }
 
 async Task InitializeDatabaseAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger logger)

@@ -29,9 +29,14 @@ public class CategoryService : ICategoryService
         return Result<CategoryDto>.Success(MapToDto(category));
     }
 
-    public async Task<Result<PagedResult<CategoryDto>>> GetAllAsync(string? search, int page, int pageSize, CancellationToken ct)
+    public async Task<Result<PagedResult<CategoryDto>>> GetAllAsync(string? search, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
         var query = _uow.Categories.Query();
+        
+        if (includeInactive)
+        {
+            query = query.IgnoreQueryFilters();
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -52,39 +57,63 @@ public class CategoryService : ICategoryService
 
     public async Task<Result<CategoryDto>> CreateAsync(CreateCategoryRequest request, CancellationToken ct)
     {
-        if (await _uow.Categories.Query().AnyAsync(c => c.Name == request.Name, ct))
-            return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", ErrorCodes.DuplicateCode);
+        try
+        {
+            if (await _uow.Categories.Query().AnyAsync(c => c.Name == request.Name, ct))
+                return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", ErrorCodes.DuplicateCode);
 
-        var category = Category.Create(request.Name, request.Description, null);
-        
-        await _uow.Categories.AddAsync(category, ct);
-        await _uow.SaveChangesAsync(ct);
+            var category = Category.Create(request.Name, request.Description, null);
 
-        _logger.LogInformation("Category created: {CategoryName} (ID: {CategoryId})", category.Name, category.Id);
+            await _uow.Categories.AddAsync(category, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        return Result<CategoryDto>.Success(MapToDto(category));
+            _logger.LogInformation("Category created: {CategoryName} (ID: {CategoryId})", category.Name, category.Id);
+
+            return Result<CategoryDto>.Success(MapToDto(category));
+        }
+        catch (DomainException ex)
+        {
+            return Result<CategoryDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while creating category");
+            return Result<CategoryDto>.Failure("حدث خطأ أثناء إضافة الفئة.");
+        }
     }
 
     public async Task<Result<CategoryDto>> UpdateAsync(int id, UpdateCategoryRequest request, CancellationToken ct)
     {
-        var category = await _uow.Categories.GetByIdAsync(id, ct);
-        if (category == null)
-            return Result<CategoryDto>.Failure("الفئة غير موجودة", ErrorCodes.NotFound);
+        try
+        {
+            var category = await _uow.Categories.Query().IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, ct);
+            if (category == null)
+                return Result<CategoryDto>.Failure("الفئة غير موجودة", ErrorCodes.NotFound);
 
-        if (await _uow.Categories.Query().AnyAsync(c => c.Name == request.Name && c.Id != id, ct))
-            return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", ErrorCodes.DuplicateCode);
+            if (await _uow.Categories.Query().AnyAsync(c => c.Name == request.Name && c.Id != id, ct))
+                return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", ErrorCodes.DuplicateCode);
 
-        category.Update(request.Name, request.Description, null);
-        
-        if (request.IsActive && !category.IsActive) category.Restore();
-        else if (!request.IsActive && category.IsActive) category.MarkAsDeleted();
+            category.Update(request.Name, request.Description, null);
 
-        await _uow.Categories.UpdateAsync(category, ct);
-        await _uow.SaveChangesAsync(ct);
+            if (request.IsActive && !category.IsActive) category.Restore();
+            else if (!request.IsActive && category.IsActive) category.MarkAsDeleted();
 
-        _logger.LogInformation("Category updated: {CategoryName} (ID: {CategoryId})", category.Name, category.Id);
+            await _uow.Categories.UpdateAsync(category, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        return Result<CategoryDto>.Success(MapToDto(category));
+            _logger.LogInformation("Category updated: {CategoryName} (ID: {CategoryId})", category.Name, category.Id);
+
+            return Result<CategoryDto>.Success(MapToDto(category));
+        }
+        catch (DomainException ex)
+        {
+            return Result<CategoryDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while updating category {Id}", id);
+            return Result<CategoryDto>.Failure("حدث خطأ أثناء تحديث بيانات الفئة.");
+        }
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct)
@@ -93,7 +122,6 @@ public class CategoryService : ICategoryService
         if (category == null)
             return Result.Failure("الفئة غير موجودة", ErrorCodes.NotFound);
 
-        // Optional: Check if products are linked to this category
         if (await _uow.Products.Query().AnyAsync(p => p.CategoryId == id, ct))
             return Result.Failure("لا يمكن حذف الفئة لأنها مرتبطة بمنتجات");
 
@@ -101,6 +129,22 @@ public class CategoryService : ICategoryService
         await _uow.SaveChangesAsync(ct);
 
         _logger.LogInformation("Category soft-deleted: {CategoryId}", id);
+        return Result.Success();
+    }
+
+    public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
+    {
+        var category = await _uow.Categories.Query().IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (category == null)
+            return Result.Failure("الفئة غير موجودة", ErrorCodes.NotFound);
+
+        if (await _uow.Products.Query().AnyAsync(p => p.CategoryId == id, ct))
+            return Result.Failure("لا يمكن حذف الفئة نهائياً لأنها مرتبطة بمنتجات");
+
+        await _uow.Categories.HardDeleteAsync(id, ct);
+        await _uow.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Category permanently deleted: {CategoryId}", id);
         return Result.Success();
     }
 

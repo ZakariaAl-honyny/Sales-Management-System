@@ -25,13 +25,14 @@ public class WarehouseStockConfiguration : IEntityTypeConfiguration<WarehouseSto
         builder.ToTable("WarehouseStocks");
         builder.HasKey(ws => ws.Id);
         builder.Property(ws => ws.Quantity).IsRequired().HasPrecision(18, 3);
+        builder.Property(ws => ws.ReorderLevel).IsRequired().HasPrecision(18, 3);
         builder.HasIndex(ws => new { ws.WarehouseId, ws.ProductId }).IsUnique();
-        
+
         builder.HasOne(ws => ws.Warehouse)
             .WithMany()
             .HasForeignKey(ws => ws.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
-            
+
         builder.HasOne(ws => ws.Product)
             .WithMany(p => p.WarehouseStocks)
             .HasForeignKey(ws => ws.ProductId)

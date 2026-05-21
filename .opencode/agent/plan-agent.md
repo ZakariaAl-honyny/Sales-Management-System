@@ -21,7 +21,8 @@ Translate specs into exact technical blueprints matching the PRD's Clean Archite
 ```text
 Desktop → (HttpClient) → API → Application → Infrastructure → SQL Server
 Desktop NEVER → SQL Server (RULE-007)
-Domain calculates LineTotal and DueAmount
+Domain calculates LineTotal and DueAmount (supports Wholesale/Retail)
+CQRS: Separate Reads (Queries) from Writes (Commands)
 ```
 
 ## Behaviors
@@ -33,6 +34,6 @@ Domain calculates LineTotal and DueAmount
 - Plan all FluentValidation validators
 
 ## Must NOT
-- Write WinForms code
+- Write WinForms code (project is WPF/MVVM — use SalesSystem.DesktopPWF patterns)
 - Skip transaction planning for financial operations
 - Deviate from PRD solution structure

@@ -1,0 +1,383 @@
+<Page x:Class="SalesSystem.DesktopPWF.Views.DashboardView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+      mc:Ignorable="d"
+      d:DesignHeight="700" d:DesignWidth="1000"
+      Title="الرئيسية"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Loaded">
+            <i:InvokeCommandAction Command="{Binding RefreshCommand}" />
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="2"
+                Background="#80FFFFFF" 
+                Panel.ZIndex="1000" 
+                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4" Background="{StaticResource BorderBrush}" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="جاري تحديث البيانات..." 
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           HorizontalAlignment="Center" 
+                           Margin="0,12,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Error Message Bar -->
+        <Border Grid.Row="0"
+                Background="{StaticResource ErrorLightBrush}" 
+                BorderBrush="{StaticResource ErrorBrush}"
+                BorderThickness="1"
+                Padding="16,12"
+                Margin="32,24,32,0"
+                CornerRadius="8"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠️" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding ErrorMessage}" 
+                           Foreground="{StaticResource ErrorTextBrush}" 
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24">
+                <!-- Header Area -->
+                <Grid Margin="0,0,0,32">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="لوحة التحكم" 
+                                   Style="{StaticResource HeaderStyle}" 
+                                   AutomationProperties.AutomationId="DashboardHeaderTitle"/>
+                        <TextBlock Text="نظرة عامة على أداء النظام والعمليات اليومية" 
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource SecondaryButton}"
+                            Command="{Binding RefreshCommand}"
+                            VerticalAlignment="Center"
+                            AutomationProperties.AutomationId="DashboardRefreshButton">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تحديث البيانات" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- Primary KPI Cards -->
+                <UniformGrid Rows="1" Margin="0,0,0,32">
+                    <!-- Today's Sales -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="CardTodaySales">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Background="{StaticResource SuccessLightBrush}" CornerRadius="12" Padding="12">
+                                    <TextBlock Text="💰"/>
+                                </Border>
+                                <TextBlock Grid.Column="1" 
+                                           Text="مبيعات اليوم" 
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" 
+                                           Margin="16,0,0,0"/>
+                            </Grid>
+                             <TextBlock Text="{Binding FormattedTodaySales}"
+                                        Style="{StaticResource HeaderStyle}"
+                                        AutomationProperties.AutomationId="ValueTodaySales"/>
+                            <TextBlock Text="إجمالي المبالغ التي بعت بها اليوم"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Monthly Sales -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="CardMonthSales">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Background="{StaticResource InfoLightBrush}" CornerRadius="12" Padding="12">
+                                    <TextBlock Text="📊"/>
+                                </Border>
+                                <TextBlock Grid.Column="1" 
+                                           Text="مبيعات الشهر" 
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" 
+                                           Margin="16,0,0,0"/>
+                            </Grid>
+                             <TextBlock Text="{Binding FormattedMonthSales}"
+                                        Style="{StaticResource HeaderStyle}"
+                                        AutomationProperties.AutomationId="ValueMonthSales"/>
+                            <TextBlock Text="إجمالي مبيعاتك خلال الـ 30 يوماً الماضية"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Monthly Purchases -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="CardMonthPurchases">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Background="{StaticResource WarningLightBrush}" CornerRadius="12" Padding="12">
+                                    <TextBlock Text="📦"/>
+                                </Border>
+                                <TextBlock Grid.Column="1" 
+                                           Text="مشتريات الشهر" 
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" 
+                                           Margin="16,0,0,0"/>
+                            </Grid>
+                             <TextBlock Text="{Binding FormattedMonthPurchases}"
+                                        Style="{StaticResource HeaderStyle}"
+                                        AutomationProperties.AutomationId="ValueMonthPurchases"/>
+                            <TextBlock Text="المبالغ التي دفعتها للموردين لشراء بضاعة"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Net Profit -->
+                    <Border Style="{StaticResource CardStyle}" AutomationProperties.AutomationId="CardNetProfit">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Background="{StaticResource AccentLightBrush}" CornerRadius="12" Padding="12">
+                                    <TextBlock Text="📈"/>
+                                </Border>
+                                <TextBlock Grid.Column="1" 
+                                           Text="صافي الربح" 
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" 
+                                           Margin="16,0,0,0"/>
+                            </Grid>
+                             <TextBlock Text="{Binding FormattedNetProfit}"
+                                        Style="{StaticResource HeaderStyle}"
+                                        Foreground="{StaticResource SuccessBrush}"
+                                        AutomationProperties.AutomationId="ValueNetProfit"/>
+                            <TextBlock Text="مكسبك الحقيقي (المبيعات - التكاليف)"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="11"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <!-- Second Row: Entity Stats -->
+                <UniformGrid Rows="1" Margin="0,0,0,32">
+                    <!-- Total Customers -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="StatCustomers">
+                        <StackPanel>
+                            <TextBlock Text="إجمالي العملاء" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding TotalCustomers}" Style="{StaticResource HeaderStyle}" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Total Suppliers -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="StatSuppliers">
+                        <StackPanel>
+                            <TextBlock Text="إجمالي الموردين" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding TotalSuppliers}" Style="{StaticResource HeaderStyle}" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Total Products -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="StatProducts">
+                        <StackPanel>
+                            <TextBlock Text="إجمالي المنتجات" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding TotalProducts}" Style="{StaticResource HeaderStyle}" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Low Stock Alert -->
+                    <Border Style="{StaticResource CardStyle}" AutomationProperties.AutomationId="StatLowStock" BorderBrush="{StaticResource ErrorBrush}" BorderThickness="0,0,0,3">
+                        <StackPanel>
+                            <TextBlock Text="تنبيهات المخزون" Foreground="{StaticResource ErrorBrush}" FontWeight="SemiBold"/>
+                             <TextBlock Text="{Binding LowStockCount}" Style="{StaticResource HeaderStyle}" Margin="0,8,0,0" Foreground="{StaticResource ErrorBrush}"/>
+                            <TextBlock Text="بضائع قاربت على النفاذ وتحتاج شراء" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <!-- Bottom Section: Detailed Lists -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Recent Invoices -->
+                    <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,16,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="آخر فواتير المبيعات" 
+                                       Style="{StaticResource HeaderStyle}"
+                                       Margin="0,0,0,16"/>
+
+                            <ListView Grid.Row="1" 
+                                      ItemsSource="{Binding RecentInvoices}"
+                                      BorderThickness="0"
+                                      Background="Transparent"
+                                      AutomationProperties.AutomationId="ListRecentInvoices">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Padding" Value="16"/>
+                                        <Setter Property="Margin" Value="0,0,0,12"/>
+                                        <Setter Property="Background" Value="{StaticResource MutedLightBrush}"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListViewItem">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            CornerRadius="8"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Id}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="{Binding CustomerName}" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding FormattedAmount}" FontWeight="Bold" FontSize="16" Foreground="{StaticResource SuccessTextBrush}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="{Binding FormattedDate}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0" HorizontalAlignment="Right"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+
+                            <!-- Empty State -->
+                            <TextBlock Grid.Row="1"
+                                       Text="لا توجد بيانات متاحة حالياً"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding RecentInvoices.Count, Converter={StaticResource InverseBoolToVisibility}}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Low Stock Alerts -->
+                    <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="تنبيهات المخزون المنخفض" 
+                                       Style="{StaticResource HeaderStyle}"
+                                       Margin="0,0,0,16"/>
+
+                            <ListView Grid.Row="1" 
+                                      ItemsSource="{Binding LowStockItems}"
+                                      BorderThickness="0"
+                                      Background="Transparent"
+                                      AutomationProperties.AutomationId="ListLowStock">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Padding" Value="16"/>
+                                        <Setter Property="Margin" Value="0,0,0,12"/>
+                                        <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListViewItem">
+                                                    <Border Background="{TemplateBinding Background}"
+                                                            CornerRadius="8"
+                                                            Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding ProductName}" FontWeight="Bold" FontSize="15" Foreground="{StaticResource ErrorTextBrush}"/>
+                                                <TextBlock FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0">
+                                                    <Run Text="الحد الأدنى: "/>
+                                                    <Run Text="{Binding FormattedMinStock}"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding FormattedCurrentStock}" FontWeight="Bold" FontSize="18" Foreground="{StaticResource ErrorTextBrush}" HorizontalAlignment="Right"/>
+                                                <TextBlock Text="متوفر حالياً" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0" HorizontalAlignment="Right"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+
+                            <!-- Empty State -->
+                            <TextBlock Grid.Row="1"
+                                       Text="المخزون سليم، لا توجد تنبيهات"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding LowStockItems.Count, Converter={StaticResource InverseBoolToVisibility}}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

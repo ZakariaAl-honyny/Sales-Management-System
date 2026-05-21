@@ -37,9 +37,9 @@ public class ProductsController : ControllerBase
     [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int? categoryId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
+    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int? categoryId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
-        var result = await _productService.GetAllAsync(search, categoryId, page, pageSize, ct);
+        var result = await _productService.GetAllAsync(search, categoryId, page, pageSize, includeInactive, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -93,7 +93,7 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a product.
+    /// Deletes a product (Soft Delete).
     /// </summary>
     /// <param name="id">Product ID to delete.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -108,5 +108,33 @@ public class ProductsController : ControllerBase
         if (result.IsSuccess)
             return Ok(new { message = "تم الحذف بنجاح", id });
         return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Permanently deletes a product.
+    /// </summary>
+    /// <param name="id">Product ID to delete permanently.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns success message with deleted ID.</returns>
+    [HttpDelete("permanent/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)
+    {
+        var result = await _productService.PermanentDeleteAsync(id, ct);
+        if (result.IsSuccess)
+            return Ok(new { message = "تم الحذف النهائي بنجاح", id });
+        return BadRequest(new { error = result.Error });
+    }
+
+    [HttpGet("barcode/{barcode}")]
+    [Authorize(Policy = "AllStaff")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetByBarcode(string barcode, CancellationToken ct)
+    {
+        var result = await _productService.GetByBarcodeAsync(barcode, ct);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
     }
 }

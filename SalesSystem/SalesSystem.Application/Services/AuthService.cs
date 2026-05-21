@@ -32,47 +32,55 @@ public class AuthService : IAuthService
 
     public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
-        _logger.LogInformation("Login attempt for user: {UserName}", request.UserName);
-
-        // 1. Find user (Using GetAllAsync and filtering as per task T010 requirement)
-        var users = await _uow.Users.GetAllAsync(ct);
-        var user = users.FirstOrDefault(u => u.UserName.Equals(request.UserName, StringComparison.OrdinalIgnoreCase));
-
-        if (user == null)
+        try
         {
-            _logger.LogWarning("Login failed: User {UserName} not found", request.UserName);
-            return Result<LoginResponse>.Failure("Invalid credentials", ErrorCodes.Unauthorized);
-        }
+            _logger.LogInformation("Login attempt for user: {UserName}", request.UserName);
 
-        // 2. Check if active
-        if (!user.IsActive)
+            // 1. Find user (Using GetAllAsync and filtering as per task T010 requirement)
+            var users = await _uow.Users.GetAllAsync(ct);
+            var user = users.FirstOrDefault(u => u.UserName.Equals(request.UserName, StringComparison.OrdinalIgnoreCase));
+
+            if (user == null)
+            {
+                _logger.LogWarning("Login failed: User {UserName} not found", request.UserName);
+                return Result<LoginResponse>.Failure("بيانات الاعتماد غير صالحة", ErrorCodes.Unauthorized);
+            }
+
+            // 2. Check if active
+            if (!user.IsActive)
+            {
+                _logger.LogWarning("Login failed: User {UserName} is inactive", request.UserName);
+                return Result<LoginResponse>.Failure("الحساب معطل", ErrorCodes.Forbidden);
+            }
+
+            // 3. Verify password
+            bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+            if (!isPasswordValid)
+            {
+                _logger.LogWarning("Login failed: Incorrect password for user {UserName}", request.UserName);
+                return Result<LoginResponse>.Failure("بيانات الاعتماد غير صالحة", ErrorCodes.Unauthorized);
+            }
+
+            // 4. Generate JWT
+            string token = _jwtTokenGenerator.GenerateToken(user);
+            var expiresAt = DateTime.UtcNow.AddHours(_jwtSettings.ExpirationHours);
+
+            _logger.LogInformation("Login successful for user: {UserName}", request.UserName);
+
+            // 5. Return success result
+            return Result<LoginResponse>.Success(new LoginResponse(
+                user.Id,
+                user.UserName,
+                user.FullName,
+                (byte)user.Role,
+                token,
+                expiresAt
+            ));
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning("Login failed: User {UserName} is inactive", request.UserName);
-            return Result<LoginResponse>.Failure("Account is disabled", ErrorCodes.Forbidden);
+            _logger.LogError(ex, "Error occurred during login for user: {UserName}", request.UserName);
+            return Result<LoginResponse>.Failure("حدث خطأ أثناء تسجيل الدخول.");
         }
-
-        // 3. Verify password
-        bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-        if (!isPasswordValid)
-        {
-            _logger.LogWarning("Login failed: Incorrect password for user {UserName}", request.UserName);
-            return Result<LoginResponse>.Failure("Invalid credentials", ErrorCodes.Unauthorized);
-        }
-
-        // 4. Generate JWT
-        string token = _jwtTokenGenerator.GenerateToken(user);
-        var expiresAt = DateTime.UtcNow.AddHours(_jwtSettings.ExpirationHours);
-
-        _logger.LogInformation("Login successful for user: {UserName}", request.UserName);
-
-        // 5. Return success result
-        return Result<LoginResponse>.Success(new LoginResponse(
-            user.Id,
-            user.UserName,
-            user.FullName,
-            (byte)user.Role,
-            token,
-            expiresAt
-        ));
     }
 }

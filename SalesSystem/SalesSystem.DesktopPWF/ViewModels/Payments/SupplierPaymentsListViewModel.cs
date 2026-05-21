@@ -1,0 +1,245 @@
+using SalesSystem.DesktopPWF.Messaging.Messages;
+using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Input;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.DesktopPWF.Services.Api;
+using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Helpers;
+using System.ComponentModel;
+using System.Windows.Data;
+
+namespace SalesSystem.DesktopPWF.ViewModels.Payments;
+
+/// <summary>
+/// ViewModel for Supplier Payments List
+/// </summary>
+public class SupplierPaymentsListViewModel : ViewModelBase
+{
+    private readonly ISupplierPaymentApiService _paymentService;
+    private readonly ISupplierApiService _supplierService;
+    private readonly IDialogService _dialogService;
+    private readonly IPaymentPrinter _paymentPrinter;
+    private readonly ISettingsApiService _settingsService;
+
+    private string _searchText = string.Empty;
+    private DateTime? _dateFrom;
+    private DateTime? _dateTo;
+    private bool _isLoading;
+    private string _errorMessage = string.Empty;
+    private bool _isEmpty;
+    private SupplierPaymentDto? _selectedPayment;
+    private ObservableCollection<SupplierPaymentDto> _payments = new();
+    private ICollectionView? _paymentsView;
+
+    public SupplierPaymentsListViewModel()
+    {
+        _paymentService = App.GetService<ISupplierPaymentApiService>();
+        _supplierService = App.GetService<ISupplierApiService>();
+        _dialogService = App.GetService<IDialogService>();
+        _paymentPrinter = App.GetService<IPaymentPrinter>();
+        _settingsService = App.GetService<ISettingsApiService>();
+
+        NewCommand = new RelayCommand(OnNew);
+        ViewCommand = new RelayCommand(OnView, () => SelectedPayment != null);
+        EditCommand = new RelayCommand(OnEdit, () => SelectedPayment != null);
+        DeleteCommand = new AsyncRelayCommand(OnDelete, () => SelectedPayment != null);
+        PrintCommand = new AsyncRelayCommand(OnPrint, () => SelectedPayment != null);
+        RefreshCommand = new AsyncRelayCommand(LoadPaymentsAsync);
+        SearchCommand = new AsyncRelayCommand(LoadPaymentsAsync);
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set => SetProperty(ref _searchText, value);
+    }
+
+    public DateTime? DateFrom
+    {
+        get => _dateFrom;
+        set => SetProperty(ref _dateFrom, value);
+    }
+
+    public DateTime? DateTo
+    {
+        get => _dateTo;
+        set => SetProperty(ref _dateTo, value);
+    }
+
+    public bool IsLoading
+    {
+        get => _isLoading;
+        set => SetProperty(ref _isLoading, value);
+    }
+
+    public string ErrorMessage
+    {
+        get => _errorMessage;
+        set => SetProperty(ref _errorMessage, value);
+    }
+
+    public bool IsEmpty
+    {
+        get => _isEmpty;
+        private set => SetProperty(ref _isEmpty, value);
+    }
+
+    public SupplierPaymentDto? SelectedPayment
+    {
+        get => _selectedPayment;
+        set
+        {
+            SetProperty(ref _selectedPayment, value);
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public ObservableCollection<SupplierPaymentDto> Payments
+    {
+        get => _payments;
+        set => SetProperty(ref _payments, value);
+    }
+
+    public ICollectionView? PaymentsView
+    {
+        get => _paymentsView;
+        private set => SetProperty(ref _paymentsView, value);
+    }
+
+    public int PaymentsCount => Payments.Count;
+
+    public ICommand NewCommand { get; private set; } = null!;
+    public ICommand ViewCommand { get; private set; } = null!;
+    public ICommand EditCommand { get; private set; } = null!;
+    public ICommand DeleteCommand { get; private set; } = null!;
+    public ICommand PrintCommand { get; private set; } = null!;
+    public ICommand RefreshCommand { get; private set; } = null!;
+    public ICommand SearchCommand { get; private set; } = null!;
+
+    public async Task LoadPaymentsAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = string.Empty;
+
+            var result = await _paymentService.GetAllAsync(SearchText, DateFrom, DateTo);
+
+            if (result.IsSuccess && result.Value != null)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Payments.Clear();
+                    foreach (var item in result.Value)
+                    {
+                        Payments.Add(item);
+                    }
+                    SetupCollectionView();
+                    IsEmpty = Payments.Count == 0;
+                    OnPropertyChanged(nameof(PaymentsCount));
+                });
+            }
+            else
+            {
+                ErrorMessage = result.Error ?? "حدث خطأ غير معروف";
+                IsEmpty = Payments.Count == 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = HandleException(ex, "SupplierPaymentsListViewModel.LoadPaymentsAsync", "[SupplierPaymentsListViewModel.LoadPaymentsAsync] Failed to load supplier payments list.");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void SetupCollectionView()
+    {
+        PaymentsView = CollectionViewSource.GetDefaultView(Payments);
+        // Add filtering if needed in the future
+    }
+
+    private void OnNew()
+    {
+        var vm = new SupplierPaymentEditorViewModel();
+        if (_dialogService.ShowDialog(vm))
+        {
+            _ = LoadPaymentsAsync();
+        }
+    }
+
+    private void OnView()
+    {
+        if (SelectedPayment == null) return;
+        var vm = new SupplierPaymentEditorViewModel(SelectedPayment.Id, isReadOnly: true);
+        _dialogService.ShowDialog(vm);
+    }
+
+    private void OnEdit()
+    {
+        if (SelectedPayment == null) return;
+        var vm = new SupplierPaymentEditorViewModel(SelectedPayment.Id);
+        if (_dialogService.ShowDialog(vm))
+        {
+            _ = LoadPaymentsAsync();
+        }
+    }
+
+    private async Task OnDelete()
+    {
+        if (SelectedPayment == null) return;
+
+        var result = await _dialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
+
+        if (!result) return;
+
+        try
+        {
+            IsLoading = true;
+            var deleteResult = await _paymentService.DeleteAsync(SelectedPayment.Id);
+
+            if (deleteResult.IsSuccess)
+            {
+                await LoadPaymentsAsync();
+            }
+            else
+            {
+                ErrorMessage = deleteResult.Error ?? "فشل في حذف السداد";
+                await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"حدث خطأ: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task OnPrint()
+    {
+        if (SelectedPayment == null) return;
+
+        IsLoading = true;
+        try
+        {
+            var settingsResult = await _settingsService.GetSettingsAsync();
+            if (!settingsResult.IsSuccess || settingsResult.Value == null) return;
+
+            _paymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

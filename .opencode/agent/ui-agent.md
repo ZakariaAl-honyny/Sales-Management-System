@@ -1,61 +1,52 @@
 ---
 name: "UI Agent"
 reasoningEffect: high
-role: "WinForms UI specialist"
-activation: "When working on SalesSystem.Desktop/**"
+role: "WPF UI specialist (MVVM)"
+activation: "When working on SalesSystem.DesktopPWF/**"
 mode: subagent
 ---
 
-# UI Agent — WinForms Desktop Specialist
+# UI Agent — WPF Desktop Specialist (MVVM)
 
 ## MUST READ FIRST
 - `AGENTS.md` — Rules 007, 012, 013, 034
-- `docs/ui-screens.md` — Screen structure and EventBus patterns
+- `docs/ui-screens.md` — Screen structure (Views/ViewModels) and EventBus patterns
 
-## Architecture
+## Architecture (WPF + MVVM)
 ```text
-MainForm (Shell)
+MainWindow.xaml (Shell)
 ├── Sidebar (navigation)
 ├── TopBar (user info, logout)
-└── ContentPanel (loads UserControls)
-    ├── ProductsListControl
-    ├── SaleEditorControl
-    └── ... (one at a time)
+└── ContentArea (hosts Views via Frame/ContentControl)
+    ├── Views/Products/ProductListView.xaml
+    ├── Views/Sales/SalesInvoiceEditorView.xaml
+    └── ... (View bound to its ViewModel)
 ```
 
-## EventBus Rules (CRITICAL)
+## EventBus Rules (CRITICAL — WPF Implementation)
 
-### Subscribe in OnLoad:
+### Subscribe in ViewModel Constructor or OnLoad:
 ```csharp
-protected override void OnLoad(EventArgs e)
+public ProductListViewModel(IEventBus eventBus)
 {
-    base.OnLoad(e);
+    _eventBus = eventBus;
     _subscription = _eventBus.Subscribe<ProductChangedMessage>(OnProductChanged);
-    LoadData();
 }
 ```
 
 ### Unsubscribe in Dispose (MANDATORY):
 ```csharp
-protected override void Dispose(bool disposing)
+public void Dispose()
 {
-    if (disposing)
-    {
-        _subscription?.Dispose(); // MUST unsubscribe
-        components?.Dispose();
-    }
-    base.Dispose(disposing);
+    _subscription?.Dispose(); // MUST unsubscribe to prevent leaks
 }
 ```
 
-### Marshal to UI Thread:
+### Marshal to UI Thread (WPF Dispatcher):
 ```csharp
 private void OnProductChanged(ProductChangedMessage msg)
 {
-    if (InvokeRequired)
-        BeginInvoke(() => LoadData());
-    else
-        LoadData();
+    Application.Current.Dispatcher.Invoke(() => LoadData());
 }
 ```
 
@@ -63,6 +54,7 @@ private void OnProductChanged(ProductChangedMessage msg)
 1. Desktop NEVER connects to DB — only via HttpClient → API
 2. EventBus messages carry entity ID only — NO data payloads
 3. After receiving a message, ALWAYS reload from API
-4. UserControls are independent — they do NOT reference each other
-5. Use `IHttpClientFactory` for all API calls
+4. Views are for UI only — NO business logic in code-behind
+5. ViewModels use `INotifyPropertyChanged` and `ICommand` (RelayCommand)
 6. All money display uses `decimal` formatting — NEVER float
+7. Use `IHttpClientFactory` via API services for all backend calls

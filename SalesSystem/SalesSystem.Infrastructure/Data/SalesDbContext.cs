@@ -29,6 +29,14 @@ public class SalesDbContext : DbContext
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
     public DbSet<StoreSettings> StoreSettings => Set<StoreSettings>();
     public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
+    public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
+    public DbSet<ProductBarcode> ProductBarcodes => Set<ProductBarcode>();
+    public DbSet<ProductUnit> ProductUnits => Set<ProductUnit>();
+    public DbSet<UnitBarcode> UnitBarcodes => Set<UnitBarcode>();
+    public DbSet<CashBox> CashBoxes => Set<CashBox>();
+    public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 

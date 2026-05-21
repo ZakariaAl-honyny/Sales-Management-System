@@ -123,10 +123,14 @@ Content-Type: application/json
   "barcode": "123456789",
   "categoryId": 1,
   "categoryName": "Category",
-  "unitId": 1,
-  "unitName": "Piece",
-  "salePrice": 100.00,
+  "wholesaleUnitId": 2,
+  "wholesaleUnitName": "كرتون",
+  "retailUnitId": 1,
+  "retailUnitName": "قطعة",
+  "conversionFactor": 12.000,
   "purchasePrice": 80.00,
+  "wholesalePrice": 95.00,
+  "retailPrice": 10.00,
   "minStock": 10,
 **Response (200):**
 ```json
@@ -313,10 +317,14 @@ Get all products with pagination.
       "name": "Product Name",
       "categoryId": 1,
       "categoryName": "Electronics",
-      "unitId": 1,
-      "unitName": "قطعة",
+      "wholesaleUnitId": 2,
+      "wholesaleUnitName": "كرتون",
+      "retailUnitId": 1,
+      "retailUnitName": "قطعة",
+      "conversionFactor": 12.000,
       "purchasePrice": 100.00,
-      "salePrice": 150.00,
+      "wholesalePrice": 1100.00,
+      "retailPrice": 100.00,
       "minStock": 10,
       "description": "Product description",
       "isActive": true
@@ -455,9 +463,12 @@ Create new product.
   "code": "PROD002",
   "barcode": "987654321",
   "categoryId": 1,
-  "unitId": 1,
-  "costPrice": 100.00,
-  "salePrice": 150.00,
+  "wholesaleUnitId": 2,
+  "retailUnitId": 1,
+  "conversionFactor": 12,
+  "purchasePrice": 100.00,
+  "wholesalePrice": 1100.00,
+  "retailPrice": 100.00,
   "minStock": 10,
   "description": "Product description"
 }
@@ -1130,6 +1141,46 @@ Delete unit.
   "error": "الوحدة غير موجودة"
 }
 ```
+
+---
+
+## Settings
+
+**Base URL:** `/api/v1/settings`  
+**Authorization:** All Staff (GET), Admin Only (PUT)
+
+### GET /api/v1/settings
+Retrieve store settings (Name, Address, Tax Number, etc.).
+
+### PUT /api/v1/settings
+Update store settings. Requires `Admin` role.
+
+---
+
+## Backup
+
+**Base URL:** `/api/v1/backup`  
+**Authorization:** Admin Only
+
+### GET /api/v1/backup/list
+List all database backup files in the backup directory.
+
+### POST /api/v1/backup/create
+Create a new SQL Server database backup (`.bak` file).
+
+### POST /api/v1/backup/restore
+Restore database from a selected backup file.  
+**Warning:** This operation terminates all connections and forces an application restart.
+
+---
+
+## Reports
+
+**Base URL:** `/api/v1/reports`  
+**Authorization:** Manager+
+
+### GET /api/v1/reports/low-stock
+Get report of products below reorder level with suggested order quantities in both wholesale and retail units.
 
 ---
 

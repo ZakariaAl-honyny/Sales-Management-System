@@ -54,6 +54,16 @@ public class ExceptionMiddleware
                 })
             };
         }
+        else if (exception is System.UnauthorizedAccessException)
+        {
+            response.StatusCode = 403; // Forbidden
+            errorResponse = new
+            {
+                error = "Unauthorized",
+                errorCode = "UNAUTHORIZED_ERROR",
+                details = "You do not have permission to access this resource"
+            };
+        }
         else
         {
             _logger.LogError(exception, "Unhandled exception");

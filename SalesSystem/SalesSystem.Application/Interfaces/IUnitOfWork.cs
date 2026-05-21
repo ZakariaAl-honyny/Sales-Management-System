@@ -24,8 +24,20 @@ public interface IUnitOfWork
     IGenericRepository<CustomerPayment> CustomerPayments { get; }
     IGenericRepository<SupplierPayment> SupplierPayments { get; }
     IGenericRepository<StoreSettings> StoreSettings { get; }
+    IGenericRepository<SystemLog> SystemLogs { get; }
+    IGenericRepository<StockTransferItem> StockTransferItems { get; }
+    IGenericRepository<SalesInvoiceItem> SalesInvoiceItems { get; }
+    IGenericRepository<PurchaseInvoiceItem> PurchaseInvoiceItems { get; }
+    IGenericRepository<ProductBarcode> ProductBarcodes { get; }
+    IGenericRepository<UnitBarcode> UnitBarcodes { get; }
+    IGenericRepository<ProductUnit> ProductUnits { get; }
+    IGenericRepository<CashBox> CashBoxes { get; }
+    IGenericRepository<CashTransaction> CashTransactions { get; }
+    IGenericRepository<SystemSetting> SystemSettings { get; }
+    IGenericRepository<ProductPriceHistory> ProductPriceHistory { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
+    Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken ct = default);
 }
 
 public interface IDbContextTransaction : IAsyncDisposable, IDisposable

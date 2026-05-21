@@ -1,7 +1,7 @@
-# AGENTS.md — Sales Management System (MVP v3.0)
+# AGENTS.md — Sales Management System (v4.0 Expansion)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
-# WinForms Desktop + ASP.NET Core 10 API + SQL Server
+# WPF Desktop + ASP.NET Core 10 API + SQL Server
 
 ---
 
@@ -22,7 +22,7 @@ SalesSystem/
 ├── SalesSystem.Application/     ← Services + Interfaces + Use Cases
 ├── SalesSystem.Infrastructure/  ← EF Core + DbContext + Repositories
 ├── SalesSystem.Api/             ← Controllers + FluentValidation + Middleware
-└── SalesSystem.Desktop/         ← WinForms UI + UserControls + EventBus
+└── SalesSystem.DesktopPWF/     ← WPF UI + MVVM + EventBus
 ```
 
 **Data Flow (NEVER break this chain):**
@@ -244,36 +244,31 @@ NEVER hard-delete a User — invoices reference them via FK.
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-012 | Unsubscribe in `Dispose(bool disposing)` |
-| RULE-013 | Marshal handlers to UI thread via `Invoke`/`BeginInvoke` |
+| RULE-012 | Unsubscribe in `Dispose()` or View Unload |
+| RULE-013 | Marshal handlers to UI thread via `Application.Current.Dispatcher` |
 | RULE-034 | Messages carry entity ID only — NO data payloads |
 
-**CORRECT EventBus usage in a UserControl:**
+**CORRECT EventBus usage in a ViewModel:**
 ```csharp
-public partial class ProductsListControl : UserControl
+public class ProductsListViewModel : ViewModelBase, IDisposable
 {
     private IDisposable? _subscription;
 
-    protected override void OnLoad(EventArgs e)
+    public ProductsListViewModel(IEventBus eventBus)
     {
-        base.OnLoad(e);
-        _subscription = _eventBus.Subscribe<ProductChangedMessage>(OnProductChanged);
-        LoadData();
+        _subscription = eventBus.Subscribe<ProductChangedMessage>(OnProductChanged);
+        _ = LoadDataAsync();
     }
 
     private void OnProductChanged(ProductChangedMessage msg)
     {
         // Reload from API — do NOT use data from the message
-        LoadData();
+        _ = LoadDataAsync();
     }
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
-        if (disposing)
-        {
-            _subscription?.Dispose(); // MUST unsubscribe
-        }
-        base.Dispose(disposing);
+        _subscription?.Dispose(); // MUST unsubscribe
     }
 }
 ```
@@ -313,6 +308,167 @@ public partial class ProductsListControl : UserControl
 | Strings | `nvarchar` with explicit `MaxLength` |
 | Decimals | `.HasPrecision(18, 2)` or `.HasPrecision(18, 3)` |
 
+### 2.17 Clean Code & Centralized Design (New)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-041 | **DRY Principle**: NEVER duplicate business logic (e.g., pricing, unit conversion). All core math must live in `SalesSystem.Domain`. |
+| RULE-042 | **Rich Domain Model**: Use `private set` for critical entity properties (like `CurrentQuantity`). State changes MUST happen via centralized domain methods (e.g., `DeductStock()`). |
+| RULE-043 | **CQRS & MediatR**: Strictly separate Read operations (Queries) from Write operations (Commands) to prevent UI reads from blocking transactional logic. |
+| RULE-044 | **FluentValidation**: EVERY Command (Write operation) MUST have an associated `AbstractValidator` executed before reaching the Database. |
+
+### 2.18 Wholesale/Retail Pricing (v4.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-045 | Product has TWO prices: `RetailPrice` and `WholesalePrice` - NEVER compute prices dynamically |
+| RULE-046 | Use `Product.GetPriceByUnit(UnitType)` to get correct price - NEVER use conditional logic outside Domain |
+| RULE-047 | Use `Product.ConvertToSmallestUnit(quantity, unitType)` for unit conversion - NEVER compute conversion in UI or Service |
+| RULE-048 | Use `Stock.DeductStock(quantity, unitType, conversionFactor)` - conversion happens inside Domain |
+| RULE-049 | Invoice items store `SaleMode` (Retail/Wholesale) to determine which price was used |
+
+### 2.19 Delete Strategy (v4.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-050 | Use `DeleteStrategy` enum for ALL delete operations |
+| RULE-051 | Three options: Cancel (0), Deactivate (1), Permanent (2) |
+
+**Enum Definition:**
+```csharp
+public enum DeleteStrategy
+{
+    Cancel = 0,      // Abort operation
+    Deactivate = 1,  // Soft delete - set IsActive = false
+    Permanent = 2   // Hard delete - physical removal from DB
+}
+```
+
+**UI Pattern (WPF):**
+```csharp
+var strategy = await _dialogService.ShowDeleteConfirmationAsync($"المنتج: {product.Name}");
+if (strategy == DeleteStrategy.Cancel) return;
+if (strategy == DeleteStrategy.Deactivate)
+{
+    // Soft delete - keep entity, mark as inactive
+    var result = await _productService.DeleteAsync(product.Id);
+}
+else if (strategy == DeleteStrategy.Permanent)
+{
+    // Hard delete - check references first
+    var result = await _productService.DeletePermanentlyAsync(product.Id);
+}
+```
+
+**API Endpoints:**
+- `DELETE /api/v1/products/{id}` → Soft delete (IsActive=false)
+- `DELETE /api/v1/products/permanent/{id}` → Hard delete (with reference validation)
+- Same pattern for: Categories, Units, Warehouses, Customers, Suppliers, Users
+
+### 2.20 Defensive Programming (v4.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-052 | All Domain entities MUST have Guard Clauses to prevent invalid states |
+| RULE-053 | Use `DomainException` with Arabic messages for validation failures |
+
+**Pattern:**
+```csharp
+// In entity constructor or factory method
+if (string.IsNullOrWhiteSpace(name))
+    throw new DomainException("الاسم مطلوب");
+if (price < 0)
+    throw new DomainException("السعر لا يمكن أن يكون سالباً");
+if (quantity <= 0)
+    throw new DomainException("الكمية يجب أن تكون أكبر من الصفر");
+```
+
+**Entities with Guard Clauses:** Product, Customer, Supplier, SalesInvoice, PurchaseInvoice, WarehouseStock, StockTransfer, SalesReturn, PurchaseReturn, User, Category, Unit, Warehouse, DocumentSequence, StoreSettings, InventoryMovement, CustomerPayment, SupplierPayment, SalesInvoiceItem, PurchaseInvoiceItem, SalesReturnItem, PurchaseReturnItem, StockTransferItem
+
+### 2.21 WPF Dialog Service (v4.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-054 | Use `IDialogService` for ALL user-facing messages |
+| RULE-055 | NEVER use raw `MessageBox.Show` |
+
+**DialogService Methods:**
+```csharp
+public interface IDialogService
+{
+    Task ShowErrorAsync(string title, string message);
+    Task ShowSuccessAsync(string title, string message);
+    Task ShowWarningAsync(string title, string message);
+    Task<bool> ShowConfirmationAsync(string title, string message);
+    Task<DeleteStrategy> ShowDeleteConfirmationAsync(string itemDescription);
+}
+```
+
+**Styled Dialogs Location:** `Views/Dialogs/`
+- `ErrorDialog.xaml` - Red theme, error icon ✕
+- `SuccessDialog.xaml` - Green theme, success icon ✓
+- `WarningDialog.xaml` - Yellow/orange theme, warning icon ⚠
+- `ConfirmationDialog.xaml` - Blue theme, question icon ?
+- `DeleteConfirmationDialog.xaml` - Orange/red theme, 3 buttons (Cancel/Deactivate/Delete)
+
+### 2.22 Toast Notifications (v4.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-056 | Use `IToastNotificationService` for minor success messages |
+| RULE-057 | Toast auto-dismisses: Success/Info = 3s, Error = 5s |
+
+**Service:**
+```csharp
+public interface IToastNotificationService
+{
+    void ShowSuccess(string message);  // Green, 3s
+    void ShowError(string message);    // Red, 5s
+    void ShowInfo(string message);     // Blue, 3s
+}
+```
+
+**Usage:** Use for delete/restore confirmations, minor success feedback.
+**Location:** `Services/App/Toast/ToastWindow.xaml`
+
+### 2.23 Real-Time UI Validation (v4.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-058 | ViewModelBase implements `INotifyDataErrorInfo` |
+| RULE-059 | Save buttons disabled via `CanExecute` when HasErrors |
+
+**Implementation:**
+```csharp
+// ViewModelBase methods
+public void AddError(string propertyName, string errorMessage);
+public void ClearErrors(string propertyName);
+public void ClearAllErrors();
+public bool HasErrors { get; }
+```
+
+**XAML Red Border Style:**
+```xml
+<Style x:Key="ValidationTextBoxStyle" TargetType="TextBox">
+    <Setter Property="Validation.ErrorTemplate">
+        <Setter.Value>
+            <ControlTemplate>
+                <DockPanel>
+                    <Border BorderBrush="Red" BorderThickness="1">
+                        <AdornedElementPlaceholder/>
+                    </Border>
+                </DockPanel>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+```
+
+**Validation Rules (Arabic):**
+- `"يجب اختيار منتج"` (Product required)
+- `"الكمية يجب أن تكون أكبر من صفر"` (Quantity must be > 0)
+- `"السعر لا يمكن أن يكون سالباً"` (Price cannot be negative)
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -326,6 +482,9 @@ public enum MovementType : byte
     PurchaseIn = 1, SaleOut = 2, SaleReturnIn = 3,
     PurchaseReturnOut = 4, TransferOut = 5, TransferIn = 6, Adjustment = 7
 }
+public enum UnitType : byte { Retail = 0, Wholesale = 1 }  // For wholesale/retail pricing
+public enum SaleMode : byte { Retail = 1, Wholesale = 2 }  // Invoice line item mode
+public enum DeleteStrategy { Cancel = 0, Deactivate = 1, Permanent = 2 }
 ```
 
 ---
@@ -345,6 +504,8 @@ public enum MovementType : byte
 ❌ DataAnnotations on Domain Entities (use Fluent API)
 ❌ Cascade delete on any FK
 ❌ Hard-deleting Users (soft delete only — invoices reference them)
+❌ Duplicating business logic outside of the Domain layer
+❌ Direct property modification on Entities from outside the class (use Domain methods instead)
 ```
 
 ---
@@ -435,3 +596,11 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Fluent API config (no DataAnnotations on entities)?
 - [ ] All FKs use `DeleteBehavior.Restrict`?
 - [ ] Users soft-deleted only (never hard delete)?
+- [ ] Domain Entities use `private set` for critical properties and methods for state changes?
+- [ ] Read and Write operations are separated (CQRS)?
+- [ ] Delete operations use DeleteStrategy enum (not direct MessageBox)?
+- [ ] Guard Clauses exist for all entity creation?
+- [ ] DialogService used instead of MessageBox.Show?
+- [ ] Toast notifications for minor success messages?
+- [ ] INotifyDataErrorInfo implemented with red border styles?
+- [ ] Save buttons disabled when form has errors (CanExecute)?

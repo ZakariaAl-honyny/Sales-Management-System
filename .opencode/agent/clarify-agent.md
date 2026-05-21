@@ -19,7 +19,7 @@ Surface hidden assumptions and underspecified areas BEFORE planning begins.
 - `[SCOPE]` — in or out of scope? (reference PRD Out of Scope section)
 - `[LOGIC]` — business rule unclear (e.g., return flow edge cases)
 - `[DATA]` — data shape, volume, or type unclear
-- `[UX]` — WinForms interaction flow undefined
+- `[UX]` — WPF interaction flow undefined
 - `[SECURITY]` — role permission gap
 - `[PERF]` — performance target unclear
 - `[DB]` — database constraint or migration question

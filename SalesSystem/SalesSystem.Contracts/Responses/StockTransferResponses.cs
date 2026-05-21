@@ -1,6 +1,7 @@
 using SalesSystem.Contracts.Enums;
 
 namespace SalesSystem.Contracts.Responses;
+
 public record StockTransferResponse(
     int Id, string TransferNumber,
     int SourceWarehouseId, string SourceWarehouseName,

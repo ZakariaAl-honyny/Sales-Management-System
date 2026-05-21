@@ -13,11 +13,13 @@ public class WarehouseService : IWarehouseService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<WarehouseService> _logger;
+    private readonly IDocumentSequenceService _sequenceService;
 
-    public WarehouseService(IUnitOfWork uow, ILogger<WarehouseService> logger)
+    public WarehouseService(IUnitOfWork uow, ILogger<WarehouseService> logger, IDocumentSequenceService sequenceService)
     {
         _uow = uow;
         _logger = logger;
+        _sequenceService = sequenceService;
     }
 
     public async Task<Result<WarehouseDto>> GetByIdAsync(int id, CancellationToken ct)
@@ -29,13 +31,18 @@ public class WarehouseService : IWarehouseService
         return Result<WarehouseDto>.Success(MapToDto(warehouse));
     }
 
-    public async Task<Result<PagedResult<WarehouseDto>>> GetAllAsync(string? search, int page, int pageSize, CancellationToken ct)
+    public async Task<Result<PagedResult<WarehouseDto>>> GetAllAsync(string? search, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
         var query = _uow.Warehouses.Query();
+        
+        if (includeInactive)
+        {
+            query = query.IgnoreQueryFilters();
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(w => w.Name.Contains(search) || 
+            query = query.Where(w => w.Name.Contains(search) ||
                                     (w.Code != null && w.Code.Contains(search)));
         }
 
@@ -53,49 +60,62 @@ public class WarehouseService : IWarehouseService
 
     public async Task<Result<WarehouseDto>> CreateAsync(CreateWarehouseRequest request, CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(request.Code))
+        string? code = request.Code;
+        if (string.IsNullOrWhiteSpace(code))
         {
-            if (await _uow.Warehouses.Query().AnyAsync(w => w.Code == request.Code, ct))
-                return Result<WarehouseDto>.Failure("كود المخزن مستخدم بالفعل", ErrorCodes.DuplicateCode);
+            var codeResult = await _sequenceService.GetNextNumberAsync("WH", ct);
+            if (!codeResult.IsSuccess)
+                return Result<WarehouseDto>.Failure(codeResult.Error ?? "حدث خطأ أثناء توليد الكود");
+            code = codeResult.Value;
         }
 
-        await using var transaction = await _uow.BeginTransactionAsync(ct);
-        try
+        if (await _uow.Warehouses.Query().AnyAsync(w => w.Code == code, ct))
+            return Result<WarehouseDto>.Failure("كود المخزن مستخدم بالفعل", ErrorCodes.DuplicateCode);
+
+        return await _uow.ExecuteAsync(async () =>
         {
-            if (request.IsDefault)
+            await using var transaction = await _uow.BeginTransactionAsync(ct);
+            try
             {
-                await UnsetOtherDefaultsAsync(ct);
+                if (request.IsDefault)
+                {
+                    await UnsetOtherDefaultsAsync(ct);
+                }
+
+                var warehouse = Warehouse.Create(
+                    name: request.Name,
+                    code: code,
+                    location: request.Location,
+                    isDefault: request.IsDefault,
+                    createdByUserId: null
+                );
+
+                await _uow.Warehouses.AddAsync(warehouse, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                await transaction.CommitAsync(ct);
+
+                _logger.LogInformation("Warehouse created: {WarehouseName} (ID: {WarehouseId}, Default: {IsDefault})",
+                    warehouse.Name, warehouse.Id, warehouse.IsDefault);
+
+                return Result<WarehouseDto>.Success(MapToDto(warehouse));
             }
-
-            var warehouse = Warehouse.Create(
-                name: request.Name,
-                code: request.Code,
-                location: request.Location,
-                isDefault: request.IsDefault,
-                createdByUserId: null
-            );
-
-            await _uow.Warehouses.AddAsync(warehouse, ct);
-            await _uow.SaveChangesAsync(ct);
-            
-            await transaction.CommitAsync(ct);
-
-            _logger.LogInformation("Warehouse created: {WarehouseName} (ID: {WarehouseId}, Default: {IsDefault})", 
-                warehouse.Name, warehouse.Id, warehouse.IsDefault);
-
-            return Result<WarehouseDto>.Success(MapToDto(warehouse));
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Error creating warehouse");
-            return Result<WarehouseDto>.Failure("حدث خطأ أثناء إنشاء المخزن");
-        }
+            catch (DomainException ex)
+            {
+                return Result<WarehouseDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Error creating warehouse");
+                return Result<WarehouseDto>.Failure("حدث خطأ أثناء إضافة المستودع");
+            }
+        }, ct);
     }
 
     public async Task<Result<WarehouseDto>> UpdateAsync(int id, UpdateWarehouseRequest request, CancellationToken ct)
     {
-        var warehouse = await _uow.Warehouses.GetByIdAsync(id, ct);
+        var warehouse = await _uow.Warehouses.Query().IgnoreQueryFilters().FirstOrDefaultAsync(w => w.Id == id, ct);
         if (warehouse == null)
             return Result<WarehouseDto>.Failure("المخزن غير موجود", ErrorCodes.NotFound);
 
@@ -105,44 +125,51 @@ public class WarehouseService : IWarehouseService
                 return Result<WarehouseDto>.Failure("كود المخزن مستخدم بالفعل", ErrorCodes.DuplicateCode);
         }
 
-        await using var transaction = await _uow.BeginTransactionAsync(ct);
-        try
+        return await _uow.ExecuteAsync(async () =>
         {
-            if (request.IsDefault && !warehouse.IsDefault)
+            await using var transaction = await _uow.BeginTransactionAsync(ct);
+            try
             {
-                await UnsetOtherDefaultsAsync(ct);
+                if (request.IsDefault && !warehouse.IsDefault)
+                {
+                    await UnsetOtherDefaultsAsync(ct);
+                }
+
+                warehouse.Update(
+                    name: request.Name,
+                    code: request.Code,
+                    location: request.Location,
+                    isDefault: request.IsDefault,
+                    updatedByUserId: null
+                );
+
+                if (request.IsActive != warehouse.IsActive)
+                {
+                    if (request.IsActive) warehouse.Restore();
+                    else warehouse.MarkAsDeleted();
+                }
+
+                await _uow.Warehouses.UpdateAsync(warehouse, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                await transaction.CommitAsync(ct);
+
+                _logger.LogInformation("Warehouse updated: {WarehouseName} (ID: {WarehouseId}, Default: {IsDefault})",
+                    warehouse.Name, warehouse.Id, warehouse.IsDefault);
+
+                return Result<WarehouseDto>.Success(MapToDto(warehouse));
             }
-
-            warehouse.Update(
-                name: request.Name,
-                code: request.Code,
-                location: request.Location,
-                isDefault: request.IsDefault,
-                updatedByUserId: null
-            );
-
-            if (request.IsActive != warehouse.IsActive)
+            catch (DomainException ex)
             {
-                if (request.IsActive) warehouse.Restore();
-                else warehouse.MarkAsDeleted();
+                return Result<WarehouseDto>.Failure(ex.Message);
             }
-
-            await _uow.Warehouses.UpdateAsync(warehouse, ct);
-            await _uow.SaveChangesAsync(ct);
-            
-            await transaction.CommitAsync(ct);
-
-            _logger.LogInformation("Warehouse updated: {WarehouseName} (ID: {WarehouseId}, Default: {IsDefault})", 
-                warehouse.Name, warehouse.Id, warehouse.IsDefault);
-
-            return Result<WarehouseDto>.Success(MapToDto(warehouse));
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Error updating warehouse");
-            return Result<WarehouseDto>.Failure("حدث خطأ أثناء تحديث المخزن");
-        }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Error updating warehouse {Id}", id);
+                return Result<WarehouseDto>.Failure("حدث خطأ أثناء تحديث المستودع");
+            }
+        }, ct);
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken ct)
@@ -161,6 +188,28 @@ public class WarehouseService : IWarehouseService
         return Result.Success();
     }
 
+    public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
+    {
+        var warehouse = await _uow.Warehouses.Query().IgnoreQueryFilters().FirstOrDefaultAsync(w => w.Id == id, ct);
+        if (warehouse == null)
+            return Result.Failure("المخزن غير موجود", ErrorCodes.NotFound);
+
+        if (warehouse.IsDefault)
+            return Result.Failure("لا يمكن حذف المخزن الافتراضي نهائياً");
+
+        if (await _uow.WarehouseStocks.Query().AnyAsync(ws => ws.WarehouseId == id, ct))
+            return Result.Failure("لا يمكن حذف المخزن نهائياً لأنه يحتوي على مخزون");
+
+        if (await _uow.StockTransfers.Query().AnyAsync(st => st.FromWarehouseId == id || st.ToWarehouseId == id, ct))
+            return Result.Failure("لا يمكن حذف المخزن نهائياً لأنه مرتبط بتحويلات مخزون");
+
+        await _uow.Warehouses.HardDeleteAsync(id, ct);
+        await _uow.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Warehouse permanently deleted: {WarehouseId}", id);
+        return Result.Success();
+    }
+
     private async Task UnsetOtherDefaultsAsync(CancellationToken ct)
     {
         var defaults = await _uow.Warehouses.Query()
@@ -170,10 +219,10 @@ public class WarehouseService : IWarehouseService
         foreach (var w in defaults)
         {
             w.Update(
-                name: w.Name, 
-                code: w.Code, 
-                location: w.Location, 
-                isDefault: false, 
+                name: w.Name,
+                code: w.Code,
+                location: w.Location,
+                isDefault: false,
                 updatedByUserId: null
             );
             await _uow.Warehouses.UpdateAsync(w, ct);
