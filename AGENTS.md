@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.4 Production)
+# AGENTS.md — Sales Management System (v4.5 Refactored)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -754,7 +754,68 @@ public abstract class AdminOnlyViewModel : ViewModelBase
 | RULE-136 | Windows Service auto-start configured during install |
 | RULE-137 | Installer creates backup directory, sets permissions |
 
-### 2.35 Dialog Service Enhancement (v4.4)
+### 2.36 ViewModel ExecuteAsync Pattern (v4.5)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-141 | ALL ViewModel async commands MUST use `ExecuteAsync()` wrapper — NEVER manual try/catch/finally |
+| RULE-142 | `IsBusy` property (protected set) replaces `IsLoading` — managed by `ExecuteAsync()` |
+| RULE-143 | `StatusMessage` property (protected set) for user feedback during operations |
+| RULE-144 | `ExecuteAsync(Func<Task>)` — wraps operations with IsBusy + error handling + logging |
+| RULE-145 | `ExecuteAsync(Func<Task>, Action<Exception>)` — same with custom error callback for UI display |
+| RULE-146 | `ExecuteResultAsync<T>(Func<Task<Result<T>>>)` — wraps Result<T> operations, returns null on failure |
+
+**ExecuteAsync Pattern:**
+```csharp
+// CORRECT — use ExecuteAsync wrapper
+public class ProductsListViewModel : ViewModelBase
+{
+    public ProductsListViewModel()
+    {
+        RefreshCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(LoadProductsOperationAsync)));
+    }
+
+    private async Task LoadProductsOperationAsync()
+    {
+        ErrorMessage = null;
+        var result = await _productService.GetAllAsync(IncludeInactive);
+        if (result.IsSuccess && result.Value != null)
+        {
+            await InvokeOnUIThreadAsync(() => { /* update UI */ });
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في التحميل", "LoadProducts");
+        }
+    }
+}
+
+// WRONG — NEVER do this (manual try/catch/finally)
+private async Task LoadProductsAsync()
+{
+    try { IsLoading = true; /* ... */ }
+    catch (Exception ex) { HandleException(ex); }
+    finally { IsLoading = false; }
+}
+```
+
+**Key rules:**
+- Validation/early-return logic stays OUTSIDE `ExecuteAsync()` (before the wrapper call)
+- Business logic goes INSIDE the operation method (no try/catch needed)
+- `IsBusy` is automatically set to true/false by `ExecuteAsync()`
+- Exceptions are automatically caught, logged via Serilog, and handled
+
+### 2.37 Architecture Decisions (v4.5)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-147 | Service Layer pattern is the standard — NOT CQRS/MediatR |
+| RULE-148 | MediatR package is REMOVED — use direct service interfaces |
+| RULE-149 | Legacy WinForms project is DELETED — all code rebuilt in DesktopPWF (WPF) |
+| RULE-150 | MASTER-PLAN.md reflects actual Clean Architecture (Layered) — NOT aspirational |
+
+### 2.38 Dialog Service Enhancement (v4.4)
 
 | RULE | DIRECTIVE |
 |------|-----------|
@@ -834,6 +895,10 @@ public enum InvoiceTypePrint : byte
 ❌ Hardcoding JWT secret (use environment variable — throw in production)
 ❌ Writing `appsettings.json` without atomic pattern (use `.tmp` → `File.Replace()`)
 ❌ Allowing `CashBox.CurrentBalance` to go negative
+❌ Manual try/catch/finally in ViewModel commands (use ExecuteAsync wrapper)
+❌ IsLoading property (use IsBusy from ViewModelBase instead)
+❌ MediatR/CQRS pattern (use Service Layer — MediatR package removed)
+❌ Legacy WinForms code (deleted — use DesktopPWF WPF only)
 ```
 
 ---
@@ -972,3 +1037,8 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] NO `MessageBox.Show` anywhere — use `IDialogService` with styled dialogs?
 - [ ] `IDialogService` has `ShowInfoAsync` (blue theme, info icon)?
 - [ ] Inno Setup script includes .NET 10 runtime check?
+- [ ] ALL ViewModel commands use `ExecuteAsync()` wrapper (no manual try/catch)?
+- [ ] `IsBusy` used instead of `IsLoading` in all ViewModels?
+- [ ] MediatR NOT used (Service Layer pattern only)?
+- [ ] Legacy WinForms code deleted (not referenced)?
+- [ ] MASTER-PLAN.md reflects actual architecture (not aspirational)?
