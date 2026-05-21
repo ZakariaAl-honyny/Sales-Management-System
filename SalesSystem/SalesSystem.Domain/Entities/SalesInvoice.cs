@@ -39,9 +39,13 @@ public class SalesInvoice : BaseEntity
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(invoiceNo))
-            throw new ArgumentException("InvoiceNo is required.", nameof(invoiceNo));
+            throw new DomainException("رقم الفاتورة مطلوب.");
         if (warehouseId <= 0)
-            throw new ArgumentException("WarehouseId is required.", nameof(warehouseId));
+            throw new DomainException("المستودع مطلوب.");
+        if (discountAmount < 0)
+            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
+        if (dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow.Date))
+            throw new DomainException("تاريخ الاستحقاق لا يمكن أن يكون في الماضي.");
 
         var invoice = new SalesInvoice
         {
@@ -61,18 +65,22 @@ public class SalesInvoice : BaseEntity
 
     public void AddItem(SalesInvoiceItem item)
     {
+        if (item == null)
+            throw new DomainException("الصنف مطلوب.");
         if (Status != InvoiceStatus.Draft)
-            throw new DomainException("Cannot add items to a non-draft invoice.");
-        
+            throw new DomainException("لا يمكن إضافة أصناف لفاتورة غير مسودة.");
+
         Items.Add(item);
         RecalculateTotals();
     }
 
     public void RemoveItem(SalesInvoiceItem item)
     {
+        if (item == null)
+            throw new DomainException("الصنف مطلوب.");
         if (Status != InvoiceStatus.Draft)
-            throw new DomainException("Cannot remove items from a non-draft invoice.");
-        
+            throw new DomainException("لا يمكن حذف أصناف من فاتورة غير مسودة.");
+
         Items.Remove(item);
         RecalculateTotals();
     }
@@ -87,10 +95,10 @@ public class SalesInvoice : BaseEntity
     public void SetPaidAmount(decimal amount)
     {
         if (amount < 0)
-            throw new ArgumentException("PaidAmount cannot be negative.", nameof(amount));
+            throw new DomainException("المبلغ المدفوع لا يمكن أن يكون سالباً.");
         if (amount > TotalAmount)
-            throw new DomainException("المبلغ المدفوع أكبر من الإجمالي");
-        
+            throw new DomainException("المبلغ المدفوع أكبر من الإجمالي.");
+
         PaidAmount = amount;
         RecalculateTotals();
     }
@@ -98,7 +106,7 @@ public class SalesInvoice : BaseEntity
     public void SetTaxAmount(decimal taxAmount)
     {
         if (taxAmount < 0)
-            throw new ArgumentException("TaxAmount cannot be negative.", nameof(taxAmount));
+            throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
         TaxAmount = taxAmount;
         RecalculateTotals();
     }
@@ -106,34 +114,33 @@ public class SalesInvoice : BaseEntity
     public void Post()
     {
         if (Status != InvoiceStatus.Draft)
-            throw new DomainException("Only draft invoices can be posted.");
-        
+            throw new DomainException("فقط الفواتير المسودة يمكن ترحيلها.");
+
         if (!Items.Any())
-            throw new DomainException("Cannot post an invoice with no items.");
-        
+            throw new DomainException("لا يمكن ترحيل فاتورة بدون أصناف.");
+
         RecalculateTotals();
         Status = InvoiceStatus.Posted;
     }
 
     public void Cancel()
     {
-        // 1. التحقق من الحالة الحالية (Invariants)
         if (Status == InvoiceStatus.Cancelled)
-            throw new DomainException("Invoice is already cancelled.");
-            
-        // Check if PaidAmount > 0 because InvoiceStatus.Paid does not exist in the enum
+            throw new DomainException("الفاتورة ملغاة بالفعل.");
+
         if (PaidAmount > 0)
-            throw new DomainException("Cannot directly cancel a paid invoice.");
+            throw new DomainException("لا يمكن إلغاء فاتورة مدفوعة مباشرة.");
 
-        // 2. تغيير الحالة
         Status = InvoiceStatus.Cancelled;
-
-        // 3. إطلاق حدث لتقوم الأنظمة الأخرى (مثل المخازن أو الحسابات) بالتفاعل
-        // AddDomainEvent(new InvoiceCancelledDomainEvent(this));
     }
 
     public void UpdateTotals(decimal discountAmount, decimal taxAmount)
     {
+        if (discountAmount < 0)
+            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
+        if (taxAmount < 0)
+            throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
+
         DiscountAmount = discountAmount;
         TaxAmount = taxAmount;
         RecalculateTotals();

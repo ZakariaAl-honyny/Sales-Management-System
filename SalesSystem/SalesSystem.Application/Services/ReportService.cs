@@ -20,15 +20,18 @@ public class ReportService : IReportService
         _logger = logger;
     }
 
-    public async Task<Result<IEnumerable<SalesReportDto>>> GetSalesReportAsync(DateTime from, DateTime to, CancellationToken ct)
+    public async Task<Result<IEnumerable<SalesReportDto>>> GetSalesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct)
     {
         try
         {
             if (from > to)
+            {
+                _logger.LogWarning("Sales report failed: Start date {From} is after end date {To}", from, to);
                 return Result<IEnumerable<SalesReportDto>>.Failure("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
+            }
 
-            _logger.LogInformation("Generating sales report from {From} to {To}", from, to);
-            var report = await _reportRepository.GetSalesReportAsync(from, to, ct);
+            _logger.LogInformation("Generating sales report from {From} to {To} for warehouse {WarehouseId}", from, to, warehouseId);
+            var report = await _reportRepository.GetSalesReportAsync(warehouseId, from, to, ct);
             return Result<IEnumerable<SalesReportDto>>.Success(report);
         }
         catch (Exception ex)
@@ -38,15 +41,15 @@ public class ReportService : IReportService
         }
     }
 
-    public async Task<Result<IEnumerable<PurchaseReportDto>>> GetPurchasesReportAsync(DateTime from, DateTime to, CancellationToken ct)
+    public async Task<Result<IEnumerable<PurchaseReportDto>>> GetPurchasesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct)
     {
         try
         {
             if (from > to)
                 return Result<IEnumerable<PurchaseReportDto>>.Failure("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
 
-            _logger.LogInformation("Generating purchases report from {From} to {To}", from, to);
-            var report = await _reportRepository.GetPurchasesReportAsync(from, to, ct);
+            _logger.LogInformation("Generating purchases report from {From} to {To} for warehouse {WarehouseId}", from, to, warehouseId);
+            var report = await _reportRepository.GetPurchasesReportAsync(warehouseId, from, to, ct);
             return Result<IEnumerable<PurchaseReportDto>>.Success(report);
         }
         catch (Exception ex)
@@ -119,18 +122,33 @@ public class ReportService : IReportService
         }
     }
 
-    public async Task<Result<IEnumerable<LowStockReportDto>>> GetLowStockReportAsync(CancellationToken ct)
+    public async Task<Result<IEnumerable<LowStockReportDto>>> GetLowStockReportAsync(int? warehouseId, CancellationToken ct)
     {
         try
         {
-            _logger.LogInformation("Generating low stock report");
-            var report = await _reportRepository.GetLowStockReportAsync(ct);
+            _logger.LogInformation("Generating low stock report for warehouse: {WarehouseId}", warehouseId);
+            var report = await _reportRepository.GetLowStockReportAsync(warehouseId, ct);
             return Result<IEnumerable<LowStockReportDto>>.Success(report);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating low stock report");
             return Result<IEnumerable<LowStockReportDto>>.Failure("حدث خطأ أثناء إنشاء تقرير المخزون المنخفض");
+        }
+    }
+
+    public async Task<Result<DashboardSummaryDto>> GetDashboardSummaryAsync(CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating dashboard summary");
+            var summary = await _reportRepository.GetDashboardSummaryAsync(ct);
+            return Result<DashboardSummaryDto>.Success(summary);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating dashboard summary");
+            return Result<DashboardSummaryDto>.Failure("حدث خطأ أثناء إنشاء ملخص لوحة التحكم");
         }
     }
 }

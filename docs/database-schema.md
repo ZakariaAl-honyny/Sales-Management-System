@@ -83,9 +83,13 @@ Default schema: **`dbo`**
 - `Barcode` nvarchar(50) null unique
 - `Name` nvarchar(150) not null
 - `CategoryId` int null FK
-- `UnitId` int null FK
+- `WholesaleUnitId` int null FK
+- `RetailUnitId` int null FK
+- `ConversionFactor` decimal(18,3) not null default 1
 - `PurchasePrice` decimal(18,2) not null default 0
-- `SalePrice` decimal(18,2) not null default 0
+- `WholesalePrice` decimal(18,2) not null default 0
+- `RetailPrice` decimal(18,2) not null default 0
+- `ReorderLevel` decimal(18,3) not null default 0  -- Minimum stock level for low-stock alerts
 - `MinStock` decimal(18,3) not null default 0
 - `Description` nvarchar(500) null
 - `CreatedByUserId` int null FK
@@ -93,6 +97,16 @@ Default schema: **`dbo`**
 - `IsActive` bit not null default 1
 - `CreatedAt` datetime2 not null
 - `UpdatedAt` datetime2 null
+
+## D2) ProductBarcodes (NEW - Multi-barcode support)
+### Columns
+- `Id` int PK
+- `ProductId` int not null FK → Products(Id)
+- `BarcodeValue` nvarchar(100) not null unique
+- `UnitType` tinyint not null default 0  -- 0=Retail, 1=Wholesale
+- `IsDefault` bit not null default 0
+- `CreatedAt` datetime2 not null
+- `IsActive` bit not null default 1
 
 ---
 
@@ -117,6 +131,7 @@ Default schema: **`dbo`**
 - `WarehouseId` int not null FK
 - `ProductId` int not null FK
 - `Quantity` decimal(18,3) not null default 0
+- `ReorderLevel` decimal(18,3) not null default 0
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -202,6 +217,11 @@ Default schema: **`dbo`**
 - `DiscountAmount` decimal(18,2) not null default 0
 - `LineTotal` decimal(18,2) not null
 - `Notes` nvarchar(250) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
 
 ---
 
@@ -242,6 +262,11 @@ Default schema: **`dbo`**
 - `DiscountAmount` decimal(18,2) not null default 0
 - `LineTotal` decimal(18,2) not null
 - `Notes` nvarchar(250) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
 
 ---
 
@@ -275,6 +300,11 @@ Default schema: **`dbo`**
 - `Quantity` decimal(18,3) not null
 - `UnitCost` decimal(18,2) not null
 - `LineTotal` decimal(18,2) not null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
 
 ---
 
@@ -306,6 +336,11 @@ Default schema: **`dbo`**
 - `Quantity` decimal(18,3) not null
 - `UnitPrice` decimal(18,2) not null
 - `LineTotal` decimal(18,2) not null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
 
 ---
 
@@ -335,6 +370,11 @@ Default schema: **`dbo`**
 - `ProductId` int not null FK
 - `Quantity` decimal(18,3) not null
 - `Notes` nvarchar(250) null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
 
 ---
 
@@ -390,6 +430,7 @@ Default schema: **`dbo`**
 - `CurrencyCode` nvarchar(10) not null default 'SAR'
 - `DefaultTaxRate` decimal(5,2) not null default 0
 - `IsTaxEnabled` bit not null default 0
+- `TaxNumber` nvarchar(50) null
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -502,9 +543,13 @@ CREATE TABLE dbo.Products
     Barcode         NVARCHAR(50)  NULL,
     Name            NVARCHAR(150) NOT NULL,
     CategoryId      INT           NULL REFERENCES dbo.Categories(Id),
-    UnitId          INT           NULL REFERENCES dbo.Units(Id),
+    WholesaleUnitId INT           NULL REFERENCES dbo.Units(Id),
+    RetailUnitId    INT           NULL REFERENCES dbo.Units(Id),
+    ConversionFactor DECIMAL(18,3) NOT NULL DEFAULT 1,
     PurchasePrice   DECIMAL(18,2) NOT NULL DEFAULT 0,
-    SalePrice       DECIMAL(18,2) NOT NULL DEFAULT 0,
+    WholesalePrice  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    RetailPrice     DECIMAL(18,2) NOT NULL DEFAULT 0,
+    ReorderLevel    DECIMAL(18,3) NOT NULL DEFAULT 0,
     MinStock        DECIMAL(18,3) NOT NULL DEFAULT 0,
     Description     NVARCHAR(500) NULL,
     CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
@@ -517,6 +562,21 @@ CREATE TABLE dbo.Products
     CONSTRAINT UQ_Products_Barcode UNIQUE (Barcode)
 );
 
+-- 5b. ProductBarcodes (Multi-barcode support)
+CREATE TABLE dbo.ProductBarcodes
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductBarcodes PRIMARY KEY,
+    ProductId       INT NOT NULL REFERENCES dbo.Products(Id),
+    BarcodeValue    NVARCHAR(100) NOT NULL,
+    UnitType        TINYINT NOT NULL DEFAULT 0,  -- 0=Retail, 1=Wholesale
+    IsDefault       BIT NOT NULL DEFAULT 0,
+    CreatedAt       DATETIME2 NOT NULL CONSTRAINT DF_ProductBarcodes_CreatedAt DEFAULT(SYSDATETIME()),
+    IsActive        BIT NOT NULL CONSTRAINT DF_ProductBarcodes_IsActive DEFAULT(1),
+
+    CONSTRAINT UQ_ProductBarcodes_BarcodeValue UNIQUE (BarcodeValue)
+);
+CREATE INDEX IX_ProductBarcodes_ProductId ON dbo.ProductBarcodes(ProductId);
+
 -- 6. WarehouseStocks
 CREATE TABLE dbo.WarehouseStocks
 (
@@ -524,6 +584,7 @@ CREATE TABLE dbo.WarehouseStocks
     WarehouseId     INT NOT NULL REFERENCES dbo.Warehouses(Id),
     ProductId       INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity        DECIMAL(18,3) NOT NULL DEFAULT 0,
+    ReorderLevel    DECIMAL(18,3) NOT NULL DEFAULT 0,
     CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_WarehouseStocks_IsActive DEFAULT(1),
@@ -608,7 +669,13 @@ CREATE TABLE dbo.PurchaseInvoiceItems
     Quantity                DECIMAL(18,3) NOT NULL,
     UnitCost                DECIMAL(18,2) NOT NULL,
     DiscountAmount          DECIMAL(18,2) NOT NULL DEFAULT 0,
-    LineTotal               DECIMAL(18,2) NOT NULL
+    LineTotal               DECIMAL(18,2) NOT NULL,
+    Notes                   NVARCHAR(250) NULL,
+    CreatedByUserId         INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId         INT           NULL REFERENCES dbo.Users(Id),
+    IsActive                BIT           NOT NULL DEFAULT(1),
+    CreatedAt               DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt               DATETIME2     NULL
 );
 
 -- 11. SalesInvoices
@@ -645,7 +712,13 @@ CREATE TABLE dbo.SalesInvoiceItems
     Quantity             DECIMAL(18,3) NOT NULL,
     UnitPrice            DECIMAL(18,2) NOT NULL,
     DiscountAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    LineTotal            DECIMAL(18,2) NOT NULL
+    LineTotal            DECIMAL(18,2) NOT NULL,
+    Notes                NVARCHAR(250) NULL,
+    CreatedByUserId      INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId      INT           NULL REFERENCES dbo.Users(Id),
+    IsActive             BIT           NOT NULL DEFAULT(1),
+    CreatedAt            DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt            DATETIME2     NULL
 );
 
 -- 13. InventoryMovements
@@ -682,8 +755,9 @@ CREATE TABLE dbo.StoreSettings
     Address         NVARCHAR(250) NULL,
     LogoPath        NVARCHAR(255) NULL,
     CurrencyCode    NVARCHAR(10)  NOT NULL CONSTRAINT DF_StoreSettings_Currency DEFAULT(N'SAR'),
-    DefaultTaxRate  DECIMAL(5,2)  NOT NULL CONSTRAINT DF_StoreSettings_TaxRate DEFAULT(0),
+    DefaultTaxRate  DECIMAL(18,2) NOT NULL CONSTRAINT DF_StoreSettings_TaxRate DEFAULT(0),
     IsTaxEnabled    BIT           NOT NULL CONSTRAINT DF_StoreSettings_TaxEnabled DEFAULT(0),
+    TaxNumber       NVARCHAR(50)  NULL,
     CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_StoreSettings_IsActive DEFAULT(1),
@@ -719,7 +793,12 @@ CREATE TABLE dbo.PurchaseReturnItems
     ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity             DECIMAL(18,3) NOT NULL,
     UnitCost             DECIMAL(18,2) NOT NULL,
-    LineTotal            DECIMAL(18,2) NOT NULL
+    LineTotal            DECIMAL(18,2) NOT NULL,
+    CreatedByUserId      INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId      INT           NULL REFERENCES dbo.Users(Id),
+    IsActive             BIT           NOT NULL DEFAULT(1),
+    CreatedAt            DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt            DATETIME2     NULL
 );
 
 -- 17. SalesReturns
@@ -750,7 +829,12 @@ CREATE TABLE dbo.SalesReturnItems
     ProductId         INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity          DECIMAL(18,3) NOT NULL,
     UnitPrice         DECIMAL(18,2) NOT NULL,
-    LineTotal         DECIMAL(18,2) NOT NULL
+    LineTotal         DECIMAL(18,2) NOT NULL,
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt         DATETIME2     NULL
 );
 
 -- 19. StockTransfers
@@ -777,7 +861,12 @@ CREATE TABLE dbo.StockTransferItems
     StockTransferId     INT NOT NULL REFERENCES dbo.StockTransfers(Id),
     ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity            DECIMAL(18,3) NOT NULL,
-    Notes               NVARCHAR(250) NULL
+    Notes               NVARCHAR(250) NULL,
+    CreatedByUserId     INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId     INT           NULL REFERENCES dbo.Users(Id),
+    IsActive            BIT           NOT NULL DEFAULT(1),
+    CreatedAt           DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt           DATETIME2     NULL
 );
 
 -- 21. CustomerPayments

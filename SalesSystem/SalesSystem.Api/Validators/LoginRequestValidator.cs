@@ -11,11 +11,11 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
     public LoginRequestValidator()
     {
         RuleFor(x => x.UserName)
-            .NotEmpty().WithMessage("Username is required")
-            .MaximumLength(50).WithMessage("Username must not exceed 50 characters");
+            .NotEmpty().WithMessage("اسم المستخدم مطلوب")
+            .MaximumLength(50).WithMessage("اسم المستخدم يجب ألا يتجاوز 50 حرفاً");
 
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Password is required")
-            .MinimumLength(3).WithMessage("Password must be at least 3 characters");
+            .NotEmpty().WithMessage("كلمة المرور مطلوبة")
+            .MinimumLength(3).WithMessage("كلمة المرور يجب أن تكون 3 أحرف على الأقل");
     }
 }

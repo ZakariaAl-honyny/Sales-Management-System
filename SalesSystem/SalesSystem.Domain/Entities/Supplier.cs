@@ -12,6 +12,8 @@ public class Supplier : BaseEntity
     public string? Address { get; private set; }
     public decimal OpeningBalance { get; private set; }
     public decimal CurrentBalance { get; private set; }
+    public decimal CreditLimit { get; private set; }
+    public string? TaxNumber { get; private set; }
 
     private Supplier() { }
 
@@ -22,10 +24,16 @@ public class Supplier : BaseEntity
         string? phone = null,
         string? email = null,
         string? address = null,
+        string? taxNumber = null,
+        decimal creditLimit = 0,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Name is required.", nameof(name));
+            throw new DomainException("اسم المورد مطلوب.");
+        if (openingBalance < 0)
+            throw new DomainException("الرصيد الافتتاحي لا يمكن أن يكون سالباً.");
+        if (creditLimit < 0)
+            throw new DomainException("حد الائتمان لا يمكن أن يكون سالباً.");
 
         var supplier = new Supplier
         {
@@ -35,7 +43,9 @@ public class Supplier : BaseEntity
             Code = code,
             Phone = phone,
             Email = email,
-            Address = address
+            Address = address,
+            TaxNumber = taxNumber,
+            CreditLimit = creditLimit
         };
         supplier.SetCreatedBy(createdByUserId);
         return supplier;
@@ -44,14 +54,14 @@ public class Supplier : BaseEntity
     public void IncreaseBalance(decimal amount)
     {
         if (amount <= 0)
-            throw new ArgumentException("Amount must be positive.", nameof(amount));
+            throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
         CurrentBalance += amount;
     }
 
     public void DecreaseBalance(decimal amount)
     {
         if (amount <= 0)
-            throw new ArgumentException("Amount must be positive.", nameof(amount));
+            throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
         CurrentBalance -= amount;
     }
 
@@ -61,13 +71,21 @@ public class Supplier : BaseEntity
         string? phone,
         string? email,
         string? address,
+        string? taxNumber,
+        decimal creditLimit,
         int? updatedByUserId)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم المورد مطلوب.");
+        if (creditLimit < 0)
+            throw new DomainException("حد الائتمان لا يمكن أن يكون سالباً.");
         Name = name;
         Code = code;
         Phone = phone;
         Email = email;
         Address = address;
+        TaxNumber = taxNumber;
+        CreditLimit = creditLimit;
         SetUpdatedBy(updatedByUserId);
         UpdatedAt = DateTime.UtcNow;
     }

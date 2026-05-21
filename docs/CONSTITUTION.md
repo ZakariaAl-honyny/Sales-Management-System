@@ -1,5 +1,5 @@
 # Project Constitution — Sales Management System
-# Version: 2.0 | Platform: .NET 10 LTS | Date: 2026
+# Version: 2.1 (v4.2) | Platform: .NET 10 LTS | Date: 2026
 
 ---
 
@@ -10,9 +10,9 @@
 | Project Name     | Sales Management System                       |
 | Version          | MVP v3.0                                      |
 | Target Platform  | .NET 10 LTS (Support until Nov 2028)          |
-| Architecture     | Clean Architecture (6-project solution)       |
+| Architecture     | Clean Architecture + CQRS (6-project solution)|
 | Database         | SQL Server 2019+                              |
-| Desktop UI       | WinForms (.NET 10)                            |
+| Desktop UI       | WPF (Windows Presentation Foundation)         |
 | Backend API      | ASP.NET Core 10 Web API                       |
 | ORM              | Entity Framework Core 10                      |
 | Future Expansion | Web (Blazor) + Mobile (.NET MAUI 10)          |
@@ -33,6 +33,8 @@ ALL quantities: `decimal(18,3)` — NEVER `int` unless human explicitly approves
 
 ```csharp
 // Sales LineTotal — inside SalesInvoiceItem entity
+// Quantity is always stored in Retail Units. 
+// If Mode == Wholesale, Price is WholesalePrice, and QtyInRetail = Qty * ConversionFactor.
 LineTotal = (Quantity * UnitPrice) - DiscountAmount;
 
 // Purchase LineTotal — inside PurchaseInvoiceItem entity
@@ -42,6 +44,10 @@ LineTotal = (Quantity * UnitCost) - DiscountAmount;
 SubTotal    = Items.Sum(i => i.LineTotal);
 TotalAmount = SubTotal - InvoiceDiscount + TaxAmount;
 DueAmount   = TotalAmount - PaidAmount;
+
+// Wholesale/Retail Conversion (Domain Only)
+// RetailQty = (Mode == Wholesale) ? InputQty * ConversionFactor : InputQty;
+// Stock Deduction ALWAYS uses RetailQty.
 ```
 
 **Critical Constraint:** `PaidAmount <= TotalAmount` — enforced in Domain entity AND as DB CHECK constraint.
@@ -95,7 +101,7 @@ FORBIDDEN:
 
 ### 2.5 Stock Integrity
 
-- Validate stock availability BEFORE opening transaction
+- Validate stock availability BEFORE opening transaction (Stock is always in Retail Units)
 - Deduct stock AFTER saving invoice (to have reference ID)
 - Record EVERY stock change in InventoryMovements table
 - NO negative quantities — enforced at DB level: `CHECK (Quantity >= 0)`
@@ -122,6 +128,7 @@ FORBIDDEN:
 - API Controllers NEVER contain business logic — delegate to Application layer
 - Domain layer has ZERO dependencies on Infrastructure (no EF Core, no NuGet)
 - All multi-table operations use `IUnitOfWork` pattern
+- **CQRS Principle**: Separate Read operations (Queries) from Write operations (Commands).
 
 ---
 
@@ -178,6 +185,141 @@ FORBIDDEN:
 
 ---
 
+### 2.13 Delete Strategy (v4.2)
+
+Three-option delete confirmation for ALL entities:
+
+| Strategy | Enum Value | Behavior |
+|----------|-----------|---------|
+| Cancel | 0 | Abort operation, no changes |
+| Deactivate | 1 | Soft delete — `IsActive = false` |
+| Permanent | 2 | Hard delete — physical DB removal (if not referenced) |
+
+**Enum:**
+```csharp
+public enum DeleteStrategy { Cancel = 0, Deactivate = 1, Permanent = 2 }
+```
+
+**Implementation Pattern:**
+```csharp
+var strategy = await _dialogService.ShowDeleteConfirmationAsync($"المنتج: {name}");
+if (strategy == DeleteStrategy.Cancel) return;
+
+if (strategy == DeleteStrategy.Deactivate)
+    await _service.DeleteAsync(id); // Soft delete
+else if (strategy == DeleteStrategy.Permanent)
+    await _service.DeletePermanentlyAsync(id); // Hard delete with reference check
+```
+
+**Reference Validation Required:**
+- Product → Check SalesInvoiceItems, PurchaseInvoiceItems
+- Category → Check Products
+- Unit → Check Products (UnitId, RetailUnitId, WholesaleUnitId)
+- Warehouse → Check WarehouseStocks, StockTransfers
+- Customer → Check SalesInvoices, CustomerPayments
+- Supplier → Check PurchaseInvoices, SupplierPayments
+- User → Check not last Admin
+
+---
+
+### 2.14 Defensive Programming (v4.2)
+
+ALL Domain entities MUST have Guard Clauses in constructors/factories:
+
+```csharp
+public static Product Create(...)
+{
+    if (string.IsNullOrWhiteSpace(name))
+        throw new DomainException("الاسم مطلوب");
+    if (purchasePrice < 0)
+        throw new DomainException("سعر الشراء لا يمكن أن يكون سالباً");
+    if (retailPrice < 0)
+        throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
+    if (conversionFactor <= 0)
+        throw new DomainException("نسبة التحويل يجب أن تكون أكبر من صفر");
+    // ...
+}
+```
+
+**Entities with Guard Clauses:** Product, Customer, Supplier, SalesInvoice, PurchaseInvoice, WarehouseStock, StockTransfer, SalesReturn, PurchaseReturn, User, Category, Unit, Warehouse, DocumentSequence, StoreSettings, InventoryMovement, CustomerPayment, SupplierPayment, SalesInvoiceItem, PurchaseInvoiceItem, SalesReturnItem, PurchaseReturnItem, StockTransferItem
+
+**Exception Type:** `DomainException` — NEVER `ArgumentException` in Domain layer.
+
+---
+
+### 2.15 WPF Interactive Dialogs (v4.2)
+
+**DialogService Interface:**
+```csharp
+public interface IDialogService
+{
+    Task ShowErrorAsync(string title, string message);
+    Task ShowSuccessAsync(string title, string message);
+    Task ShowWarningAsync(string title, string message);
+    Task<bool> ShowConfirmationAsync(string title, string message);
+    Task<DeleteStrategy> ShowDeleteConfirmationAsync(string itemDescription);
+}
+```
+
+**Styled Dialogs** (RTL Arabic):
+- ErrorDialog — Red theme, ✕ icon
+- SuccessDialog — Green theme, ✓ icon
+- WarningDialog — Yellow theme, ⚠ icon
+- ConfirmationDialog — Blue theme, ? icon (Yes/No)
+- DeleteConfirmationDialog — 3 buttons: Cancel/Deactivate/Delete
+
+**NEVER use raw `MessageBox.Show` in ViewModels.**
+
+---
+
+### 2.16 Toast Notifications (v4.2)
+
+**For minor success messages — auto-dismiss:**
+```csharp
+_toastService.ShowSuccess("تم حذف المنتج بنجاح");  // Green, 3s
+_toastService.ShowError("فشل الحذف");              // Red, 5s
+_toastService.ShowInfo("تم التحديث");               // Blue, 3s
+```
+
+**Location:** `Services/App/Toast/ToastWindow.xaml`
+
+---
+
+### 2.17 Real-Time UI Validation (v4.2)
+
+**ViewModelBase implements INotifyDataErrorInfo:**
+```csharp
+public void AddError(string propertyName, string errorMessage);
+public void ClearErrors(string propertyName);
+public bool HasErrors { get; }
+```
+
+**Save Button CanExecute:**
+```csharp
+public bool CanSave => !HasErrors && !string.IsNullOrWhiteSpace(Name);
+// Button.IsEnabled="{Binding CanSave}"
+```
+
+**Validation Error Messages (Arabic):**
+- "الاسم مطلوب"
+- "الكمية يجب أن تكون أكبر من الصفر"
+- "السعر لا يمكن أن يكون سالباً"
+- "يجب اختيار منتج"
+
+---
+
+### 2.18 API Permanent Delete Endpoints (v4.2)
+
+| Endpoint | Description |
+|----------|-------------|
+| `DELETE /api/v1/products/{id}` | Soft delete (IsActive=false) |
+| `DELETE /api/v1/products/permanent/{id}` | Hard delete with reference check |
+| Same pattern for all entities |
+
+Reference validation returns 400 Bad Request if entity is used in transactions.
+
+---
+
 ## 3. Technology Stack
 
 ### Backend
@@ -198,7 +340,7 @@ FORBIDDEN:
 
 | Component | Technology |
 |-----------|-----------|
-| UI | WinForms (.NET 10) |
+| UI | WPF (Windows Presentation Foundation) |
 | HTTP | HttpClient + IHttpClientFactory |
 | JSON | System.Text.Json |
 | Architecture | Shell + UserControls + EventBus (Pub/Sub) |
@@ -312,3 +454,16 @@ Step 7: Quality validation (all checklist items must PASS)
 ### Desktop
 - [ ] EventBus: subscribe in OnLoad, unsubscribe in Dispose
 - [ ] EventBus handlers marshal to UI thread
+
+### Delete & Defensive Programming
+- [ ] Delete uses DeleteStrategy enum (not MessageBox)
+- [ ] Guard Clauses exist for all entity constructors
+- [ ] DomainException used (not ArgumentException)
+- [ ] Permanent delete checks references before removal
+
+### WPF UI
+- [ ] DialogService used (not raw MessageBox)
+- [ ] Toast notifications for minor success messages
+- [ ] INotifyDataErrorInfo with HasErrors property
+- [ ] Save buttons disabled when form has errors
+- [ ] Red border styles on invalid fields

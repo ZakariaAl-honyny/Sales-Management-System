@@ -7,12 +7,6 @@ using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Api.Controllers;
 
-/// <summary>
-/// Controller for managing product categories.
-/// </summary>
-/// <remarks>
-/// Requires Manager or Admin role (Policy: ManagerAndAbove).
-/// </remarks>
 [ApiController]
 [Route("api/v1/categories")]
 [Authorize(Policy = "ManagerAndAbove")]
@@ -25,29 +19,15 @@ public class CategoriesController : ControllerBase
         _categoryService = categoryService;
     }
 
-    /// <summary>
-    /// Retrieves all categories with pagination.
-    /// </summary>
-    /// <param name="search">Optional search term for category name.</param>
-    /// <param name="page">Page number (default: 1).</param>
-    /// <param name="pageSize">Items per page (default: 10).</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns paginated list of categories.</returns>
-    [HttpGet] 
+    [HttpGet]
     [ProducesResponseType(typeof(PagedResult<CategoryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<PagedResult<CategoryDto>>> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken ct = default)
+    public async Task<ActionResult<PagedResult<CategoryDto>>> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
-        var result = await _categoryService.GetAllAsync(search, page, pageSize, ct);
+        var result = await _categoryService.GetAllAsync(search, page, pageSize, includeInactive, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Retrieves a category by its ID.
-    /// </summary>
-    /// <param name="id">Category ID.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns the category if found.</returns>
     [HttpGet("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -57,12 +37,6 @@ public class CategoriesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Creates a new category.
-    /// </summary>
-    /// <param name="request">Create category request with Name and optional Description.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns the created category with ID.</returns>
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -72,13 +46,6 @@ public class CategoriesController : ControllerBase
         return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Updates an existing category.
-    /// </summary>
-    /// <param name="id">Category ID to update.</param>
-    /// <param name="request">Update category request with Id, Name, Description, and IsActive.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns the updated category.</returns>
     [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -88,12 +55,6 @@ public class CategoriesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Deletes a category.
-    /// </summary>
-    /// <param name="id">Category ID to delete.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns success message with deleted ID.</returns>
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -102,6 +63,17 @@ public class CategoriesController : ControllerBase
         var result = await _categoryService.DeleteAsync(id, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم الحذف بنجاح", id });
+        return BadRequest(new { error = result.Error });
+    }
+
+    [HttpDelete("permanent/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)
+    {
+        var result = await _categoryService.PermanentDeleteAsync(id, ct);
+        if (result.IsSuccess)
+            return Ok(new { message = "تم الحذف النهائي بنجاح", id });
         return BadRequest(new { error = result.Error });
     }
 }

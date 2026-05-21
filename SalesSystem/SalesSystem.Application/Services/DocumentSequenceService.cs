@@ -25,7 +25,7 @@ public class DocumentSequenceService : IDocumentSequenceService
         try
         {
             var year = DateTime.Now.Year;
-            
+
             // Try to find an existing sequence for this prefix and year
             var sequence = await _uow.DocumentSequences.Query()
                 .FirstOrDefaultAsync(s => s.Prefix == prefix && s.Year == year, ct);
@@ -36,7 +36,7 @@ public class DocumentSequenceService : IDocumentSequenceService
                 // We assume documentType is derived from prefix or generic for now
                 // In a more complex system, documentType would be passed as a param
                 string documentType = DetermineDocumentType(prefix);
-                
+
                 sequence = DocumentSequence.Create(documentType, prefix, year);
                 await _uow.DocumentSequences.AddAsync(sequence, ct);
             }
@@ -45,13 +45,17 @@ public class DocumentSequenceService : IDocumentSequenceService
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Generated sequence number: {Number}", nextNumber);
-            
+
             return Result<string>.Success(nextNumber);
+        }
+        catch (DomainException ex)
+        {
+            return Result<string>.Failure(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error generating sequence number for prefix {Prefix}", prefix);
-            return Result<string>.Failure("حدث خطأ أثناء توليد الرقم التسلسلي");
+            _logger.LogError(ex, "Error generating next number for sequence {Prefix}", prefix);
+            return Result<string>.Failure("حدث خطأ أثناء توليد الرقم المتسلسل");
         }
         finally
         {
@@ -70,6 +74,9 @@ public class DocumentSequenceService : IDocumentSequenceService
             "TRF" => "Stock Transfer",
             "CP" => "Customer Payment",
             "SP" => "Supplier Payment",
+            "PRD" => "Product",
+            "CUST" => "Customer",
+            "SUP" => "Supplier",
             _ => "Other"
         };
     }

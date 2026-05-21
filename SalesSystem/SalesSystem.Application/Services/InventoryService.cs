@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -31,18 +31,29 @@ public class InventoryService : IInventoryService
             .FirstOrDefaultAsync(ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
 
         if (stock == null)
-            return Result<decimal>.Failure("ط¸â€‍ط¸â€¦ ط¸ظ¹ط·ع¾ط¸â€¦ ط·آ§ط¸â€‍ط·آ¹ط·آ«ط¸ث†ط·آ± ط·آ¹ط¸â€‍ط¸â€° ط·آ³ط·آ¬ط¸â€‍ ط¸â€¦ط·آ®ط·آ²ط¸ث†ط¸â€  ط¸â€‍ط¸â€،ط·آ°ط·آ§ ط·آ§ط¸â€‍ط¸â€¦ط¸â€ ط·ع¾ط·آ¬ ط¸ظ¾ط¸ظ¹ ط¸â€،ط·آ°ط·آ§ ط·آ§ط¸â€‍ط¸â€¦ط·آ³ط·ع¾ط¸ث†ط·آ¯ط·آ¹");
+        {
+            _logger.LogWarning("Stock record not found for Product {ProductId} in Warehouse {WarehouseId}", productId, warehouseId);
+            return Result<decimal>.Failure("لم يتم العثور على سجل مخزون لهذا المنتج في هذا المستودع");
+        }
 
         return Result<decimal>.Success(stock.Quantity);
     }
 
-    public async Task<Result> ValidateStockAsync(int productId, int warehouseId, decimal requiredQty, CancellationToken ct)
+    public async Task<Result> ValidateStockAsync(int productId, int warehouseId, decimal requiredQty, bool allowNegativeStock = false, CancellationToken ct = default)
     {
+        if (allowNegativeStock)
+        {
+            return Result.Success();
+        }
+
         var stockResult = await GetStockAsync(productId, warehouseId, ct);
         if (!stockResult.IsSuccess) return stockResult;
 
         if (stockResult.Value < requiredQty)
-            return Result.Failure($"ط·آ§ط¸â€‍ط¸â€¦ط·آ®ط·آ²ط¸ث†ط¸â€  ط·ط›ط¸ظ¹ط·آ± ط¸ئ’ط·آ§ط¸ظ¾ط¸ع† ط¸â€‍ط¸â€‍ط¸â€¦ط¸â€ ط·ع¾ط·آ¬ {productId}: ط·آ§ط¸â€‍ط¸â€¦ط·ع¾ط¸ث†ط¸ظ¾ط·آ± {stockResult.Value}ط·إ’ ط·آ§ط¸â€‍ط¸â€¦ط·آ·ط¸â€‍ط¸ث†ط·آ¨ {requiredQty}");
+        {
+            _logger.LogWarning("Insufficient stock for Product {ProductId} in Warehouse {WarehouseId}. Available: {Available}, Required: {Required}", productId, warehouseId, stockResult.Value, requiredQty);
+            return Result.Failure($"المخزون غير كافٍ للمنتج {productId}: المتوفر {stockResult.Value}، المطلوب {requiredQty}");
+        }
 
         return Result.Success();
     }
@@ -78,7 +89,7 @@ public class InventoryService : IInventoryService
 
         await _uow.InventoryMovements.AddAsync(movement, ct);
         _logger.LogInformation("Stock Increased: Product {ProductId}, Warehouse {WarehouseId}, Qty +{Quantity}, Ref {RefType}:{RefId}", productId, warehouseId, quantity, referenceType, referenceId);
-        
+
         return Result.Success();
     }
 
@@ -88,7 +99,10 @@ public class InventoryService : IInventoryService
             .FirstOrDefaultAsync(ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
 
         if (stock == null)
-            return Result.Failure("ط·آ³ط·آ¬ط¸â€‍ ط·آ§ط¸â€‍ط¸â€¦ط·آ®ط·آ²ط¸ث†ط¸â€  ط·ط›ط¸ظ¹ط·آ± ط¸â€¦ط¸ث†ط·آ¬ط¸ث†ط·آ¯");
+        {
+            _logger.LogWarning("Cannot decrease stock: record not found for Product {ProductId} in Warehouse {WarehouseId}", productId, warehouseId);
+            return Result.Failure("سجل المخزون غير موجود");
+        }
 
         decimal qtyBefore = stock.Quantity;
         stock.DecreaseQuantity(quantity);
@@ -128,12 +142,12 @@ public class InventoryService : IInventoryService
             .FirstOrDefaultAsync(t => t.Id == id, ct);
 
         if (transfer == null)
-            return Result<StockTransferDto>.Failure("ط·آ§ط¸â€‍ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍ ط·ط›ط¸ظ¹ط·آ± ط¸â€¦ط¸ث†ط·آ¬ط¸ث†ط·آ¯", ErrorCodes.NotFound);
+            return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
 
         return Result<StockTransferDto>.Success(MapToDto(transfer));
     }
 
-    public async Task<Result<PagedResult<StockTransferDto>>> GetAllTransfersAsync(int? fromWarehouseId, int? toWarehouseId, int page, int pageSize, CancellationToken ct)
+    public async Task<Result<PagedResult<StockTransferDto>>> GetAllTransfersAsync(int? fromWarehouseId, int? toWarehouseId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
         var query = _uow.StockTransfers.Query()
             .Include(t => t.FromWarehouse)
@@ -142,6 +156,7 @@ public class InventoryService : IInventoryService
 
         if (fromWarehouseId.HasValue) query = query.Where(t => t.FromWarehouseId == fromWarehouseId.Value);
         if (toWarehouseId.HasValue) query = query.Where(t => t.ToWarehouseId == toWarehouseId.Value);
+        if (!includeInactive) query = query.Where(t => t.Status != InvoiceStatus.Cancelled);
 
         var totalItems = await query.CountAsync(ct);
         var items = await query
@@ -158,62 +173,58 @@ public class InventoryService : IInventoryService
     public async Task<Result<StockTransferDto>> CreateTransferAsync(CreateStockTransferRequest request, int userId, CancellationToken ct)
     {
         if (request.FromWarehouseId == request.ToWarehouseId)
-            return Result<StockTransferDto>.Failure("ط¸â€‍ط·آ§ ط¸ظ¹ط¸â€¦ط¸ئ’ط¸â€  ط·آ§ط¸â€‍ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍ ط¸â€‍ط¸â€ ط¸ظ¾ط·آ³ ط·آ§ط¸â€‍ط¸â€¦ط·آ®ط·آ²ط¸â€ ");
+        {
+            _logger.LogWarning("Stock transfer failed: Same source and destination warehouse {WarehouseId}", request.FromWarehouseId);
+            return Result<StockTransferDto>.Failure("لا يمكن التحويل لنفس المخزن");
+        }
 
         if (request.Items.Count == 0)
-            return Result<StockTransferDto>.Failure("ط¸ظ¹ط·آ¬ط·آ¨ ط·آ¥ط·آ¶ط·آ§ط¸ظ¾ط·آ© ط·آ£ط·آµط¸â€ ط·آ§ط¸ظ¾ ط¸â€‍ط¸â€‍ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍");
+            return Result<StockTransferDto>.Failure("يجب إضافة أصناف للتحويل");
 
-        // 1. Validation BEFORE transaction
-        foreach (var item in request.Items)
+        // 2. Save Draft
+        return await _uow.ExecuteAsync(async () =>
         {
-            var validation = await ValidateStockAsync(item.ProductId, request.FromWarehouseId, item.Quantity, ct);
-            if (!validation.IsSuccess) return Result<StockTransferDto>.Failure(validation.Error!);
-        }
-
-        // 2. Start Transaction
-        await using var transaction = await _uow.BeginTransactionAsync(ct);
-        try
-        {
-            var transferNoResult = await _sequenceService.GetNextNumberAsync("TRF", ct);
-            if (!transferNoResult.IsSuccess) return Result<StockTransferDto>.Failure(transferNoResult.Error!);
-
-            var transfer = StockTransfer.Create(
-                transferNoResult.Value!,
-                request.FromWarehouseId,
-                request.ToWarehouseId,
-                request.Notes,
-                request.TransferDate
-            );
-            transfer.SetCreatedBy(userId);
-
-            foreach (var item in request.Items)
+            await using var transaction = await _uow.BeginTransactionAsync(ct);
+            try
             {
-                transfer.AddItem(item.ProductId, item.Quantity, item.Notes);
+                var transferNoResult = await _sequenceService.GetNextNumberAsync("TRF", ct);
+                if (!transferNoResult.IsSuccess) return Result<StockTransferDto>.Failure(transferNoResult.Error!);
+
+                var transfer = StockTransfer.Create(
+                    transferNoResult.Value!,
+                    request.FromWarehouseId,
+                    request.ToWarehouseId,
+                    request.Notes,
+                    request.TransferDate
+                );
+                transfer.SetCreatedBy(userId);
+
+                foreach (var item in request.Items)
+                {
+                    transfer.AddItem(item.ProductId, item.Quantity, (SaleMode)item.Mode, item.Notes);
+                }
+
+                await _uow.StockTransfers.AddAsync(transfer, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                await transaction.CommitAsync(ct);
+
+                _logger.LogInformation("Stock Transfer Draft created: {TransferNo}", transfer.TransferNo);
+
+                return await GetTransferByIdAsync(transfer.Id, ct);
             }
-
-            await _uow.StockTransfers.AddAsync(transfer, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            // 3. Update Stocks & Record Movements
-            foreach (var item in transfer.Items)
+            catch (DomainException ex)
             {
-                await DecreaseStockAsync(item.ProductId, transfer.FromWarehouseId, item.Quantity, MovementType.TransferOut, "StockTransfer", transfer.Id, null, userId, ct);
-                await IncreaseStockAsync(item.ProductId, transfer.ToWarehouseId, item.Quantity, MovementType.TransferIn, "StockTransfer", transfer.Id, null, userId, ct);
+                await transaction.RollbackAsync(ct);
+                return Result<StockTransferDto>.Failure(ex.Message);
             }
-
-            await _uow.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-
-            _logger.LogInformation("Stock Transfer created: {TransferNo}", transfer.TransferNo);
-
-            return await GetTransferByIdAsync(transfer.Id, ct);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Error creating stock transfer");
-            return Result<StockTransferDto>.Failure("ط·آ­ط·آ¯ط·آ« ط·آ®ط·آ·ط·آ£ ط·آ£ط·آ«ط¸â€ ط·آ§ط·طŒ ط·آ­ط¸ظ¾ط·آ¸ ط·آ§ط¸â€‍ط·ع¾ط·آ­ط¸ث†ط¸ظ¹ط¸â€‍");
-        }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Error creating stock transfer");
+                return Result<StockTransferDto>.Failure("حدث خطأ أثناء حفظ التحويل");
+            }
+        }, ct);
     }
 
     public async Task<Result<IEnumerable<WarehouseStockDto>>> GetWarehouseStockAsync(int warehouseId, string? search, CancellationToken ct)
@@ -234,7 +245,7 @@ public class InventoryService : IInventoryService
             s.WarehouseId,
             null,
             s.ProductId,
-            s.Product?.Name ?? "Unknown",
+            s.Product?.Name ?? "غير معروف",
             s.Product?.Unit?.Name,
             s.Quantity,
             s.ReorderLevel
@@ -242,7 +253,7 @@ public class InventoryService : IInventoryService
 
         return Result<IEnumerable<WarehouseStockDto>>.Success(dtos);
     }
-    
+
     public async Task<Result<PagedResult<WarehouseStockDto>>> GetWarehouseStocksAsync(int? warehouseId, int? productId, int page, int pageSize, CancellationToken ct)
     {
         var query = _uow.WarehouseStocks.Query()
@@ -266,7 +277,7 @@ public class InventoryService : IInventoryService
             s.WarehouseId,
             s.Warehouse?.Name,
             s.ProductId,
-            s.Product?.Name ?? "Unknown",
+            s.Product?.Name ?? "غير معروف",
             s.Product?.Unit?.Name,
             s.Quantity,
             s.ReorderLevel
@@ -296,9 +307,9 @@ public class InventoryService : IInventoryService
         var dtos = items.Select(m => new InventoryMovementDto(
             m.Id,
             m.ProductId,
-            m.Product?.Name ?? "Unknown",
+            m.Product?.Name ?? "غير معروف",
             m.WarehouseId,
-            m.Warehouse?.Name ?? "Unknown",
+            m.Warehouse?.Name ?? "غير معروف",
             (byte)m.MovementType,
             m.QuantityChange,
             m.QuantityBefore,
@@ -314,24 +325,183 @@ public class InventoryService : IInventoryService
 
     #endregion
 
-        private static StockTransferDto MapToDto(StockTransfer t)
+    public async Task<Result<StockTransferDto>> UpdateTransferAsync(int id, UpdateStockTransferRequest request, int userId, CancellationToken ct)
+    {
+        var transfer = await _uow.StockTransfers.Query()
+            .Include(t => t.Items)
+                .ThenInclude(it => it.Product)
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
+
+        if (transfer == null)
+            return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
+
+        if (transfer.Status != InvoiceStatus.Draft)
+            return Result<StockTransferDto>.Failure("لا يمكن تعديل تحويل مرحل أو ملغى");
+
+        return await _uow.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _uow.BeginTransactionAsync(ct);
+            try
+            {
+                // Simple update logic - clear and re-add items for Drafts
+                _uow.StockTransferItems.DeleteRange(transfer.Items);
+                transfer.Items.Clear();
+
+                foreach (var item in request.Items)
+                {
+                    transfer.AddItem(item.ProductId, item.Quantity, (SaleMode)item.Mode, item.Notes);
+                }
+
+                transfer.UpdateNotes(request.Notes);
+
+                await _uow.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+
+                return await GetTransferByIdAsync(transfer.Id, ct);
+            }
+            catch (DomainException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                return Result<StockTransferDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Error updating stock transfer {Id}", id);
+                return Result<StockTransferDto>.Failure("حدث خطأ أثناء تحديث التحويل");
+            }
+        }, ct);
+    }
+
+    public async Task<Result<StockTransferDto>> PostTransferAsync(int id, int userId, CancellationToken ct)
+    {
+        var transfer = await _uow.StockTransfers.Query()
+            .Include(t => t.Items)
+                .ThenInclude(it => it.Product)
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
+
+        if (transfer == null)
+            return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
+
+        if (transfer.Status != InvoiceStatus.Draft)
+            return Result<StockTransferDto>.Failure("يمكن فقط ترحيل الحوالات المسودة");
+
+        var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
+        bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
+
+        // 1. Validate Stock
+        foreach (var item in transfer.Items)
+        {
+            var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+            var validation = await ValidateStockAsync(item.ProductId, transfer.FromWarehouseId, retailQty, allowNegativeStock, ct);
+            if (!validation.IsSuccess) return Result<StockTransferDto>.Failure(validation.Error!);
+        }
+
+        return await _uow.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _uow.BeginTransactionAsync(ct);
+            try
+            {
+                transfer.Post();
+
+                foreach (var item in transfer.Items)
+                {
+                    var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+                    await DecreaseStockAsync(item.ProductId, transfer.FromWarehouseId, retailQty, MovementType.TransferOut, "StockTransfer", transfer.Id, null, userId, ct);
+                    await IncreaseStockAsync(item.ProductId, transfer.ToWarehouseId, retailQty, MovementType.TransferIn, "StockTransfer", transfer.Id, null, userId, ct);
+                }
+
+                await _uow.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+
+                _logger.LogInformation("Stock Transfer Posted: {TransferNo}", transfer.TransferNo);
+                return await GetTransferByIdAsync(transfer.Id, ct);
+            }
+            catch (DomainException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                return Result<StockTransferDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Error posting stock transfer {Id}", id);
+                return Result<StockTransferDto>.Failure("حدث خطأ أثناء ترحيل التحويل");
+            }
+        }, ct);
+    }
+
+    public async Task<Result<StockTransferDto>> CancelTransferAsync(int id, int userId, CancellationToken ct)
+    {
+        var transfer = await _uow.StockTransfers.Query()
+            .Include(t => t.Items)
+                .ThenInclude(it => it.Product)
+            .FirstOrDefaultAsync(t => t.Id == id, ct);
+
+        if (transfer == null)
+            return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
+
+        if (transfer.Status == InvoiceStatus.Cancelled)
+            return Result<StockTransferDto>.Failure("التحويل ملغى بالفعل");
+
+        return await _uow.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _uow.BeginTransactionAsync(ct);
+            try
+            {
+                bool wasPosted = transfer.Status == InvoiceStatus.Posted;
+                transfer.Cancel();
+
+                if (wasPosted)
+                {
+                    // Reverse stock movements
+                    foreach (var item in transfer.Items)
+                    {
+                        var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+                        await IncreaseStockAsync(item.ProductId, transfer.FromWarehouseId, retailQty, MovementType.TransferIn, "StockTransferCancel", transfer.Id, null, userId, ct);
+                        await DecreaseStockAsync(item.ProductId, transfer.ToWarehouseId, retailQty, MovementType.TransferOut, "StockTransferCancel", transfer.Id, null, userId, ct);
+                    }
+                }
+
+                await _uow.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+
+                _logger.LogInformation("Stock Transfer Cancelled: {TransferNo}", transfer.TransferNo);
+                return await GetTransferByIdAsync(transfer.Id, ct);
+            }
+            catch (DomainException ex)
+            {
+                await transaction.RollbackAsync(ct);
+                return Result<StockTransferDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+                _logger.LogError(ex, "Error cancelling stock transfer {Id}", id);
+                return Result<StockTransferDto>.Failure("حدث خطأ أثناء إلغاء التحويل");
+            }
+        }, ct);
+    }
+
+    private static StockTransferDto MapToDto(StockTransfer t)
     {
         return new StockTransferDto(
             t.Id,
             t.TransferNo,
             t.FromWarehouseId,
-            t.FromWarehouse?.Name ?? "Unknown",
+            t.FromWarehouse?.Name ?? "غير معروف",
             t.ToWarehouseId,
-            t.ToWarehouse?.Name ?? "Unknown",
+            t.ToWarehouse?.Name ?? "غير معروف",
             t.TransferDate,
             t.Notes,
             (byte)t.Status,
             t.Items.Select(it => new StockTransferItemDto(
-                it.StockTransferItemId,
+                it.Id,
                 it.ProductId,
                 it.Product?.Code,
-                it.Product?.Name ?? "Unknown",
+                it.Product?.Name ?? "غير معروف",
                 it.Quantity,
+                (byte)it.Mode,
                 it.Notes
             )).ToList()
         );

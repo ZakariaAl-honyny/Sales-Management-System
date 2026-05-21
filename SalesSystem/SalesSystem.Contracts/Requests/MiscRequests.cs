@@ -7,10 +7,8 @@ public record ReportFilterRequest(
 );
 
 public record UpdateSettingsRequest(
-    string StoreName, string? Address, string? Phone,
-    string? LogoUrl, string Currency, decimal DefaultTaxRate
-);
-
-public record CreateUserRequest(
-    string Username, string Password, string FullName, string Role
-);
+    string StoreName, string? Address, string? Phone, string? Email,
+    string? LogoUrl, string Currency, decimal DefaultTaxRate,
+    bool IsTaxEnabled, string? TaxNumber,
+    bool EnableStockAlerts, bool AllowNegativeStock, bool AutoUpdatePrices,
+    string InvoicePrefix);

@@ -1,6 +1,7 @@
 using SalesSystem.Contracts.Enums;
 
 namespace SalesSystem.Contracts.Requests;
+
 public record CreateSalesInvoiceRequest(
     int WarehouseId,
     int? CustomerId,
@@ -17,4 +18,5 @@ public record CreateSalesInvoiceItemRequest(
     decimal Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
+    SaleMode Mode,
     string? Notes);

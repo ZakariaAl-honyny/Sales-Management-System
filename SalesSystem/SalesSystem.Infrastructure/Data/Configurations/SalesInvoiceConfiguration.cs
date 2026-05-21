@@ -21,22 +21,22 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
         builder.Property(si => si.Notes).HasMaxLength(500);
         builder.Property(si => si.PaymentType).HasConversion<byte>();
         builder.Property(si => si.Status).HasConversion<byte>();
-        
+
         builder.HasOne(si => si.Customer)
             .WithMany()
             .HasForeignKey(si => si.CustomerId)
             .OnDelete(DeleteBehavior.Restrict);
-            
+
         builder.HasOne(si => si.Warehouse)
             .WithMany()
             .HasForeignKey(si => si.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
-            
+
         builder.HasMany(si => si.Items)
             .WithOne(i => i.SalesInvoice)
             .HasForeignKey(i => i.SalesInvoiceId)
             .OnDelete(DeleteBehavior.Restrict);
-            
+
         builder.HasQueryFilter(si => si.IsActive);
     }
 }
@@ -46,13 +46,14 @@ public class SalesInvoiceItemConfiguration : IEntityTypeConfiguration<SalesInvoi
     public void Configure(EntityTypeBuilder<SalesInvoiceItem> builder)
     {
         builder.ToTable("SalesInvoiceItems");
-        builder.HasKey(sii => sii.SalesInvoiceItemId);
+        builder.HasKey(sii => sii.Id);
         builder.Property(sii => sii.Quantity).HasPrecision(18, 3);
         builder.Property(sii => sii.UnitPrice).HasPrecision(18, 2);
         builder.Property(sii => sii.DiscountAmount).HasPrecision(18, 2);
         builder.Property(sii => sii.LineTotal).HasPrecision(18, 2);
+        builder.Property(sii => sii.Mode).HasConversion<byte>();
         builder.Property(sii => sii.Notes).HasMaxLength(250);
-        
+
         builder.HasOne(sii => sii.Product)
             .WithMany()
             .HasForeignKey(sii => sii.ProductId)

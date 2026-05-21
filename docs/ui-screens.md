@@ -222,7 +222,10 @@ This design is:
 Since you are relying on an AI agent:
 Ask it to work in this format:
 
-> "Design for me a Sales System interface structure in a traditional Admin Dashboard style, using WinForms. I want only the main screens, navigation, and common components with mock data, without connecting to the database now. The goal is to fix the final system look before implementing the API and logic."
+> "Design for me a Sales System interface structure in a professional Admin Dashboard style,
+> using **WPF + MVVM** (.NET 10). I want Views, ViewModels, and navigation structure
+> with mock data, without connecting to the database now. The project is `SalesSystem.DesktopPWF`.
+> The goal is to fix the final system look before implementing the API and logic."
 
 ---
 
@@ -258,7 +261,7 @@ I recommend this division:
 - `SalesSystem.Application`
 - `SalesSystem.Infrastructure`
 - `SalesSystem.Api`
-- `SalesSystem.Desktop`
+- `SalesSystem.DesktopPWF`  ← **WPF + MVVM** (NOT WinForms)
 
 ---
 
@@ -339,92 +342,85 @@ Contains:
 
 ---
 
-## 2.6 `SalesSystem.Desktop`
+## 2.6 `SalesSystem.DesktopPWF` (WPF + MVVM)
 Contains:
-- WinForms UI
-- UserControls
-- Forms
-- Messaging
-- Api Clients
-- Navigation
-- Dialogs
-- Notifications
+- WPF Views (`.xaml` — UI only, zero logic)
+- ViewModels (binding logic, `INotifyPropertyChanged`)
+- Services/Api (HttpClient wrappers — NEVER direct DB)
+- Services/App (EventBus, NavigationService, SessionService, DialogService, SoundService)
+- Messaging/Messages (EventBus message types — ID only, no data payload)
+- Converters (WPF `IValueConverter` implementations)
+- Helpers (ThemeHelper, UI utilities)
+- Resources (styles, brushes, icons, themes)
 
 ---
 
 # 3) Internal structure of the Desktop project
 
-This is your most important part.
+> **IMPORTANT:** The Desktop is `SalesSystem.DesktopPWF` — WPF with MVVM pattern.
+> All UI files are `.xaml`. There are NO WinForms `.cs` Form classes.
 
-## Inside `SalesSystem.Desktop`
+## Inside `SalesSystem.DesktopPWF`
 
-### A) `Forms`
-- `MainForm`
-- `LoginForm`
-- `SettingsForm`
-- `BackupForm`
-- `ConfirmDialog`
-- `MessageDialog`
+### A) Root Level
+- `MainWindow.xaml` — Shell: sidebar + content host
+- `LoginWindow.xaml` — Login screen
+- `App.xaml` / `App.xaml.cs` — Entry point + DI container
 
-### B) `Shell`
-- `ShellHost`
-- `INavigationService`
-- `NavigationService`
+### B) `Views/` — XAML screens (no code-behind logic)
+| Folder | Contents |
+|--------|----------|
+| `Views/Common/` | Shared dialogs, selection windows, confirmation dialogs |
+| `Views/Dashboard/` | Main dashboard with KPI cards |
+| `Views/Products/` | Product list + editor |
+| `Views/Categories/` | Category list + editor |
+| `Views/Units/` | Measurement units list + editor |
+| `Views/Customers/` | Customer list + editor |
+| `Views/Suppliers/` | Supplier list + editor |
+| `Views/Warehouses/` | Warehouse list + editor |
+| `Views/Sales/` | Sales invoice list + editor |
+| `Views/Purchases/` | Purchase invoice list + editor |
+| `Views/Returns/` | Sales return + Purchase return editors |
+| `Views/Inventory/` | Stock management / adjustments |
+| `Views/Transfers/` | Stock transfer list + editor |
+| `Views/Payments/` | Customer + Supplier payments |
+| `Views/Invoices/` | Invoice selection dialogs |
+| `Views/Reports/` | Reports + **LowStockView.xaml** [NEW SPEC-009] |
+| `Views/Settings/` | Store settings screen |
+| `Views/Users/` | User management screen |
+| `Views/Login/` | Additional login-related views |
 
-### C) `Controls/Common`
-Reusable common UserControls:
-- `SearchBarControl`
-- `ToolbarControl`
-- `LoadingControl`
-- `EmptyStateControl`
-- `SummaryCardControl`
-- `DateRangePickerControl`
-- `MoneyTextBoxControl`
-- `StatusBadgeControl`
+### C) `ViewModels/` — MVVM binding logic
+- `ViewModelBase.cs` — base: `INotifyPropertyChanged`, `AsyncRelayCommand`
+- `DashboardViewModel.cs`
+- `LoginWindowViewModel.cs`
+- `ReportsViewModel.cs`
+- `SettingsViewModel.cs`
+- `WarehouseListViewModel.cs` / `WarehouseEditorViewModel.cs`
+- Subfolders mirror `Views/` structure
 
-### D) `Controls/Products`
-- `ProductsListControl`
-- `ProductEditorControl`
-- `ProductDetailsControl`
+### D) `Services/App/` — Application-level singletons
+- `EventBus.cs` — Pub/Sub (subscribe in `OnLoad`, unsubscribe in `Dispose`)
+- `NavigationService.cs` — load Views into `MainWindow` content area
+- `SessionService.cs` — JWT token (in-memory ONLY, never to disk)
+- `DialogService.cs` — open editor/confirm windows
+- `ISoundService.cs` / `SoundService.cs` — audible feedback
+- `IPrinterService.cs` — print contract [SPEC-006]
 
-### E) `Controls/Customers`
-- `CustomersListControl`
-- `CustomerEditorControl`
-- `CustomerBalanceControl`
+### E) `Services/Api/` — HttpClient API wrappers
+- `IApiService.cs` — all interface definitions in one file
+- One `XxxApiService.cs` per domain entity
+- **Rule:** Desktop NEVER connects to the database — only via API
 
-### F) `Controls/Suppliers`
-- `SuppliersListControl`
-- `SupplierEditorControl`
-- `SupplierBalanceControl`
+### F) `Messaging/Messages/`
+- One message class per event (e.g., `ProductChangedMessage`)
+- **Rule (RULE-034):** Messages carry entity ID ONLY — no data payloads
 
-### G) `Controls/Warehouses`
-- `WarehousesListControl`
-- `WarehouseEditorControl`
-- `WarehouseStockControl`
-
-### H) `Controls/Purchases`
-- `PurchaseListControl`
-- `PurchaseEditorControl`
-- `PurchaseItemsControl`
-
-### I) `Controls/Sales`
-- `SalesListControl`
-- `SaleEditorControl`
-- `SaleItemsControl`
-- `PaymentPanelControl`
-
-### J) `Controls/Returns`
-- `ReturnsListControl`
-- `ReturnEditorControl`
-
-### K) `Controls/Transfers`
-- `StockTransferControl`
-
-### L) `Controls/Reports`
-- `DailySalesReportControl`
-- `StockReportControl`
-- `CustomerDebtReportControl`
-- `SupplierDebtReportControl`
+### G) Supporting folders
+- `Converters/` — WPF `IValueConverter` (e.g., bool-to-visibility)
+- `Helpers/` — ThemeHelper, UI utilities
+- `Models/` — local display/view models
+- `Resources/` — styles, brushes, icons, themes
 
 ---
 
@@ -447,33 +443,18 @@ It only deals with the API.
 
 ---
 
-## `Services/Navigation`
-- `INavigationService`
-- `NavigationService`
+## `Services/App/` — App-level services
+- `EventBus.cs` — pub/sub event bus
+- `NavigationService.cs` — navigate between Views in `MainWindow`
+- `SessionService.cs` — JWT token (in-memory only)
+- `DialogService.cs` — open editor/confirm windows
+- `ISoundService.cs` / `SoundService.cs` — audible feedback
+- `IPrinterService.cs` — print contract
 
 Its function:
-- Load UserControl inside the MainForm
-- Navigate between screens
-
----
-
-## `Services/Dialogs`
-- `IDialogService`
-- `DialogService`
-
-Its function:
-- Open Add/Edit/Confirm window
-
----
-
-## `Services/Notifications`
-- `INotificationService`
-- `NotificationService`
-
-Its function:
-- Success messages
-- Error messages
-- Alerts
+- Navigate between WPF Views
+- Manage application session
+- Provide dialog and notification services
 
 ---
 
@@ -778,8 +759,8 @@ I do not recommend that:
 If you want, I can prepare for you in the next message one of these three:
 
 1. **Initial structure for the Products module fully**
-2. **Practical EventBus code ready for WinForms**
-3. **Navigation map between screens inside MainForm**
+2. **Practical EventBus code ready for WPF/MVVM**
+3. **Navigation map between screens inside MainWindow**
 
 I prefer we start with the **Products module** because it will be the template we repeat for the entire system.
 
@@ -830,8 +811,8 @@ Instead of linking each screen to the other manually, you make there a **central
 > "Data changed, reload"
 
 And this is very excellent with:
-- WinForms
-- UserControls
+- WPF (MVVM)
+- Views / ViewModels
 - API
 - Continuous development
 
@@ -967,15 +948,14 @@ _bus.Subscribe<ProductChangedMessage>(async _ => await LoadProductsAsync());
 
 ---
 
-# Very important point in WinForms
+# Very important point in WPF (MVVM)
 If the update will affect the interface, you must pay attention to the **UI Thread**.
 
-Meaning upon receiving the message:
-- Use `Invoke`
-- Or `BeginInvoke`
-- Or `SynchronizationContext`
+In WPF, upon receiving the message:
+- Use `Application.Current.Dispatcher.Invoke(() => ...)`
+- Or `DispatcherHelper.RunOnUI(action)`
 
-So as to avoid update problems.
+So as to avoid cross-thread update problems.
 
 ---
 

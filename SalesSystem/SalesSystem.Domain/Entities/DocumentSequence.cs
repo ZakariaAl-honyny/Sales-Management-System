@@ -1,4 +1,5 @@
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
@@ -14,11 +15,11 @@ public class DocumentSequence : BaseEntity
     public static DocumentSequence Create(string documentType, string prefix, int year)
     {
         if (string.IsNullOrWhiteSpace(documentType))
-            throw new ArgumentException("DocumentType is required.", nameof(documentType));
+            throw new DomainException("نوع المستند مطلوب.");
         if (string.IsNullOrWhiteSpace(prefix))
-            throw new ArgumentException("Prefix is required.", nameof(prefix));
+            throw new DomainException("البادئة مطلوبة.");
         if (year <= 0)
-            throw new ArgumentException("Year is required.", nameof(year));
+            throw new DomainException("السنة مطلوبة.");
 
         return new DocumentSequence
         {

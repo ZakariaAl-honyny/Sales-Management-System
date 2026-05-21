@@ -28,12 +28,12 @@ public class ReportsController : ControllerBase
     /// </summary>
     [HttpGet("sales")]
     [Authorize(Policy = "ManagerAndAbove")]
-    public async Task<IActionResult> GetSalesReport([FromQuery] DateTime from, [FromQuery] DateTime to, CancellationToken ct)
+    public async Task<IActionResult> GetSalesReport([FromQuery] int? warehouseId, [FromQuery] DateTime from, [FromQuery] DateTime to, CancellationToken ct)
     {
         if (from > to)
             return BadRequest(new { error = "تاريخ البداية يجب أن يكون قبل تاريخ النهاية" });
 
-        var result = await _reportService.GetSalesReportAsync(from, to, ct);
+        var result = await _reportService.GetSalesReportAsync(warehouseId, from, to, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -42,12 +42,12 @@ public class ReportsController : ControllerBase
     /// </summary>
     [HttpGet("purchases")]
     [Authorize(Policy = "ManagerAndAbove")]
-    public async Task<IActionResult> GetPurchasesReport([FromQuery] DateTime from, [FromQuery] DateTime to, CancellationToken ct)
+    public async Task<IActionResult> GetPurchasesReport([FromQuery] int? warehouseId, [FromQuery] DateTime from, [FromQuery] DateTime to, CancellationToken ct)
     {
         if (from > to)
             return BadRequest(new { error = "تاريخ البداية يجب أن يكون قبل تاريخ النهاية" });
 
-        var result = await _reportService.GetPurchasesReportAsync(from, to, ct);
+        var result = await _reportService.GetPurchasesReportAsync(warehouseId, from, to, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -103,9 +103,9 @@ public class ReportsController : ControllerBase
     /// </summary>
     [HttpGet("low-stock")]
     [Authorize(Policy = "ManagerAndAbove")]
-    public async Task<IActionResult> GetLowStockReport(CancellationToken ct)
+    public async Task<IActionResult> GetLowStockReport([FromQuery] int? warehouseId, CancellationToken ct)
     {
-        var result = await _reportService.GetLowStockReportAsync(ct);
+        var result = await _reportService.GetLowStockReportAsync(warehouseId, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 }

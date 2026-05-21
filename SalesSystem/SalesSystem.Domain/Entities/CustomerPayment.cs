@@ -1,4 +1,5 @@
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
@@ -30,11 +31,11 @@ public class CustomerPayment : BaseEntity
         DateTime? paymentDate = null)
     {
         if (string.IsNullOrWhiteSpace(paymentNo))
-            throw new ArgumentException("PaymentNo is required.", nameof(paymentNo));
+            throw new DomainException("رقم السداد مطلوب.");
         if (customerId <= 0)
-            throw new ArgumentException("CustomerId is required.", nameof(customerId));
+            throw new DomainException("العميل مطلوب.");
         if (amount <= 0)
-            throw new ArgumentException("Amount must be positive.", nameof(amount));
+            throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
 
         var payment = new CustomerPayment
         {
@@ -49,5 +50,16 @@ public class CustomerPayment : BaseEntity
         };
         payment.SetCreatedBy(createdByUserId);
         return payment;
+    }
+
+    public void Update(decimal amount, byte paymentMethod, DateTime? paymentDate, string? notes)
+    {
+        if (amount <= 0)
+            throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
+        
+        Amount = amount;
+        PaymentMethod = paymentMethod;
+        if (paymentDate.HasValue) PaymentDate = paymentDate.Value;
+        Notes = notes;
     }
 }

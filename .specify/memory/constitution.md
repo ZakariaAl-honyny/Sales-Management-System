@@ -1,18 +1,19 @@
 <!--
-  SYNC IMPACT REPORT
+  SYNC IMPORT REPORT
   ==================
-  Version change: 0.0.0 (unfilled template) → 1.0.0
-  Modified principles: N/A (initial fill)
+  Version change: 1.0.0 → 1.1.0
+  Modified principles: N/A (added new principles)
   Added sections:
-    - 12 Core Principles (I–XII)
-    - Technology Stack & Constraints
-    - Development Workflow & Quality Gates
-    - Governance
+    - XIII. Delete Strategy (Conditional Soft/Hard Delete)
+    - XIV. Defensive Programming & Guard Clauses
+    - XV. WPF Interactive Dialogs
+    - XVI. Toast Notifications
+    - XVII. Real-Time UI Validation
   Removed sections: None
   Templates requiring updates:
-    ✅ plan-template.md — Constitution Check section aligns with principles
-    ✅ spec-template.md — Requirements section compatible with FR-### tagging
-    ✅ tasks-template.md — Phase structure compatible with 7-phase roadmap
+    ✅ plan-template.md — Constitutional Check section aligns
+    ✅ spec-template.md — Requirements section compatible
+    ✅ tasks-template.md — Phase structure compatible
   Follow-up TODOs: None
 -->
 
@@ -157,13 +158,85 @@
 - **Rationale**: FK integrity on audit fields ensures historical records
   always trace back to a valid user, even after user deactivation.
 
+### XIII. Delete Strategy (v4.2)
+
+- ALL delete operations MUST use the `DeleteStrategy` enum:
+  - `Cancel = 0` — Abort operation
+  - `Deactivate = 1` — Soft delete (`IsActive = false`)
+  - `Permanent = 2` — Hard delete (physical removal if not referenced)
+- Soft delete preserves entity history for audit trails.
+- Hard delete MUST validate references before removal:
+  - Product → Check SalesInvoiceItems, PurchaseInvoiceItems
+  - Category → Check Products
+  - Unit → Check Products (UnitId, RetailUnitId, WholesaleUnitId)
+  - Warehouse → Check WarehouseStocks, StockTransfers
+  - Customer → Check SalesInvoices, CustomerPayments
+  - Supplier → Check PurchaseInvoices, SupplierPayments
+  - User → Check not last Admin
+- **Rationale**: Conditional delete gives users flexibility while preserving
+  financial audit trails.
+
+### XIV. Defensive Programming & Guard Clauses
+
+- ALL Domain entity constructors/factories MUST have Guard Clauses.
+- Exception type: `DomainException` — `ArgumentException` in Domain is FORBIDDEN.
+- Guard Clause Examples:
+```csharp
+if (string.IsNullOrWhiteSpace(name))
+    throw new DomainException("الاسم مطلوب");
+if (price < 0)
+    throw new DomainException("السعر لا يمكن أن يكون سالباً");
+if (quantity <= 0)
+    throw new DomainException("الكمية يجب أن تكون أكبر من الصفر");
+```
+- **Rationale**: Invalid state prevention at the source eliminates
+  downstream bugs and improves error messages.
+
+### XV. WPF Interactive Dialogs
+
+- ALL user-facing messages MUST use `IDialogService` — raw `MessageBox.Show`
+  is FORBIDDEN in ViewModels.
+- DialogService Interface:
+```csharp
+public interface IDialogService
+{
+    Task ShowErrorAsync(string title, string message);
+    Task ShowSuccessAsync(string title, string message);
+    Task ShowWarningAsync(string title, string message);
+    Task<bool> ShowConfirmationAsync(string title, string message);
+    Task<DeleteStrategy> ShowDeleteConfirmationAsync(string itemDescription);
+}
+```
+- Styled Dialogs (RTL Arabic): Error, Success, Warning, Confirmation,
+  DeleteConfirmation (3 buttons)
+- **Rationale**: Consistent UI experience with localized error messages.
+
+### XVI. Toast Notifications
+
+- Use `IToastNotificationService` for minor success messages.
+- Auto-dismiss: Success/Info = 3 seconds, Error = 5 seconds.
+- Toast NOT for critical errors — use DialogService instead.
+- **Rationale**: Non-blocking feedback improves UX without interrupting workflow.
+
+### XVII. Real-Time UI Validation
+
+- `ViewModelBase` MUST implement `INotifyDataErrorInfo`.
+- Save buttons MUST be disabled via `CanExecute` when `HasErrors = true`.
+- Validation Error Messages (Arabic):
+  - "الاسم مطلوب"
+  - "الكمية يجب أن تكون أكبر من الصفر"
+  - "السعر لا يمكن أن يكون سالباً"
+  - "يجب اختيار منتج"
+- XAML Red Border Style on invalid inputs.
+- **Rationale**: Immediate feedback prevents submission of invalid forms.
+
 ## Technology Stack & Constraints
 
 | Component | Technology | Version |
 |-----------|-----------|---------|
 | Runtime | .NET | 10 LTS |
 | API | ASP.NET Core Web API | 10 |
-| Desktop UI | WinForms | .NET 10 |
+| Desktop UI | WPF (MVVM) + INotifyDataErrorInfo | .NET 10 |
 | Database | SQL Server | 2019+ |
 | ORM | Entity Framework Core | 10 |
 | Auth | JWT Bearer + BCrypt.Net-Next | 4.x |
@@ -184,6 +257,7 @@ public enum MovementType : byte
     PurchaseIn = 1, SaleOut = 2, SaleReturnIn = 3,
     PurchaseReturnOut = 4, TransferOut = 5, TransferIn = 6, Adjustment = 7
 }
+public enum DeleteStrategy { Cancel = 0, Deactivate = 1, Permanent = 2 }
 ```
 
 ### EventBus Rules (Desktop)
@@ -208,7 +282,7 @@ SalesSystem/
 ├── SalesSystem.Application/     ← Services, Interfaces, Use Cases
 ├── SalesSystem.Infrastructure/  ← EF Core, DbContext, Repositories
 ├── SalesSystem.Api/             ← Controllers, FluentValidation, Middleware
-└── SalesSystem.Desktop/         ← WinForms UI, UserControls, EventBus
+└── SalesSystem.DesktopPWF/     ← WPF UI, MVVM, EventBus
 ```
 
 ### Implementation Phases
@@ -238,6 +312,19 @@ SalesSystem/
 - [ ] EventBus: subscribe in OnLoad, unsubscribe in Dispose
 - [ ] Users soft-deleted only (never hard delete)
 
+### Delete & Defensive Programming
+- [ ] Delete uses DeleteStrategy enum (not MessageBox)?
+- [ ] Guard Clauses exist for all entity constructors?
+- [ ] DomainException used (not ArgumentException)?
+- [ ] Permanent delete checks references before removal?
+
+### WPF UI
+- [ ] DialogService used (not raw MessageBox)?
+- [ ] Toast notifications for minor success messages?
+- [ ] INotifyDataErrorInfo with HasErrors property?
+- [ ] Save buttons disabled when form has errors?
+- [ ] Red border styles on invalid fields?
+
 ## Governance
 
 - This Constitution is the supreme authority for the Sales Management
@@ -255,4 +342,4 @@ SalesSystem/
   `docs/database-schema.md` (SQL schema), `docs/PRD-MVP-v3.0.md`
   (full requirements).
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-06 | **Last Amended**: 2026-05-06
+**Version**: 1.1.0 | **Ratified**: 2026-05-06 | **Last Amended**: 2026-05-20

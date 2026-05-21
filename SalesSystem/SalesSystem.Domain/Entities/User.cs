@@ -1,5 +1,6 @@
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
@@ -15,11 +16,11 @@ public class User : BaseEntity
     public static User Create(string userName, string passwordHash, string fullName, UserRole role, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(userName))
-            throw new ArgumentException("UserName is required.", nameof(userName));
+            throw new DomainException("اسم المستخدم مطلوب.");
         if (string.IsNullOrWhiteSpace(passwordHash))
-            throw new ArgumentException("PasswordHash is required.", nameof(passwordHash));
+            throw new DomainException("كلمة المرور مطلوبة.");
         if (string.IsNullOrWhiteSpace(fullName))
-            throw new ArgumentException("FullName is required.", nameof(fullName));
+            throw new DomainException("الاسم الكامل مطلوب.");
 
         var user = new User
         {

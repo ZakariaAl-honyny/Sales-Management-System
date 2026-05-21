@@ -2,15 +2,16 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 
 namespace SalesSystem.Application.Interfaces.Services;
+
 public interface IReportService
 {
     /// <summary>
     /// Get sales report for a date range (Posted invoices only)
     /// </summary>
-    Task<Result<IEnumerable<SalesReportDto>>> GetSalesReportAsync(DateTime from, DateTime to, CancellationToken ct);
-    
+    Task<Result<IEnumerable<SalesReportDto>>> GetSalesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct);
+
     /// Get purchases report for a date range (Posted invoices only)
-    Task<Result<IEnumerable<PurchaseReportDto>>> GetPurchasesReportAsync(DateTime from, DateTime to, CancellationToken ct);
+    Task<Result<IEnumerable<PurchaseReportDto>>> GetPurchasesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct);
     /// Get stock report for a specific warehouse or all warehouses
     Task<Result<IEnumerable<StockReportDto>>> GetStockReportAsync(int? warehouseId, CancellationToken ct);
     /// Get customer balances report
@@ -20,5 +21,7 @@ public interface IReportService
     /// Get product movements report for a specific product
     Task<Result<IEnumerable<ProductMovementReportDto>>> GetProductMovementsReportAsync(int productId, DateTime? from, DateTime? to, CancellationToken ct);
     /// Get low stock products (below reorder level)
-    Task<Result<IEnumerable<LowStockReportDto>>> GetLowStockReportAsync(CancellationToken ct);
+    Task<Result<IEnumerable<LowStockReportDto>>> GetLowStockReportAsync(int? warehouseId, CancellationToken ct);
+    /// Get dashboard summary statistics
+    Task<Result<DashboardSummaryDto>> GetDashboardSummaryAsync(CancellationToken ct);
 }

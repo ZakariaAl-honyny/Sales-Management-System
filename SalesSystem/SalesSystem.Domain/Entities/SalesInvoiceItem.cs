@@ -1,17 +1,18 @@
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SalesInvoiceItem
+public class SalesInvoiceItem : BaseEntity
 {
-    public int SalesInvoiceItemId { get; private set; }
     public int SalesInvoiceId { get; private set; }
     public int ProductId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal LineTotal { get; private set; }
+    public SaleMode Mode { get; private set; } = SaleMode.Retail;
     public string? Notes { get; private set; }
 
     public virtual SalesInvoice? SalesInvoice { get; private set; }
@@ -24,16 +25,17 @@ public class SalesInvoiceItem
         decimal quantity,
         decimal unitPrice,
         decimal discountAmount = 0,
+        SaleMode mode = SaleMode.Retail,
         string? notes = null)
     {
         if (productId <= 0)
-            throw new ArgumentException("ProductId is required.", nameof(productId));
+            throw new DomainException("المنتج مطلوب.");
         if (quantity <= 0)
-            throw new ArgumentException("Quantity must be positive.", nameof(quantity));
+            throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
         if (unitPrice < 0)
-            throw new ArgumentException("UnitPrice cannot be negative.", nameof(unitPrice));
+            throw new DomainException("سعر الوحدة لا يمكن أن يكون سالباً.");
         if (discountAmount < 0)
-            throw new ArgumentException("DiscountAmount cannot be negative.", nameof(discountAmount));
+            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
 
         var item = new SalesInvoiceItem
         {
@@ -41,6 +43,7 @@ public class SalesInvoiceItem
             Quantity = quantity,
             UnitPrice = unitPrice,
             DiscountAmount = discountAmount,
+            Mode = mode,
             Notes = notes
         };
 

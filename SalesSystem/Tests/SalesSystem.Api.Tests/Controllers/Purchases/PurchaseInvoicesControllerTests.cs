@@ -1,0 +1,286 @@
+using Microsoft.AspNetCore.Mvc;
+using FluentAssertions;
+using SalesSystem.Api.Controllers;
+using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
+
+namespace SalesSystem.Api.Tests.Controllers.Purchases;
+
+[Trait("Category", "PurchaseInvoicesController")]
+public class PurchaseInvoicesControllerTests : ControllerTestBase
+{
+    private readonly PurchaseInvoicesController _controller;
+
+    public PurchaseInvoicesControllerTests()
+    {
+        _controller = new PurchaseInvoicesController(PurchaseServiceMock.Object);
+    }
+
+    #region GetAll Tests
+
+    [Fact]
+    public async Task GetAll_WhenCalled_ReturnsOkWithPagedResult()
+    {
+        // Arrange
+        var expectedResult = new PagedResult<PurchaseInvoiceDto>
+        {
+            Items = new List<PurchaseInvoiceDto> { CreateInvoiceDto(1, 1), CreateInvoiceDto(2, 2) },
+            Page = 1, PageSize = 10, TotalCount = 2
+        };
+
+        PurchaseServiceMock.Setup(x => x.GetAllAsync(null, null, 1, 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessResult(expectedResult));
+
+        // Act
+        var result = await _controller.GetAll(null, null, 1, 10);
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetAll_WhenServiceFails_ReturnsBadRequest()
+    {
+        // Arrange
+        PurchaseServiceMock.Setup(x => x.GetAllAsync(null, null, 1, 10, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateFailureResult<PagedResult<PurchaseInvoiceDto>>("حدث خطأ"));
+
+        // Act
+        var result = await _controller.GetAll(null, null, 1, 10);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    #endregion
+
+    #region GetById Tests
+
+    [Fact]
+    public async Task GetById_WhenInvoiceExists_ReturnsOkWithInvoice()
+    {
+        // Arrange
+        var invoiceId = 1;
+        var invoiceDto = CreateInvoiceDto(invoiceId, 1);
+        PurchaseServiceMock.Setup(x => x.GetByIdAsync(invoiceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessResult(invoiceDto));
+
+        // Act
+        var result = await _controller.GetById(invoiceId, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetById_WhenInvoiceNotFound_ReturnsNotFound()
+    {
+        // Arrange
+        var invoiceId = 999;
+        PurchaseServiceMock.Setup(x => x.GetByIdAsync(invoiceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateFailureResult<PurchaseInvoiceDto>("الفاتورة غير موجودة"));
+
+        // Act
+        var result = await _controller.GetById(invoiceId, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    #endregion
+
+    #region Create Tests
+
+    [Fact]
+    public async Task Create_WhenValidRequest_ReturnsCreatedAtActionWithInvoice()
+    {
+        // Arrange
+        var createdInvoice = CreateInvoiceDto(1, 1);
+        SetupUserId(_controller, 1);
+        var request = CreateValidRequest();
+        PurchaseServiceMock.Setup(x => x.CreateAsync(request, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessResult(createdInvoice));
+
+        // Act
+        var result = await _controller.Create(request, CancellationToken.None);
+
+        // Assert
+        var createdResult = result.Should().BeOfType<CreatedAtActionResult>().Subject;
+        createdResult.ActionName.Should().Be(nameof(PurchaseInvoicesController.GetById));
+    }
+
+    [Fact]
+    public async Task Create_WhenServiceFails_ReturnsBadRequest()
+    {
+        // Arrange
+        SetupUserId(_controller, 1);
+        var request = CreateValidRequest();
+        PurchaseServiceMock.Setup(x => x.CreateAsync(request, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateFailureResult<PurchaseInvoiceDto>("بيانات غير صالحة"));
+
+        // Act
+        var result = await _controller.Create(request, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Create_WithoutUserId_ReturnsUnauthorized()
+    {
+        // Arrange
+        SetupUserWithoutId(_controller);
+        var request = CreateValidRequest();
+
+        // Act
+        var result = await _controller.Create(request, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<UnauthorizedResult>();
+    }
+
+    #endregion
+
+    #region Post Tests
+
+    [Fact]
+    public async Task Post_WhenDraftInvoice_ReturnsOkWithPostedInvoice()
+    {
+        // Arrange
+        var invoiceId = 1;
+        var postedInvoice = CreateInvoiceDto(invoiceId, 2);
+        SetupUserId(_controller, 1);
+        PurchaseServiceMock.Setup(x => x.PostAsync(invoiceId, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessResult(postedInvoice));
+
+        // Act
+        var result = await _controller.Post(invoiceId, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task Post_WhenInvoiceNotFound_ReturnsBadRequest()
+    {
+        // Arrange
+        var invoiceId = 999;
+        SetupUserId(_controller, 1);
+        PurchaseServiceMock.Setup(x => x.PostAsync(invoiceId, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateFailureResult<PurchaseInvoiceDto>("الفاتورة غير موجودة"));
+
+        // Act
+        var result = await _controller.Post(invoiceId, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Post_WithoutUserId_ReturnsUnauthorized()
+    {
+        // Arrange
+        SetupUserWithoutId(_controller);
+
+        // Act
+        var result = await _controller.Post(1, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<UnauthorizedResult>();
+    }
+
+    #endregion
+
+    #region Cancel Tests
+
+    [Fact]
+    public async Task Cancel_WhenPostedInvoice_ReturnsOkWithCancelledInvoice()
+    {
+        // Arrange
+        var invoiceId = 1;
+        var cancelledInvoice = CreateInvoiceDto(invoiceId, 3);
+        SetupUserId(_controller, 1);
+        PurchaseServiceMock.Setup(x => x.CancelAsync(invoiceId, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateSuccessResult(cancelledInvoice));
+
+        // Act
+        var result = await _controller.Cancel(invoiceId, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task Cancel_WhenInvoiceNotFound_ReturnsBadRequest()
+    {
+        // Arrange
+        var invoiceId = 999;
+        SetupUserId(_controller, 1);
+        PurchaseServiceMock.Setup(x => x.CancelAsync(invoiceId, 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CreateFailureResult<PurchaseInvoiceDto>("الفاتورة غير موجودة"));
+
+        // Act
+        var result = await _controller.Cancel(invoiceId, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Cancel_WithoutUserId_ReturnsUnauthorized()
+    {
+        // Arrange
+        SetupUserWithoutId(_controller);
+
+        // Act
+        var result = await _controller.Cancel(1, CancellationToken.None);
+
+        // Assert
+        result.Should().BeOfType<UnauthorizedResult>();
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private static PurchaseInvoiceDto CreateInvoiceDto(int id, byte status) => new(
+        Id: id,
+        InvoiceNo: $"PUR-2026-{id:D6}",
+        SupplierId: 1,
+        SupplierName: "مورد اختبار",
+        WarehouseId: 1,
+        WarehouseName: "المستودع الرئيسي",
+        InvoiceDate: DateTime.UtcNow,
+        DueDate: null,
+        PaymentType: 1,
+        SubTotal: 200.00m,
+        DiscountAmount: 10.00m,
+        TaxAmount: 28.50m,
+        TotalAmount: 218.50m,
+        PaidAmount: 100.00m,
+        DueAmount: 118.50m,
+        Notes: null,
+        Status: status,
+        Items: new List<PurchaseInvoiceItemDto>
+        {
+            new(id * 10, 1, null, "منتج اختبار", 5.000m, 40.00m, 0.00m, 200.00m)
+        });
+
+    private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(
+        SupplierId: 1,
+        WarehouseId: 1,
+        InvoiceDate: null,
+        DueDate: null,
+        PaymentType: PaymentType.Cash,
+        DiscountAmount: 10.00m,
+        TaxRate: 15.00m,
+        PaidAmount: 100.00m,
+        Notes: null,
+        Items: new List<CreatePurchaseInvoiceItemRequest>
+        {
+            new(ProductId: 1, Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, Notes: null)
+        });
+
+    #endregion
+}

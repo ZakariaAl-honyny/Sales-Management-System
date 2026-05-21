@@ -19,33 +19,30 @@ Write production-quality C# code that exactly implements the patterns from AGENT
 
 ## Code Patterns
 
-### Domain Entity Pattern
+### Domain Entity Pattern (WPF + MVVM)
 ```csharp
 public class Product : BaseEntity
 {
     // Private setters — immutable after creation
     public string Name { get; private set; }
-    public decimal SalePrice { get; private set; }   // decimal(18,2)
-    public decimal PurchasePrice { get; private set; } // decimal(18,2)
-    public decimal MinStock { get; private set; }      // decimal(18,3)
+    public decimal WholesalePrice { get; private set; } // decimal(18,2)
+    public decimal RetailPrice { get; private set; }    // decimal(18,2)
+    public decimal ConversionFactor { get; private set; } // decimal(18,3)
     public bool IsActive { get; private set; } = true;
+
+    // Wholesale/Retail Logic (Domain Only)
+    public decimal GetUnitPrice(SaleMode mode) => mode == SaleMode.Wholesale ? WholesalePrice : RetailPrice;
 
     // Protected constructor for EF Core
     protected Product() { }
 
     // Static factory method with validation
-    public static Product Create(string name, decimal salePrice, decimal purchasePrice)
+    public static Product Create(string name, decimal wholesalePrice, decimal retailPrice, decimal conversionFactor)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب");
-        return new Product { Name = name, SalePrice = salePrice, PurchasePrice = purchasePrice };
+        return new Product { Name = name, WholesalePrice = wholesalePrice, RetailPrice = retailPrice, ConversionFactor = conversionFactor };
     }
-
-    // Update method with validation
-    public void Update(string name, decimal salePrice) { /* validate then set */ }
-
-    // Soft delete — NEVER hard delete
-    public void Deactivate() => IsActive = false;
 }
 ```
 
@@ -53,7 +50,7 @@ public class Product : BaseEntity
 ```csharp
 public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest req, CancellationToken ct)
 {
-    var product = Product.Create(req.Name, req.SalePrice, req.PurchasePrice);
+    var product = Product.Create(req.Name, req.WholesalePrice, req.RetailPrice, req.ConversionFactor);
     await _uow.Products.AddAsync(product, ct);
     await _uow.SaveChangesAsync(ct);
     _logger.LogInformation("تم إنشاء المنتج {ProductId}", product.Id);

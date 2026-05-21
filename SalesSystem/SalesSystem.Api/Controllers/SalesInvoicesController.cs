@@ -36,13 +36,17 @@ public class SalesInvoicesController : ControllerBase
     [ProducesResponseType(typeof(PagedResult<SalesInvoiceDto>), 200)]
     [ProducesResponseType(400)]
     public async Task<IActionResult> GetAll(
-        [FromQuery] int? customerId, 
-        [FromQuery] int? status, 
-        [FromQuery] int page = 1, 
-        [FromQuery] int pageSize = 10, 
+        [FromQuery] int? customerId,
+        [FromQuery] int? status,
+        [FromQuery] string? search,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
         CancellationToken ct = default)
     {
-        var result = await _salesService.GetAllAsync(customerId, status, page, pageSize, ct);
+        var result = await _salesService.GetAllAsync(customerId, status, search, from, to, page, pageSize, includeInactive, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -62,6 +66,21 @@ public class SalesInvoicesController : ControllerBase
     }
 
     /// <summary>
+    /// Gets a sales invoice by number
+    /// </summary>
+    /// <param name="invoiceNo">Invoice number</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Invoice details</returns>
+    [HttpGet("number/{invoiceNo}")]
+    [ProducesResponseType(typeof(SalesInvoiceDto), 200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetByNumber(string invoiceNo, CancellationToken ct)
+    {
+        var result = await _salesService.GetByNumberAsync(invoiceNo, ct);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
+    }
+
+    /// <summary>
     /// Creates a new sales invoice (draft)
     /// </summary>
     /// <param name="request">Sales invoice creation request</param>
@@ -76,9 +95,29 @@ public class SalesInvoicesController : ControllerBase
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
         var result = await _salesService.CreateAsync(request, userId, ct);
-        return result.IsSuccess 
-            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) 
+        return result.IsSuccess
+            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
             : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Updates an existing sales invoice (draft only)
+    /// </summary>
+    /// <param name="id">Invoice ID</param>
+    /// <param name="request">Sales invoice update request</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Updated invoice</returns>
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(SalesInvoiceDto), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateSalesInvoiceRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _salesService.UpdateAsync(id, request, userId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>

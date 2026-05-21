@@ -7,7 +7,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-10%20LTS-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET 10"/>
-  <img src="https://img.shields.io/badge/WinForms-Desktop-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="WinForms"/>
+  <img src="https://img.shields.io/badge/WPF-MVVM-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="WPF"/>
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-MVP%20v3.0-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.0%20Expansion-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -24,15 +24,26 @@
 
 ## 📋 Overview
 
-A **comprehensive sales management platform** built with Clean Architecture principles, designed for small-to-medium retail businesses. The current MVP delivers a **WinForms Desktop client** backed by an **ASP.NET Core Web API**, handling sales, purchases, inventory, returns, and financial tracking with full Arabic/English bilingual support.
+A **comprehensive sales management platform** built with Clean Architecture + CQRS principles, designed for small-to-medium retail businesses. The current version delivers a **WPF Desktop client (MVVM)** backed by an **ASP.NET Core Web API**, handling sales, purchases, inventory, returns, and financial tracking with full Arabic/English bilingual support.
 
 The API-first architecture is designed to support **future web and mobile clients** without any backend changes.
 
 ### Why This Project?
 
 - 🏪 **Purpose-built for retail** — Sales invoices, purchase orders, returns, and stock transfers
+- 🔄 **Wholesale & Retail Flex** — Sell by box or piece simultaneously with intelligent inventory conversion
+  - Separate `WholesalePrice` and `RetailPrice` per product
+  - `ConversionFactor` for box↔piece conversion (e.g., 1 box = 12 pieces)
+  - `UnitType` enum (Retail=0, Wholesale=1) for pricing mode
+- 🔍 **Multi-barcode support** — Multiple barcodes per product (retail, wholesale, custom)
+  - `ProductBarcodes` table for additional barcodes
+  - Auto-detect unit type from scanned barcode
+  - Fallback to legacy `Products.Barcode` column
+- 🔌 **Hardware Integration** — Built-in barcode scanner support (Keyboard Emulation) with mobile camera scanning planned
 - 🔒 **Financial integrity** — All money calculations use `decimal` precision, never floating-point
-- 📦 **Multi-warehouse** — Track inventory across multiple storage locations
+- 📦 **Multi-warehouse & Low Stock AI** — Track inventory across branches with auto-calculated reorder suggestions
+  - `ReorderLevel` on each product
+  - Smart low-stock reporting (e.g., "1 box + 3 pieces")
 - 👥 **Role-based access** — Admin, Manager, and Cashier with granular permissions
 - 📊 **Full audit trail** — Every stock change and financial transaction is tracked
 - 🌐 **API-first design** — RESTful API ready for web/mobile clients in future phases
@@ -50,7 +61,7 @@ SalesSystem/
 ├── ⚙️ SalesSystem.Application/     ← Services, Interfaces, Use Cases
 ├── 🗄️ SalesSystem.Infrastructure/  ← EF Core, DbContext, Repositories
 ├── 🌐 SalesSystem.Api/             ← Controllers, Validation, Middleware
-└── 🖥️ SalesSystem.Desktop/         ← WinForms UI, UserControls, EventBus
+└── 🖥️ SalesSystem.DesktopPWF/      ← WPF UI, MVVM, EventBus
 ```
 
 ### Data Flow
@@ -62,6 +73,10 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 ```
 
 > **Key Principle:** The Desktop app **never** connects to the database directly. All communication goes through the Web API.
+
+### New Services (v4.2)
+- `DialogService` - Modal dialogs (Error, Success, Warning, Confirm, Delete)
+- `ToastNotificationService` - Auto-dismissing notifications
 
 ---
 
@@ -102,6 +117,30 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - 80mm thermal receipt printing
 - Print preview support
 
+### 🔒 Defensive Programming (v4.2)
+- Guard Clauses on ALL Domain entities
+- Arabic error messages for validation failures
+- Real-time form validation with red border indicators
+- Save buttons disabled until form is valid
+
+### 🗑️ Conditional Delete Strategy (v4.2)
+- Three-option delete dialog: Cancel / Deactivate / Permanent Delete
+- Soft delete keeps entity history for audit trails
+- Hard delete with reference validation (prevents breaking FKs)
+- Applied to: Products, Customers, Suppliers, Categories, Units, Warehouses
+
+### 💬 Modern Dialogs (v4.2)
+- Styled modal dialogs (Error, Success, Warning, Confirmation)
+- RTL Arabic interface with custom themes
+- Delete confirmation with 3 options
+- Toast notifications for minor actions (auto-dismiss)
+
+### ✨ Real-Time Validation (v4.2)
+- INotifyDataErrorInfo implementation
+- Dynamic validation feedback as user types
+- Visual red borders on invalid fields
+- Arabic error messages: "الاسم مطلوب", "الكمية يجب أن تكون أكبر من صفر"
+
 ### 🚫 Out of Scope (Future Phases)
 
 The following features are **not included** in the current MVP but are planned for future development:
@@ -126,7 +165,7 @@ The following features are **not included** in the current MVP but are planned f
 |-------|-----------|---------|
 | **Runtime** | .NET | 10 LTS |
 | **API** | ASP.NET Core Web API | 10 |
-| **Desktop UI** | WinForms | .NET 10 |
+| **Desktop UI** | WPF (MVVM) + INotifyDataErrorInfo | .NET 10 |
 | **Database** | SQL Server | 2019+ |
 | **ORM** | Entity Framework Core | 10 |
 | **Authentication** | JWT Bearer | — |
@@ -139,11 +178,12 @@ The following features are **not included** in the current MVP but are planned f
 
 ## 📐 Database Schema
 
-**22 tables** covering the full retail domain:
+**24 tables** covering the full retail domain:
 
 | Category | Tables |
 |----------|--------|
 | **Core** | Users, Units, Categories, Products, Warehouses, WarehouseStocks |
+| **Products** | ProductBarcodes (multi-barcode support) |
 | **Trading Partners** | Customers, Suppliers |
 | **Purchases** | PurchaseInvoices, PurchaseInvoiceItems |
 | **Sales** | SalesInvoices, SalesInvoiceItems |
@@ -214,7 +254,7 @@ cd SalesSystem.Api
 dotnet run
 
 # 6. Run the Desktop app
-cd SalesSystem.Desktop
+cd SalesSystem.DesktopPWF
 dotnet run
 ```
 
@@ -229,13 +269,22 @@ dotnet run
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| **Phase 1** | Foundation — Solution, Entities, DB Schema | 🔲 Planned |
-| **Phase 2** | Infrastructure — DbContext, Repositories, UnitOfWork | 🔲 Planned |
-| **Phase 3** | Business Logic — Sales, Purchase, Inventory Services | 🔲 Planned |
-| **Phase 4** | API & Desktop Shell — Controllers, Auth, Navigation | 🔲 Planned |
-| **Phase 5** | Desktop Modules — Products, Customers, Sales UI | 🔲 Planned |
-| **Phase 6** | Printing — A4 Invoices, 80mm Thermal Receipts | 🔲 Planned |
+| Phase 1-5 | Foundation → Desktop Modules | ✅ Completed |
+| **Phase 6** | Printing — A4 Invoices, 80mm Thermal Receipts | 🔲 In Progress |
 | **Phase 7** | Production — Backup, Windows Service, Installer | 🔲 Planned |
+
+---
+
+## 🆕 What's New in v4.2
+
+| Feature | Description |
+|---------|-------------|
+| **DeleteStrategy** | Conditional soft/hard delete with 3-option dialog |
+| **Guard Clauses** | Domain entities protected from invalid states |
+| **Styled Dialogs** | Modern RTL modal dialogs with Arabic text |
+| **Toast Notifications** | Non-blocking success/error notifications |
+| **Real-Time Validation** | INotifyDataErrorInfo with red border feedback |
+| **CanExecute Logic** | Save buttons disabled until form is valid |
 
 ---
 
@@ -243,7 +292,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 40 non-negotiable rules
+1. Read [`AGENTS.md`](AGENTS.md) — all 44+ non-negotiable rules
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 
