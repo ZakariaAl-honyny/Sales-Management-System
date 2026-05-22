@@ -228,7 +228,7 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
             var result = await operation();
             if (!result.IsSuccess)
             {
-                HandleFailure(result.Error, "ExecuteResultAsync");
+                HandleFailure(result.Error ?? "حدث خطأ غير معروف", "ExecuteResultAsync");
                 return null;
             }
             return result.Value;
