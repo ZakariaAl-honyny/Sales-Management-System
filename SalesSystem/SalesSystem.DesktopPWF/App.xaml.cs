@@ -48,7 +48,7 @@ public partial class App : System.Windows.Application
         return _serviceProvider.GetRequiredService<T>();
     }
 
-    private void Application_Startup(object sender, StartupEventArgs e)
+    private async void Application_Startup(object sender, StartupEventArgs e)
     {
         // Setup Serilog
         SetupLogging();
@@ -60,6 +60,16 @@ public partial class App : System.Windows.Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
+
+        // Check API and database connectivity before showing UI
+        var canConnect = await CheckDatabaseConnectionAsync();
+        if (!canConnect)
+        {
+            Log.Fatal("Application shutting down due to database connection failure");
+            Log.CloseAndFlush();
+            Environment.Exit(1);
+            return;
+        }
 
         // Check authentication and show appropriate window
         var sessionService = _serviceProvider.GetRequiredService<ISessionService>();
@@ -83,6 +93,40 @@ public partial class App : System.Windows.Application
         }
 
         Log.Information("Application started successfully");
+    }
+
+    /// <summary>
+    /// Checks API and database connectivity before startup.
+    /// Shows error dialog if connection fails, with retry option.
+    /// Returns true if database is reachable, false to shut down.
+    /// </summary>
+    private async Task<bool> CheckDatabaseConnectionAsync()
+    {
+        var healthService = _serviceProvider!.GetRequiredService<IDatabaseHealthCheckService>();
+
+        while (true)
+        {
+            var result = await healthService.CheckAsync();
+
+            if (result.IsDatabaseConnected)
+                return true;
+
+            // Show error dialog on UI thread
+            var retry = await Dispatcher.InvokeAsync(() =>
+            {
+                var dialog = new Views.Dialogs.DatabaseErrorDialog(
+                    result.ErrorMessage ?? "تعذر الاتصال بقاعدة البيانات");
+                dialog.Owner = MainWindow;
+                dialog.ShowDialog();
+                return dialog.RetryClicked;
+            });
+
+            if (!retry)
+                return false;
+
+            // Small delay before retry
+            await Task.Delay(1000);
+        }
     }
 
     private void Application_Exit(object sender, ExitEventArgs e)
@@ -151,6 +195,9 @@ public partial class App : System.Windows.Application
         services.AddSingleton<Services.App.IPaymentPrinter, Services.Printing.PaymentPrinter>();
         services.AddSingleton<Services.App.ITransferPrinter, Services.Printing.TransferPrinter>();
         services.AddSingleton<IPrintApiService, PrintApiService>();
+
+        // Health check
+        services.AddSingleton<IDatabaseHealthCheckService, DatabaseHealthCheckService>();
 
         // ViewModels
         services.AddTransient<LoginWindowViewModel>();

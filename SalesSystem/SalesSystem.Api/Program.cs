@@ -349,9 +349,43 @@ app.UseAuthorization();
 
 app.UseHttpsRedirection();
 
-// Health check
-app.MapGet("/api/v1/health", () => new { Status = "OK", Version = "1.0", Timestamp = DateTime.UtcNow })
-    .WithName("HealthCheck");
+// Health check - also checks database connectivity
+app.MapGet("/api/v1/health", async (SalesDbContext db) =>
+{
+    var dbConnected = false;
+    try
+    {
+        dbConnected = await db.Database.CanConnectAsync();
+    }
+    catch
+    {
+        // DB not reachable
+    }
+
+    return new
+    {
+        Status = dbConnected ? "OK" : "Degraded",
+        Database = dbConnected ? "Connected" : "Disconnected",
+        Version = "1.0",
+        Timestamp = DateTime.UtcNow
+    };
+}).WithName("HealthCheck");
+
+// Dedicated database health check
+app.MapGet("/api/v1/health/database", async (SalesDbContext db) =>
+{
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync();
+        if (canConnect)
+            return Results.Json(new { status = "connected", message = "Database is reachable" });
+        return Results.Json(new { status = "disconnected", message = "Database is not reachable" }, statusCode: 503);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { status = "error", message = ex.Message }, statusCode: 503);
+    }
+}).WithName("DatabaseHealthCheck");
 
 app.MapControllers();
 

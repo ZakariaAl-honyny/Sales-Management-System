@@ -64,6 +64,17 @@ public class ExceptionMiddleware
                 details = "You do not have permission to access this resource"
             };
         }
+        else if (IsDatabaseConnectionException(exception))
+        {
+            _logger.LogError(exception, "Database connection failure");
+            response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            errorResponse = new
+            {
+                error = "تعذر الاتصال بقاعدة البيانات. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+                errorCode = "DATABASE_CONNECTION_ERROR",
+                details = GetInnerMessage(exception)
+            };
+        }
         else
         {
             _logger.LogError(exception, "Unhandled exception");
@@ -76,5 +87,30 @@ public class ExceptionMiddleware
         }
 
         await response.WriteAsync(JsonSerializer.Serialize(errorResponse));
+    }
+
+    private static bool IsDatabaseConnectionException(Exception ex)
+    {
+        // Check for common database connection exception types
+        if (ex is InvalidOperationException && 
+            (ex.Message.Contains("Connection string", StringComparison.OrdinalIgnoreCase) ||
+             ex.Message.Contains("Cannot open database", StringComparison.OrdinalIgnoreCase) ||
+             ex.Message.Contains("provider", StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        // Check inner exception recursively
+        if (ex.InnerException != null)
+            return IsDatabaseConnectionException(ex.InnerException);
+
+        // Check by exception type name (avoids direct dependency on SQL Server packages)
+        var typeName = ex.GetType().FullName ?? "";
+        return typeName.Contains("SqlException", StringComparison.Ordinal) ||
+               typeName.Contains("SqlClient", StringComparison.Ordinal) ||
+               typeName.Contains("EntityException", StringComparison.Ordinal);
+    }
+
+    private static string GetInnerMessage(Exception ex)
+    {
+        return ex.InnerException?.Message ?? ex.Message;
     }
 }

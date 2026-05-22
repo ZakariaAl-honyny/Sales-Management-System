@@ -383,4 +383,16 @@ public interface IPrintApiService
     Task<Result<PrintPreviewData>> GetPurchasePreviewDataAsync(int invoiceId, CancellationToken ct = default);
 }
 
+public interface IDatabaseHealthCheckService
+{
+    Task<HealthCheckResult> CheckAsync(CancellationToken ct = default);
+}
+
+public record HealthCheckResult
+{
+    public bool IsDatabaseConnected { get; init; }
+    public string? ErrorMessage { get; init; }
+    public bool IsApiReachable { get; init; }
+}
+
 public record PrintPreviewData(string TempFilePath, string InvoiceNumber);
