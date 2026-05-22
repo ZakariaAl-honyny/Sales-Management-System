@@ -440,7 +440,10 @@ dotnet run
 | **MASTER-PLAN.md Rewritten** | Now reflects actual Clean Architecture (Layered) — NOT aspirational Vertical Slices |
 | **Test Files Updated** | Application.Tests, Api.Tests, DesktopPWF.Tests, E2ETests — all updated to match current API signatures |
 | **E2ETests Fixed** | CS0118 namespace conflict resolved (FlaUI.Core.Application vs System.Windows.Application) |
-| **AGENTS.md Updated** | v4.5 with RULE-141 to RULE-150 (ExecuteAsync, MediatR removal, Legacy deletion) |
+| **AGENTS.md Updated** | v4.5 with RULE-141 to RULE-159 (ExecuteAsync, MediatR removal, Legacy deletion, DB Health Check) |
+| **DB Health Check** | `GET /api/v1/health/database` endpoint + Desktop startup check before login |
+| **DatabaseErrorDialog** | Styled dialog with Retry/Exit on DB connection failure (Arabic) |
+| **ExceptionMiddleware** | Detects DB failures → returns `DATABASE_CONNECTION_ERROR` with 503 |
 
 ---
 

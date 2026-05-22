@@ -73,6 +73,62 @@ public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest req, Canc
 // Example: INV-2026-000001, PUR-2026-000001
 ```
 
+### ViewModel Pattern (v4.5 — ExecuteAsync)
+```csharp
+public class ProductsListViewModel : ViewModelBase, IDisposable
+{
+    public ProductsListViewModel(IProductApiService productService, IDialogService dialogService)
+    {
+        _productService = productService;
+        _dialogService = dialogService;
+        RefreshCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(LoadProductsOperationAsync)));
+    }
+
+    private async Task LoadProductsOperationAsync()
+    {
+        ErrorMessage = null;
+        var result = await _productService.GetAllAsync(IncludeInactive);
+        if (result.IsSuccess && result.Value != null)
+        {
+            Products = new ObservableCollection<ProductDto>(result.Value);
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في التحميل", "LoadProducts");
+        }
+    }
+}
+// NEVER use manual try/catch/finally — ExecuteAsync() handles IsBusy + error + logging
+```
+
+### DB Health Check Pattern
+```csharp
+// API: /api/v1/health/database endpoint
+app.MapGet("/api/v1/health/database", async (SalesDbContext db) =>
+{
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync();
+        if (canConnect) return Results.Json(new { status = "connected" });
+        return Results.Json(new { status = "disconnected" }, statusCode: 503);
+    }
+    catch (Exception ex) { return Results.Json(new { status = "error", message = ex.Message }, statusCode: 503); }
+});
+
+// Desktop: App.xaml.cs startup check
+var canConnect = await CheckDatabaseConnectionAsync();
+if (!canConnect) { Environment.Exit(1); return; }
+```
+
+### DialogService Usage
+```csharp
+// NEVER use MessageBox.Show — always use IDialogService
+await _dialogService.ShowErrorAsync("خطأ", "تعذر الاتصال بقاعدة البيانات");
+bool confirmed = await _dialogService.ShowConfirmationAsync("تأكيد", "هل أنت متأكد؟");
+var strategy = await _dialogService.ShowDeleteConfirmationAsync("المنتج: XYZ");
+```
+
 ## Implementation Sequence
 ```text
 For each task:
@@ -92,3 +148,7 @@ For each task:
 - Direct DB access from Desktop
 - DataAnnotations on Domain entities
 - Cascade delete on any FK
+- Manual try/catch/finally in ViewModels (use ExecuteAsync wrapper)
+- MessageBox.Show (use IDialogService)
+- Starting Desktop without DB health check first
+- Business logic in Controllers

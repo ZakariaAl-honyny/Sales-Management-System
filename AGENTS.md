@@ -815,7 +815,83 @@ private async Task LoadProductsAsync()
 | RULE-149 | Legacy WinForms project is DELETED — all code rebuilt in DesktopPWF (WPF) |
 | RULE-150 | MASTER-PLAN.md reflects actual Clean Architecture (Layered) — NOT aspirational |
 
-### 2.38 Dialog Service Enhancement (v4.4)
+### 2.38 Database Health Check & Graceful Error Handling (v4.5)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-151 | API MUST expose `GET /api/v1/health/database` endpoint that checks DB connectivity via `DbContext.Database.CanConnectAsync()` |
+| RULE-152 | `GET /api/v1/health` MUST include `Database` field (`Connected`/`Disconnected`) — NEVER return static `OK` |
+| RULE-153 | Desktop MUST check database connectivity on startup BEFORE showing login window — use `IDatabaseHealthCheckService` |
+| RULE-154 | On DB connection failure, Desktop MUST show `DatabaseErrorDialog` with Retry/Exit buttons — NEVER crash silently |
+| RULE-155 | `ExceptionMiddleware` MUST detect DB connection exceptions (`InvalidOperationException` with connection string message, `SqlException`) and return `503 Service Unavailable` with `DATABASE_CONNECTION_ERROR` code |
+| RULE-156 | `ExceptionMiddleware` MUST use `IsDatabaseConnectionException()` helper — checks exception type name (avoids hard dependency on SQL Server packages) |
+| RULE-157 | `SecureDbContextFactory.GetDecryptedConnectionString()` MUST fall back to `SALESSYSTEM_DB_CONNECTION` environment variable — NEVER throw on missing config alone |
+| RULE-158 | Desktop `DatabaseErrorDialog` MUST provide retry loop — user can retry or exit, application NEVER blocks indefinitely |
+| RULE-159 | `DatabaseHealthCheckService` MUST catch `HttpRequestException` and `TaskCanceledException` — return `HealthCheckResult` with Arabic error messages |
+
+**Desktop Startup Flow:**
+```csharp
+// App.xaml.cs
+private async Task<bool> CheckDatabaseConnectionAsync()
+{
+    var healthService = _serviceProvider!.GetRequiredService<IDatabaseHealthCheckService>();
+
+    while (true)
+    {
+        var result = await healthService.CheckAsync();
+        if (result.IsDatabaseConnected) return true;
+
+        var retry = await Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new DatabaseErrorDialog(result.ErrorMessage);
+            dialog.Owner = MainWindow;
+            dialog.ShowDialog();
+            return dialog.RetryClicked;
+        });
+
+        if (!retry) return false;
+        await Task.Delay(1000);
+    }
+}
+```
+
+**API Health Check Pattern:**
+```csharp
+app.MapGet("/api/v1/health", async (SalesDbContext db) =>
+{
+    var dbConnected = false;
+    try { dbConnected = await db.Database.CanConnectAsync(); } catch { }
+    return new { Status = dbConnected ? "OK" : "Degraded", Database = dbConnected ? "Connected" : "Disconnected", Version = "1.0", Timestamp = DateTime.UtcNow };
+});
+
+app.MapGet("/api/v1/health/database", async (SalesDbContext db) =>
+{
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync();
+        if (canConnect) return Results.Json(new { status = "connected" });
+        return Results.Json(new { status = "disconnected" }, statusCode: 503);
+    }
+    catch (Exception ex) { return Results.Json(new { status = "error", message = ex.Message }, statusCode: 503); }
+});
+```
+
+**ExceptionMiddleware DB Detection Pattern:**
+```csharp
+private static bool IsDatabaseConnectionException(Exception ex)
+{
+    if (ex is InvalidOperationException && 
+        (ex.Message.Contains("Connection string", StringComparison.OrdinalIgnoreCase) ||
+         ex.Message.Contains("Cannot open database", StringComparison.OrdinalIgnoreCase)))
+        return true;
+    if (ex.InnerException != null) return IsDatabaseConnectionException(ex.InnerException);
+    var typeName = ex.GetType().FullName ?? "";
+    return typeName.Contains("SqlException", StringComparison.Ordinal) ||
+           typeName.Contains("SqlClient", StringComparison.Ordinal);
+}
+```
+
+### 2.39 Dialog Service Enhancement (v4.4)
 
 | RULE | DIRECTIVE |
 |------|-----------|
@@ -899,6 +975,10 @@ public enum InvoiceTypePrint : byte
 ❌ IsLoading property (use IsBusy from ViewModelBase instead)
 ❌ MediatR/CQRS pattern (use Service Layer — MediatR package removed)
 ❌ Legacy WinForms code (deleted — use DesktopPWF WPF only)
+❌ Starting Desktop without checking DB connection (use DatabaseHealthCheckService first)
+❌ Letting DB connection exceptions crash the API without returning DATABASE_CONNECTION_ERROR
+❌ Showing raw exception messages to end users (use DatabaseErrorDialog with Arabic messages)
+❌ Using `SecureDbContextFactory` without fallback to `SALESSYSTEM_DB_CONNECTION` env var
 ```
 
 ---
@@ -1042,3 +1122,8 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] MediatR NOT used (Service Layer pattern only)?
 - [ ] Legacy WinForms code deleted (not referenced)?
 - [ ] MASTER-PLAN.md reflects actual architecture (not aspirational)?
+- [ ] API exposes `GET /api/v1/health/database` endpoint?
+- [ ] Desktop checks DB connectivity on startup before showing login?
+- [ ] `DatabaseErrorDialog` shown on connection failure with Retry/Exit?
+- [ ] `ExceptionMiddleware` detects DB exceptions and returns `DATABASE_CONNECTION_ERROR`?
+- [ ] `SecureDbContextFactory` falls back to `SALESSYSTEM_DB_CONNECTION` env var?

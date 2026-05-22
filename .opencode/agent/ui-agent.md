@@ -58,3 +58,45 @@ private void OnProductChanged(ProductChangedMessage msg)
 5. ViewModels use `INotifyPropertyChanged` and `ICommand` (RelayCommand)
 6. All money display uses `decimal` formatting — NEVER float
 7. Use `IHttpClientFactory` via API services for all backend calls
+8. **ALL async commands** MUST use `ExecuteAsync()` wrapper from ViewModelBase — NEVER manual try/catch/finally
+9. `IsBusy` (protected set) replaces `IsLoading` — auto-managed by ExecuteAsync()
+10. **DB Health Check on Startup**: App.xaml.cs MUST check `IDatabaseHealthCheckService` before showing login
+11. **DatabaseErrorDialog**: Use styled dialog with Retry/Exit buttons on DB connection failure — NEVER raw MessageBox
+12. **IDialogService**: Use for ALL user-facing messages — NEVER `MessageBox.Show`
+13. **DialogService methods**: `ShowErrorAsync`, `ShowSuccessAsync`, `ShowWarningAsync`, `ShowInfoAsync`, `ShowConfirmationAsync`, `ShowDeleteConfirmationAsync`
+14. **Delete operations**: Use `DeleteStrategy` enum (Cancel/Deactivate/Permanent) via `ShowDeleteConfirmationAsync`
+
+## ExecuteAsync Pattern (ViewModels)
+```csharp
+// CORRECT — use ExecuteAsync wrapper
+public class ProductsListViewModel : ViewModelBase
+{
+    public ProductsListViewModel()
+    {
+        RefreshCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(LoadProductsOperationAsync)));
+    }
+
+    private async Task LoadProductsOperationAsync()
+    {
+        ErrorMessage = null;
+        var result = await _productService.GetAllAsync(IncludeInactive);
+        if (result.IsSuccess && result.Value != null)
+        {
+            await InvokeOnUIThreadAsync(() => { /* update UI */ });
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في التحميل", "LoadProducts");
+        }
+    }
+}
+
+// WRONG — NEVER do this
+private async Task LoadProductsAsync()
+{
+    try { IsLoading = true; /* ... */ }
+    catch (Exception ex) { HandleException(ex); }
+    finally { IsLoading = false; }
+}
+```

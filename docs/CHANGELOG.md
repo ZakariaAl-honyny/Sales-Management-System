@@ -25,14 +25,24 @@ All notable changes to this project will be documented in this file.
   - DesktopPWF.Tests: Updated 13 ViewModel test files with corrected DTO constructors + `DeleteStrategy` mocks.
   - All test exclusions documented with detailed comments in .csproj files.
 
+- **DB Health Check & Graceful Error Handling (v4.5)**:
+  - `GET /api/v1/health` — now includes `Database` field (`Connected`/`Disconnected`), returns `Degraded` status when DB is unreachable.
+  - `GET /api/v1/health/database` — dedicated endpoint calling `DbContext.Database.CanConnectAsync()`, returns 503 on failure.
+  - ExceptionMiddleware — detects `InvalidOperationException` (connection string) and `SqlException` by type name, returns `503 Service Unavailable` with `DATABASE_CONNECTION_ERROR` code.
+  - `DatabaseErrorDialog.xaml` — styled RTL dialog with warning icon, diagnostic tips, Retry/Exit buttons.
+  - `IDatabaseHealthCheckService` / `DatabaseHealthCheckService` — Desktop service calling `/api/v1/health/database`, catches `HttpRequestException` and `TaskCanceledException`, returns `HealthCheckResult` with Arabic error messages.
+  - `App.xaml.cs` — now checks API + DB connectivity BEFORE showing login window, loops with retry dialog until connected or user exits.
+  - `SecureDbContextFactory.GetDecryptedConnectionString()` — falls back to `SALESSYSTEM_DB_CONNECTION` env var before throwing.
+
 ### Changed
 - **Version updated to v4.5** — Code Quality & Refactoring release.
-- **AGENTS.md updated to v4.5** — 150 rules (RULE-141 to RULE-150 added).
+- **AGENTS.md updated to v4.5** — 159 rules (RULE-141 to RULE-159 added).
   - Section 2.36: ViewModel ExecuteAsync Pattern (RULE-141 to RULE-146).
   - Section 2.37: Architecture Decisions (RULE-147 to RULE-150).
-  - FORBIDDEN list: 4 new items (manual try/catch, IsLoading, MediatR, Legacy code).
-  - Checklist: 5 new items (ExecuteAsync, IsBusy, MediatR, Legacy, MASTER-PLAN).
-- **README.md updated to v4.5** — Phase 10 added as Completed.
+  - Section 2.38: DB Health Check & Graceful Error Handling (RULE-151 to RULE-159).
+  - FORBIDDEN list: 4 new items (starting Desktop without DB check, API crash on DB error, raw exception messages, missing env var fallback).
+  - Checklist: 5 new DB health check items.
+- **README.md updated to v4.5** — Phase 10 added as Completed, What's New section updated.
 - **MASTER-PLAN.md completely rewritten** — Now reflects actual Clean Architecture (Layered), NOT aspirational Vertical Slices.
   - Reduced from 2,945 lines to 693 lines.
   - Removed all fictional code that was never built.

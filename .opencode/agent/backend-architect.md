@@ -35,6 +35,9 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 7. Domain has ZERO dependencies on Infrastructure
 8. Controllers are THIN — delegate to services, return HTTP codes only
 9. **Wholesale/Retail**: Product entity is the single source of truth for conversion.
+10. **DB Health**: API MUST expose `/api/v1/health/database` — checks DB via `DbContext.Database.CanConnectAsync()`
+11. **ExceptionMiddleware**: MUST detect DB connection exceptions (`SqlException`, `InvalidOperationException` with connection string message) → return `503` with `DATABASE_CONNECTION_ERROR`
+12. **SecureDbContextFactory**: MUST fall back to `SALESSYSTEM_DB_CONNECTION` env var before throwing
 
 ## Pattern to Follow
 ```csharp
