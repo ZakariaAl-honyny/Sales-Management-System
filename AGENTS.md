@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/006-printing/plan.md](specs/006-printing/plan.md)
+**Active Feature Plan**: [specs/007-multi-window/plan.md](specs/007-multi-window/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
@@ -899,6 +899,66 @@ private static bool IsDatabaseConnectionException(Exception ex)
 | RULE-139 | ALL sync dialog methods use styled dialogs — NEVER raw `MessageBox.Show` |
 | RULE-140 | `UpdateDialogViewModel` implements `IDisposable` — disposes `_downloadCts` |
 
+### 2.40 Multi-Window Screen Management (v4.5)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-160 | Use `IScreenWindowService` / `ScreenWindowService` for ALL non-modal window opening — NEVER create + ShowDialog directly |
+| RULE-161 | Editors MUST open non-modally via `ScreenWindowService.OpenScreen(viewModel, options)` — NEVER `ShowDialog()` |
+| RULE-162 | ScreenWindow hosts any View/ViewModel pair in a generic `ScreenWindow.xaml` — NEVER create per-screen Window classes |
+| RULE-163 | Window tracking uses `WeakReference<Window>` — NEVER strong references (prevent memory leaks) |
+| RULE-164 | Cascade positioning: new windows offset 30px × (count % 10) from MainWindow |
+| RULE-165 | `OnClosed` callback MUST marshal UI operations via `Application.Current.Dispatcher.InvokeAsync()` |
+| RULE-166 | ViewModel lifecycle: `CloseRequested` → close window → `Cleanup()` → fire `OnClosed` — ALL handled by ScreenWindowService |
+| RULE-167 | Auto-titles use Arabic names (e.g., "فاتورة بيع") — NEVER English or type names |
+| RULE-168 | MainWindow MUST provide "فتح نافذة جديدة" menu items for opening list screens in new windows |
+| RULE-169 | ScreenWindowService resolves View by naming convention: `ViewModel` → `View` in FullName (same as DialogService) |
+| RULE-170 | `OpenWindow(Window)` overload for pre-created windows — `OpenScreen(object viewModel)` for convention-based resolution |
+
+**Correct pattern — opening an editor non-modally:**
+```csharp
+// CORRECT — use ScreenWindowService
+private void AddNewInvoice()
+{
+    var editorVm = App.GetService<SalesInvoiceEditorViewModel>();
+    _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
+    {
+        Title = "فاتورة بيع جديدة",
+        OnClosed = (vm) =>
+        {
+            if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+            {
+                _eventBus.Publish(new SaleInvoiceChangedMessage(editor.InvoiceId.Value));
+                Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+            }
+        }
+    });
+}
+
+// WRONG — NEVER do this (modal, blocks MainWindow)
+private void AddNewInvoice()
+{
+    var editorVm = new SalesInvoiceEditorViewModel();
+    var editorWindow = new SalesInvoiceEditorView { DataContext = editorVm };
+    editorVm.CloseRequested += () => editorWindow.DialogResult = true;
+    if (editorWindow.ShowDialog() == true) { /* ... */ }  // ❌ BLOCKS
+}
+```
+
+**Opening a list screen in a new window:**
+```csharp
+private void OpenNewSalesWindow_Click(object sender, RoutedEventArgs e)
+{
+    var page = new Views.Sales.SalesInvoicesListView();
+    var window = new Views.ScreenWindow();
+    window.SetContent(page, page.DataContext);
+    App.GetService<IScreenWindowService>().OpenWindow(window, new ScreenWindowOptions
+    {
+        Title = "المبيعات", Width = 1000, Height = 700
+    });
+}
+```
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -979,6 +1039,10 @@ public enum InvoiceTypePrint : byte
 ❌ Letting DB connection exceptions crash the API without returning DATABASE_CONNECTION_ERROR
 ❌ Showing raw exception messages to end users (use DatabaseErrorDialog with Arabic messages)
 ❌ Using `SecureDbContextFactory` without fallback to `SALESSYSTEM_DB_CONNECTION` env var
+❌ Opening editors with `ShowDialog()` (always use `ScreenWindowService.OpenScreen` — non-modal)
+❌ Creating Window instances directly for screens (use `ScreenWindow` + `OpenWindow` instead)
+❌ Using strong references for window tracking (use `WeakReference<Window>`)
+❌ Calling UI operations from `OnClosed` callback without `Dispatcher.InvokeAsync()`
 ```
 
 ---
@@ -1127,3 +1191,10 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] `DatabaseErrorDialog` shown on connection failure with Retry/Exit?
 - [ ] `ExceptionMiddleware` detects DB exceptions and returns `DATABASE_CONNECTION_ERROR`?
 - [ ] `SecureDbContextFactory` falls back to `SALESSYSTEM_DB_CONNECTION` env var?
+- [ ] Editors open non-modally via `ScreenWindowService.OpenScreen()` — NOT `ShowDialog()`?
+- [ ] `WeakReference<Window>` used for window tracking (not strong references)?
+- [ ] `OnClosed` callbacks use `Dispatcher.InvokeAsync()` for UI thread safety?
+- [ ] Auto-titles set to Arabic names (e.g., "فاتورة بيع") — not English type names?
+- [ ] MainWindow has "فتح نافذة جديدة" menu items for list screens?
+- [ ] ViewModel lifecycle: `Cleanup()` called on window close, EventBus unsubscribed?
+- [ ] `Cascade positioning` applied: 30px offset × (count % 10) from MainWindow?

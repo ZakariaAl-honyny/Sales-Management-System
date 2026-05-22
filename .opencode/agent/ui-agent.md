@@ -9,7 +9,7 @@ mode: subagent
 # UI Agent — WPF Desktop Specialist (MVVM)
 
 ## MUST READ FIRST
-- `AGENTS.md` — Rules 007, 012, 013, 034
+- `AGENTS.md` — Rules 007, 012, 013, 034, 160-170
 - `docs/ui-screens.md` — Screen structure (Views/ViewModels) and EventBus patterns
 
 ## Architecture (WPF + MVVM)
@@ -17,10 +17,18 @@ mode: subagent
 MainWindow.xaml (Shell)
 ├── Sidebar (navigation)
 ├── TopBar (user info, logout)
+├── Menu (with "فتح نافذة جديدة" items)
 └── ContentArea (hosts Views via Frame/ContentControl)
     ├── Views/Products/ProductListView.xaml
     ├── Views/Sales/SalesInvoiceEditorView.xaml
     └── ... (View bound to its ViewModel)
+
+ScreenWindow.xaml (Generic host for independent windows)
+├── ContentControl hosts any View
+├── Opens non-modally via IScreenWindowService
+├── Cascade positioning, Arabic auto-titles
+├── WeakReference tracking (no memory leaks)
+└── Cleanup() called on close → EventBus unsubscribed
 ```
 
 ## EventBus Rules (CRITICAL — WPF Implementation)
@@ -65,6 +73,11 @@ private void OnProductChanged(ProductChangedMessage msg)
 12. **IDialogService**: Use for ALL user-facing messages — NEVER `MessageBox.Show`
 13. **DialogService methods**: `ShowErrorAsync`, `ShowSuccessAsync`, `ShowWarningAsync`, `ShowInfoAsync`, `ShowConfirmationAsync`, `ShowDeleteConfirmationAsync`
 14. **Delete operations**: Use `DeleteStrategy` enum (Cancel/Deactivate/Permanent) via `ShowDeleteConfirmationAsync`
+15. **Multi-Window**: Use `IScreenWindowService.OpenScreen(viewModel, options)` for ALL non-modal window opening
+16. **ScreenWindow**: Use `Views.ScreenWindow` with `SetContent(page, page.DataContext)` for list views in new windows
+17. **OnClosed callback**: ALWAYS use `Application.Current.Dispatcher.InvokeAsync()` for UI operations
+18. **Cascade positioning**: Handled by ScreenWindowService automatically — no manual positioning
+19. **Arabic auto-titles**: ScreenWindowService maps ViewModel type → Arabic name — do NOT hardcode Window.Title
 
 ## ExecuteAsync Pattern (ViewModels)
 ```csharp
@@ -98,5 +111,47 @@ private async Task LoadProductsAsync()
     try { IsLoading = true; /* ... */ }
     catch (Exception ex) { HandleException(ex); }
     finally { IsLoading = false; }
+}
+```
+
+## Multi-Window Pattern (v4.5)
+```csharp
+// CORRECT — opening an editor non-modally
+private void AddNewInvoice()
+{
+    var editorVm = App.GetService<SalesInvoiceEditorViewModel>();
+    _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
+    {
+        Title = "فاتورة بيع جديدة",
+        OnClosed = (vm) =>
+        {
+            if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+            {
+                _eventBus.Publish(new SaleInvoiceChangedMessage(editor.InvoiceId.Value));
+                Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+            }
+        }
+    });
+}
+
+// CORRECT — opening a list screen in a new window
+private void OpenNewSalesWindow_Click(object sender, RoutedEventArgs e)
+{
+    var page = new Views.Sales.SalesInvoicesListView();
+    var window = new Views.ScreenWindow();
+    window.SetContent(page, page.DataContext);
+    App.GetService<IScreenWindowService>().OpenWindow(window, new ScreenWindowOptions
+    {
+        Title = "المبيعات", Width = 1000, Height = 700
+    });
+}
+
+// WRONG — NEVER block MainWindow with ShowDialog()
+private void AddNewInvoice()
+{
+    var editorVm = new SalesInvoiceEditorViewModel();
+    var editorWindow = new SalesInvoiceEditorView { DataContext = editorVm };
+    editorVm.CloseRequested += () => editorWindow.DialogResult = true;
+    if (editorWindow.ShowDialog() == true) { /* ... */ }  // ❌ BLOCKS
 }
 ```

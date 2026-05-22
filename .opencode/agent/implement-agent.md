@@ -129,6 +129,45 @@ bool confirmed = await _dialogService.ShowConfirmationAsync("تأكيد", "هل 
 var strategy = await _dialogService.ShowDeleteConfirmationAsync("المنتج: XYZ");
 ```
 
+### Multi-Window Screen Pattern (v4.5)
+```csharp
+// IScreenWindowService — open any ViewModel non-modally
+public interface IScreenWindowService
+{
+    void OpenWindow<TWindow>(object viewModel, ScreenWindowOptions? options = null) where TWindow : Window, new();
+    void OpenScreen(object viewModel, ScreenWindowOptions? options = null);  // convention-based
+    void OpenScreen<TViewModel>(ScreenWindowOptions? options = null) where TViewModel : class;  // DI-resolved
+    void OpenWindow(Window window, ScreenWindowOptions? options = null);  // pre-created window
+    void CloseAll();
+    IReadOnlyList<Window> OpenWindows { get; }
+}
+
+// ScreenWindowOptions
+public class ScreenWindowOptions
+{
+    public string? Title { get; set; }  // Arabic default
+    public double Width { get; set; } = 900;
+    public double Height { get; set; } = 650;
+    public double? Left { get; set; }
+    public double? Top { get; set; }
+    public bool IsModal { get; set; } = false;
+    public Action<object?>? OnClosed { get; set; }  // receives ViewModel
+}
+
+// ViewModel lifecycle — handled by ScreenWindowService:
+// 1. CloseRequested → window.Close()
+// 2. window.Closed → vmBase.Cleanup() → OnClosed callback → UntrackWindow
+```
+
+### ScreenWindow (Generic Host)
+```csharp
+// ScreenWindow.xaml — ContentControl hosts any View
+// ScreenWindow.xaml.cs — SetContent(FrameworkElement, object), OnClosing → Cleanup
+var window = new Views.ScreenWindow();
+window.SetContent(myPage, myPage.DataContext);
+App.GetService<IScreenWindowService>().OpenWindow(window, new ScreenWindowOptions { Title = "..." });
+```
+
 ## Implementation Sequence
 ```text
 For each task:
@@ -152,3 +191,7 @@ For each task:
 - MessageBox.Show (use IDialogService)
 - Starting Desktop without DB health check first
 - Business logic in Controllers
+- ShowDialog() for editors (use IScreenWindowService.OpenScreen — non-modal)
+- Creating Window instances directly (use ScreenWindow + OpenWindow)
+- Strong references for window tracking (use WeakReference)
+- UI operations in OnClosed callback without Dispatcher.InvokeAsync()

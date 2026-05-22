@@ -414,6 +414,7 @@ dotnet run
 | **Phase 8** | Dynamic UOM + Costing + Cash Boxes | ✅ Completed |
 | **Phase 9** | **Production Readiness** — Auto-Update, DPAPI Security, Backup System, Windows Service, Admin Screens, Inno Setup Installer | ✅ **Completed** |
 | **Phase 10** | **Code Quality & Refactoring** — ExecuteAsync() wrapper, MediatR removal, Legacy deletion, Test updates, MASTER-PLAN.md rewrite | ✅ **Completed** |
+| **Phase 11** | **Multi-Window Screen Management** — Non-modal editors, ScreenWindowService, "فتح نافذة جديدة" menus | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -440,10 +441,17 @@ dotnet run
 | **MASTER-PLAN.md Rewritten** | Now reflects actual Clean Architecture (Layered) — NOT aspirational Vertical Slices |
 | **Test Files Updated** | Application.Tests, Api.Tests, DesktopPWF.Tests, E2ETests — all updated to match current API signatures |
 | **E2ETests Fixed** | CS0118 namespace conflict resolved (FlaUI.Core.Application vs System.Windows.Application) |
-| **AGENTS.md Updated** | v4.5 with RULE-141 to RULE-159 (ExecuteAsync, MediatR removal, Legacy deletion, DB Health Check) |
+| **AGENTS.md Updated** | v4.5 with RULE-141 to RULE-170 (ExecuteAsync, MediatR removal, Legacy deletion, DB Health Check, Multi-Window) |
 | **DB Health Check** | `GET /api/v1/health/database` endpoint + Desktop startup check before login |
 | **DatabaseErrorDialog** | Styled dialog with Retry/Exit on DB connection failure (Arabic) |
 | **ExceptionMiddleware** | Detects DB failures → returns `DATABASE_CONNECTION_ERROR` with 503 |
+| **🆕 Multi-Window Screen Management** | Open multiple independent windows simultaneously (e.g., 3 sale invoices at once) |
+| **🆕 IScreenWindowService** | Service layer for non-modal window lifecycle tracking, cascade positioning, weak reference management |
+| **🆕 ScreenWindow** | Generic host window that accepts any View/ViewModel pair via naming convention |
+| **🆕 Non-Modal Editors** | All 7 editor types (Sales, Purchases, Returns, Payments, Transfers) now open non-modally |
+| **🆕 MainWindow Menu** | "فتح نافذة جديدة" items for Sales, Purchases, Warehouses, Products, Customers, Suppliers |
+| **🆕 Arabic Auto-Titles** | Windows auto-title with Arabic names (فاتورة بيع, فاتورة شراء, سداد عميل, etc.) |
+| **🆕 Cascade Positioning** | New windows offset 30px from MainWindow — no overlapping |
 
 ---
 

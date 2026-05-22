@@ -38,6 +38,10 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 10. **DB Health**: API MUST expose `/api/v1/health/database` — checks DB via `DbContext.Database.CanConnectAsync()`
 11. **ExceptionMiddleware**: MUST detect DB connection exceptions (`SqlException`, `InvalidOperationException` with connection string message) → return `503` with `DATABASE_CONNECTION_ERROR`
 12. **SecureDbContextFactory**: MUST fall back to `SALESSYSTEM_DB_CONNECTION` env var before throwing
+13. **Multi-Window Desktop**: Use `IScreenWindowService` for ALL non-modal window lifecycle management
+14. **Window Tracking**: Use `WeakReference<Window>` — NEVER strong references (prevents memory leaks)
+15. **Lifecycle**: `CloseRequested` → Close → `Cleanup()` → `OnClosed` callback — ALL managed by ScreenWindowService
+16. **Naming Convention**: View type resolved from ViewModel type by replacing "ViewModel" → "View" in FullName
 
 ## Pattern to Follow
 ```csharp
