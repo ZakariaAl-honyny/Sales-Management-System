@@ -24,6 +24,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
     private readonly IProductApiService _productService;
     private readonly IDialogService _dialogService;
     private readonly IPrintApiService _printService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<SalesInvoiceDto> _invoices = new();
     private ICollectionView? _invoicesView;
@@ -44,7 +45,8 @@ public class SalesInvoiceListViewModel : ViewModelBase
             App.GetService<IWarehouseApiService>(),
             App.GetService<IProductApiService>(),
             App.GetService<IDialogService>(),
-            App.GetService<IPrintApiService>())
+            App.GetService<IPrintApiService>(),
+            App.GetService<IScreenWindowService>())
     {
     }
 
@@ -55,7 +57,8 @@ public class SalesInvoiceListViewModel : ViewModelBase
         IWarehouseApiService warehouseService,
         IProductApiService productService,
         IDialogService dialogService,
-        IPrintApiService printService)
+        IPrintApiService printService,
+        IScreenWindowService screenWindowService)
     {
         _invoiceService = invoiceService ?? throw new ArgumentNullException(nameof(invoiceService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
@@ -64,6 +67,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
         _productService = productService ?? throw new ArgumentNullException(nameof(productService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _printService = printService ?? throw new ArgumentNullException(nameof(printService));
+        _screenWindowService = screenWindowService ?? throw new ArgumentNullException(nameof(screenWindowService));
 
         // Initialize commands
         RefreshCommand = new AsyncRelayCommand(LoadInvoicesAsync);
@@ -286,16 +290,19 @@ public class SalesInvoiceListViewModel : ViewModelBase
 
     private void AddNewInvoice()
     {
-        var editorVm = new SalesInvoiceEditorViewModel();
-        var editorWindow = new SalesInvoiceEditorView { DataContext = editorVm };
-        editorVm.CloseRequested += () => editorWindow.DialogResult = true;
-
-        if (editorWindow.ShowDialog() == true)
+        var editorVm = App.GetService<SalesInvoiceEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            if (editorVm.InvoiceId.HasValue)
-                _eventBus.Publish(new SaleInvoiceChangedMessage(editorVm.InvoiceId.Value));
-            _ = LoadInvoicesAsync();
-        }
+            Title = "فاتورة بيع جديدة",
+            OnClosed = (vm) =>
+            {
+                if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+                {
+                    _eventBus.Publish(new SaleInvoiceChangedMessage(editor.InvoiceId.Value));
+                    System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+                }
+            }
+        });
     }
 
     private void ViewInvoice()
@@ -303,7 +310,10 @@ public class SalesInvoiceListViewModel : ViewModelBase
         if (SelectedInvoice == null) return;
 
         var editorVm = new SalesInvoiceEditorViewModel(SelectedInvoice.Id, isReadOnly: true);
-        _dialogService.ShowDialog(editorVm);
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
+        {
+            Title = "عرض فاتورة بيع"
+        });
     }
 
     private void EditInvoice()
@@ -311,11 +321,15 @@ public class SalesInvoiceListViewModel : ViewModelBase
         if (SelectedInvoice == null) return;
 
         var editorVm = new SalesInvoiceEditorViewModel(SelectedInvoice.Id);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _eventBus.Publish(new SaleInvoiceChangedMessage(SelectedInvoice.Id));
-            _ = LoadInvoicesAsync();
-        }
+            Title = "تعديل فاتورة بيع",
+            OnClosed = (vm) =>
+            {
+                _eventBus.Publish(new SaleInvoiceChangedMessage(SelectedInvoice.Id));
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+            }
+        });
     }
 
     private async Task PostInvoiceAsync()

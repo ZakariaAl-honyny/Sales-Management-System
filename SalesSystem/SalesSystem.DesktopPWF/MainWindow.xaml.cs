@@ -219,4 +219,38 @@ public partial class MainWindow : Window
     private void CustomerPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("CustomerPayments");
     private void SupplierPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("SupplierPayments");
     private void InventoryStatusMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Inventory");
+
+    private void OpenPageInNewWindow(string title, string tag)
+    {
+        FrameworkElement? page = tag switch
+        {
+            "Sales" => new Views.Sales.SalesInvoicesListView(),
+            "Purchases" => new Views.Purchases.PurchaseInvoicesListView(),
+            "Products" => new Views.Products.ProductsListView(),
+            "Customers" => new Views.Customers.CustomersListView(),
+            "Suppliers" => new Views.Suppliers.SuppliersListView(),
+            "Warehouses" => new Views.WarehousesView(),
+            _ => null
+        };
+
+        if (page == null) return;
+
+        var screenWindow = new Views.ScreenWindow();
+        screenWindow.SetContent(page, page.DataContext);
+
+        var screenService = App.GetService<IScreenWindowService>();
+        screenService.OpenWindow(screenWindow, new ScreenWindowOptions
+        {
+            Title = title,
+            Width = 1000,
+            Height = 700
+        });
+    }
+
+    private void OpenNewSalesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المبيعات", "Sales");
+    private void OpenNewPurchasesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المشتريات", "Purchases");
+    private void OpenNewWarehousesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المستودعات", "Warehouses");
+    private void OpenNewProductsWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المنتجات", "Products");
+    private void OpenNewCustomersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("العملاء", "Customers");
+    private void OpenNewSuppliersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("الموردين", "Suppliers");
 }

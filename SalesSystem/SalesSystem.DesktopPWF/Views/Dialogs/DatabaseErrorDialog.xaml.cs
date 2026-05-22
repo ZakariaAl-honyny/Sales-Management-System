@@ -15,7 +15,6 @@ public partial class DatabaseErrorDialog : Window
     {
         InitializeComponent();
         MessageText.Text = message;
-        Owner = System.Windows.Application.Current?.MainWindow;
     }
 
     private void RetryButton_Click(object sender, RoutedEventArgs e)

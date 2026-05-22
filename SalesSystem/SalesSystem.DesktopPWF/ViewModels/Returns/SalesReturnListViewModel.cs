@@ -21,6 +21,7 @@ public class SalesReturnListViewModel : ViewModelBase
     private readonly ISalesReturnApiService _returnService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<SalesReturnDto> _returns = new();
     private ICollectionView? _returnsView;
@@ -36,6 +37,7 @@ public class SalesReturnListViewModel : ViewModelBase
         _returnService = App.GetService<ISalesReturnApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         // Initialize commands
         RefreshCommand = new AsyncRelayCommand(LoadReturnsAsync);
@@ -223,11 +225,15 @@ public class SalesReturnListViewModel : ViewModelBase
 
     private void AddNewReturn()
     {
-        var editorVm = new SalesReturnEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        var editorVm = App.GetService<SalesReturnEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadReturnsAsync();
-        }
+            Title = "مرتجع مبيعات جديد",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
+            }
+        });
     }
 
     private async void SearchInvoiceForReturn()
@@ -250,14 +256,15 @@ public class SalesReturnListViewModel : ViewModelBase
                 
                 if (fullInvoiceResult.IsSuccess && fullInvoiceResult.Value != null)
                 {
-                    InvokeOnUIThread(() =>
+                    var editorVm = new SalesReturnEditorViewModel();
+                    editorVm.SelectedInvoice = fullInvoiceResult.Value;
+                    
+                    _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
                     {
-                        var editorVm = new SalesReturnEditorViewModel();
-                        editorVm.SelectedInvoice = fullInvoiceResult.Value;
-                        
-                        if (dialogService.ShowDialog(editorVm))
+                        Title = "مرتجع مبيعات من فاتورة",
+                        OnClosed = (vm) =>
                         {
-                            _ = LoadReturnsAsync();
+                            System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
                         }
                     });
                 }
@@ -288,10 +295,14 @@ public class SalesReturnListViewModel : ViewModelBase
         if (SelectedReturn == null) return;
         var editorVm = new SalesReturnEditorViewModel();
         _ = editorVm.LoadReturnAsync(SelectedReturn.Id);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadReturnsAsync();
-        }
+            Title = "عرض مرتجع مبيعات",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
+            }
+        });
     }
 
     private void UpdateCommandStates()

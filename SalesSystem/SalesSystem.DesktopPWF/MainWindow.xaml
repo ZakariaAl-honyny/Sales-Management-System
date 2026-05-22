@@ -33,17 +33,23 @@
                 <MenuItem Header="إرجاع المبيعات" Click="SalesReturnsMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="تسديد ديون العملاء" Click="CustomerPaymentsMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="فتح نافذة مبيعات جديدة" Click="OpenNewSalesWindow_Click"/>
             </MenuItem>
             <MenuItem Header="المشتريات">
                 <MenuItem Header="فواتير الشراء" Click="PurchaseInvoicesMenuItem_Click"/>
                 <MenuItem Header="إرجاع المشتريات" Click="PurchaseReturnsMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="تسديد ديون الموردين" Click="SupplierPaymentsMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="فتح نافذة مشتريات جديدة" Click="OpenNewPurchasesWindow_Click"/>
             </MenuItem>
             <MenuItem Header="المستودعات">
                 <MenuItem Header="إدارة المستودعات" Click="WarehousesMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="نقل المخزون" Click="StockTransfersMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="فتح نافذة مستودعات جديدة" Click="OpenNewWarehousesWindow_Click"/>
             </MenuItem>
             <MenuItem Header="التقارير">
                 <MenuItem Header="تقرير المبيعات" Tag="Reports" Click="ReportMenuItem_Click"/>
@@ -57,6 +63,10 @@
                 <MenuItem Header="إدارة الموردين" Click="SuppliersMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="إدارة المستخدمين" Click="UsersMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="فتح نافذة منتجات جديدة" Click="OpenNewProductsWindow_Click"/>
+                <MenuItem Header="فتح نافذة عملاء جديدة" Click="OpenNewCustomersWindow_Click"/>
+                <MenuItem Header="فتح نافذة موردين جديدة" Click="OpenNewSuppliersWindow_Click"/>
             </MenuItem>
         </Menu>
 

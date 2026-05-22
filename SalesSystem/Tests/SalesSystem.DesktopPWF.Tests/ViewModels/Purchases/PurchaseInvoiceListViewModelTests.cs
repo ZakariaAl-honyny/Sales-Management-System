@@ -9,6 +9,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels.Purchases;
 
 /// <summary>
@@ -20,6 +21,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
     private readonly Mock<IPrintApiService> _mockPrintService;
+    private readonly Mock<IScreenWindowService> _mockScreenWindowService;
     private readonly PurchaseInvoiceListViewModel _viewModel;
 
     public PurchaseInvoiceListViewModelTests()
@@ -28,12 +30,14 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
         _mockPrintService = new Mock<IPrintApiService>();
+        _mockScreenWindowService = new Mock<IScreenWindowService>();
 
         _viewModel = new PurchaseInvoiceListViewModel(
             _mockInvoiceService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
-            _mockPrintService.Object);
+            _mockPrintService.Object,
+            _mockScreenWindowService.Object);
     }
 
     public void Dispose()

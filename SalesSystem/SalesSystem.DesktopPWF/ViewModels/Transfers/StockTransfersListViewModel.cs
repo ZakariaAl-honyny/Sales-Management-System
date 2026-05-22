@@ -21,6 +21,7 @@ public class StockTransfersListViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
     private readonly ITransferPrinter _transferPrinter;
     private readonly ISettingsApiService _settingsService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
@@ -39,6 +40,7 @@ public class StockTransfersListViewModel : ViewModelBase
         _dialogService = App.GetService<IDialogService>();
         _transferPrinter = App.GetService<ITransferPrinter>();
         _settingsService = App.GetService<ISettingsApiService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         AddCommand = new RelayCommand(OnNew);
         ViewCommand = new RelayCommand(OnView, () => SelectedTransfer != null);
@@ -214,28 +216,39 @@ public class StockTransfersListViewModel : ViewModelBase
 
     private void OnNew()
     {
-        var vm = new StockTransferEditorViewModel();
-        if (_dialogService.ShowDialog(vm))
+        var vm = App.GetService<StockTransferEditorViewModel>();
+        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            _ = LoadTransfersAsync();
-        }
+            Title = "نقل مخزون جديد",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadTransfersAsync());
+            }
+        });
     }
 
     private void OnView()
     {
         if (SelectedTransfer == null) return;
         var vm = new StockTransferEditorViewModel(SelectedTransfer.Id, isReadOnly: true);
-        _dialogService.ShowDialog(vm);
+        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        {
+            Title = "عرض نقل مخزون"
+        });
     }
 
     private void OnEdit()
     {
         if (SelectedTransfer == null) return;
         var vm = new StockTransferEditorViewModel(SelectedTransfer.Id);
-        if (_dialogService.ShowDialog(vm))
+        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            _ = LoadTransfersAsync();
-        }
+            Title = "تعديل نقل مخزون",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadTransfersAsync());
+            }
+        });
     }
 
     private async Task OnPost()

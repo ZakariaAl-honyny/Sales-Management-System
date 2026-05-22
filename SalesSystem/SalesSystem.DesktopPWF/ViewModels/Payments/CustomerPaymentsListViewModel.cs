@@ -23,6 +23,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
     private readonly INavigationService _navigationService;
     private readonly IPaymentPrinter _paymentPrinter;
     private readonly ISettingsApiService _settingsService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
@@ -42,6 +43,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
         _navigationService = App.GetService<INavigationService>();
         _paymentPrinter = App.GetService<IPaymentPrinter>();
         _settingsService = App.GetService<ISettingsApiService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         NewCommand = new RelayCommand(OnNew);
         ViewCommand = new RelayCommand(OnView, () => SelectedPayment != null);
@@ -167,28 +169,39 @@ public class CustomerPaymentsListViewModel : ViewModelBase
 
     private void OnNew()
     {
-        var vm = new CustomerPaymentEditorViewModel();
-        if (_dialogService.ShowDialog(vm))
+        var vm = App.GetService<CustomerPaymentEditorViewModel>();
+        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            _ = LoadPaymentsAsync();
-        }
+            Title = "سداد عميل جديد",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
+            }
+        });
     }
 
     private void OnView()
     {
         if (SelectedPayment == null) return;
         var vm = new CustomerPaymentEditorViewModel(SelectedPayment.Id, isReadOnly: true);
-        _dialogService.ShowDialog(vm);
+        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        {
+            Title = "عرض سداد عميل"
+        });
     }
 
     private void OnEdit()
     {
         if (SelectedPayment == null) return;
         var vm = new CustomerPaymentEditorViewModel(SelectedPayment.Id);
-        if (_dialogService.ShowDialog(vm))
+        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            _ = LoadPaymentsAsync();
-        }
+            Title = "تعديل سداد عميل",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
+            }
+        });
     }
 
     private async Task OnDelete()

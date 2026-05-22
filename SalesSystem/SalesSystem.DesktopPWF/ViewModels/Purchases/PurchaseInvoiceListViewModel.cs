@@ -21,6 +21,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IPrintApiService _printService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<PurchaseInvoiceDto> _invoices = new();
     private ICollectionView? _invoicesView;
@@ -37,7 +38,8 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
             App.GetService<IPurchaseInvoiceApiService>(),
             App.GetService<IEventBus>(),
             App.GetService<IDialogService>(),
-            App.GetService<IPrintApiService>())
+            App.GetService<IPrintApiService>(),
+            App.GetService<IScreenWindowService>())
     {
     }
 
@@ -45,12 +47,14 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         IPurchaseInvoiceApiService invoiceService,
         IEventBus eventBus,
         IDialogService dialogService,
-        IPrintApiService printService)
+        IPrintApiService printService,
+        IScreenWindowService screenWindowService)
     {
         _invoiceService = invoiceService ?? throw new ArgumentNullException(nameof(invoiceService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _printService = printService ?? throw new ArgumentNullException(nameof(printService));
+        _screenWindowService = screenWindowService ?? throw new ArgumentNullException(nameof(screenWindowService));
 
         // Initialize commands
         RefreshCommand = new AsyncRelayCommand(LoadInvoicesAsync);
@@ -274,13 +278,19 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
 
     private void AddNewInvoice()
     {
-        var editorVm = new PurchaseInvoiceEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        var editorVm = App.GetService<PurchaseInvoiceEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            if (editorVm.InvoiceId.HasValue)
-                _eventBus.Publish(new PurchaseInvoiceChangedMessage(editorVm.InvoiceId.Value));
-            _ = LoadInvoicesAsync();
-        }
+            Title = "فاتورة شراء جديدة",
+            OnClosed = (vm) =>
+            {
+                if (vm is PurchaseInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+                {
+                    _eventBus.Publish(new PurchaseInvoiceChangedMessage(editor.InvoiceId.Value));
+                    System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+                }
+            }
+        });
     }
 
     private void ViewInvoice()
@@ -288,7 +298,10 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         if (SelectedInvoice == null) return;
 
         var editorVm = new PurchaseInvoiceEditorViewModel(SelectedInvoice.Id, isReadOnly: true);
-        _dialogService.ShowDialog(editorVm);
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
+        {
+            Title = "عرض فاتورة شراء"
+        });
     }
 
     private void EditInvoice()
@@ -296,11 +309,15 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         if (SelectedInvoice == null) return;
 
         var editorVm = new PurchaseInvoiceEditorViewModel(SelectedInvoice.Id);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _eventBus.Publish(new PurchaseInvoiceChangedMessage(SelectedInvoice.Id));
-            _ = LoadInvoicesAsync();
-        }
+            Title = "تعديل فاتورة شراء",
+            OnClosed = (vm) =>
+            {
+                _eventBus.Publish(new PurchaseInvoiceChangedMessage(SelectedInvoice.Id));
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+            }
+        });
     }
 
     private async Task PostInvoiceAsync()

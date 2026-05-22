@@ -116,7 +116,6 @@ public partial class App : System.Windows.Application
             {
                 var dialog = new Views.Dialogs.DatabaseErrorDialog(
                     result.ErrorMessage ?? "تعذر الاتصال بقاعدة البيانات");
-                dialog.Owner = MainWindow;
                 dialog.ShowDialog();
                 return dialog.RetryClicked;
             });
@@ -158,6 +157,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ISessionService, SessionService>();
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IScreenWindowService, ScreenWindowService>();
         services.AddSingleton<IEventBus, EventBus>();
         services.AddSingleton<ISoundService, SoundService>();
         services.AddSingleton<IBarcodeInputService, BarcodeInputService>();
