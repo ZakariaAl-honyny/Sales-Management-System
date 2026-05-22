@@ -60,12 +60,12 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave());
-        PostCommand = new AsyncRelayCommand(PostAsync, CanPost);
-        CancelReturnCommand = new AsyncRelayCommand(CancelReturnAsync, CanCancel);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        PostCommand = new AsyncRelayCommand(PostAsync);
+        CancelReturnCommand = new AsyncRelayCommand(CancelReturnAsync);
         CancelCommand = new RelayCommand(() => RequestClose());
-        SearchInvoiceCommand = new AsyncRelayCommand(SearchInvoiceAsync, () => !IsEditMode);
-        PrintA4Command = new AsyncRelayCommand(PrintA4Async, () => _returnId.HasValue);
+        SearchInvoiceCommand = new AsyncRelayCommand(SearchInvoiceAsync);
+        PrintA4Command = new AsyncRelayCommand(PrintA4Async);
         ProcessBarcodeCommand = new AsyncRelayCommand(async () => 
         {
             var code = SearchText;
@@ -104,7 +104,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             if (SetProperty(ref _selectedWarehouseId, value))
             {
                 UpdateImpactAnalysis();
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -118,7 +117,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             {
                 if (value != null) SearchText = value.InvoiceNo;
                 UpdateItemsFromInvoice();
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -164,7 +162,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsPosted));
                 OnPropertyChanged(nameof(IsCancelled));
                 OnPropertyChanged(nameof(IsReadOnly));
-                UpdateCommandStates();
             }
         }
     }
@@ -349,7 +346,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 }
                 OnPropertyChanged(nameof(TotalAmount));
                 UpdateImpactAnalysis();
-                UpdateCommandStates();
             }
             else
             {
@@ -428,36 +424,39 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         Impact = summary;
     }
 
-    private bool CanSave()
+    private async Task<bool> Validate()
     {
-        if (IsReadOnly) return false;
-        if (SelectedInvoice == null) return false;
-        if (SelectedWarehouseId <= 0) return false;
-        if (!Items.Any(i => i.ReturnQuantity > 0)) return false;
+        if (IsReadOnly)
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "الفاتورة ليست في حالة مسودة ولا يمكن تعديلها" });
+            RequestFocusFirstInvalidField();
+            return false;
+        }
+        if (SelectedInvoice == null)
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى اختيار فاتورة المشتريات أولاً" });
+            RequestFocusFirstInvalidField();
+            return false;
+        }
+        if (SelectedWarehouseId <= 0)
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى اختيار المستودع" });
+            RequestFocusFirstInvalidField();
+            return false;
+        }
+        if (!Items.Any(i => i.ReturnQuantity > 0))
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى إدخال كميات المرتجع" });
+            RequestFocusFirstInvalidField();
+            return false;
+        }
         return true;
-    }
-
-    private bool CanPost()
-    {
-        return IsEditMode && Status == InvoiceStatus.Draft && _returnId.HasValue;
-    }
-
-    private bool CanCancel()
-    {
-        return IsEditMode && Status != InvoiceStatus.Cancelled && _returnId.HasValue;
-    }
-
-    private void UpdateCommandStates()
-    {
-        (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PostCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (CancelReturnCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (SearchInvoiceCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintA4Command as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private async Task SaveAsync()
     {
+        if (!await Validate()) return;
+
         IsLoading = true;
         ErrorMessage = null;
 
@@ -489,13 +488,13 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المرتجع", "PurchaseReturnEditorViewModel.SaveAsync", "[PurchaseReturnEditorViewModel.SaveAsync] Failed to save purchase return.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في حفظ المرتجع", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "PurchaseReturnEditorViewModel.SaveAsync", "[PurchaseReturnEditorViewModel.SaveAsync] Failed to save purchase return.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في حفظ المرتجع", ErrorMessage);
         }
         finally
         {
@@ -528,7 +527,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = result.Error ?? "فشل في ترحيل المرتجع";
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
         }
         finally
@@ -557,7 +556,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = result.Error ?? "فشل في إلغاء المرتجع";
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
         }
         finally
@@ -588,7 +587,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error preparing print for purchase return {Id}", _returnId);
-            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحضير الطباعة");
+            await _dialogService.ShowErrorAsync("خطأ في الطباعة", "حدث خطأ أثناء تحضير الطباعة");
         }
         finally
         {
@@ -615,7 +614,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         }
 
         // If invoice selected, find product by code or barcode
-        var item = Items.FirstOrDefault(i => i.ProductCode == barcode);
+        var item = Items.FirstOrDefault(i => i.ProductName.Contains(barcode) || i.ProductId.ToString() == barcode);
         if (item != null)
         {
             if (item.ReturnQuantity < item.OriginalQuantity)
@@ -659,7 +658,6 @@ public class PurchaseReturnItemViewModel : ViewModelBase
     private readonly ISoundService? _soundService;
 
     public int ProductId { get; }
-    public string ProductCode { get; }
     public string ProductName { get; }
     public decimal OriginalQuantity { get; }
     public decimal UnitPrice { get; }
@@ -686,7 +684,6 @@ public class PurchaseReturnItemViewModel : ViewModelBase
     public PurchaseReturnItemViewModel(PurchaseInvoiceItemDto item, ISoundService? soundService = null)
     {
         ProductId = item.ProductId;
-        ProductCode = item.ProductCode ?? string.Empty;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitCost;
@@ -699,7 +696,6 @@ public class PurchaseReturnItemViewModel : ViewModelBase
     public PurchaseReturnItemViewModel(PurchaseReturnItemDto item, ISoundService? soundService = null)
     {
         ProductId = item.ProductId;
-        ProductCode = item.ProductCode ?? string.Empty;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitCost;

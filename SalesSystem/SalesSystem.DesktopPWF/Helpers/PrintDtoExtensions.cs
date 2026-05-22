@@ -38,7 +38,6 @@ public static class PrintDtoExtensions
     {
         return items.Select(i => new InvoiceItemPrintDto
         {
-            ProductCode = i.ProductCode ?? string.Empty,
             ProductName = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitPrice,
@@ -80,7 +79,6 @@ public static class PrintDtoExtensions
     {
         return items.Select(i => new InvoiceItemPrintDto
         {
-            ProductCode = i.ProductCode ?? string.Empty,
             ProductName = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitCost,
@@ -121,7 +119,6 @@ public static class PrintDtoExtensions
     {
         return items.Select(i => new InvoiceItemPrintDto
         {
-            ProductCode = i.ProductCode ?? string.Empty,
             ProductName = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitPrice,
@@ -162,7 +159,6 @@ public static class PrintDtoExtensions
     {
         return items.Select(i => new InvoiceItemPrintDto
         {
-            ProductCode = i.ProductCode ?? string.Empty,
             ProductName = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitCost,
@@ -231,7 +227,6 @@ public static class PrintDtoExtensions
     {
         return items.Select(i => new InvoiceItemPrintDto
         {
-            ProductCode = i.ProductCode ?? string.Empty,
             ProductName = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = 0,

@@ -108,7 +108,7 @@ public class LowStockViewModel : ViewModelBase
                 {
                     Warehouses.Clear();
                     // Add "All Warehouses" option
-                    Warehouses.Add(new WarehouseDto(0, null, "كل المخازن", string.Empty, true, true));
+                    Warehouses.Add(new WarehouseDto(0, "كل المخازن", string.Empty, true, true));
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
                     
@@ -141,12 +141,13 @@ public class LowStockViewModel : ViewModelBase
             }
             else
             {
-                _dialogService.ShowError(result.Error ?? "فشل في تحميل تقرير المخزون المنخفض", "خطأ");
+                await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", result.Error ?? "فشل في تحميل تقرير المخزون المنخفض");
             }
         }
         catch (Exception ex)
         {
-            _dialogService.ShowError($"حدث خطأ غير متوقع: {ex.Message}", "خطأ");
+            LogSystemError("Failed to load low stock report", "LowStockViewModel.LoadDataAsync", ex);
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", "حدث خطأ غير متوقع أثناء تحميل التقرير. يرجى المحاولة مرة أخرى.");
         }
         finally
         {
@@ -154,11 +155,11 @@ public class LowStockViewModel : ViewModelBase
         }
     }
 
-    private void ExportToExcel()
+    private async void ExportToExcel()
     {
         if (Items.Count == 0)
         {
-            _dialogService.ShowWarning("لا توجد بيانات لتصديرها", "تنبيه");
+            await _dialogService.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
             return;
         }
 
@@ -191,7 +192,7 @@ public class LowStockViewModel : ViewModelBase
                     for (int i = 0; i < Items.Count; i++)
                     {
                         var item = Items[i];
-                        worksheet.Cell(i + 2, 1).Value = item.ProductCode;
+                        // worksheet.Cell(i + 2, 1).Value = item.ProductCode;
                         worksheet.Cell(i + 2, 2).Value = item.ProductName;
                         worksheet.Cell(i + 2, 3).Value = item.CategoryName;
                         worksheet.Cell(i + 2, 4).Value = item.WarehouseName;
@@ -210,18 +211,19 @@ public class LowStockViewModel : ViewModelBase
 
                     workbook.SaveAs(saveFileDialog.FileName);
                 }
-                _dialogService.ShowInfo("تم تصدير الملف بنجاح", "نجاح");
+                await _dialogService.ShowInfoAsync("نجاح", "تم تصدير الملف بنجاح");
             }
         }
         catch (Exception ex)
         {
-            _dialogService.ShowError($"فشل في تصدير الملف: {ex.Message}", "خطأ");
+            LogSystemError("Failed to export low stock report to Excel", "LowStockViewModel.ExportToExcel", ex);
+            await _dialogService.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
         }
     }
 
-    private void Print()
+    private async void Print()
     {
         // Printing logic using a print service or simple PDF export
-        _dialogService.ShowInfo("جاري تجهيز الطباعة...", "معلومات");
+        await _dialogService.ShowInfoAsync("معلومات", "جاري تجهيز الطباعة...");
     }
 }

@@ -80,12 +80,12 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave());
-        PostCommand = new AsyncRelayCommand(PostAsync, CanPost);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        PostCommand = new AsyncRelayCommand(PostAsync);
         CancelCommand = new RelayCommand(Cancel);
         AddLineCommand = new RelayCommand(AddLine);
         RemoveLineCommand = new RelayCommand(RemoveLine, CanRemoveLine);
-        PrintA4Command = new AsyncRelayCommand(PrintA4Async, CanPrint);
+        PrintA4Command = new AsyncRelayCommand(PrintA4Async);
         SearchProductCommand = new RelayCommand(SearchProduct);
         SearchProductSingleCommand = new RelayCommand(SearchProductSingle);
         SearchSupplierCommand = new RelayCommand(SearchSupplier);
@@ -498,7 +498,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "PurchaseInvoiceEditorViewModel.LoadInvoiceAsync", $"[PurchaseInvoiceEditorViewModel.LoadInvoiceAsync] Failed to load purchase invoice ID {_invoiceId}.");
-            _dialogService.ShowError(ErrorMessage!, "خطأ");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل الفاتورة", ErrorMessage!);
         }
         finally
         {
@@ -508,7 +508,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     private async Task SaveAsync()
     {
-        if (!ValidateInvoice()) return;
+        if (!await ValidateInvoice()) return;
 
         IsLoading = true;
         ErrorMessage = null;
@@ -539,20 +539,20 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsEditMode));
                 OnPropertyChanged(nameof(IsReadOnly));
                 
-                _dialogService.ShowInfo("✅ تم حفظ فاتورة الشراء بنجاح. يمكنك الآن الترحيل النهائي للمخزون.", "نجاح");
+                await _dialogService.ShowInfoAsync("نجاح", "✅ تم حفظ فاتورة الشراء بنجاح. يمكنك الآن الترحيل النهائي للمخزون.");
                 _eventBus.Publish(new PurchaseInvoiceChangedMessage(_invoiceId.Value));
                 UpdateCommandStates();
             }
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ الفاتورة", "PurchaseInvoiceEditorViewModel.SaveAsync", "[PurchaseInvoiceEditorViewModel.SaveAsync] Failed to save purchase invoice.");
-                _dialogService.ShowError(ErrorMessage!, "خطأ");
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "PurchaseInvoiceEditorViewModel.SaveAsync", "[PurchaseInvoiceEditorViewModel.SaveAsync] Failed to save purchase invoice.");
-            _dialogService.ShowError(ErrorMessage!, "خطأ");
+            await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
         }
         finally
         {
@@ -569,7 +569,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             if (_invoiceId == null) return;
         }
 
-        if (!_dialogService.ShowConfirmation("هل أنت متأكد من ترحيل هذه الفاتورة؟\nسيتم إضافة الكميات إلى المخزون.", "تأكيد الترحيل")) return;
+        if (!await _dialogService.ShowConfirmationAsync("تأكيد الترحيل", "هل أنت متأكد من ترحيل هذه الفاتورة؟\nسيتم إضافة الكميات إلى المخزون.")) return;
 
         IsLoading = true;
         ErrorMessage = null;
@@ -579,20 +579,20 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             var postResult = await _invoiceService.PostAsync(_invoiceId!.Value);
             if (postResult.IsSuccess)
             {
-                _dialogService.ShowInfo("تم ترحيل الفاتورة بنجاح", "نجاح");
+                await _dialogService.ShowInfoAsync("نجاح", "تم ترحيل الفاتورة بنجاح");
                 _eventBus.Publish(new PurchaseInvoiceChangedMessage(_invoiceId.Value));
                 RequestClose();
             }
             else
             {
                 ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "PurchaseInvoiceEditorViewModel.PostAsync", $"[PurchaseInvoiceEditorViewModel.PostAsync] Failed to post/confirm purchase invoice ID {_invoiceId}.");
-                _dialogService.ShowError(ErrorMessage!, "خطأ");
+                await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "PurchaseInvoiceEditorViewModel.PostAsync", $"[PurchaseInvoiceEditorViewModel.PostAsync] Failed to post/confirm purchase invoice ID {_invoiceId}.");
-            _dialogService.ShowError(ErrorMessage!, "خطأ");
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
         }
         finally
         {
@@ -661,22 +661,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         return Items.Count > 1;
     }
 
-    private bool CanSave()
-    {
-        return !HasErrors && SelectedSupplierId > 0 && Items.Any(i => i.SelectedProduct != null && i.Quantity > 0);
-    }
-
-    private bool CanPost()
-    {
-        return CanSave() && SelectedWarehouseId > 0 && Status == (byte)InvoiceStatus.Draft;
-    }
-
-    private bool CanPrint()
-    {
-        return _invoiceId.HasValue;
-    }
-
-    private bool ValidateInvoice()
+    private async Task<bool> ValidateInvoice()
     {
         var errors = new List<string>();
 
@@ -691,8 +676,8 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
         if (errors.Any())
         {
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            _dialogService.ShowWarning(errorMsg, "بيانات غير مكتملة");
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return false;
         }
 
@@ -940,9 +925,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     private void UpdateCommandStates()
     {
-        (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PostCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintA4Command as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
     #endregion
 }

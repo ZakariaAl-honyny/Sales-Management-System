@@ -156,3 +156,9 @@ Check EVERY input for validation.
 Check EVERY response for data leakage.
 Verify passwords hashed with BCrypt cost 12+.
 Verify no sensitive data in logs.
+
+- Check that ALL controllers use `[Authorize]` (not `[AllowAnonymous]` bypasses on non-login endpoints)
+- Check that NO hardcoded connection strings exist in production code (design-time factory is acceptable)
+- Check that Settings GET endpoints are restricted to AdminOnly (not accessible by Cashier)
+- Check that LogsController has input size validation
+- Check that CORS is configured if running outside desktop-only mode

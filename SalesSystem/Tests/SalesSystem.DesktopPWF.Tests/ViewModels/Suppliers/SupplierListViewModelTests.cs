@@ -40,7 +40,7 @@ public class SupplierListViewModelTests : IDisposable
 
     private static SupplierDto CreateSupplier(int id, string name, bool isActive = true)
     {
-        return new SupplierDto(id, $"S{id:000}", name, null, null, null, null, 0m, 0m, 0m, isActive);
+        return new SupplierDto(id, name, null, null, null, null, 0m, 0m, 0m, isActive);
     }
 
     #region LoadSuppliers Tests
@@ -70,7 +70,7 @@ public class SupplierListViewModelTests : IDisposable
     {
         _mockSupplierService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
-            .ReturnsAsync(Result<List<SupplierDto>>.Failure("فشل في الاتصال"));
+            .ReturnsAsync(Result<List<SupplierDto>>.Failure("فشل في تحميل الموردين"));
 
         await _viewModel.LoadSuppliersAsync();
 
@@ -134,7 +134,7 @@ public class SupplierListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<SupplierDto>>.Success(new List<SupplierDto>()));
 
-        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
+        _viewModel.DeleteCommand.Execute(null);
         await Task.Delay(100);
 
         _mockSupplierService.Verify(s => s.DeleteAsync(supplier.Id), Times.Once);
@@ -160,7 +160,7 @@ public class SupplierListViewModelTests : IDisposable
             .Setup(s => s.DeleteAsync(It.IsAny<int>()))
             .ReturnsAsync(Result.Success());
 
-        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
+        _viewModel.DeleteCommand.Execute(null);
         await Task.Delay(100);
 
         _mockEventBus.Verify(

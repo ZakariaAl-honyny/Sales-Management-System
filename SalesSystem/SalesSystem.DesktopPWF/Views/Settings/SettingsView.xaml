@@ -9,12 +9,13 @@
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
-    <Grid Margin="24,24,24,0">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <Grid Margin="24,24,24,24">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
         <!-- Header -->
         <TextBlock Grid.Row="0"
@@ -119,6 +120,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,16">
@@ -148,7 +150,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBox Grid.Column="0" Text="{Binding LogoPath}" IsReadOnly="True" AutomationProperties.AutomationId="TxtLogoPath"/>
-                                    <Button Grid.Column="1" Content="تصفح..." Command="{Binding BrowseLogoCommand}" Margin="8,0,0,0" AutomationProperties.AutomationId="BtnBrowseLogo"/>
+                                    <Button Grid.Column="1" Content="تصفح..." Command="{Binding BrowseLogoCommand}" Margin="8,0,0,0" AutomationProperties.AutomationId="BtnBrowseLogo" ToolTip="اختيار ملف"/>
                                 </Grid>
                             </StackPanel>
 
@@ -196,7 +198,8 @@
                                     Style="{StaticResource DangerButton}"
                                     VerticalAlignment="Bottom"
                                     Width="180"
-                                    AutomationProperties.AutomationId="BtnRestoreBackup"/>
+                                    AutomationProperties.AutomationId="BtnRestoreBackup"
+                                    ToolTip="استعادة النسخة الاحتياطية المحددة"/>
                         </Grid>
 
                         <Button Content="📦 إنشاء نسخة احتياطية جديدة الآن" 
@@ -204,7 +207,8 @@
                                 Style="{StaticResource SecondaryButton}"
                                 HorizontalAlignment="Left"
                                 Padding="20,10"
-                                AutomationProperties.AutomationId="BtnCreateBackup"/>
+                                AutomationProperties.AutomationId="BtnCreateBackup"
+                                ToolTip="إنشاء نسخة احتياطية فورية"/>
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -219,7 +223,8 @@
                             Command="{Binding SaveCommand}"
                             IsDefault="True"
                             TabIndex="11"
-                            AutomationProperties.AutomationId="BtnSaveSettings"/>
+                            AutomationProperties.AutomationId="BtnSaveSettings"
+                            ToolTip="حفظ إعدادات النظام"/>
                 </StackPanel>
             </Grid>
         </Border>

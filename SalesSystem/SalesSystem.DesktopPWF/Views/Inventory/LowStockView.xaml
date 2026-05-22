@@ -36,7 +36,8 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
                 <Button Command="{Binding ExportCommand}" 
                         Style="{StaticResource SecondaryButton}" 
-                        Margin="0,0,12,0" Height="40" Padding="20,0">
+                        Margin="0,0,12,0" Height="40" Padding="20,0"
+                        ToolTip="تصدير البيانات إلى ملف Excel">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="📊" Margin="0,0,8,0" VerticalAlignment="Center"/>
                         <TextBlock Text="تصدير إكسل" VerticalAlignment="Center"/>
@@ -44,7 +45,8 @@
                 </Button>
                 <Button Command="{Binding RefreshCommand}" 
                         Style="{StaticResource PrimaryButton}" 
-                        Height="40" Padding="20,0">
+                        Height="40" Padding="20,0"
+                        ToolTip="تحديث البيانات">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
                         <TextBlock Text="تحديث" VerticalAlignment="Center"/>

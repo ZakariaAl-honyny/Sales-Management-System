@@ -145,7 +145,6 @@ public class ApiIntegrationTests : IAsyncLifetime
     {
         // Arrange - Using correct request signature
         var request = new CreateProductRequest(
-            Code: "TEST001",
             Barcode: "TEST123",
             Name: "Test Product",
             CategoryId: 1,
@@ -188,7 +187,6 @@ public class ApiIntegrationTests : IAsyncLifetime
         // Arrange - Using correct request signature
         var request = new CreateCustomerRequest(
             Name: "Test Customer",
-            Code: "C001",
             Phone: "0123456789",
             Email: "test@test.com",
             Address: "Test Address",

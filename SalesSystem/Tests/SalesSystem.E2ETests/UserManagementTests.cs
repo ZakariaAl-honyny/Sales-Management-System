@@ -13,8 +13,8 @@ namespace SalesSystem.E2ETests;
 [Collection("E2E")]
 public class UserManagementTests : TestBase, IDisposable
 {
-    private Window? _mainWindow;
-    private Window? _userEditorWindow;
+    private Window _mainWindow;
+    private Window _userEditorWindow;
     private bool _disposed;
 
     public UserManagementTests()
@@ -115,8 +115,6 @@ public class UserManagementTests : TestBase, IDisposable
             var testUsername = GenerateUniqueUsername("E2EUser");
             var testDisplayName = $"مستخدم اختبار E2E {DateTime.Now:HHmmss}";
             var testPassword = "TestPass123!";
-            var testRole = "Manager"; // Use Manager role for testing
-
             // Enter user data
             usernameBox!.Focus();
             Keyboard.Type(testUsername);

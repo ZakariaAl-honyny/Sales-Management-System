@@ -11,9 +11,6 @@ public class UpdateProductRequestValidator : AbstractValidator<UpdateProductRequ
             .NotEmpty().WithMessage("اسم المنتج مطلوب")
             .MaximumLength(200).WithMessage("اسم المنتج لا يمكن أن يتجاوز 200 حرف");
 
-        RuleFor(x => x.Code)
-            .MaximumLength(50).WithMessage("كود المنتج لا يمكن أن يتجاوز 50 حرف");
-
         RuleFor(x => x.Barcode)
             .MaximumLength(50).WithMessage("الباركود لا يمكن أن يتجاوز 50 حرف");
 

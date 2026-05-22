@@ -198,8 +198,9 @@ private async Task LoadPaymentAsync()
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            LogSystemError($"Failed to load supplier payment {_paymentId}", "SupplierPaymentEditorViewModel.LoadPaymentAsync", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء تحميل بيانات السداد";
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage);
         }
 finally
         {
@@ -220,8 +221,8 @@ finally
 
         if (errors.Any())
         {
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            await _dialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return;
         }
 
@@ -263,13 +264,13 @@ finally
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
         }
         finally
         {
@@ -299,7 +300,8 @@ finally
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+            LogSystemError($"Failed to print supplier payment {_paymentId}", "SupplierPaymentEditorViewModel.OnPrint", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
         }
         finally
         {

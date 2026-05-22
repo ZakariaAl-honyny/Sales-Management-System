@@ -38,7 +38,7 @@
                     </TextBox.InputBindings>
                 </TextBox>
                 <Button Grid.Column="1" Content="🔍 بحث" Command="{Binding SearchCommand}" 
-                        Style="{StaticResource SecondaryButton}" Width="80" Margin="8,0,0,0"/>
+                        Style="{StaticResource SecondaryButton}" Width="80" Margin="8,0,0,0" ToolTip="البحث في القائمة"/>
             </Grid>
         </Border>
 
@@ -59,7 +59,6 @@
                     </DataGrid.InputBindings>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="رقم الصنف" Binding="{Binding Id}" Width="80"/>
-                        <DataGridTextColumn Header="الكود" Binding="{Binding Code}" Width="100"/>
                         <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="120"/>
                         <DataGridTextColumn Header="اسم الصنف" Binding="{Binding Name}" Width="*"/>
                         <DataGridTextColumn Header="سعر التجزئة" Binding="{Binding RetailPrice, StringFormat=N2}" Width="100"/>
@@ -86,8 +85,8 @@
                        FontSize="11"/>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button Content="إلغاء" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" Width="100" Margin="0,0,12,0"/>
-                <Button Content="✅ اختيار" Command="{Binding SelectCommand}" Style="{StaticResource PrimaryButton}" Width="120" IsDefault="True"/>
+                <Button Content="إلغاء" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" Width="100" Margin="0,0,12,0" ToolTip="إلغاء وإغلاق النافذة"/>
+                <Button Content="✅ اختيار" Command="{Binding SelectCommand}" Style="{StaticResource PrimaryButton}" Width="120" IsDefault="True" ToolTip="تأكيد الاختيار"/>
             </StackPanel>
         </Grid>
 

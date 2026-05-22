@@ -1,4 +1,4 @@
-# MASTER-PLAN — Sales Management System (v4.4 Production)
+# MASTER-PLAN — Sales Management System (v4.6 Audit & Polish)
 
 ## 📋 Core Philosophy
 
@@ -685,6 +685,10 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v4.6 | 2026-05-22 | Audit & Polish — LogSystemError centralized, Dialog overlay, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes |
+| v4.5.2 | 2026-05-22 | Identifier Strategy — Code removal (Product/Customer/Supplier) |
+| v4.5.1 | 2026-05-22 | Error & Shutdown improvements — Error message overhaul, Arabic-friendly errors, MessageBox elimination |
+| v4.5 | 2026-05-21 | Multi-Window Screen Management — Non-modal editors, ScreenWindowService |
 | v4.4 | 2026-05-21 | Production release — Auto-Update, DPAPI, Backup, Windows Service, Installer |
 | v4.3 | 2026-05-15 | Print engine (QuestPDF + Win32), Dynamic UOM, Costing strategy, Cash boxes, Price history |
 | v4.2 | 2026-05-10 | Delete strategy, Defensive programming, WPF dialogs, Toast notifications, Real-time validation |

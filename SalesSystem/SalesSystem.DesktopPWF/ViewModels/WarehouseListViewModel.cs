@@ -18,10 +18,16 @@ namespace SalesSystem.DesktopPWF.ViewModels;
 /// </summary>
 public class WarehouseListViewModel : ViewModelBase
 {
-    private readonly IWarehouseApiService _warehouseService;
-    private readonly IEventBus _eventBus;
-    private readonly IDialogService _dialogService;
-    private readonly IToastNotificationService _toastService;
+    private IWarehouseApiService? _warehouseService;
+    private IEventBus? _eventBus;
+    private IDialogService? _dialogService;
+    private IToastNotificationService? _toastService;
+
+    private IWarehouseApiService WarehouseService => _warehouseService ??= App.GetService<IWarehouseApiService>();
+    private IEventBus EventBus => _eventBus ??= App.GetService<IEventBus>();
+    private IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+    private IToastNotificationService ToastService => _toastService ??= App.GetService<IToastNotificationService>();
+
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ICollectionView? _warehousesView;
     private WarehouseDto? _selectedWarehouse;
@@ -32,11 +38,32 @@ public class WarehouseListViewModel : ViewModelBase
 
     public WarehouseListViewModel()
     {
-        _warehouseService = App.GetService<IWarehouseApiService>();
-        _eventBus = App.GetService<IEventBus>();
-        _dialogService = App.GetService<IDialogService>();
-        _toastService = App.GetService<IToastNotificationService>();
+        InitializeCommands();
+    }
 
+    /// <summary>
+    /// Constructor with explicit dependencies for testing.
+    /// </summary>
+    public WarehouseListViewModel(
+        IWarehouseApiService warehouseService,
+        IEventBus eventBus,
+        IDialogService dialogService,
+        IToastNotificationService toastService)
+    {
+        _warehouseService = warehouseService ?? throw new ArgumentNullException(nameof(warehouseService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+        _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
+
+        InitializeCommands();
+    }
+
+    /// <summary>
+    /// Initializes commands and subscribes to events. Separated from constructor
+    /// to support testing via GetUninitializedObject + reflection.
+    /// </summary>
+    private void InitializeCommands()
+    {
         RefreshCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadWarehousesOperationAsync)));
         AddCommand = new RelayCommand(AddWarehouse);
         EditCommand = new RelayCommand(EditWarehouse, () => SelectedWarehouse != null);
@@ -44,7 +71,7 @@ public class WarehouseListViewModel : ViewModelBase
         RestoreCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(RestoreWarehouseOperationAsync, ex => ErrorMessage = HandleException(ex, "WarehouseListViewModel.RestoreWarehouseAsync"))), () => SelectedWarehouse != null && !SelectedWarehouse.IsActive);
         SearchCommand = new RelayCommand(Search);
 
-        _eventBus.Subscribe<WarehouseChangedMessage>(OnWarehouseChanged);
+        EventBus.Subscribe<WarehouseChangedMessage>(OnWarehouseChanged);
     }
 
     #region Properties
@@ -114,12 +141,12 @@ public class WarehouseListViewModel : ViewModelBase
     #endregion
 
     #region Commands
-    public ICommand RefreshCommand { get; }
-    public ICommand AddCommand { get; }
-    public ICommand EditCommand { get; }
-    public ICommand DeleteCommand { get; }
+    public ICommand RefreshCommand { get; private set; } = null!;
+    public ICommand AddCommand { get; private set; } = null!;
+    public ICommand EditCommand { get; private set; } = null!;
+    public ICommand DeleteCommand { get; private set; } = null!;
     public ICommand RestoreCommand { get; private set; } = null!;
-    public ICommand SearchCommand { get; }
+    public ICommand SearchCommand { get; private set; } = null!;
     #endregion
 
     #region Methods
@@ -132,7 +159,7 @@ public class WarehouseListViewModel : ViewModelBase
     {
         ErrorMessage = null;
 
-        var result = await _warehouseService.GetAllAsync(IncludeInactive);
+        var result = await WarehouseService.GetAllAsync(IncludeInactive);
 
         if (result.IsSuccess && result.Value != null)
         {
@@ -143,7 +170,15 @@ public class WarehouseListViewModel : ViewModelBase
                 {
                     Warehouses.Add(item);
                 }
-                SetupCollectionView();
+                try
+                {
+                    SetupCollectionView();
+                }
+                catch (InvalidOperationException)
+                {
+                    // WPF CollectionView requires a running Dispatcher — silently skip in non-WPF contexts (e.g., tests)
+                    WarehousesView = null;
+                }
                 IsEmpty = Warehouses.Count == 0;
                 OnPropertyChanged(nameof(WarehousesCount));
             });
@@ -168,15 +203,14 @@ public class WarehouseListViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var searchLower = SearchText.Trim().ToLower();
-        return (warehouse.Code?.ToLower().Contains(searchLower) ?? false) ||
-               warehouse.Name.ToLower().Contains(searchLower) ||
+        return warehouse.Name.ToLower().Contains(searchLower) ||
                (warehouse.Location?.ToLower().Contains(searchLower) ?? false);
     }
 
     private void AddWarehouse()
     {
         var editorVm = new WarehouseEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        if (DialogService.ShowDialog(editorVm))
         {
             _ = ExecuteAsync(LoadWarehousesOperationAsync);
         }
@@ -187,7 +221,7 @@ public class WarehouseListViewModel : ViewModelBase
         if (SelectedWarehouse == null) return;
 
         var editorVm = new WarehouseEditorViewModel(SelectedWarehouse);
-        if (_dialogService.ShowDialog(editorVm))
+        if (DialogService.ShowDialog(editorVm))
         {
             _ = ExecuteAsync(LoadWarehousesOperationAsync);
         }
@@ -205,7 +239,7 @@ public class WarehouseListViewModel : ViewModelBase
     {
         if (SelectedWarehouse == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"المستودع: {SelectedWarehouse.Name}");
+        var strategy = await DialogService.ShowDeleteConfirmationAsync($"المستودع: {SelectedWarehouse.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
@@ -213,12 +247,12 @@ public class WarehouseListViewModel : ViewModelBase
 
         if (strategy == DeleteStrategy.Deactivate)
         {
-            var deleteResult = await _warehouseService.DeleteAsync(SelectedWarehouse.Id);
+            var deleteResult = await WarehouseService.DeleteAsync(SelectedWarehouse.Id);
             if (deleteResult.IsSuccess)
             {
-                _eventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
+                EventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
                 await LoadWarehousesOperationAsync();
-                _toastService.ShowSuccess("تم إلغاء تنشيط المستودع بنجاح");
+                ToastService.ShowSuccess("تم إلغاء تنشيط المستودع بنجاح");
             }
             else
             {
@@ -227,16 +261,18 @@ public class WarehouseListViewModel : ViewModelBase
         }
         else if (strategy == DeleteStrategy.Permanent)
         {
-            var deleteResult = await _warehouseService.DeletePermanentlyAsync(SelectedWarehouse.Id);
+            var deleteResult = await WarehouseService.DeletePermanentlyAsync(SelectedWarehouse.Id);
             if (deleteResult.IsSuccess)
             {
-                _eventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
+                EventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
                 await LoadWarehousesOperationAsync();
-                _toastService.ShowSuccess("تم حذف المستودع نهائياً");
+                ToastService.ShowSuccess("تم حذف المستودع نهائياً");
             }
             else
             {
-                ErrorMessage = deleteResult.Error ?? "فشل في حذف المستودع";
+                var error = deleteResult.Error ?? "فشل في حذف المستودع";
+                ErrorMessage = error;
+                LogSystemError($"Hard delete failed for Warehouse {SelectedWarehouse.Id}: {error}", "WarehouseListViewModel.DeleteWarehouseAsync");
             }
         }
     }
@@ -249,24 +285,23 @@ public class WarehouseListViewModel : ViewModelBase
 
         var request = new UpdateWarehouseRequest(
             Name: SelectedWarehouse.Name,
-            Code: SelectedWarehouse.Code,
             Location: SelectedWarehouse.Location,
             IsDefault: SelectedWarehouse.IsDefault,
             IsActive: true
         );
 
-        var result = await _warehouseService.UpdateAsync(SelectedWarehouse.Id, request);
+        var result = await WarehouseService.UpdateAsync(SelectedWarehouse.Id, request);
 
         if (result.IsSuccess)
         {
-            _eventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
+            EventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
             await LoadWarehousesOperationAsync();
-            await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة المستودع بنجاح");
+            await DialogService.ShowSuccessAsync("نجاح", "تم استعادة المستودع بنجاح");
         }
         else
         {
             ErrorMessage = result.Error ?? "فشل في استعادة المستودع";
-            await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
+            await DialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
         }
     }
 
@@ -282,7 +317,7 @@ public class WarehouseListViewModel : ViewModelBase
 
     public override void Cleanup()
     {
-        _eventBus.Unsubscribe<WarehouseChangedMessage>(OnWarehouseChanged);
+        EventBus.Unsubscribe<WarehouseChangedMessage>(OnWarehouseChanged);
     }
     #endregion
 }

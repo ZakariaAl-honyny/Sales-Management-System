@@ -66,7 +66,7 @@ public class DatabaseHealthCheckService : IDatabaseHealthCheckService
         }
         catch (TaskCanceledException)
         {
-            Log.Warning("Health check timed out");
+            Log.Error("Health check timed out");
             return new HealthCheckResult
             {
                 IsApiReachable = false,

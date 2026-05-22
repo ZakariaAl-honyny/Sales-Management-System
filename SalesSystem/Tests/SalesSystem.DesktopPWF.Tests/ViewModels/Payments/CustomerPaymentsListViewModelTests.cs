@@ -281,7 +281,8 @@ public class CustomerPaymentsListViewModelTests
             .ReturnsAsync(Result<List<CustomerPaymentDto>>.Success(new List<CustomerPaymentDto>()));
 
         _viewModel.SelectedPayment = payment;
-        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
+        _viewModel.DeleteCommand.Execute(null);
+        await Task.Delay(100);
 
         _mockPaymentService.Verify(s => s.DeleteAsync(payment.Id), Times.Once);
     }

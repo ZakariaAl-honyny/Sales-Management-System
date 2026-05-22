@@ -1,5 +1,4 @@
 using SalesSystem.DesktopPWF.Messaging.Messages;
-using System.Windows;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -16,9 +15,9 @@ public class SupplierEditorViewModel : ViewModelBase
 {
     private readonly ISupplierApiService _supplierService;
     private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
 
     private int _supplierId;
-    private string _code = string.Empty;
     private string _name = string.Empty;
     private string _phone = string.Empty;
     private string _email = string.Empty;
@@ -34,29 +33,29 @@ public class SupplierEditorViewModel : ViewModelBase
 
 
     public SupplierEditorViewModel()
-        : this(App.GetService<ISupplierApiService>(), App.GetService<IEventBus>())
+        : this(App.GetService<ISupplierApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
     {
     }
 
-    public SupplierEditorViewModel(ISupplierApiService supplierService, IEventBus eventBus)
+    public SupplierEditorViewModel(ISupplierApiService supplierService, IEventBus eventBus, IDialogService dialogService)
     {
         _supplierService = supplierService;
         _eventBus = eventBus;
+        _dialogService = dialogService;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         CancelCommand = new RelayCommand(Cancel);
     }
 
     public SupplierEditorViewModel(SupplierDto supplier)
-        : this(supplier, App.GetService<ISupplierApiService>(), App.GetService<IEventBus>())
+        : this(supplier, App.GetService<ISupplierApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
     {
     }
 
-    public SupplierEditorViewModel(SupplierDto supplier, ISupplierApiService supplierService, IEventBus eventBus)
-        : this(supplierService, eventBus)
+    public SupplierEditorViewModel(SupplierDto supplier, ISupplierApiService supplierService, IEventBus eventBus, IDialogService dialogService)
+        : this(supplierService, eventBus, dialogService)
     {
         _supplierId = supplier.Id;
-        _code = supplier.Code ?? string.Empty;
         _name = supplier.Name;
         _phone = supplier.Phone ?? string.Empty;
         _email = supplier.Email ?? string.Empty;
@@ -75,12 +74,6 @@ public class SupplierEditorViewModel : ViewModelBase
     {
         get => _isEditMode;
         set => SetProperty(ref _isEditMode, value);
-    }
-
-    public string Code
-    {
-        get => _code;
-        set => SetProperty(ref _code, value);
     }
 
     public string Name
@@ -198,8 +191,8 @@ public class SupplierEditorViewModel : ViewModelBase
             if (HasNameError) errors.Add("• " + NameError);
             if (HasOpeningBalanceError) errors.Add("• " + OpeningBalanceError);
             
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            System.Windows.MessageBox.Show(errorMsg, "بيانات غير مكتملة", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return;
         }
 
@@ -214,7 +207,6 @@ public class SupplierEditorViewModel : ViewModelBase
             {
                 var updateRequest = new UpdateSupplierRequest(
                     Name,
-                    string.IsNullOrWhiteSpace(Code) ? null : Code,
                     string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                     string.IsNullOrWhiteSpace(Email) ? null : Email,
                     string.IsNullOrWhiteSpace(Address) ? null : Address,
@@ -228,7 +220,6 @@ public class SupplierEditorViewModel : ViewModelBase
             {
                 var createRequest = new CreateSupplierRequest(
                     Name,
-                    string.IsNullOrWhiteSpace(Code) ? null : Code,
                     string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                     string.IsNullOrWhiteSpace(Email) ? null : Email,
                     string.IsNullOrWhiteSpace(Address) ? null : Address,
@@ -244,24 +235,20 @@ public class SupplierEditorViewModel : ViewModelBase
                 // Publish event to notify other modules
                 _eventBus.Publish(new SupplierChangedMessage(result.Value.Id));
 
-                System.Windows.MessageBox.Show(
-                    IsEditMode ? "تم تحديث المورد بنجاح" : "تم إضافة المورد بنجاح",
-                    "نجاح",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث المورد بنجاح" : "تم إضافة المورد بنجاح");
 
                 RequestClose();
             }
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المورد", "SupplierEditorViewModel.SaveAsync", "[SupplierEditorViewModel.SaveAsync] Failed to save supplier.");
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ في الحفظ", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SupplierEditorViewModel.SaveAsync", "[SupplierEditorViewModel.SaveAsync] Failed to save supplier.");
-            System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
         }
         finally
         {

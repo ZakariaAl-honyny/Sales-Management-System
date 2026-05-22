@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using SalesSystem.DesktopPWF.Services.Api;
+using SalesSystem.DesktopPWF.Services.App;
 
 namespace SalesSystem.DesktopPWF.Views.Common;
 
@@ -13,6 +14,8 @@ public partial class PdfPreviewWindow : Window
 {
     private readonly string _pdfPath;
     private readonly string _invoiceNumber;
+    private IDialogService? _dialogService;
+    private IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
 
     public PdfPreviewWindow(string pdfPath, string invoiceNumber)
     {
@@ -34,8 +37,7 @@ public partial class PdfPreviewWindow : Window
         }
         else
         {
-            MessageBox.Show("ملف PDF غير موجود", "خطأ",
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            _ = DialogService.ShowErrorAsync("خطأ في الطباعة", "ملف PDF غير موجود");
             Close();
         }
     }
@@ -57,8 +59,7 @@ public partial class PdfPreviewWindow : Window
             var result = await printService.PrintSalesA4Async(ExtractInvoiceId());
             if (!result.IsSuccess)
             {
-                MessageBox.Show(result.Error, "خطأ في الطباعة",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                _ = DialogService.ShowErrorAsync("خطأ في الطباعة", result.Error ?? "حدث خطأ أثناء الطباعة");
             }
         }
         finally
@@ -77,8 +78,7 @@ public partial class PdfPreviewWindow : Window
             var result = await printService.PrintSalesThermalAsync(ExtractInvoiceId());
             if (!result.IsSuccess)
             {
-                MessageBox.Show(result.Error, "خطأ في الطباعة",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                _ = DialogService.ShowErrorAsync("خطأ في الطباعة", result.Error ?? "حدث خطأ أثناء الطباعة");
             }
         }
         finally

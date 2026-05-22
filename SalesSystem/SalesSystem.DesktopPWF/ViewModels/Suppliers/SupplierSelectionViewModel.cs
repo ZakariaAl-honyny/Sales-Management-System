@@ -92,7 +92,6 @@ public class SupplierSelectionViewModel : ViewModelBase
                     if (string.IsNullOrWhiteSpace(SearchText)) return true;
                     var search = SearchText.ToLower();
                     return supplier.Name.ToLower().Contains(search) || 
-                           (supplier.Code?.ToLower().Contains(search) ?? false) ||
                            (supplier.Phone?.ToLower().Contains(search) ?? false);
                 };
             }

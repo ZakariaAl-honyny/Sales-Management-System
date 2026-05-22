@@ -12,7 +12,7 @@ public record SalesReturnResponse(
 );
 
 public record SalesReturnItemResponse(
-    int Id, int ProductId, string ProductName, string ProductCode,
+    int Id, int ProductId, string ProductName,
     decimal Quantity, decimal UnitPrice, decimal LineTotal
 );
 
@@ -26,6 +26,6 @@ public record PurchaseReturnResponse(
 );
 
 public record PurchaseReturnItemResponse(
-    int Id, int ProductId, string ProductName, string ProductCode,
+    int Id, int ProductId, string ProductName,
     decimal Quantity, decimal UnitCost, decimal LineTotal
 );

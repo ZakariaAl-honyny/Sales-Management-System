@@ -39,9 +39,9 @@ public static class InputHelper
 
     private static void Element_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter)
+        if (e.Key == Key.Enter && sender is DependencyObject depObj)
         {
-            var command = GetEnterKeyCommand(sender as DependencyObject);
+            var command = GetEnterKeyCommand(depObj);
             if (command != null && command.CanExecute(null))
             {
                 command.Execute(null);

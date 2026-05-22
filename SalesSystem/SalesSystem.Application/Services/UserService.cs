@@ -162,11 +162,20 @@ public class UserService : IUserService
             }
         }
 
-        await _uow.Users.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        try
+        {
+            await _uow.Users.HardDeleteAsync(id, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("User permanently deleted: {UserName}", user.UserName);
-        return Result.Success();
+            _logger.LogInformation("User permanently deleted: {UserName}", user.UserName);
+            return Result.Success();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Failed to permanently delete user {UserId} due to database constraint", id);
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            return Result.Failure($"لا يمكن حذف المستخدم نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام. ({innerMessage})");
+        }
     }
 
     private static UserDto MapToDto(User user)

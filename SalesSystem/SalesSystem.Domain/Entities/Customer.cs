@@ -5,7 +5,6 @@ namespace SalesSystem.Domain.Entities;
 
 public class Customer : BaseEntity
 {
-    public string? Code { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Phone { get; private set; }
     public string? Email { get; private set; }
@@ -20,7 +19,6 @@ public class Customer : BaseEntity
     public static Customer Create(
         string name,
         decimal openingBalance = 0,
-        string? code = null,
         string? phone = null,
         string? email = null,
         string? address = null,
@@ -40,7 +38,6 @@ public class Customer : BaseEntity
             Name = name,
             OpeningBalance = openingBalance,
             CurrentBalance = openingBalance,
-            Code = code,
             Phone = phone,
             Email = email,
             Address = address,
@@ -67,7 +64,6 @@ public class Customer : BaseEntity
 
     public void Update(
         string name,
-        string? code,
         string? phone,
         string? email,
         string? address,
@@ -81,7 +77,6 @@ public class Customer : BaseEntity
             throw new DomainException("حد الائتمان لا يمكن أن يكون سالباً.");
 
         Name = name;
-        Code = code;
         Phone = phone;
         Email = email;
         Address = address;

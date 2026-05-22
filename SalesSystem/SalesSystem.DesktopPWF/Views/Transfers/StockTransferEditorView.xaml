@@ -100,7 +100,8 @@
                                     <Button Style="{StaticResource SuccessButton}" 
                                             Padding="16,4" Height="30"
                                             Command="{Binding SearchProductCommand}"
-                                            Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}">
+                                            Visibility="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBoolToVisibility}}"
+                                            ToolTip="إضافة سطر جديد للفاتورة">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="إضافة صنف" VerticalAlignment="Center"/>
@@ -189,7 +190,8 @@
                                                     Content="🗑️"
                                                     Style="{StaticResource DangerButton}"
                                                     Height="28" Width="28" Padding="0"
-                                                    Visibility="{Binding DataContext.IsReadOnly, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBoolToVisibility}}"/>
+                                                    Visibility="{Binding DataContext.IsReadOnly, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBoolToVisibility}}"
+                                                    ToolTip="حذف هذا السطر من الفاتورة"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -227,32 +229,37 @@
                             Style="{StaticResource PrimaryButton}" 
                             Width="120" 
                             Margin="0,0,12,0"
-                            Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}"/>
+                            Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}"
+                            ToolTip="ترحيل العملية نهائياً — سيتم تحديث المخزون والرصيد"/>
 
                     <Button Content="💾 حفظ مسودة" 
                             Command="{Binding SaveCommand}" 
                             Style="{StaticResource SecondaryButton}" 
                             Width="110" 
                             Margin="0,0,8,0" 
-                            Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}"/>
+                            Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}"
+                            ToolTip="حفظ كمسودة دون ترحيل"/>
 
                     <Button Content="🖨️ طباعة A4" 
                             Command="{Binding PrintA4Command}" 
                             Style="{StaticResource SecondaryButton}" 
                             Width="110" 
                             Margin="0,0,8,0"
-                            Visibility="{Binding IsEdit, Converter={StaticResource BoolToVisibility}}"/>
+                            Visibility="{Binding IsEdit, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="طباعة فاتورة بصيغة A4"/>
 
                     <Button Content="❌ إلغاء التحويل" 
                             Command="{Binding CancelTransferCommand}" 
                             Style="{StaticResource DangerButton}" 
                             Width="110" 
                             Margin="0,0,12,0" 
-                            Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}"/>
+                            Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}"
+                            ToolTip="إلغاء العملية (للحالات غير المرحلة)"/>
 
                     <Button Content="🚫 إغلاق" 
                             Command="{Binding CancelCommand}" 
-                            Style="{StaticResource SecondaryButton}"/>
+                            Style="{StaticResource SecondaryButton}"
+                            ToolTip="إغلاق النافذة دون حفظ"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 

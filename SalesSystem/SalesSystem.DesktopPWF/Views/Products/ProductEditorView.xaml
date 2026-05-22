@@ -43,7 +43,8 @@
                                  Tag="أدخل اسم المنتج بالكامل" 
                                  TabIndex="2"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtProductName"/>
+                                 AutomationProperties.AutomationId="TxtProductName"
+                                 ToolTip="اسم المنتج كما يظهر في الفواتير — هذا الحقل إلزامي"/>
                         <TextBlock Text="{Binding NameError}" Foreground="{StaticResource ErrorBrush}" Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibility}}"/>
                         <Border Height="8"/>
 
@@ -105,7 +106,7 @@
                                 <TextBox Text="{Binding ConversionFactor, UpdateSourceTrigger=PropertyChanged, StringFormat=N3}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          TabIndex="7"
-                                         ToolTip="عدد وحدات التجزئة الموجودة داخل وحدة الجملة الواحدة (مثلاً: 12 قطعة في الكرتون)"/>
+                                         ToolTip="عدد وحدات التجزئة في وحدة الجملة (مثلاً 12 قطعة في الكرتون) — هذا الحقل إلزامي"/>
                                 <TextBlock Text="{Binding ConversionFactorError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasConversionFactorError, Converter={StaticResource BoolToVisibility}}"/>
                             </StackPanel>
                         </Grid>
@@ -127,7 +128,8 @@
                                 <TextBox Text="{Binding RetailPrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"
-                                         TabIndex="8"/>
+                                         TabIndex="8"
+                                         ToolTip="سعر البيع للعميل العادي (تجزئة) — هذا الحقل إلزامي ويجب أن يكون أكبر من صفر"/>
                                 <TextBlock Text="{Binding RetailPriceError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasRetailPriceError, Converter={StaticResource BoolToVisibility}}"/>
                             </StackPanel>
 
@@ -136,7 +138,8 @@
                                 <TextBox Text="{Binding WholesalePrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"
-                                         TabIndex="9"/>
+                                         TabIndex="9"
+                                         ToolTip="سعر البيع لتجار الجملة — هذا الحقل إلزامي ويجب أن يكون أكبر من صفر"/>
                                 <TextBlock Text="{Binding WholesalePriceError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasWholesalePriceError, Converter={StaticResource BoolToVisibility}}"/>
                             </StackPanel>
 
@@ -159,7 +162,9 @@
                                 <TextBlock Text="الباركود" Style="{StaticResource LabelStyle}"/>
                                 <TextBox Text="{Binding Barcode, UpdateSourceTrigger=PropertyChanged}" 
                                          Style="{StaticResource ModernTextBox}" 
-                                         TabIndex="11"/>
+                                         TabIndex="11"
+                                         ToolTip="الباركود (رقم المنتج العالمي) — يجب أن يكون فريداً لكل منتج. إذا كان المنتج ليس له باركود، اتركه فارغاً"/>
+                                <TextBlock Text="الباركود يجب أن يكون فريداً — لا يمكن تكرار نفس الرمز لمنتجين مختلفين" Style="{StaticResource HelperTextStyle}"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
@@ -190,12 +195,12 @@
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button Command="{Binding SaveCommand}" 
-                            IsEnabled="{Binding CanSave}"
                             Style="{StaticResource PrimaryButton}"
                             Width="140"
                             Margin="0,0,12,0"
                             IsDefault="True" 
-                            TabIndex="14">
+                            TabIndex="14"
+                            ToolTip="حفظ البيانات المدخلة">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,8,0" Stretch="Uniform"/>
                             <TextBlock Text="حفظ البيانات"/>
@@ -206,7 +211,8 @@
                             Command="{Binding CancelCommand}" 
                             Style="{StaticResource SecondaryButton}" 
                             Width="100"
-                            TabIndex="15"/>
+                            TabIndex="15"
+                            ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 

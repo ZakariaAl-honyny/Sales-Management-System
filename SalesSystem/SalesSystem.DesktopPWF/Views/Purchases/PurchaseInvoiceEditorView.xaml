@@ -96,7 +96,7 @@
                         </TextBox>
                         <!-- Green button: opens continuous product selection window -->
                         <Button Grid.Column="2" Content="إضافة" Command="{Binding SearchProductCommand}"
-                                Style="{StaticResource SuccessButton}" Margin="8,0,0,0" Width="80" Height="36"/>
+                                Style="{StaticResource SuccessButton}" Margin="8,0,0,0" Width="80" Height="36" ToolTip="البحث عن منتج وإضافته للقائمة"/>
                         <!-- Separator -->
                         <Separator Grid.Column="3" Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
                         <TextBlock Grid.Column="4" Text="مسح الباركود يضيف الصنف تلقائياً" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
@@ -115,7 +115,7 @@
                                     </Border>
                                 </StackPanel>
                                 <Button HorizontalAlignment="Right" Content="+ إضافة صنف" Command="{Binding AddLineCommand}"
-                                        Style="{StaticResource SecondaryButton}" Height="30" Padding="12,0" FontSize="12"/>
+                                        Style="{StaticResource SecondaryButton}" Height="30" Padding="12,0" FontSize="12" ToolTip="إضافة سطر جديد للفاتورة"/>
                             </Grid>
                         </Border>
 
@@ -132,7 +132,7 @@
                                                 <ComboBox ItemsSource="{Binding AvailableProducts}" SelectedItem="{Binding SelectedProduct, ValidatesOnDataErrors=True, UpdateSourceTrigger=PropertyChanged}"
                                                           DisplayMemberPath="Name" IsEditable="True" Style="{StaticResource ValidationComboBoxStyle}"/>
                                                 <Button Grid.Column="1" Content="🔍" Command="{Binding DataContext.SearchProductSingleCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                        CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Width="28" Height="24" Margin="2,0"/>
+                                                        CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Width="28" Height="24" Margin="2,0" ToolTip="فتح نافذة بحث متقدم عن المنتجات"/>
                                             </Grid>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -170,7 +170,7 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Button Command="{Binding DataContext.RemoveLineCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                    CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Foreground="{StaticResource ErrorBrush}" BorderBrush="Transparent">
+                                                    CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Foreground="{StaticResource ErrorBrush}" BorderBrush="Transparent" ToolTip="حذف هذا السطر من الفاتورة">
                                                 <Path Data="{StaticResource IconClose}" Fill="{StaticResource ErrorBrush}" Width="8" Height="8" Stretch="Uniform"/>
                                             </Button>
                                         </DataTemplate>
@@ -199,7 +199,7 @@
                                 <ComboBox ItemsSource="{Binding Suppliers}" SelectedValue="{Binding SelectedSupplierId}" 
                                           SelectedValuePath="Id" DisplayMemberPath="Name"/>
                                 <Button Grid.Column="1" Content="🔍" Command="{Binding SearchSupplierCommand}"
-                                        Style="{StaticResource SecondaryButton}" Width="32" Height="32" Margin="4,0,0,0"/>
+                                        Style="{StaticResource SecondaryButton}" Width="32" Height="32" Margin="4,0,0,0" ToolTip="البحث عن مورد"/>
                             </Grid>
 
                             <TextBlock Text="رقم فاتورة المورد" Style="{StaticResource LabelStyle}"/>
@@ -284,28 +284,32 @@
                             Width="140" 
                             IsDefault="True" 
                             TabIndex="11"
-                            Margin="0,0,12,0"/>
+                            Margin="0,0,12,0"
+                            ToolTip="ترحيل العملية نهائياً — سيتم تحديث المخزون والرصيد"/>
 
                     <Button Content="💾 حفظ مسودة" 
                             Command="{Binding SaveCommand}" 
                             Style="{StaticResource SecondaryButton}" 
                             Width="120" 
                             Margin="0,0,8,0" 
-                            TabIndex="13"/>
+                            TabIndex="13"
+                            ToolTip="حفظ كمسودة دون ترحيل"/>
 
                     <Button Content="📄 A4" 
                             Command="{Binding PrintA4Command}" 
                             Style="{StaticResource SecondaryButton}" 
                             Margin="0,0,12,0" 
                             TabIndex="14" 
-                            Padding="16,0"/>
+                            Padding="16,0"
+                            ToolTip="طباعة فاتورة بصيغة A4"/>
 
                     <Separator Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
 
                     <Button Content="🚫 إلغاء" 
                             Command="{Binding CancelCommand}" 
                             Style="{StaticResource SecondaryButton}" 
-                            TabIndex="15"/>
+                            TabIndex="15"
+                            ToolTip="إلغاء العملية (للحالات غير المرحلة)"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 

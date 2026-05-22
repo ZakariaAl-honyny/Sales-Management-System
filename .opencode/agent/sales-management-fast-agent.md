@@ -34,3 +34,52 @@ You fix simple errors and clean code. You do NOT add new features.
 - Fluent API ONLY (NEVER DataAnnotations on entities)
 - Use Serilog (NEVER Console.WriteLine)
 - Complete code — NO TODOs, NO placeholders
+
+## Interactive Validation Fixes (v4.6)
+
+When fixing validation issues, follow this checklist:
+
+### Remove from ViewModel C#:
+1. Remove CanExecute predicate from SaveCommand/PostCommand constructors
+   - ❌ `new AsyncRelayCommand(SaveAsync, () => CanSave)`
+   - ✅ `new AsyncRelayCommand(SaveAsync)`
+2. Remove `CanSave` computed property
+3. Remove `CanSave()` / `CanPost()` / `CanPrint()` methods
+4. Remove `OnPropertyChanged(nameof(CanSave))` from all property setters
+5. Remove `(SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged()` from property setters
+6. Add `Validate()` method that collects errors and shows `_dialogService.ShowWarningAsync()`
+7. Add `if (!Validate()) return;` at start of SaveAsync()
+
+### Remove from XAML:
+1. Remove `IsEnabled="{Binding CanSave}"` from Button elements
+2. Add `*` to required field labels: `Text="اسم المنتج *"`
+3. Add ToolTips to input fields: `ToolTip="أدخل اسم المنتج — هذا الحقل إلزامي"`
+4. Add helper text for unique fields (barcode, username)
+
+### Verify:
+- Build succeeds with 0 errors
+- No remaining references to `CanSave` or `CanExecute` in modified files
+
+### LogSystemError Fixes (v4.6)
+
+When fixing logging issues, follow this checklist:
+
+1. Replace `Serilog.Log.Error(ex, "[Context] message {Id}.", id)` with `LogSystemError($"message {id}", "Context", ex)`
+2. Verify import: `LogSystemError` is inherited from `ViewModelBase` — no import needed
+3. Verify the ViewModel extends `ViewModelBase`
+
+### Dialog Overlay Fixes (v4.6)
+
+When fixing dialog windows:
+1. Add `WindowStyle="None"` + `AllowsTransparency="True"` + `Background="Transparent"` to Window element
+2. Add `<Rectangle Fill="#80000000"/>` as first child of Grid for dimming
+3. Wrap content in `<Border Background="White" CornerRadius="16" Effect="{StaticResource DeepShadow}">`
+4. Add `PositionOverOwner()` method to code-behind
+5. Call `PositionOverOwner()` in `Loaded` event or after setting `Owner`
+
+### Hard Delete Fixes (v4.6)
+
+When fixing hard delete operations:
+1. Wrap `_uow.Products.Remove(entity)` + `SaveChangesAsync()` in `try/catch (DbUpdateException)`
+2. Log via `_logger.LogError(ex, "Cannot delete {Entity} {Id}: {Error}", name, id, ex.InnerException?.Message)`
+3. Return `Result.Failure("لا يمكن حذف هذا العنصر لأنه مرتبط بمعاملات أخرى", ErrorCodes.ReferencedByOtherEntities)`

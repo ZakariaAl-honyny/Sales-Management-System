@@ -53,7 +53,6 @@ public class ProductService : IProductService
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(p => p.Name.Contains(search) ||
-                                    (p.Code != null && p.Code.Contains(search)) ||
                                     (p.Barcode != null && p.Barcode.Contains(search)));
         }
 
@@ -78,24 +77,8 @@ public class ProductService : IProductService
     {
         try
         {
-            string? code = request.Code;
-            if (string.IsNullOrWhiteSpace(code))
-            {
-                var codeResult = await _sequenceService.GetNextNumberAsync("PRD", ct);
-                if (!codeResult.IsSuccess)
-                    return Result<ProductDto>.Failure(codeResult.Error ?? "حدث خطأ أثناء توليد الكود");
-                code = codeResult.Value;
-            }
-
             // Normalize barcode: treat empty/whitespace as null to avoid unique index conflicts
             string? barcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
-
-            // Validate code uniqueness (including inactive products)
-            if (await _uow.Products.Query().IgnoreQueryFilters().AnyAsync(p => p.Code == code, ct))
-            {
-                _logger.LogWarning("Product creation failed: Duplicate code {Code} (including inactive)", code);
-                return Result<ProductDto>.Failure("كود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateCode);
-            }
 
             // Validate barcode uniqueness only when a barcode was actually provided
             if (barcode != null)
@@ -114,7 +97,6 @@ public class ProductService : IProductService
                 request.WholesalePrice,
                 request.ConversionFactor,
                 request.MinStock,
-                code,
                 barcode,          // Use normalized barcode (null if empty)
                 request.CategoryId,
                 request.RetailUnitId,
@@ -158,12 +140,6 @@ public class ProductService : IProductService
             // Normalize barcode: treat empty/whitespace as null to avoid unique index conflicts
             string? barcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
 
-            if (!string.IsNullOrWhiteSpace(request.Code) && request.Code != product.Code)
-            {
-                if (await _uow.Products.Query().IgnoreQueryFilters().AnyAsync(p => p.Code == request.Code && p.Id != id, ct))
-                    return Result<ProductDto>.Failure("كود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateCode);
-            }
-
             // Validate barcode uniqueness only when a real barcode was provided
             if (barcode != null && barcode != product.Barcode)
             {
@@ -178,7 +154,6 @@ public class ProductService : IProductService
                 request.WholesalePrice,
                 request.ConversionFactor,
                 request.MinStock,
-                request.Code,
                 barcode,          // Use normalized barcode (null if empty)
                 request.CategoryId,
                 request.RetailUnitId,
@@ -244,11 +219,20 @@ public class ProductService : IProductService
         if (hasPurchaseItems)
             return Result.Failure("لا يمكن حذف المنتج نهائياً لأنه مرتبط بعمليات شراء");
 
-        await _uow.Products.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        try
+        {
+            await _uow.Products.HardDeleteAsync(id, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Product permanently deleted: {ProductId}", id);
-        return Result.Success();
+            _logger.LogInformation("Product permanently deleted: {ProductId}", id);
+            return Result.Success();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Failed to permanently delete product {ProductId} due to database constraint", id);
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            return Result.Failure($"لا يمكن حذف المنتج نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام. ({innerMessage})");
+        }
     }
 
     public async Task<Result<ProductDto>> GetByBarcodeAsync(string barcode, CancellationToken ct)
@@ -272,7 +256,6 @@ public class ProductService : IProductService
     {
         return new ProductDto(
             p.Id,
-            p.Code,
             p.Barcode,
             p.Name,
             p.CategoryId,

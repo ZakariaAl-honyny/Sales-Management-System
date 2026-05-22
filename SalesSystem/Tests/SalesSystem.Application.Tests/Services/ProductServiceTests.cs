@@ -120,31 +120,6 @@ public class ProductServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateAsync_DuplicateCode_ReturnsFailure()
-    {
-        _output.WriteLine("[TEST] CreateAsync_DuplicateCode_ReturnsFailure");
-
-        var existing = Product.Create("Existing", purchasePrice: 10m, salePrice: 100m, minStock: 0, code: "P001", barcode: null, categoryId: null, unitId: null, description: null, createdByUserId: null);
-        _dbContext.Products.Add(existing);
-        await _dbContext.SaveChangesAsync();
-
-        var request = new SalesSystem.Contracts.Requests.CreateProductRequest
-        {
-            Name = "New Product",
-            PurchasePrice = 50m,
-            SalePrice = 100m,
-            Code = "P001" // Duplicate
-        };
-
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("كود المنتج مستخدم بالفعل");
-
-        _output.WriteLine("[PASS] Duplicate code returns failure");
-    }
-
-    [Fact]
     public async Task CreateAsync_DuplicateBarcode_ReturnsFailure()
     {
         _output.WriteLine("[TEST] CreateAsync_DuplicateBarcode_ReturnsFailure");

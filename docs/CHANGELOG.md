@@ -2,6 +2,193 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.1] - 2026-05-22
+### Added
+- **LogSystemError Centralized (v4.6)**: All `Serilog.Log.Error` calls moved to `ViewModelBase.LogSystemError()` — 17 calls across 11 ViewModels consolidated.
+- **Hard Delete DbUpdateException Safety**: All 7 Application services (Product, Customer, Supplier, Category, Unit, Warehouse, User) now catch `DbUpdateException` in `PermanentDeleteAsync()` and return `Result.Failure` with Arabic message including inner exception.
+- **ValidationErrorsDialog**: New dedicated dialog with `ItemsControl` for bulleted red error list — `ShowValidationErrorsAsync(title, List<string> errors)` added to `IDialogService`.
+- **ValidationFocusBehavior**: New helper class with `FindFirstInvalid()` and `FindFirstEmptyRequired()` methods — auto-focuses first invalid field after validation dialog.
+- **FocusFirstInvalidFieldRequested**: New event in ViewModelBase + `RequestFocusFirstInvalidField()` — 14 editor Views subscribe and auto-focus on first error.
+- **7 Dialog Styles in Styles.xaml**: DialogOverlayStyle, DialogCardStyle, DialogHeaderStyle, DialogIconBorderStyle, DialogTitleStyle, DialogButtonBaseStyle, ValidationErrorItemStyle.
+
+### Changed
+- **Dialog Overhaul (v4.6)**: All 8 dialog windows (Error, Warning, Success, Info, Confirmation, DeleteConfirmation, DatabaseError, ValidationErrors) updated with:
+  - `WindowStyle="None"` + `AllowsTransparency="True"` + `Background="Transparent"` — transparent overlay pattern.
+  - Full-screen `#80000000` dimming rectangle behind centered card.
+  - `CornerRadius="16"` and `DeepShadow` on dialog card.
+  - `PositionOverOwner()` in all code-behind files.
+  - Button hover effects: `IsMouseOver` (darker shade) and `IsPressed` (even darker) triggers in `ControlTemplate.Triggers`.
+- **14 Editor ViewModels** updated: Use `ShowValidationErrorsAsync(errorsList)` instead of `ShowWarningAsync(joinedString)` and call `RequestFocusFirstInvalidField()`.
+- **14 Editor Views** updated: Subscribe to `FocusFirstInvalidFieldRequested` → `ValidationFocusBehavior.FindFirstInvalid(this)?.Focus()`.
+- **Login icon**: `Background="{DynamicResource PrimaryBrush}"` → `Background="Transparent"` — icon fill uses PrimaryBrush instead of White.
+- **Settings layout**: Added 4th `RowDefinition Height="Auto"`; changed bottom margin from `0` to `24`.
+- **AGENTS.md**: Version updated to v4.6; new rules RULE-198 to RULE-218 added; FORBIDDEN list expanded; checklist expanded.
+
+### Removed
+- All direct `Serilog.Log.Error` calls from ViewModels — centralized in `ViewModelBase.LogSystemError()` and `HandleException()`.
+- All `CanExecute` predicates from editor ViewModel Save/Post commands (Phase 13 completed).
+- All `IsEnabled="{Binding CanSave}"` from XAML files.
+
+## [1.7.0] - 2026-05-22
+### Added
+- **Interactive Validation (v4.6)**: Complete overhaul of form validation UX across the entire WPF Desktop application.
+  - Save/Post/Print buttons are ALWAYS enabled — no CanExecute predicates block user actions.
+  - On-click validation shows styled warning dialog listing ALL missing/incorrect fields with Arabic messages.
+  - Required fields marked with `*` on ALL editor screens (Category, Unit, Warehouse added).
+  - Field-level ToolTips (35+) on every input explaining validation rules, formats, and uniqueness constraints.
+  - Unique field explanations: Barcode ("يجب أن يكون فريداً") and Username ("يجب أن يكون فريداً ولا يمكن تكراره").
+  - AGENTS.md RULE-059 rewritten: "InterActive Validation" pattern documented with correct/wrong code examples.
+
+### Changed
+- **13 Editor ViewModels** modified to remove CanExecute predicates:
+  - ProductEditorViewModel, CategoryEditorViewModel, UnitEditorViewModel, WarehouseEditorViewModel
+  - UserEditorViewModel, CustomerEditorViewModel, SupplierEditorViewModel
+  - SalesInvoiceEditorViewModel, PurchaseInvoiceEditorViewModel, StockTransferEditorViewModel
+  - SalesReturnEditorViewModel, PurchaseReturnEditorViewModel
+- **7 XAML files** updated with ToolTips, `*` markers, and `IsEnabled="{Binding CanSave}"` removed:
+  - ProductEditorView, CategoryEditorView, UnitEditorView, WarehouseEditorView
+  - CustomerEditorView, SupplierEditorView, UserEditorView
+- **AGENTS.md** — RULE-059 updated from "Save buttons disabled via CanExecute" to "InterActive Validation — buttons always enabled".
+- **README.md** — Added "What's New in v4.6" section and implementation phase row.
+- **orchestrator.md** — Added Phase 13: Interactive Validation.
+- **implement-agent.md** — Added Interactive Validation pattern section.
+- **backend-architect.md** — Added Rule 19: no CanExecute blocking.
+- **code-reviewer.md** — Added Interactive Validation checklist section with 8 items.
+- **ui-agent.md** — Added Interactive Validation section with patterns and rules.
+
+## [1.6.1] - 2026-05-22
+### Added
+- **Warehouse Code Removal (v4.5.3)**: `Code` column removed from Warehouse entity — completing the Identifier Strategy across all entities.
+  - RULE-198: WarehouseResponse DTO must not have Code field.
+
+### Changed
+- **AGENTS.md updated to v4.5.3** — Updated from v4.5.2, 198 rules total.
+  - RULE-191/195/196 expanded to include Warehouse.
+  - New RULE-198 for WarehouseResponse.
+  - FORBIDDEN list + checklist updated.
+- **README.md** — Updated v4.5.2 → v4.5.3, added Warehouse Code row to table.
+- **Subagents** — Updated code-reviewer, implement-agent, ui-agent with Warehouse patterns.
+
+### Removed
+- **Warehouse.Code** — Removed from Warehouse entity, EF config, migrations (Code column + IX_Warehouses_Code index).
+- **Warehouse.Code from Contracts** — Removed from WarehouseRequests (Create/Update), WarehouseDto, WarehouseResponse.
+- **Warehouse.Code from Service** — Removed auto-generation, uniqueness check, search filter from WarehouseService.
+- **Warehouse.Code from API** — Removed Code validation rules from WarehouseRequestValidators.
+- **Warehouse.Code from Desktop** — Removed Code field/property from WarehouseListViewModel, WarehouseEditorViewModel.
+- **Warehouse.Code from Tests** — Removed Code assertions/tests from all 4+ Warehouse test files.
+- **WarehouseResponse.Code** — Removed Code field from WarehouseResponse record.
+- **Leftover Code assertions** — Removed `result.Value.Code` from CustomerServiceTests and SupplierServiceTests (previously missed).
+
+## [1.6.0] - 2026-05-22
+### Added
+- **Identifier Strategy — Code Removal (v4.5.2)**: 7 new rules (RULE-191 to RULE-197) in AGENTS.md.
+  - Product, Customer, Supplier MUST NOT have Code column — use auto-increment Id instead.
+  - Search/filter by Id or Name only.
+  - Invoice item DTOs carry ProductId only (no ProductCode).
+  - Report DTOs exclude Code fields.
+  - Code auto-generation services removed.
+  - Editor ViewModels must not have Code property.
+  - DuplicateCode error constant removed.
+
+### Changed
+- **AGENTS.md updated to v4.5.2** — Updated from v4.5.1, 197 rules total.
+  - Section 2.45: Identifier Strategy (RULE-191 to RULE-197).
+  - FORBIDDEN list: 4 new items (Code column, ProductCode, auto-generation, Code search).
+  - Checklist: 5 new items.
+- **README.md** — Added "What's New in v4.5.2" section with 7 rows.
+
+### Removed
+- **Code column** — Removed from Product, Customer, and Supplier entities (domain, DB, DTOs, ViewModels, XAML).
+- **ProductCode** — Removed from all invoice item DTOs (SalesInvoiceItem, PurchaseInvoiceItem, SalesReturnItem, PurchaseReturnItem, StockTransferItem).
+- **Code fields** — Removed from report DTOs (StockReport, CustomerBalanceReport, SupplierBalanceReport, LowStockReport).
+- **Code auto-generation** — Removed DocumentSequenceService calls for PRD/CUST/SUP prefixes in ProductService, CustomerService, SupplierService.
+- **Code validation** — Removed from API validators (Product, Customer, Supplier).
+- **Code editor fields** — Removed Code TextBox from ProductEditorView, CustomerEditorView, SupplierEditorView.
+- **Code search** — Removed from all list/selection ViewModel search filters.
+- **Code assertions** — Removed from all unit tests.
+- **DuplicateCode error** — Removed `ErrorCodes.DuplicateCode` constant.
+
+## [1.5.1] - 2026-05-22
+
+### Fixed
+- **HandleResponseAsync JSON parsing crash**: Non-generic `HandleResponseAsync` in `IApiService.cs` now checks `ContentType` before calling `ReadFromJsonAsync<ErrorResponse>()` — prevents `JsonException` crash when API returns 404 with empty/HTML body (mirrors the pattern in the generic overload).
+- **Print test log level**: `SettingsViewModel.cs` print test failure changed from `Log.Error` to `Log.Warning` — printer test failure is a user/configuration issue, not a system error.
+
+### Changed
+- **Logging separation policy**: Clear distinction documented in AGENTS.md — `Log.Error` for system errors only (DB down, API unreachable, parse crashes), `Log.Warning` for user mistakes (validation, business rules, "not found").
+
+## [1.5.0] - 2026-05-22
+
+### Added
+- **Error Message Best Practices (v4.5.1)**: 7 new rules (RULE-171 to RULE-177) in AGENTS.md.
+  - ALL catch blocks use `Serilog.Log.Error()` — NEVER `ex.Message` in user-facing dialogs.
+  - `HandleFailure()` transforms timeout/network/not-found errors into user-friendly Arabic.
+  - Dialog titles are screen-specific (e.g., `"خطأ في حفظ الفاتورة"`) — NEVER generic `"خطأ"`.
+  - `MessageBox.Show` is FORBIDDEN — ALL user-facing messages go through `IDialogService`.
+  - ALL dialog calls use `Async` suffix methods (`ShowErrorAsync`, `ShowSuccessAsync`).
+  - Success messages name the action (e.g., `"تم تصدير التقرير إلى Excel بنجاح"`).
+  - Raw HTTP response bodies logged via Serilog — NEVER shown to users.
+
+- **Application Shutdown (v4.5.1)**: 4 new rules (RULE-178 to RULE-181) in AGENTS.md.
+  - `App.xaml` uses `ShutdownMode="OnExplicitShutdown"` — prevents app staying alive due to hidden ScreenWindow instances.
+  - `LoginWindow.CloseButton_Click` calls `Application.Current.Shutdown()` — fully exits app.
+  - `MainWindow.Closed` calls `System.Windows.Application.Current.Shutdown()` — except during logout.
+  - Logout flow sets `_isLoggingOut = true`, clears session, opens new LoginWindow — prevents shutdown.
+
+- **AGENTS.md updated to v4.5.1** — 181 rules total.
+  - Section 2.41: Error Message Best Practices (RULE-171 to RULE-177).
+  - Section 2.42: Application Shutdown (RULE-178 to RULE-181).
+  - FORBIDDEN list: 7 new items.
+  - Checklist: 9 new items.
+
+- **Bug-fix patterns**: Code reviewer / implement agent checklists expanded with 7 new items for: manual window creation, ignored ShowDialog returns, AddCommand CanExecute verification, MessageBox.Show audit.
+
+- **Self-Explaining System (v4.5.1)**: 6 new rules (RULE-185 to RULE-190) in AGENTS.md for ToolTip requirements.
+  - ALL interactive controls must have Arabic ToolTip explaining the action.
+  - ToolTips must be user-action-oriented, not just repeat button text.
+  - Action buttons must explain consequences (e.g., stock updates).
+  - Navigation MenuItems must describe destination screen.
+  - Empty-state buttons must have ToolTips.
+  - Error dismiss buttons must have ToolTip.
+- **174 Arabic ToolTips**: Added across ~40 XAML files in the DesktopPWF Views.
+  - Group 1 (List views): 32 ToolTips — Products, Customers, Suppliers, Warehouses, StockTransfers.
+  - Group 2 (Invoice editors): 40 ToolTips — Sales, Purchase, Returns, StockTransfer editors.
+  - Group 3 (CRUD editors): 22 ToolTips — Product, Customer, Supplier, User, Category, Unit, Warehouse, Payment editors.
+  - Group 4 (Menus & Misc): 57 ToolTips — MainWindow menus, Selection dialogs, LowStock, Dashboard, Reports, Settings.
+  - Group 5 (Remaining lists): 23 ToolTips — Sales/Purchase/Returns lists, Users, Categories, Units, Payments.
+
+### Changed
+- **Version updated to v4.5.1** — Error Message & Shutdown Improvements release.
+- **README.md updated to v4.5.1** — New "What's New" section, updated version badge.
+- **SupplierListViewModel**: Refactored to use `InitializeCommands()` pattern (matching ProductListViewModel standard).
+- **AGENTS.md updated to v4.5.1** — 190 rules total.
+  - Section 2.43: UI ToolTips (RULE-185 to RULE-190).
+  - FORBIDDEN list: 2 new items (missing ToolTip, redundant ToolTip).
+  - Checklist: 5 new items.
+- **README.md** — Added 5 new rows to What's New in v4.5.1 for ToolTip features.
+
+### Fixed
+- **Raw exception messages**: 13 files fixed — catch blocks no longer show `ex.Message` to users.
+- **Generic "خطأ" titles**: 12 ViewModels updated with screen-specific dialog titles.
+- **MessageBox.Show violations**: 16 calls replaced with `IDialogService` across 6 editor ViewModels.
+- **Sync dialog calls**: `LowStockViewModel` + `PurchaseInvoiceEditorViewModel` — all sync `ShowError`/`ShowInfo`/`ShowWarning` migrated to async.
+- **HandleFailure transformation**: `ViewModelBase.HandleFailure()` now transforms common errors (timeout, network, not found) to user-friendly Arabic.
+- **Vague success messages**: `ReportsViewModel` — `"تم التصدير بنجاح"` → `"تم تصدير التقرير إلى Excel بنجاح"` / `"إلى CSV"`.
+- **Raw HTTP body exposure**: `SettingsViewModel` — raw HTTP response body replaced with user-friendly message + Serilog logging.
+- **CS0234 namespace collision**: `Application.Current` → `System.Windows.Application.Current` in `LoginWindow.xaml.cs` and `MainWindow.xaml.cs`.
+- **CS8602 null dereferences**: Fixed in `InputHelper.cs`, `MainWindow.xaml.cs`, `App.xaml.cs`, `UpdaterService.cs`, `UpdateDialogViewModel.cs`.
+- **CS1729 constructor mismatch**: `CustomerEditorViewModelTests` + `SupplierEditorViewModelTests` — added `Mock<IDialogService>` and updated 53 constructor calls.
+- **CS8632 nullable annotations**: Removed `?` from 6 field declarations across 4 E2E test files with `#nullable disable`.
+- **SYSLIB0050 obsolete API**: `WarehouseListViewModelTests` — `FormatterServices.GetUninitializedObject` → `RuntimeHelpers.GetUninitializedObject`.
+- **CustomerListViewModel**: Replaced manual `CustomerEditorView` creation + `ShowDialog()` with `_dialogService.ShowDialog(editorVm)` in `AddCustomer()` and `EditCustomer()`.
+- **CustomerListViewModel**: Replaced `MessageBox.Show` in `RestoreCustomerAsync()` with `_dialogService.ShowSuccessAsync()` + `HandleFailure()`.
+- **SupplierListViewModel**: `AddSupplier()` and `EditSupplier()` now check `_dialogService.ShowDialog()` return value and reload list on success — previously ignored return, causing stale list.
+- **SupplierListViewModel**: Extracted command initialization into `InitializeCommands()` — eliminated duplicate code in both constructors.
+- **SupplierListViewModel**: Replaced `MessageBox.Show` in `RestoreSupplierAsync()` with `_dialogService.ShowSuccessAsync()` + `HandleFailure()`.
+- **SupplierListViewModel**: Command properties changed from `{ get; }` to `{ get; private set; } = null!;` to support `InitializeCommands()` pattern.
+- **ProductEditorViewModel**: Added `IDialogService` dependency; replaced 4× `MessageBox.Show` in `SaveAsync()` with `_dialogService.ShowSuccessAsync()` / `ShowErrorAsync()`.
+- **ProductEditorViewModelTests**: Updated 19 constructor calls with `Mock<IDialogService>` parameter.
+
 ## [1.4.0] - 2026-05-21
 
 ### Added

@@ -32,7 +32,6 @@ public static class PrintDtoExtensions
             invoice.Items.Select((item, index) => new InvoiceItemPrintDto(
                 index + 1,
                 item.ProductName,
-                item.ProductCode,
                 item.Quantity,
                 item.Mode == 2 ? "جملة" : "تجزئة",
                 item.UnitPrice,
@@ -64,7 +63,6 @@ public static class PrintDtoExtensions
             invoice.Items.Select((item, index) => new InvoiceItemPrintDto(
                 index + 1,
                 item.ProductName,
-                item.ProductCode,
                 item.Quantity,
                 item.Mode == 2 ? "جملة" : "تجزئة",
                 item.UnitCost,

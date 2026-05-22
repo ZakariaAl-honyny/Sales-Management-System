@@ -2,7 +2,6 @@ using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
@@ -208,8 +207,7 @@ public class CustomerListViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var searchLower = SearchText.Trim().ToLower();
-        return (customer.Code?.ToLower().Contains(searchLower) ?? false) ||
-               customer.Name.ToLower().Contains(searchLower) ||
+        return customer.Name.ToLower().Contains(searchLower) ||
                (customer.Phone?.ToLower().Contains(searchLower) ?? false) ||
                (customer.Email?.ToLower().Contains(searchLower) ?? false) ||
                (customer.Address?.ToLower().Contains(searchLower) ?? false);
@@ -218,12 +216,8 @@ public class CustomerListViewModel : ViewModelBase
     private void AddCustomer()
     {
         var editorVm = new CustomerEditorViewModel();
-        var editorWindow = new Views.Customers.CustomerEditorView { DataContext = editorVm };
-        editorVm.CloseRequested += () => editorWindow.DialogResult = true;
-
-        if (editorWindow.ShowDialog() == true)
+        if (_dialogService.ShowDialog(editorVm))
         {
-            // Customer was saved successfully - refresh list
             _ = LoadCustomersAsync();
         }
     }
@@ -233,10 +227,7 @@ public class CustomerListViewModel : ViewModelBase
         if (SelectedCustomer == null) return;
 
         var editorVm = new CustomerEditorViewModel(SelectedCustomer);
-        var editorWindow = new Views.Customers.CustomerEditorView { DataContext = editorVm };
-        editorVm.CloseRequested += () => editorWindow.DialogResult = true;
-
-        if (editorWindow.ShowDialog() == true)
+        if (_dialogService.ShowDialog(editorVm))
         {
             _ = LoadCustomersAsync();
         }
@@ -288,7 +279,9 @@ public class CustomerListViewModel : ViewModelBase
                 }
                 else
                 {
-                    ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في حذف العميل", "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
+                    var error = deleteResult.Error ?? "فشل في حذف العميل";
+                    ErrorMessage = HandleFailure(error, "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
+                    LogSystemError($"Hard delete failed for Customer {SelectedCustomer.Id}: {error}", "CustomerListViewModel.DeleteCustomerAsync");
                 }
             }
         }
@@ -313,7 +306,6 @@ public class CustomerListViewModel : ViewModelBase
         {
             var request = new UpdateCustomerRequest(
                 Name: SelectedCustomer.Name,
-                Code: SelectedCustomer.Code,
                 Phone: SelectedCustomer.Phone,
                 Email: SelectedCustomer.Email,
                 Address: SelectedCustomer.Address,
@@ -328,12 +320,11 @@ public class CustomerListViewModel : ViewModelBase
             {
                 _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
                 await LoadCustomersAsync();
-                System.Windows.MessageBox.Show("تم استعادة العميل بنجاح", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
+                await _dialogService.ShowSuccessAsync("استعادة العميل", "تم استعادة العميل بنجاح");
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في استعادة العميل";
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ في الاستعادة", MessageBoxButton.OK, MessageBoxImage.Error);
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة العميل", "CustomerListViewModel.RestoreCustomerAsync", $"[CustomerListViewModel.RestoreCustomerAsync] Failed to restore customer with ID {SelectedCustomer.Id}.");
             }
         }
         catch (Exception ex)

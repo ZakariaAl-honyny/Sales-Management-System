@@ -26,7 +26,7 @@ public class ProductUnitConfiguration : IEntityTypeConfiguration<ProductUnit>
         builder.HasOne(x => x.Product)
             .WithMany(x => x.Units)
             .HasForeignKey(x => x.ProductId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasQueryFilter(x => x.IsActive);
     }

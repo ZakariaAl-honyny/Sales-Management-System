@@ -56,3 +56,11 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - SalesInvoices: `CHECK (PaidAmount >= 0 AND PaidAmount <= TotalAmount)`
 - Unique indexes: InvoiceNo, Product Code/Barcode, UserName
 - Composite unique: `WarehouseStocks(WarehouseId, ProductId)`
+- WarehouseStocks: MUST have `.ToTable(t => t.HasCheckConstraint("CHK_WarehouseStocks_Quantity_NonNegative", "[Quantity] >= 0"))`
+- ALL money fields: `decimal(18,2)` — NEVER `decimal(18,4)`
+- `Product.ReorderLevel`: MUST use `.HasPrecision(18, 3)` (quantity field)
+- `ProductPriceHistory`: MUST have dedicated config file with `HasMaxLength` on `ChangeType` and `CostingMethod`
+- `UnitBarcode`: MUST have `.HasQueryFilter(x => x.IsActive)`
+- `CostingMethod` enum: WeightedAverage=1, LastPurchasePrice=2, SupplierPrice=3
+- `CashTransactionType` enum: 8 values (1-8) matching AGENTS.md Section 3
+- `InvoiceTypePrint` enum: Sales=1, Purchase=2, SalesReturn=3, PurchaseReturn=4, Test=5

@@ -43,7 +43,6 @@ public class SupplierService : ISupplierService
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(s => s.Name.Contains(search) ||
-                                    (s.Code != null && s.Code.Contains(search)) ||
                                     (s.Phone != null && s.Phone.Contains(search)));
         }
 
@@ -63,25 +62,9 @@ public class SupplierService : ISupplierService
     {
         try
         {
-            string? code = request.Code;
-            if (string.IsNullOrWhiteSpace(code))
-            {
-                var codeResult = await _sequenceService.GetNextNumberAsync("SUP", ct);
-                if (!codeResult.IsSuccess)
-                    return Result<SupplierDto>.Failure(codeResult.Error ?? "حدث خطأ أثناء توليد الكود");
-                code = codeResult.Value;
-            }
-
-            // Validate code uniqueness (Regardless of source, including inactive)
-            if (await _uow.Suppliers.Query().IgnoreQueryFilters().AnyAsync(s => s.Code == code, ct))
-            {
-                return Result<SupplierDto>.Failure("كود المورد مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateCode);
-            }
-
             var supplier = Supplier.Create(
                 name: request.Name,
                 openingBalance: request.OpeningBalance,
-                code: code,
                 phone: request.Phone,
                 email: request.Email,
                 address: request.Address,
@@ -116,15 +99,8 @@ public class SupplierService : ISupplierService
             if (supplier == null)
                 return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
-            if (!string.IsNullOrWhiteSpace(request.Code) && request.Code != supplier.Code)
-            {
-                if (await _uow.Suppliers.Query().IgnoreQueryFilters().AnyAsync(s => s.Code == request.Code && s.Id != id, ct))
-                    return Result<SupplierDto>.Failure("كود المورد مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateCode);
-            }
-
             supplier.Update(
                 name: request.Name,
-                code: request.Code,
                 phone: request.Phone,
                 email: request.Email,
                 address: request.Address,
@@ -182,18 +158,26 @@ public class SupplierService : ISupplierService
         if (await _uow.SupplierPayments.Query().AnyAsync(sp => sp.SupplierId == id, ct))
             return Result.Failure("لا يمكن حذف المورد نهائياً لأنه مرتبط بسندات صرف");
 
-        await _uow.Suppliers.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        try
+        {
+            await _uow.Suppliers.HardDeleteAsync(id, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Supplier permanently deleted: {SupplierId}", id);
-        return Result.Success();
+            _logger.LogInformation("Supplier permanently deleted: {SupplierId}", id);
+            return Result.Success();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Failed to permanently delete supplier {SupplierId} due to database constraint", id);
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            return Result.Failure($"لا يمكن حذف المورد نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام. ({innerMessage})");
+        }
     }
 
     private static SupplierDto MapToDto(Supplier s)
     {
         return new SupplierDto(
             s.Id,
-            s.Code,
             s.Name,
             s.Phone,
             s.Email,

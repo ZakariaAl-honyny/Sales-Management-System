@@ -41,7 +41,8 @@
                                  Tag="أدخل الاسم الكامل للمورد" 
                                  TabIndex="2"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtSupplierName"/>
+                                 AutomationProperties.AutomationId="TxtSupplierName"
+                             ToolTip="الاسم الكامل للمورد — هذا الحقل إلزامي ولا يمكن أن يكون فارغاً"/>
                         <TextBlock Text="{Binding NameError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibility}}"/>
                         <Border Height="12"/>
 
@@ -52,7 +53,8 @@
                                  Tag="05xxxxxxxx (10 أرقام)" 
                                  TabIndex="3"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtSupplierPhone"/>
+                                 AutomationProperties.AutomationId="TxtSupplierPhone"
+                             ToolTip="رقم جوال المورد — يُستخدم للتواصل وطلب البضائع"/>
                         <TextBlock Text="مثال: 0512345678 - سيتم استخدامه للتواصل وطلب البضائع" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="12"/>
 
@@ -67,7 +69,8 @@
                                  VerticalContentAlignment="Top" 
                                  TabIndex="4"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtSupplierAddress"/>
+                                 AutomationProperties.AutomationId="TxtSupplierAddress"
+                             ToolTip="عنوان المورد — يساعد في إرسال المرتجعات"/>
                         <TextBlock Text="يساعدك العنوان في الوصول للمورد أو إرسال المرتجعات" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="12"/>
 
@@ -84,7 +87,8 @@
                                          Tag="15 رقم"
                                          TabIndex="5"
                                          helpers:FocusHelper.AdvanceOnEnter="True"
-                                         AutomationProperties.AutomationId="TxtSupplierTaxNumber"/>
+                                         AutomationProperties.AutomationId="TxtSupplierTaxNumber"
+                                         ToolTip="الرقم الضريبي للمورد — يستخدم في إصدار فواتير الشراء"/>
                                 <TextBlock Text="الرقم الضريبي الموحد للمورد" Style="{StaticResource HelperTextStyle}"/>
                             </StackPanel>
 
@@ -95,7 +99,8 @@
                                          Tag="example@test.com"
                                          TabIndex="6"
                                          helpers:FocusHelper.AdvanceOnEnter="True"
-                                         AutomationProperties.AutomationId="TxtSupplierEmail"/>
+                                         AutomationProperties.AutomationId="TxtSupplierEmail"
+                                         ToolTip="البريد الإلكتروني الرسمي للمورد للمراسلة"/>
                                 <TextBlock Text="البريد الإلكتروني الرسمي للمراسلة" Style="{StaticResource HelperTextStyle}"/>
                             </StackPanel>
                         </Grid>
@@ -108,7 +113,8 @@
                                      Style="{StaticResource ModernTextBox}" 
                                      TabIndex="7"
                                      helpers:FocusHelper.AdvanceOnEnter="True"
-                                     AutomationProperties.AutomationId="TxtSupplierOpeningBalance"/>
+                                     AutomationProperties.AutomationId="TxtSupplierOpeningBalance"
+                                     ToolTip="الرصيد السابق للمورد — المبلغ المستحق له (موجب) أو المستحق عليه (سالب)"/>
                             <TextBlock Text="المبلغ المستحق للمورد (بالموجب) أو المستحق عليه (بالسالب) قبل استخدام النظام" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
                             <Border Height="12"/>
                         </StackPanel>
@@ -138,7 +144,8 @@
                             Margin="0,0,12,0"
                             IsDefault="True"
                             TabIndex="9"
-                            AutomationProperties.AutomationId="BtnSaveSupplier">
+                            AutomationProperties.AutomationId="BtnSaveSupplier"
+                            ToolTip="حفظ البيانات المدخلة">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,8,0" Stretch="Uniform"/>
                             <TextBlock Text="حفظ البيانات"/>
@@ -149,7 +156,8 @@
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
                             TabIndex="10"
-                            AutomationProperties.AutomationId="BtnCancelSupplier"/>
+                            AutomationProperties.AutomationId="BtnCancelSupplier"
+                            ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 

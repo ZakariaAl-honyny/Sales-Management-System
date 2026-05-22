@@ -42,7 +42,8 @@
                     <Button Command="{Binding SearchCommand}" 
                             Style="{StaticResource PrimaryButton}"
                             Margin="12,0,0,0" Height="36" Padding="16,0"
-                            AutomationProperties.AutomationId="BtnSearchUnit">
+                            AutomationProperties.AutomationId="BtnSearchUnit"
+                            ToolTip="البحث في البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="بحث" VerticalAlignment="Center"/>
@@ -61,7 +62,8 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0" AutomationProperties.AutomationId="BtnAddUnit">
+                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0" AutomationProperties.AutomationId="BtnAddUnit"
+                            ToolTip="إضافة عنصر جديد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="إضافة وحدة" VerticalAlignment="Center"/>
@@ -91,7 +93,8 @@
                             <TextBlock Text="استعادة" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0" AutomationProperties.AutomationId="BtnRefreshUnits">
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0" AutomationProperties.AutomationId="BtnRefreshUnits"
+                            ToolTip="تحديث قائمة البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -182,7 +185,8 @@
                         <TextBlock Text="📏" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
                         <TextBlock Text="لا توجد وحدات حالياً" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
                         <TextBlock Text="قم بإضافة وحدات القياس (مثل: كيلو، حبة، كرتون) للبدء" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة أول وحدة" Command="{Binding AddCommand}" Margin="0,24,0,0"/>
+                        <Button Content="➕ إضافة أول وحدة" Command="{Binding AddCommand}" Margin="0,24,0,0"
+                                ToolTip="إضافة عنصر جديد"/>
                     </StackPanel>
                 </Grid>
             </Grid>

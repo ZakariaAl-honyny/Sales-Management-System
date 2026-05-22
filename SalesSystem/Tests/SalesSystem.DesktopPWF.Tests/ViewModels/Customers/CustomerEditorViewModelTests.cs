@@ -9,6 +9,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels.Customers;
 
 /// <summary>
@@ -18,11 +19,13 @@ public class CustomerEditorViewModelTests : IDisposable
 {
     private readonly Mock<ICustomerApiService> _mockCustomerService;
     private readonly Mock<IEventBus> _mockEventBus;
+    private readonly Mock<IDialogService> _mockDialogService;
 
     public CustomerEditorViewModelTests()
     {
         _mockCustomerService = new Mock<ICustomerApiService>();
         _mockEventBus = new Mock<IEventBus>();
+        _mockDialogService = new Mock<IDialogService>();
     }
 
     public void Dispose()
@@ -37,7 +40,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange & Act
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.SaveCommand.Should().NotBeNull();
@@ -50,7 +54,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange & Act
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.IsEditMode.Should().BeFalse();
@@ -60,10 +65,10 @@ public class CustomerEditorViewModelTests : IDisposable
     public void Constructor_WithCustomerDto_SetsIsEditModeTrue()
     {
         // Arrange
-        var customer = CreateTestCustomerDto(1, "CUST-001", "عميل تجريبي");
+        var customer = CreateTestCustomerDto(1, "عميل تجريبي");
 
         // Act - Use the service-based constructor
-        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object);
+        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object, _mockDialogService.Object);
 
         // Assert
         viewModel.IsEditMode.Should().BeTrue();
@@ -75,10 +80,10 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange & Act
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
-        viewModel.Code.Should().BeEmpty();
         viewModel.Name.Should().BeEmpty();
         viewModel.Phone.Should().BeEmpty();
         viewModel.Email.Should().BeEmpty();
@@ -97,7 +102,6 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var customer = new CustomerDto(
             Id: 1,
-            Code: "CUST-001",
             Name: "عميل تجريبي",
             Phone: "0501234567",
             Email: "test@example.com",
@@ -109,11 +113,10 @@ public class CustomerEditorViewModelTests : IDisposable
             IsActive: false);
 
         // Act
-        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object);
+        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object, _mockDialogService.Object);
 
         // Assert - field is private, we verify via IsEditMode being true
         viewModel.IsEditMode.Should().BeTrue();
-        viewModel.Code.Should().Be("CUST-001");
         viewModel.Name.Should().Be("عميل تجريبي");
         viewModel.Phone.Should().Be("0501234567");
         viewModel.Email.Should().Be("test@example.com");
@@ -129,7 +132,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.Title.Should().Be("إضافة عميل جديد");
@@ -141,7 +145,6 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var customer = new CustomerDto(
             Id: 1,
-            Code: "CUST-001",
             Name: "عميل تجريبي",
             Phone: null,
             Email: null,
@@ -152,7 +155,7 @@ public class CustomerEditorViewModelTests : IDisposable
             CreditLimit: 0,
             IsActive: true);
 
-        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object);
+        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object, _mockDialogService.Object);
 
         // Assert
         viewModel.Title.Should().Be("تعديل عميل");
@@ -168,7 +171,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.Name = "";
 
         // Assert - Check HasNameError property
@@ -181,7 +185,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.CreditLimit = -100;
 
         // Assert - Check HasCreditLimitError property
@@ -194,7 +199,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.OpeningBalance = -100;
 
         // Assert - Check HasOpeningBalanceError property
@@ -207,7 +213,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.HasNameError = true;
 
         // Assert
@@ -220,7 +227,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.HasNameError = false;
 
         // Assert
@@ -233,7 +241,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.HasCreditLimitError = true;
 
         // Assert
@@ -246,7 +255,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.HasOpeningBalanceError = true;
 
         // Assert
@@ -263,7 +273,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -280,7 +291,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -297,7 +309,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -314,7 +327,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -326,29 +340,13 @@ public class CustomerEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Code_Set_NotifiesPropertyChanged()
-    {
-        // Arrange
-        var viewModel = new CustomerEditorViewModel(
-            _mockCustomerService.Object,
-            _mockEventBus.Object);
-        var propertyChangedEvents = new List<string>();
-        viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        // Act
-        viewModel.Code = "CUST-001";
-
-        // Assert
-        propertyChangedEvents.Should().Contain("Code");
-    }
-
-    [Fact]
     public void Phone_Set_NotifiesPropertyChanged()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -365,7 +363,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -382,7 +381,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -399,7 +399,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -420,7 +421,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.Name = ""; // Invalid - name is empty
 
         // Assert - Validation not triggered yet
@@ -433,7 +435,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.Name = "عميل جديد";
         viewModel.CreditLimit = 5000;
 
@@ -447,7 +450,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Act
         viewModel.ErrorMessage = "فشل في الحفظ";
@@ -462,7 +466,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Act
         viewModel.IsLoading = true;
@@ -481,7 +486,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var closeRequestedInvoked = false;
         viewModel.CloseRequested += () => closeRequestedInvoked = true;
 
@@ -498,7 +504,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Act & Assert
         viewModel.CancelCommand.CanExecute(null).Should().BeTrue();
@@ -510,12 +517,10 @@ public class CustomerEditorViewModelTests : IDisposable
 
     private static CustomerDto CreateTestCustomerDto(
         int id,
-        string code,
         string name)
     {
         return new CustomerDto(
             Id: id,
-            Code: code,
             Name: name,
             Phone: null,
             Email: null,

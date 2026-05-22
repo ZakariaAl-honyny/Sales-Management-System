@@ -64,8 +64,8 @@ public class UpdaterService : IUpdaterService
             if (updateInfo == null)
                 return Result<UpdateCheckResult>.Failure("Invalid version.json format");
 
-            var currentVersion = GetCurrentVersion().Value;
-            var skippedVersion = GetSkippedVersion().Value;
+            var currentVersion = GetCurrentVersion().Value ?? "0.0.0";
+            var skippedVersion = GetSkippedVersion().Value ?? string.Empty;
 
             if (!updateInfo.IsForceUpdate(currentVersion) &&
                 updateInfo.LatestVersion == skippedVersion)

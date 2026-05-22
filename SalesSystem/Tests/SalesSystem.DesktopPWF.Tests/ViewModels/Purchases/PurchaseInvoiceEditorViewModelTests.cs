@@ -44,20 +44,20 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
         var suppliers = new List<SupplierDto>
         {
-            new SupplierDto(Id: 1, Code: "S001", Name: "مورد 1", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true),
-            new SupplierDto(Id: 2, Code: "S002", Name: "مورد 2", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true)
+            new SupplierDto(Id: 1, Name: "مورد 1", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true),
+            new SupplierDto(Id: 2, Name: "مورد 2", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true)
         };
 
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Code: "W001", Name: "المستودع الرئيسي", Location: null, IsDefault: true, IsActive: true),
-            new WarehouseDto(Id: 2, Code: "W002", Name: "المستودع الفرعي", Location: null, IsDefault: false, IsActive: true)
+            new WarehouseDto(Id: 1, Name: "المستودع الرئيسي", Location: null, IsDefault: true, IsActive: true),
+            new WarehouseDto(Id: 2, Name: "المستودع الفرعي", Location: null, IsDefault: false, IsActive: true)
         };
 
         var products = new List<ProductDto>
         {
-            CreateProductDto(1, "P001", "منتج 1", 100m, 80m),
-            CreateProductDto(2, "P002", "منتج 2", 200m, 160m)
+            CreateProductDto(1, "منتج 1", 100m, 80m),
+            CreateProductDto(2, "منتج 2", 200m, 160m)
         };
 
         _mockSupplierService.Setup(s => s.GetAllAsync()).ReturnsAsync(Result<List<SupplierDto>>.Success(suppliers));
@@ -107,7 +107,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
     {
         var invoice = new PurchaseInvoiceDto(1, "PUR-2026-001", 1, "مورد تجريبي", 1, "المستودع الرئيسي", DateTime.Today, null, 1, 1000m, 0, 0, 1000m, 1000m, 0, null, null, 1, new List<PurchaseInvoiceItemDto>
         {
-            new PurchaseInvoiceItemDto(1, 1, "P001", "منتج 1", 10, 100m, 0, 1000m, 1)
+            new PurchaseInvoiceItemDto(1, 1, "منتج 1", 10, 100m, 0, 1000m, 1)
         });
 
         _mockInvoiceService.Setup(s => s.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(Result<PurchaseInvoiceDto>.Success(invoice));
@@ -132,27 +132,31 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public void PostCommand_CannotExecute_WhenNoWarehouseSelected()
+    public void PostCommand_NoPredicate_AlwaysCanExecute_WhenNoWarehouseSelected()
     {
+        // Interactive validation v4.6 removed CanExecute predicates
+        // Validation is done in Validate() and shown as warning dialog
         _viewModel.SelectedWarehouseId = 0;
         _viewModel.SelectedSupplierId = 1;
         _viewModel.Items.First().SelectedProduct = _viewModel.Products.First();
         _viewModel.Items.First().Quantity = 10;
-        _viewModel.PostCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.PostCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
-    public void PostCommand_CannotExecute_WhenNoSupplierSelected()
+    public void PostCommand_NoPredicate_AlwaysCanExecute_WhenNoSupplierSelected()
     {
+        // Interactive validation v4.6 removed CanExecute predicates
+        // Validation is done in Validate() and shown as warning dialog
         _viewModel.SelectedWarehouseId = 1;
         _viewModel.SelectedSupplierId = 0;
         _viewModel.Items.First().SelectedProduct = _viewModel.Products.First();
         _viewModel.Items.First().Quantity = 10;
-        _viewModel.PostCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.PostCommand.CanExecute(null).Should().BeTrue();
     }
 
-    private static ProductDto CreateProductDto(int id, string code, string name, decimal salePrice, decimal purchasePrice)
+    private static ProductDto CreateProductDto(int id, string name, decimal salePrice, decimal purchasePrice)
     {
-        return new ProductDto(id, code, null, name, null, null, 1, "وحدة", 1, "وحدة", 1, "وحدة", 1, purchasePrice, salePrice, salePrice, salePrice * 10, 0, null, true);
+        return new ProductDto(id, null, name, null, null, 1, "وحدة", 1, "وحدة", 1, "وحدة", 1, purchasePrice, salePrice, salePrice, salePrice * 10, 0, null, true);
     }
 }

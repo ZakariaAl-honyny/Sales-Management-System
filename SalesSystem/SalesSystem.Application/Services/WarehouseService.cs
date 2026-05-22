@@ -13,13 +13,11 @@ public class WarehouseService : IWarehouseService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<WarehouseService> _logger;
-    private readonly IDocumentSequenceService _sequenceService;
 
-    public WarehouseService(IUnitOfWork uow, ILogger<WarehouseService> logger, IDocumentSequenceService sequenceService)
+    public WarehouseService(IUnitOfWork uow, ILogger<WarehouseService> logger)
     {
         _uow = uow;
         _logger = logger;
-        _sequenceService = sequenceService;
     }
 
     public async Task<Result<WarehouseDto>> GetByIdAsync(int id, CancellationToken ct)
@@ -42,8 +40,7 @@ public class WarehouseService : IWarehouseService
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(w => w.Name.Contains(search) ||
-                                    (w.Code != null && w.Code.Contains(search)));
+            query = query.Where(w => w.Name.Contains(search));
         }
 
         var totalItems = await query.CountAsync(ct);
@@ -60,18 +57,6 @@ public class WarehouseService : IWarehouseService
 
     public async Task<Result<WarehouseDto>> CreateAsync(CreateWarehouseRequest request, CancellationToken ct)
     {
-        string? code = request.Code;
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            var codeResult = await _sequenceService.GetNextNumberAsync("WH", ct);
-            if (!codeResult.IsSuccess)
-                return Result<WarehouseDto>.Failure(codeResult.Error ?? "حدث خطأ أثناء توليد الكود");
-            code = codeResult.Value;
-        }
-
-        if (await _uow.Warehouses.Query().AnyAsync(w => w.Code == code, ct))
-            return Result<WarehouseDto>.Failure("كود المخزن مستخدم بالفعل", ErrorCodes.DuplicateCode);
-
         return await _uow.ExecuteAsync(async () =>
         {
             await using var transaction = await _uow.BeginTransactionAsync(ct);
@@ -84,7 +69,6 @@ public class WarehouseService : IWarehouseService
 
                 var warehouse = Warehouse.Create(
                     name: request.Name,
-                    code: code,
                     location: request.Location,
                     isDefault: request.IsDefault,
                     createdByUserId: null
@@ -119,12 +103,6 @@ public class WarehouseService : IWarehouseService
         if (warehouse == null)
             return Result<WarehouseDto>.Failure("المخزن غير موجود", ErrorCodes.NotFound);
 
-        if (!string.IsNullOrWhiteSpace(request.Code) && request.Code != warehouse.Code)
-        {
-            if (await _uow.Warehouses.Query().AnyAsync(w => w.Code == request.Code && w.Id != id, ct))
-                return Result<WarehouseDto>.Failure("كود المخزن مستخدم بالفعل", ErrorCodes.DuplicateCode);
-        }
-
         return await _uow.ExecuteAsync(async () =>
         {
             await using var transaction = await _uow.BeginTransactionAsync(ct);
@@ -137,7 +115,6 @@ public class WarehouseService : IWarehouseService
 
                 warehouse.Update(
                     name: request.Name,
-                    code: request.Code,
                     location: request.Location,
                     isDefault: request.IsDefault,
                     updatedByUserId: null
@@ -203,11 +180,20 @@ public class WarehouseService : IWarehouseService
         if (await _uow.StockTransfers.Query().AnyAsync(st => st.FromWarehouseId == id || st.ToWarehouseId == id, ct))
             return Result.Failure("لا يمكن حذف المخزن نهائياً لأنه مرتبط بتحويلات مخزون");
 
-        await _uow.Warehouses.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        try
+        {
+            await _uow.Warehouses.HardDeleteAsync(id, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Warehouse permanently deleted: {WarehouseId}", id);
-        return Result.Success();
+            _logger.LogInformation("Warehouse permanently deleted: {WarehouseId}", id);
+            return Result.Success();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Failed to permanently delete warehouse {WarehouseId} due to database constraint", id);
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            return Result.Failure($"لا يمكن حذف المخزن نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام. ({innerMessage})");
+        }
     }
 
     private async Task UnsetOtherDefaultsAsync(CancellationToken ct)
@@ -220,7 +206,6 @@ public class WarehouseService : IWarehouseService
         {
             w.Update(
                 name: w.Name,
-                code: w.Code,
                 location: w.Location,
                 isDefault: false,
                 updatedByUserId: null
@@ -233,7 +218,6 @@ public class WarehouseService : IWarehouseService
     {
         return new WarehouseDto(
             w.Id,
-            w.Code,
             w.Name,
             w.Location,
             w.IsDefault,

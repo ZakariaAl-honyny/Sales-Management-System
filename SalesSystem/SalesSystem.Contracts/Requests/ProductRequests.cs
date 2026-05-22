@@ -1,7 +1,7 @@
 namespace SalesSystem.Contracts.Requests;
 
 public record CreateProductRequest(
-    string Code, string Barcode, string Name,
+    string Barcode, string Name,
     int? CategoryId, int? UnitId, // Legacy
     int? RetailUnitId, int? WholesaleUnitId,
     decimal ConversionFactor,
@@ -11,7 +11,7 @@ public record CreateProductRequest(
 );
 
 public record UpdateProductRequest(
-    string Code, string Barcode, string Name,
+    string Barcode, string Name,
     int? CategoryId, int? UnitId, // Legacy
     int? RetailUnitId, int? WholesaleUnitId,
     decimal ConversionFactor,

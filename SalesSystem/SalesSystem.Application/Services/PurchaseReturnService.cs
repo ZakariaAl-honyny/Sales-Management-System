@@ -316,7 +316,6 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.Items.Select(it => new PurchaseReturnItemDto(
                 it.Id,
                 it.ProductId,
-                it.Product?.Code,
                 it.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 it.UnitCost,

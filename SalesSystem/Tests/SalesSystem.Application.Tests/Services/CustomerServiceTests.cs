@@ -63,7 +63,7 @@ public class CustomerServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingCustomer_ReturnsDto");
 
-        var customer = Customer.Create("Test Customer", 0m, "C001", "1234567890", null, null, null);
+        var customer = Customer.Create("Test Customer", 0m, "1234567890");
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
@@ -71,7 +71,6 @@ public class CustomerServiceTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("Test Customer");
-        result.Value.Code.Should().Be("C001");
 
         _output.WriteLine("[PASS] GetByIdAsync returns customer dto");
     }
@@ -116,30 +115,6 @@ public class CustomerServiceTests : IDisposable
         result.Value.CurrentBalance.Should().Be(1000m);
 
         _output.WriteLine("[PASS] CreateAsync creates customer correctly");
-    }
-
-    [Fact]
-    public async Task CreateAsync_DuplicateCode_ReturnsFailure()
-    {
-        _output.WriteLine("[TEST] CreateAsync_DuplicateCode_ReturnsFailure");
-
-        var existing = Customer.Create("Existing Customer", 0m, "C001", null, null, null, null);
-        _dbContext.Customers.Add(existing);
-        await _dbContext.SaveChangesAsync();
-
-        var request = new SalesSystem.Contracts.Requests.CreateCustomerRequest
-        {
-            Name = "New Customer",
-            Code = "C001", // Duplicate
-            OpeningBalance = 0m
-        };
-
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("كود العميل مستخدم بالفعل");
-
-        _output.WriteLine("[PASS] Duplicate code returns failure");
     }
 
     #endregion

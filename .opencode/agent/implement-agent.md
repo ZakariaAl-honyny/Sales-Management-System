@@ -179,6 +179,71 @@ For each task:
 6. Flag deviations: "⚠️ DEVIATION: [what] — Reason: [why]"
 ```
 
+## Interactive Validation Pattern (v4.6)
+
+Buttons are ALWAYS enabled. Validation happens on click with clear warning dialogs.
+
+```csharp
+// CORRECT — button always enabled, validate on click
+SaveCommand = new AsyncRelayCommand(SaveAsync);  // NO CanExecute predicate
+
+private bool Validate()
+{
+    var errors = new List<string>();
+    if (string.IsNullOrWhiteSpace(Name))
+        errors.Add("• اسم المنتج مطلوب");
+    if (Price <= 0)
+        errors.Add("• السعر يجب أن يكون أكبر من صفر");
+
+    if (errors.Any())
+    {
+        _ = _dialogService.ShowWarningAsync(
+            "بيانات غير مكتملة",
+            "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors));
+        return false;
+    }
+    return true;
+}
+
+private async Task SaveAsync()
+{
+    if (!Validate()) return;
+    // ... save logic
+}
+```
+
+**XAML Pattern:**
+
+```xml
+<!-- CORRECT — no IsEnabled binding -->
+<Button Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}"/>
+
+<!-- WRONG — Never disable buttons -->
+<Button Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}"/>  <!-- ❌ -->
+```
+
+**Rules:**
+
+1. Save/Post commands MUST NOT have CanExecute predicates — use `new AsyncRelayCommand(SaveAsync)` with no predicate
+2. XAML buttons MUST NOT have `IsEnabled="{Binding CanSave}"` bindings
+3. Validate() collects ALL errors and shows ONE warning dialog listing everything missing
+4. Required fields marked with `*` in XAML label Text
+5. Every input field has a ToolTip explaining validation rules (format, uniqueness, constraints)
+6. Unique fields (barcode, username) have helper TextBlock explaining uniqueness
+7. Dialog titles are screen-specific like `"بيانات غير مكتملة"` not generic `"خطأ"`
+8. Property setters MUST NOT call `RaiseCanExecuteChanged()` or `OnPropertyChanged(nameof(CanSave))`
+9. The `CanSave` property is REMOVED from ViewModels
+10. `CanSave()` / `CanPost()` / `CanPrint()` methods are REMOVED
+
+**Remove from ViewModel:**
+
+- CanExecute predicate from command constructor
+- `CanSave` property
+- `CanSave()` / `CanPost()` / `CanPrint()` methods
+- `OnPropertyChanged(nameof(CanSave))` from property setters
+- `RaiseCanExecuteChanged()` from property setters
+- `IsEnabled="{Binding CanSave}"` from XAML
+
 ## FORBIDDEN (NEVER DO THESE)
 - float/double/real for money or quantity
 - Skip transactions for financial operations
@@ -195,3 +260,334 @@ For each task:
 - Creating Window instances directly (use ScreenWindow + OpenWindow)
 - Strong references for window tracking (use WeakReference)
 - UI operations in OnClosed callback without Dispatcher.InvokeAsync()
+- Serilog.Log.Error directly in ViewModels (use LogSystemError from ViewModelBase instead)
+
+### Error Message Pattern (v4.5.1)
+
+```csharp
+// CORRECT — catch block pattern
+catch (Exception ex)
+{
+    Serilog.Log.Error(ex, "Context description");
+    ErrorMessage = "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.";
+    await _dialogService.ShowErrorAsync("خطأ في حفظ الفاتورة", ErrorMessage);
+}
+```
+
+### API Error Response Parsing Pattern
+```csharp
+// CORRECT — always check ContentType before parsing error JSON
+protected async Task<Result> HandleResponseAsync(HttpResponseMessage response)
+{
+    if (response.IsSuccessStatusCode)
+        return Result.Success();
+
+    try
+    {
+        if (response.Content.Headers.ContentType?.MediaType == "application/json")
+        {
+            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+            Serilog.Log.Warning("API failure: {StatusCode} - {Error}", 
+                response.StatusCode, error?.Error);
+            return Result.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
+        }
+
+        var content = await response.Content.ReadAsStringAsync();
+        Serilog.Log.Warning("API failure (non-JSON): {StatusCode} - {Content}", 
+            response.StatusCode, content);
+        return Result.Failure($"خطأ في الخادم: {response.StatusCode}", response.StatusCode.ToString());
+    }
+    catch (Exception ex)
+    {
+        Serilog.Log.Error(ex, "Unexpected error parsing API error response");
+        return Result.Failure("حدث خطأ غير متوقع", "Unknown");
+    }
+}
+// WRONG — NEVER call ReadFromJsonAsync without content-type check
+var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(); // ❌ crashes on empty/HTML body
+```
+
+### Logging Separation Policy
+```csharp
+// SYSTEM ERRORS → Log.Error (DB down, connection fail, parse crash, file I/O)
+catch (HttpRequestException ex)
+{
+    Log.Error(ex, "API server is not reachable");
+}
+catch (Exception ex)
+{
+    Log.Error(ex, "Unexpected error in {Context}", context);
+}
+
+// USER MISTAKES → Log.Warning (validation, business rules, not found from user input)
+if (response.StatusCode == HttpStatusCode.NotFound)
+{
+    Log.Warning("User requested non-existent resource: {Id}", id);
+}
+if (response.StatusCode == HttpStatusCode.BadRequest)
+{
+    Log.Warning("Validation error from API: {Error}", error?.Error);
+}
+```
+
+### Dialog Service Usage (v4.5.1)
+- NEVER use `MessageBox.Show` — always use `IDialogService`
+- ALWAYS use Async suffix: `ShowErrorAsync`, `ShowSuccessAsync`, `ShowWarningAsync`, `ShowInfoAsync`, `ShowConfirmationAsync`
+- NEVER use sync: `ShowError`, `ShowInfo`, `ShowWarning`, `ShowConfirmation`
+- Titles must be screen-specific, never generic "خطأ"
+- Log raw exception details via Serilog, show only user-friendly Arabic messages
+
+### List ViewModel AddCommand Pattern (v4.5.1)
+
+ALWAYS use this pattern for list ViewModel AddCommand:
+
+```csharp
+// CORRECT — AddCommand pattern
+public ICommand AddCommand { get; private set; } = null!;
+// In InitializeCommands():
+AddCommand = new RelayCommand(AddEntity);  // NO CanExecute predicate
+
+private void AddEntity()
+{
+    var editorVm = new EntityEditorViewModel();
+    if (_dialogService.ShowDialog(editorVm))
+    {
+        _ = LoadEntitiesAsync();  // MUST refresh on success
+    }
+}
+
+// WRONG — ignores return value, list never refreshes
+_dialogService.ShowDialog(new EntityEditorViewModel());  // ❌
+```
+
+### Editor ViewModel IDialogService Pattern (v4.5.1)
+
+ALL editor ViewModels MUST have IDialogService:
+
+```csharp
+// In editor ViewModel:
+private readonly IDialogService _dialogService;
+
+// Parameterless constructor:
+_dialogService = App.GetService<IDialogService>();
+
+// DI constructor:
+public EditorVm(..., IDialogService dialogService)
+{
+    _dialogService = dialogService;
+}
+
+// Success feedback:
+await _dialogService.ShowSuccessAsync("title", "message");
+// Error feedback:
+await _dialogService.ShowErrorAsync("title", "message");
+```
+
+NEVER use MessageBox.Show in editor ViewModels.
+
+### ToolTip Pattern (v4.5.1)
+
+ALL interactive XAML controls MUST have Arabic ToolTip:
+
+```xml
+<!-- CORRECT — describes action and consequence -->
+<Button Content="منتج جديد" ToolTip="فتح شاشة إضافة منتج جديد" />
+
+<!-- CORRECT — explains consequence of action -->
+<Button Content="✅ ترحيل نهائي" ToolTip="ترحيل العملية نهائياً — سيتم تحديث المخزون والرصيد" />
+
+<!-- WRONG — just repeats button text -->
+<Button Content="منتج جديد" ToolTip="منتج جديد" />  <!-- ❌ -->
+
+<!-- MISSING — no ToolTip at all -->
+<Button Content="حفظ" />  <!-- ❌ -->
+```
+
+ToolTip standards:
+- Action-oriented: describe what happens when user clicks
+- Consequence-aware: explain side effects (stock update, balance change)
+- Never just repeat the button text
+- All in Arabic
+
+### Identifier Strategy — No Code Column (v4.5.3)
+
+Product, Customer, Supplier, and Warehouse entities MUST NOT have a Code column. Use auto-increment Id instead.
+
+```csharp
+// CORRECT — no Code property
+public class Product : BaseEntity
+{
+    public string Name { get; private set; } = string.Empty;
+    public string? Barcode { get; private set; }  // Barcode is still valid for scanning
+    // NO Code property
+}
+
+// CORRECT — Product.Create without code parameter
+public static Product Create(
+    string name,
+    decimal purchasePrice,
+    decimal retailPrice,
+    // ... other params ...
+    string? barcode = null)
+{
+    // No code parameter
+}
+
+// CORRECT — searching by Name or Id, not Code
+query = query.Where(p => p.Name.Contains(search) ||
+                         (p.Barcode != null && p.Barcode.Contains(search)));
+// NOT: p.Code != null && p.Code.Contains(search)
+
+// CORRECT — DTO without ProductCode
+public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName, ...);
+// NOT: string? ProductCode
+```
+
+#### Warehouse-Specific Notes:
+- Warehouse.Create signature: `Create(string name, string? location = null, bool isDefault = false, int? createdByUserId = null)`
+- Warehouse.Update signature: `Update(string name, string? location, bool isDefault, int? updatedByUserId = null)`
+- WarehouseDto: `(int Id, string Name, string? Location, bool IsDefault, bool IsActive)` — 5 params, no Code
+- WarehouseResponse: `(int Id, string Name, string? Location, bool IsDefault, bool IsActive)` — 5 params, no Code
+- CreateWarehouseRequest: `(string Name, string? Location, bool IsDefault)` — no Code
+- UpdateWarehouseRequest: `(string Name, string? Location, bool IsDefault, bool IsActive)` — no Code
+- WarehouseService no longer injects IDocumentSequenceService (no code auto-generation)
+
+**When removing Code from an entity:**
+1. Remove property from Domain entity
+2. Remove from EF Core configuration (HasMaxLength + HasIndex)
+3. Remove from factory methods (Create, Update)
+4. Remove from DTOs
+5. Remove from Requests and Responses
+6. Remove from ViewModel properties and editor fields
+7. Remove from search/filter logic
+8. Remove from XAML bindings
+9. Remove from tests
+10. Remove auto-generation logic from services
+
+### LogSystemError Pattern (v4.6)
+
+ALL ViewModels MUST use LogSystemError instead of direct Serilog.Log.Error:
+
+```csharp
+// CORRECT — use LogSystemError from ViewModelBase
+catch (Exception ex)
+{
+    LogSystemError($"Failed to load customer payment {_paymentId}", "CustomerPaymentEditorViewModel.LoadPaymentAsync", ex);
+}
+
+// WRONG — NEVER call Serilog.Log.Error directly in ViewModels
+catch (Exception ex)
+{
+    Serilog.Log.Error(ex, "[CustomerPaymentEditorViewModel.LoadPaymentAsync] Failed to load customer payment {PaymentId}.", _paymentId); // ❌
+}
+```
+
+### Hard Delete Pattern (v4.6)
+
+ALL PermanentDeleteAsync methods MUST catch DbUpdateException:
+
+```csharp
+// CORRECT — hard delete with FK safety
+public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
+{
+    try
+    {
+        var entity = await _uow.Products.GetByIdAsync(id, ct);
+        if (entity == null)
+            return Result.Failure("المنتج غير موجود", ErrorCodes.NotFound);
+
+        _uow.Products.Remove(entity);
+        await _uow.SaveChangesAsync(ct);
+        _logger.LogInformation("Product {Id} permanently deleted", id);
+        return Result.Success();
+    }
+    catch (DbUpdateException ex)
+    {
+        _logger.LogError(ex, "Cannot permanently delete Product {Id}: {Error}", id, ex.InnerException?.Message);
+        return Result.Failure("لا يمكن حذف هذا المنتج لأنه مرتبط بمعاملات أخرى", ErrorCodes.ReferencedByOtherEntities);
+    }
+}
+```
+
+### Dialog Transparency Overlay Pattern (v4.6)
+
+Every dialog window MUST use this pattern:
+
+```xaml
+<!-- Dialog XAML pattern -->
+<Window x:Class="SalesSystem.DesktopPWF.Views.Dialogs.WarningDialog"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ...>
+    <Grid>
+        <!-- Dimming overlay -->
+        <Rectangle Fill="#80000000"/>
+        <!-- Centered card -->
+        <Border Background="{StaticResource DialogCardBackground}"
+                CornerRadius="16"
+                Effect="{StaticResource DeepShadow}"
+                ...>
+            <!-- Content -->
+        </Border>
+    </Grid>
+</Window>
+```
+
+```csharp
+// Dialog code-behind pattern
+private void PositionOverOwner()
+{
+    if (Owner is Window owner)
+    {
+        Left = owner.Left;
+        Top = owner.Top;
+        Width = owner.Width;
+        Height = owner.Height;
+    }
+}
+```
+
+### ValidationErrorsDialog Pattern (v4.6)
+
+```csharp
+// In IDialogService:
+Task ShowValidationErrorsAsync(string title, List<string> errors);
+
+// In ViewModel:
+private bool Validate()
+{
+    var errors = new List<string>();
+    if (string.IsNullOrWhiteSpace(Name))
+        errors.Add("• اسم المنتج مطلوب");
+    
+    if (errors.Any())
+    {
+        _ = _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+        RequestFocusFirstInvalidField();
+        return false;
+    }
+    return true;
+}
+```
+
+### Auto-Focus Pattern (v4.6)
+
+```csharp
+// In ViewModel Base:
+public event EventHandler? FocusFirstInvalidFieldRequested;
+protected void RequestFocusFirstInvalidField() =>
+    FocusFirstInvalidFieldRequested?.Invoke(this, EventArgs.Empty);
+
+// In Editor View code-behind:
+public MyEditorView()
+{
+    InitializeComponent();
+    Loaded += (s, e) =>
+    {
+        if (DataContext is MyEditorViewModel vm)
+            vm.FocusFirstInvalidFieldRequested += (_, _) =>
+                ValidationFocusBehavior.FindFirstInvalid(this)?.Focus();
+    };
+}
+```

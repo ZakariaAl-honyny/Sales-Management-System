@@ -6,20 +6,20 @@ namespace SalesSystem.Domain.Tests.Enums;
 public class CostingMethodTests
 {
     [Fact]
-    public void WeightedAverage_ShouldBeZero()
+    public void WeightedAverage_ShouldBeOne()
     {
-        Assert.Equal(0, (int)CostingMethod.WeightedAverage);
+        Assert.Equal(1, (int)CostingMethod.WeightedAverage);
     }
 
     [Fact]
-    public void LastPurchasePrice_ShouldBeOne()
+    public void LastPurchasePrice_ShouldBeTwo()
     {
-        Assert.Equal(1, (int)CostingMethod.LastPurchasePrice);
+        Assert.Equal(2, (int)CostingMethod.LastPurchasePrice);
     }
 
     [Fact]
-    public void SupplierPrice_ShouldBeTwo()
+    public void SupplierPrice_ShouldBeThree()
     {
-        Assert.Equal(2, (int)CostingMethod.SupplierPrice);
+        Assert.Equal(3, (int)CostingMethod.SupplierPrice);
     }
 }

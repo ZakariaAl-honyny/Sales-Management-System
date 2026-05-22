@@ -7,11 +7,11 @@ namespace SalesSystem.Domain.Tests.Entities;
 public class CashTransactionTests
 {
     [Fact]
-    public void Create_GivenSaleInType_ShouldSetPropertiesCorrectly()
+    public void Create_GivenSalesIncomeType_ShouldSetPropertiesCorrectly()
     {
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.SaleIn,
+            type: CashTransactionType.SalesIncome,
             amount: 500m,
             balanceBefore: 1000m,
             balanceAfter: 1500m,
@@ -22,7 +22,7 @@ public class CashTransactionTests
         );
 
         transaction.CashBoxId.Should().Be(1);
-        transaction.TransactionType.Should().Be(CashTransactionType.SaleIn);
+        transaction.TransactionType.Should().Be(CashTransactionType.SalesIncome);
         transaction.Amount.Should().Be(500m);
         transaction.BalanceBefore.Should().Be(1000m);
         transaction.BalanceAfter.Should().Be(1500m);
@@ -33,11 +33,11 @@ public class CashTransactionTests
     }
 
     [Fact]
-    public void Create_GivenPurchaseOutType_ShouldSetTypeCorrectly()
+    public void Create_GivenSupplierPaymentType_ShouldSetTypeCorrectly()
     {
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.PurchaseOut,
+            type: CashTransactionType.SupplierPayment,
             amount: -200m,
             balanceBefore: 1500m,
             balanceAfter: 1300m,
@@ -47,7 +47,7 @@ public class CashTransactionTests
             notes: null
         );
 
-        transaction.TransactionType.Should().Be(CashTransactionType.PurchaseOut);
+        transaction.TransactionType.Should().Be(CashTransactionType.SupplierPayment);
         transaction.Amount.Should().Be(-200m);
     }
 
@@ -88,11 +88,11 @@ public class CashTransactionTests
     }
 
     [Fact]
-    public void Create_GivenManualInType_ShouldSetTypeCorrectly()
+    public void Create_GivenCustomerPaymentType_ShouldSetTypeCorrectly()
     {
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.ManualIn,
+            type: CashTransactionType.CustomerPayment,
             amount: 300m,
             balanceBefore: 1000m,
             balanceAfter: 1300m,
@@ -102,15 +102,15 @@ public class CashTransactionTests
             notes: "Manual deposit"
         );
 
-        transaction.TransactionType.Should().Be(CashTransactionType.ManualIn);
+        transaction.TransactionType.Should().Be(CashTransactionType.CustomerPayment);
     }
 
     [Fact]
-    public void Create_GivenManualOutType_ShouldSetTypeCorrectly()
+    public void Create_GivenExpenseType_ShouldSetTypeCorrectly()
     {
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.ManualOut,
+            type: CashTransactionType.Expense,
             amount: -100m,
             balanceBefore: 1300m,
             balanceAfter: 1200m,
@@ -120,7 +120,7 @@ public class CashTransactionTests
             notes: "Owner withdrawal"
         );
 
-        transaction.TransactionType.Should().Be(CashTransactionType.ManualOut);
+        transaction.TransactionType.Should().Be(CashTransactionType.Expense);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class CashTransactionTests
     {
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.ManualIn,
+            type: CashTransactionType.CustomerPayment,
             amount: 100m,
             balanceBefore: 0m,
             balanceAfter: 100m,
@@ -143,12 +143,14 @@ public class CashTransactionTests
     }
 
     [Theory]
-    [InlineData(CashTransactionType.SaleIn)]
-    [InlineData(CashTransactionType.PurchaseOut)]
-    [InlineData(CashTransactionType.TransferIn)]
+    [InlineData(CashTransactionType.OpeningBalance)]
+    [InlineData(CashTransactionType.SalesIncome)]
+    [InlineData(CashTransactionType.Expense)]
     [InlineData(CashTransactionType.TransferOut)]
-    [InlineData(CashTransactionType.ManualIn)]
-    [InlineData(CashTransactionType.ManualOut)]
+    [InlineData(CashTransactionType.TransferIn)]
+    [InlineData(CashTransactionType.RefundOut)]
+    [InlineData(CashTransactionType.SupplierPayment)]
+    [InlineData(CashTransactionType.CustomerPayment)]
     public void Create_GivenAllTransactionTypes_ShouldSucceed(CashTransactionType type)
     {
         var transaction = CashTransaction.Create(
@@ -172,7 +174,7 @@ public class CashTransactionTests
         // Entity has no guard clause — negative amounts are valid (e.g., expenses, transfers out)
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.PurchaseOut,
+            type: CashTransactionType.SupplierPayment,
             amount: -500m,
             balanceBefore: 1000m,
             balanceAfter: 500m,
@@ -190,7 +192,7 @@ public class CashTransactionTests
     {
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.ManualIn,
+            type: CashTransactionType.CustomerPayment,
             amount: 0m,
             balanceBefore: 0m,
             balanceAfter: 0m,
@@ -214,7 +216,7 @@ public class CashTransactionTests
 
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.SaleIn,
+            type: CashTransactionType.SalesIncome,
             amount: amount,
             balanceBefore: before,
             balanceAfter: after,
@@ -236,7 +238,7 @@ public class CashTransactionTests
     {
         var transaction = CashTransaction.Create(
             cashBoxId: 1,
-            type: CashTransactionType.SaleIn,
+            type: CashTransactionType.SalesIncome,
             amount: amount,
             balanceBefore: before,
             balanceAfter: expectedAfter,
@@ -253,7 +255,7 @@ public class CashTransactionTests
     public void Create_SetsCreatedAtToUtcNow()
     {
         var before = DateTime.UtcNow;
-        var transaction = CashTransaction.Create(1, CashTransactionType.SaleIn, 100m, 0m, 100m, null, null, 1, null);
+        var transaction = CashTransaction.Create(1, CashTransactionType.SalesIncome, 100m, 0m, 100m, null, null, 1, null);
         var after = DateTime.UtcNow;
 
         transaction.CreatedAt.Should().BeOnOrAfter(before);
@@ -263,7 +265,7 @@ public class CashTransactionTests
     [Fact]
     public void OnceCreated_Properties_ShouldBeImmutable()
     {
-        var transaction = CashTransaction.Create(1, CashTransactionType.SaleIn, 100m, 0m, 100m, null, null, 1, null);
+        var transaction = CashTransaction.Create(1, CashTransactionType.SalesIncome, 100m, 0m, 100m, null, null, 1, null);
 
         // All setters are private — no public mutators exist
         transaction.GetType().GetProperty(nameof(CashTransaction.Amount))!.SetMethod!.IsPublic.Should().BeFalse();

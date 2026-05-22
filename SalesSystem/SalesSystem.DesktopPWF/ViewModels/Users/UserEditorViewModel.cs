@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
-using System.Windows;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -15,6 +15,7 @@ public class UserEditorViewModel : ViewModelBase
 {
     private readonly IUserApiService _userService;
     private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
 
     private int _id;
     private string _username = string.Empty;
@@ -36,6 +37,7 @@ public class UserEditorViewModel : ViewModelBase
     {
         _userService = App.GetService<IUserApiService>();
         _eventBus = App.GetService<IEventBus>();
+        _dialogService = App.GetService<IDialogService>();
         _isEditMode = false;
         WindowTitle = "إضافة مستخدم جديد";
         InitializeCommands();
@@ -54,7 +56,7 @@ public class UserEditorViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave());
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
         CancelCommand = new RelayCommand(() => RequestClose());
     }
 
@@ -64,31 +66,19 @@ public class UserEditorViewModel : ViewModelBase
     public string Username
     {
         get => _username;
-        set
-        {
-            if (SetProperty(ref _username, value))
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        }
+        set => SetProperty(ref _username, value);
     }
 
     public string FullName
     {
         get => _fullName;
-        set
-        {
-            if (SetProperty(ref _fullName, value))
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        }
+        set => SetProperty(ref _fullName, value);
     }
 
     public string Password
     {
         get => _password;
-        set
-        {
-            if (SetProperty(ref _password, value))
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        }
+        set => SetProperty(ref _password, value);
     }
 
     public UserRole Role
@@ -129,16 +119,30 @@ public class UserEditorViewModel : ViewModelBase
     #endregion
 
     #region Methods
-    private bool CanSave()
+    private async Task<bool> ValidateAsync()
     {
-        if (string.IsNullOrWhiteSpace(Username)) return false;
-        if (string.IsNullOrWhiteSpace(FullName)) return false;
-        if (!IsEditMode && string.IsNullOrWhiteSpace(Password)) return false;
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(Username))
+            errors.Add("• اسم المستخدم مطلوب — تأكد من إدخال اسم فريد للدخول إلى النظام");
+        if (string.IsNullOrWhiteSpace(FullName))
+            errors.Add("• الاسم بالكامل مطلوب — سيظهر هذا الاسم في الفواتير والتقارير");
+        if (!IsEditMode && string.IsNullOrWhiteSpace(Password))
+            errors.Add("• كلمة المرور مطلوبة — يجب أن تكون كلمة مرور قوية لحماية الحساب");
+
+        if (errors.Any())
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
+            return false;
+        }
         return true;
     }
 
     private async Task SaveAsync()
     {
+        if (!await ValidateAsync())
+            return;
+
         IsLoading = true;
         ErrorMessage = null;
 
@@ -165,13 +169,13 @@ public class UserEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ بيانات المستخدم", "UserEditorViewModel.SaveAsync", "[UserEditorViewModel.SaveAsync] Failed to save user data.");
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ في الحفظ", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "UserEditorViewModel.SaveAsync", "[UserEditorViewModel.SaveAsync] Failed to save user data.");
-            System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
         }
         finally
         {

@@ -17,13 +17,21 @@ namespace SalesSystem.DesktopPWF.ViewModels.Payments;
 /// </summary>
 public class CustomerPaymentsListViewModel : ViewModelBase
 {
-    private readonly ICustomerPaymentApiService _paymentService;
-    private readonly ICustomerApiService _customerService;
-    private readonly IDialogService _dialogService;
-    private readonly INavigationService _navigationService;
-    private readonly IPaymentPrinter _paymentPrinter;
-    private readonly ISettingsApiService _settingsService;
-    private readonly IScreenWindowService _screenWindowService;
+    private ICustomerPaymentApiService? _paymentService;
+    private ICustomerApiService? _customerService;
+    private IDialogService? _dialogService;
+    private INavigationService? _navigationService;
+    private IPaymentPrinter? _paymentPrinter;
+    private ISettingsApiService? _settingsService;
+    private IScreenWindowService? _screenWindowService;
+
+    private ICustomerPaymentApiService PaymentService => _paymentService ??= App.GetService<ICustomerPaymentApiService>();
+    private ICustomerApiService CustomerService => _customerService ??= App.GetService<ICustomerApiService>();
+    private IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+    private INavigationService NavigationService => _navigationService ??= App.GetService<INavigationService>();
+    private IPaymentPrinter PaymentPrinter => _paymentPrinter ??= App.GetService<IPaymentPrinter>();
+    private ISettingsApiService SettingsService => _settingsService ??= App.GetService<ISettingsApiService>();
+    private IScreenWindowService ScreenWindowService => _screenWindowService ??= App.GetService<IScreenWindowService>();
 
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
@@ -37,14 +45,6 @@ public class CustomerPaymentsListViewModel : ViewModelBase
 
     public CustomerPaymentsListViewModel()
     {
-        _paymentService = App.GetService<ICustomerPaymentApiService>();
-        _customerService = App.GetService<ICustomerApiService>();
-        _dialogService = App.GetService<IDialogService>();
-        _navigationService = App.GetService<INavigationService>();
-        _paymentPrinter = App.GetService<IPaymentPrinter>();
-        _settingsService = App.GetService<ISettingsApiService>();
-        _screenWindowService = App.GetService<IScreenWindowService>();
-
         NewCommand = new RelayCommand(OnNew);
         ViewCommand = new RelayCommand(OnView, () => SelectedPayment != null);
         EditCommand = new RelayCommand(OnEdit, () => SelectedPayment != null);
@@ -129,18 +129,26 @@ public class CustomerPaymentsListViewModel : ViewModelBase
             IsLoading = true;
             ErrorMessage = string.Empty;
 
-            var result = await _paymentService.GetAllAsync(SearchText, DateFrom, DateTo);
+            var result = await PaymentService.GetAllAsync(SearchText, DateFrom, DateTo);
 
             if (result.IsSuccess && result.Value != null)
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                InvokeOnUIThread(() =>
                 {
                     Payments.Clear();
                     foreach (var item in result.Value)
                     {
                         Payments.Add(item);
                     }
-                    SetupCollectionView();
+                    try
+                    {
+                        SetupCollectionView();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // WPF CollectionView requires a running Dispatcher — skip in non-WPF contexts
+                        PaymentsView = null;
+                    }
                     IsEmpty = Payments.Count == 0;
                     OnPropertyChanged(nameof(PaymentsCount));
                 });
@@ -170,7 +178,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
     private void OnNew()
     {
         var vm = App.GetService<CustomerPaymentEditorViewModel>();
-        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
             Title = "سداد عميل جديد",
             OnClosed = (vm) =>
@@ -184,7 +192,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
         var vm = new CustomerPaymentEditorViewModel(SelectedPayment.Id, isReadOnly: true);
-        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
             Title = "عرض سداد عميل"
         });
@@ -194,7 +202,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
         var vm = new CustomerPaymentEditorViewModel(SelectedPayment.Id);
-        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
             Title = "تعديل سداد عميل",
             OnClosed = (vm) =>
@@ -208,14 +216,14 @@ public class CustomerPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
 
-        var result = await _dialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
+        var result = await DialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
 
         if (!result) return;
 
         try
         {
             IsLoading = true;
-            var deleteResult = await _paymentService.DeleteAsync(SelectedPayment.Id);
+            var deleteResult = await PaymentService.DeleteAsync(SelectedPayment.Id);
 
             if (deleteResult.IsSuccess)
             {
@@ -224,12 +232,14 @@ public class CustomerPaymentsListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = deleteResult.Error ?? "فشل في حذف السداد";
-                await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
+                await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            LogSystemError($"Failed to delete customer payment {SelectedPayment?.Id}", "CustomerPaymentsListViewModel.OnDelete", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
+            await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
         }
         finally
         {
@@ -244,14 +254,15 @@ public class CustomerPaymentsListViewModel : ViewModelBase
         IsLoading = true;
         try
         {
-            var settingsResult = await _settingsService.GetSettingsAsync();
+            var settingsResult = await SettingsService.GetSettingsAsync();
             if (!settingsResult.IsSuccess || settingsResult.Value == null) return;
 
-            _paymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
+            PaymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+            LogSystemError($"Failed to print customer payment {SelectedPayment?.Id}", "CustomerPaymentsListViewModel.OnPrint", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
         }
         finally
         {

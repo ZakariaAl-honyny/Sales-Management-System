@@ -90,7 +90,7 @@ public class TransferPrinter : ITransferPrinter
         // 4. Items List
         foreach (var item in _items)
         {
-            g.DrawString(item.ProductCode, bodyFont, Brushes.Black, new RectangleF(margin.Right - 150, y, 150, 20), PrintHelper.RTLFormatRight);
+            // g.DrawString(item.ProductCode, bodyFont, Brushes.Black, new RectangleF(margin.Right - 150, y, 150, 20), PrintHelper.RTLFormatRight);
             g.DrawString(item.ProductName, bodyFont, Brushes.Black, new RectangleF(margin.Right - 450, y, 300, 20), PrintHelper.RTLFormatRight);
             string qStr = PrintHelper.FormatQuantity(item.Quantity);
             if (item.Mode == 2) qStr += " (جملة)";

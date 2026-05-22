@@ -155,3 +155,130 @@ private void AddNewInvoice()
     if (editorWindow.ShowDialog() == true) { /* ... */ }  // ❌ BLOCKS
 }
 ```
+
+## Error Message Pattern (v4.5.1 — ALL ViewModels)
+
+```csharp
+// CORRECT — log the real error, show user-friendly message
+catch (Exception ex)
+{
+    Serilog.Log.Error(ex, "Failed to save invoice");
+    await _dialogService.ShowErrorAsync("خطأ في حفظ الفاتورة",
+        "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.");
+}
+
+// WRONG — NEVER show ex.Message to users
+catch (Exception ex)
+{
+    await _dialogService.ShowErrorAsync("خطأ", $"حدث خطأ: {ex.Message}"); // ❌
+}
+```
+
+### Dialog Titles Pattern
+- Save failures: `"خطأ في حفظ الفاتورة"`, `"خطأ في حفظ التحويل"`, etc.
+- Post failures: `"خطأ في الترحيل"`
+- Cancel failures: `"خطأ في الإلغاء"`
+- Load failures: `"خطأ في تحميل البيانات"`
+- Delete failures: `"خطأ في الحذف"`
+- Print failures: `"خطأ في الطباعة"`
+- Export failures: `"خطأ في تصدير الملف"`
+
+### List ViewModel Add Pattern
+- AddCommand MUST be `RelayCommand` (sync, not async) — it just opens a dialog
+- AddCommand MUST NOT have a CanExecute predicate — always enabled
+- Add method MUST check `_dialogService.ShowDialog()` return and refresh on true
+- NEVER create View windows manually — use `_dialogService.ShowDialog(vm)`
+
+### ToolTip Requirements (v4.5.1)
+- EVERY Button, MenuItem, and ListBoxItem MUST have an Arabic ToolTip
+- ToolTips must describe the user action, not just repeat the label text
+- Action buttons (Post, Cancel, Delete) MUST explain consequences
+- Empty-state buttons MUST have ToolTips (first-time users)
+- ToolTips must be added in XAML via `ToolTip="text"` attribute
+
+### Identifier Strategy — No Code Field (v4.5.3)
+- Product, Customer, Supplier, Warehouse editor screens MUST NOT have a Code text field
+- List ViewModels MUST NOT filter/search by Code
+- Selection ViewModels MUST NOT show a Code column
+- Use auto-increment Id (int PK) as sole identifier for display and search
+- WarehouseResponse bindings must NOT include a Code field — it was removed from the record
+
+### Interactive Validation (v4.6) — Buttons Always Enabled, Validate on Click
+
+**CRITICAL CHANGE:** Save/Post buttons are NEVER disabled via CanExecute. Validation happens when the user clicks the button.
+
+#### CORRECT Pattern:
+```csharp
+// ViewModel — no CanExecute predicate
+SaveCommand = new AsyncRelayCommand(SaveAsync);  // NO predicate
+
+private bool Validate()
+{
+    var errors = new List<string>();
+    if (string.IsNullOrWhiteSpace(Name))
+        errors.Add("• اسم المنتج مطلوب");
+    if (errors.Any())
+    {
+        _ = _dialogService.ShowWarningAsync("بيانات غير مكتملة",
+            "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors));
+        return false;
+    }
+    return true;
+}
+
+private async Task SaveAsync()
+{
+    if (!Validate()) return;
+    // ... save logic
+}
+```
+
+#### WRONG Pattern (NEVER):
+```csharp
+SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave);  // ❌ blocks button
+Button IsEnabled="{Binding CanSave}"  // ❌ disables button in XAML
+```
+
+#### XAML Requirements:
+1. NO `IsEnabled` binding on Save/Post buttons
+2. Required fields marked with `*` in label Text (e.g., `Text="اسم المنتج *"`)
+3. Every TextBox/ComboBox has `ToolTip="..."` explaining validation rule
+4. Unique fields (barcode, username) have helper TextBlock:
+   ```xml
+   <TextBlock Text="الباركود يجب أن يكون فريداً — لا يمكن تكرار نفس الرمز لمنتجين مختلفين" 
+              Style="{StaticResource HelperTextStyle}"/>
+   ```
+
+#### What to Remove from ViewModel:
+- Remove CanExecute predicate from command constructor
+- Remove `CanSave` property
+- Remove `CanSave()` / `CanPost()` / `CanPrint()` methods
+- Remove `OnPropertyChanged(nameof(CanSave))` from property setters
+- Remove `RaiseCanExecuteChanged()` from property setters
+
+#### What to Remove from XAML:
+- Remove `IsEnabled="{Binding CanSave}"` from Button elements
+
+#### What to Add to Validate():
+- Collect ALL errors into a `List<string>`
+- If errors exist, call `_dialogService.ShowWarningAsync("screen title", errorMsg)`
+- Return false if invalid
+
+### LogSystemError Pattern (v4.6)
+- ALL ViewModels MUST use `LogSystemError(message, context, exception)` — NEVER `Serilog.Log.Error(ex, ...)` directly
+- `LogSystemError` is defined in ViewModelBase — call it directly (inherited)
+
+### ValidationErrorsDialog Pattern (v4.6)
+- Use `_dialogService.ShowValidationErrorsAsync(title, List<string> errors)` for validation
+- After showing dialog, call `RequestFocusFirstInvalidField()` to auto-focus first error field
+- In View code-behind, subscribe to `FocusFirstInvalidFieldRequested`:
+  ```csharp
+  vm.FocusFirstInvalidFieldRequested += (_, _) =>
+      ValidationFocusBehavior.FindFirstInvalid(this)?.Focus();
+  ```
+
+### Dialog Overlay Pattern (v4.6)
+- All dialogs MUST have: `WindowStyle="None"`, `AllowsTransparency="True"`, `Background="Transparent"`
+- Full-screen `#80000000` dimming rectangle behind centered card
+- Button hover effects via ControlTemplate.Triggers (IsMouseOver, IsPressed)
+- `PositionOverOwner()` in code-behind

@@ -63,7 +63,7 @@ public class SupplierServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingSupplier_ReturnsDto");
 
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", "1234567890", null, null, null);
+        var supplier = Supplier.Create("Test Supplier", 0m, "1234567890");
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -71,7 +71,6 @@ public class SupplierServiceTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("Test Supplier");
-        result.Value.Code.Should().Be("S001");
 
         _output.WriteLine("[PASS] GetByIdAsync returns supplier dto");
     }
@@ -116,30 +115,6 @@ public class SupplierServiceTests : IDisposable
         result.Value.CurrentBalance.Should().Be(2000m);
 
         _output.WriteLine("[PASS] CreateAsync creates supplier correctly");
-    }
-
-    [Fact]
-    public async Task CreateAsync_DuplicateCode_ReturnsFailure()
-    {
-        _output.WriteLine("[TEST] CreateAsync_DuplicateCode_ReturnsFailure");
-
-        var existing = Supplier.Create("Existing Supplier", 0m, "S001", null, null, null, null);
-        _dbContext.Suppliers.Add(existing);
-        await _dbContext.SaveChangesAsync();
-
-        var request = new SalesSystem.Contracts.Requests.CreateSupplierRequest
-        {
-            Name = "New Supplier",
-            Code = "S001", // Duplicate
-            OpeningBalance = 0m
-        };
-
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("كود المورد مستخدم بالفعل");
-
-        _output.WriteLine("[PASS] Duplicate code returns failure");
     }
 
     #endregion

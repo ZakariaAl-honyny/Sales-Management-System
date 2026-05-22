@@ -143,7 +143,7 @@ public class ReportsViewModelTests
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.DateTo = DateTime.Today;
+        _viewModel.DateTo = DateTime.Today.AddDays(1);
 
         propertyChangedEvents.Should().Contain("DateTo");
     }
@@ -318,8 +318,8 @@ public class ReportsViewModelTests
     {
         var stockReports = new List<StockReportDto>
         {
-            new(1, "P001", "منتج 1", "فئة", "وحدة", "مستودع", 100m, 10m, 10m, 1000m),
-            new(2, "P002", "منتج 2", "فئة", "وحدة", "مستودع", 200m, 20m, 20m, 4000m)
+            new(1, "منتج 1", "فئة", "وحدة", "مستودع", 100m, 10m, 10m, 1000m),
+            new(2, "منتج 2", "فئة", "وحدة", "مستودع", 200m, 20m, 20m, 4000m)
         };
 
         _mockReportService
@@ -343,8 +343,8 @@ public class ReportsViewModelTests
     {
         var customerBalances = new List<CustomerBalanceReportDto>
         {
-            new(1, "C001", "عميل 1", 0m, 1000m, 0m, 500m, 0m, 500m),
-            new(2, "C002", "عميل 2", 0m, 2000m, 0m, 1000m, 0m, 1000m)
+            new(1, "عميل 1", 0m, 1000m, 0m, 500m, 0m, 500m),
+            new(2, "عميل 2", 0m, 2000m, 0m, 1000m, 0m, 1000m)
         };
 
         _mockReportService
@@ -368,8 +368,8 @@ public class ReportsViewModelTests
     {
         var supplierBalances = new List<SupplierBalanceReportDto>
         {
-            new(1, "S001", "مورد 1", 0m, 1000m, 0m, 500m, 0m, 500m),
-            new(2, "S002", "مورد 2", 0m, 2000m, 0m, 1000m, 0m, 1000m)
+            new(1, "مورد 1", 0m, 1000m, 0m, 500m, 0m, 500m),
+            new(2, "مورد 2", 0m, 2000m, 0m, 1000m, 0m, 1000m)
         };
 
         _mockReportService

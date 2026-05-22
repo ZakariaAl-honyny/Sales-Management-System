@@ -94,7 +94,6 @@ public class CustomerSelectionViewModel : ViewModelBase
                     if (string.IsNullOrWhiteSpace(SearchText)) return true;
                     var search = SearchText.ToLower();
                     return customer.Name.ToLower().Contains(search) || 
-                           (customer.Code?.ToLower().Contains(search) ?? false) ||
                            (customer.Phone?.ToLower().Contains(search) ?? false);
                 };
             }

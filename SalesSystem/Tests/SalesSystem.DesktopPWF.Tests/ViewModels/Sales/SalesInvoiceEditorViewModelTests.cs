@@ -331,25 +331,27 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     #region Command CanExecute Tests
 
     [Fact]
-    public void SaveCommand_CannotExecute_WhenNoItems()
+    public void SaveCommand_NoPredicate_AlwaysCanExecute()
     {
-        // Arrange
+        // Interactive validation v4.6 removed CanExecute predicates - SaveCommand always enabled
+        // Validation is done in Validate() and shown as warning dialog
         var viewModel = CreateViewModel(null);
         viewModel.Items.Clear();
 
         // Act & Assert
-        viewModel.SaveCommand.CanExecute(null).Should().BeFalse();
+        viewModel.SaveCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
-    public void PostCommand_CannotExecute_WhenNoWarehouseSelected()
+    public void PostCommand_NoPredicate_AlwaysCanExecute()
     {
-        // Arrange
+        // Interactive validation v4.6 removed CanExecute predicates - PostCommand always enabled
+        // Validation is done in Validate() and shown as warning dialog
         var viewModel = CreateViewModel(null);
         viewModel.SelectedWarehouseId = 0;
 
         // Act & Assert
-        viewModel.PostCommand.CanExecute(null).Should().BeFalse();
+        viewModel.PostCommand.CanExecute(null).Should().BeTrue();
     }
 
     #endregion
@@ -599,11 +601,11 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         // Setup empty collections to avoid null references
         var customers = new List<CustomerDto>
         {
-            new CustomerDto(Id: 1, Code: "C001", Name: "عميل 1", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true)
+            new CustomerDto(Id: 1, Name: "عميل 1", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true)
         };
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Code: "W001", Name: "مستودع 1", Location: null, IsDefault: true, IsActive: true)
+            new WarehouseDto(Id: 1, Name: "مستودع 1", Location: null, IsDefault: true, IsActive: true)
         };
         var products = SetupProducts();
 
@@ -618,7 +620,6 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         {
             new ProductDto(
                 Id: 1,
-                Code: "P001",
                 Barcode: null,
                 Name: "منتج 1",
                 CategoryId: 1,
@@ -639,7 +640,6 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 IsActive: true),
             new ProductDto(
                 Id: 2,
-                Code: "P002",
                 Barcode: null,
                 Name: "منتج 2",
                 CategoryId: 1,

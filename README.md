@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.5%20Refactored-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -415,6 +415,10 @@ dotnet run
 | **Phase 9** | **Production Readiness** — Auto-Update, DPAPI Security, Backup System, Windows Service, Admin Screens, Inno Setup Installer | ✅ **Completed** |
 | **Phase 10** | **Code Quality & Refactoring** — ExecuteAsync() wrapper, MediatR removal, Legacy deletion, Test updates, MASTER-PLAN.md rewrite | ✅ **Completed** |
 | **Phase 11** | **Multi-Window Screen Management** — Non-modal editors, ScreenWindowService, "فتح نافذة جديدة" menus | ✅ **Completed** |
+| **v4.5.1** | **Error Message & Shutdown Improvements** — Error message overhaul, Arabic-friendly errors, shutdown handling, MessageBox elimination, async dialog compliance | ✅ **Complete** |
+| **v4.5.1a** | **Logging Separation & API Error Fixes** — Logging policy (Error vs Warning), `HandleResponseAsync` content-type guard, print test log level fix | ✅ **Complete** |
+| **Phase 13** | **Interactive Validation** — Remove CanExecute blocking, on-click warning dialogs, field ToolTips, required `*` markers, unique field explanations | ✅ **Completed** |
+| **Phase 14** | **Audit & Polish** — LogSystemError centralized, Dialog overlay + hover, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -427,6 +431,94 @@ dotnet run
 | 4 — PrintService | Win32 raw printing (`OpenPrinter`/`WritePrinter`), temp-file cleanup, Arabic error messages | ✅ |
 | 5 — API + Desktop | `PrintController` (11 endpoints), `IPrintApiService`/`PrintApiService`, `PdfPreviewWindow`, WPF print buttons, DI registrations | ✅ |
 | 6 — Production | Print settings in `SystemSetting` table, `IPrintApiService` injection into ViewModels, test print endpoint, 254+ tests | ✅ |
+
+---
+
+## 🆕 What's New in v4.5.3 — Identifier Strategy Complete (All Entities)
+
+| Feature | Description |
+|---------|-------------|
+| **Removed Code Columns** | `Code` column removed from Product, Customer, and Supplier entities — use auto-increment `Id` (int PK) as sole identifier |
+| **Faster Search** | Search/filter by integer `Id` or `Name` only — no string Code comparisons |
+| **Simpler Forms** | Code text fields removed from all editor screens (Product, Customer, Supplier) |
+| **Cleaner Invoice Items** | `ProductCode` removed from all invoice item DTOs — uses `ProductId` only |
+| **Removed Code Reports** | Report DTOs (StockReport, CustomerBalance, SupplierBalance, LowStock) no longer include Code fields |
+| **Code Auto-Generation Removed** | `DocumentSequenceService` calls for PRD/CUST/SUP prefixes removed — no manual/auto code needed |
+| **Smaller Database** | 3 columns and 3 unique indexes removed from Products, Customers, Suppliers tables |
+| **Warehouse Code Removed** | `Code` column removed from Warehouse entity — all layers (Domain, EF, DTOs, Validators, ViewModels, Tests) |
+
+---
+
+## 🆕 What's New in v4.6 — Interactive Validation (Self-Explaining System)
+
+| Feature | Description |
+|---------|-------------|
+| **Buttons Always Enabled** | Save/Post/Print buttons are NEVER disabled — users see all available actions at all times |
+| **On-Click Validation** | When clicking Save with incomplete data, a clear warning dialog lists EVERY missing/incorrect field |
+| **Required Field Markers (*)** | All required fields consistently marked with `*` across every editor screen |
+| **Field-Level ToolTips** | Every input field has an Arabic ToolTip explaining validation rules (format, uniqueness, constraints) |
+| **Unique Field Explanations** | Barcode and Username fields have explicit helper text explaining uniqueness requirements |
+| **CanExecute Removed From All Commands** | 13 editor ViewModels had CanExecute predicates removed — Save, Post, Cancel commands always enabled |
+| **Interactive Instead of Blocking** | System guides users through completing data rather than blocking them with disabled buttons |
+| **13 ViewModels + 7 XAML Files Updated** | Product, Customer, Supplier, Category, Unit, Warehouse, User, Sales/Purchase Invoice, Stock Transfer, Sale/Purchase Return editors |
+
+### Before (v4.5.3) — Blocking Validation
+- Save buttons disabled (greyed out) until all required fields filled
+- Users didn't know WHY the button was disabled
+- No field-level explanations for validation rules
+- Barcode/username uniqueness not explained
+- Not all required fields had `*` markers
+
+### After (v4.6) — Interactive Validation
+- All buttons always visible and clickable
+- Clicking Save with missing data shows: "يرجى إكمال البيانات الإلزامية التالية:" + bullet list of all issues
+- Every input field has ToolTip explaining its rule
+- Unique fields have helper text: "الباركود يجب أن يكون فريداً — لا يمكن تكرار نفس الرمز لمنتجين مختلفين"
+- Required fields consistently marked with `*`
+- Warning dialog titles are screen-specific (e.g., "بيانات غير مكتملة")
+
+---
+
+### 🆕 What's New in v4.6 — Audit Fixes & System-Wide Polish
+
+| Feature | Description |
+|---------|-------------|
+| **LogSystemError Centralized** | All `Serilog.Log.Error` calls moved to `ViewModelBase.LogSystemError()` — zero direct calls in any ViewModel |
+| **Hard Delete Safety** | All 7 Application services now catch `DbUpdateException` in `PermanentDeleteAsync()` — returns descriptive Arabic error with inner exception logged |
+| **Dialog Overlay + Hover Effects** | All 8 dialog windows updated with transparent overlay (`WindowStyle="None"`, `AllowsTransparency="True"`, `#80000000` dimming), deep shadow cards, and button hover effects (IsMouseOver/IsPressed) |
+| **ValidationErrorsDialog** | New dedicated dialog with `ItemsControl` for bulleted error list — `ShowValidationErrorsAsync(title, List<string>)` added to `IDialogService` |
+| **Auto-Focus on First Invalid Field** | `ValidationFocusBehavior` helper class + `FocusFirstInvalidFieldRequested` event — after validation dialog closes, focus jumps to first error field |
+| **Login Icon Background Fix** | Login window icon no longer shows black rectangle — transparent background with PrimaryBrush fill |
+| **Settings Layout Fixed** | Test Print button no longer overflows — 4th RowDefinition added, bottom margin corrected |
+| **6 Subagent Files Updated** | All agent files updated with v4.6 patterns for automatic enforcement by AI agents |
+
+---
+
+## 🆕 What's New in v4.5.1
+
+| Feature | Description |
+|---------|-------------|
+| **Error Message Best Practices** | All catch blocks now use `Serilog.Log.Error()` — raw `ex.Message` NEVER shown to users |
+| **Arabic-Friendly Error Handling** | `HandleFailure()` transforms timeout/network/not-found errors into clear Arabic messages |
+| **Screen-Specific Dialog Titles** | All error dialogs now have context titles like `"خطأ في حفظ الفاتورة"` instead of generic `"خطأ"` |
+| **MessageBox Eliminated** | All 16 remaining `MessageBox.Show` calls replaced with `IDialogService` across 6 editor ViewModels |
+| **Async Dialog Compliance** | All sync `ShowError`/`ShowInfo`/`ShowWarning` calls migrated to `ShowErrorAsync`/`ShowInfoAsync`/`ShowWarningAsync` |
+| **Application Shutdown** | `ShutdownMode="OnExplicitShutdown"` with proper exit handling (LoginWindow close → shutdown, MainWindow close → shutdown, Logout → reopen LoginWindow) |
+| **Safe Error Logging** | Raw HTTP response bodies no longer shown to users — logged via Serilog instead |
+| **Vague Success Messages Fixed** | `"تم التصدير بنجاح"` → `"تم تصدير التقرير إلى Excel بنجاح"` / `"إلى CSV"` |
+| **Logging Separation Policy** | `Log.Error` reserved for system errors only (DB down, API unreachable, parse crashes); `Log.Warning` for user mistakes (validation errors, business rules, "not found") |
+| **HandleResponseAsync JSON Fix** | Non-generic `HandleResponseAsync` now checks content type before parsing JSON — prevents crash on empty/HTML 404 responses |
+| **Print Test Log Level Fixed** | Print test failures downgraded from `Log.Error` to `Log.Warning` — printer config is a user/configuration issue |
+| **Manual Window Creation Eliminated** | `CustomerListViewModel` `AddCustomer()`/`EditCustomer()` replaced manual `new CustomerEditorView { DataContext = vm }` + `ShowDialog()` with `_dialogService.ShowDialog()` |
+| **Supplier List Refresh Fixed** | `SupplierListViewModel` `AddSupplier()`/`EditSupplier()` now check `ShowDialog()` return and refresh list — previously ignored return causing stale data |
+| **Supplier Code Deduplicated** | `SupplierListViewModel` extracted command initialization into `InitializeCommands()` — eliminated duplicate code in both constructors |
+| **Supplier Command Properties Fixed** | Command properties changed from `{ get; }` to `{ get; private set; } = null!;` to support standard InitializeCommands pattern |
+| **Product Editor Messages Fixed** | `ProductEditorViewModel` added `IDialogService` dependency; replaced all 4 `MessageBox.Show` calls with proper async dialog calls |
+| **Self-Explaining System — ToolTips** | 174 Arabic ToolTips added across ~40 XAML files covering every Button, MenuItem, and interactive control |
+| **ToolTip Mapping Standard** | ToolTips describe user actions (e.g., `"فتح شاشة إضافة منتج جديد"`) — never just repeat button text |
+| **Consequence-Aware ToolTips** | Action buttons explain consequences: `"ترحيل العملية نهائياً — سيتم تحديث المخزون والرصيد"` |
+| **Navigation Menu ToolTips** | All 31 MainWindow MenuItems now have destination descriptions: `"عرض وإدارة فواتير البيع"` |
+| **Empty-State ToolTips** | All 11 "add first item" buttons now have ToolTips guiding first-time users |
 
 ---
 
@@ -495,7 +587,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 140+ non-negotiable rules (RULE-001 to RULE-140)
+1. Read [`AGENTS.md`](AGENTS.md) — all 218 non-negotiable rules (RULE-001 to RULE-219)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

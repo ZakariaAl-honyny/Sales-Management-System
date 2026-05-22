@@ -1,6 +1,6 @@
 using SalesSystem.DesktopPWF.Messaging.Messages;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Windows;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -19,9 +19,9 @@ public class ProductEditorViewModel : ViewModelBase
     private readonly ICategoryApiService _categoryService;
     private readonly IUnitApiService _unitService;
     private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
 
     private int _productId;
-    private string _code = string.Empty;
     private string _barcode = string.Empty;
     private string _name = string.Empty;
     private int? _categoryId;
@@ -52,8 +52,9 @@ public class ProductEditorViewModel : ViewModelBase
         _categoryService = App.GetService<ICategoryApiService>();
         _unitService = App.GetService<IUnitApiService>();
         _eventBus = App.GetService<IEventBus>();
+        _dialogService = App.GetService<IDialogService>();
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
         CancelCommand = new RelayCommand(Cancel);
         LoadLookupDataCommand = new AsyncRelayCommand(LoadLookupDataAsync);
 
@@ -64,14 +65,16 @@ public class ProductEditorViewModel : ViewModelBase
         IProductApiService productService,
         ICategoryApiService categoryService,
         IUnitApiService unitService,
-        IEventBus eventBus)
+        IEventBus eventBus,
+        IDialogService dialogService)
     {
         _productService = productService;
         _categoryService = categoryService;
         _unitService = unitService;
         _eventBus = eventBus;
+        _dialogService = dialogService;
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
         CancelCommand = new RelayCommand(Cancel);
         LoadLookupDataCommand = new AsyncRelayCommand(LoadLookupDataAsync);
 
@@ -83,10 +86,10 @@ public class ProductEditorViewModel : ViewModelBase
             App.GetService<IProductApiService>(),
             App.GetService<ICategoryApiService>(),
             App.GetService<IUnitApiService>(),
-            App.GetService<IEventBus>())
+            App.GetService<IEventBus>(),
+            App.GetService<IDialogService>())
     {
         _productId = product.Id;
-        _code = product.Code ?? string.Empty;
         _barcode = product.Barcode ?? string.Empty;
         _name = product.Name;
         _categoryId = product.CategoryId;
@@ -109,11 +112,11 @@ public class ProductEditorViewModel : ViewModelBase
         IProductApiService productService,
         ICategoryApiService categoryService,
         IUnitApiService unitService,
-        IEventBus eventBus)
-        : this(productService, categoryService, unitService, eventBus)
+        IEventBus eventBus,
+        IDialogService dialogService)
+        : this(productService, categoryService, unitService, eventBus, dialogService)
     {
         _productId = product.Id;
-        _code = product.Code ?? string.Empty;
         _barcode = product.Barcode ?? string.Empty;
         _name = product.Name;
         _categoryId = product.CategoryId;
@@ -140,12 +143,6 @@ public class ProductEditorViewModel : ViewModelBase
         set => SetProperty(ref _isEditMode, value);
     }
 
-    public string Code
-    {
-        get => _code;
-        set => SetProperty(ref _code, value);
-    }
-
     public string Barcode
     {
         get => _barcode;
@@ -159,8 +156,6 @@ public class ProductEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _name, value))
             {
-                OnPropertyChanged(nameof(HasErrors));
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -301,13 +296,6 @@ public class ProductEditorViewModel : ViewModelBase
     }
 
     // Validation
-    private bool _hasCodeError;
-    public bool HasCodeError
-    {
-        get => _hasCodeError;
-        set => SetProperty(ref _hasCodeError, value);
-    }
-
     private bool _hasNameError;
     public bool HasNameError
     {
@@ -385,9 +373,7 @@ public class ProductEditorViewModel : ViewModelBase
         }
     }
 
-    public string? CodeError => HasCodeError ? "الكود مطلوب" : null;
     public string? NameError => HasNameError ? "الاسم مطلوب" : null;
-    public bool CanSave => !HasErrors && !string.IsNullOrWhiteSpace(Name);
     public string? RetailPriceError => HasRetailPriceError ? "سعر التجزئة مطلوب (أكبر من 0)" : null;
     public string? WholesalePriceError => HasWholesalePriceError ? "سعر الجملة مطلوب (أكبر من 0)" : null;
     public string? WholesaleUnitError => HasWholesaleUnitError ? "يجب اختيار وحدة الجملة" : null;
@@ -459,9 +445,8 @@ public class ProductEditorViewModel : ViewModelBase
         }
     }
 
-    private bool Validate()
+    private async Task<bool> ValidateAsync()
     {
-        HasCodeError = false; // Code is auto-generated if empty
         HasNameError = string.IsNullOrWhiteSpace(Name);
         HasRetailPriceError = RetailPrice <= 0;
         HasWholesalePriceError = WholesalePrice <= 0;
@@ -478,27 +463,30 @@ public class ProductEditorViewModel : ViewModelBase
         OnPropertyChanged(nameof(WholesalePriceError));
         OnPropertyChanged(nameof(ConversionFactorError));
         OnPropertyChanged(nameof(HasErrors));
-        OnPropertyChanged(nameof(CanSave));
-        (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
 
-        return !HasNameError && !HasRetailPriceError && !HasWholesalePriceError && !HasConversionFactorError && !HasCategoryError && !HasUnitError && !HasWholesaleUnitError;
+        var errors = new List<string>();
+        if (HasNameError) errors.Add("• " + NameError);
+        if (HasCategoryError) errors.Add("• " + CategoryError);
+        if (HasUnitError) errors.Add("• " + UnitError);
+        if (HasWholesaleUnitError) errors.Add("• " + WholesaleUnitError);
+        if (HasConversionFactorError) errors.Add("• " + ConversionFactorError);
+        if (HasRetailPriceError) errors.Add("• " + RetailPriceError);
+        if (HasWholesalePriceError) errors.Add("• " + WholesalePriceError);
+
+        if (errors.Any())
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
+            return false;
+        }
+
+        return true;
     }
 
     private async Task SaveAsync()
     {
-        if (!Validate())
+        if (!await ValidateAsync())
         {
-            var errors = new List<string>();
-            if (HasNameError) errors.Add("• " + NameError);
-            if (HasCategoryError) errors.Add("• " + CategoryError);
-            if (HasUnitError) errors.Add("• " + UnitError);
-            if (HasWholesaleUnitError) errors.Add("• " + WholesaleUnitError);
-            if (HasConversionFactorError) errors.Add("• " + ConversionFactorError);
-            if (HasRetailPriceError) errors.Add("• " + RetailPriceError);
-            if (HasWholesalePriceError) errors.Add("• " + WholesalePriceError);
-            
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            System.Windows.MessageBox.Show(errorMsg, "بيانات غير مكتملة", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -512,7 +500,7 @@ public class ProductEditorViewModel : ViewModelBase
             if (IsEditMode)
             {
                 var updateRequest = new UpdateProductRequest(
-                    Code, Barcode, Name,
+                    Barcode, Name,
                     CategoryId, UnitId,
                     RetailUnitId, WholesaleUnitId,
                     ConversionFactor,
@@ -526,7 +514,7 @@ public class ProductEditorViewModel : ViewModelBase
             else
             {
                 var createRequest = new CreateProductRequest(
-                    Code, Barcode, Name,
+                    Barcode, Name,
                     CategoryId, UnitId,
                     RetailUnitId, WholesaleUnitId,
                     ConversionFactor,
@@ -542,24 +530,22 @@ public class ProductEditorViewModel : ViewModelBase
                 // Publish event to notify other modules
                 _eventBus.Publish(new ProductChangedMessage(result.Value.Id));
 
-                System.Windows.MessageBox.Show(
-                    IsEditMode ? "تم تحديث المنتج بنجاح" : "تم إضافة المنتج بنجاح",
-                    "نجاح",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                await _dialogService.ShowSuccessAsync(
+                    IsEditMode ? "تحديث المنتج" : "إضافة منتج",
+                    IsEditMode ? "تم تحديث المنتج بنجاح" : "تم إضافة المنتج بنجاح");
 
                 RequestClose();
             }
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المنتج", "ProductEditorViewModel.SaveAsync", "[ProductEditorViewModel.SaveAsync] Failed to save product data.");
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _dialogService.ShowErrorAsync("خطأ في حفظ المنتج", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "ProductEditorViewModel.SaveAsync", "[ProductEditorViewModel.SaveAsync] Failed to save product data.");
-            System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            await _dialogService.ShowErrorAsync("خطأ في حفظ المنتج", ErrorMessage);
         }
         finally
         {

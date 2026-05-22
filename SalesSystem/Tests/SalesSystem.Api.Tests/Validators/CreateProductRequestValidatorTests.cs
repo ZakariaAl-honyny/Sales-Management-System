@@ -51,45 +51,6 @@ public class CreateProductRequestValidatorTests
 
     #endregion
 
-    #region Code Validation
-
-    [Theory]
-    [InlineData(null, true)]
-    [InlineData("", true)]
-    [InlineData("PROD001", true)]
-    [InlineData("كود عربي", true)]
-    public void GivenProductCode_WhenValidating_ThenCorrectResult(string? code, bool isValid)
-    {
-        // Arrange
-        var request = CreateValidRequest() with { Code = code };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        if (isValid)
-            result.ShouldNotHaveValidationErrorFor(x => x.Code);
-        else
-            result.ShouldHaveValidationErrorFor(x => x.Code);
-    }
-
-    [Fact]
-    public void GivenCodeExceeds50Chars_WhenValidating_ThenFailsWithMaxLengthError()
-    {
-        // Arrange
-        var longCode = new string('C', 51);
-        var request = CreateValidRequest() with { Code = longCode };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Code)
-            .WithErrorMessage("كود المنتج لا يمكن أن يتجاوز 50 حرف");
-    }
-
-    #endregion
-
     #region Price Validation
 
     [Fact]
@@ -257,7 +218,6 @@ public class CreateProductRequestValidatorTests
     #endregion
 
     private static CreateProductRequest CreateValidRequest() => new(
-        Code: "PROD001",
         Barcode: "123456789",
         Name: "Valid Product",
         CategoryId: 1,

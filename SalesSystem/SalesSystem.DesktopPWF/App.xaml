@@ -5,7 +5,8 @@
              xmlns:converters="clr-namespace:SalesSystem.DesktopPWF"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              Startup="Application_Startup"
-             Exit="Application_Exit">
+             Exit="Application_Exit"
+             ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>

@@ -249,13 +249,15 @@ public async Task DeleteUnitAsync()
                 }
                 else
                 {
-                    ErrorMessage = deleteResult.Error ?? "فشل في حذف الوحدة";
+                    var error = deleteResult.Error ?? "فشل في حذف الوحدة";
+                    ErrorMessage = error;
+                    LogSystemError($"Hard delete failed for Unit {SelectedUnit.Id}: {error}", "UnitListViewModel.DeleteUnitAsync");
                 }
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
             HandleException(ex, "UnitListViewModel.DeleteUnitAsync", $"[UnitListViewModel.DeleteUnitAsync] Failed to delete unit with ID {SelectedUnit?.Id}.");
         }
         finally
@@ -294,7 +296,7 @@ public async Task DeleteUnitAsync()
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            ErrorMessage = "حدث خطأ غير متوقع أثناء استعادة الوحدة";
             HandleException(ex, "UnitListViewModel.RestoreUnitAsync", $"[UnitListViewModel.RestoreUnitAsync] Failed to restore unit with ID {SelectedUnit?.Id}.");
         }
 finally

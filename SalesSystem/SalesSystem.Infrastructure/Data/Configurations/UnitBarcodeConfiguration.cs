@@ -18,6 +18,8 @@ public class UnitBarcodeConfiguration : IEntityTypeConfiguration<UnitBarcode>
         builder.HasOne(x => x.ProductUnit)
             .WithMany(x => x.Barcodes)
             .HasForeignKey(x => x.ProductUnitId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(x => x.IsActive);
     }
 }

@@ -98,7 +98,6 @@ public class SalesService : ISalesService
                 (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
                 i.Items.Any(item => 
                     item.Product.Name.ToLower().Contains(searchLower) ||
-                    item.Product.Code.ToLower().Contains(searchLower) ||
                     item.Product.Barcode.ToLower().Contains(searchLower))
             );
         }
@@ -424,7 +423,6 @@ public class SalesService : ISalesService
             i.Items.Select(it => new SalesInvoiceItemDto(
                 it.Id,
                 it.ProductId,
-                it.Product?.Code,
                 it.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 it.UnitPrice,

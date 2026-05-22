@@ -5,6 +5,7 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using System.Collections.Generic;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Units;
 
@@ -12,6 +13,7 @@ public class UnitEditorViewModel : ViewModelBase
 {
     private readonly IUnitApiService _unitService;
     private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
     private string _name = string.Empty;
     private bool _isLoading;
     private string? _errorMessage;
@@ -21,6 +23,7 @@ public class UnitEditorViewModel : ViewModelBase
     {
         _unitService = App.GetService<IUnitApiService>();
         _eventBus = App.GetService<IEventBus>();
+        _dialogService = App.GetService<IDialogService>();
         InitializeCommands();
     }
 
@@ -35,11 +38,9 @@ public class UnitEditorViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => !HasErrors && !string.IsNullOrWhiteSpace(Name));
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
         CancelCommand = new RelayCommand(() => RequestClose());
     }
-
-    public bool CanSave => !HasErrors && !string.IsNullOrWhiteSpace(Name);
 
     #region Properties
 
@@ -48,11 +49,7 @@ public class UnitEditorViewModel : ViewModelBase
         get => _name;
         set
         {
-            if (SetProperty(ref _name, value))
-            {
-                OnPropertyChanged(nameof(CanSave));
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-            }
+            SetProperty(ref _name, value);
         }
     }
 
@@ -87,6 +84,8 @@ public class UnitEditorViewModel : ViewModelBase
 
     private async Task SaveAsync()
     {
+        if (!await ValidateAsync()) return;
+
         IsLoading = true;
         ErrorMessage = null;
 
@@ -112,18 +111,33 @@ public class UnitEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ الوحدة", "UnitEditorViewModel.SaveAsync");
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ في الحفظ", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "UnitEditorViewModel.SaveAsync", "Failed to save unit data.");
-            System.Windows.MessageBox.Show(ErrorMessage, "خطأ", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
         }
         finally
         {
             IsLoading = false;
         }
+    }
+
+    private async Task<bool> ValidateAsync()
+    {
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(Name))
+            errors.Add("• اسم الوحدة مطلوب");
+
+        if (errors.Any())
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
+            return false;
+        }
+        return true;
     }
 
     #endregion

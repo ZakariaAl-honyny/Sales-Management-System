@@ -1,8 +1,6 @@
 namespace SalesSystem.DesktopPWF.Tests.ViewModels;
 
-using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Runtime.Serialization;
 using FluentAssertions;
 using Moq;
 using SalesSystem.Contracts.Common;
@@ -35,27 +33,11 @@ public class WarehouseListViewModelTests : IDisposable
 
     private WarehouseListViewModel CreateViewModel()
     {
-        var viewModel = (WarehouseListViewModel)FormatterServices.GetUninitializedObject(typeof(WarehouseListViewModel));
-
-        var fieldNames = new[] { "_warehouseService", "_eventBus", "_dialogService", "_toastService" };
-        var mockObjects = new object[] { _mockWarehouseService.Object, _mockEventBus.Object, _mockDialogService.Object, _mockToastService.Object };
-
-        for (int i = 0; i < fieldNames.Length; i++)
-        {
-            var field = typeof(WarehouseListViewModel).GetField(fieldNames[i],
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            field?.SetValue(viewModel, mockObjects[i]);
-        }
-
-        var warehousesField = typeof(WarehouseListViewModel).GetField("<Warehouses>k__BackingField",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        warehousesField?.SetValue(viewModel, new ObservableCollection<WarehouseDto>());
-
-        var initMethod = typeof(WarehouseListViewModel).GetMethod("InitializeCommands",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        initMethod?.Invoke(viewModel, null);
-
-        return viewModel;
+        return new WarehouseListViewModel(
+            _mockWarehouseService.Object,
+            _mockEventBus.Object,
+            _mockDialogService.Object,
+            _mockToastService.Object);
     }
 
     public void Dispose()
@@ -70,8 +52,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(1, "W001", "المستودع الرئيسي", "الرياض", true, true),
-            new(2, "W002", "المستودع الثاني", "جدة", true, true)
+            new(1, "المستودع الرئيسي", "الرياض", true, true),
+            new(2, "المستودع الثاني", "جدة", true, true)
         };
 
         _mockWarehouseService
@@ -90,7 +72,7 @@ public class WarehouseListViewModelTests : IDisposable
     {
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
-            .ReturnsAsync(Result<List<WarehouseDto>>.Failure("فشل في الاتصال"));
+            .ReturnsAsync(Result<List<WarehouseDto>>.Failure("فشل في تحميل المستودعات"));
 
         await _viewModel.LoadWarehousesAsync();
 
@@ -122,7 +104,7 @@ public class WarehouseListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto>
             {
-                new(1, "W001", "مستودع تجريبي", null, true, true)
+                new(1, "مستودع تجريبي", null, true, true)
             }));
 
         await _viewModel.LoadWarehousesAsync();
@@ -137,7 +119,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
-        var warehouseToDelete = new WarehouseDto(5, "W005", "مستودع للحذف", null, true, true);
+        var warehouseToDelete = new WarehouseDto(5, "مستودع للحذف", null, true, true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -158,7 +140,7 @@ public class WarehouseListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto>()));
 
-        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
+        _viewModel.DeleteCommand.Execute(null);
         await Task.Delay(100);
 
         _mockWarehouseService.Verify(
@@ -169,7 +151,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenDeleteFails_SetsErrorMessage()
     {
-        var warehouseToDelete = new WarehouseDto(5, "W005", "مستودع", null, true, true);
+        var warehouseToDelete = new WarehouseDto(5, "مستودع", null, true, true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -186,7 +168,7 @@ public class WarehouseListViewModelTests : IDisposable
             .Setup(s => s.DeleteAsync(warehouseToDelete.Id))
             .ReturnsAsync(Result.Failure("فشل في الحذف"));
 
-        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
+        _viewModel.DeleteCommand.Execute(null);
         await Task.Delay(100);
 
         _viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
@@ -195,7 +177,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenWarehouseSelected_PublishesEvent()
     {
-        var warehouseToDelete = new WarehouseDto(5, "W005", "مستودع", null, true, true);
+        var warehouseToDelete = new WarehouseDto(5, "مستودع", null, true, true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -212,7 +194,7 @@ public class WarehouseListViewModelTests : IDisposable
             .Setup(s => s.DeleteAsync(It.IsAny<int>()))
             .ReturnsAsync(Result.Success());
 
-        await ((dynamic)_viewModel.DeleteCommand).ExecuteAsync(null);
+        _viewModel.DeleteCommand.Execute(null);
         await Task.Delay(100);
 
         _mockEventBus.Verify(
@@ -229,9 +211,9 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(1, "W001", "مستودع الرياض", "الرياض", true, true),
-            new(2, "W002", "مستودع جدة", "جدة", true, true),
-            new(3, "W003", "مستودع الرياض الفرعي", "الرياض", true, true)
+            new(1, "مستودع الرياض", "الرياض", true, true),
+            new(2, "مستودع جدة", "جدة", true, true),
+            new(3, "مستودع الرياض الفرعي", "الرياض", true, true)
         };
 
         _mockWarehouseService
@@ -262,8 +244,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(1, "W001", "مستودع الرياض", null, true, true),
-            new(2, "W002", "مستودع جدة", null, true, true)
+            new(1, "مستودع الرياض", null, true, true),
+            new(2, "مستودع جدة", null, true, true)
         };
 
         _mockWarehouseService
@@ -287,12 +269,12 @@ public class WarehouseListViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchText_SearchByCode_FiltersWarehouses()
+    public async Task SearchText_SearchByName_FiltersWarehouses()
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(1, "WH001", "مستودع أ", null, true, true),
-            new(2, "WH002", "مستودع ب", null, true, true)
+            new(1, "مستودع أ", null, true, true),
+            new(2, "مستودع ب", null, true, true)
         };
 
         _mockWarehouseService
@@ -301,7 +283,7 @@ public class WarehouseListViewModelTests : IDisposable
 
         await _viewModel.LoadWarehousesAsync();
 
-        _viewModel.SearchText = "WH001";
+        _viewModel.SearchText = "مستودع أ";
         _viewModel.SearchCommand.Execute(null);
 
         var count = 0;
@@ -343,7 +325,7 @@ public class WarehouseListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var warehouse = new WarehouseDto(1, "W001", "مستودع", null, true, true);
+        var warehouse = new WarehouseDto(1, "مستودع", null, true, true);
         _viewModel.SelectedWarehouse = warehouse;
 
         propertyChangedEvents.Should().Contain("SelectedWarehouse");
@@ -374,7 +356,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_CanExecute_WhenActiveWarehouseSelected()
     {
-        var warehouse = new WarehouseDto(1, "W001", "مستودع", null, true, true);
+        var warehouse = new WarehouseDto(1, "مستودع", null, true, true);
         _viewModel.SelectedWarehouse = warehouse;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -389,7 +371,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CanExecute_WhenWarehouseSelected()
     {
-        var warehouse = new WarehouseDto(1, "W001", "مستودع", null, true, true);
+        var warehouse = new WarehouseDto(1, "مستودع", null, true, true);
         _viewModel.SelectedWarehouse = warehouse;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -441,7 +423,7 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(1, "W001", "مستودع", null, true, true)
+            new(1, "مستودع", null, true, true)
         };
 
         _mockWarehouseService
@@ -463,8 +445,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(1, "W001", "مستودع رئيسي", null, true, true),
-            new(2, "W002", "مستودع فرعي", null, true, true)
+            new(1, "مستودع رئيسي", null, true, true),
+            new(2, "مستودع فرعي", null, true, true)
         };
 
         _mockWarehouseService

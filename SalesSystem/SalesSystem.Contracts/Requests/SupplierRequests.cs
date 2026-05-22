@@ -2,7 +2,6 @@ namespace SalesSystem.Contracts.Requests;
 
 public record CreateSupplierRequest(
     string Name,
-    string? Code,
     string? Phone,
     string? Email,
     string? Address,
@@ -13,7 +12,6 @@ public record CreateSupplierRequest(
 
 public record UpdateSupplierRequest(
     string Name,
-    string? Code,
     string? Phone,
     string? Email,
     string? Address,

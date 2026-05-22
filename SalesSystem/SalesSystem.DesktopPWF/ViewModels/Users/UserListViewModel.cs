@@ -224,7 +224,7 @@ public class UserListViewModel : AdminOnlyViewModel
 
         if (SelectedUser.Id == CurrentUserId)
         {
-            await _dialogService.ShowErrorAsync("خطأ", "لا يمكنك تعطيل حسابك الخاص. يرجى طلب مسؤول آخر للقيام بذلك.");
+            await _dialogService.ShowErrorAsync("خطأ في تعطيل الحساب", "لا يمكنك تعطيل حسابك الخاص. يرجى طلب مسؤول آخر للقيام بذلك.");
             return;
         }
 
@@ -330,7 +330,7 @@ public class UserListViewModel : AdminOnlyViewModel
             else
             {
                 ErrorMessage = result.Error ?? "فشل في إعادة تعيين كلمة المرور";
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في إعادة تعيين كلمة المرور", ErrorMessage);
             }
         }
         catch (Exception ex)

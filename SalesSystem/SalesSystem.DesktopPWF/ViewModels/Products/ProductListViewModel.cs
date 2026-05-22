@@ -213,8 +213,7 @@ public class ProductListViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var searchLower = SearchText.Trim().ToLower();
-        return (product.Code?.ToLower().Contains(searchLower) ?? false) ||
-               product.Name.ToLower().Contains(searchLower) ||
+        return product.Name.ToLower().Contains(searchLower) ||
                (product.CategoryName?.ToLower().Contains(searchLower) ?? false) ||
                (product.Barcode?.ToLower().Contains(searchLower) ?? false);
     }
@@ -291,6 +290,7 @@ public async Task DeleteProductAsync()
                     var error = deleteResult.Error ?? "فشل في حذف المنتج";
                     ErrorMessage = error;
                     _toastService.ShowError(error);
+                    LogSystemError($"Hard delete failed for Product {SelectedProduct.Id}: {error}", "ProductListViewModel.DeleteProductAsync");
                 }
             }
         }
@@ -314,7 +314,6 @@ public async Task DeleteProductAsync()
         try
         {
             var request = new UpdateProductRequest(
-                Code: SelectedProduct.Code ?? string.Empty,
                 Barcode: SelectedProduct.Barcode ?? string.Empty,
                 Name: SelectedProduct.Name,
                 CategoryId: SelectedProduct.CategoryId,

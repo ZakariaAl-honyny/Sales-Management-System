@@ -42,6 +42,19 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 14. **Window Tracking**: Use `WeakReference<Window>` — NEVER strong references (prevents memory leaks)
 15. **Lifecycle**: `CloseRequested` → Close → `Cleanup()` → `OnClosed` callback — ALL managed by ScreenWindowService
 16. **Naming Convention**: View type resolved from ViewModel type by replacing "ViewModel" → "View" in FullName
+17. **API Error Response Parsing**: `HandleResponseAsync` MUST check `ContentType == "application/json"` before calling `ReadFromJsonAsync` — never assume error responses are JSON
+18. **Logging Separation**: `Log.Error` for system failures only; `Log.Warning` for user validation errors and business rule violations
+19. **Interactive Validation**: Save/Post commands MUST NOT have CanExecute predicates — validate on click with `_dialogService.ShowWarningAsync` instead. Required fields marked with `*`. Every input needs ToolTip explaining its validation rule.
+20. **LogSystemError**: ALL ViewModels MUST use `LogSystemError(message, context, exception)` from ViewModelBase — NEVER call `Serilog.Log.Error` directly
+21. **Hard Delete Safety**: ALL `PermanentDeleteAsync()` methods MUST catch `DbUpdateException` and return `Result.Failure` with Arabic message
+22. **Controllers Purity**: Controllers MUST NOT inject `DbContext` or `IUnitOfWork` directly — delegation to Application Services is REQUIRED
+23. **All Services Return Result<T>**: ZERO exceptions thrown from service methods — ALL returns `Result<T>` or `Result`
+24. **Enum Integrity**: ALL enum values MUST match AGENTS.md Section 3 exactly — NEVER deviate from canonical values
+25. **WarehouseStocks CHECK**: `HasCheckConstraint("CHK_WarehouseStocks_Quantity_NonNegative", "[Quantity] >= 0")` is REQUIRED
+26. **FK Restrict**: ALL FKs MUST use `DeleteBehavior.Restrict` — ZERO Cascade deletes allowed
+27. **ProductPriceHistory Config**: MUST have dedicated `IEntityTypeConfiguration<ProductPriceHistory>` with explicit HasMaxLength on string fields
+28. **Product.ReorderLevel Precision**: MUST use `.HasPrecision(18, 3)` — it's a quantity field
+29. **UnitBarcode HasQueryFilter**: MUST add `.HasQueryFilter(x => x.IsActive)` to match ProductBarcode pattern
 
 ## Pattern to Follow
 ```csharp

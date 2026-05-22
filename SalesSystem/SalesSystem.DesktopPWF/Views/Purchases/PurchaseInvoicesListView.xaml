@@ -65,7 +65,8 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0">
+                    <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                            ToolTip="فتح شاشة إنشاء فاتورة جديدة">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="فاتورة جديدة" VerticalAlignment="Center"/>
@@ -280,7 +281,8 @@
                         <TextBlock Text="📦" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
                         <TextBlock Text="لا توجد فواتير شراء حالياً" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
                         <TextBlock Text="سجل عمليات الشراء من الموردين لزيادة المخزون وإدارة فواتيرك هنا" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة فاتورة شراء" Command="{Binding NewCommand}" Margin="0,24,0,0"/>
+                        <Button Content="➕ إضافة فاتورة شراء" Command="{Binding NewCommand}" Margin="0,24,0,0"
+                                ToolTip="إنشاء فاتورة جديدة"/>
                     </StackPanel>
                 </Grid>
             </Grid>

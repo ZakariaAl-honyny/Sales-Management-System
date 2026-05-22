@@ -10,7 +10,7 @@ public class UpdateDialogViewModel : ViewModelBase, IDisposable
     private CancellationTokenSource? _downloadCts;
 
     public string SystemName { get; } = "نظام إدارة المبيعات";
-    public string CurrentVersion { get; }
+    public string CurrentVersion { get; } = string.Empty;
     public string LatestVersion { get; }
     public string ReleaseDate { get; }
     public bool IsCriticalUpdate { get; }
@@ -73,7 +73,7 @@ public class UpdateDialogViewModel : ViewModelBase, IDisposable
         _updaterService = updaterService;
         _updateInfo = updateInfo;
 
-        CurrentVersion = updaterService.GetCurrentVersion().Value;
+        CurrentVersion = updaterService.GetCurrentVersion().Value ?? "0.0.0";
         LatestVersion = updateInfo.LatestVersion;
         ReleaseDate = updateInfo.ReleaseDate;
         IsCriticalUpdate = updateInfo.IsCritical;

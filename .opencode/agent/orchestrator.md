@@ -25,13 +25,20 @@ Lead architect for the Sales Management System. You coordinate all subagents and
 
 ## Implementation Phases (Follow This Order)
 ```text
-Phase 1: Foundation   → Solution structure, Domain entities, Contracts, Exceptions
-Phase 2: Infrastructure → DbContext, Fluent API configs, Migrations, Repositories, UnitOfWork
-Phase 3: Application   → Services (Product → Customer → Sales → Purchase → Returns)
-Phase 4: API          → Controllers, FluentValidation, JWT Auth, Swagger
-Phase 5: Desktop Shell → MainForm, Navigation, EventBus, Login
-Phase 6: Desktop Modules → Products → Customers → Sales → Purchases → Returns → Reports
-Phase 7: Production    → Backup, Settings, Windows Service, Installer
+Phase 1: Foundation        → Solution structure, Domain entities, Contracts, Exceptions
+Phase 2: Infrastructure    → DbContext, Fluent API configs, Migrations, Repositories, UnitOfWork
+Phase 3: Application       → Services (Product → Customer → Sales → Purchase → Returns)
+Phase 4: API               → Controllers, FluentValidation, JWT Auth, Swagger
+Phase 5: Desktop Shell     → MainForm, Navigation, EventBus, Login
+Phase 6: Desktop Modules   → Products → Customers → Sales → Purchases → Returns → Reports
+Phase 7: Printing Engine   → QuestPDF A4, ESC/POS Thermal, PrintController, WPF Preview
+Phase 8: Dynamic UOM + Costing + Cash Boxes
+Phase 9: Production        → Auto-Update, DPAPI Security, Backup, Windows Service, Admin, Installer
+Phase 10: Code Quality     → ExecuteAsync() pattern, MediatR removal, Legacy deletion, Test updates
+Phase 11: Multi-Window     → ScreenWindowService, non-modal editors, cascade positioning
+Phase 12: Error & Logging  → HandleResponseAsync fix, logging separation policy (Error vs Warning)
+Phase 13: Interactive Validation → Remove CanExecute blocking, on-click warning dialogs, field ToolTips, required * markers, unique field explanations
+Phase 14: Audit & Polish   → LogSystemError centralized, Dialog overlay + hover, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes
 ```
 
 ## Before Accepting Any Code

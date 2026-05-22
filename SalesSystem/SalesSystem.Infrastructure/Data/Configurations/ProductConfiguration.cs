@@ -10,8 +10,6 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
     {
         builder.ToTable("Products");
         builder.HasKey(p => p.Id);
-        builder.Property(p => p.Code).HasMaxLength(30);
-        builder.HasIndex(p => p.Code).IsUnique();
         builder.Property(p => p.Barcode).HasMaxLength(50);
         builder.HasIndex(p => p.Barcode).IsUnique();
         builder.Property(p => p.Name).IsRequired().HasMaxLength(150);
@@ -20,6 +18,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.WholesalePrice).IsRequired().HasPrecision(18, 2).HasDefaultValue(0m);
         builder.Property(p => p.RetailPrice).IsRequired().HasPrecision(18, 2).HasDefaultValue(0m);
         builder.Property(p => p.MinStock).IsRequired().HasPrecision(18, 3);
+        builder.Property(p => p.ReorderLevel).HasPrecision(18, 3);
         builder.Property(p => p.ConversionFactor).IsRequired().HasPrecision(18, 3).HasDefaultValue(1m);
         builder.Property(p => p.Description).HasMaxLength(500);
 

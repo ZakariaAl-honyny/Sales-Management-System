@@ -104,28 +104,21 @@ public partial class App : System.Windows.Application
     {
         var healthService = _serviceProvider!.GetRequiredService<IDatabaseHealthCheckService>();
 
-        while (true)
+        var result = await healthService.CheckAsync();
+
+        if (result.IsDatabaseConnected)
+            return true;
+
+        var retry = await Dispatcher.InvokeAsync(() =>
         {
-            var result = await healthService.CheckAsync();
+            var dialog = new Views.Dialogs.DatabaseErrorDialog(
+                result.ErrorMessage ?? "تعذر الاتصال بقاعدة البيانات",
+                () => healthService.CheckAsync());
+            dialog.ShowDialog();
+            return dialog.RetryClicked;
+        });
 
-            if (result.IsDatabaseConnected)
-                return true;
-
-            // Show error dialog on UI thread
-            var retry = await Dispatcher.InvokeAsync(() =>
-            {
-                var dialog = new Views.Dialogs.DatabaseErrorDialog(
-                    result.ErrorMessage ?? "تعذر الاتصال بقاعدة البيانات");
-                dialog.ShowDialog();
-                return dialog.RetryClicked;
-            });
-
-            if (!retry)
-                return false;
-
-            // Small delay before retry
-            await Task.Delay(1000);
-        }
+        return retry;
     }
 
     private void Application_Exit(object sender, ExitEventArgs e)
@@ -335,12 +328,13 @@ public partial class App : System.Windows.Application
 
             var result = await updaterService.CheckForUpdatesAsync();
 
-            if (!result.IsSuccess || !result.Value.UpdateAvailable || result.Value.UpdateInfo == null)
+            var updateValue = result.Value;
+            if (!result.IsSuccess || updateValue == null || !updateValue.UpdateAvailable || updateValue.UpdateInfo == null)
                 return;
 
             await Dispatcher.InvokeAsync(() =>
             {
-                ShowUpdateDialog(result.Value.UpdateInfo);
+                ShowUpdateDialog(updateValue!.UpdateInfo);
             });
         }
         catch (Exception ex)

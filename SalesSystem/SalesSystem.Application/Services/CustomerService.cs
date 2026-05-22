@@ -43,7 +43,6 @@ public class CustomerService : ICustomerService
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(c => c.Name.Contains(search) ||
-                                    (c.Code != null && c.Code.Contains(search)) ||
                                     (c.Phone != null && c.Phone.Contains(search)));
         }
 
@@ -63,26 +62,9 @@ public class CustomerService : ICustomerService
     {
         try
         {
-            string? code = request.Code;
-            if (string.IsNullOrWhiteSpace(code))
-            {
-                var codeResult = await _sequenceService.GetNextNumberAsync("CUST", ct);
-                if (!codeResult.IsSuccess)
-                    return Result<CustomerDto>.Failure(codeResult.Error ?? "حدث خطأ أثناء توليد الكود");
-                code = codeResult.Value;
-            }
-
-            // Validate code uniqueness (Regardless of source, including inactive)
-            if (await _uow.Customers.Query().IgnoreQueryFilters().AnyAsync(c => c.Code == code, ct))
-            {
-                _logger.LogWarning("Customer creation failed: Duplicate code {Code} (including inactive)", code);
-                return Result<CustomerDto>.Failure("كود العميل مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateCode);
-            }
-
             var customer = Customer.Create(
                 name: request.Name,
                 openingBalance: request.OpeningBalance,
-                code: code,
                 phone: request.Phone,
                 email: request.Email,
                 address: request.Address,
@@ -117,15 +99,8 @@ public class CustomerService : ICustomerService
             if (customer == null)
                 return Result<CustomerDto>.Failure("العميل غير موجود", ErrorCodes.NotFound);
 
-            if (!string.IsNullOrWhiteSpace(request.Code) && request.Code != customer.Code)
-            {
-                if (await _uow.Customers.Query().IgnoreQueryFilters().AnyAsync(c => c.Code == request.Code && c.Id != id, ct))
-                    return Result<CustomerDto>.Failure("كود العميل مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateCode);
-            }
-
             customer.Update(
                 name: request.Name,
-                code: request.Code,
                 phone: request.Phone,
                 email: request.Email,
                 address: request.Address,
@@ -183,18 +158,26 @@ public class CustomerService : ICustomerService
         if (await _uow.CustomerPayments.Query().AnyAsync(cp => cp.CustomerId == id, ct))
             return Result.Failure("لا يمكن حذف العميل نهائياً لأنه مرتبط بسندات قبض");
 
-        await _uow.Customers.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        try
+        {
+            await _uow.Customers.HardDeleteAsync(id, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Customer permanently deleted: {CustomerId}", id);
-        return Result.Success();
+            _logger.LogInformation("Customer permanently deleted: {CustomerId}", id);
+            return Result.Success();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Failed to permanently delete customer {CustomerId} due to database constraint", id);
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            return Result.Failure($"لا يمكن حذف العميل نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام. ({innerMessage})");
+        }
     }
 
     private static CustomerDto MapToDto(Customer c)
     {
         return new CustomerDto(
             c.Id,
-            c.Code,
             c.Name,
             c.Phone,
             c.Email,

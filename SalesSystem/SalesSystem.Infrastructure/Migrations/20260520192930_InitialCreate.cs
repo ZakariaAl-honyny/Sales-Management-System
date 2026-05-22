@@ -59,7 +59,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Code = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
@@ -161,7 +160,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Code = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
@@ -275,7 +273,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Code = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Location = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: true),
                     IsDefault = table.Column<bool>(type: "bit", nullable: false),
@@ -328,7 +325,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Code = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     Barcode = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     CategoryId = table.Column<int>(type: "int", nullable: true),
@@ -1035,13 +1031,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 column: "SalesInvoiceId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Customers_Code",
-                table: "Customers",
-                column: "Code",
-                unique: true,
-                filter: "[Code] IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_DocumentSequences_DocumentType",
                 table: "DocumentSequences",
                 column: "DocumentType",
@@ -1089,13 +1078,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 name: "IX_Products_CategoryId",
                 table: "Products",
                 column: "CategoryId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Products_Code",
-                table: "Products",
-                column: "Code",
-                unique: true,
-                filter: "[Code] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Products_RetailUnitId",
@@ -1274,13 +1256,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 column: "SupplierId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Suppliers_Code",
-                table: "Suppliers",
-                column: "Code",
-                unique: true,
-                filter: "[Code] IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_SystemSettings_SettingKey",
                 table: "SystemSettings",
                 column: "SettingKey",
@@ -1302,13 +1277,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 table: "Users",
                 column: "UserName",
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Warehouses_Code",
-                table: "Warehouses",
-                column: "Code",
-                unique: true,
-                filter: "[Code] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_WarehouseStocks_ProductId",

@@ -106,9 +106,16 @@ public abstract class ApiServiceBase
 
         try
         {
-            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-            Serilog.Log.Warning("API Command failure: {StatusCode} - {Error} ({ErrorCode})", response.StatusCode, error?.Error, error?.ErrorCode);
-            return Result.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
+            if (response.Content.Headers.ContentType?.MediaType == "application/json")
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                Serilog.Log.Warning("API Command failure: {StatusCode} - {Error} ({ErrorCode})", response.StatusCode, error?.Error, error?.ErrorCode);
+                return Result.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            Serilog.Log.Warning("API Command failure (non-JSON): {StatusCode} - {Content}", response.StatusCode, content);
+            return Result.Failure($"خطأ في الخادم: {response.StatusCode}", response.StatusCode.ToString());
         }
         catch (Exception ex)
         {

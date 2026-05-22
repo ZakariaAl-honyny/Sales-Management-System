@@ -779,4 +779,80 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
+    <!-- ============================================ -->
+    <!-- أنماط نوافذ الحوار (Dialog Styles) v4.6       -->
+    <!-- ============================================ -->
+
+    <!-- غلاف الحوار الأساسي (للاستخدام داخل نوافذ الحوار) -->
+    <Style x:Key="DialogOverlayStyle" TargetType="Rectangle">
+        <Setter Property="Fill" Value="#80000000"/>
+    </Style>
+
+    <!-- بطاقة الحوار المركزية -->
+    <Style x:Key="DialogCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="White"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Padding" Value="28"/>
+        <Setter Property="Effect" Value="{StaticResource DeepShadow}"/>
+    </Style>
+
+    <!-- رأس الحوار (أيقونة + عنوان) -->
+    <Style x:Key="DialogHeaderStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal"/>
+        <Setter Property="Margin" Value="0,0,0,16"/>
+    </Style>
+
+    <!-- أيقونة الحوار -->
+    <Style x:Key="DialogIconBorderStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="25"/>
+        <Setter Property="Width" Value="50"/>
+        <Setter Property="Height" Value="50"/>
+    </Style>
+
+    <!-- نص عنوان الحوار -->
+    <Style x:Key="DialogTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="12,0,0,0"/>
+    </Style>
+
+    <!-- زر الحوار الأساسي (Generic with hover) -->
+    <!-- ملاحظة: كل زر حوار يحدد لونه الخاص، لكن هذا النمط يوفر المحفزات -->
+    <Style x:Key="DialogButtonBaseStyle" TargetType="Button">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="MinWidth" Value="100"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Border" Background="{TemplateBinding Background}" 
+                            CornerRadius="8" Padding="14,8">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{Binding Path=Background, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Null}}"/>
+                            <!-- Note: Individual dialog XAML files override this trigger with specific colors -->
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Border" Property="Opacity" Value="0.85"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- قائمة الأخطاء في حوار التحقق -->
+    <Style x:Key="ValidationErrorItemStyle" TargetType="TextBlock">
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="#333"/>
+        <Setter Property="LineHeight" Value="22"/>
+    </Style>
+
 </ResourceDictionary>

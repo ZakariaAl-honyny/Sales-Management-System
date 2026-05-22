@@ -9,6 +9,7 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Printing;
+using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Infrastructure;
@@ -132,7 +133,9 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ISystemSettingsRepository, SystemSettingsRepository>();
 builder.Services.AddScoped<IUpdateProductPricingService, UpdateProductPricingService>();
 builder.Services.AddScoped<IPrintService, PrintService>();
+builder.Services.AddScoped<IPrintDataService, PrintDataService>();
 builder.Services.AddScoped<InvoicePrintDtoBuilder>();
+builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================
@@ -301,7 +304,6 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
 
         var warehouse = Warehouse.Create(
             name: "المخزن الرئيسي",
-            code: "WH-001",
             location: null,
             isDefault: true,
             createdByUserId: null
@@ -310,7 +312,6 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
 
         var cashCustomer = Customer.Create(
             name: "عميل نقدي",
-            code: "CASH",
             openingBalance: 0,
             createdByUserId: null
         );

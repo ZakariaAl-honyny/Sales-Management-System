@@ -9,6 +9,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels.Products;
 
 /// <summary>
@@ -20,6 +21,7 @@ public class ProductEditorViewModelTests : IDisposable
     private readonly Mock<ICategoryApiService> _mockCategoryService;
     private readonly Mock<IUnitApiService> _mockUnitService;
     private readonly Mock<IEventBus> _mockEventBus;
+    private readonly Mock<IDialogService> _mockDialogService;
 
     public ProductEditorViewModelTests()
     {
@@ -27,6 +29,7 @@ public class ProductEditorViewModelTests : IDisposable
         _mockCategoryService = new Mock<ICategoryApiService>();
         _mockUnitService = new Mock<IUnitApiService>();
         _mockEventBus = new Mock<IEventBus>();
+        _mockDialogService = new Mock<IDialogService>();
     }
 
     public void Dispose()
@@ -43,7 +46,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.SaveCommand.Should().NotBeNull();
@@ -59,7 +63,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.IsEditMode.Should().BeFalse();
@@ -71,7 +76,6 @@ public class ProductEditorViewModelTests : IDisposable
         // Arrange
         var product = new ProductDto(
             Id: 1,
-            Code: "PROD-001",
             Barcode: null,
             Name: "منتج تجريبي",
             CategoryId: 1,
@@ -97,7 +101,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.IsEditMode.Should().BeTrue();
@@ -111,10 +116,10 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
-        viewModel.Code.Should().BeEmpty();
         viewModel.Name.Should().BeEmpty();
         viewModel.Barcode.Should().BeEmpty();
         viewModel.PurchasePrice.Should().Be(0);
@@ -134,7 +139,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.Title.Should().Be("إضافة منتج جديد");
@@ -146,7 +152,6 @@ public class ProductEditorViewModelTests : IDisposable
         // Arrange
         var product = new ProductDto(
             Id: 1,
-            Code: "PROD-001",
             Barcode: null,
             Name: "منتج تجريبي",
             CategoryId: 1,
@@ -171,7 +176,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.Title.Should().Be("تعديل منتج");
@@ -182,25 +188,6 @@ public class ProductEditorViewModelTests : IDisposable
     #region Property Notification Tests
 
     [Fact]
-    public void Code_Set_NotifiesPropertyChanged()
-    {
-        // Arrange
-        var viewModel = new ProductEditorViewModel(
-            _mockProductService.Object,
-            _mockCategoryService.Object,
-            _mockUnitService.Object,
-            _mockEventBus.Object);
-        var propertyChangedEvents = new List<string>();
-        viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        // Act
-        viewModel.Code = "NEW-001";
-
-        // Assert
-        propertyChangedEvents.Should().Contain("Code");
-    }
-
-    [Fact]
     public void Name_Set_NotifiesPropertyChanged()
     {
         // Arrange
@@ -208,7 +195,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -227,7 +215,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -246,7 +235,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -265,7 +255,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -284,7 +275,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -307,7 +299,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var closeRequestedInvoked = false;
         viewModel.CloseRequested += () => closeRequestedInvoked = true;
 
@@ -326,7 +319,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Act & Assert
         viewModel.CancelCommand.CanExecute(null).Should().BeTrue();
@@ -344,7 +338,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var category = new CategoryDto(Id: 1, Name: "فئة تجريبية", Description: null, IsActive: true);
 
         // Act
@@ -362,7 +357,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.SelectedCategory = new CategoryDto(Id: 1, Name: "فئة تجريبية", Description: null, IsActive: true);
 
         // Act
@@ -380,7 +376,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -403,7 +400,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var unit = new UnitDto(Id: 1, Name: "وحدة تجريبية", Symbol: "م", IsActive: true);
 
         // Act
@@ -421,7 +419,8 @@ public class ProductEditorViewModelTests : IDisposable
             _mockProductService.Object,
             _mockCategoryService.Object,
             _mockUnitService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.SelectedUnit = new UnitDto(Id: 1, Name: "وحدة تجريبية", Symbol: "م", IsActive: true);
 
         // Act
@@ -437,12 +436,10 @@ public class ProductEditorViewModelTests : IDisposable
 
     private static ProductDto CreateTestProductDto(
         int id,
-        string code,
         string name)
     {
         return new ProductDto(
             Id: id,
-            Code: code,
             Barcode: null,
             Name: name,
             CategoryId: 1,

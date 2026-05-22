@@ -93,7 +93,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb4");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "Original Name", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 80m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m, code: "P001", minStock: 10m);
+        var product = Product.Create(name: "Original Name", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 80m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m, minStock: 10m);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
@@ -107,7 +107,6 @@ public class GenericRepositoryTests
             wholesaleUnitId: 2,
             conversionFactor: 10m,
             minStock: 20m,
-            code: "P001",
             barcode: null,
             categoryId: null,
             description: null,
@@ -242,7 +241,7 @@ public class GenericRepositoryTests
         await context.SaveChangesAsync();
 
         // Act
-        warehouse.Update(name: "Updated Warehouse", code: null, location: "New Location", isDefault: false, updatedByUserId: 1);
+        warehouse.Update(name: "Updated Warehouse", location: "New Location", isDefault: false, updatedByUserId: 1);
         await repository.UpdateAsync(warehouse);
         await context.SaveChangesAsync();
 
@@ -407,7 +406,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("EdgeDb2");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "Original", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 50m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m, code: "P001", minStock: 5m);
+        var product = Product.Create(name: "Original", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 50m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m, minStock: 5m);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
@@ -424,7 +423,6 @@ public class GenericRepositoryTests
             wholesaleUnitId: 2,
             conversionFactor: 10m,
             minStock: 10m,
-            code: "P001",
             barcode: null,
             categoryId: null,
             description: null,

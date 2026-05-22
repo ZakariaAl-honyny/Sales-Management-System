@@ -237,7 +237,7 @@ public class InventoryService : IInventoryService
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(s => s.Product!.Name.Contains(search) || (s.Product.Code != null && s.Product.Code.Contains(search)));
+            query = query.Where(s => s.Product!.Name.Contains(search));
         }
 
         var items = await query.ToListAsync(ct);
@@ -498,7 +498,6 @@ public class InventoryService : IInventoryService
             t.Items.Select(it => new StockTransferItemDto(
                 it.Id,
                 it.ProductId,
-                it.Product?.Code,
                 it.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 (byte)it.Mode,

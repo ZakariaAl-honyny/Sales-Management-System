@@ -16,12 +16,19 @@ namespace SalesSystem.DesktopPWF.ViewModels.Payments;
 /// </summary>
 public class SupplierPaymentsListViewModel : ViewModelBase
 {
-    private readonly ISupplierPaymentApiService _paymentService;
-    private readonly ISupplierApiService _supplierService;
-    private readonly IDialogService _dialogService;
-    private readonly IPaymentPrinter _paymentPrinter;
-    private readonly ISettingsApiService _settingsService;
-    private readonly IScreenWindowService _screenWindowService;
+    private ISupplierPaymentApiService? _paymentService;
+    private ISupplierApiService? _supplierService;
+    private IDialogService? _dialogService;
+    private IPaymentPrinter? _paymentPrinter;
+    private ISettingsApiService? _settingsService;
+    private IScreenWindowService? _screenWindowService;
+
+    private ISupplierPaymentApiService PaymentService => _paymentService ??= App.GetService<ISupplierPaymentApiService>();
+    private ISupplierApiService SupplierService => _supplierService ??= App.GetService<ISupplierApiService>();
+    private IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+    private IPaymentPrinter PaymentPrinter => _paymentPrinter ??= App.GetService<IPaymentPrinter>();
+    private ISettingsApiService SettingsService => _settingsService ??= App.GetService<ISettingsApiService>();
+    private IScreenWindowService ScreenWindowService => _screenWindowService ??= App.GetService<IScreenWindowService>();
 
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
@@ -35,13 +42,6 @@ public class SupplierPaymentsListViewModel : ViewModelBase
 
     public SupplierPaymentsListViewModel()
     {
-        _paymentService = App.GetService<ISupplierPaymentApiService>();
-        _supplierService = App.GetService<ISupplierApiService>();
-        _dialogService = App.GetService<IDialogService>();
-        _paymentPrinter = App.GetService<IPaymentPrinter>();
-        _settingsService = App.GetService<ISettingsApiService>();
-        _screenWindowService = App.GetService<IScreenWindowService>();
-
         NewCommand = new RelayCommand(OnNew);
         ViewCommand = new RelayCommand(OnView, () => SelectedPayment != null);
         EditCommand = new RelayCommand(OnEdit, () => SelectedPayment != null);
@@ -126,11 +126,11 @@ public class SupplierPaymentsListViewModel : ViewModelBase
             IsLoading = true;
             ErrorMessage = string.Empty;
 
-            var result = await _paymentService.GetAllAsync(SearchText, DateFrom, DateTo);
+            var result = await PaymentService.GetAllAsync(SearchText, DateFrom, DateTo);
 
             if (result.IsSuccess && result.Value != null)
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                InvokeOnUIThread(() =>
                 {
                     Payments.Clear();
                     foreach (var item in result.Value)
@@ -167,7 +167,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     private void OnNew()
     {
         var vm = App.GetService<SupplierPaymentEditorViewModel>();
-        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
             Title = "سداد مورد جديد",
             OnClosed = (vm) =>
@@ -181,7 +181,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
         var vm = new SupplierPaymentEditorViewModel(SelectedPayment.Id, isReadOnly: true);
-        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
             Title = "عرض سداد مورد"
         });
@@ -191,7 +191,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
         var vm = new SupplierPaymentEditorViewModel(SelectedPayment.Id);
-        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
             Title = "تعديل سداد مورد",
             OnClosed = (vm) =>
@@ -205,14 +205,14 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
 
-        var result = await _dialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
+        var result = await DialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
 
         if (!result) return;
 
         try
         {
             IsLoading = true;
-            var deleteResult = await _paymentService.DeleteAsync(SelectedPayment.Id);
+            var deleteResult = await PaymentService.DeleteAsync(SelectedPayment.Id);
 
             if (deleteResult.IsSuccess)
             {
@@ -221,12 +221,14 @@ public class SupplierPaymentsListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = deleteResult.Error ?? "فشل في حذف السداد";
-                await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
+                await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            LogSystemError($"Failed to delete supplier payment {SelectedPayment?.Id}", "SupplierPaymentsListViewModel.OnDelete", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
+            await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
         }
         finally
         {
@@ -241,14 +243,15 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         IsLoading = true;
         try
         {
-            var settingsResult = await _settingsService.GetSettingsAsync();
+            var settingsResult = await SettingsService.GetSettingsAsync();
             if (!settingsResult.IsSuccess || settingsResult.Value == null) return;
 
-            _paymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
+            PaymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+            LogSystemError($"Failed to print supplier payment {SelectedPayment?.Id}", "SupplierPaymentsListViewModel.OnPrint", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
         }
         finally
         {

@@ -1,25 +1,25 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Entities;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Controller for receiving logs from clients (Desktop app)
+/// Controller for receiving logs from clients (Desktop app).
+/// Delegates all data access to ILogService — no direct IUnitOfWork dependency.
 /// </summary>
 [ApiController]
 [Route("api/v1/logs")]
 public class LogsController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
+    private readonly ILogService _logService;
     private readonly ILogger<LogsController> _logger;
 
-    public LogsController(IUnitOfWork uow, ILogger<LogsController> logger)
+    public LogsController(ILogService logService, ILogger<LogsController> logger)
     {
-        _uow = uow;
+        _logService = logService;
         _logger = logger;
     }
 
@@ -30,7 +30,7 @@ public class LogsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         int? userId = int.TryParse(userIdStr, out var id) ? id : null;
 
-        var log = SystemLog.Create(
+        var result = await _logService.CreateLogAsync(
             request.LogLevel,
             request.Message,
             request.Exception,
@@ -38,22 +38,13 @@ public class LogsController : ControllerBase
             request.Source ?? "Desktop",
             request.Context,
             userId,
-            request.MachineName
-        );
+            request.MachineName,
+            ct);
 
-        await _uow.SystemLogs.AddAsync(log, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        // Also log to Serilog on server side for visibility
-        if (request.LogLevel == "Error" || request.LogLevel == "Fatal")
+        if (!result.IsSuccess)
         {
-            _logger.LogError("Client Log [{Source}]: {Message} | Context: {Context} | Machine: {Machine}", 
-                request.Source, request.Message, request.Context, request.MachineName);
-        }
-        else
-        {
-            _logger.LogWarning("Client Log [{Source}]: {Message} | Context: {Context} | Machine: {Machine}", 
-                request.Source, request.Message, request.Context, request.MachineName);
+            _logger.LogError("Failed to store client log: {Error}", result.Error);
+            return StatusCode(500, new { error = result.Error });
         }
 
         return Ok();

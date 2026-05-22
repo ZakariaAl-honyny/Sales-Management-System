@@ -61,7 +61,7 @@ public class UnitService : IUnitService
         try
         {
             if (await _uow.Units.Query().AnyAsync(u => u.Name == request.Name, ct))
-                return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", ErrorCodes.DuplicateCode);
+                return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", "DUPLICATE_UNIT_NAME");
 
             var unit = Unit.Create(request.Name, request.Symbol, null);
 
@@ -92,7 +92,7 @@ public class UnitService : IUnitService
                 return Result<UnitDto>.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
             if (await _uow.Units.Query().AnyAsync(u => u.Name == request.Name && u.Id != id, ct))
-                return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", ErrorCodes.DuplicateCode);
+                return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", "DUPLICATE_UNIT_NAME");
 
             unit.Update(request.Name, request.Symbol, null);
 
@@ -142,11 +142,20 @@ public class UnitService : IUnitService
         if (await _uow.Products.Query().AnyAsync(p => p.UnitId == id || p.RetailUnitId == id || p.WholesaleUnitId == id, ct))
             return Result.Failure("لا يمكن حذف الوحدة نهائياً لأنها مرتبطة بمنتجات");
 
-        await _uow.Units.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        try
+        {
+            await _uow.Units.HardDeleteAsync(id, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Unit permanently deleted: {UnitId}", id);
-        return Result.Success();
+            _logger.LogInformation("Unit permanently deleted: {UnitId}", id);
+            return Result.Success();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Failed to permanently delete unit {UnitId} due to database constraint", id);
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            return Result.Failure($"لا يمكن حذف الوحدة نهائياً. قد تكون مرتبطة ببيانات أخرى في النظام. ({innerMessage})");
+        }
     }
 
     private static UnitDto MapToDto(Unit u)

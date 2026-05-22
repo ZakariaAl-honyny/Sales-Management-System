@@ -62,13 +62,13 @@ public class SalesReturnEditorViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave());
-        PostCommand = new AsyncRelayCommand(PostAsync, CanPost);
-        CancelReturnCommand = new AsyncRelayCommand(CancelReturnAsync, CanCancel);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        PostCommand = new AsyncRelayCommand(PostAsync);
+        CancelReturnCommand = new AsyncRelayCommand(CancelReturnAsync);
         CancelCommand = new RelayCommand(() => RequestClose());
-        SearchInvoiceCommand = new AsyncRelayCommand(SearchInvoiceAsync, () => !IsEditMode);
-        PrintA4Command = new AsyncRelayCommand(PrintA4Async, () => _returnId.HasValue);
-        PrintReceiptCommand = new AsyncRelayCommand(PrintReceiptAsync, () => _returnId.HasValue);
+        SearchInvoiceCommand = new AsyncRelayCommand(SearchInvoiceAsync);
+        PrintA4Command = new AsyncRelayCommand(PrintA4Async);
+        PrintReceiptCommand = new AsyncRelayCommand(PrintReceiptAsync);
         ProcessBarcodeCommand = new AsyncRelayCommand(async () => 
         {
             var code = SearchText;
@@ -107,7 +107,6 @@ public class SalesReturnEditorViewModel : ViewModelBase
             if (SetProperty(ref _selectedWarehouseId, value))
             {
                 UpdateImpactAnalysis();
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -121,7 +120,6 @@ public class SalesReturnEditorViewModel : ViewModelBase
             {
                 if (value != null) SearchText = value.InvoiceNo;
                 UpdateItemsFromInvoice();
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -167,7 +165,6 @@ public class SalesReturnEditorViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsPosted));
                 OnPropertyChanged(nameof(IsCancelled));
                 OnPropertyChanged(nameof(IsReadOnly));
-                UpdateCommandStates();
             }
         }
     }
@@ -353,7 +350,6 @@ public class SalesReturnEditorViewModel : ViewModelBase
                 }
                 OnPropertyChanged(nameof(TotalAmount));
                 UpdateImpactAnalysis();
-                UpdateCommandStates();
             }
             else
             {
@@ -364,7 +360,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
         {
             ErrorMessage = "حدث خطأ أثناء تحميل البيانات";
             _logger.LogError(ex, "Error loading sales return {Id}", id);
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage);
         }
         finally
         {
@@ -434,37 +430,33 @@ public class SalesReturnEditorViewModel : ViewModelBase
         Impact = summary;
     }
 
-    private bool CanSave()
+    private async Task<bool> ValidateAsync()
     {
-        if (IsReadOnly) return false;
-        if (SelectedInvoice == null) return false;
-        if (SelectedWarehouseId <= 0) return false;
-        if (!Items.Any(i => i.ReturnQuantity > 0)) return false;
+        if (SelectedInvoice == null)
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يجب اختيار فاتورة بيع لإنشاء مرتجع" });
+            RequestFocusFirstInvalidField();
+            return false;
+        }
+        if (SelectedWarehouseId <= 0)
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يجب اختيار المستودع" });
+            RequestFocusFirstInvalidField();
+            return false;
+        }
+        if (!Items.Any(i => i.ReturnQuantity > 0))
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يجب إدخال كمية المرتجع لمنتج واحد على الأقل" });
+            RequestFocusFirstInvalidField();
+            return false;
+        }
         return true;
-    }
-
-    private bool CanPost()
-    {
-        return IsEditMode && Status == InvoiceStatus.Draft && _returnId.HasValue;
-    }
-
-    private bool CanCancel()
-    {
-        return IsEditMode && Status != InvoiceStatus.Cancelled && _returnId.HasValue;
-    }
-
-    private void UpdateCommandStates()
-    {
-        (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PostCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (CancelReturnCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (SearchInvoiceCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintA4Command as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintReceiptCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private async Task SaveAsync()
     {
+        if (!await ValidateAsync()) return;
+
         IsLoading = true;
         ErrorMessage = null;
 
@@ -495,18 +487,17 @@ public class SalesReturnEditorViewModel : ViewModelBase
                 
                 _eventBus.Publish(new SalesReturnChangedMessage(_returnId.Value));
                 await _dialogService.ShowSuccessAsync("نجاح", "تم إنشاء مرتجع المبيعات بنجاح");
-                UpdateCommandStates();
             }
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المرتجع", "SalesReturnEditorViewModel.SaveAsync", "[SalesReturnEditorViewModel.SaveAsync] Failed to save sales return.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في حفظ المرتجع", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SalesReturnEditorViewModel.SaveAsync", "[SalesReturnEditorViewModel.SaveAsync] Failed to save sales return.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في حفظ المرتجع", ErrorMessage);
         }
         finally
         {
@@ -545,13 +536,13 @@ public class SalesReturnEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = result.Error ?? "فشل في ترحيل المرتجع";
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SalesReturnEditorViewModel.PostAsync", $"[SalesReturnEditorViewModel.PostAsync] Failed to post sales return ID {_returnId}.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
         }
         finally
         {
@@ -578,7 +569,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
         }
 
         // If invoice selected, find product by code or barcode
-        var item = Items.FirstOrDefault(i => i.ProductCode == barcode);
+        var item = Items.FirstOrDefault(i => i.ProductName.Contains(barcode) || i.ProductId.ToString() == barcode);
         if (item != null)
         {
             if (item.ReturnQuantity < item.OriginalQuantity)
@@ -634,7 +625,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = result.Error ?? "فشل في إلغاء المرتجع";
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
         }
         finally
@@ -675,7 +666,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error preparing print for sales return {Id}", _returnId);
-            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحضير الطباعة");
+            await _dialogService.ShowErrorAsync("خطأ في الطباعة", "حدث خطأ أثناء تحضير الطباعة");
         }
         finally
         {
@@ -692,7 +683,6 @@ public class SalesReturnItemViewModel : ViewModelBase
     private readonly ISoundService? _soundService;
 
     public int ProductId { get; }
-    public string ProductCode { get; }
     public string ProductName { get; }
     public decimal OriginalQuantity { get; }
     public decimal UnitPrice { get; }
@@ -718,7 +708,6 @@ public class SalesReturnItemViewModel : ViewModelBase
     public SalesReturnItemViewModel(SalesInvoiceItemDto item, ISoundService? soundService = null)
     {
         ProductId = item.ProductId;
-        ProductCode = item.ProductCode ?? string.Empty;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitPrice;
@@ -731,7 +720,6 @@ public class SalesReturnItemViewModel : ViewModelBase
     public SalesReturnItemViewModel(SalesReturnItemDto item, ISoundService? soundService = null)
     {
         ProductId = item.ProductId;
-        ProductCode = item.ProductCode ?? string.Empty;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity; // In case of viewing, we might need a different property but for simplicity
         UnitPrice = item.UnitPrice;

@@ -51,6 +51,18 @@ Quality assurance and test automation specialist for the SalesSystem.
 - `IncreaseBalance_PositiveAmount_IncreasesCustomerDebt`
 - `DecreaseBalance_PositiveAmount_DecreasesCustomerDebt`
 
+### Hard Delete Safety
+- `PermanentDelete_ReferencedByInvoice_ReturnsFailureWithArabicMessage`
+- `PermanentDelete_ReferencedByTransaction_ReturnsFailureWithArabicMessage`
+- `PermanentDelete_ReferencedByOtherEntity_ReturnsFailureWithArabicMessage`
+
+### LogSystemError
+- `LogSystemError_WithException_CallsSerilogError`
+- `LogSystemError_WithoutException_LogsMessageOnly`
+- `HandleException_HttpRequestException_ReturnsArabicMessage`
+- `HandleException_TaskCanceledException_ReturnsTimeoutMessage`
+- `ExecuteAsync_WhenException_CaughtAndLogged`
+
 ## Rules
 - Use Fluent API ONLY in test configurations (no DataAnnotations)
 - Use `decimal` for all money/quantity assertions — NEVER float/double

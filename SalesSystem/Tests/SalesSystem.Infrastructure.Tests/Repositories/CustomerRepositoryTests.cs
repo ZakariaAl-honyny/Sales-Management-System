@@ -114,7 +114,6 @@ public class CustomerRepositoryTests
         // Act
         customer.Update(
             name: "Updated Name",
-            code: "C001",
             phone: "9876543210",
             email: "updated@test.com",
             address: "New Address",
@@ -129,7 +128,6 @@ public class CustomerRepositoryTests
         var updated = await context.Customers.FirstOrDefaultAsync(c => c.Id == customer.Id);
         updated.Should().NotBeNull();
         updated!.Name.Should().Be("Updated Name");
-        updated.Code.Should().Be("C001");
     }
 
     [Fact]

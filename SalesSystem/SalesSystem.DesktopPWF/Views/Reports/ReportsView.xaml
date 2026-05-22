@@ -55,19 +55,19 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding GenerateReportCommand}" Style="{StaticResource PrimaryButton}" Height="36" Padding="20,0" TabIndex="4">
+                    <Button Command="{Binding GenerateReportCommand}" Style="{StaticResource PrimaryButton}" Height="36" Padding="20,0" TabIndex="4" ToolTip="توليد التقرير حسب المعايير المحددة">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="⚙️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="توليد التقرير" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     <Menu Background="Transparent" Margin="12,0,0,0">
-                        <MenuItem Header="📁 تصدير" Padding="12,4" Height="36" Background="#F1F5F9" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                        <MenuItem Header="📁 تصدير" ToolTip="تصدير التقرير" Padding="12,4" Height="36" Background="#F1F5F9" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
                             <MenuItem.Icon>
                                 <TextBlock Text="📤" VerticalAlignment="Center"/>
                             </MenuItem.Icon>
-                            <MenuItem Header="Excel (.xlsx)" Command="{Binding ExportExcelCommand}"/>
-                            <MenuItem Header="CSV (.csv)" Command="{Binding ExportCsvCommand}"/>
+                            <MenuItem Header="Excel (.xlsx)" ToolTip="تصدير إلى ملف Excel" Command="{Binding ExportExcelCommand}"/>
+                            <MenuItem Header="CSV (.csv)" ToolTip="تصدير إلى ملف CSV" Command="{Binding ExportCsvCommand}"/>
                         </MenuItem>
                     </Menu>
                 </StackPanel>

@@ -358,7 +358,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
             {
                 IsLoading = false;
                 ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "SalesInvoiceListViewModel.PostInvoiceAsync", $"[SalesInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm sales invoice ID {SelectedInvoice.Id}.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -397,7 +397,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
             {
                 IsLoading = false;
                 ErrorMessage = HandleFailure(cancelResult.Error ?? "فشل في إلغاء الفاتورة", "SalesInvoiceListViewModel.CancelInvoiceAsync", $"[SalesInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel sales invoice ID {SelectedInvoice.Id}.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
         }
         catch (Exception ex)

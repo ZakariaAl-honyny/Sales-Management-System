@@ -1,5 +1,4 @@
 using SalesSystem.DesktopPWF.Messaging.Messages;
-using System.Windows;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -16,9 +15,9 @@ public class CustomerEditorViewModel : ViewModelBase
 {
     private readonly ICustomerApiService _customerService;
     private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
 
     private int _customerId;
-    private string _code = string.Empty;
     private string _name = string.Empty;
     private string _phone = string.Empty;
     private string _email = string.Empty;
@@ -34,29 +33,29 @@ public class CustomerEditorViewModel : ViewModelBase
 
 
     public CustomerEditorViewModel()
-        : this(App.GetService<ICustomerApiService>(), App.GetService<IEventBus>())
+        : this(App.GetService<ICustomerApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
     {
     }
 
-    public CustomerEditorViewModel(ICustomerApiService customerService, IEventBus eventBus)
+    public CustomerEditorViewModel(ICustomerApiService customerService, IEventBus eventBus, IDialogService dialogService)
     {
         _customerService = customerService;
         _eventBus = eventBus;
+        _dialogService = dialogService;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         CancelCommand = new RelayCommand(Cancel);
     }
 
     public CustomerEditorViewModel(CustomerDto customer)
-        : this(customer, App.GetService<ICustomerApiService>(), App.GetService<IEventBus>())
+        : this(customer, App.GetService<ICustomerApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
     {
     }
 
-    public CustomerEditorViewModel(CustomerDto customer, ICustomerApiService customerService, IEventBus eventBus)
-        : this(customerService, eventBus)
+    public CustomerEditorViewModel(CustomerDto customer, ICustomerApiService customerService, IEventBus eventBus, IDialogService dialogService)
+        : this(customerService, eventBus, dialogService)
     {
         _customerId = customer.Id;
-        _code = customer.Code ?? string.Empty;
         _name = customer.Name;
         _phone = customer.Phone ?? string.Empty;
         _email = customer.Email ?? string.Empty;
@@ -75,12 +74,6 @@ public class CustomerEditorViewModel : ViewModelBase
     {
         get => _isEditMode;
         set => SetProperty(ref _isEditMode, value);
-    }
-
-    public string Code
-    {
-        get => _code;
-        set => SetProperty(ref _code, value);
     }
 
     public string Name
@@ -214,8 +207,8 @@ public class CustomerEditorViewModel : ViewModelBase
             if (HasCreditLimitError) errors.Add("• " + CreditLimitError);
             if (HasOpeningBalanceError) errors.Add("• " + OpeningBalanceError);
             
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            System.Windows.MessageBox.Show(errorMsg, "بيانات غير مكتملة", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return;
         }
 
@@ -230,7 +223,6 @@ public class CustomerEditorViewModel : ViewModelBase
             {
                 var updateRequest = new UpdateCustomerRequest(
                     Name,
-                    string.IsNullOrWhiteSpace(Code) ? null : Code,
                     string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                     string.IsNullOrWhiteSpace(Email) ? null : Email,
                     string.IsNullOrWhiteSpace(Address) ? null : Address,
@@ -244,7 +236,6 @@ public class CustomerEditorViewModel : ViewModelBase
             {
                 var createRequest = new CreateCustomerRequest(
                     Name,
-                    string.IsNullOrWhiteSpace(Code) ? null : Code,
                     string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                     string.IsNullOrWhiteSpace(Email) ? null : Email,
                     string.IsNullOrWhiteSpace(Address) ? null : Address,
@@ -260,24 +251,20 @@ public class CustomerEditorViewModel : ViewModelBase
                 // Publish event to notify other modules
                 _eventBus.Publish(new CustomerChangedMessage(result.Value.Id));
 
-                System.Windows.MessageBox.Show(
-                    IsEditMode ? "تم تحديث العميل بنجاح" : "تم إضافة العميل بنجاح",
-                    "نجاح",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث العميل بنجاح" : "تم إضافة العميل بنجاح");
 
                 RequestClose();
             }
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ العميل", "CustomerEditorViewModel.SaveAsync", "[CustomerEditorViewModel.SaveAsync] Failed to save customer.");
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ في الحفظ", MessageBoxButton.OK, MessageBoxImage.Error);
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "CustomerEditorViewModel.SaveAsync", "[CustomerEditorViewModel.SaveAsync] Failed to save customer.");
-            System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
         }
         finally
         {

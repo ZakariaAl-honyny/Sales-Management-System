@@ -309,7 +309,7 @@ public class LoginWindowViewModelTests
         await Task.Delay(100);
 
         _viewModel.ErrorMessage.Should().NotBeNull();
-        _viewModel.ErrorMessage.Should().Contain("خطأ");
+        _viewModel.ErrorMessage.Should().Contain("فشل");
     }
 
     [Fact]

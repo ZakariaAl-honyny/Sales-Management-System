@@ -98,7 +98,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
                 It.IsAny<int>(),
                 It.IsAny<int>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SalesInvoiceDto>>.Failure("فشل في الاتصال"));
+            .ReturnsAsync(Result<List<SalesInvoiceDto>>.Failure("فشل في تحميل الفواتير"));
 
         await _viewModel.LoadInvoicesAsync();
 

@@ -1,3 +1,4 @@
+#nullable disable
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
@@ -13,8 +14,8 @@ namespace SalesSystem.E2ETests;
 [Collection("E2E")]
 public class SalesInvoiceTests : TestBase, IDisposable
 {
-    private Window? _mainWindow;
-    private Window? _invoiceEditorWindow;
+    private Window _mainWindow = null!;
+    private Window _invoiceEditorWindow = null!;
     private bool _disposed;
 
     public SalesInvoiceTests()

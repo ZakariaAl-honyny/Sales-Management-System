@@ -74,14 +74,14 @@ public class StockTransferEditorViewModel : ViewModelBase
 
         AddItemCommand = new RelayCommand(_ => OnAddItem());
         RemoveItemCommand = new RelayCommand(p => OnRemoveItem(p as TransferItemViewModel));
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsLoading && !_isReadOnly && Items.Count > 0 && Status == InvoiceStatus.Draft);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
         CancelCommand = new RelayCommand(_ => OnCancel());
-        PostCommand = new AsyncRelayCommand(PostAsync, () => CanPost);
-        CancelTransferCommand = new AsyncRelayCommand(CancelTransferAsync, () => CanCancelTransfer);
+        PostCommand = new AsyncRelayCommand(PostAsync);
+        CancelTransferCommand = new AsyncRelayCommand(CancelTransferAsync);
         SearchProductCommand = new RelayCommand(SearchProduct);
         SearchProductSingleCommand = new RelayCommand(SearchProductSingle);
         QuickAddProductCommand = new AsyncRelayCommand(QuickAddProductAsync);
-        PrintA4Command = new AsyncRelayCommand(PrintA4Async, () => _transferId.HasValue);
+        PrintA4Command = new AsyncRelayCommand(PrintA4Async);
 
         InitializeAsync();
     }
@@ -140,13 +140,7 @@ public class StockTransferEditorViewModel : ViewModelBase
     public bool IsLoading
     {
         get => _isLoading;
-        set
-        {
-            if (SetProperty(ref _isLoading, value))
-            {
-                UpdateCommandStates();
-            }
-        }
+        set => SetProperty(ref _isLoading, value);
     }
 
     public string QuickSearchText
@@ -188,15 +182,7 @@ public class StockTransferEditorViewModel : ViewModelBase
     public InvoiceStatus Status
     {
         get => _status;
-        set
-        {
-            if (SetProperty(ref _status, value))
-            {
-                OnPropertyChanged(nameof(CanPost));
-                OnPropertyChanged(nameof(CanCancelTransfer));
-                UpdateCommandStates();
-            }
-        }
+        set => SetProperty(ref _status, value);
     }
 
     public ICommand AddItemCommand { get; }
@@ -209,9 +195,6 @@ public class StockTransferEditorViewModel : ViewModelBase
     public ICommand SearchProductSingleCommand { get; }
     public ICommand QuickAddProductCommand { get; }
     public ICommand PrintA4Command { get; }
-
-    public bool CanPost => Status == InvoiceStatus.Draft && _transferId.HasValue && !IsLoading;
-    public bool CanCancelTransfer => Status != InvoiceStatus.Cancelled && _transferId.HasValue && !IsLoading;
 
     public async Task HandleBarcodeInput(Key key, string? keyText = null)
     {
@@ -285,7 +268,6 @@ public class StockTransferEditorViewModel : ViewModelBase
                         Mode = item.Mode
                     });
                 }
-                UpdateCommandStates();
             }
             else
             {
@@ -320,7 +302,6 @@ public class StockTransferEditorViewModel : ViewModelBase
             }
         };
         Items.Add(item);
-        UpdateCommandStates();
     }
 
     private void OnRemoveItem(TransferItemViewModel? item)
@@ -328,7 +309,6 @@ public class StockTransferEditorViewModel : ViewModelBase
         if (item != null)
         {
             Items.Remove(item);
-            UpdateCommandStates();
         }
     }
 
@@ -342,7 +322,6 @@ public class StockTransferEditorViewModel : ViewModelBase
         // Find product by barcode or code or name locally first
         var product = Products.FirstOrDefault(p => 
             p.Barcode == searchText || 
-            p.Code == searchText || 
             p.Name.Equals(searchText, StringComparison.OrdinalIgnoreCase));
 
         if (product == null)
@@ -392,7 +371,6 @@ public class StockTransferEditorViewModel : ViewModelBase
                 });
             }
             _soundService.PlaySuccess();
-            UpdateCommandStates();
         }
         else
         {
@@ -448,7 +426,6 @@ public class StockTransferEditorViewModel : ViewModelBase
                 });
             }
             _soundService.PlaySuccess();
-            UpdateCommandStates();
         };
 
         _dialogService.ShowDialog(vm);
@@ -527,20 +504,11 @@ public class StockTransferEditorViewModel : ViewModelBase
                     _soundService.PlaySuccess();
                 }
             }
-            UpdateCommandStates();
 
             System.Windows.Application.Current.Dispatcher.Invoke(() => vm.CloseDialog());
         };
 
         _dialogService.ShowDialog(vm);
-    }
-
-    private void UpdateCommandStates()
-    {
-        (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PostCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (CancelTransferCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintA4Command as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private async Task SaveAsync()
@@ -567,8 +535,8 @@ public class StockTransferEditorViewModel : ViewModelBase
 
         if (errors.Any())
         {
-            string errorMsg = "يرجى إكمال وتصحيح البيانات التالية:\n\n" + string.Join("\n", errors);
-            await _dialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return;
         }
 
@@ -613,7 +581,6 @@ public class StockTransferEditorViewModel : ViewModelBase
                 Status = (InvoiceStatus)result.Value.Status;
                 _eventBus.Publish(new StockTransferChangedMessage(_transferId.Value));
                 
-                UpdateCommandStates();
                 OnPropertyChanged(nameof(IsEdit));
                 OnPropertyChanged(nameof(WindowTitle));
                 
@@ -622,13 +589,13 @@ public class StockTransferEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "StockTransferEditorViewModel.SaveAsync", "[StockTransferEditorViewModel.SaveAsync] Failed to save stock transfer.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في حفظ التحويل", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.SaveAsync", "[StockTransferEditorViewModel.SaveAsync] Failed to save stock transfer.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في حفظ التحويل", ErrorMessage);
         }
         finally
         {
@@ -660,13 +627,13 @@ public class StockTransferEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "StockTransferEditorViewModel.PostAsync", "[StockTransferEditorViewModel.PostAsync] Failed to post stock transfer.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.PostAsync", "[StockTransferEditorViewModel.PostAsync] Failed to post stock transfer.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
         }
         finally
         {
@@ -693,13 +660,13 @@ public class StockTransferEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "StockTransferEditorViewModel.CancelTransferAsync", "[StockTransferEditorViewModel.CancelTransferAsync] Failed to cancel stock transfer.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.CancelTransferAsync", "[StockTransferEditorViewModel.CancelTransferAsync] Failed to cancel stock transfer.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
         }
         finally
         {
@@ -730,7 +697,7 @@ public class StockTransferEditorViewModel : ViewModelBase
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.PrintA4Async", "[StockTransferEditorViewModel.PrintA4Async] Failed to prepare print.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في الطباعة", ErrorMessage);
         }
         finally
         {

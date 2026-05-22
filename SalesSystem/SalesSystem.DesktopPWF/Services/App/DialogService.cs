@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Windows;
 using SalesSystem.DesktopPWF.Views.Dialogs;
 
@@ -16,6 +17,7 @@ public interface IDialogService
     Task ShowWarningAsync(string title, string message);
     Task<bool> ShowConfirmationAsync(string title, string message);
     Task<DeleteStrategy> ShowDeleteConfirmationAsync(string itemDescription);
+    Task ShowValidationErrorsAsync(string title, List<string> errors);
 }
 
 public class DialogService : IDialogService
@@ -161,6 +163,16 @@ public Task<bool> ShowConfirmationAsync(string title, string message)
             dialog.Owner = System.Windows.Application.Current.MainWindow;
             dialog.ShowDialog();
             return dialog.Confirmed;
+        }).Task;
+    }
+
+    public Task ShowValidationErrorsAsync(string title, List<string> errors)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new ValidationErrorsDialog(title, errors);
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.ShowDialog();
         }).Task;
     }
 

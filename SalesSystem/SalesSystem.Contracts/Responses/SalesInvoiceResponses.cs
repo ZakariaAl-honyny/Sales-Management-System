@@ -16,6 +16,6 @@ public record SalesInvoiceResponse(
 );
 
 public record SalesInvoiceItemResponse(
-    int Id, int ProductId, string ProductName, string ProductCode,
+    int Id, int ProductId, string ProductName,
     decimal Quantity, decimal UnitPrice, decimal DiscountAmount, decimal LineTotal
 );

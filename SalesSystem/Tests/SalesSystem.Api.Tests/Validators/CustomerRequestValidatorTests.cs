@@ -130,43 +130,6 @@ public class CreateCustomerRequestValidatorTests
 
     #endregion
 
-    #region Code Validation
-
-    [Theory]
-    [InlineData(null, true)]
-    [InlineData("", true)]
-    [InlineData("CUST001", true)]
-    [InlineData("كود123", true)]
-    public void GivenCode_WhenValidating_ThenCorrectResult(string? code, bool isValid)
-    {
-        // Arrange
-        var request = CreateValidRequest() with { Code = code };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        if (isValid)
-            result.ShouldNotHaveValidationErrorFor(x => x.Code);
-    }
-
-    [Fact]
-    public void GivenCodeExceeds30Chars_WhenValidating_ThenFailsWithMaxLengthError()
-    {
-        // Arrange
-        var longCode = new string('C', 31);
-        var request = CreateValidRequest() with { Code = longCode };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Code)
-            .WithErrorMessage("كود العميل لا يمكن أن يتجاوز 30 حرف");
-    }
-
-    #endregion
-
     #region Arabic Text Handling
 
     [Fact]
@@ -189,7 +152,6 @@ public class CreateCustomerRequestValidatorTests
         var request = CreateValidRequest() with
         {
             Name = "Customer Name - اسم",
-            Code = "C001-كود",
             Phone = "+201234567890"
         };
 
@@ -221,7 +183,6 @@ public class CreateCustomerRequestValidatorTests
 
     private static CreateCustomerRequest CreateValidRequest() => new(
         Name: "Valid Customer",
-        Code: "CUST001",
         Phone: "01234567890",
         Email: "customer@example.com",
         Address: "Test Address",
@@ -352,25 +313,6 @@ public class UpdateCustomerRequestValidatorTests
 
     #endregion
 
-    #region Code Validation
-
-    [Fact]
-    public void GivenCodeExceeds30Chars_WhenValidating_ThenFailsWithMaxLengthError()
-    {
-        // Arrange
-        var longCode = new string('C', 31);
-        var request = CreateValidRequest() with { Code = longCode };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Code)
-            .WithErrorMessage("كود العميل لا يمكن أن يتجاوز 30 حرف");
-    }
-
-    #endregion
-
     #region Arabic Text Handling - Update
 
     [Theory]
@@ -412,7 +354,6 @@ public class UpdateCustomerRequestValidatorTests
         var request = CreateValidRequest() with
         {
             Name = "Customer Updated - اسم",
-            Code = "C001-كود",
             Phone = "+201234567890"
         };
 
@@ -444,7 +385,6 @@ public class UpdateCustomerRequestValidatorTests
 
     private static UpdateCustomerRequest CreateValidRequest() => new(
         Name: "Updated Customer",
-        Code: "CUST001",
         Phone: "01234567890",
         Email: "updated@example.com",
         Address: "Updated Address",

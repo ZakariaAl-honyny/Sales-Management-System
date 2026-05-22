@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.ViewModels.Sales;
 
 namespace SalesSystem.DesktopPWF.Views.Sales;
@@ -18,6 +19,14 @@ public partial class SalesInvoiceEditorView : Window
     {
         DataContext = viewModel;
         IsReadOnly = viewModel.IsReadOnly;
+
+        viewModel.FocusFirstInvalidFieldRequested += () =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                Helpers.ValidationFocusBehavior.FindFirstInvalid(this)?.Focus();
+            });
+        };
     }       
 
     public bool IsReadOnly

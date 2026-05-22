@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
-using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
@@ -104,7 +103,6 @@ public class WarehouseServiceTests : IDisposable
         var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest
         {
             Name = "New Warehouse",
-            Code = "W001",
             Location = "Building A",
             IsDefault = false
         };
@@ -113,7 +111,6 @@ public class WarehouseServiceTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("New Warehouse");
-        result.Value.Code.Should().Be("W001");
 
         _output.WriteLine("[PASS] CreateAsync creates warehouse correctly");
     }
@@ -145,29 +142,6 @@ public class WarehouseServiceTests : IDisposable
         _output.WriteLine("[PASS] Creating new default warehouse unsets old defaults");
     }
 
-    [Fact]
-    public async Task CreateAsync_DuplicateCode_ReturnsFailure()
-    {
-        _output.WriteLine("[TEST] CreateAsync_DuplicateCode_ReturnsFailure");
-
-        var existing = Warehouse.Create("Existing Warehouse", false, code: "W001");
-        _dbContext.Warehouses.Add(existing);
-        await _dbContext.SaveChangesAsync();
-
-        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest
-        {
-            Name = "New Warehouse",
-            Code = "W001" // Duplicate
-        };
-
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("كود المخزن مستخدم بالفعل");
-
-        _output.WriteLine("[PASS] Duplicate code returns failure");
-    }
-
     #endregion
 
     #region UpdateAsync Tests
@@ -177,14 +151,13 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesWarehouse");
 
-        var warehouse = Warehouse.Create("Original Warehouse", false, code: "W001");
+        var warehouse = Warehouse.Create("Original Warehouse", isDefault: false);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
         var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest
         {
             Name = "Updated Warehouse",
-            Code = null,
             Location = "New Location",
             IsDefault = false,
             IsActive = true

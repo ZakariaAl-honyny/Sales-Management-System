@@ -98,7 +98,6 @@ public class PurchaseService : IPurchaseService
                 (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
                 i.Items.Any(item => 
                     item.Product.Name.ToLower().Contains(searchLower) ||
-                    item.Product.Code.ToLower().Contains(searchLower) ||
                     item.Product.Barcode.ToLower().Contains(searchLower))
             );
         }
@@ -422,7 +421,6 @@ return await _uow.ExecuteAsync(async () =>
             i.Items.Select(it => new PurchaseInvoiceItemDto(
                 it.Id,
                 it.ProductId,
-                it.Product?.Code,
                 it.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 it.UnitCost,

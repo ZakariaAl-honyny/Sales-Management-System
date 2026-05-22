@@ -62,7 +62,8 @@
 
                 <!-- Actions Section -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding SearchInvoiceForReturnCommand}" Style="{StaticResource PrimaryButton}" Height="36" Padding="16,0">
+                    <Button Command="{Binding SearchInvoiceForReturnCommand}" Style="{StaticResource PrimaryButton}" Height="36" Padding="16,0"
+                            ToolTip="البحث في البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="بحث" VerticalAlignment="Center"/>
@@ -75,14 +76,16 @@
                                Margin="20,0,20,0"
                                FontSize="12"/>
 
-                    <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,8,0" Height="36" Padding="16,0">
+                    <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
+                            ToolTip="فتح شاشة إنشاء مرتجع جديد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="مرتجع جديد" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0">
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0"
+                            ToolTip="تحديث قائمة البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -112,7 +115,8 @@
                         Command="{Binding RefreshCommand}" 
                         Background="Transparent" BorderThickness="0" 
                         Foreground="{StaticResource ErrorTextBrush}"
-                        VerticalAlignment="Center"/>
+                        VerticalAlignment="Center"
+                        ToolTip="إخفاء رسالة الخطأ"/>
             </Grid>
         </Border>
 
@@ -220,7 +224,8 @@
                         <TextBlock Text="🔄" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
                         <TextBlock Text="لا توجد مرتجعات مبيعات حالياً" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                         <TextBlock Text="سجل عمليات استرجاع المنتجات من العملاء لإدارتها هنا" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة مرتجع جديد" Command="{Binding NewCommand}" Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" Width="160" Height="36"/>
+                        <Button Content="➕ إضافة مرتجع جديد" Command="{Binding NewCommand}" Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" Width="160" Height="36"
+                                ToolTip="إنشاء مرتجع جديد"/>
                     </StackPanel>
                 </Grid>
             </Grid>

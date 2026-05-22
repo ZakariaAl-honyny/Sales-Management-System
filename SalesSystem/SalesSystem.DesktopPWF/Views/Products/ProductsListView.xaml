@@ -69,14 +69,16 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,8,0" Height="36" Padding="16,0">
+                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
+                            ToolTip="فتح شاشة إضافة منتج جديد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="منتج جديد" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Height="36" Padding="16,0">
+                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
+                            ToolTip="تعديل العنصر المحدد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="✏️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="تعديل" VerticalAlignment="Center"/>
@@ -84,7 +86,8 @@
                     </Button>
 
                     <Button Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
-                            Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}">
+                            Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}"
+                            ToolTip="حذف أو إلغاء تنشيط العنصر المحدد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🗑️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="حذف" VerticalAlignment="Center"/>
@@ -92,14 +95,16 @@
                     </Button>
 
                     <Button Command="{Binding RestoreCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
-                            Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}">
+                            Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}"
+                            ToolTip="استعادة العنصر المحذوف">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="♻️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="استعادة" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
 
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0">
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0"
+                            ToolTip="تحديث قائمة البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -237,7 +242,8 @@
                         <TextBlock Text="📦" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
                         <TextBlock Text="لا توجد منتجات حالياً" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                         <TextBlock Text="ابدأ بإضافة منتجاتك وتعريف الأصناف للبدء في عمليات البيع والمخزون" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة أول منتج" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" Width="160" Height="36"/>
+                        <Button Content="➕ إضافة أول منتج" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" Width="160" Height="36"
+                                ToolTip="فتح شاشة إضافة منتج جديد"/>
                     </StackPanel>
                 </Grid>
             </Grid>

@@ -196,10 +196,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<string>("Code")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -245,10 +241,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[Code] IS NOT NULL");
 
                     b.ToTable("Customers", (string)null);
                 });
@@ -455,10 +447,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Code")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<decimal>("ConversionFactor")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(18, 3)
@@ -532,10 +520,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasFilter("[Barcode] IS NOT NULL");
 
                     b.HasIndex("CategoryId");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[Code] IS NOT NULL");
 
                     b.HasIndex("RetailUnitId");
 
@@ -1470,10 +1454,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<string>("Code")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1519,10 +1499,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[Code] IS NOT NULL");
 
                     b.ToTable("Suppliers", (string)null);
                 });
@@ -1855,10 +1831,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Code")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1887,10 +1859,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[Code] IS NOT NULL");
 
                     b.ToTable("Warehouses", (string)null);
                 });

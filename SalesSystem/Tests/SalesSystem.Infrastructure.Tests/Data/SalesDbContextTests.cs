@@ -66,7 +66,6 @@ public class SalesDbContextTests
         // Act
         customer.Update(
             name: "Updated Name",
-            code: null,
             phone: "9876543210",
             email: "test@test.com",
             address: null,

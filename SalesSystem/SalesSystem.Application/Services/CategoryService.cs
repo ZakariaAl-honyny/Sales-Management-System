@@ -60,7 +60,7 @@ public class CategoryService : ICategoryService
         try
         {
             if (await _uow.Categories.Query().AnyAsync(c => c.Name == request.Name, ct))
-                return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", ErrorCodes.DuplicateCode);
+                return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", "DUPLICATE_CATEGORY_NAME");
 
             var category = Category.Create(request.Name, request.Description, null);
 
@@ -91,7 +91,7 @@ public class CategoryService : ICategoryService
                 return Result<CategoryDto>.Failure("الفئة غير موجودة", ErrorCodes.NotFound);
 
             if (await _uow.Categories.Query().AnyAsync(c => c.Name == request.Name && c.Id != id, ct))
-                return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", ErrorCodes.DuplicateCode);
+                return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", "DUPLICATE_CATEGORY_NAME");
 
             category.Update(request.Name, request.Description, null);
 
@@ -141,11 +141,20 @@ public class CategoryService : ICategoryService
         if (await _uow.Products.Query().AnyAsync(p => p.CategoryId == id, ct))
             return Result.Failure("لا يمكن حذف الفئة نهائياً لأنها مرتبطة بمنتجات");
 
-        await _uow.Categories.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        try
+        {
+            await _uow.Categories.HardDeleteAsync(id, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Category permanently deleted: {CategoryId}", id);
-        return Result.Success();
+            _logger.LogInformation("Category permanently deleted: {CategoryId}", id);
+            return Result.Success();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Failed to permanently delete category {CategoryId} due to database constraint", id);
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            return Result.Failure($"لا يمكن حذف الفئة نهائياً. قد تكون مرتبطة ببيانات أخرى في النظام. ({innerMessage})");
+        }
     }
 
     private static CategoryDto MapToDto(Category c)

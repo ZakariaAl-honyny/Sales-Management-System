@@ -15,6 +15,7 @@ public partial class MainWindow : Window
 {
     private readonly ISessionService _session;
     private readonly IDialogService _dialogService;
+    private bool _isLoggingOut;
 
     public MainWindow()
     {
@@ -25,6 +26,12 @@ public partial class MainWindow : Window
         UpdateUserInfo();
         ApplyPermissions();
         NavigateTo("Dashboard");
+
+        Closed += (s, e) =>
+        {
+            if (!_isLoggingOut)
+                System.Windows.Application.Current.Shutdown();
+        };
     }
 
     private void UpdateUserInfo()
@@ -157,21 +164,22 @@ public partial class MainWindow : Window
             var updaterService = App.GetService<IUpdaterService>();
             IsEnabled = false;
 
-            var result = await updaterService.CheckForUpdatesAsync();
+            var checkResult = await updaterService.CheckForUpdatesAsync();
 
-            if (!result.IsSuccess)
+            if (!checkResult.IsSuccess)
             {
-                _ = _dialogService.ShowErrorAsync("خطأ", $"تعذر الاتصال بخادم التحديثات.\n{result.Error}");
+                _ = _dialogService.ShowErrorAsync("خطأ", $"تعذر الاتصال بخادم التحديثات.\n{checkResult.Error}");
                 return;
             }
 
-            if (!result.Value.UpdateAvailable || result.Value.UpdateInfo == null)
+            var value = checkResult.Value;
+            if (value == null || !value.UpdateAvailable || value.UpdateInfo == null)
             {
                 _ = _dialogService.ShowSuccessAsync("تحديث", $"برنامجك محدّث!\nتعمل على أحدث إصدار: {updaterService.GetCurrentVersion().Value}");
                 return;
             }
 
-            var vm = new UpdateDialogViewModel(updaterService, result.Value.UpdateInfo);
+            var vm = new UpdateDialogViewModel(updaterService, value.UpdateInfo);
             var dialog = new UpdateDialog(vm) { Owner = this };
             dialog.ShowDialog();
         }
@@ -191,6 +199,7 @@ public partial class MainWindow : Window
         var confirmed = await _dialogService.ShowConfirmationAsync("تسجيل الخروج", "هل أنت متأكد من تسجيل الخروج؟");
         if (confirmed)
         {
+            _isLoggingOut = true;
             _session.ClearSession();
             var loginWindow = new LoginWindow();
             loginWindow.Show();

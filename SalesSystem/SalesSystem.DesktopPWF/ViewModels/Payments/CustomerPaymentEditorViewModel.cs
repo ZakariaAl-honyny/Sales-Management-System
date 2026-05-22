@@ -199,8 +199,9 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            LogSystemError($"Failed to load customer payment {_paymentId}", "CustomerPaymentEditorViewModel.LoadPaymentAsync", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء تحميل بيانات السداد";
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage);
         }
         finally
         {
@@ -216,8 +217,8 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
 
         if (errors.Any())
         {
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            await _dialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return;
         }
 
@@ -259,13 +260,13 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "CustomerPaymentEditorViewModel.SaveAsync", "[CustomerPaymentEditorViewModel.SaveAsync] Failed to save customer payment.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "CustomerPaymentEditorViewModel.SaveAsync", "[CustomerPaymentEditorViewModel.SaveAsync] Failed to save customer payment.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
         }
         finally
         {
@@ -295,7 +296,8 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+            LogSystemError($"Failed to print customer payment {_paymentId}", "CustomerPaymentEditorViewModel.OnPrint", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
         }
         finally
         {

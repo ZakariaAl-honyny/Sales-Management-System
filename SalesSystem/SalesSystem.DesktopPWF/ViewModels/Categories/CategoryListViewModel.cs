@@ -249,13 +249,15 @@ public async Task DeleteCategoryAsync()
                 }
                 else
                 {
-                    ErrorMessage = deleteResult.Error ?? "فشل في حذف التصنيف";
+                    var error = deleteResult.Error ?? "فشل في حذف التصنيف";
+                    ErrorMessage = error;
+                    LogSystemError($"Hard delete failed for Category {SelectedCategory.Id}: {error}", "CategoryListViewModel.DeleteCategoryAsync");
                 }
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
             HandleException(ex, "CategoryListViewModel.DeleteCategoryAsync", $"[CategoryListViewModel.DeleteCategoryAsync] Failed to delete category with ID {SelectedCategory?.Id}.");
         }
         finally
@@ -294,7 +296,7 @@ public async Task DeleteCategoryAsync()
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            ErrorMessage = "حدث خطأ غير متوقع أثناء استعادة التصنيف";
             HandleException(ex, "CategoryListViewModel.RestoreCategoryAsync", $"[CategoryListViewModel.RestoreCategoryAsync] Failed to restore category with ID {SelectedCategory?.Id}.");
         }
 finally

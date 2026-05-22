@@ -289,7 +289,6 @@ public class SalesReturnService : ISalesReturnService
             r.Items.Select(it => new SalesReturnItemDto(
                 it.Id,
                 it.ProductId,
-                it.Product?.Code,
                 it.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 it.UnitPrice,

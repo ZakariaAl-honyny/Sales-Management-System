@@ -1,0 +1,92 @@
+<Window x:Class="SalesSystem.DesktopPWF.Views.Dialogs.ValidationErrorsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        FlowDirection="RightToLeft">
+
+    <Grid>
+        <Rectangle Fill="#80000000"/>
+
+        <Border VerticalAlignment="Center" HorizontalAlignment="Center"
+                Background="White" CornerRadius="16" 
+                Width="480" MinHeight="260" MaxHeight="500" Padding="28"
+                Effect="{StaticResource DeepShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                    <Border Background="#FFF3E0" CornerRadius="25" Width="50" Height="50">
+                        <TextBlock Text="&#9888;" FontSize="24" FontWeight="Bold" Foreground="#F57C00"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                        <TextBlock x:Name="TitleText" Text="بيانات غير مكتملة" FontSize="18" 
+                                   FontWeight="Bold" Foreground="#E65100"/>
+                        <TextBlock Text="يرجى مراجعة البيانات التالية:" FontSize="13" 
+                                   Foreground="#777" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- قائمة الأخطاء النقطية -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,0,8">
+                    <ItemsControl x:Name="ErrorsList" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="•" FontSize="16" 
+                                               FontWeight="Bold" Foreground="#D32F2F"
+                                               Margin="0,0,8,0" VerticalAlignment="Top"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding}" 
+                                               TextWrapping="Wrap" FontSize="14" 
+                                               Foreground="#333" LineHeight="22"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Close button -->
+                <Button x:Name="OkButton" Grid.Row="2" Content="حسناً" 
+                        Width="120" Height="38"
+                        HorizontalAlignment="Center" Margin="0,12,0,0"
+                        Background="#F57C00" Foreground="White" FontWeight="SemiBold"
+                        BorderThickness="0" Cursor="Hand" IsDefault="True"
+                        Click="OkButton_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Border" Background="{TemplateBinding Background}" 
+                                    CornerRadius="8" Padding="14,8">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="#E67E22"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="#D35400"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
