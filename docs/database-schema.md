@@ -1,5 +1,5 @@
 # Database Schema Design
-# Sales Management System — v4.3 (Dynamic UOM + Costing + Cash Boxes)
+# Sales Management System — v4.5.3 (Identifier Strategy Complete — No Code Columns)
 # Platform: SQL Server 2019+
 # 30+ Tables | decimal-only financials | nvarchar text | Soft delete
 
@@ -79,7 +79,6 @@ Default schema: **`dbo`**
 ## D) Products
 ### Columns
 - `Id` int PK
-- `Code` nvarchar(30) null unique
 - `Barcode` nvarchar(50) null unique (legacy — prefer UnitBarcodes)
 - `Name` nvarchar(150) not null
 - `CategoryId` int null FK
@@ -96,6 +95,7 @@ Default schema: **`dbo`**
 
 > **v4.3 Change:** Pricing (RetailPrice, WholesalePrice) and ConversionFactor moved to `ProductUnits` table.
 > Barcodes moved to `UnitBarcodes` table (one per product-unit combination).
+> **v4.5.3 Change:** `Code` column removed — use auto-increment `Id` as sole identifier.
 
 ## D2) ProductUnits (v4.3 — Dynamic Unit of Measure)
 ### Columns
@@ -131,7 +131,6 @@ Default schema: **`dbo`**
 ## E) Warehouses
 ### Columns
 - `Id` int PK
-- `Code` nvarchar(30) null unique
 - `Name` nvarchar(100) not null
 - `Location` nvarchar(250) null
 - `IsDefault` bit not null default 0
@@ -140,6 +139,8 @@ Default schema: **`dbo`**
 - `IsActive` bit not null default 1
 - `CreatedAt` datetime2 not null
 - `UpdatedAt` datetime2 null
+
+> **v4.5.3 Change:** `Code` column removed — use auto-increment `Id` as sole identifier.
 
 ---
 
@@ -165,7 +166,6 @@ Default schema: **`dbo`**
 ## G) Suppliers
 ### Columns
 - `Id` int PK
-- `Code` nvarchar(30) null unique
 - `Name` nvarchar(150) not null
 - `Phone` nvarchar(20) null
 - `Email` nvarchar(100) null
@@ -177,13 +177,14 @@ Default schema: **`dbo`**
 - `IsActive` bit not null default 1
 - `CreatedAt` datetime2 not null
 - `UpdatedAt` datetime2 null
+
+> **v4.5.3 Change:** `Code` column removed — use auto-increment `Id` as sole identifier.
 
 ---
 
 ## H) Customers
 ### Columns
 - `Id` int PK
-- `Code` nvarchar(30) null unique
 - `Name` nvarchar(150) not null
 - `Phone` nvarchar(20) null
 - `Email` nvarchar(100) null
@@ -195,6 +196,8 @@ Default schema: **`dbo`**
 - `IsActive` bit not null default 1
 - `CreatedAt` datetime2 not null
 - `UpdatedAt` datetime2 null
+
+> **v4.5.3 Change:** `Code` column removed — use auto-increment `Id` as sole identifier.
 
 ---
 
@@ -611,7 +614,6 @@ CREATE TABLE dbo.Categories
 CREATE TABLE dbo.Warehouses
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Warehouses PRIMARY KEY,
-    Code            NVARCHAR(30)  NULL,
     Name            NVARCHAR(100) NOT NULL,
     Location        NVARCHAR(250) NULL,
     IsDefault       BIT           NOT NULL CONSTRAINT DF_Warehouses_IsDefault DEFAULT(0),
@@ -619,16 +621,13 @@ CREATE TABLE dbo.Warehouses
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_Warehouses_IsActive DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Warehouses_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Warehouses_Code UNIQUE (Code)
+    UpdatedAt       DATETIME2     NULL
 );
 
 -- 5. Products
 CREATE TABLE dbo.Products
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Products PRIMARY KEY,
-    Code            NVARCHAR(30)  NULL,
     Barcode         NVARCHAR(50)  NULL,  -- Legacy — prefer UnitBarcodes
     Name            NVARCHAR(150) NOT NULL,
     CategoryId      INT           NULL REFERENCES dbo.Categories(Id),
@@ -641,9 +640,7 @@ CREATE TABLE dbo.Products
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_Products_IsActive DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Products_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Products_Code UNIQUE (Code)
+    UpdatedAt       DATETIME2     NULL
 );
 
 -- 5b. ProductUnits (v4.3 — Dynamic Unit of Measure)
@@ -703,7 +700,6 @@ CREATE TABLE dbo.WarehouseStocks
 CREATE TABLE dbo.Suppliers
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Suppliers PRIMARY KEY,
-    Code            NVARCHAR(30)  NULL,
     Name            NVARCHAR(150) NOT NULL,
     Phone           NVARCHAR(20)  NULL,
     Email           NVARCHAR(100) NULL,
@@ -714,16 +710,13 @@ CREATE TABLE dbo.Suppliers
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_Suppliers_IsActive DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Suppliers_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Suppliers_Code UNIQUE (Code)
+    UpdatedAt       DATETIME2     NULL
 );
 
 -- 8. Customers
 CREATE TABLE dbo.Customers
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Customers PRIMARY KEY,
-    Code            NVARCHAR(30)  NULL,
     Name            NVARCHAR(150) NOT NULL,
     Phone           NVARCHAR(20)  NULL,
     Email           NVARCHAR(100) NULL,
@@ -734,9 +727,7 @@ CREATE TABLE dbo.Customers
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_Customers_IsActive DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Customers_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Customers_Code UNIQUE (Code)
+    UpdatedAt       DATETIME2     NULL
 );
 
 -- 9. PurchaseInvoices

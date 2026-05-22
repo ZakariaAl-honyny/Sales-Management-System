@@ -299,7 +299,8 @@ public record StoreSettingsDto(
     bool EnableStockAlerts,
     bool AllowNegativeStock,
     bool AutoUpdatePrices,
-    string InvoicePrefix);
+    string InvoicePrefix,
+    int CostingMethod = 1);
 
 public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
 

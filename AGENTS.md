@@ -1318,13 +1318,13 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] All FKs use `DeleteBehavior.Restrict`?
 - [ ] Users soft-deleted only (never hard delete)?
 - [ ] Domain Entities use `private set` for critical properties and methods for state changes?
-- [ ] Read and Write operations are separated (CQRS)?
+- [ ] Service Layer pattern used (NOT CQRS/MediatR)?
 - [ ] Delete operations use DeleteStrategy enum (not direct MessageBox)?
 - [ ] Guard Clauses exist for all entity creation?
 - [ ] DialogService used instead of MessageBox.Show?
 - [ ] Toast notifications for minor success messages?
 - [ ] INotifyDataErrorInfo implemented with red border styles?
-- [ ] Save buttons disabled when form has errors (CanExecute)?
+- [ ] Save buttons ALWAYS enabled (no CanExecute) — validate on click with warning dialog?
 - [ ] Pricing stored per ProductUnit (not on Product)?
 - [ ] Unit conversions computed in Domain (not UI or Service)?
 - [ ] Barcodes stored in UnitBarcode table (not embedded in Unit)?
@@ -1414,3 +1414,9 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] UnitBarcode has HasQueryFilter(IsActive)?
 - [ ] Product/Customer/Supplier Response DTOs have NO Code field?
 - [ ] ErrorCodes has NO DuplicateCode constant?
+- [ ] PrintDataService returns `Result<InvoicePrintDto>` (not nullable `InvoicePrintDto?`)?
+- [ ] Purchase Invoice DataGrid has PriceDifferenceIndicator with orange `#E65100` TextBlock?
+- [ ] SettingsView has CostingMethod RadioButton group (WeightedAverage/LastPurchasePrice/SupplierPrice)?
+- [ ] SettingsViewModel has CostingMethod, IsWeightedAverageSelected, IsLastPriceSelected, IsSupplierPriceSelected properties?
+- [ ] StoreSettingsDto and UpdateSettingsRequest include CostingMethod field?
+- [ ] SettingsController Get/Update support CostingMethod via ISystemSettingsRepository?

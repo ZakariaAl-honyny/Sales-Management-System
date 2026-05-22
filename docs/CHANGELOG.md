@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-05-23
+### Added
+- **UpdateProductPricingService Returns Result<T>**: Changed from `Task` + throwing exceptions to `Task<Result>` — returns `Result.Failure` with Arabic messages for "unit not found" and "no base unit" instead of `InvalidOperationException`.
+- **FK DeleteBehavior.Restrict Enforced**: Cascade delete removed from ProductUnitConfiguration (Barcodes FK, Product FK), UnitBarcodeConfiguration, ProductBarcodeConfiguration — ALL FKs now use `DeleteBehavior.Restrict` per AGENTS.md RULE-214.
+- **Controller Purity Enforcement**:
+  - PrintController: Moved all `SalesDbContext` queries to dedicated `PrintDataService` in Application layer — controller only delegates to `IPrintDataService`.
+  - LogsController: Removed `[AllowAnonymous]` — now `[Authorize(Policy = "AllStaff")]` with class-level attribute.
+  - SettingsController: Both GET endpoints changed from `AllStaff` to `[Authorize(Policy = "AdminOnly")]`.
+- **PrintDataService Returns Result<InvoicePrintDto>**: Changed return type from `InvoicePrintDto?` (nullable) to `Task<Result<InvoicePrintDto>>` — wraps DTO in `Result.Success/Failure` instead of returning null.
+- **6 New FluentValidators**: `UpdateSalesInvoiceValidator`, `UpdatePurchaseInvoiceValidator`, `UpdateStockTransferValidator`, `UpdateCustomerPaymentValidator`, `UpdateSupplierPaymentValidator`, `CreateLogRequestValidator` — all with Arabic messages.
+- **Costing Method in Settings UI**: 3 RadioButtons (Weighted Average / Last Purchase Price / Supplier Price) with Arabic explanations in Settings screen — persisted via API to SystemSettings table.
+  - New properties: `CostingMethod`, `IsWeightedAverageSelected`, `IsLastPriceSelected`, `IsSupplierPriceSelected` in SettingsViewModel.
+  - SettingsController updated: `Get()` reads costing method from `ISystemSettingsRepository`, `Update()` saves it.
+  - StoreSettingsDto and UpdateSettingsRequest DTOs now include `CostingMethod` field.
+- **Price Sync Indicators in Purchase Invoice**: New `CostChangedFromDatabase` + `PriceDifferenceIndicator` properties in PurchaseInvoiceLineViewModel — orange sync warning shows when entered unit cost differs from current DB cost.
+  - Updated PurchaseInvoiceEditorView.xaml DataGrid: enhanced "التكلفة" column with sync warning TextBlock.
+
+### Changed
+- **decimal(18,4) → decimal(18,2)**: All money fields changed from `HasPrecision(18,4)` to `HasPrecision(18,2)`:
+  - ProductUnitConfiguration: SalesPrice, PurchaseCost, SupplierPrice, LastPurchasePrice.
+  - CashTransactionConfiguration: Amount, BalanceBefore, BalanceAfter.
+  - CashBoxConfiguration: CurrentBalance.
+- **UpdateProductPricingService.WeightedAverage**: Rounding changed from `Math.Round(weightedAverage, 4)` to `Math.Round(weightedAverage, 2)` — consistent with new `decimal(18,2)` precision.
+- **API PrintController 10 methods**: All updated to use `result.IsSuccess` / `result.Value!` pattern — PrintControllerTests Moq setups use `Result<InvoicePrintDto>.Success/Failure`.
+- **AGENTS.md**: RULE-211 updated — ALL money fields use `decimal(18,2)` (not 18,4). RULE-214/215/216 for FK Restrict enforcement.
+- **MASTER-PLAN.md**: Phase 5 WPF XAML and Phase 4 WPF ViewModels now complete with CostingMethod UI and Price Sync Indicators.
+- **README.md**: Updated to v4.7 with new "What's New" section, new Phase 16 row.
+
+### Fixed
+- **3 UpdateProductPricingService tests**: 
+  - `WeightedAverage_ShouldCalculateCorrectly` — expected values changed from `13.7113m`/`164.5356m` to `13.71m`/`164.52m` with `0.01m` precision.
+  - `WhenProductUnitNotFound_ShouldThrow` → `ShouldReturnFailure` — changed from `InvalidOperationException` assertion to `result.IsSuccess.Should().BeFalse()` + Arabic error check.
+  - `WhenNoBaseUnit_ShouldThrow` → `ShouldReturnFailure` — same pattern with Arabic error message.
+- **PrintControllerTests**: All 11 Moq setups updated — `_printDataService.Setup(...).ReturnsAsync(Result<InvoicePrintDto>.Success(...))` instead of raw DTO.
+
 ## [1.7.1] - 2026-05-22
 ### Added
 - **LogSystemError Centralized (v4.6)**: All `Serilog.Log.Error` calls moved to `ViewModelBase.LogSystemError()` — 17 calls across 11 ViewModels consolidated.

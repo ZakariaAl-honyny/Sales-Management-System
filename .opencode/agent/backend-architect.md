@@ -23,7 +23,7 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 - Design API controllers (THIN — delegate to services)
 - Create FluentValidation validators for ALL Request models
 - Implement business logic in Application layer ONLY (Domain for calculations)
-- **CQRS Principle**: Strictly separate Queries (Read) from Commands (Write).
+- **Service Layer Pattern**: All business logic in Application Services — NOT CQRS/MediatR (Service Layer is simpler and sufficient for this scale)
 
 ## Rules You MUST Follow
 1. ALL money = `decimal(18,2)` — NEVER float/double
@@ -55,6 +55,11 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 27. **ProductPriceHistory Config**: MUST have dedicated `IEntityTypeConfiguration<ProductPriceHistory>` with explicit HasMaxLength on string fields
 28. **Product.ReorderLevel Precision**: MUST use `.HasPrecision(18, 3)` — it's a quantity field
 29. **UnitBarcode HasQueryFilter**: MUST add `.HasQueryFilter(x => x.IsActive)` to match ProductBarcode pattern
+30. **UpdateProductPricingService Returns Result<T>**: MUST return `Task<Result>` — NEVER `Task` (void). Catch `InvalidOperationException` patterns and convert to `Result.Failure` with Arabic messages.
+31. **PrintDataService MUST Return Result<T>**: MUST return `Task<Result<InvoicePrintDto>>` — NEVER nullable `InvoicePrintDto?`. Wrap DTO in `Result.Success/Failure`.
+32. **FluentValidators for ALL Requests**: EVERY Command/Request model MUST have an associated `AbstractValidator` — including Update operations (UpdateSalesInvoice, UpdatePurchaseInvoice, UpdateStockTransfer, UpdateCustomerPayment, UpdateSupplierPayment).
+33. **CostingMethod API Support**: SettingsController MUST support Get/Set CostingMethod via ISystemSettingsRepository — StoreSettingsDto and UpdateSettingsRequest MUST include `int CostingMethod = 1` field.
+34. **decimal(18,2) Precision Enforcement**: ALL money fields in Fluent API configurations MUST use `.HasPrecision(18, 2)` — NEVER `HasPrecision(18, 4)`.
 
 ## Pattern to Follow
 ```csharp

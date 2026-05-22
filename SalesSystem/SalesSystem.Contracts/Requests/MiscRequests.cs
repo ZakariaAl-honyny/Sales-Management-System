@@ -11,7 +11,8 @@ public record UpdateSettingsRequest(
     string? LogoUrl, string Currency, decimal DefaultTaxRate,
     bool IsTaxEnabled, string? TaxNumber,
     bool EnableStockAlerts, bool AllowNegativeStock, bool AutoUpdatePrices,
-    string InvoicePrefix);
+    string InvoicePrefix,
+    int CostingMethod = 1);
 
 public record UpdatePrintSettingsRequest(
     string ThermalPrinterName,

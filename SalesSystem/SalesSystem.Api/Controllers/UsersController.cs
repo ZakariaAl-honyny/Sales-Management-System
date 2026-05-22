@@ -34,6 +34,8 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
         var result = await _userService.GetAllAsync(includeInactive, ct);
+        if (!result.IsSuccess)
+            return BadRequest(new { error = result.Error });
         return Ok(result.Value);
     }
 

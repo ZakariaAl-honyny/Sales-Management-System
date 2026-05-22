@@ -12,10 +12,10 @@ public class ProductUnitConfiguration : IEntityTypeConfiguration<ProductUnit>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.UnitName).IsRequired().HasMaxLength(100);
         builder.Property(x => x.BaseConversionFactor).HasPrecision(18, 6);
-        builder.Property(x => x.SalesPrice).HasPrecision(18, 4);
-        builder.Property(x => x.PurchaseCost).HasPrecision(18, 4);
-        builder.Property(x => x.SupplierPrice).HasPrecision(18, 4);
-        builder.Property(x => x.LastPurchasePrice).HasPrecision(18, 4);
+        builder.Property(x => x.SalesPrice).HasPrecision(18, 2);
+        builder.Property(x => x.PurchaseCost).HasPrecision(18, 2);
+        builder.Property(x => x.SupplierPrice).HasPrecision(18, 2);
+        builder.Property(x => x.LastPurchasePrice).HasPrecision(18, 2);
         builder.Property(x => x.SortOrder).HasDefaultValue(1);
         builder.Property(x => x.IsActive).HasDefaultValue(true);
 

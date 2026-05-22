@@ -1,5 +1,5 @@
 # Project Constitution — Sales Management System
-# Version: 2.2 (v4.3) | Platform: .NET 10 LTS | Date: 2026
+# Version: 2.3 (v4.6) | Platform: .NET 10 LTS | Date: 2026
 
 ---
 

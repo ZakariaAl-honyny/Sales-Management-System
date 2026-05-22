@@ -6,6 +6,7 @@ using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Api.Tests.Controllers;
@@ -91,7 +92,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateSampleSalesDto());
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
@@ -108,7 +109,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((InvoicePrintDto?)null);
+            .ReturnsAsync(Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة"));
 
         var result = await _controller.PreviewSalesInvoice(999, CancellationToken.None);
 
@@ -121,7 +122,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateSampleSalesDto());
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("الطابعة غير متصلة"));
@@ -139,7 +140,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateSampleSalesDto());
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
@@ -154,7 +155,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((InvoicePrintDto?)null);
+            .ReturnsAsync(Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة"));
 
         var result = await _controller.PrintSalesA4(999, CancellationToken.None);
 
@@ -167,7 +168,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateSampleSalesDto());
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("فشلت الطباعة"));
@@ -184,7 +185,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateSampleSalesDto());
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.PrintThermalAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
@@ -199,7 +200,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((InvoicePrintDto?)null);
+            .ReturnsAsync(Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة"));
 
         var result = await _controller.PrintSalesThermal(999, CancellationToken.None);
 
@@ -212,7 +213,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateSampleSalesDto());
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.PrintThermalAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("فشلت الطباعة الحرارية"));
@@ -229,7 +230,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetPurchaseInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateSamplePurchaseDto());
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSamplePurchaseDto()));
         _printServiceMock
             .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
@@ -246,7 +247,7 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetPurchaseInvoicePrintDataAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((InvoicePrintDto?)null);
+            .ReturnsAsync(Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة"));
 
         var result = await _controller.PreviewPurchaseInvoice(999, CancellationToken.None);
 

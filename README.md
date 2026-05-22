@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.6-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.7-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -419,6 +419,7 @@ dotnet run
 | **v4.5.1a** | **Logging Separation & API Error Fixes** — Logging policy (Error vs Warning), `HandleResponseAsync` content-type guard, print test log level fix | ✅ **Complete** |
 | **Phase 13** | **Interactive Validation** — Remove CanExecute blocking, on-click warning dialogs, field ToolTips, required `*` markers, unique field explanations | ✅ **Completed** |
 | **Phase 14** | **Audit & Polish** — LogSystemError centralized, Dialog overlay + hover, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes | ✅ **Completed** |
+| **Phase 16** | **Audit & Service Layer Purity** — Result pattern enforcement, decimal precision fix, FK Restrict, Controller purity, FluentValidators, CostingMethod UI, Price Sync Indicators | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -580,6 +581,23 @@ dotnet run
 | **PrintController** | 11 API endpoints for preview, print, save, and test page |
 | **Print Settings** | Persisted in `SystemSetting` table — printer names, logo, tax info |
 | **254+ Tests** | Full test coverage across all 5 test projects |
+
+---
+
+## 🆕 What's New in v4.6 — Audit & Service Layer Purity
+
+| Feature | Description |
+|---------|-------------|
+| **UpdateProductPricingService Returns Result** | Changed from `Task` + throwing exceptions to `Task<Result>` — never throws, returns `Result.Failure` with Arabic messages |
+| **decimal(18,4) → decimal(18,2)** | All money fields in ProductUnit, CashBox, CashTransaction configurations changed from `HasPrecision(18,4)` to `HasPrecision(18,2)` |
+| **FK DeleteBehavior.Restrict Enforced** | Cascade delete removed from ProductUnit, UnitBarcode, ProductBarcode configurations — ALL FKs use `Restrict` |
+| **Controller Purity Enforced** | PrintController moved DbContext queries to PrintDataService; LogsController removed `[AllowAnonymous]`; SettingsController GET restricted to AdminOnly |
+| **PrintDataService Returns Result<T>** | Changed from returning `InvoicePrintDto?` (nullable) to `Result<InvoicePrintDto>` — never returns null |
+| **6 New FluentValidators** | Created for: UpdateSalesInvoice, UpdatePurchaseInvoice, UpdateStockTransfer, UpdateCustomerPayment, UpdateSupplierPayment, CreateLogRequest |
+| **Costing Method in Settings UI** | 3 RadioButtons (Weighted Average / Last Purchase Price / Supplier Price) with Arabic explanations in Settings screen — persisted via API to SystemSettings table |
+| **Price Sync Indicators in Purchase Invoice** | New `CostChangedFromDatabase` + `PriceDifferenceIndicator` properties in PurchaseInvoiceLineViewModel — orange warning shows when entered cost differs from DB current cost |
+| **API CostingMethod Support** | SettingsController Get/Update now read/write CostingMethod via ISystemSettingsRepository; StoreSettingsDto and UpdateSettingsRequest include CostingMethod field |
+| **42/42 Tests Passing** | 3 UpdateProductPricingService tests fixed — WeightedAverage rounding (13.71 not 13.7113), Result assertions instead of exception expectations |
 
 ---
 

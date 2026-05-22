@@ -25,23 +25,29 @@ public class Product : BaseEntity
 {
     // Private setters — immutable after creation
     public string Name { get; private set; }
-    public decimal WholesalePrice { get; private set; } // decimal(18,2)
-    public decimal RetailPrice { get; private set; }    // decimal(18,2)
-    public decimal ConversionFactor { get; private set; } // decimal(18,3)
     public bool IsActive { get; private set; } = true;
+    
+    // Units collection (Dynamic UOM — prices live on ProductUnit)
+    private readonly List<ProductUnit> _units = new();
+    public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
 
-    // Wholesale/Retail Logic (Domain Only)
-    public decimal GetUnitPrice(SaleMode mode) => mode == SaleMode.Wholesale ? WholesalePrice : RetailPrice;
+    // Get price from product unit  
+    public decimal GetPriceByUnit(UnitType type, int productUnitId)
+    {
+        var unit = _units.FirstOrDefault(u => u.Id == productUnitId)
+            ?? throw new DomainException("الوحدة غير موجودة");
+        return type == UnitType.Retail ? unit.RetailPrice : unit.WholesalePrice;
+    }
 
     // Protected constructor for EF Core
     protected Product() { }
 
     // Static factory method with validation
-    public static Product Create(string name, decimal wholesalePrice, decimal retailPrice, decimal conversionFactor)
+    public static Product Create(string name, int createdByUserId)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب");
-        return new Product { Name = name, WholesalePrice = wholesalePrice, RetailPrice = retailPrice, ConversionFactor = conversionFactor };
+        return new Product { Name = name, IsActive = true, CreatedByUserId = createdByUserId, CreatedAt = DateTime.UtcNow };
     }
 }
 ```
@@ -463,6 +469,51 @@ public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName, ...
 8. Remove from XAML bindings
 9. Remove from tests
 10. Remove auto-generation logic from services
+
+### Price Sync Indicators (v4.6) — Purchase Invoice
+
+When the user edits unit cost on a purchase invoice, show a sync warning if it differs from DB:
+
+```csharp
+private decimal _oldCostInDatabase;
+
+// ⭐ Shows warning when cost differs from DB cost
+public bool CostChangedFromDatabase =>
+    _oldCostInDatabase > 0 &&
+    Math.Abs(UnitCost - _oldCostInDatabase) > 0.0001m;
+
+public string PriceDifferenceIndicator
+{
+    get
+    {
+        if (!CostChangedFromDatabase) return string.Empty;
+        var diff = UnitCost - _oldCostInDatabase;
+        var direction = diff > 0 ? "↑ ارتفع" : "↓ انخفض";
+        return $"🔄 {direction} عن السعر القديم ({_oldCostInDatabase:N2}) | سيتم تحديث التكلفة عند الحفظ";
+    }
+}
+
+// In UnitCost setter:
+OnPropertyChanged(nameof(CostChangedFromDatabase));
+OnPropertyChanged(nameof(PriceDifferenceIndicator));
+```
+
+### CostingMethod Settings UI Pattern (v4.6)
+
+```csharp
+// SettingsViewModel — Costing Method properties
+private int _costingMethod = 1; // Default WeightedAverage
+public int CostingMethod
+{
+    get => _costingMethod;
+    set => SetProperty(ref _costingMethod, value);
+}
+public bool IsWeightedAverageSelected { get => _costingMethod == 1; set { if (value) CostingMethod = 1; } }
+public bool IsLastPriceSelected { get => _costingMethod == 2; set { if (value) CostingMethod = 2; } }
+public bool IsSupplierPriceSelected { get => _costingMethod == 3; set { if (value) CostingMethod = 3; } }
+
+// XAML: RadioButton GroupName="CostingMethod" with IsChecked binding
+```
 
 ### LogSystemError Pattern (v4.6)
 

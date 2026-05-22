@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Printing.Contracts;
@@ -14,12 +15,12 @@ public interface IPrintDataService
     /// <summary>
     /// Gets sales invoice print data including store info, or null if not found.
     /// </summary>
-    Task<InvoicePrintDto?> GetSalesInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result<InvoicePrintDto>> GetSalesInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default);
 
     /// <summary>
     /// Gets purchase invoice print data including store info, or null if not found.
     /// </summary>
-    Task<InvoicePrintDto?> GetPurchaseInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result<InvoicePrintDto>> GetPurchaseInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default);
 
     /// <summary>
     /// Gets the store settings for print header info.

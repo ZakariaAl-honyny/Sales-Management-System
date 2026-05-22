@@ -12,6 +12,7 @@ namespace SalesSystem.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/logs")]
+[Authorize(Policy = "AllStaff")]
 public class LogsController : ControllerBase
 {
     private readonly ILogService _logService;
@@ -24,7 +25,6 @@ public class LogsController : ControllerBase
     }
 
     [HttpPost]
-    [AllowAnonymous] // Allow logging even if not logged in (e.g., login errors)
     public async Task<IActionResult> Create([FromBody] CreateLogRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

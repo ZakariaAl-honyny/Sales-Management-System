@@ -936,6 +936,22 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
     private decimal _quantity = 1;
     private decimal _unitCost;
     private decimal _discountAmount;
+    private decimal _oldCostInDatabase;
+
+    public bool CostChangedFromDatabase =>
+        _oldCostInDatabase > 0 &&
+        Math.Abs(UnitCost - _oldCostInDatabase) > 0.0001m;
+
+    public string PriceDifferenceIndicator
+    {
+        get
+        {
+            if (!CostChangedFromDatabase) return string.Empty;
+            var diff = UnitCost - _oldCostInDatabase;
+            var direction = diff > 0 ? "↑ ارتفع" : "↓ انخفض";
+            return $"🔄 {direction} عن السعر القديم ({_oldCostInDatabase:N2}) | سيتم تحديث التكلفة في بطاقة الصنف عند الحفظ";
+        }
+    }
 
     private readonly ISoundService? _soundService;
     public ObservableCollection<ProductDto> AvailableProducts { get; }
@@ -961,6 +977,9 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
             {
                 ProductId = value.Id;
                 ClearErrors(nameof(ProductName));
+                _oldCostInDatabase = value.PurchasePrice;
+                OnPropertyChanged(nameof(CostChangedFromDatabase));
+                OnPropertyChanged(nameof(PriceDifferenceIndicator));
                 if (UnitCost == 0)
                 {
                     UnitCost = Mode == (byte)SaleMode.Wholesale
@@ -996,6 +1015,8 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
             {
                 ValidateUnitCost();
                 OnPropertyChanged(nameof(LineTotal));
+                OnPropertyChanged(nameof(CostChangedFromDatabase));
+                OnPropertyChanged(nameof(PriceDifferenceIndicator));
             }
         }
     }

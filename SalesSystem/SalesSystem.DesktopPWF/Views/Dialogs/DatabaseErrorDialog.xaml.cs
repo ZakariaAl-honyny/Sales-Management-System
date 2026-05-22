@@ -18,13 +18,19 @@ public partial class DatabaseErrorDialog : Window
 
     private void PositionOverOwner()
     {
-        Owner = System.Windows.Application.Current.MainWindow;
-        if (Owner != null)
+        var mainWindow = System.Windows.Application.Current.MainWindow;
+        if (mainWindow != null && mainWindow != this)
         {
+            Owner = mainWindow;
             Width = Owner.ActualWidth;
             Height = Owner.ActualHeight;
             Left = Owner.Left;
             Top = Owner.Top;
+        }
+        else
+        {
+            // No valid owner window — center on screen
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
     }
 

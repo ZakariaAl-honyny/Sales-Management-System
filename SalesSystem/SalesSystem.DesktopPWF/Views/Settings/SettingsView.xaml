@@ -106,6 +106,52 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Costing Method -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Text="💰 طريقة احتساب تكلفة المخزون" Style="{StaticResource HeaderStyle}" Margin="0,0,0,16"/>
+                        
+                        <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
+                                Padding="16" Margin="0,4" Background="#F1F8E9">
+                            <StackPanel>
+                                <RadioButton Content="متوسط التكلفة المرجح  (Weighted Average)"
+                                             IsChecked="{Binding IsWeightedAverageSelected}"
+                                             GroupName="CostingMethod"
+                                             FontSize="14" FontWeight="Bold"
+                                             ToolTip="يجمع بين سعر البضاعة القديمة في المخزن والجديدة ليعطيك تكلفة موحدة ومتوازنة"/>
+                                <TextBlock Margin="28,6,0,0" TextWrapping="Wrap" Foreground="#555" FontSize="12"
+                                           Text="يجمع بين سعر البضاعة القديمة في المخزن والجديدة ليعطيك تكلفة موحدة ومتوازنة. الأنسب للتقارير الضريبية الدقيقة وللمحاسبة القياسية."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
+                                Padding="16" Margin="0,4">
+                            <StackPanel>
+                                <RadioButton Content="آخر سعر توريد  (Last Purchase Price)"
+                                             IsChecked="{Binding IsLastPriceSelected}"
+                                             GroupName="CostingMethod"
+                                             FontSize="14" FontWeight="Bold"
+                                             ToolTip="يستبدل تكلفة المنتج بسعر آخر فاتورة شراء مباشرةً"/>
+                                <TextBlock Margin="28,6,0,0" TextWrapping="Wrap" Foreground="#555" FontSize="12"
+                                           Text="يستبدل تكلفة المنتج بسعر آخر فاتورة شراء مباشرةً. مناسب للأسواق المتقلبة حيث تريد دائماً أن يعكس السعر الواقع الحالي."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
+                                Padding="16" Margin="0,4">
+                            <StackPanel>
+                                <RadioButton Content="سعر المورد  (Supplier Catalog Price)"
+                                             IsChecked="{Binding IsSupplierPriceSelected}"
+                                             GroupName="CostingMethod"
+                                             FontSize="14" FontWeight="Bold"
+                                             ToolTip="يعتمد على السعر المدخل في بطاقة الصنف من قائمة المورد ولا يتغير تلقائياً عند الشراء"/>
+                                <TextBlock Margin="28,6,0,0" TextWrapping="Wrap" Foreground="#555" FontSize="12"
+                                           Text="يعتمد على السعر المدخل في بطاقة الصنف من قائمة المورد ولا يتغير تلقائياً عند الشراء. مناسب عندما تتفاوض على سعر ثابت مع المورد لفترة طويلة."/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
                 <!-- Print Settings -->
                 <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
                     <StackPanel>

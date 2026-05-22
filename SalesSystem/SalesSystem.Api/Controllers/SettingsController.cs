@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
 
@@ -23,9 +24,16 @@ public class SettingsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Get(CancellationToken ct)
     {
         var result = await _settingsService.GetSettingsAsync(ct);
+        if (result.IsSuccess && result.Value != null)
+        {
+            var costingMethod = await _systemSettings.GetCostingMethodAsync(ct);
+            var dto = result.Value with { CostingMethod = (int)costingMethod };
+            return Ok(dto);
+        }
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -36,12 +44,18 @@ public class SettingsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
         var result = await _settingsService.UpdateSettingsAsync(request, userId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+        {
+            await _systemSettings.SetCostingMethodAsync((CostingMethod)request.CostingMethod, ct);
+            return Ok(result.Value);
+        }
+        return BadRequest(new { error = result.Error });
     }
 
     // ─── Print Settings Endpoints ────────────
 
     [HttpGet("print")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> GetPrintSettings(CancellationToken ct)
     {
         var thermalPrinter = await _systemSettings.GetStringAsync("ThermalPrinterName", "", ct);

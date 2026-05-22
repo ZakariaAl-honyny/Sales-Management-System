@@ -264,6 +264,46 @@ Button IsEnabled="{Binding CanSave}"  // ❌ disables button in XAML
 - If errors exist, call `_dialogService.ShowWarningAsync("screen title", errorMsg)`
 - Return false if invalid
 
+### Costing Method Settings UI (v4.6)
+
+Add 3 RadioButtons in SettingsView for costing method selection:
+
+```xml
+<RadioButton Content="متوسط التكلفة المرجح  (Weighted Average)"
+             IsChecked="{Binding IsWeightedAverageSelected}"
+             GroupName="CostingMethod"
+             FontSize="14" FontWeight="Bold"/>
+<RadioButton Content="آخر سعر توريد  (Last Purchase Price)"
+             IsChecked="{Binding IsLastPriceSelected}"
+             GroupName="CostingMethod"/>
+<RadioButton Content="سعر المورد  (Supplier Catalog Price)"
+             IsChecked="{Binding IsSupplierPriceSelected}"
+             GroupName="CostingMethod"/>
+```
+
+Each RadioButton must have Arabic explanation text below it.
+
+### Price Sync Indicators (v4.6) — Purchase Invoice
+
+In PurchaseInvoiceEditorView.xaml DataGrid, the "التكلفة" column MUST include a sync warning:
+
+```xml
+<!-- Unit Cost with sync indicator -->
+<DataGridTemplateColumn Header="التكلفة" Width="130">
+    <DataGridTemplateColumn.CellTemplate>
+        <DataTemplate>
+            <StackPanel>
+                <TextBox Text="{Binding UnitCost, ...}" />
+                <TextBlock Text="{Binding PriceDifferenceIndicator}"
+                           FontSize="10" Foreground="#E65100"
+                           Visibility="{Binding CostChangedFromDatabase,
+                                        Converter={StaticResource BoolToVisibility}}"/>
+            </StackPanel>
+        </DataTemplate>
+    </DataGridTemplateColumn.CellTemplate>
+</DataGridTemplateColumn>
+```
+
 ### LogSystemError Pattern (v4.6)
 - ALL ViewModels MUST use `LogSystemError(message, context, exception)` — NEVER `Serilog.Log.Error(ex, ...)` directly
 - `LogSystemError` is defined in ViewModelBase — call it directly (inherited)

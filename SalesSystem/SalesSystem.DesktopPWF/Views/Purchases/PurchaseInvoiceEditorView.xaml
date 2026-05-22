@@ -156,11 +156,21 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="التكلفة" Width="90">
+                                <!-- Unit Cost with sync indicator -->
+                                <DataGridTemplateColumn Header="التكلفة" Width="130">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
-                                                     Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"/>
+                                            <StackPanel>
+                                                <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
+                                                         Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"/>
+                                                <!-- Sync warning — only shows when cost differs from DB -->
+                                                <TextBlock Text="{Binding PriceDifferenceIndicator}"
+                                                           FontSize="10"
+                                                           Foreground="#E65100"
+                                                           TextWrapping="Wrap"
+                                                           Visibility="{Binding CostChangedFromDatabase,
+                                                                        Converter={StaticResource BoolToVisibility}}"/>
+                                            </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>

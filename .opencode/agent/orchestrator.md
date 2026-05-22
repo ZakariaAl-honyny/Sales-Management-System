@@ -39,6 +39,8 @@ Phase 11: Multi-Window     → ScreenWindowService, non-modal editors, cascade p
 Phase 12: Error & Logging  → HandleResponseAsync fix, logging separation policy (Error vs Warning)
 Phase 13: Interactive Validation → Remove CanExecute blocking, on-click warning dialogs, field ToolTips, required * markers, unique field explanations
 Phase 14: Audit & Polish   → LogSystemError centralized, Dialog overlay + hover, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes
+Phase 15: Identifier Strategy → Remove Code column from Product, Customer, Supplier, Warehouse — use auto-increment Id as sole identifier across all layers
+Phase 16: Audit & Service Layer Purity → Result pattern enforcement, decimal precision fix (18,4→18,2), FK Restrict enforcement (no Cascade), Controller purity (no direct DbContext), PrintDataService Result<T>, new FluentValidators (6), CostingMethod UI + API, Price Sync Indicators in Purchase Invoice
 ```
 
 ## Before Accepting Any Code
@@ -49,7 +51,7 @@ Run through AGENTS.md Section 9 checklist. If ANY item fails, reject the code.
 |-----------|----------|
 | Entity/DbContext/Migration | database-engineer |
 | Service/Controller/Validation | backend-architect |
-| WinForms/UserControl/EventBus | ui-agent |
+| WPF/UserControl/EventBus | ui-agent |
 | Unit/Integration tests | test-engineer |
 | Simple fixes/cleanup | fast-agent |
 | Security review | security-auditor |

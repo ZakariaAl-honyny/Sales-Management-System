@@ -11,7 +11,7 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
         builder.ToTable("CashBoxes");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.BoxName).IsRequired().HasMaxLength(100);
-        builder.Property(x => x.CurrentBalance).HasPrecision(18, 4);
+        builder.Property(x => x.CurrentBalance).HasPrecision(18, 2);
         builder.Property(x => x.CurrencyCode).HasMaxLength(10).HasDefaultValue("SAR");
         builder.Property(x => x.Notes).HasMaxLength(500);
         builder.Property(x => x.IsActive).HasDefaultValue(true);

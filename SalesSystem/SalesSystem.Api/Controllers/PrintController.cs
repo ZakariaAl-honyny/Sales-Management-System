@@ -7,7 +7,6 @@ namespace SalesSystem.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/print")]
-[Authorize]
 public class PrintController : ControllerBase
 {
     private readonly IPrintService _printService;
@@ -25,119 +24,130 @@ public class PrintController : ControllerBase
     }
 
     [HttpPost("preview/sales/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
     public async Task<IActionResult> PreviewSalesInvoice(int id, CancellationToken ct)
     {
-        var dto = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.ShowPreviewAsync(dto);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
+        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
     [HttpPost("a4/sales/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
     public async Task<IActionResult> PrintSalesA4(int id, CancellationToken ct)
     {
-        var dto = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.PrintA4Async(dto);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var printResult = await _printService.PrintA4Async(result.Value!);
+        return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
     }
 
     [HttpPost("thermal/sales/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
     public async Task<IActionResult> PrintSalesThermal(int id, CancellationToken ct)
     {
-        var dto = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.PrintThermalAsync(dto);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var printResult = await _printService.PrintThermalAsync(result.Value!);
+        return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
     }
 
     [HttpPost("preview-data/sales/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
     public async Task<IActionResult> GetSalesPreviewData(int id, CancellationToken ct)
     {
-        var dto = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.ShowPreviewAsync(dto);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
+        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
     [HttpPost("save/sales/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
     public async Task<IActionResult> SaveSalesPdf(int id, [FromBody] SavePdfRequest request, CancellationToken ct)
     {
-        var dto = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.SavePdfAsync(dto, request.FilePath);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var saveResult = await _printService.SavePdfAsync(result.Value!, request.FilePath);
+        return saveResult.IsSuccess ? Ok(saveResult) : BadRequest(saveResult);
     }
 
     [HttpPost("preview/purchase/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
     public async Task<IActionResult> PreviewPurchaseInvoice(int id, CancellationToken ct)
     {
-        var dto = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.ShowPreviewAsync(dto);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
+        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
     [HttpPost("a4/purchase/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
     public async Task<IActionResult> PrintPurchaseA4(int id, CancellationToken ct)
     {
-        var dto = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.PrintA4Async(dto);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var printResult = await _printService.PrintA4Async(result.Value!);
+        return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
     }
 
     [HttpPost("thermal/purchase/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
     public async Task<IActionResult> PrintPurchaseThermal(int id, CancellationToken ct)
     {
-        var dto = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.PrintThermalAsync(dto);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var printResult = await _printService.PrintThermalAsync(result.Value!);
+        return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
     }
 
     [HttpPost("preview-data/purchase/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
     public async Task<IActionResult> GetPurchasePreviewData(int id, CancellationToken ct)
     {
-        var dto = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.ShowPreviewAsync(dto);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
+        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
     [HttpPost("save/purchase/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
     public async Task<IActionResult> SavePurchasePdf(int id, [FromBody] SavePdfRequest request, CancellationToken ct)
     {
-        var dto = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
-        if (dto == null)
-            return NotFound(new { error = "الفاتورة غير موجودة" });
+        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
 
-        var result = await _printService.SavePdfAsync(dto, request.FilePath);
-        return result.IsSuccess ? Ok(result) : BadRequest(result);
+        var saveResult = await _printService.SavePdfAsync(result.Value!, request.FilePath);
+        return saveResult.IsSuccess ? Ok(saveResult) : BadRequest(saveResult);
     }
 
     /// <summary>
     /// Prints a test page to verify printer connectivity.
     /// </summary>
     [HttpPost("test")]
+    [Authorize(Policy = "AllStaff")]
     public async Task<IActionResult> PrintTestPage(CancellationToken ct)
     {
         var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate) =

@@ -32,6 +32,7 @@ public class SettingsViewModel : ViewModelBase
     private ObservableCollection<string> _backups = new();
     private string? _selectedBackup;
 
+    private int _costingMethod = 1; // Default WeightedAverage
     private string _thermalPrinterName = string.Empty;
     private string _a4PrinterName = string.Empty;
     private string _logoPath = string.Empty;
@@ -132,6 +133,32 @@ public class SettingsViewModel : ViewModelBase
                 RestoreBackupCommand.RaiseCanExecuteChanged();
             }
         }
+    }
+    #endregion
+
+    #region Costing Method Properties
+    public int CostingMethod
+    {
+        get => _costingMethod;
+        set => SetProperty(ref _costingMethod, value);
+    }
+
+    public bool IsWeightedAverageSelected
+    {
+        get => _costingMethod == 1;
+        set { if (value) CostingMethod = 1; }
+    }
+
+    public bool IsLastPriceSelected
+    {
+        get => _costingMethod == 2;
+        set { if (value) CostingMethod = 2; }
+    }
+
+    public bool IsSupplierPriceSelected
+    {
+        get => _costingMethod == 3;
+        set { if (value) CostingMethod = 3; }
     }
     #endregion
 
@@ -237,6 +264,7 @@ public class SettingsViewModel : ViewModelBase
             AllowNegativeStock = s.AllowNegativeStock;
             AutoUpdatePrices = s.AutoUpdatePrices;
             InvoicePrefix = s.InvoicePrefix;
+            CostingMethod = s.CostingMethod;
         }
 
         try
@@ -294,7 +322,8 @@ public class SettingsViewModel : ViewModelBase
             EnableStockAlerts,
             AllowNegativeStock,
             AutoUpdatePrices,
-            InvoicePrefix
+            InvoicePrefix,
+            CostingMethod
         );
 
         var result = await _settingsService.UpdateSettingsAsync(request);

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Infrastructure.Printing;
@@ -32,30 +33,34 @@ public class PrintDataService : IPrintDataService
         _logger = logger;
     }
 
-    public async Task<InvoicePrintDto?> GetSalesInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default)
+    public async Task<Result<InvoicePrintDto>> GetSalesInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default)
     {
         var invoice = await _uow.SalesInvoices.Query()
             .Include(i => i.Customer)
             .Include(i => i.Items).ThenInclude(it => it.Product)
             .FirstOrDefaultAsync(i => i.Id == invoiceId, ct);
 
-        if (invoice == null) return null;
+        if (invoice == null)
+            return Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة");
 
         var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
-        return await _builder.BuildFromSalesAsync(invoice, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        var dto = await _builder.BuildFromSalesAsync(invoice, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        return Result<InvoicePrintDto>.Success(dto);
     }
 
-    public async Task<InvoicePrintDto?> GetPurchaseInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default)
+    public async Task<Result<InvoicePrintDto>> GetPurchaseInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default)
     {
         var invoice = await _uow.PurchaseInvoices.Query()
             .Include(i => i.Supplier)
             .Include(i => i.Items).ThenInclude(it => it.Product)
             .FirstOrDefaultAsync(i => i.Id == invoiceId, ct);
 
-        if (invoice == null) return null;
+        if (invoice == null)
+            return Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة");
 
         var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
-        return await _builder.BuildFromPurchaseAsync(invoice, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        var dto = await _builder.BuildFromPurchaseAsync(invoice, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        return Result<InvoicePrintDto>.Success(dto);
     }
 
     private async Task<(string name, string phone, string address, string taxNumber,

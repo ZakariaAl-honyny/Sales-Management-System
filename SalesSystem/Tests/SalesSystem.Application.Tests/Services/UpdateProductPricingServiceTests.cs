@@ -142,8 +142,8 @@ public class UpdateProductPricingServiceTests
 
         await _sut.UpdateFromPurchaseAsync(request);
 
-        _baseUnit.PurchaseCost.Should().BeApproximately(13.7113m, 0.0001m);
-        _derivedUnit.PurchaseCost.Should().BeApproximately(164.5356m, 0.0001m);
+        _baseUnit.PurchaseCost.Should().BeApproximately(13.71m, 0.01m);
+        _derivedUnit.PurchaseCost.Should().BeApproximately(164.52m, 0.01m);
     }
 
     [Fact]
@@ -343,7 +343,7 @@ public class UpdateProductPricingServiceTests
     // ─── Error Cases ────────────────────────────────────────────
 
     [Fact]
-    public async Task UpdateFromPurchaseAsync_WhenProductUnitNotFound_ShouldThrow()
+    public async Task UpdateFromPurchaseAsync_WhenProductUnitNotFound_ShouldReturnFailure()
     {
         var repoMock = new Mock<IGenericRepository<ProductUnit>>();
         repoMock.Setup(r => r.Query()).Returns(Array.Empty<ProductUnit>().AsAsyncQueryable());
@@ -351,13 +351,13 @@ public class UpdateProductPricingServiceTests
 
         var request = CreateRequest(productUnitId: 999, newCost: 10, newQty: 1);
 
-        await _sut.Invoking(s => s.UpdateFromPurchaseAsync(request))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*ProductUnit 999 not found*");
+        var result = await _sut.UpdateFromPurchaseAsync(request);
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("وحدة المنتج غير موجودة");
     }
 
     [Fact]
-    public async Task UpdateFromPurchaseAsync_WhenNoBaseUnit_ShouldThrow()
+    public async Task UpdateFromPurchaseAsync_WhenNoBaseUnit_ShouldReturnFailure()
     {
         var product = Product.Create("بلا وحدة أساسية", purchasePrice: 5, retailPrice: 10, createdByUserId: 1);
         var derivedOnly = ProductUnit.CreateDerivedUnit(
@@ -372,9 +372,9 @@ public class UpdateProductPricingServiceTests
 
         var request = CreateRequest(productUnitId: derivedOnly.Id, newCost: 60, newQty: 5);
 
-        await _sut.Invoking(s => s.UpdateFromPurchaseAsync(request))
-            .Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*no base unit*");
+        var result = await _sut.UpdateFromPurchaseAsync(request);
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("لا يحتوي على وحدة أساسية");
     }
 }
 

@@ -128,5 +128,12 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] Product/Customer/Supplier Response DTOs have NO Code field?
 - [ ] ErrorCodes has NO DuplicateCode constant?
 
+### Price Sync & Costing UI (v4.6)
+- [ ] Purchase invoice DataGrid has PriceDifferenceIndicator TextBlock with orange foreground?
+- [ ] SettingsView has CostingMethod RadioButton group with Arabic explanations?
+- [ ] CostingMethod property exists in SettingsViewModel (CostingMethod, IsWeightedAverageSelected, IsLastPriceSelected, IsSupplierPriceSelected)?
+- [ ] SettingsController Get/Update support CostingMethod via ISystemSettingsRepository?
+- [ ] StoreSettingsDto and UpdateSettingsRequest include CostingMethod field?
+
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`

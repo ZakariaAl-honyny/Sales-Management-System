@@ -22,10 +22,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     BranchId = table.Column<int>(type: "int", nullable: true),
                     CurrencyCode = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false, defaultValue: "SAR"),
                     AssignedUserId = table.Column<int>(type: "int", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
                     Notes = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
                     CreatedByUserId = table.Column<int>(type: "int", nullable: true),
                     UpdatedByUserId = table.Column<int>(type: "int", nullable: true)
                 },
@@ -100,16 +100,16 @@ namespace SalesSystem.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ProductPriceHistory",
+                name: "ProductPriceHistories",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ProductUnitId = table.Column<int>(type: "int", nullable: false),
-                    ChangeType = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    OldValue = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    NewValue = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    CostingMethod = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ChangeType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    OldValue = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    NewValue = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    CostingMethod = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     InvoiceId = table.Column<int>(type: "int", nullable: true),
                     ChangedBy = table.Column<int>(type: "int", nullable: false),
                     ChangedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -121,7 +121,7 @@ namespace SalesSystem.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ProductPriceHistory", x => x.Id);
+                    table.PrimaryKey("PK_ProductPriceHistories", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -216,8 +216,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     DisplayName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     UpdatedBy = table.Column<int>(type: "int", nullable: true),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     CreatedByUserId = table.Column<int>(type: "int", nullable: true),
                     UpdatedByUserId = table.Column<int>(type: "int", nullable: true)
@@ -337,7 +337,7 @@ namespace SalesSystem.Infrastructure.Migrations
                     WholesalePrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
                     RetailPrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
                     MinStock = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
-                    ReorderLevel = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    ReorderLevel = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -565,7 +565,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         column: x => x.ProductId,
                         principalTable: "Products",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -583,9 +583,9 @@ namespace SalesSystem.Infrastructure.Migrations
                     SupplierPrice = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
                     LastPurchasePrice = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
                     SortOrder = table.Column<int>(type: "int", nullable: false, defaultValue: 1),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false, defaultValue: true),
                     CreatedByUserId = table.Column<int>(type: "int", nullable: true),
                     UpdatedByUserId = table.Column<int>(type: "int", nullable: true)
                 },
@@ -598,7 +598,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         column: x => x.ProductId,
                         principalTable: "Products",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -620,6 +620,7 @@ namespace SalesSystem.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_WarehouseStocks", x => x.Id);
+                    table.CheckConstraint("CHK_WarehouseStocks_Quantity_NonNegative", "[Quantity] >= 0");
                     table.ForeignKey(
                         name: "FK_WarehouseStocks_Products_ProductId",
                         column: x => x.ProductId,
@@ -924,7 +925,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         column: x => x.ProductUnitId,
                         principalTable: "ProductUnits",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -1309,7 +1310,7 @@ namespace SalesSystem.Infrastructure.Migrations
                 name: "ProductBarcodes");
 
             migrationBuilder.DropTable(
-                name: "ProductPriceHistory");
+                name: "ProductPriceHistories");
 
             migrationBuilder.DropTable(
                 name: "PurchaseInvoiceItems");
