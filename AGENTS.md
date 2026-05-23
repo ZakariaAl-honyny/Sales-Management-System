@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.6.2 — Validation ErrorTemplate & INotifyDataErrorInfo)
+# AGENTS.md — Sales Management System (v4.6.4 — Security Hardening & Code Quality)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -1170,6 +1170,30 @@ public interface ISoundService
 | RULE-238 | ViewModels MUST NOT declare `async void` for operations that can throw exceptions, unless they are standard event handlers or ICommand execute wraps. All other async operations must return `Task` and be executed within `ExecuteAsync` wrappers |
 | RULE-239 | Derived list ViewModels MUST NOT shadow base class helper properties (such as `DialogService`) to avoid compile warnings and null reference issues. Use `SetDialogService()` instead |
 
+### 2.59 Rate Limiting & Brute-Force Protection (v4.6.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-240 | ALL login endpoints MUST use `[EnableRateLimiting("LoginPolicy")]` — 5 attempts per 15 minutes per IP |
+| RULE-241 | Global rate limit of 100 requests per minute per IP for all unauthenticated requests |
+| RULE-242 | Rate limit exceeded responses MUST return HTTP 429 with Arabic message and `RATE_LIMIT_EXCEEDED` code |
+| RULE-243 | Rate limiter middleware MUST be placed BEFORE `UseAuthentication()` in the middleware pipeline |
+
+### 2.60 User Hard-Delete Protection (v4.6.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-244 | `UserService.PermanentDeleteAsync()` MUST return `Result.Failure` — never hard-delete users |
+| RULE-245 | Any attempt to hard-delete a user MUST be logged as a Serilog warning |
+| RULE-246 | Users can only be soft-deleted (deactivated) via `DeleteAsync()` which sets `IsActive = false` |
+
+### 2.61 Connection String Security (v4.6.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-247 | `appsettings.Development.json` MUST NOT contain plaintext connection strings — use `SALESSYSTEM_DB_CONNECTION` env var |
+| RULE-248 | All connection string values in config files MUST be empty strings with a `_comment` property explaining env var usage |
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -1287,6 +1311,10 @@ public enum InvoiceTypePrint : byte
 ❌ Setting Window.Owner = this (self-ownership crash)
 ❌ Relying on API return order for list display (always sort client-side)
 ❌ HasXxxError / XxxError boolean + computed string pattern for validation (use INotifyDataErrorInfo AddError/ClearErrors instead)
+❌ Plaintext connection strings in any appsettings file (use env var `SALESSYSTEM_DB_CONNECTION`)
+❌ Hard-deleting Users (soft delete only — `PermanentDeleteAsync` MUST return `Result.Failure`)
+❌ Login endpoint without rate limiting (use `[EnableRateLimiting("LoginPolicy")]`)
+❌ Unhandled exception dialog without FallbackErrorDialog (use thread-safe dialog overlay)
 ❌ Duplicating validation dialog logic in each Editor ViewModel (use ValidateAllAsync from ViewModelBase)
 ```
 
@@ -1502,3 +1530,10 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] DPAPI encryption applied to connection string with "DPAPI:" prefix?
 - [ ] No `async void` used for operation methods (use `Task` + `ExecuteAsync`)?
 - [ ] No shadowing of base class properties (like `DialogService`)?
+- [ ] Rate limiting configured (Login: 5/15min, Global: 100/min)?
+- [ ] User hard-delete guarded (PermanentDeleteAsync returns Result.Failure)?
+- [ ] No plaintext connection strings in any config file?
+- [ ] FluentValidators enhanced for all invoice/payment/transfer requests?
+- [ ] FallbackErrorDialog exists for unhandled exceptions?
+- [ ] Login endpoint has `[EnableRateLimiting("LoginPolicy")]`?
+- [ ] Rate limiter middleware placed BEFORE `UseAuthentication()`?

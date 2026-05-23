@@ -2506,7 +2506,36 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 
 ---
 
+## ✅ Phase 20: Security Hardening & Code Quality (v4.6.4)
+
+**Goal**: Harden security with rate limiting, protect user integrity, secure connection strings, enhance validation, fix build warnings.
+
+### Key Changes
+- **Rate Limiting**: Added `AddRateLimiter` with `LoginPolicy` (5 attempts per 15 min per IP) and global policy (100 req/min). Arabic 429 response with `RATE_LIMIT_EXCEEDED` code.
+- **User Hard-Delete Guarded**: `UserService.PermanentDeleteAsync()` returns `Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي")` — enforces RULE-038.
+- **Connection String Security**: Removed plaintext connection string from `appsettings.Development.json`. Uses `SALESSYSTEM_DB_CONNECTION` env var only.
+- **FluentValidator Enhancements**: Enhanced all 7 invoice/payment/transfer validators with date, enum, and max-length rules.
+- **FallbackErrorDialog**: Added `FallbackErrorDialog.xaml` for thread-safe unhandled exception display.
+- **Build Fixes**: Resolved 10 CS0109 warnings and 4 CS1540 errors across 8 ViewModels.
+- **Test Coverage**: 5 new tests + 50 test files compiling.
+
+### Key Rules
+- RULE-240 through RULE-248 (Rate Limiting, User Hard-Delete, Connection String Security)
+
+### Verification
+- [ ] `dotnet build` — 0 errors, 0 warnings
+- [ ] Login endpoint rate-limited (5/15min)
+- [ ] User permanent delete returns failure
+- [ ] No plaintext connection strings
+- [ ] Security-Plan.md reflects implementation status
+
+---
+
 ## 📝 Version History
+
+| Version | Date | Description |
+|---------|------|-------------|
+| **v4.6.4** | **2026-05-23** | **Security Hardening & Code Quality** — Rate limiting, user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes |
 
 | Version | Date | Description |
 |---------|------|-------------|

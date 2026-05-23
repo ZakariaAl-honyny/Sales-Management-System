@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.2] - 2026-05-23
+### Added
+- **v4.6.4 — Security Hardening & Code Quality**:
+  - **Rate Limiting**: Added `AddRateLimiter` with `LoginPolicy` (5 attempts per 15 min per IP) and global policy (100 req/min). Arabic 429 response with `RATE_LIMIT_EXCEEDED` code.
+  - **User Hard-Delete Guarded**: `UserService.PermanentDeleteAsync()` now returns `Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي")` — enforces RULE-038 (soft delete only).
+  - **Connection String Security**: Removed plaintext SQL connection string from `appsettings.Development.json`. Uses `SALESSYSTEM_DB_CONNECTION` env var only per RULE-040.
+  - **FluentValidator Enhancements**: Enhanced all 7 invoice/payment/transfer validators with additional rules: `PaymentType.IsInEnum()`, date not future, `Notes.MaxLength(500)`, `DiscountAmount >= 0`.
+  - **FallbackErrorDialog**: Added `FallbackErrorDialog.xaml` for thread-safe unhandled exception display.
+  - **Security-Plan.md**: Comprehensive 7-layer security document with implementation status table.
+
+### Fixed
+- **Build Warnings (10 CS0109)**: Removed unnecessary `new` keyword from `_dialogService` in 5 ViewModels.
+- **Build Errors (4 CS1540)**: Fixed protected member access via `((ViewModelBase)this).DialogService` in ReportsViewModel, StockTransfersListViewModel, SupplierPaymentsListViewModel.
+- **Test Compilation**: Fixed 2 errors in `PurchaseInvoicesControllerTests.cs` (missing `using SalesSystem.Contracts.Enums`).
+
+### Tests
+- **5 New Tests**: SetDialogService constructor test, ValidateAsync empty name, ValidateAsync valid name clears errors, ValidateAsync multiple errors, Post_AlreadyPostedInvoice_ThrowsDomainException.
+
 ## [1.9.1] - 2026-05-23
 ### Added
 - **v4.6.3 — Architecture Alignment & Code Quality Audit**:

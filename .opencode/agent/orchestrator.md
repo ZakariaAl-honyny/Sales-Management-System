@@ -43,6 +43,8 @@ Phase 15: Identifier Strategy → Remove Code column from Product, Customer, Sup
 Phase 16: Audit & Service Layer Purity → Result pattern enforcement, decimal precision fix (18,4→18,2), FK Restrict enforcement (no Cascade), Controller purity (no direct DbContext), PrintDataService Result<T>, new FluentValidators (6), CostingMethod UI + API, Price Sync Indicators in Purchase Invoice
 Phase 17: UI Sorting & Dialog Safety → Newest-first sorting across 14 ViewModels (OrderByDescending), DatabaseErrorDialog self-owner fix (guard against MainWindow == this), comprehensive system audit by Code Reviewer/Database Engineer/Security Auditor
 Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2) → Replace legacy HasXxxError boolean pattern with proper INotifyDataErrorInfo real-time validation; professional red border + ❗ icon ErrorTemplate in Styles.xaml; SetDialogService() added to ViewModelBase; all 14 Editor ViewModels refactored; ValidateAllAsync() for pre-save validation dialog
+Phase 19: Architecture Alignment & Code Quality Remediation (v4.6.3) → Costing settings HTTP refactoring, VM DI registration, CS0108 member hiding resolutions, async void try-catch safety, RTL Arabic corrections
+Phase 20: Security Hardening & Code Quality (v4.6.4) → Rate limiting, user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes
 ```
 
 ### Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2)
@@ -69,6 +71,45 @@ Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2) → Repla
 - [ ] ProductEditorViewModel has no HasXxxError properties
 - [ ] CustomerEditorViewModel has no HasXxxError properties
 - [ ] ValidateAllAsync() shows validation dialog on pre-save errors
+
+### Phase 19: Architecture Alignment & Code Quality Remediation (v4.6.3)
+
+**Goal**: Align Costing settings with Clean Architecture boundaries, resolve ViewModel compiler shadowing (CS0108 warnings), wrap async void operations in ViewModels with safe try-catches, correct garbled Arabic text.
+
+### Phase 20: Security Hardening & Code Quality (v4.6.4)
+
+**Goal**: Harden security with rate limiting, protect user integrity (no hard-delete), secure connection strings, enhance FluentValidation, fix all build warnings.
+
+**Files Changed:**
+- `Program.cs` — Add `AddRateLimiter` services + `UseRateLimiter()` middleware
+- `AuthController.cs` — Add `[EnableRateLimiting("LoginPolicy")]` on Login endpoint
+- `UserService.cs` — Guard `PermanentDeleteAsync` → return `Result.Failure`
+- `appsettings.Development.json` — Remove plaintext connection string
+- 7 Validator files — Enhance with date/enum/maxlength validation rules
+- `FallbackErrorDialog.xaml` + `.xaml.cs` — New thread-safe error dialog
+- 5 ViewModels — Fix CS0109 warnings (remove `new` keyword on `_dialogService`)
+- 3 ViewModels — Fix CS1540 protected member access errors
+- `Security-Plan.md` — Update with implementation status table
+
+**Rules Added:**
+- RULE-240: `[EnableRateLimiting("LoginPolicy")]` on login
+- RULE-241: Global rate limit of 100 req/min
+- RULE-242: Arabic 429 response with `RATE_LIMIT_EXCEEDED`
+- RULE-243: Rate limiter before `UseAuthentication()`
+- RULE-244: `PermanentDeleteAsync` returns `Result.Failure`
+- RULE-245: Hard-delete attempt logged as warning
+- RULE-246: Soft delete only via `DeleteAsync()`
+- RULE-247: No plaintext connection strings in config files
+- RULE-248: Config files use env var with `_comment`
+
+**Verification:**
+- [ ] `dotnet build` — 0 errors, 0 warnings across all projects
+- [ ] Login endpoint rate-limited (5/15min per IP)
+- [ ] User permanent delete returns failure, not hard-delete
+- [ ] No plaintext connection strings in any config file
+- [ ] All 7 FluentValidators have date, enum, maxlength rules
+- [ ] No CS0109, CS1540, CS0108 warnings in build
+- [ ] Security-Plan.md reflects actual implementation status
 
 ## Before Accepting Any Code
 Run through AGENTS.md Section 9 checklist. If ANY item fails, reject the code.

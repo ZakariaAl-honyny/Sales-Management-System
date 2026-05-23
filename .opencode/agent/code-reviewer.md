@@ -161,5 +161,19 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] Garbled Arabic strings corrected and encoded in UTF-8?
 - [ ] Critical VM initialization and search methods return Task or wrapped in safe try-catch?
 
+### Rate Limiting & Security (v4.6.4)
+- [ ] Login endpoint has `[EnableRateLimiting("LoginPolicy")]`?
+- [ ] Rate limiter middleware placed BEFORE `UseAuthentication()`?
+- [ ] Global rate limit of 100 req/min configured?
+- [ ] 429 response uses Arabic message with `RATE_LIMIT_EXCEEDED` code?
+- [ ] `UserService.PermanentDeleteAsync()` returns `Result.Failure` (not hard-delete)?
+- [ ] No plaintext connection strings in any config file?
+
+### Build Quality (v4.6.4)
+- [ ] No CS0109 warnings (unnecessary `new` keyword on fields)?
+- [ ] No CS1540 errors (protected member access via base class)?
+- [ ] No async void patterns in commands (use AsyncRelayCommand + ExecuteAsync)?
+- [ ] FallbackErrorDialog exists for unhandled exceptions?
+
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`

@@ -718,3 +718,110 @@ When performing bug fixing or code quality remediation:
 
 5. **Arabic Encoding and String Literals**:
    - Ensure all user-facing Arabic string literals are encoded in UTF-8 to prevent Mojibake (garbled text) in UI dropdowns, menus, and message dialogs.
+
+### Rate Limiting Pattern (v4.6.4)
+
+**Service Registration (Program.cs):**
+```csharp
+builder.Services.AddRateLimiter(options =>
+{
+    // Global: 100 req/min per IP
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        context => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Login: 5 attempts per 15 min
+    options.AddPolicy("LoginPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0
+            }));
+
+    // Arabic 429 response
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+        context.HttpContext.Response.ContentType = "application/json";
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter = retryAfter.TotalSeconds.ToString("0");
+        }
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            Error = "تم تجاوز الحد المسموح من الطلبات. حاول مجدداً بعد قليل",
+            Code = "RATE_LIMIT_EXCEEDED"
+        }, ct);
+    };
+});
+```
+
+**Middleware Pipeline Order (CRITICAL):**
+```csharp
+app.UseHttpsRedirection();
+app.UseCors("DesktopOnly");
+app.UseRateLimiter();       // ← BEFORE auth
+app.UseAuthentication();
+app.UseAuthorization();
+```
+
+**Controller Usage:**
+```csharp
+[HttpPost("login")]
+[EnableRateLimiting("LoginPolicy")]
+[AllowAnonymous]
+public async Task<IActionResult> Login(LoginRequest request)
+```
+
+### User Hard-Delete Guard Pattern (v4.6.4)
+
+```csharp
+// PermanentDeleteAsync MUST return Result.Failure — never hard-delete users
+public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct = default)
+{
+    _logger.LogWarning("Attempt to hard-delete user {UserId} blocked — soft delete only", id);
+    return Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي — استخدم خاصية تعطيل الحساب بدلاً من ذلك",
+        ErrorCodes.InvalidOperation);
+}
+```
+
+### Connection String Security Pattern (v4.6.4)
+
+```json
+// appsettings.Development.json — connection string from env var only
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "",
+    "_comment": "Connection string is loaded from SALESSYSTEM_DB_CONNECTION environment variable per RULE-040"
+  }
+}
+```
+
+### FallbackErrorDialog Pattern (v4.6.4)
+
+```csharp
+// App.xaml.cs — thread-safe fallback for unhandled exceptions
+private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+{
+    var exception = e.Exception;
+    Log.Error(exception, "Unhandled exception");
+    
+    // Show fallback dialog on UI thread
+    Application.Current.Dispatcher.Invoke(() =>
+    {
+        var dialog = new FallbackErrorDialog(exception.Message);
+        dialog.ShowDialog();
+    });
+    
+    e.Handled = true;
+}
+```

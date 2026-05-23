@@ -11,12 +11,12 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-In%20Development-FFA500?style=for-the-badge" alt="Status"/>
+  <img src="https://img.shields.io/badge/Status-Security%20Hardening-2ECC71?style=for-the-badge" alt="Status"/>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.6.3-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6.4-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -423,6 +423,7 @@ dotnet run
 | **v4.6.1** | **UI Sorting & Dialog Safety** — Newest-first sorting across 14 ViewModels, DatabaseErrorDialog self-owner fix, comprehensive system audit | ✅ **Completed** |
 | **v4.6.2** | **WPF Validation ErrorTemplate** — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated | ✅ **Completed** |
 | **v4.6.3** | **Architecture Alignment & Code Quality Audit** — Settings ViewModels/Views relocation, DI registration, MessageBox removal, async void refactoring, shadowing resolved | ✅ **Completed** |
+| **v4.6.4** | **Security Hardening & Code Quality** — Rate limiting (5/15min), user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -667,6 +668,21 @@ dotnet run
 
 ---
 
+## 🛡️ What's New in v4.6.4 — Security Hardening & Code Quality
+
+| Feature | Description |
+|---------|-------------|
+| **Rate Limiting** | Login endpoint protected with `[EnableRateLimiting("LoginPolicy")]` — 5 attempts per 15 minutes per IP. Global rate limit of 100 req/min with Arabic 429 response (`RATE_LIMIT_EXCEEDED`) |
+| **User Hard-Delete Blocked** | `UserService.PermanentDeleteAsync()` now returns `Result.Failure` — users can only be soft-deactivated per RULE-038. Hard-delete attempt logged as warning |
+| **Connection String Security** | Removed plaintext connection string from `appsettings.Development.json`. Uses only `SALESSYSTEM_DB_CONNECTION` env var with `_comment` explaining the policy |
+| **FluentValidator Enhancements** | Enhanced all 7 invoice/payment/transfer/return validators with additional rules: `PaymentType.IsInEnum()`, `InvoiceDate` not future, `Notes.MaxLength(500)`, `DiscountAmount >= 0` |
+| **FallbackErrorDialog** | Added `FallbackErrorDialog.xaml` — thread-safe dialog overlay for unhandled exceptions, replacing raw `MessageBox.Show` |
+| **Build Warning Fixes** | Resolved 10 CS0109 warnings (unnecessary `new` keyword) and 4 CS1540 errors (protected member access) across 8 ViewModel files |
+| **Test Coverage** | 50 test files re-enabled and compiling. 5 new tests: SetDialogService constructor, ValidateAsync (empty/valid/multiple), Post_AlreadyPostedInvoice |
+| **Security-Plan.md** | Comprehensive 7-layer security architecture document with implementation status table tracking what's done vs planned |
+
+---
+
 ## 🆕 What's New in v4.6.3 — Architecture Alignment & Code Quality Audit
 
 | Feature | Description |
@@ -686,7 +702,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 239 non-negotiable rules (RULE-001 to RULE-239)
+1. Read [`AGENTS.md`](AGENTS.md) — all 248 non-negotiable rules (RULE-001 to RULE-248)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 
