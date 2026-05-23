@@ -1,178 +1,199 @@
 # Tasks: Phase 7 — Production Readiness
 
-**Input**: Design documents from `specs/007-production-readiness/`
-**Prerequisites**: plan.md (required), spec.md (required), data-model.md, contracts/api-endpoints.md, contracts/ui-contracts.md
+**Spec**: `specs/007-production-readiness/spec.md`  
+**Plan**: `specs/007-production-readiness/plan.md`  
+**Contracts**: `specs/007-production-readiness/contracts/`  
+**AGENTS.md**: Read BEFORE writing any code — rules are LAW.
 
-This task list is organized by User Story to support incremental implementation, TDD workflows, and independent validation of each release increment.
-
----
-
-## Format: `[ID] [P?] [Story?] Description with exact file paths`
-
-- **[P]**: Parallelizable (touches different files, no dependencies)
-- **[Story]**: Maps to user stories [US1] through [US5] from `spec.md`
-- **Checklist format**: Starts with `- [ ]` and includes exact file targets
+> **Smaller-model note**: Every task below includes the exact file path, what to implement, and which AGENTS.md rule applies. Follow AGENTS.md §2 (Constitution) strictly. Return `Result<T>` from all services. Use `IDialogService` — never `MessageBox.Show`.
 
 ---
 
-## Phase 1: Setup (Shared Infrastructure)
-
-**Purpose**: Initial project alignment and environment synchronization.
-
-- [ ] T001 Create project folders and prepare shared setup folders in `c:\Users\ALlahabi\Desktop\Sales Management System`
-- [ ] T002 [P] Verify the .NET 10 compilation configuration targets and solution files in `SalesSystem/SalesSystem.slnx`
-- [ ] T003 [P] Setup linting profiles and ignore entries in `.specify/init-options.json` and `.gitignore`
+## Format: `- [ ] [ID] [P?] [Story?] Description — FILE: path — RULE: X`
 
 ---
 
-## Phase 2: Foundational (Blocking Prerequisites)
+## Phase 1: Setup
 
-**Purpose**: Core security, database health, and host infrastructure required by all subsequent features.
-
-*⚠️ **CRITICAL CHECKPOINT**: No user story work can begin until this phase is complete and verified.*
-
-- [ ] T004 Implement database connectivity health checks in `SalesSystem/SalesSystem.Api/Controllers/HealthController.cs`
-- [ ] T005 [P] Create connection string security interface and DPAPI-based encryption service in `SalesSystem/SalesSystem.Infrastructure/Services/ConnectionStringProtector.cs`
-- [ ] T006 [P] Implement `SecureDbContextFactory` with transparent connection decryption in `SalesSystem/SalesSystem.Infrastructure/Data/SecureDbContextFactory.cs`
-- [ ] T007 Configure Windows Service hosting pipeline, Serilog EventLog sink, and SQL startup retry policy in `SalesSystem/SalesSystem.Api/Program.cs`
-
-**Checkpoint**: Foundation ready - database verification and configuration security infrastructure are online.
+- [ ] T001 Verify solution builds with 0 errors: run `dotnet build SalesSystem/SalesSystem.sln` and fix any existing compilation errors before starting — FILE: `SalesSystem/SalesSystem.sln`
+- [ ] T002 [P] Add `Microsoft.Extensions.Hosting.WindowsServices` NuGet to Api project — FILE: `SalesSystem/SalesSystem.Api/SalesSystem.Api.csproj` — needed by T007
+- [ ] T003 [P] Add `Serilog.Sinks.EventLog` NuGet to Api project — FILE: `SalesSystem/SalesSystem.Api/SalesSystem.Api.csproj` — RULE-035
 
 ---
 
-## Phase 3: User Story 1 - System Installs on a Clean Windows Machine (Priority: P1) 🎯 MVP
+## Phase 2: Foundational (BLOCKS all user stories)
 
-**Goal**: Seamless installation experience on target machines, including service setup, automatic migrations, and full seed data injection.
+**⚠️ Complete and verify before any Phase 3+ work.**
 
-**Independent Test**: Install using the `.exe` package on a clean VM. Confirm `SalesSystemService` boots automatically, performs database creation/migration, and enables immediate client connection.
+- [ ] T004 Add `IConnectionStringProtector` interface with methods `bool IsEncrypted(string)`, `string Protect(string)`, `string Unprotect(string)` — FILE: `SalesSystem/SalesSystem.Application/Interfaces/Services/IConnectionStringProtector.cs`
 
-### Implementation for User Story 1
+- [ ] T005 [P] Implement `ConnectionStringProtector` using `System.Security.Cryptography.ProtectedData` with `DataProtectionScope.LocalMachine`. Prefix = `"DPAPI:"`. `Protect()` → base64 of encrypted bytes. `Unprotect()` → strip prefix, decrypt — FILE: `SalesSystem/SalesSystem.Infrastructure/Services/ConnectionStringProtector.cs` — RULE-040
 
-- [ ] T008 [US1] Create `DbSeeder.cs` for idempotent seed data injection (Default admin, warehouse, cash customer, units) in `SalesSystem/SalesSystem.Infrastructure/Data/DbSeeder.cs`
-- [ ] T009 [US1] Integrate startup migration execution and database seeding logic in `SalesSystem/SalesSystem.Api/Program.cs`
-- [ ] T010 [US1] Configure API project compilation metadata for self-contained Windows service packaging in `SalesSystem/SalesSystem.Api/SalesSystem.Api.csproj`
-- [ ] T011 [US1] Build the single-file Inno Setup installer script with automatic service registration in `Installer/setup.iss`
+- [ ] T006 [P] Add `GET /api/v1/health` and `GET /api/v1/health/database` endpoints (no `[Authorize]`). Health checks `DbContext.Database.CanConnectAsync()`. Returns `200 {"status":"healthy","database":"connected"}` or `503` — FILE: `SalesSystem/SalesSystem.Api/Controllers/HealthController.cs` — RULE-025
 
-**Checkpoint**: User Story 1 complete - system is fully distributable and installs without manual DB steps.
+- [ ] T007 In `Program.cs`: call `builder.Host.UseWindowsService()`. Add Serilog EventLog sink when `WindowsServiceHelpers.IsWindowsService()` is true. Register `IConnectionStringProtector` as singleton. Register `AdminOnly` authorization policy (`Role == "1"`) — FILE: `SalesSystem/SalesSystem.Api/Program.cs` — RULE-038
 
----
-
-## Phase 4: User Story 2 - Admin Performs and Restores a Database Backup (Priority: P1)
-
-**Goal**: Full system database backup and restore capabilities (manual and daily scheduled) utilizing robust T-SQL with single-user rollback fallback recovery.
-
-**Independent Test**: Execute manual backup, drop local database schemas, run restore from generated `.bak` file, and verify all transactional data is restored.
-
-### Implementation for User Story 2
-
-- [ ] T012 [US2] Declare the backup and restore interfaces in `SalesSystem/SalesSystem.Application/Interfaces/Services/IBackupService.cs`
-- [ ] T013 [US2] Implement SQL Server T-SQL backup, single-user mode restore (`ROLLBACK AFTER 30`), and multi-user fallback recovery in `SalesSystem/SalesSystem.Infrastructure/Services/BackupService.cs`
-- [ ] T014 [US2] Implement the scheduled daily 2:00 AM background backup job inside `SalesSystem/SalesSystem.Api/BackgroundServices/ScheduledBackupWorker.cs`
-- [ ] T015 [US2] Create backup list, manual backup, and restore controller endpoints under `SalesSystem/SalesSystem.Api/Controllers/BackupController.cs`
-- [ ] T016 [US2] Implement the desktop backup API client proxy in `SalesSystem/SalesSystem.DesktopPWF/Services/Api/BackupApiService.cs`
-- [ ] T017 [US2] Build the Settings Backup/Restore UI view and binding ViewModel in `SalesSystem/SalesSystem.DesktopPWF/Views/Settings/BackupView.xaml` and `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Settings/BackupViewModel.cs`
-
-**Checkpoint**: User Story 2 complete - database backups can be generated manually/automatically and restored safely.
+**Checkpoint**: `dotnet build` passes. Health endpoint returns 200.
 
 ---
 
-## Phase 5: User Story 3 - Admin Manages System Settings and User Accounts (Priority: P2)
+## Phase 3: User Story 1 — Clean Windows Installer (P1) 🎯
 
-**Goal**: Advanced store parameter management and safe administrative account maintenance with soft-delete protections.
+**Goal**: App installs on clean Windows machine; service starts automatically; DB seeded.  
+**Test**: Install `.exe` on clean VM → reboot → desktop reaches login screen within 3 min.
 
-**Independent Test**: Log in as Admin, deactivate a cashier, verify login is blocked but cashier's invoice references remain intact, and verify non-admins are denied access.
+- [ ] T008 [US1] Create `DbSeeder.cs` with `SeedAsync(SalesDbContext db)`. Check if admin user exists before inserting. Seed: 1 Admin user (`admin`/BCrypt hash of `Admin@123`, work factor 12), 1 default Warehouse (`IsDefault=true`), 1 Cash Customer (`Name="نقدي"`, `CurrentBalance=0`), base units (Piece with `ConversionFactor=1`) — FILE: `SalesSystem/SalesSystem.Infrastructure/Data/DbSeeder.cs` — RULE-039
 
-### Implementation for User Story 3
+- [ ] T009 [US1] In `Program.cs` startup, after `app.Build()`: call `db.Database.MigrateAsync()` then `DbSeeder.SeedAsync(db)` inside a try/catch that logs failures with Serilog but does NOT crash the service — FILE: `SalesSystem/SalesSystem.Api/Program.cs` — RULE-035, RULE-036
 
-- [ ] T018 [US3] Create dynamic system configurations data repository inside `SalesSystem/SalesSystem.Infrastructure/Data/Repositories/SystemSettingsRepository.cs`
-- [ ] T019 [US3] Create Settings request validators and update controllers in `SalesSystem/SalesSystem.Api/Validators/UpdateSettingsRequestValidator.cs` and `SalesSystem/SalesSystem.Api/Controllers/SettingsController.cs`
-- [ ] T020 [US3] Implement full user CRUD endpoints including soft-delete and restore routes in `SalesSystem/SalesSystem.Api/Controllers/UsersController.cs`
-- [ ] T021 [US3] Add the last-admin active guard check to UserService in `SalesSystem/SalesSystem.Application/Services/UserService.cs`
-- [ ] T022 [US3] Implement user management and settings client services in `SalesSystem/SalesSystem.DesktopPWF/Services/Api/UserApiService.cs` and `SalesSystem/SalesSystem.DesktopPWF/Services/Api/SettingsApiService.cs`
-- [ ] T023 [US3] Build the User Management control and ViewModel in `SalesSystem/SalesSystem.DesktopPWF/Views/Users/UsersListView.xaml` and `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Users/UserListViewModel.cs`
-- [ ] T024 [US3] Create the Store Settings view and ViewModel supporting costing methods and tax toggles in `SalesSystem/SalesSystem.DesktopPWF/Views/Settings/SettingsView.xaml` and `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Settings/SettingsViewModel.cs`
+- [ ] T010 [US1] Set `<RuntimeIdentifier>win-x64</RuntimeIdentifier>`, `<SelfContained>true</SelfContained>`, `<PublishSingleFile>true</PublishSingleFile>` in Api `.csproj` for release publish — FILE: `SalesSystem/SalesSystem.Api/SalesSystem.Api.csproj`
 
-**Checkpoint**: User Story 3 complete - administrators can manage users and customize store settings securely.
+- [ ] T011 [US1] Write `Installer/setup.iss` Inno Setup script. `[Run]` section must: (1) `sc create SalesSystemService binPath="..." start=auto`, (2) `sc failure SalesSystemService reset=86400 actions=restart/60000/restart/300000/restart/900000`. Include desktop client shortcut in `[Icons]` — FILE: `Installer/setup.iss`
+
+**Checkpoint**: Service registers and starts automatically after install.
 
 ---
 
-## Phase 6: User Story 4 - Connection String is Secured at First Run (Priority: P2)
+## Phase 4: User Story 2 — Database Backup & Restore (P1)
 
-**Goal**: Automatic first-run connection security wrapping via machine-bound DPAPI.
+**Goal**: Manual backup, scheduled 2 AM backup, restore with single-user mode.  
+**Test**: Backup → drop DB → restore → all data accessible after re-login.
 
-**Independent Test**: Put cleartext string in `appsettings.json`, start service, confirm it is replaced with `DPAPI:` prefixed key, and app connects successfully.
+- [ ] T012 [US2] Add interface with: `Task<Result<string>> BackupAsync(CancellationToken ct)`, `Task<Result> RestoreAsync(string fileName, CancellationToken ct)`, `Task<Result<List<BackupFileDto>>> ListBackupsAsync()` — FILE: `SalesSystem/SalesSystem.Application/Interfaces/Services/IBackupService.cs` — RULE-006
 
-### Implementation for User Story 4
+- [ ] T013 [US2] Implement `BackupService`. Backup SQL: `BACKUP DATABASE [{db}] TO DISK=N'{path}' WITH FORMAT,INIT,STATS=10`. Restore SQL: first `ALTER DATABASE [{db}] SET SINGLE_USER WITH ROLLBACK AFTER 30`, then `RESTORE DATABASE ... WITH REPLACE,STATS=5`, then `ALTER DATABASE [{db}] SET MULTI_USER`. On restore failure catch: run `TrySetMultiUserAsync()`. Backup filename: `SalesSystem_{yyyyMMdd}_{HHmmss}.bak`. Retention cleanup: delete `.bak` files beyond configured `BackupRetentionDays` — FILE: `SalesSystem/SalesSystem.Infrastructure/Services/BackupService.cs` — RULE-003
 
-- [ ] T025 [US4] Implement `FirstRunSetupService` connection string auto-detector and atomic configuration writer in `SalesSystem/SalesSystem.Infrastructure/Services/FirstRunSetupService.cs`
-- [ ] T026 [US4] Integrate First-Run protector runner inside API Program pipeline in `SalesSystem/SalesSystem.Api/Program.cs`
-- [ ] T027 [US4] Build desktop startup connection validator and `DatabaseErrorDialog` triggers in `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs` and `SalesSystem/SalesSystem.DesktopPWF/Views/Dialogs/DatabaseErrorDialog.xaml`
+- [ ] T014 [US2] Implement `ScheduledBackupWorker : BackgroundService`. In `ExecuteAsync`: calculate delay to next 02:00 AM, `await Task.Delay(delay, ct)`, then call `IBackupService.BackupAsync()`. Loop. Log result with Serilog — FILE: `SalesSystem/SalesSystem.Api/BackgroundServices/ScheduledBackupWorker.cs` — RULE-035
 
-**Checkpoint**: User Story 4 complete - database configuration parameters are fully secured at runtime.
+- [ ] T015 [US2] Add `BackupController` with `[Authorize(Policy="AdminOnly")]`. Endpoints: `GET /api/v1/backup/list`, `POST /api/v1/backup`, `POST /api/v1/backup/restore` (body: `{ "fileName": "..." }`). FluentValidation: fileName NotEmpty, ends with `.bak` — FILE: `SalesSystem/SalesSystem.Api/Controllers/BackupController.cs` — RULE-025, RULE-038
 
----
+- [ ] T016 [US2] Add `IBackupApiService` interface and `BackupApiService` implementation using `IHttpClientFactory`. Methods: `ListBackupsAsync()`, `BackupNowAsync()`, `RestoreAsync(string fileName)`. All return `Result<T>` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/Api/BackupApiService.cs` — RULE-007
 
-## Phase 7: User Story 5 - Auto-Update Notifies and Applies Updates Silently (Priority: P3)
+- [ ] T017 [US2] Build `BackupView.xaml` (DataGrid of backup files + two buttons: "إنشاء نسخة احتياطية الآن" / "استعادة من النسخة المحددة") and `BackupViewModel.cs`. On restore: call `await _dialogService.ShowConfirmationAsync(...)` first. On success: call `_dialogService.ShowSuccessAsync(...)` then force logout. ViewModel calls `SetDialogService()` in constructor — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Settings/BackupView.xaml` + `ViewModels/Settings/BackupViewModel.cs` — RULE-054, RULE-055
 
-**Goal**: Background auto-update detection on client startup with SHA256 checksum validation.
-
-**Independent Test**: Mock a newer version manifest, launch desktop, check that login is immediate (non-blocked) and the background updater shows prompt after 3s.
-
-### Implementation for User Story 5
-
-- [ ] T028 [US5] Implement the `UpdaterService` for version comparisons, downloads, and checksum validations in `SalesSystem/SalesSystem.DesktopPWF/Services/App/UpdaterService.cs`
-- [ ] T029 [US5] Create the mock/update manifest endpoints in `SalesSystem/SalesSystem.Api/Controllers/UpdatesController.cs`
-- [ ] T030 [US5] Design the Update Dialog window and update prompt bindings in `SalesSystem/SalesSystem.DesktopPWF/Views/Updates/UpdateDialog.xaml` and `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Updates/UpdateDialogViewModel.cs`
-- [ ] T031 [US5] Set up background update checking worker registrations inside `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs`
-
-**Checkpoint**: User Story 5 complete - desktop client supports silent checks and integrity-verified auto-updates.
+**Checkpoint**: Manual backup creates `.bak` file. Restore brings back all data.
 
 ---
 
-## Phase 8: Polish & Cross-Cutting Concerns
+## Phase 5: User Story 3 — Settings & User Management (P2)
 
-**Purpose**: High-fidelity logging, code quality validations, and compilation warning resolution.
+**Goal**: Admin can edit store settings, manage users (soft-delete only, last-admin guard).  
+**Test**: Create Cashier user → login as Cashier → Settings screen not visible → 403 from API.
 
-- [ ] T032 [P] Clean up leftover debug Console writes and integrate Serilog EventLog sink for service modes in `SalesSystem/SalesSystem.Api/Program.cs`
-- [ ] T033 Verify decimal arithmetic and domain guard constraints across all new systems to enforce RULE-001, RULE-002, and RULE-009
-- [ ] T034 [P] Update and run all unit tests inside `SalesSystem/Tests` ensuring 100% pass rates across Domain, Application, Infrastructure, Api, and Desktop projects
-- [ ] T035 [P] Compile production release bundles and verify 0 compilation warnings across all project configurations
+- [ ] T018 [US3] Add `UpdateSettingsRequest` DTO and `UpdateSettingsRequestValidator` (StoreName NotEmpty MaxLength 200, DefaultTaxRate `>=0 <=100`, CostingMethod InclusiveBetween 1–3) — FILE: `SalesSystem/SalesSystem.Api/Validators/UpdateSettingsRequestValidator.cs` — RULE-044
+
+- [ ] T019 [US3] Update `SettingsController`: `GET /api/v1/settings` and `PUT /api/v1/settings`, both `[Authorize(Policy="AdminOnly")]`. Response includes `costingMethod` field. Service call returns `Result<T>` — FILE: `SalesSystem/SalesSystem.Api/Controllers/SettingsController.cs` — RULE-025
+
+- [ ] T020 [US3] Add to `UsersController`: `GET /api/v1/users?includeInactive=bool`, `POST /api/v1/users`, `PUT /api/v1/users/{id}`, `DELETE /api/v1/users/{id}` (soft delete only — `IsActive=false`), `PUT /api/v1/users/{id}/restore`. All `[Authorize(Policy="AdminOnly")]` — FILE: `SalesSystem/SalesSystem.Api/Controllers/UsersController.cs` — RULE-038
+
+- [ ] T021 [US3] In `UserService.DeactivateAsync()`: count active Admins first. If count == 1 and user is Admin → `return Result.Failure("لا يمكن إلغاء تفعيل آخر مسؤول في النظام")`. Never hard-delete — FILE: `SalesSystem/SalesSystem.Application/Services/UserService.cs` — RULE-006, RULE-012 (constitution XII)
+
+- [ ] T022 [P] [US3] Verify/update `SettingsApiService` has `GetSettingsAsync()` and `UpdateSettingsAsync(UpdateSettingsRequest)` returning `Result<T>` via `IHttpClientFactory` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/Api/SettingsApiService.cs` — RULE-007
+
+- [ ] T023 [P] [US3] Verify/update `UserApiService` has `GetAllAsync(bool includeInactive)`, `CreateAsync(CreateUserRequest)`, `UpdateAsync(int id, UpdateUserRequest)`, `DeactivateAsync(int id)`, `RestoreAsync(int id)` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/Api/UserApiService.cs`
+
+- [ ] T024 [US3] Build `UsersListView.xaml` + `UsersListViewModel.cs`. DataGrid columns: Id, FullName, UserName, RoleName, IsActive badge, CreatedAt. Toolbar: "مستخدم جديد" button opens `UserEditorView` via `ScreenWindowService.OpenScreen<UserEditorView, UserEditorViewModel>()`. Subscribe to `UserChangedMessage` on EventBus, unsubscribe in `Dispose()` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Users/UsersListView.xaml` + `ViewModels/Users/UsersListViewModel.cs` — RULE-012, RULE-013
+
+- [ ] T025 [US3] Build `UserEditorView.xaml` + `UserEditorViewModel.cs`. Fields: FullName*, UserName*, Password* (PasswordBox), Role ComboBox. Call `SetDialogService()` in constructor. `SaveCommand` always enabled. `Validate()` method shows `_dialogService.ShowWarningAsync(...)` listing all missing fields. On success: `_toastService.ShowSuccess("تم حفظ المستخدم")` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Users/UserEditorView.xaml` + `ViewModels/Users/UserEditorViewModel.cs` — RULE-054, RULE-059
+
+- [ ] T026 [US3] Update `SettingsView.xaml` + `SettingsViewModel.cs` to add CostingMethod radio buttons (3 options per `ui-contracts.md`) and bind to API. Load on navigate, save via `PUT /api/v1/settings` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Settings/SettingsView.xaml` + `ViewModels/SettingsViewModel.cs`
+
+- [ ] T027 [US3] Hide Settings and User Management sidebar items when `SessionService.CurrentUser.Role != Admin`. Sidebar XAML uses `Visibility` converter bound to role — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/MainWindow.xaml` — RULE-038
+
+**Checkpoint**: Non-admin users cannot see or access Settings/Users screens.
+
+---
+
+## Phase 6: User Story 4 — DPAPI First-Run Encryption (P2)
+
+**Goal**: Connection string auto-encrypted on first run; transparent decryption after.  
+**Test**: Plain-text string in `appsettings.json` → start API → string becomes `DPAPI:...` → app connects.
+
+- [ ] T028 [US4] Implement `FirstRunSetupService`. In `RunAsync()`: read current connection string from `appsettings.json`. If `!IsEncrypted(value)`: call `Protect(value)`, write back using atomic pattern (write to `.tmp` file → `File.Replace(tmp, target, backup)`). Use `System.Text.Json` to read/write — FILE: `SalesSystem/SalesSystem.Infrastructure/Services/FirstRunSetupService.cs` — RULE-040
+
+- [ ] T029 [US4] Register and call `FirstRunSetupService.RunAsync()` in `Program.cs` BEFORE `builder.Build()`. Then configure `DbContext` connection string: if encrypted, call `Unprotect()` first — FILE: `SalesSystem/SalesSystem.Api/Program.cs`
+
+- [ ] T030 [US4] In `App.xaml.cs` `OnStartup`: call `IDatabaseHealthCheckService.CheckAsync()` (up to 3 retries with 2s delay). On failure: show `DatabaseErrorDialog` (Retry/Exit). Only show `MainWindow` after health check passes — FILE: `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs` + `Views/Common/DatabaseErrorDialog.xaml` — RULE-054
+
+**Checkpoint**: `appsettings.json` shows `DPAPI:` prefix after first run. App connects normally.
+
+---
+
+## Phase 7: User Story 5 — Silent Auto-Update (P3)
+
+**Goal**: Background update check on startup; SHA256 verified; never blocks login.  
+**Test**: Mock manifest with newer version → login appears immediately → prompt appears after login.
+
+- [ ] T031 [US5] Implement `AutoUpdateService`. `CheckAndOfferUpdateAsync()`: use `CancellationTokenSource(TimeSpan.FromSeconds(8))`. Fetch manifest JSON from configured URL. Compare `System.Version.Parse(manifest.Version) > currentVersion`. Download file. Compute SHA256 and compare to manifest hash. If mismatch: `Log.Warning("SHA256 mismatch")` and return. Read/write `skippedVersion` from `%AppData%\SalesSystem\settings.json` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/App/AutoUpdateService.cs` — RULE-035, RULE-037
+
+- [ ] T032 [US5] Build `UpdateAvailableDialog.xaml` + `UpdateAvailableViewModel.cs`. Three buttons: "تثبيت الآن" (launches installer via `Process.Start()`), "تذكيري لاحقاً" (dismiss), "تخطي هذا الإصدار" (writes `skippedVersion` to settings.json) — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Common/UpdateAvailableDialog.xaml`
+
+- [ ] T033 [US5] In `App.xaml.cs` `OnStartup`: launch `_ = Task.Run(() => _autoUpdateService.CheckAndOfferUpdateAsync())` — fire and forget, never awaited on startup thread. Show update dialog on `Application.Current.Dispatcher` after check completes — FILE: `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs`
+
+**Checkpoint**: Login screen appears in < 3s regardless of update server reachability.
+
+---
+
+## Phase 8: Polish & Cross-Cutting
+
+- [ ] T034 [P] Register all new services in DI: `BackupApiService`, `AutoUpdateService`, `BackupViewModel`, `UsersListViewModel`, `UserEditorViewModel` in `App.xaml.cs`. Register `IBackupService`, `ScheduledBackupWorker`, `IConnectionStringProtector` in `Program.cs` — FILE: `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs` + `SalesSystem/SalesSystem.Api/Program.cs`
+
+- [ ] T035 [P] Add `CreateUserRequestValidator` (FullName NotEmpty MaxLength 150, UserName NotEmpty MaxLength 100 no spaces, Password MinLength 8, Role 1–3) — FILE: `SalesSystem/SalesSystem.Api/Validators/CreateUserRequestValidator.cs` — RULE-044
+
+- [ ] T036 Verify all new endpoints have `[Authorize]`. Verify all new service methods return `Result<T>`. Verify no `MessageBox.Show` anywhere in Desktop. Search with: `grep -r "MessageBox.Show" SalesSystem/SalesSystem.DesktopPWF/` — RULE-038, RULE-006, RULE-055
+
+- [ ] T037 [P] Update `docs/CHANGELOG.md` and `docs/MASTER-PLAN.md` version history with v4.6.4 entry covering: Windows Service, DPAPI, Backup/Restore, User Management, Auto-Update, Inno Setup installer
 
 ---
 
 ## Dependencies & Execution Order
 
-### Phase Dependencies
-1. **Setup (Phase 1)**: No dependencies - executes immediately.
-2. **Foundational (Phase 2)**: Depends on Phase 1 - BLOCKS all User Story work.
-3. **User Stories (Phases 3-7)**: Depend on Phase 2 completion. Can execute in priority order: P1 (US1, US2) → P2 (US3, US4) → P3 (US5).
-4. **Polish (Phase 8)**: Executes after all target user stories are implemented.
-
-### Parallel Opportunities [P]
-* Shared setup (T002, T003) can run in parallel.
-* Foundational DPAPI and Health check structures (T004, T005, T006) can execute in parallel.
-* Once Phase 2 is complete, US1, US2, and US3 are largely decoupled and can be implemented in parallel if multiple resources are available.
-* All polish tasks marked with `[P]` (T032, T034, T035) can be executed concurrently.
-
----
-
-## Parallel Example: Foundational Phase
-```powershell
-# Implement independent foundaton modules together:
-Task: "T004 Implement database connectivity health checks in HealthController.cs"
-Task: "T005 Implement connection string security using DPAPI in ConnectionStringProtector.cs"
-```
+| Phase | Depends On | Can Parallel With |
+|-------|-----------|-------------------|
+| Phase 1 (Setup) | — | All T002, T003 in parallel |
+| Phase 2 (Foundational) | Phase 1 | T005, T006 in parallel |
+| Phase 3 (US1 Installer) | Phase 2 | Phase 4 (US2) |
+| Phase 4 (US2 Backup) | Phase 2 | Phase 3 (US1) |
+| Phase 5 (US3 Settings) | Phase 2 | Phase 6 (US4) |
+| Phase 6 (US4 DPAPI) | Phase 2 | Phase 5 (US3) |
+| Phase 7 (US5 Update) | Phase 2 | After P1 stories |
+| Phase 8 (Polish) | All phases | T034, T035 in parallel |
 
 ---
 
 ## Implementation Strategy
 
-### MVP Release (P1 Scope)
-1. Complete Setup and Foundational prerequisites.
-2. Deliver **User Story 1** (Self-contained Installer) and **User Story 2** (Database Backups).
-3. Validate clean installation and manual backup/restore behaviors.
+### MVP (P1 only — deliver first)
+1. Phase 1 + Phase 2 (foundation)
+2. Phase 4 (US2 — Backup/Restore) — highest business value
+3. Phase 3 (US1 — Installer)
 
-### Continuous Security Integration
-1. Layer on connection security (**User Story 4**) to lock configuration files.
-2. Deploy User administration panels (**User Story 3**) to lock down endpoints.
-3. Configure final updates (**User Story 5**) to distribute subsequent builds.
+### Full Release
+4. Phase 6 (US4 — DPAPI security)
+5. Phase 5 (US3 — Settings/Users)
+6. Phase 7 (US5 — Auto-update)
+7. Phase 8 (Polish + DI wiring)
+
+---
+
+## Key Patterns (copy into implementation)
+
+```csharp
+// Every service method — RULE-006
+public async Task<Result<T>> DoSomethingAsync(CancellationToken ct)
+{
+    try { ... return Result<T>.Success(value); }
+    catch (Exception ex) { _logger.LogError(ex, "..."); return Result<T>.Failure("حدث خطأ"); }
+}
+
+// Every Editor ViewModel constructor — RULE-054, RULE-059
+public MyEditorViewModel(IDialogService dialogService, ...)
+{
+    SetDialogService(dialogService);
+    SaveCommand = new AsyncRelayCommand(SaveAsync);  // NO CanExecute predicate
+}
+
+// EventBus subscription — RULE-012
+_subscription = _eventBus.Subscribe<EntityChangedMessage>(_ => _ = LoadAsync());
+public void Dispose() { _subscription?.Dispose(); }
+```
