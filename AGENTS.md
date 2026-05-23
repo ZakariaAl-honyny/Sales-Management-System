@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/007-multi-window/plan.md](specs/007-multi-window/plan.md)
+**Active Feature Plan**: [specs/007-production-readiness/plan.md](specs/007-production-readiness/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
