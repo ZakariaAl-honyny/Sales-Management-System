@@ -1050,3 +1050,17 @@ I do not recommend that:
 - Any change occurs
 - Is published as a message
 - Every interested Control reloads from the API
+
+---
+
+# 17) Settings Screen (Costing Method Selector) [v4.6.3]
+
+The System Settings module exposes store configuration settings:
+- **Costing Method Selection**:
+  - A RadioButton group allows the administrator to choose the costing strategy:
+    1. **Weighted Average (`متوسط التكلفة المرجح`)** — Default costing method. Computes average costs iteratively upon purchase posting.
+    2. **Last Purchase Price (`آخر سعر توريد`)** — Overwrites product unit average cost directly with incoming invoice cost.
+    3. **Supplier Catalog Price (`سعر المورد`)** — Employs a pre-defined supplier price table.
+  - Under each option, explicit Arabic helper labels explain the operational consequences of the choice.
+- **Actions Control**:
+  - Save button "حفظ الإعدادات" is persistently enabled to avoid confusing the user. On click, it performs verification, persists values via the HTTP API settings client, and triggers standard Success toasts.

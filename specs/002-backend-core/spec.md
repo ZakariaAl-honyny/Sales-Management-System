@@ -3,7 +3,7 @@
 **Feature Branch**: `002-backend-core`  
 **Created**: 2026-05-06  
 **Status**: Draft  
-**Input**: User description: "Phase 2 — Backend Core" (PRD-MVP-v3.0 §7 Phase 2)
+**Input**: User description: "Phase 2 — Backend Core" (PRD-MVP §7 Phase 2)
 
 ## User Scenarios & Testing *(mandatory)*
 

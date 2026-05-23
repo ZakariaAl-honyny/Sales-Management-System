@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -70,7 +71,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Create_WhenValidRequest_ReturnsCreatedAtAction()
     {
-        var request = new CreateCustomerRequest("عميل جديد", "C001", 0.00m, null, null, null, 0.00m);
+        var request = new CreateCustomerRequest("عميل جديد", null, null, null, null, 0.00m);
         var createdCustomer = CreateCustomerDto(1);
         CustomerServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(createdCustomer));
@@ -83,7 +84,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Create_WhenServiceFails_ReturnsBadRequest()
     {
-        var request = new CreateCustomerRequest("عميل جديد", "C001", 0.00m, null, null, null, 0.00m);
+        var request = new CreateCustomerRequest("عميل جديد", null, null, null, null, 0.00m);
         CustomerServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<CustomerDto>("اسم العميل موجود مسبقاً"));
 
@@ -95,7 +96,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedCustomer()
     {
-        var request = new UpdateCustomerRequest("عميل محدث", "C001", null, null, null, 0.00m, 0.00m, true);
+        var request = new UpdateCustomerRequest("عميل محدث", null, null, null, null, 0.00m, true);
         var updatedCustomer = CreateCustomerDto(1);
         CustomerServiceMock.Setup(x => x.UpdateAsync(1, request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(updatedCustomer));
@@ -108,7 +109,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Update_WhenCustomerNotFound_ReturnsBadRequest()
     {
-        var request = new UpdateCustomerRequest("عميل محدث", "C001", null, null, null, 0.00m, 0.00m, true);
+        var request = new UpdateCustomerRequest("عميل محدث", null, null, null, null, 0.00m, true);
         CustomerServiceMock.Setup(x => x.UpdateAsync(999, request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<CustomerDto>("العميل غير موجود"));
 
@@ -163,11 +164,11 @@ public class CustomersControllerTests : ControllerTestBase
 
     private static CustomerDto CreateCustomerDto(int id) => new(
         Id: id,
-        Code: $"C{id:D3}",
         Name: $"عميل {id}",
         Phone: null,
         Email: null,
         Address: null,
+        TaxNumber: null,
         OpeningBalance: 0.00m,
         CurrentBalance: 0.00m,
         CreditLimit: 1000.00m,

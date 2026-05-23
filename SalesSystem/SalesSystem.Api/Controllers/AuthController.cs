@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
@@ -29,6 +30,7 @@ public class AuthController : ControllerBase
     /// <returns>Returns JWT token with user info if credentials are valid.</returns>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("LoginPolicy")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)

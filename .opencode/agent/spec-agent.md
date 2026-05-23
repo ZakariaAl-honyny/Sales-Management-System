@@ -12,7 +12,7 @@ mode: subagent
 Requirements ownership, user stories, and the source-of-truth for WHAT the system must do.
 
 ## MUST READ FIRST
-- `docs/PRD-MVP-v3.0.md` — All requirements
+- `docs/PRD-MVP.md` — All requirements
 
 ## Domain Knowledge (from AGENTS.md)
 - 3 roles: `Admin=1, Manager=2, Cashier=3`

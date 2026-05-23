@@ -9,6 +9,7 @@ using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -70,7 +71,7 @@ public class SalesServiceTests : IDisposable
         _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("INV-2026-000001"));
 
-        _mockInventoryService.Setup(i => i.ValidateStockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()))
+        _mockInventoryService.Setup(i => i.ValidateStockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
         _mockInventoryService.Setup(i => i.DecreaseStockAsync(
@@ -114,7 +115,7 @@ public class SalesServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Setup stock validation to FAIL
-        _mockInventoryService.Setup(i => i.ValidateStockAsync(1, 1, 100m, It.IsAny<CancellationToken>()))
+        _mockInventoryService.Setup(i => i.ValidateStockAsync(1, 1, 100m, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Failure("المخزون غير كافٍ"));
 
         _output.WriteLine("[STEP 1] Calling PostAsync with insufficient stock...");
@@ -177,7 +178,7 @@ public class SalesServiceTests : IDisposable
         _output.WriteLine("[TEST] GivenDraftInvoice_WhenCancelling_ThenNoStockOrBalanceChanges");
 
         var warehouse = Warehouse.Create(name: "Main Warehouse", isDefault: true);
-        var product = Product.Create(name: "Test Product", purchasePrice: 10m, salePrice: 100m);
+        var product = Product.Create(name: "Test Product", purchasePrice: 10m, retailPrice: 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -221,7 +222,7 @@ public class SalesServiceTests : IDisposable
 
         // Setup warehouse and product first (same as Draft test)
         var warehouse = Warehouse.Create(name: "Main Warehouse", isDefault: true);
-        var product = Product.Create(name: "Test Product", purchasePrice: 10m, salePrice: 100m);
+        var product = Product.Create(name: "Test Product", purchasePrice: 10m, retailPrice: 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -426,6 +427,50 @@ public class SalesServiceTests : IDisposable
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

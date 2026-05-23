@@ -1188,7 +1188,6 @@ public class InvoiceLineViewModel : ViewModelBase
         }
     }
 
-    public bool CanSave => !HasErrors && SelectedProduct != null && Quantity > 0;
 }
 
 public class PaymentTypeItem

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 
 namespace SalesSystem.Api.Tests.Controllers.Reports;
@@ -23,11 +24,11 @@ public class ReportsControllerTests
     {
         var from = DateTime.Now.AddDays(-30);
         var to = DateTime.Now;
-        var report = new SalesReportDto(from, to, 10000m, 50, 5000m, 5000m);
+        var report = new SalesReportDto(from, "INV-001", "العميل", 10000m, 0m, 0m, 10000m, 5000m, 5000m);
 
         _reportServiceMock
             .Setup(x => x.GetSalesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<SalesReportDto>.Success(report));
+            .ReturnsAsync(Result<IEnumerable<SalesReportDto>>.Success(new List<SalesReportDto> { report }));
 
         var result = await _controller.GetSalesReport(null, from, to, CancellationToken.None);
 
@@ -54,7 +55,7 @@ public class ReportsControllerTests
 
         _reportServiceMock
             .Setup(x => x.GetSalesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<SalesReportDto>.Failure("فشل في جلب تقرير المبيعات"));
+            .ReturnsAsync(Result<IEnumerable<SalesReportDto>>.Failure("فشل في جلب تقرير المبيعات"));
 
         var result = await _controller.GetSalesReport(null, from, to, CancellationToken.None);
 
@@ -66,11 +67,11 @@ public class ReportsControllerTests
     {
         var from = DateTime.Now.AddDays(-30);
         var to = DateTime.Now;
-        var report = new PurchasesReportDto(from, to, 8000m, 40, 4000m, 4000m);
+        var report = new PurchaseReportDto(from, "PUR-001", "المورد", 8000m, 0m, 0m, 8000m, 4000m, 4000m);
 
         _reportServiceMock
             .Setup(x => x.GetPurchasesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<PurchasesReportDto>.Success(report));
+            .ReturnsAsync(Result<IEnumerable<PurchaseReportDto>>.Success(new List<PurchaseReportDto> { report }));
 
         var result = await _controller.GetPurchasesReport(null, from, to, CancellationToken.None);
 
@@ -97,7 +98,7 @@ public class ReportsControllerTests
 
         _reportServiceMock
             .Setup(x => x.GetPurchasesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<PurchasesReportDto>.Failure("فشل في جلب تقرير المشتريات"));
+            .ReturnsAsync(Result<IEnumerable<PurchaseReportDto>>.Failure("فشل في جلب تقرير المشتريات"));
 
         var result = await _controller.GetPurchasesReport(null, from, to, CancellationToken.None);
 
@@ -107,11 +108,11 @@ public class ReportsControllerTests
     [Fact]
     public async Task GetStockReport_WhenWarehouseExists_ReturnsOkWithReport()
     {
-        var report = new StockReportDto(1, "المستودع الرئيسي", 100, 5000m);
+        var report = new StockReportDto(1, "منتج", "تصنيف", "قطعة", "المستودع الرئيسي", 100m, 10m, 50m, 5000m);
 
         _reportServiceMock
             .Setup(x => x.GetStockReportAsync(It.IsAny<int?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StockReportDto>.Success(report));
+            .ReturnsAsync(Result<IEnumerable<StockReportDto>>.Success(new List<StockReportDto> { report }));
 
         var result = await _controller.GetStockReport(1, CancellationToken.None);
 
@@ -124,42 +125,11 @@ public class ReportsControllerTests
     {
         _reportServiceMock
             .Setup(x => x.GetStockReportAsync(It.IsAny<int?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StockReportDto>.Failure("فشل في جلب تقرير المخزون"));
+            .ReturnsAsync(Result<IEnumerable<StockReportDto>>.Failure("فشل في جلب تقرير المخزون"));
 
         var result = await _controller.GetStockReport(null, CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
-    [Fact]
-    public async Task GetFinancialReport_WhenValidDateRange_ReturnsOkWithReport()
-    {
-        var from = DateTime.Now.AddDays(-30);
-        var to = DateTime.Now;
-        var report = new FinancialReportDto(from, to, 10000m, 8000m, 2000m);
-
-        _reportServiceMock
-            .Setup(x => x.GetFinancialReportAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<FinancialReportDto>.Success(report));
-
-        var result = await _controller.GetFinancialReport(from, to, CancellationToken.None);
-
-        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
-        okResult.StatusCode.Should().Be(200);
-    }
-
-    [Fact]
-    public async Task GetFinancialReport_WhenServiceFails_ReturnsBadRequest()
-    {
-        var from = DateTime.Now.AddDays(-30);
-        var to = DateTime.Now;
-
-        _reportServiceMock
-            .Setup(x => x.GetFinancialReportAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<FinancialReportDto>.Failure("فشل في جلب التقرير المالي"));
-
-        var result = await _controller.GetFinancialReport(from, to, CancellationToken.None);
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
 }

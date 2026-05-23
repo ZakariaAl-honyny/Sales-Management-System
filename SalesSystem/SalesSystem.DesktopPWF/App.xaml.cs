@@ -20,6 +20,7 @@ using SalesSystem.DesktopPWF.ViewModels.Payments;
 using SalesSystem.DesktopPWF.ViewModels.Returns;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
 using SalesSystem.DesktopPWF.ViewModels.Categories;
+using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
 using SalesSystem.DesktopPWF.Views.Updates;
@@ -227,6 +228,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<UnitEditorViewModel>();
         services.AddTransient<ReportsViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<CostingMethodSettingsViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()
@@ -278,11 +280,9 @@ public partial class App : System.Windows.Application
         var errorMessage = $"[UI THREAD EXCEPTION] Location: {e.Exception.Source} -> {e.Exception.TargetSite}. Context: WPF Dispatcher Unhandled Exception.";
         Log.Error(e.Exception, errorMessage);
 
-        System.Windows.MessageBox.Show(
-            $"حدث خطأ غير متوقع في واجهة المستخدم: {e.Exception.Message}\n\nتم تسجيل التفاصيل التشخيصية للذكاء الاصطناعي في ملف Logs.",
-            "خطأ في النظام (PWF)",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
+        new Views.Dialogs.FallbackErrorDialog(
+            $"حدث خطأ غير متوقع في واجهة المستخدم: {e.Exception.Message}\n\nتم تسجيل التفاصيل التشخيصية للذكاء الاصطناعي في ملف Logs.")
+            .ShowDialog();
 
         e.Handled = true;
     }

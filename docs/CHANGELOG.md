@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.1] - 2026-05-23
+### Added
+- **v4.6.3 — Architecture Alignment & Code Quality Audit**:
+  - Relocated Settings ViewModels (`CostingMethodSettingsViewModel`) and Views (`CostingMethodSettingsView`) from the root folder to their proper folders `ViewModels/Settings` and `Views/Settings`.
+  - Refactored `CostingMethodSettingsViewModel` to fetch costing settings via `ISettingsApiService.GetSettingsAsync()` and save via API, respecting clean architecture (no direct Infrastructure database connection).
+  - Registered `CostingMethodSettingsViewModel` as a transient service in `App.xaml.cs` for DI resolution.
+  - Replaced the unhandled exception handler's `MessageBox.Show` call in `App.xaml.cs` with a thread-safe dialog overlay fallback.
+  - Fixed compiled CS0108 member hiding warnings across list ViewModels (`ReportsViewModel`, `WarehouseListViewModel`, `SupplierPaymentsListViewModel`, `StockTransfersListViewModel`) by removing shadowed `DialogService` properties.
+  - Fixed garbled Arabic encoding issues in `StockTransfersListViewModel.cs` and `SupplierPaymentsListViewModel.cs`.
+  - Wrapped 21+ `async void` commands and initialization methods across ViewModels with robust try-catch logging patterns to prevent silent app crashes.
+
+### Files Modified
+- `App.xaml.cs`, `Services/App/DialogService.cs`, `ViewModels/Settings/CostingMethodSettingsViewModel.cs`, `Views/Settings/CostingMethodSettingsView.xaml`, `ViewModels/ReportsViewModel.cs`, `ViewModels/WarehouseListViewModel.cs`, `ViewModels/Payments/SupplierPaymentsListViewModel.cs`, `ViewModels/Transfers/StockTransfersListViewModel.cs`, `docs/CHANGELOG.md`, `docs/PRD-MVP.md`, `docs/database-schema.md`, `docs/ui-screens.md`, `docs/MASTER-PLAN.md`, `README.md`, `AGENTS.md`, `.opencode/agent/implement-agent.md`, `.opencode/agent/code-reviewer.md`, `.opencode/agent/ui-agent.md`, `.opencode/agent/backend-architect.md`, `.opencode/agent/database-engineer.md`, `.opencode/agent/security-auditor.md`, `.opencode/agent/test-engineer.md`
+
 ## [1.9.0] - 2026-05-23
 ### Added
 - **v4.6.2 — WPF Validation ErrorTemplate & INotifyDataErrorInfo Standardization**:

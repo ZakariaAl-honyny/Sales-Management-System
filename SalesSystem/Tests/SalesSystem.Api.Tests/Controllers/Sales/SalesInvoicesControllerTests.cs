@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using FluentAssertions;
+using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Tests.Controllers.Sales;
@@ -26,7 +28,7 @@ public class SalesInvoicesControllerTests : ControllerTestBase
             Page = 1, PageSize = 10, TotalCount = 2
         };
 
-        SalesServiceMock.Setup(x => x.GetAllAsync(null, null, null, null, null, false, 1, 10, It.IsAny<CancellationToken>()))
+        SalesServiceMock.Setup(x => x.GetAllAsync(null, null, null, null, null, 1, 10, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(expectedResult));
 
         var result = await _controller.GetAll(null, null, null, null, null, false, 1, 10, CancellationToken.None);
@@ -37,7 +39,7 @@ public class SalesInvoicesControllerTests : ControllerTestBase
     [Fact]
     public async Task GetAll_WhenServiceFails_ReturnsBadRequest()
     {
-        SalesServiceMock.Setup(x => x.GetAllAsync(null, null, null, null, null, false, 1, 10, It.IsAny<CancellationToken>()))
+        SalesServiceMock.Setup(x => x.GetAllAsync(null, null, null, null, null, 1, 10, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<PagedResult<SalesInvoiceDto>>("حدث خطأ"));
 
         var result = await _controller.GetAll(null, null, null, null, null, false, 1, 10, CancellationToken.None);
@@ -50,12 +52,12 @@ public class SalesInvoicesControllerTests : ControllerTestBase
     {
         var customerId = 5;
         var pagedResult = new PagedResult<SalesInvoiceDto> { Items = new List<SalesInvoiceDto>(), Page = 1, PageSize = 10, TotalCount = 0 };
-        SalesServiceMock.Setup(x => x.GetAllAsync(customerId, null, null, null, null, false, 1, 10, It.IsAny<CancellationToken>()))
+        SalesServiceMock.Setup(x => x.GetAllAsync(customerId, null, null, null, null, 1, 10, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(pagedResult));
 
         await _controller.GetAll(customerId, null, null, null, null, false, 1, 10, CancellationToken.None);
 
-        SalesServiceMock.Verify(x => x.GetAllAsync(customerId, null, null, null, null, false, 1, 10, It.IsAny<CancellationToken>()), Times.Once);
+        SalesServiceMock.Verify(x => x.GetAllAsync(customerId, null, null, null, null, 1, 10, false, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -219,21 +221,21 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         Status: status,
         Items: new List<SalesInvoiceItemDto>
         {
-            new(id * 10, 1, null, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m)
+            new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
         });
 
     private static CreateSalesInvoiceRequest CreateValidRequest() => new(
-        CustomerId: 1,
         WarehouseId: 1,
+        CustomerId: 1,
         InvoiceDate: null,
         DueDate: null,
         PaymentType: PaymentType.Cash,
         DiscountAmount: 0.00m,
-        TaxRate: 15.00m,
+        TaxAmount: 15.00m,
         PaidAmount: 50.00m,
         Notes: null,
         Items: new List<CreateSalesInvoiceItemRequest>
         {
-            new(ProductId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m, Notes: null)
+            new(ProductId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m, Mode: SaleMode.Retail, Notes: null)
         });
 }

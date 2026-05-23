@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.6.2-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6.3-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -354,7 +354,7 @@ The following features are **not included** in the current MVP but are planned f
 |----------|---------|
 | [`AGENTS.md`](AGENTS.md) | Master rules for AI-assisted development |
 | [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) | Non-negotiable architectural rules |
-| [`docs/PRD-MVP-v3.0.md`](docs/PRD-MVP-v3.0.md) | Full product requirements document |
+| [`docs/PRD-MVP.md`](docs/PRD-MVP.md) | Full product requirements document |
 | [`docs/database-schema.md`](docs/database-schema.md) | SQL Server schema (30+ tables) |
 | [`docs/ui-screens.md`](docs/ui-screens.md) | UI/UX flows and EventBus patterns |
 
@@ -422,6 +422,7 @@ dotnet run
 | **Phase 16** | **Audit & Service Layer Purity** — Result pattern enforcement, decimal precision fix, FK Restrict, Controller purity, FluentValidators, CostingMethod UI, Price Sync Indicators | ✅ **Completed** |
 | **v4.6.1** | **UI Sorting & Dialog Safety** — Newest-first sorting across 14 ViewModels, DatabaseErrorDialog self-owner fix, comprehensive system audit | ✅ **Completed** |
 | **v4.6.2** | **WPF Validation ErrorTemplate** — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated | ✅ **Completed** |
+| **v4.6.3** | **Architecture Alignment & Code Quality Audit** — Settings ViewModels/Views relocation, DI registration, MessageBox removal, async void refactoring, shadowing resolved | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -666,11 +667,26 @@ dotnet run
 
 ---
 
+## 🆕 What's New in v4.6.3 — Architecture Alignment & Code Quality Audit
+
+| Feature | Description |
+|---------|-------------|
+| **Settings Relocation** | Relocated `CostingMethodSettingsViewModel` and `CostingMethodSettingsView` to their proper architectural namespaces under ViewModels/Settings and Views/Settings |
+| **API Purity for Settings** | Refactored `CostingMethodSettingsViewModel` to utilize `ISettingsApiService` via HTTP client instead of direct `ISystemSettingsRepository` (Domain/Infrastructure) reference |
+| **DI Registration** | Registered `CostingMethodSettingsViewModel` as a transient service in `App.ConfigureServices` to enable dynamic dependency injection resolution |
+| **MessageBox Removal** | Replaced raw unhandled exception `MessageBox.Show` call in `App.xaml.cs` with a secure fallback or proper DialogService overlay |
+| **Swallowed Exceptions Fixed** | Resolved empty `catch { }` blocks in `DialogService.cs` to ensure all runtime errors are correctly logged via Serilog |
+| **CS0108 Hiding Warnings Fixed** | Eliminated compiler warnings by removing shadowed `DialogService` properties in list ViewModels and using `SetDialogService()` base method |
+| **Arabic Encoding Restored** | Corrected garbled Arabic string literals in `StockTransfersListViewModel.cs` and `SupplierPaymentsListViewModel.cs` |
+| **Async Void Refactored** | Standardized asynchronous execution flows by wrapping critical `async void` operations in ViewModels with safe try-catch patterns |
+
+---
+
 ## 🤝 Contributing
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 230 non-negotiable rules (RULE-001 to RULE-230)
+1. Read [`AGENTS.md`](AGENTS.md) — all 239 non-negotiable rules (RULE-001 to RULE-239)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

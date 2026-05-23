@@ -15,7 +15,7 @@ Write production-quality C# code that exactly implements the patterns from AGENT
 - `AGENTS.md` — All rules, enums, forbidden patterns, checklist
 - `docs/CONSTITUTION.md` — Financial formulas, transaction protocol
 - `docs/database-schema.md` — SQL types and constraints
-- `docs/PRD-MVP-v3.0.md` — Exact C# patterns to follow
+- `docs/PRD-MVP.md` — Exact C# patterns to follow
 
 ## Code Patterns
 
@@ -696,3 +696,25 @@ When implementing Editor ViewModels:
 4. **Never** create `HasXxxError` boolean + `XxxError` computed string properties — use `INotifyDataErrorInfo` instead
 
 The ErrorTemplate in Styles.xaml renders red border + ❗ icon with ToolTip automatically for any control with `Validation.HasError = true`.
+
+### Bug Fix & Quality Audit Mode (v4.6.3 — Default Assistant)
+
+When performing bug fixing or code quality remediation:
+
+1. **Architecture Boundary Enforcement**:
+   - Desktop ViewModels and Services MUST call the API via HTTP client services (e.g., `ISettingsApiService`) and NEVER reference repositories or DbContext directly.
+   - Register all Settings ViewModels in the `App.xaml.cs` ConfigureServices container using `services.AddTransient<VM>()`.
+
+2. **CS0108 Member Hiding Resolution**:
+   - When a base class (like `ViewModelBase`) defines a helper property (like `DialogService`), derived ViewModels MUST NOT declare a parallel private or public property/field of the same name.
+   - Use the base class property directly and initialize it using base methods (like `SetDialogService()`).
+
+3. **Unhandled Exception Thread Safety**:
+   - Unhandled exception handlers in `App.xaml.cs` must avoid using raw, blocking `MessageBox.Show()`. Utilize styled dialog overlays or thread-safe logging and graceful shutdown fallbacks.
+
+4. **Robust Async Operations**:
+   - Wrap all fire-and-forget `async void` operations (such as data initialization, clicks, searches) in try-catch-finally blocks or delegate execution to `ExecuteAsync()` to avoid silent application failures.
+   - Standardize on `async Task` methods for non-event handler asynchronous methods.
+
+5. **Arabic Encoding and String Literals**:
+   - Ensure all user-facing Arabic string literals are encoded in UTF-8 to prevent Mojibake (garbled text) in UI dropdowns, menus, and message dialogs.

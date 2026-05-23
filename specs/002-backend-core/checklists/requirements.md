@@ -32,5 +32,5 @@
 ## Notes
 
 - All items pass. Specification is ready for `/speckit-plan`.
-- 6 user stories cover the full Phase 2 scope from PRD-MVP-v3.0.
+- 6 user stories cover the full Phase 2 scope from PRD-MVP.
 - No [NEEDS CLARIFICATION] markers — all requirements are derived from the PRD and Constitution which provide comprehensive detail.

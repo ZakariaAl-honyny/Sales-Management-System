@@ -9,6 +9,7 @@ using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -99,11 +100,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesUnit");
 
-        var request = new SalesSystem.Contracts.Requests.CreateUnitRequest
-        {
-            Name = "Piece",
-            Symbol = "pcs"
-        };
+        var request = new SalesSystem.Contracts.Requests.CreateUnitRequest("Piece", "pcs");
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -123,10 +120,7 @@ public class UnitServiceTests : IDisposable
         _dbContext.Units.Add(existing);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateUnitRequest
-        {
-            Name = "Kilogram" // Duplicate
-        };
+        var request = new SalesSystem.Contracts.Requests.CreateUnitRequest("Kilogram", null); // Duplicate
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -149,12 +143,7 @@ public class UnitServiceTests : IDisposable
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateUnitRequest
-        {
-            Name = "Kilogram",
-            Symbol = "KG",
-            IsActive = true
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateUnitRequest("Kilogram", "KG", true);
 
         var result = await _sut.UpdateAsync(unit.Id, request, CancellationToken.None);
 
@@ -170,11 +159,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_NonExistentUnit_ReturnsNotFound");
 
-        var request = new SalesSystem.Contracts.Requests.UpdateUnitRequest
-        {
-            Name = "Updated",
-            IsActive = true
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateUnitRequest("Updated", null, true);
 
         var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
 
@@ -197,7 +182,7 @@ public class UnitServiceTests : IDisposable
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Product", 10m, 100m, 0, "P001", null, null, unit.Id, null, null);
+        var product = Product.Create("Product", 10m, 100m, barcode: "P001", categoryId: unit.Id);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -240,7 +225,7 @@ public class UnitServiceTests : IDisposable
         _dbContext.Units.Add(unit2);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.GetAllAsync("kg", 1, 10, CancellationToken.None);
+        var result = await _sut.GetAllAsync("kg", 1, 10, false, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Items.Should().HaveCount(1);
@@ -296,6 +281,50 @@ public class UnitServiceTests : IDisposable
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

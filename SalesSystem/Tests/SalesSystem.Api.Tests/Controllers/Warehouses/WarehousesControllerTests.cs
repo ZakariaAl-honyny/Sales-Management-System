@@ -28,7 +28,7 @@ public class WarehousesControllerTests
             new(1, "المستودع الرئيسي", "الرياض", false, true),
             new(2, "المستودع الفرعي", "جدة", false, true)
         };
-        var pagedResult = new PagedResult<WarehouseDto>(warehouses, 2, 1, 10);
+        var pagedResult = PagedResult<WarehouseDto>.Create(warehouses, 2, 1, 10);
 
         _warehouseServiceMock
             .Setup(x => x.GetAllAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))

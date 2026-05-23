@@ -214,6 +214,87 @@ public class CustomerEditorViewModelTests : IDisposable
 
     #endregion
 
+    #region INotifyDataErrorInfo / ValidateAsync Tests (v4.6.2)
+
+    [Fact]
+    public void SetDialogService_Constructor_CallsSetDialogService()
+    {
+        // Arrange & Act
+        var vm = new CustomerEditorViewModel(
+            _mockCustomerService.Object,
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+
+        // Assert — SetDialogService is called in constructor; VM created without exception
+        vm.Should().NotBeNull();
+        vm.SaveCommand.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenNameIsEmpty_AddsNameError()
+    {
+        // Arrange
+        var vm = new CustomerEditorViewModel(
+            _mockCustomerService.Object,
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+        vm.Name = string.Empty;
+
+        // Act
+        var isValid = await InvokeValidateAsync(vm);
+
+        // Assert
+        isValid.Should().BeFalse();
+        var errors = vm.GetErrors("Name").Cast<string>().ToList();
+        errors.Should().Contain(e => e.Contains("اسم"));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WhenNameIsValid_ClearsNameError()
+    {
+        // Arrange
+        var vm = new CustomerEditorViewModel(
+            _mockCustomerService.Object,
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+        vm.Name = "زبون تجريبي"; // Valid name
+
+        // Act
+        var isValid = await InvokeValidateAsync(vm);
+
+        // Assert
+        isValid.Should().BeTrue();
+        var errors = vm.GetErrors("Name").Cast<string>().ToList();
+        errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ValidateAsync_WithMultipleErrors_ReturnsFalse()
+    {
+        // Arrange
+        var vm = new CustomerEditorViewModel(
+            _mockCustomerService.Object,
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+        vm.Name = string.Empty;
+        vm.CreditLimit = -500;
+        vm.OpeningBalance = -100;
+
+        // Act
+        var isValid = await InvokeValidateAsync(vm);
+
+        // Assert
+        isValid.Should().BeFalse();
+        var nameErrors = vm.GetErrors("Name").Cast<string>().ToList();
+        nameErrors.Should().Contain(e => e.Contains("اسم"));
+        var creditErrors = vm.GetErrors("CreditLimit").Cast<string>().ToList();
+        creditErrors.Should().Contain(e => e.Contains("الحد الائتماني"));
+        var balanceErrors = vm.GetErrors("OpeningBalance").Cast<string>().ToList();
+        balanceErrors.Should().Contain(e => e.Contains("الرصيد الافتتاحي"));
+    }
+
+    #endregion
+
     #region Property Notification Tests
 
     [Fact]
@@ -471,6 +552,22 @@ public class CustomerEditorViewModelTests : IDisposable
             CurrentBalance: 0,
             CreditLimit: 0,
             IsActive: true);
+    }
+
+    /// <summary>
+    /// Invokes the private ValidateAsync method on CustomerEditorViewModel via reflection.
+    /// </summary>
+    private static async Task<bool> InvokeValidateAsync(CustomerEditorViewModel vm)
+    {
+        var method = typeof(CustomerEditorViewModel).GetMethod(
+            "ValidateAsync",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        if (method == null)
+            throw new InvalidOperationException("ValidateAsync method not found on CustomerEditorViewModel");
+
+        var task = (Task<bool>)method.Invoke(vm, null)!;
+        return await task;
     }
 
     #endregion

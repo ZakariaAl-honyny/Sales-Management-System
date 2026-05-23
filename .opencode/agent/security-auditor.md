@@ -148,6 +148,10 @@ var connectionString = Environment.GetEnvironmentVariable(
     "DefaultConnection": "USE_ENVIRONMENT_VARIABLE"
   }
 }
+
+### 6. DPAPI Connection Security (v4.6.3)
+- Verify that database connection strings stored in appsettings.json or configuration files are protected using DPAPI via `IConnectionStringProtector` and have the `"DPAPI:"` prefix.
+- Double-encryption MUST be guarded against by calling `IsEncrypted` before protecting.
 ```
 
 ## Audit Prompt

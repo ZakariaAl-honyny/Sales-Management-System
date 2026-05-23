@@ -148,35 +148,8 @@ public class UserService : IUserService
 
     public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
     {
-        var user = await _uow.Users.FirstOrDefaultIgnoreFiltersAsync(u => u.Id == id, ct);
-        if (user == null)
-            return Result.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
-
-        if (user.Role == UserRole.Admin)
-        {
-            var users = await _uow.Users.ToListIgnoreFiltersAsync(ct);
-            var otherActiveAdmins = users
-                .Where(u => u.Role == UserRole.Admin && u.IsActive && u.Id != id)
-                .ToList();
-            if (otherActiveAdmins.Count == 0)
-            {
-                return Result.Failure("لا يمكن حذف آخر مدير في النظام", ErrorCodes.InvalidOperation);
-            }
-        }
-
-        try
-        {
-            await _uow.Users.HardDeleteAsync(id, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("User permanently deleted: {UserName}", user.UserName);
-            return Result.Success();
-        }
-        catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
-        {
-            _logger.LogError(ex, "Failed to permanently delete user {UserId} due to database constraint", id);
-            return Result.Failure("لا يمكن حذف المستخدم نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
-        }
+        _logger.LogWarning("Attempt to hard-delete user {UserId} blocked — soft delete only", id);
+        return Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي — استخدم خاصية تعطيل الحساب بدلاً من ذلك", ErrorCodes.InvalidOperation);
     }
 
     private static UserDto MapToDto(User user)

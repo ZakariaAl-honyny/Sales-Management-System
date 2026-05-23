@@ -15,7 +15,7 @@ Translate specs into exact technical blueprints matching the PRD's Clean Archite
 - `AGENTS.md` — All rules, enums, forbidden patterns
 - `docs/CONSTITUTION.md` — Non-negotiable rules
 - `docs/database-schema.md` — Exact SQL types
-- `docs/PRD-MVP-v3.0.md` — Domain entities and service patterns
+- `docs/PRD-MVP.md` — Domain entities and service patterns
 
 ## Architecture Constraints
 ```text

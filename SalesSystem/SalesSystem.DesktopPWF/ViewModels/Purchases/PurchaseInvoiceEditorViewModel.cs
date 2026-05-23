@@ -104,21 +104,29 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     private async void InitializeAsync()
     {
-        await LoadReferenceDataAsync();
+        try
+        {
+            await LoadReferenceDataAsync();
 
-        if (_isEditMode)
-        {
-            await LoadInvoiceAsync();
-        }
-        else
-        {
-            // Select default warehouse before adding line
-            if (Warehouses.Any())
+            if (_isEditMode)
             {
-                var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
-                SelectedWarehouseId = defaultWarehouse.Id;
+                await LoadInvoiceAsync();
             }
-            AddLine();
+            else
+            {
+                // Select default warehouse before adding line
+                if (Warehouses.Any())
+                {
+                    var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
+                    SelectedWarehouseId = defaultWarehouse.Id;
+                }
+                AddLine();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Error in {Method}", nameof(InitializeAsync));
+            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحميل بيانات فاتورة الشراء");
         }
     }
 
@@ -659,6 +667,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     private void RecalculateTotals()
     {
+        // UI preview only — authoritative calculation happens in Domain entity
         SubTotal = Items.Sum(i => i.LineTotal);
 
         decimal netAmount = SubTotal - InvoiceDiscount;

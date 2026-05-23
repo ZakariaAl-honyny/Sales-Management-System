@@ -1,5 +1,6 @@
 using FluentValidation;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Api.Validators.Misc;
 
@@ -55,6 +56,17 @@ public class UpdateSettingsRequestValidator : AbstractValidator<UpdateSettingsRe
         RuleFor(x => x.InvoicePrefix)
             .NotEmpty().WithMessage("بادئة الفاتورة مطلوبة")
             .MaximumLength(10).WithMessage("بادئة الفاتورة لا يمكن أن تتجاوز 10 أحرف");
+    }
+}
+
+public class UpdateCostingMethodRequestValidator : AbstractValidator<UpdateCostingMethodRequest>
+{
+    public UpdateCostingMethodRequestValidator()
+    {
+        RuleFor(x => x.Method)
+            .Must(m => Enum.IsDefined(typeof(CostingMethod), m))
+            .WithMessage("طريقة التكلفة غير صالحة")
+            .When(x => x.Method > 0);
     }
 }
 

@@ -34,9 +34,9 @@ public class StockTransfersControllerTests
     {
         var transfers = new List<StockTransferDto>
         {
-            new(1, DateTime.Now, 1, "من المستودع الرئيسي", 2, "إلى المستودع الفرعي", 10, "مكتمل", 1)
+            new(1, "TRF-001", 1, "من المستودع الرئيسي", 2, "إلى المستودع الفرعي", DateTime.Now, null, 1, Array.Empty<StockTransferItemDto>())
         };
-        var pagedResult = new PagedResult<StockTransferDto>(transfers, 1, 1, 10);
+        var pagedResult = PagedResult<StockTransferDto>.Create(transfers, 1, 1, 10);
 
         _inventoryServiceMock
             .Setup(x => x.GetAllTransfersAsync(It.IsAny<int?>(), It.IsAny<int?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -63,7 +63,7 @@ public class StockTransfersControllerTests
     [Fact]
     public async Task GetById_WhenTransferExists_ReturnsOkWithTransfer()
     {
-        var transfer = new StockTransferDto(1, DateTime.Now, 1, "من المستودع الرئيسي", 2, "إلى المستودع الفرعي", 10, "مكتمل", 1);
+        var transfer = new StockTransferDto(1, "TRF-001", 1, "من المستودع الرئيسي", 2, "إلى المستودع الفرعي", DateTime.Now, null, 1, Array.Empty<StockTransferItemDto>());
 
         _inventoryServiceMock
             .Setup(x => x.GetTransferByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -90,8 +90,8 @@ public class StockTransfersControllerTests
     [Fact]
     public async Task Create_WhenValidRequest_ReturnsCreatedAtAction()
     {
-        var request = new CreateStockTransferRequest(1, 2, 1, 10);
-        var transfer = new StockTransferDto(1, DateTime.Now, 1, "من المستودع الرئيسي", 2, "إلى المستودع الفرعي", 10, "مكتمل", 1);
+        var request = new CreateStockTransferRequest(1, 2, DateTime.Now, null, new List<CreateStockTransferItemRequest> { new(1, 10m) });
+        var transfer = new StockTransferDto(1, "TRF-001", 1, "من المستودع الرئيسي", 2, "إلى المستودع الفرعي", DateTime.Now, null, 1, Array.Empty<StockTransferItemDto>());
 
         _inventoryServiceMock
             .Setup(x => x.CreateTransferAsync(It.IsAny<CreateStockTransferRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -106,7 +106,7 @@ public class StockTransfersControllerTests
     [Fact]
     public async Task Create_WhenServiceFails_ReturnsBadRequest()
     {
-        var request = new CreateStockTransferRequest(1, 2, 1, 10);
+        var request = new CreateStockTransferRequest(1, 2, DateTime.Now, null, new List<CreateStockTransferItemRequest> { new(1, 10m) });
 
         _inventoryServiceMock
             .Setup(x => x.CreateTransferAsync(It.IsAny<CreateStockTransferRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -125,7 +125,7 @@ public class StockTransfersControllerTests
             HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = new ClaimsPrincipal() }
         };
 
-        var request = new CreateStockTransferRequest(1, 2, 1, 10);
+        var request = new CreateStockTransferRequest(1, 2, DateTime.Now, null, new List<CreateStockTransferItemRequest> { new(1, 10m) });
 
         var result = await _controller.Create(request, CancellationToken.None);
 

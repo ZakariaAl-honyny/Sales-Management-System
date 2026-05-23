@@ -64,10 +64,18 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
 
     private async void InitializeAsync()
     {
-        await LoadCustomersAsync();
-        if (_paymentId.HasValue)
+        try
         {
-            await LoadPaymentAsync();
+            await LoadCustomersAsync();
+            if (_paymentId.HasValue)
+            {
+                await LoadPaymentAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Error in {Method}", nameof(InitializeAsync));
+            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحميل بيانات السداد");
         }
     }
 

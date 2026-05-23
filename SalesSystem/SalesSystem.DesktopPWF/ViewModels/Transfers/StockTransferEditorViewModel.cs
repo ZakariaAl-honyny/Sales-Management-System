@@ -88,11 +88,19 @@ public class StockTransferEditorViewModel : ViewModelBase
 
     private async void InitializeAsync()
     {
-        await LoadWarehousesAsync();
-        await LoadProductsAsync();
-        if (_transferId.HasValue)
+        try
         {
-            await LoadTransferAsync();
+            await LoadWarehousesAsync();
+            await LoadProductsAsync();
+            if (_transferId.HasValue)
+            {
+                await LoadTransferAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Error in {Method}", nameof(InitializeAsync));
+            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحميل بيانات التحويل");
         }
     }
 

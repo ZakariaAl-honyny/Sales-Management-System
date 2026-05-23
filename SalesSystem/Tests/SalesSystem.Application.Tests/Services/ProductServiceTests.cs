@@ -9,6 +9,7 @@ using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -21,6 +22,7 @@ public class ProductServiceTests : IDisposable
     private readonly ITestOutputHelper _output;
     private readonly TestDbContext _dbContext;
     private readonly Mock<IUnitOfWork> _mockUow;
+    private readonly Mock<IDocumentSequenceService> _mockSequenceService;
     private readonly Mock<ILogger<ProductService>> _mockLogger;
 
     private readonly ProductService _sut;
@@ -37,6 +39,7 @@ public class ProductServiceTests : IDisposable
         _dbContext = new TestDbContext(options);
 
         _mockUow = new Mock<IUnitOfWork>();
+        _mockSequenceService = new Mock<IDocumentSequenceService>();
         _mockLogger = new Mock<ILogger<ProductService>>();
 
         _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
@@ -49,7 +52,7 @@ public class ProductServiceTests : IDisposable
                 return 1;
             });
 
-        _sut = new ProductService(_mockUow.Object, _mockLogger.Object);
+        _sut = new ProductService(_mockUow.Object, _mockSequenceService.Object, _mockLogger.Object);
     }
 
     public void Dispose()
@@ -64,7 +67,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingProduct_ReturnsDto");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, salePrice: 100m, minStock: 5, code: "P001", barcode: null, categoryId: null, unitId: null, description: null, createdByUserId: null);
+        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m, minStock: 5);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -99,15 +102,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesProduct");
 
-        var request = new SalesSystem.Contracts.Requests.CreateProductRequest
-        {
-            Name = "New Product",
-            PurchasePrice = 50m,
-            SalePrice = 100m,
-            MinStock = 10,
-            Code = "NP001",
-            Barcode = "1234567890123"
-        };
+        var request = new SalesSystem.Contracts.Requests.CreateProductRequest("1234567890123", "New Product", null, null, null, null, 1m, 50m, 100m, 100m, 0m, 10m, null);
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -124,18 +119,11 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_DuplicateBarcode_ReturnsFailure");
 
-        var existing = Product.Create("Existing", purchasePrice: 10m, salePrice: 100m, minStock: 0, code: "P001", barcode: "1234567890", categoryId: null, unitId: null, description: null, createdByUserId: null);
+        var existing = Product.Create("Existing", purchasePrice: 10m, retailPrice: 100m, minStock: 0, barcode: "1234567890");
         _dbContext.Products.Add(existing);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateProductRequest
-        {
-            Name = "New Product",
-            PurchasePrice = 50m,
-            SalePrice = 100m,
-            Code = "P002",
-            Barcode = "1234567890" // Duplicate
-        };
+        var request = new SalesSystem.Contracts.Requests.CreateProductRequest("1234567890", "New Product", null, null, null, null, 1m, 50m, 100m, 100m, 0m, 0m, null); // Duplicate
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -154,20 +142,11 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesProduct");
 
-        var product = Product.Create("Original", purchasePrice: 10m, salePrice: 100m, minStock: 5, code: "P001", barcode: null, categoryId: null, unitId: null, description: null, createdByUserId: null);
+        var product = Product.Create("Original", purchasePrice: 10m, retailPrice: 100m, minStock: 5);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest
-        {
-            Name = "Updated Product",
-            PurchasePrice = 20m,
-            SalePrice = 200m,
-            MinStock = 10,
-            Code = null,
-            Barcode = null,
-            IsActive = true
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null, "Updated Product", null, null, null, null, 1m, 20m, 200m, 200m, 0m, 10m, null, true);
 
         var result = await _sut.UpdateAsync(product.Id, request, CancellationToken.None);
 
@@ -184,11 +163,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_NonExistentProduct_ReturnsNotFound");
 
-        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest
-        {
-            Name = "Updated",
-            IsActive = true
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null, "Updated", null, null, null, null, 1m, 0m, 0m, 0m, 0m, 0m, null, true);
 
         var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
 
@@ -207,7 +182,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_ExistingProduct_SoftDeletes");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, salePrice: 100m, minStock: 0, code: "P001", barcode: null, categoryId: null, unitId: null, description: null, createdByUserId: null);
+        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m, minStock: 0);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -243,13 +218,13 @@ public class ProductServiceTests : IDisposable
         var category = Category.Create("Electronics", null, null);
         _dbContext.Categories.Add(category);
 
-        var product1 = Product.Create("Product 1", 10m, 100m, 0, "P001", null, 1, null, null, null);
-        var product2 = Product.Create("Product 2", 10m, 100m, 0, "P002", null, null, null, null);
+        var product1 = Product.Create("Product 1", 10m, 100m, barcode: "P001", categoryId: 1);
+        var product2 = Product.Create("Product 2", 10m, 100m, barcode: "P002");
         _dbContext.Products.Add(product1);
         _dbContext.Products.Add(product2);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.GetAllAsync(null, 1, 1, 10, CancellationToken.None);
+        var result = await _sut.GetAllAsync(null, 1, 1, 10, ct: CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Items.Should().HaveCount(1);
@@ -263,13 +238,13 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetAllAsync_WithSearch_FiltersResults");
 
-        var product1 = Product.Create("Laptop", 10m, 100m, 0, "P001", null, null, null, null);
-        var product2 = Product.Create("Mouse", 10m, 100m, 0, "P002", null, null, null, null);
+        var product1 = Product.Create("Laptop", 10m, 100m, barcode: "P001");
+        var product2 = Product.Create("Mouse", 10m, 100m, barcode: "P002");
         _dbContext.Products.Add(product1);
         _dbContext.Products.Add(product2);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.GetAllAsync("Laptop", null, 1, 10, CancellationToken.None);
+        var result = await _sut.GetAllAsync("Laptop", null, 1, 10, ct: CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Items.Should().HaveCount(1);
@@ -325,6 +300,50 @@ public class ProductServiceTests : IDisposable
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

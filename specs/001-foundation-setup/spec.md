@@ -3,7 +3,7 @@
 **Feature Branch**: `001-foundation-setup`
 **Created**: 2026-05-06
 **Status**: Draft
-**Input**: Phase 1 — Foundation from PRD-MVP-v3.0
+**Input**: Phase 1 — Foundation from PRD-MVP
 
 ## User Scenarios & Testing *(mandatory)*
 

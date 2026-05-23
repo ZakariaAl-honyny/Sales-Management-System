@@ -30,7 +30,7 @@
         <StackPanel Grid.Row="1">
             <RadioButton x:Name="WeightedAverageRadio"
                          GroupName="CostingMethod"
-                         IsChecked="{Binding IsWeightedAverage}"
+                         IsChecked="{Binding IsWeightedAverageSelected}"
                          Margin="0,0,0,8">
                 <StackPanel>
                     <TextBlock Text="متوسط التكلفة المرجح" FontWeight="SemiBold" FontSize="14"/>
@@ -41,7 +41,7 @@
 
             <RadioButton x:Name="LastPurchaseRadio"
                          GroupName="CostingMethod"
-                         IsChecked="{Binding IsLastPurchasePrice}"
+                         IsChecked="{Binding IsLastPurchasePriceSelected}"
                          Margin="0,0,0,8">
                 <StackPanel>
                     <TextBlock Text="آخر سعر توريد" FontWeight="SemiBold" FontSize="14"/>
@@ -52,7 +52,7 @@
 
             <RadioButton x:Name="SupplierPriceRadio"
                          GroupName="CostingMethod"
-                         IsChecked="{Binding IsSupplierPrice}">
+                         IsChecked="{Binding IsSupplierPriceSelected}">
                 <StackPanel>
                     <TextBlock Text="سعر المورد" FontWeight="SemiBold" FontSize="14"/>
                     <TextBlock Text="يتم استخدام سعر الكتالوج المسجل من المورد"
@@ -69,7 +69,7 @@
                 CornerRadius="4"
                 Padding="12"
                 Margin="0,16,0,0"
-                Visibility="{Binding ShowWarning, Converter={StaticResource BoolToVisibilityConverter}}">
+                Visibility="{Binding ShowWarning, Converter={StaticResource BoolToVisibility}}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="!" FontSize="16" Margin="0,0,8,0"/>
                 <TextBlock Text="تغيير طريقة الاحتساب سيؤثر على تكلفة المنتجات من تاريخ التغيير فصاعداً."
@@ -85,8 +85,7 @@
                     Padding="20,10"
                     Background="#4CAF50"
                     Foreground="White"
-                    FontWeight="SemiBold"
-                    IsEnabled="{Binding HasChanges}"/>
+                     FontWeight="SemiBold"/>
             <Button Content="إلغاء"
                     Command="{Binding CancelCommand}"
                     Padding="20,10"

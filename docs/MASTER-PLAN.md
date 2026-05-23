@@ -2454,7 +2454,7 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 |-------|------|
 | **All rules (LAW)** | `AGENTS.md` |
 | **Financial formulas** | `docs/CONSTITUTION.md` |
-| **Full requirements** | `docs/PRD-MVP-v3.0.md` |
+| **Full requirements** | `docs/PRD-MVP.md` |
 | **Database schema** | `docs/database-schema.md` |
 | **UI/UX flows** | `docs/ui-screens.md` |
 | **Security details** | `.opencode/agent/security-auditor.md` |
@@ -2495,10 +2495,22 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 
 ---
 
+## ✅ Phase 19: Architecture Alignment & Code Quality Remediation (v4.6.3)
+
+**Goal**: Align Costing settings with Clean Architecture boundaries (moving to `ISettingsApiService` via HTTP Client), resolve ViewModel compiler shadowing (CS0108 warnings), wrap async void operations in ViewModels with safe try-catches, and correct garbled Arabic text.
+
+### Key Changes
+- **Costing Settings Refactor**: Migrated `CostingMethodSettingsViewModel` from repository calling to HTTP setting API client calls. Registered the VM inside `App.xaml.cs`.
+- **WPF VM Quality Standard**: Avoided CS0108 by calling base class property setting helpers and calling `SetDialogService()`. Safe try-catch wrappers for async void initialization workflows.
+- **RTL Arabic Corrections**: Rectified Mojibake in transfers/payments ViewModels.
+
+---
+
 ## 📝 Version History
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v4.6.3 | 2026-05-23 | Architecture Alignment & Code Quality — Costing settings HTTP refactoring, VM DI registration, CS0108 member hiding resolutions, async void try-catch safety, RTL Arabic corrections |
 | v4.6.2 | 2026-05-23 | WPF Validation ErrorTemplate — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated |
 | v4.6.1 | 2026-05-23 | UI Sorting & Dialog Safety — Newest-first sorting, DatabaseErrorDialog self-owner fix, comprehensive audit |
 | v4.6 | 2026-05-22 | Audit & Polish — LogSystemError centralized, Dialog overlay, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes |
@@ -2511,4 +2523,4 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 | v4.2 | 2026-05-10 | Delete strategy, Defensive programming, WPF dialogs, Toast notifications, Real-time validation |
 | v4.1 | 2026-05-05 | Wholesale/Retail pricing, Unit conversion in Domain |
 | v4.0 | 2026-05-01 | Clean Architecture rewrite — 6 projects, Service Layer, Result<T> |
-| v3.0 | 2026-04-15 | Initial architecture — PRD-MVP-v3.0 |
+| v3.0 | 2026-04-15 | Initial architecture — PRD-MVP |

@@ -43,10 +43,13 @@ public class ReportsViewModel : ViewModelBase
 {
     private IReportApiService? _reportApiService;
     private IWarehouseApiService? _warehouseService;
-    private IDialogService? _dialogService;
     private IReportApiService ReportApiService => _reportApiService ??= App.GetService<IReportApiService>();
     private IWarehouseApiService WarehouseService => _warehouseService ??= App.GetService<IWarehouseApiService>();
-    private IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+
+    // Uses 'new' to suppress CS0108 (inherited member hiding).
+    // Test uses SetField("_dialogService", mock) before property is accessed.
+    private new IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+    private IDialogService? _dialogService;
 
     private ReportType _selectedReportType;
     private DateTime _dateFrom;
@@ -396,7 +399,6 @@ public class ReportsViewModel : ViewModelBase
             foreach (var stock in result.Value)
             {
                 var row = table.NewRow();
-                // row["رمز المنتج"] = stock.ProductCode;
                 row["اسم المنتج"] = stock.ProductName;
                 row["الفئة"] = stock.CategoryName;
                 row["الوحدة"] = stock.UnitName;
@@ -435,7 +437,6 @@ public class ReportsViewModel : ViewModelBase
             foreach (var cb in result.Value)
             {
                 var row = table.NewRow();
-                // row["رمز العميل"] = cb.CustomerCode;
                 row["اسم العميل"] = cb.CustomerName;
                 row["الرصيد الافتتاحي"] = cb.OpeningBalance;
                 row["إجمالي المبيعات"] = cb.TotalSales;
@@ -471,7 +472,6 @@ public class ReportsViewModel : ViewModelBase
             foreach (var sb in result.Value)
             {
                 var row = table.NewRow();
-                // row["رمز المورد"] = sb.SupplierCode;
                 row["اسم المورد"] = sb.SupplierName;
                 row["الرصيد الافتتاحي"] = sb.OpeningBalance;
                 row["إجمالي المشتريات"] = sb.TotalPurchases;
@@ -555,7 +555,6 @@ public class ReportsViewModel : ViewModelBase
             foreach (var low in result.Value)
             {
                 var row = table.NewRow();
-                // row["رمز المنتج"] = low.ProductCode;
                 row["اسم المنتج"] = low.ProductName;
                 row["المخزن"] = low.WarehouseName;
                 row["المخزون الحالي"] = low.CurrentRetailQty;

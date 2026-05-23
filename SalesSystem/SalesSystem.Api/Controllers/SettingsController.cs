@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
@@ -49,6 +48,38 @@ public class SettingsController : ControllerBase
                 return Ok(new { warning = costingResult.Error, settings = result.Value });
             return Ok(result.Value);
         }
+        return BadRequest(new { error = result.Error });
+    }
+
+    // ─── Costing Method Endpoints ────────────
+
+    [HttpGet("costing-method")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> GetCostingMethod(CancellationToken ct)
+    {
+        var result = await _settingsService.GetCostingMethodAsync(ct);
+        if (result.IsSuccess)
+        {
+            var method = result.Value ?? CostingMethod.WeightedAverage;
+            return Ok((int)method);
+        }
+        return BadRequest(new { error = result.Error });
+    }
+
+    [HttpPut("costing-method")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> UpdateCostingMethod([FromBody] UpdateCostingMethodRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var method = (CostingMethod)request.Method;
+        if (!Enum.IsDefined(typeof(CostingMethod), method))
+            return BadRequest(new { error = "طريقة التكلفة غير صالحة" });
+
+        var result = await _settingsService.SetCostingMethodAsync(method, userId, ct);
+        if (result.IsSuccess)
+            return Ok((int)method);
         return BadRequest(new { error = result.Error });
     }
 

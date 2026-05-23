@@ -13,7 +13,7 @@ Surface hidden assumptions and underspecified areas BEFORE planning begins.
 
 ## MUST READ FIRST
 - `AGENTS.md` — All rules
-- `docs/PRD-MVP-v3.0.md` — Full requirements
+- `docs/PRD-MVP.md` — Full requirements
 
 ## Question Categories
 - `[SCOPE]` — in or out of scope? (reference PRD Out of Scope section)

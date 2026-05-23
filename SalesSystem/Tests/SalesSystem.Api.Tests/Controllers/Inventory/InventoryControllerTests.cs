@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -19,7 +20,7 @@ public class InventoryControllerTests : ControllerTestBase
     public async Task GetStock_WhenCalled_ReturnsOkWithQuantity()
     {
         InventoryServiceMock.Setup(x => x.GetStockAsync(1, 1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateSuccessResult(100m));
+            .ReturnsAsync(Result<decimal>.Success(100m));
 
         var result = await _controller.GetStock(1, 1, CancellationToken.None);
 
@@ -30,7 +31,7 @@ public class InventoryControllerTests : ControllerTestBase
     public async Task GetStock_WhenServiceFails_ReturnsBadRequest()
     {
         InventoryServiceMock.Setup(x => x.GetStockAsync(999, 1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateFailureResult<decimal>("المنتج غير موجود"));
+            .ReturnsAsync(Result<decimal>.Failure("المنتج غير موجود"));
 
         var result = await _controller.GetStock(999, 1, CancellationToken.None);
 

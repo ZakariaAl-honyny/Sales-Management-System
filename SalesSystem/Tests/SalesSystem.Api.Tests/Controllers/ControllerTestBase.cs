@@ -55,10 +55,10 @@ public abstract class ControllerTestBase
 
     #region Helper Methods
 
-    protected static Result<T> CreateSuccessResult<T>(T value) where T : class
+    protected static Result<T> CreateSuccessResult<T>(T value)
         => Result<T>.Success(value);
 
-    protected static Result<T> CreateFailureResult<T>(string error) where T : class
+    protected static Result<T> CreateFailureResult<T>(string error)
         => Result<T>.Failure(error);
 
     protected static Result CreateSuccessResult()

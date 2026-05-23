@@ -83,7 +83,13 @@ public class DialogService : IDialogService
                             var dialogResult = dialogResultProp.GetValue(viewModel) as bool?;
                             if (dialogResult == true)
                             {
-                                try { window.DialogResult = true; } catch { }
+                                try { window.DialogResult = true; }
+                                catch
+                                {
+                                    // Intentionally swallowed: setting DialogResult on a window opened non-modally
+                                    // (via ScreenWindowService) will throw InvalidOperationException.
+                                    // This is normal and expected — the closeHandler fires regardless.
+                                }
                             }
                         }
                         window.Close();

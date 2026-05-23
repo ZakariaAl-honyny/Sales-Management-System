@@ -14,6 +14,9 @@ public record UpdateSettingsRequest(
     string InvoicePrefix,
     int CostingMethod = 1);
 
+public record UpdateCostingMethodRequest(
+    int Method);
+
 public record UpdatePrintSettingsRequest(
     string ThermalPrinterName,
     string A4PrinterName,

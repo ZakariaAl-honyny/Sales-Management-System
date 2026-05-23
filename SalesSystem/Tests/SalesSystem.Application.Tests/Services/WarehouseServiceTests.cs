@@ -4,10 +4,12 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
+using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -65,7 +67,7 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingWarehouse_ReturnsDto");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
@@ -100,12 +102,7 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesWarehouse");
 
-        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest
-        {
-            Name = "New Warehouse",
-            Location = "Building A",
-            IsDefault = false
-        };
+        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest("New Warehouse", "Building A", false);
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -120,15 +117,11 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_IsDefault_UnsetsOtherDefaults");
 
-        var existing = Warehouse.Create("Existing Warehouse", true);
+        var existing = Warehouse.Create("Existing Warehouse", isDefault: true);
         _dbContext.Warehouses.Add(existing);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest
-        {
-            Name = "New Default Warehouse",
-            IsDefault = true // Set as new default
-        };
+        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest("New Default Warehouse", null, true); // Set as new default
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -155,13 +148,7 @@ public class WarehouseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest
-        {
-            Name = "Updated Warehouse",
-            Location = "New Location",
-            IsDefault = false,
-            IsActive = true
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest("Updated Warehouse", "New Location", false, true);
 
         var result = await _sut.UpdateAsync(warehouse.Id, request, CancellationToken.None);
 
@@ -177,17 +164,13 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_SetAsDefault_UnsetsOtherDefaults");
 
-        var warehouse1 = Warehouse.Create("Warehouse 1", true);
-        var warehouse2 = Warehouse.Create("Warehouse 2", false);
+        var warehouse1 = Warehouse.Create("Warehouse 1", isDefault: true);
+        var warehouse2 = Warehouse.Create("Warehouse 2");
         _dbContext.Warehouses.Add(warehouse1);
         _dbContext.Warehouses.Add(warehouse2);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest
-        {
-            Name = "Warehouse 2",
-            IsDefault = true // Set as new default
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest("Warehouse 2", null, true, true); // Set as new default
 
         var result = await _sut.UpdateAsync(warehouse2.Id, request, CancellationToken.None);
 
@@ -210,7 +193,7 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_DefaultWarehouse_ReturnsFailure");
 
-        var warehouse = Warehouse.Create("Default Warehouse", true);
+        var warehouse = Warehouse.Create("Default Warehouse", isDefault: true);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
@@ -227,7 +210,7 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_NonDefaultWarehouse_SoftDeletes");
 
-        var warehouse = Warehouse.Create("Test Warehouse", false);
+        var warehouse = Warehouse.Create("Test Warehouse");
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
@@ -247,13 +230,13 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetAllAsync_WithSearch_FiltersResults");
 
-        var warehouse1 = Warehouse.Create("Main Store", false);
-        var warehouse2 = Warehouse.Create("Backup Store", false);
+        var warehouse1 = Warehouse.Create("Main Store");
+        var warehouse2 = Warehouse.Create("Backup Store");
         _dbContext.Warehouses.Add(warehouse1);
         _dbContext.Warehouses.Add(warehouse2);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.GetAllAsync("Main", 1, 10, CancellationToken.None);
+        var result = await _sut.GetAllAsync("Main", 1, 10, ct: CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Items.Should().HaveCount(1);
@@ -316,6 +299,50 @@ public class WarehouseServiceTests : IDisposable
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

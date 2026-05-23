@@ -9,6 +9,7 @@ using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -27,6 +28,7 @@ public class PurchaseServiceTests : IDisposable
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IInventoryService> _mockInventoryService;
     private readonly Mock<IDocumentSequenceService> _mockSequenceService;
+    private readonly Mock<IStoreSettingsService> _mockStoreSettingsService;
     private readonly Mock<ILogger<PurchaseService>> _mockLogger;
 
     private readonly PurchaseService _sut;
@@ -45,6 +47,7 @@ public class PurchaseServiceTests : IDisposable
         _mockUow = new Mock<IUnitOfWork>();
         _mockInventoryService = new Mock<IInventoryService>();
         _mockSequenceService = new Mock<IDocumentSequenceService>();
+        _mockStoreSettingsService = new Mock<IStoreSettingsService>();
         _mockLogger = new Mock<ILogger<PurchaseService>>();
 
         _mockUow.Setup(u => u.PurchaseInvoices).Returns(new InMemoryEfCoreRepository<PurchaseInvoice>(_dbContext));
@@ -79,6 +82,7 @@ public class PurchaseServiceTests : IDisposable
             _mockUow.Object,
             _mockInventoryService.Object,
             _mockSequenceService.Object,
+            _mockStoreSettingsService.Object,
             _mockLogger.Object);
     }
 
@@ -94,19 +98,18 @@ public class PurchaseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] PostAsync_DraftInvoice_ChangesStatusToPosted");
 
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
-            warehouseId: 1,
             supplierId: 1,
-            DateTime.Now,
-            DateTime.Now.AddDays(30),
-            DomainPaymentType.Cash,
+            warehouseId: 1,
+            invoiceDate: DateTime.Now,
+            dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
             notes: null
         );
@@ -154,19 +157,18 @@ public class PurchaseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] PostAsync_AlreadyPostedInvoice_ReturnsFailure");
 
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
-            warehouseId: 1,
             supplierId: 1,
-            DateTime.Now,
-            DateTime.Now.AddDays(30),
-            DomainPaymentType.Cash,
+            warehouseId: 1,
+            invoiceDate: DateTime.Now,
+            dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
             notes: null
         );
@@ -189,19 +191,19 @@ public class PurchaseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] PostAsync_CreditInvoice_UpdatesSupplierBalance");
 
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
-            warehouseId: 1,
             supplierId: 1,
-            DateTime.Now,
-            DateTime.Now.AddDays(30),
-            DomainPaymentType.Credit,
+            warehouseId: 1,
+            invoiceDate: DateTime.Now,
+            dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
+            paymentType: DomainPaymentType.Credit,
             discountAmount: 0m,
             notes: null
         );
@@ -228,19 +230,18 @@ public class PurchaseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CancelAsync_DraftInvoice_ChangesStatusToCancelled");
 
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
-            warehouseId: 1,
             supplierId: 1,
-            DateTime.Now,
-            DateTime.Now.AddDays(30),
-            DomainPaymentType.Cash,
+            warehouseId: 1,
+            invoiceDate: DateTime.Now,
+            dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
             notes: null
         );
@@ -262,19 +263,19 @@ public class PurchaseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CancelAsync_PostedInvoice_ReversesStockAndBalance");
 
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
-            warehouseId: 1,
             supplierId: 1,
-            DateTime.Now,
-            DateTime.Now.AddDays(30),
-            DomainPaymentType.Credit,
+            warehouseId: 1,
+            invoiceDate: DateTime.Now,
+            dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
+            paymentType: DomainPaymentType.Credit,
             discountAmount: 0m,
             notes: null
         );
@@ -311,19 +312,18 @@ public class PurchaseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CancelAsync_AlreadyCancelledInvoice_ReturnsSuccess");
 
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
-            warehouseId: 1,
             supplierId: 1,
-            DateTime.Now,
-            DateTime.Now.AddDays(30),
-            DomainPaymentType.Cash,
+            warehouseId: 1,
+            invoiceDate: DateTime.Now,
+            dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
             notes: null
         );
@@ -352,12 +352,11 @@ public class PurchaseServiceTests : IDisposable
 
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
-            warehouseId: 1,
             supplierId: 1,
-            DateTime.Now,
-            DateTime.Now.AddDays(30),
-            DomainPaymentType.Cash,
-            discountAmount: 100m,
+            warehouseId: 1,
+            invoiceDate: DateTime.Now,
+            dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
+            discountAmount: 0m,
             notes: null
         );
 
@@ -432,6 +431,50 @@ public class PurchaseServiceTests : IDisposable
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

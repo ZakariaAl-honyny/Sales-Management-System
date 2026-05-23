@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Api.Tests.Controllers.Backup;
 
@@ -49,7 +50,7 @@ public class BackupControllerTests
 
         _backupServiceMock
             .Setup(x => x.GetBackupListAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<IReadOnlyList<string>>.Success(backups));
+            .ReturnsAsync(Result<List<string>>.Success(backups));
 
         var result = await _controller.GetList(CancellationToken.None);
 
@@ -62,7 +63,7 @@ public class BackupControllerTests
     {
         _backupServiceMock
             .Setup(x => x.GetBackupListAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<IReadOnlyList<string>>.Failure("فشل في جلب قائمة النسخ"));
+            .ReturnsAsync(Result<List<string>>.Failure("فشل في جلب قائمة النسخ"));
 
         var result = await _controller.GetList(CancellationToken.None);
 

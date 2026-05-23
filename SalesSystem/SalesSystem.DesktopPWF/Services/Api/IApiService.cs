@@ -294,6 +294,8 @@ public interface ISettingsApiService
     Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, CancellationToken ct = default);
     Task<Result<PrintSettingsDto>> GetPrintSettingsAsync(CancellationToken ct = default);
     Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default);
+    Task<Result<int>> GetCostingMethodAsync(CancellationToken ct = default);
+    Task<Result> SetCostingMethodAsync(UpdateCostingMethodRequest request, CancellationToken ct = default);
     void RefreshCache();
 }
 

@@ -86,3 +86,11 @@ Quality assurance and test automation specialist for the SalesSystem.
 | TC-18-006 | All 14 Editor VMs: SetDialogService() called in constructor | No NullReferenceException when ValidateAllAsync() tries to show dialog |
 | TC-18-007 | ErrorTemplate: TextBox, PasswordBox, ComboBox all show red border on error | Each control type renders red border + ❗ icon when Validation.HasError is true |
 | TC-18-008 | ValidateAllAsync: No errors returns true without dialog | Save proceeds normally; no dialog shown |
+
+### v4.6.3 — Architecture Alignment & Code Quality
+
+| Test Case | Description | Expected Result |
+|-----------|-------------|-----------------|
+| TC-19-001 | CostingMethodSettingsVM: Saves settings via HTTP Client | Invokes `ISettingsApiService.UpdateSettingsAsync()` using DTO; no direct repository/DB connection |
+| TC-19-002 | CostingMethodSettingsVM: DialogService initialized correctly | Inherited base class `DialogService` handles error dialogues without compiler shadowing warnings (CS0108) |
+| TC-19-003 | ViewModel Initialization: Wrap async void workflows | Safe try-catch logs exceptions to Serilog and prevents silent WPF application crashes |

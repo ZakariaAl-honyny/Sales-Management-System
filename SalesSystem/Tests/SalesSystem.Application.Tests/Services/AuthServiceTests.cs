@@ -21,7 +21,7 @@ public class AuthServiceTests
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IJwtTokenGenerator> _mockJwtGenerator;
     private readonly Mock<ILogger<AuthService>> _mockLogger;
-    private readonly JwtSettings _jwtSettings;
+    private readonly SalesSystem.Contracts.Common.JwtSettings _jwtSettings;
 
     private readonly AuthService _sut;
 
@@ -33,9 +33,9 @@ public class AuthServiceTests
         _mockUow = new Mock<IUnitOfWork>();
         _mockJwtGenerator = new Mock<IJwtTokenGenerator>();
         _mockLogger = new Mock<ILogger<AuthService>>();
-        _jwtSettings = new JwtSettings
+        _jwtSettings = new SalesSystem.Contracts.Common.JwtSettings
         {
-            SecretKey = "ThisIsAVeryLongSecretKeyForTestingPurposes123!",
+            Secret = "ThisIsAVeryLongSecretKeyForTestingPurposes123!",
             Issuer = "SalesSystem",
             Audience = "SalesSystemClients",
             ExpirationHours = 24
@@ -56,7 +56,7 @@ public class AuthServiceTests
         _output.WriteLine("[TEST] LoginAsync_ValidCredentials_ReturnsTokenAndUserInfo");
 
         var user = User.Create("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
-        user.Activate();
+        user.Restore();
 
         var usersList = new List<User> { user };
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
@@ -65,11 +65,7 @@ public class AuthServiceTests
         _mockJwtGenerator.Setup(g => g.GenerateToken(It.IsAny<User>()))
             .Returns("jwt-token-here");
 
-        var request = new SalesSystem.Contracts.Requests.LoginRequest
-        {
-            UserName = "testuser",
-            Password = "password123"
-        };
+        var request = new SalesSystem.Contracts.Requests.LoginRequest("testuser", "password123");
 
         var result = await _sut.LoginAsync(request, CancellationToken.None);
 
@@ -91,11 +87,7 @@ public class AuthServiceTests
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(usersList);
 
-        var request = new SalesSystem.Contracts.Requests.LoginRequest
-        {
-            UserName = "nonexistent",
-            Password = "password123"
-        };
+        var request = new SalesSystem.Contracts.Requests.LoginRequest("nonexistent", "password123");
 
         var result = await _sut.LoginAsync(request, CancellationToken.None);
 
@@ -111,17 +103,13 @@ public class AuthServiceTests
         _output.WriteLine("[TEST] LoginAsync_InvalidPassword_ReturnsUnauthorized");
 
         var user = User.Create("testuser", BCrypt.Net.BCrypt.HashPassword("correctpassword", workFactor: 12), "Test User", UserRole.Admin);
-        user.Activate();
+        user.Restore();
 
         var usersList = new List<User> { user };
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(usersList);
 
-        var request = new SalesSystem.Contracts.Requests.LoginRequest
-        {
-            UserName = "testuser",
-            Password = "wrongpassword"
-        };
+        var request = new SalesSystem.Contracts.Requests.LoginRequest("testuser", "wrongpassword");
 
         var result = await _sut.LoginAsync(request, CancellationToken.None);
 
@@ -143,11 +131,7 @@ public class AuthServiceTests
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(usersList);
 
-        var request = new SalesSystem.Contracts.Requests.LoginRequest
-        {
-            UserName = "testuser",
-            Password = "password123"
-        };
+        var request = new SalesSystem.Contracts.Requests.LoginRequest("testuser", "password123");
 
         var result = await _sut.LoginAsync(request, CancellationToken.None);
 
@@ -163,7 +147,7 @@ public class AuthServiceTests
         _output.WriteLine("[TEST] LoginAsync_CaseInsensitiveUsername_ReturnsSuccess");
 
         var user = User.Create("TestUser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
-        user.Activate();
+        user.Restore();
 
         var usersList = new List<User> { user };
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
@@ -172,11 +156,7 @@ public class AuthServiceTests
         _mockJwtGenerator.Setup(g => g.GenerateToken(It.IsAny<User>()))
             .Returns("jwt-token-here");
 
-        var request = new SalesSystem.Contracts.Requests.LoginRequest
-        {
-            UserName = "TESTUSER", // Different case
-            Password = "password123"
-        };
+        var request = new SalesSystem.Contracts.Requests.LoginRequest("TESTUSER", "password123"); // Different case
 
         var result = await _sut.LoginAsync(request, CancellationToken.None);
 
@@ -192,7 +172,7 @@ public class AuthServiceTests
         _output.WriteLine("[TEST] LoginAsync_ExpirationTimeInResponse_IsCorrect");
 
         var user = User.Create("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
-        user.Activate();
+        user.Restore();
 
         var usersList = new List<User> { user };
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
@@ -201,11 +181,7 @@ public class AuthServiceTests
         _mockJwtGenerator.Setup(g => g.GenerateToken(It.IsAny<User>()))
             .Returns("jwt-token-here");
 
-        var request = new SalesSystem.Contracts.Requests.LoginRequest
-        {
-            UserName = "testuser",
-            Password = "password123"
-        };
+        var request = new SalesSystem.Contracts.Requests.LoginRequest("testuser", "password123");
 
         var beforeLogin = DateTime.UtcNow;
         var result = await _sut.LoginAsync(request, CancellationToken.None);
@@ -217,18 +193,6 @@ public class AuthServiceTests
 
         _output.WriteLine($"[DEBUG] Token expires at: {result.Value.ExpiresAt}");
         _output.WriteLine("[PASS] Expiration time is correctly calculated");
-    }
-
-    #endregion
-
-    #region Helper Classes
-
-    private class JwtSettings
-    {
-        public string SecretKey { get; set; } = string.Empty;
-        public string Issuer { get; set; } = string.Empty;
-        public string Audience { get; set; } = string.Empty;
-        public int ExpirationHours { get; set; }
     }
 
     #endregion

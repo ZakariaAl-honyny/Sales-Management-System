@@ -19,7 +19,6 @@ public class CustomerPaymentsListViewModel : ViewModelBase
 {
     private ICustomerPaymentApiService? _paymentService;
     private ICustomerApiService? _customerService;
-    private IDialogService? _dialogService;
     private INavigationService? _navigationService;
     private IPaymentPrinter? _paymentPrinter;
     private ISettingsApiService? _settingsService;
@@ -27,11 +26,15 @@ public class CustomerPaymentsListViewModel : ViewModelBase
 
     private ICustomerPaymentApiService PaymentService => _paymentService ??= App.GetService<ICustomerPaymentApiService>();
     private ICustomerApiService CustomerService => _customerService ??= App.GetService<ICustomerApiService>();
-    private IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
     private INavigationService NavigationService => _navigationService ??= App.GetService<INavigationService>();
     private IPaymentPrinter PaymentPrinter => _paymentPrinter ??= App.GetService<IPaymentPrinter>();
     private ISettingsApiService SettingsService => _settingsService ??= App.GetService<ISettingsApiService>();
     private IScreenWindowService ScreenWindowService => _screenWindowService ??= App.GetService<IScreenWindowService>();
+
+    // Uses 'new' to suppress CS0108 (inherited member hiding).
+    // Test uses SetField("_dialogService", mock) before property is accessed.
+    private new IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+    private IDialogService? _dialogService;
 
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
@@ -149,7 +152,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ظ…ط¯ظپظˆط¹ط§طھ ط§ظ„ط¹ظ…ظ„ط§ط،", "CustomerPaymentsListViewModel.LoadPaymentsAsync", "[CustomerPaymentsListViewModel.LoadPaymentsAsync] Failed to load customer payments list.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل مدفوعات العملاء", "CustomerPaymentsListViewModel.LoadPaymentsAsync", "[CustomerPaymentsListViewModel.LoadPaymentsAsync] Failed to load customer payments list.");
                 IsEmpty = Payments.Count == 0;
             }
         }
@@ -174,7 +177,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
         var vm = App.GetService<CustomerPaymentEditorViewModel>();
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "ط³ط¯ط§ط¯ ط¹ظ…ظٹظ„ ط¬ط¯ظٹط¯",
+            Title = "سداد عميل جديد",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
@@ -188,7 +191,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
         var vm = new CustomerPaymentEditorViewModel(SelectedPayment.Id, isReadOnly: true);
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "ط¹ط±ط¶ ط³ط¯ط§ط¯ ط¹ظ…ظٹظ„"
+            Title = "عرض سداد عميل"
         });
     }
 
@@ -198,7 +201,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
         var vm = new CustomerPaymentEditorViewModel(SelectedPayment.Id);
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "طھط¹ط¯ظٹظ„ ط³ط¯ط§ط¯ ط¹ظ…ظٹظ„",
+            Title = "تعديل سداد عميل",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
@@ -210,7 +213,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
 
-        var result = await DialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ظ„ط­ط°ظپ", "ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† ط­ط°ظپ ظ‡ط°ط§ ط§ظ„ط³ط¯ط§ط¯طں");
+        var result = await DialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
 
         if (!result) return;
 
@@ -225,15 +228,15 @@ public class CustomerPaymentsListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ط³ط¯ط§ط¯";
-                await DialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط­ط°ظپ", ErrorMessage);
+                ErrorMessage = deleteResult.Error ?? "فشل في حذف السداد";
+                await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             LogSystemError($"Failed to delete customer payment {SelectedPayment?.Id}", "CustomerPaymentsListViewModel.OnDelete", ex);
-            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ظ„ط­ط°ظپ";
-            await DialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط­ط°ظپ", ErrorMessage);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
+            await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
         }
         finally
         {
@@ -256,7 +259,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
         catch (Exception ex)
         {
             LogSystemError($"Failed to print customer payment {SelectedPayment?.Id}", "CustomerPaymentsListViewModel.OnPrint", ex);
-            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ظ„ط·ط¨ط§ط¹ط©";
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
         }
         finally
         {

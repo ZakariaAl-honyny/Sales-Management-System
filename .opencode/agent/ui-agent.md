@@ -437,3 +437,14 @@ private async Task<bool> ValidateAsync()
     return await ValidateAllAsync();  // Handles dialog + focus
 }
 ```
+
+### Settings Relocation & IsEnabled Bindings (v4.6.3)
+
+1. **Namespace & File Structure**:
+   - Store settings views and view models MUST live under `Views/Settings` and `ViewModels/Settings` respectively.
+   - Any settings view model MUST be registered in dependency injection under `App.xaml.cs`.
+
+2. **Buttons Always Enabled**:
+   - Action buttons (Save, Post, Print) in View XAML MUST NOT bind their `IsEnabled` property to VM properties like `HasChanges` or `CanSave` (e.g., `IsEnabled="{Binding HasChanges}"` is FORBIDDEN).
+   - Leave buttons enabled at all times. Clicking the button must trigger `Validate()` and display clear warning dialogs for missing or incorrect fields.
+```

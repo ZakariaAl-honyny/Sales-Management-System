@@ -1131,6 +1131,45 @@ The following bugs were fixed in this session:
 | RULE-229 | Pre-save validation MUST call `ClearAllErrors()` then `AddError()` for each field, then `await ValidateAllAsync()` from ViewModelBase — this shows the styled validation warning dialog automatically |
 | RULE-230 | The `Validation.ErrorTemplate` in `Styles.xaml` MUST render a red border + ❗ icon badge with `ToolTip` bound to `[0].ErrorContent` — applies to TextBox, PasswordBox, and ComboBox |
 
+### 2.55 Sound Service (ISoundService) & Transaction Feedback (v4.6.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-231 | `ISoundService` handles system-wide audio feedback via native Windows sounds (`PlaySuccessSound()`, `PlayErrorSound()`, `PlayWarningSound()`) |
+| RULE-232 | Audio feedback MUST fire on: successful barcode scans, quantity adjustments, pre-save validation dialogs, and save/post success events |
+
+**ISoundService Interface:**
+```csharp
+public interface ISoundService
+{
+    void PlaySuccess();
+    void PlayError();
+    void PlayWarning();
+}
+```
+
+### 2.56 Barcode Scanning (Continuous Input) & Event-Driven Selection (v4.6.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-233 | Continuous scanning MUST allow scanning product barcodes consecutively without closing the editor window or manually focusing the search field |
+| RULE-234 | `BarcodeLookupService` identifies products by barcode and automatically raises selection events marshaled to the UI thread via `Application.Current.Dispatcher` |
+
+### 2.57 Auto-Update System & DPAPI Security Integration (v4.6.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-235 | `IUpdaterService` handles background update checking, utilizing `%AppData%\SalesSystem\settings.json` to store skipped versions |
+| RULE-236 | DPAPI encryption via `IConnectionStringProtector` must be used for database connection strings to secure them at rest, applying `"DPAPI:"` prefix to raw values |
+| RULE-237 | `FirstRunSetupService` performs atomic write of encrypted settings on application startup via `.tmp` -> `File.Replace()` pattern |
+
+### 2.58 WPF ViewModels Code Quality Standard (v4.6.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-238 | ViewModels MUST NOT declare `async void` for operations that can throw exceptions, unless they are standard event handlers or ICommand execute wraps. All other async operations must return `Task` and be executed within `ExecuteAsync` wrappers |
+| RULE-239 | Derived list ViewModels MUST NOT shadow base class helper properties (such as `DialogService`) to avoid compile warnings and null reference issues. Use `SetDialogService()` instead |
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -1317,7 +1356,7 @@ Supplier Payments:SP-{YYYY}-{000001}
 | Topic | Read This File |
 |-------|---------------|
 | Financial formulas | `docs/CONSTITUTION.md` |
-| Full requirements | `docs/PRD-MVP-v3.0.md` |
+| Full requirements | `docs/PRD-MVP.md` |
 | Database schema | `docs/database-schema.md` |
 | UI/UX flows | `docs/ui-screens.md` |
 | Security details | `.opencode/agent/security-auditor.md` |
@@ -1457,3 +1496,9 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] All validation uses INotifyDataErrorInfo (no HasXxxError booleans)?
 - [ ] ErrorTemplate renders red border + icon for invalid fields?
 - [ ] ValidateAsync() calls ClearAllErrors() + AddError() + await ValidateAllAsync()?
+- [ ] Sound Service (`ISoundService`) integrated and audible cues triggered?
+- [ ] Continuous scanning active with event-driven Dispatcher marshaling?
+- [ ] Auto-update checking done asynchronously in background?
+- [ ] DPAPI encryption applied to connection string with "DPAPI:" prefix?
+- [ ] No `async void` used for operation methods (use `Task` + `ExecuteAsync`)?
+- [ ] No shadowing of base class properties (like `DialogService`)?

@@ -152,5 +152,14 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] ValidateAsync calls ClearAllErrors() + AddError() + await ValidateAllAsync()?
 - [ ] ErrorTemplate applied to TextBox, PasswordBox, ComboBox?
 
+### Bug Fix & Code Quality (v4.6.3)
+- [ ] Costing settings accessed via ISettingsApiService HTTP client (no direct Repository references in WPF VM)?
+- [ ] Costing VM registered in ConfigureServices?
+- [ ] No raw unhandled ex blocking MessageBox.Show?
+- [ ] Empty catch blocks resolved/documented?
+- [ ] No shadowed base class DialogService properties (no CS0108 warnings)?
+- [ ] Garbled Arabic strings corrected and encoded in UTF-8?
+- [ ] Critical VM initialization and search methods return Task or wrapped in safe try-catch?
+
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`

@@ -9,6 +9,7 @@ using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -78,7 +79,7 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetStockAsync_ExistingStock_ReturnsQuantity");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
@@ -118,7 +119,7 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] ValidateStockAsync_SufficientStock_ReturnsSuccess");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
@@ -128,7 +129,7 @@ public class InventoryServiceTests : IDisposable
         _dbContext.WarehouseStocks.Add(stock);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.ValidateStockAsync(productId: 1, warehouseId: 1, requiredQty: 50m, CancellationToken.None);
+        var result = await _sut.ValidateStockAsync(productId: 1, warehouseId: 1, requiredQty: 50m, ct: CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
 
@@ -140,7 +141,7 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] ValidateStockAsync_InsufficientStock_ReturnsFailure");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
@@ -150,7 +151,7 @@ public class InventoryServiceTests : IDisposable
         _dbContext.WarehouseStocks.Add(stock);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.ValidateStockAsync(productId: 1, warehouseId: 1, requiredQty: 50m, CancellationToken.None);
+        var result = await _sut.ValidateStockAsync(productId: 1, warehouseId: 1, requiredQty: 50m, ct: CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("أقل من الكمية المطلوبة");
@@ -167,7 +168,7 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] IncreaseStockAsync_ExistingStock_IncreasesCorrectly");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
@@ -205,7 +206,7 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] IncreaseStockAsync_NewStock_CreatesStockRecord");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
@@ -241,7 +242,7 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DecreaseStockAsync_SufficientQuantity_DecreasesCorrectly");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
@@ -278,7 +279,7 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DecreaseStockAsync_InsufficientQuantity_ThrowsDomainException");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
@@ -310,7 +311,7 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DecreaseStockAsync_ZeroQuantity_ThrowsDomainException");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
@@ -367,8 +368,8 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateTransferAsync_ValidRequest_CreatesTransferAndMovesStock");
 
-        var fromWarehouse = Warehouse.Create("Warehouse A", true);
-        var toWarehouse = Warehouse.Create("Warehouse B", false);
+        var fromWarehouse = Warehouse.Create("Warehouse A", isDefault: true);
+        var toWarehouse = Warehouse.Create("Warehouse B");
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(fromWarehouse);
         _dbContext.Warehouses.Add(toWarehouse);
@@ -379,17 +380,12 @@ public class InventoryServiceTests : IDisposable
         _dbContext.WarehouseStocks.Add(stock);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateStockTransferRequest
-        {
-            FromWarehouseId = 1,
-            ToWarehouseId = 2,
-            Items = new List<SalesSystem.Contracts.Requests.StockTransferItemRequest>
+        var request = new SalesSystem.Contracts.Requests.CreateStockTransferRequest(
+            1, 2, DateTime.Now, "Test transfer",
+            new List<SalesSystem.Contracts.Requests.CreateStockTransferItemRequest>
             {
-                new() { ProductId = 1, Quantity = 20m, Notes = null }
-            },
-            TransferDate = DateTime.Now,
-            Notes = "Test transfer"
-        };
+                new(1, 20m)
+            });
 
         var result = await _sut.CreateTransferAsync(request, userId: 1, CancellationToken.None);
 
@@ -411,21 +407,16 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateTransferAsync_SameWarehouse_ReturnsFailure");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateStockTransferRequest
-        {
-            FromWarehouseId = 1,
-            ToWarehouseId = 1, // Same warehouse
-            Items = new List<SalesSystem.Contracts.Requests.StockTransferItemRequest>
+        var request = new SalesSystem.Contracts.Requests.CreateStockTransferRequest(
+            1, 1, DateTime.Now, null,
+            new List<SalesSystem.Contracts.Requests.CreateStockTransferItemRequest>
             {
-                new() { ProductId = 1, Quantity = 10m, Notes = null }
-            },
-            TransferDate = DateTime.Now,
-            Notes = null
-        };
+                new(1, 10m)
+            }); // Same warehouse
 
         var result = await _sut.CreateTransferAsync(request, userId: 1, CancellationToken.None);
 
@@ -440,20 +431,15 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateTransferAsync_EmptyItems_ReturnsFailure");
 
-        var fromWarehouse = Warehouse.Create("Warehouse A", true);
-        var toWarehouse = Warehouse.Create("Warehouse B", false);
+        var fromWarehouse = Warehouse.Create("Warehouse A", isDefault: true);
+        var toWarehouse = Warehouse.Create("Warehouse B");
         _dbContext.Warehouses.Add(fromWarehouse);
         _dbContext.Warehouses.Add(toWarehouse);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateStockTransferRequest
-        {
-            FromWarehouseId = 1,
-            ToWarehouseId = 2,
-            Items = new List<SalesSystem.Contracts.Requests.StockTransferItemRequest>(), // Empty
-            TransferDate = DateTime.Now,
-            Notes = null
-        };
+        var request = new SalesSystem.Contracts.Requests.CreateStockTransferRequest(
+            1, 2, DateTime.Now, null,
+            new List<SalesSystem.Contracts.Requests.CreateStockTransferItemRequest>()); // Empty
 
         var result = await _sut.CreateTransferAsync(request, userId: 1, CancellationToken.None);
 
@@ -468,8 +454,8 @@ public class InventoryServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateTransferAsync_InsufficientStock_ReturnsFailure");
 
-        var fromWarehouse = Warehouse.Create("Warehouse A", true);
-        var toWarehouse = Warehouse.Create("Warehouse B", false);
+        var fromWarehouse = Warehouse.Create("Warehouse A", isDefault: true);
+        var toWarehouse = Warehouse.Create("Warehouse B");
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(fromWarehouse);
         _dbContext.Warehouses.Add(toWarehouse);
@@ -480,17 +466,12 @@ public class InventoryServiceTests : IDisposable
         _dbContext.WarehouseStocks.Add(stock);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateStockTransferRequest
-        {
-            FromWarehouseId = 1,
-            ToWarehouseId = 2,
-            Items = new List<SalesSystem.Contracts.Requests.StockTransferItemRequest>
+        var request = new SalesSystem.Contracts.Requests.CreateStockTransferRequest(
+            1, 2, DateTime.Now, null,
+            new List<SalesSystem.Contracts.Requests.CreateStockTransferItemRequest>
             {
-                new() { ProductId = 1, Quantity = 50m, Notes = null } // More than available
-            },
-            TransferDate = DateTime.Now,
-            Notes = null
-        };
+                new(1, 50m) // More than available
+            });
 
         var result = await _sut.CreateTransferAsync(request, userId: 1, CancellationToken.None);
 
@@ -559,6 +540,50 @@ public class InventoryServiceTests : IDisposable
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

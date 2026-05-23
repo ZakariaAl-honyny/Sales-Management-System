@@ -14,7 +14,7 @@ Lead architect for the Sales Management System. You coordinate all subagents and
 ## MUST READ FIRST
 - `AGENTS.md` — Master rules file (READ COMPLETELY)
 - `docs/CONSTITUTION.md` — Non-negotiable rules
-- `docs/PRD-MVP-v3.0.md` — Full requirements
+- `docs/PRD-MVP.md` — Full requirements
 
 ## Responsibilities
 1. Break features into tasks following PRD implementation phases

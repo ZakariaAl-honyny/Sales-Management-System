@@ -48,14 +48,14 @@ public class ReportServiceTests
         var to = DateTime.Now;
         var reportItems = new List<SalesSystem.Contracts.DTOs.SalesReportDto>
         {
-            new(SalesSystem.Contracts.DTOs.SalesReportPeriod.Daily, DateTime.Now.AddDays(-1), 10m, 1000m, 500m),
-            new(SalesSystem.Contracts.DTOs.SalesReportPeriod.Daily, DateTime.Now, 12m, 1200m, 600m)
+            new(DateTime.Now.AddDays(-1), "INV-001", "Customer 1", 1000m, 0m, 0m, 1000m, 500m, 500m),
+            new(DateTime.Now, "INV-002", "Customer 2", 1200m, 0m, 0m, 1200m, 600m, 600m)
         };
 
-        _mockReportRepository.Setup(r => r.GetSalesReportAsync(from, to, It.IsAny<CancellationToken>()))
+        _mockReportRepository.Setup(r => r.GetSalesReportAsync(null, from, to, It.IsAny<CancellationToken>()))
             .ReturnsAsync(reportItems);
 
-        var result = await _sut.GetSalesReportAsync(from, to, CancellationToken.None);
+        var result = await _sut.GetSalesReportAsync(null, from, to, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().HaveCount(2);
@@ -71,7 +71,7 @@ public class ReportServiceTests
         var from = DateTime.Now;
         var to = DateTime.Now.AddDays(-30); // to < from
 
-        var result = await _sut.GetSalesReportAsync(from, to, CancellationToken.None);
+        var result = await _sut.GetSalesReportAsync(null, from, to, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
@@ -92,14 +92,14 @@ public class ReportServiceTests
         var to = DateTime.Now;
         var reportItems = new List<SalesSystem.Contracts.DTOs.PurchaseReportDto>
         {
-            new(SalesSystem.Contracts.DTOs.PurchaseReportPeriod.Daily, DateTime.Now.AddDays(-1), 10m, 1000m),
-            new(SalesSystem.Contracts.DTOs.PurchaseReportPeriod.Daily, DateTime.Now, 12m, 1200m)
+            new(DateTime.Now.AddDays(-1), "PUR-001", "Supplier 1", 1000m, 0m, 0m, 1000m, 1000m, 0m),
+            new(DateTime.Now, "PUR-002", "Supplier 2", 1200m, 0m, 0m, 1200m, 1200m, 0m)
         };
 
-        _mockReportRepository.Setup(r => r.GetPurchasesReportAsync(from, to, It.IsAny<CancellationToken>()))
+        _mockReportRepository.Setup(r => r.GetPurchasesReportAsync(null, from, to, It.IsAny<CancellationToken>()))
             .ReturnsAsync(reportItems);
 
-        var result = await _sut.GetPurchasesReportAsync(from, to, CancellationToken.None);
+        var result = await _sut.GetPurchasesReportAsync(null, from, to, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().HaveCount(2);
@@ -115,7 +115,7 @@ public class ReportServiceTests
         var from = DateTime.Now;
         var to = DateTime.Now.AddDays(-30);
 
-        var result = await _sut.GetPurchasesReportAsync(from, to, CancellationToken.None);
+        var result = await _sut.GetPurchasesReportAsync(null, from, to, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
@@ -134,8 +134,8 @@ public class ReportServiceTests
 
         var reportItems = new List<SalesSystem.Contracts.DTOs.StockReportDto>
         {
-            new(1, "Product 1", 100m, 50m, 10m),
-            new(1, "Product 2", 80m, 40m, 8m)
+            new(1, "Product 1", "Category", "Unit", "Warehouse", 100m, 50m, 10m, 1000m),
+            new(2, "Product 2", "Category", "Unit", "Warehouse", 80m, 40m, 8m, 640m)
         };
 
         _mockReportRepository.Setup(r => r.GetStockReportAsync(1, It.IsAny<CancellationToken>()))
@@ -156,8 +156,8 @@ public class ReportServiceTests
 
         var reportItems = new List<SalesSystem.Contracts.DTOs.StockReportDto>
         {
-            new(1, "Product 1", 100m, 50m, 10m),
-            new(2, "Product 2", 80m, 40m, 8m)
+            new(1, "Product 1", "Category", "Unit", "Warehouse", 100m, 50m, 10m, 1000m),
+            new(2, "Product 2", "Category", "Unit", "Warehouse", 80m, 40m, 8m, 640m)
         };
 
         _mockReportRepository.Setup(r => r.GetStockReportAsync(null, It.IsAny<CancellationToken>()))
@@ -182,7 +182,7 @@ public class ReportServiceTests
 
         var reportItems = new List<SalesSystem.Contracts.DTOs.CustomerBalanceReportDto>
         {
-            new(1, "Customer 1", 1000m, 500m, 500m)
+            new(1, "Customer 1", 1000m, 500m, 0m, 500m, 0m, 1000m)
         };
 
         _mockReportRepository.Setup(r => r.GetCustomerBalancesReportAsync(1, It.IsAny<CancellationToken>()))
@@ -203,8 +203,8 @@ public class ReportServiceTests
 
         var reportItems = new List<SalesSystem.Contracts.DTOs.CustomerBalanceReportDto>
         {
-            new(1, "Customer 1", 1000m, 500m, 500m),
-            new(2, "Customer 2", 2000m, 800m, 1200m)
+            new(1, "Customer 1", 1000m, 500m, 0m, 500m, 0m, 1000m),
+            new(2, "Customer 2", 2000m, 800m, 0m, 1200m, 0m, 1600m)
         };
 
         _mockReportRepository.Setup(r => r.GetCustomerBalancesReportAsync(null, It.IsAny<CancellationToken>()))
@@ -229,7 +229,7 @@ public class ReportServiceTests
 
         var reportItems = new List<SalesSystem.Contracts.DTOs.SupplierBalanceReportDto>
         {
-            new(1, "Supplier 1", 5000m, 2000m, 3000m)
+            new(1, "Supplier 1", 5000m, 2000m, 0m, 3000m, 0m, 4000m)
         };
 
         _mockReportRepository.Setup(r => r.GetSupplierBalancesReportAsync(1, It.IsAny<CancellationToken>()))
@@ -256,8 +256,8 @@ public class ReportServiceTests
         var to = DateTime.Now;
         var reportItems = new List<SalesSystem.Contracts.DTOs.ProductMovementReportDto>
         {
-            new(1, "Product 1", 100m, 50m, DateTime.Now.AddDays(-5), "Sale"),
-            new(1, "Product 1", 200m, 100m, DateTime.Now.AddDays(-3), "Purchase")
+            new(DateTime.Now.AddDays(-5), "Warehouse 1", "Sale", "REF-001", 100m, 50m),
+            new(DateTime.Now.AddDays(-3), "Warehouse 1", "Purchase", "REF-002", 200m, 100m)
         };
 
         _mockReportRepository.Setup(r => r.GetProductMovementsReportAsync(1, from, to, It.IsAny<CancellationToken>()))
@@ -308,14 +308,14 @@ public class ReportServiceTests
 
         var reportItems = new List<SalesSystem.Contracts.DTOs.LowStockReportDto>
         {
-            new(1, "Product 1", 10m, 50m, 40m),
-            new(2, "Product 2", 5m, 20m, 15m)
+            new(1, "Product 1", null, "Warehouse 1", 10m, 50m, 40m, 0m, 0m, "Box", "Piece", 24m),
+            new(2, "Product 2", null, "Warehouse 1", 5m, 20m, 15m, 0m, 0m, "Box", "Piece", 24m)
         };
 
-        _mockReportRepository.Setup(r => r.GetLowStockReportAsync(It.IsAny<CancellationToken>()))
+        _mockReportRepository.Setup(r => r.GetLowStockReportAsync(null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(reportItems);
 
-        var result = await _sut.GetLowStockReportAsync(CancellationToken.None);
+        var result = await _sut.GetLowStockReportAsync(null, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().HaveCount(2);
@@ -335,10 +335,10 @@ public class ReportServiceTests
         var from = DateTime.Now.AddDays(-30);
         var to = DateTime.Now;
 
-        _mockReportRepository.Setup(r => r.GetSalesReportAsync(from, to, It.IsAny<CancellationToken>()))
+        _mockReportRepository.Setup(r => r.GetSalesReportAsync(null, from, to, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Database error"));
 
-        var result = await _sut.GetSalesReportAsync(from, to, CancellationToken.None);
+        var result = await _sut.GetSalesReportAsync(null, from, to, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("حدث خطأ أثناء إنشاء تقرير المبيعات");

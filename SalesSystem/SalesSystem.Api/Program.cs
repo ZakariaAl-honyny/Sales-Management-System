@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -183,6 +184,52 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+
+// Layer 6: Rate Limiting — brute-force protection
+builder.Services.AddRateLimiter(options =>
+{
+    // Global: 100 requests per minute per IP
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        context => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Strict policy for login endpoint: 5 attempts per 15 minutes
+    options.AddPolicy("LoginPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0
+            }));
+
+    // Arabic response when rate limit exceeded
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+        context.HttpContext.Response.ContentType = "application/json";
+
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                retryAfter.TotalSeconds.ToString("0");
+        }
+
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            Error = "تم تجاوز الحد المسموح من الطلبات. حاول مجدداً بعد قليل",
+            Code = "RATE_LIMIT_EXCEEDED"
+        }, ct);
+    };
+});
+
 builder.Services.AddHttpClient();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddEndpointsApiExplorer();
@@ -358,6 +405,8 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
 app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseCors("DesktopOnly");
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

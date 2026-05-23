@@ -122,21 +122,23 @@ public class SalesReturnsControllerTests : ControllerTestBase
         CustomerName: "عميل اختبار",
         SalesInvoiceId: 10 + id,
         ReturnDate: DateTime.UtcNow,
+        SubTotal: 100.00m,
+        TaxAmount: 0.00m,
+        DiscountAmount: 0.00m,
         TotalAmount: 100.00m,
         Notes: "ملاحظات",
         Status: 1,
         Items: new List<SalesReturnItemDto>
         {
-            new(id * 10, 1, null, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m)
+            new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
         });
 
     private static CreateSalesReturnRequest CreateValidRequest() => new(
         SalesInvoiceId: 10,
-        WarehouseId: 1,
         CustomerId: 1,
+        WarehouseId: 1,
         ReturnDate: null,
         Notes: "ملاحظات إرجاع",
-        Status: 1,
         Items: new List<ReturnItemRequest>
         {
             new(ProductId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m)
@@ -255,12 +257,15 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         SupplierName: "مورد اختبار",
         PurchaseInvoiceId: 10 + id,
         ReturnDate: DateTime.UtcNow,
+        SubTotal: 200.00m,
+        TaxAmount: 0.00m,
+        DiscountAmount: 0.00m,
         TotalAmount: 200.00m,
         Notes: "ملاحظات",
         Status: 1,
         Items: new List<PurchaseReturnItemDto>
         {
-            new(id * 10, 1, null, "منتج اختبار", 5.000m, 40.00m, 0.00m, 200.00m)
+            new(id * 10, 1, "منتج اختبار", 5.000m, 40.00m, 0.00m, 200.00m, 1)
         });
 
     private static CreatePurchaseReturnRequest CreateValidRequest() => new(
@@ -269,7 +274,6 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         WarehouseId: 1,
         ReturnDate: null,
         Notes: "ملاحظات إرجاع",
-        Status: 1,
         Items: new List<ReturnItemRequest>
         {
             new(ProductId: 1, Quantity: 5.000m, UnitPrice: 40.00m, DiscountAmount: 0.00m)

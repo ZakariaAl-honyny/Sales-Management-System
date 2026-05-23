@@ -68,6 +68,7 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - `Product.Code`, `Customer.Code`, `Supplier.Code`, `Warehouse.Code` unique indexes are REMOVED
 - `DuplicateCode` error constant is REMOVED from ErrorCodes
 - Entity configurations for Product, Customer, Supplier, Warehouse must NOT include Code property, HasMaxLength, or HasIndex for Code
+- `SystemSettings` table key-value configuration: Seed `CostingMethod` (Key = "CostingMethod", Value = "1" [WeightedAverage]) and ensure the API settings client correctly maps update requests.
 
 ### Future Fixes Needed (Audit Findings v4.6.1)
 - `CashBox` entity: MUST add `OpeningBalance` property and configure it in `CashBoxConfiguration.cs`

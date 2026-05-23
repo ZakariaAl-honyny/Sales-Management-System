@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Enums;
@@ -43,7 +44,7 @@ public class SettingsControllerTests
     [Fact]
     public async Task Get_WhenSettingsExist_ReturnsOkWithSettings()
     {
-        var settings = new StoreSettingsDto("متجري", "0123456789", "الرياض", "الوصف", "شركة", "10%", 15);
+        var settings = new StoreSettingsDto(1, "متجري", "0123456789", "الرياض", null, null, "SAR", 15m, true, null, true, false, true, "INV-");
         _settingsServiceMock
             .Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<StoreSettingsDto>.Success(settings));
@@ -69,8 +70,8 @@ public class SettingsControllerTests
     [Fact]
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedSettings()
     {
-        var request = new UpdateSettingsRequest("متجري المحدث", "0123456789", "جدة", "وصف جديد", "شركة", "15%", 20);
-        var settings = new StoreSettingsDto(request.StoreName, request.Phone, request.Address, request.Description, request.BusinessType, request.TaxRate, request.CreditLimit);
+        var request = new UpdateSettingsRequest("متجري المحدث", "جدة", "0123456789", "info@store.com", null, "SAR", 15m, true, null, true, false, true, "INV-");
+        var settings = new StoreSettingsDto(1, request.StoreName, request.Phone, request.Address, null, request.Email, request.Currency, request.DefaultTaxRate, request.IsTaxEnabled, request.TaxNumber, request.EnableStockAlerts, request.AllowNegativeStock, request.AutoUpdatePrices, request.InvoicePrefix);
 
         _settingsServiceMock
             .Setup(x => x.UpdateSettingsAsync(It.IsAny<UpdateSettingsRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -85,7 +86,7 @@ public class SettingsControllerTests
     [Fact]
     public async Task Update_WhenServiceFails_ReturnsBadRequest()
     {
-        var request = new UpdateSettingsRequest("متجري", "0123456789", "الرياض", "الوصف", "شركة", "10%", 15);
+        var request = new UpdateSettingsRequest("متجري", "الرياض", "0123456789", null, null, "SAR", 15m, true, null, true, false, true, "INV-");
 
         _settingsServiceMock
             .Setup(x => x.UpdateSettingsAsync(It.IsAny<UpdateSettingsRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -104,7 +105,7 @@ public class SettingsControllerTests
             HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = new ClaimsPrincipal() }
         };
 
-        var request = new UpdateSettingsRequest("متجري", "0123456789", "الرياض", "الوصف", "شركة", "10%", 15);
+        var request = new UpdateSettingsRequest("متجري", "الرياض", "0123456789", null, null, "SAR", 15m, true, null, true, false, true, "INV-");
 
         var result = await _controller.Update(request, CancellationToken.None);
 

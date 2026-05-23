@@ -60,6 +60,9 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 32. **FluentValidators for ALL Requests**: EVERY Command/Request model MUST have an associated `AbstractValidator` — including Update operations (UpdateSalesInvoice, UpdatePurchaseInvoice, UpdateStockTransfer, UpdateCustomerPayment, UpdateSupplierPayment).
 33. **CostingMethod API Support**: SettingsController MUST support Get/Set CostingMethod via ISystemSettingsRepository — StoreSettingsDto and UpdateSettingsRequest MUST include `int CostingMethod = 1` field.
 34. **decimal(18,2) Precision Enforcement**: ALL money fields in Fluent API configurations MUST use `.HasPrecision(18, 2)` — NEVER `HasPrecision(18, 4)`.
+35. **Desktop Client Separation**: WPF ViewModels and UI controllers MUST NOT reference `ISystemSettingsRepository` or DB context. Use API clients (e.g., `ISettingsApiService`) to interact with the backend services.
+36. **Thread-Safe Exception Handling**: Avoid raw `MessageBox.Show` in global unhandled exceptions. Use secure logging with structured fallback screens.
+37. **Safe Exception Swallowing**: Swallowing exceptions via empty catch blocks is forbidden. Always log the error or provide documented, safe fallback logic.
 
 ## Pattern to Follow
 ```csharp
