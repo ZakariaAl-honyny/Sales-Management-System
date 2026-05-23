@@ -63,8 +63,9 @@ builder.Services.AddDataProtection()
 // ============================================
 // 2. Read Configuration
 // ============================================
-var connectionString = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION")
-    ?? "Server=.;Database=SalesSystemDb;Trusted_Connection=true;TrustServerCertificate=true;";
+var connectionString = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION");
+if (string.IsNullOrEmpty(connectionString))
+    throw new InvalidOperationException("SALESSYSTEM_DB_CONNECTION environment variable is not set. Please configure it before starting the application.");
 
 var jwtSecret = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_SECRET")
     ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
@@ -120,6 +121,8 @@ builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IDocumentSequenceService, DocumentSequenceService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
+builder.Services.AddScoped<IBarcodeLookupService, BarcodeLookupService>();
+builder.Services.AddScoped<IProductPriceService, ProductPriceService>();
 builder.Services.AddScoped<ISalesService, SalesService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<ISalesReturnService, SalesReturnService>();
@@ -170,6 +173,15 @@ builder.Services.AddAuthorization(opts =>
 // ============================================
 // 7. Other Services
 // ============================================
+// CORS — Restrict to localhost for security
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DesktopOnly", policy =>
+        policy.WithOrigins("http://localhost:5221", "http://localhost:5222")
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
+
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -344,6 +356,8 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
 // 9. Middleware Pipeline
 // ============================================
 app.UseMiddleware<ExceptionMiddleware>();
+
+app.UseCors("DesktopOnly");
 
 app.UseAuthentication();
 app.UseAuthorization();

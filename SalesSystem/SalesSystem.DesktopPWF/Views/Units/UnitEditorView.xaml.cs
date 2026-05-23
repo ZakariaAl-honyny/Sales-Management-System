@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.ViewModels.Units;
 
@@ -19,9 +19,11 @@ public partial class UnitEditorView : Window
         {
             Dispatcher.InvokeAsync(() =>
             {
-                ValidationFocusBehavior.FindFirstInvalid(this)?.Focus();
+                (ValidationFocusBehavior.FindFirstInvalid(this) ??
+                ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
             });
         };
     }
 }
+
 

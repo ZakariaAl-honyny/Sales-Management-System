@@ -45,13 +45,13 @@
         <Border Grid.Row="1" Padding="16">
             <StackPanel>
                 <TextBlock Text="اسم التصنيف *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+<TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                          Style="{StaticResource ModernTextBox}"
                          Tag="أدخل اسم التصنيف (مثلاً: إلكترونيات، أغذية...)"
                          TabIndex="1"
                          helpers:FocusHelper.AdvanceOnEnter="True"
                          AutomationProperties.AutomationId="TxtCategoryName"
-                             ToolTip="أدخل اسماً فريداً للتصنيف — هذا الحقل مطلوب ولا يمكن أن يكون فارغاً"/>
+                              ToolTip="أدخل اسماً فريداً للتصنيف — هذا الحقل مطلوب ولا يمكن أن يكون فارغاً"/>
                 <TextBlock Text="مثال: مشروبات، معلبات، منظفات" Style="{StaticResource HelperTextStyle}"/>
                 
                 <Border Margin="0,20,0,0" Padding="16" Background="#F8FAFC" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0">

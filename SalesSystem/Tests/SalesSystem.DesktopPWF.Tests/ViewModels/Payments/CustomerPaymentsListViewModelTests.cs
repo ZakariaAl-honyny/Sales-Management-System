@@ -66,7 +66,7 @@ public class CustomerPaymentsListViewModelTests
     public void DateTo_DefaultValue_IsNull() => _viewModel.DateTo.Should().BeNull();
 
     [Fact]
-    public void IsLoading_DefaultValue_IsFalse() => _viewModel.IsLoading.Should().BeFalse();
+    public void IsBusy_DefaultValue_IsFalse() => _viewModel.IsBusy.Should().BeFalse();
 
     [Fact]
     public void ErrorMessage_DefaultValue_IsEmpty() => _viewModel.ErrorMessage.Should().BeEmpty();
@@ -116,12 +116,10 @@ public class CustomerPaymentsListViewModelTests
     }
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
-        var events = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
-        _viewModel.IsLoading = true;
-        events.Should().Contain("IsLoading");
+        // IsBusy has protected set in ViewModelBase, managed by ExecuteAsync
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -212,7 +210,7 @@ public class CustomerPaymentsListViewModelTests
         await _viewModel.LoadPaymentsAsync();
 
         _viewModel.Payments.Should().HaveCount(2);
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -225,11 +223,11 @@ public class CustomerPaymentsListViewModelTests
         await _viewModel.LoadPaymentsAsync();
 
         _viewModel.ErrorMessage.Should().NotBeEmpty();
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
-    public async Task LoadPaymentsAsync_WhenLoading_SetsIsLoadingTrue()
+    public async Task LoadPaymentsAsync_WhenLoading_SetsIsBusyTrue()
     {
         var tcs = new TaskCompletionSource<Result<List<CustomerPaymentDto>>>();
         _mockPaymentService
@@ -237,12 +235,12 @@ public class CustomerPaymentsListViewModelTests
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadPaymentsAsync();
-        _viewModel.IsLoading.Should().BeTrue();
+        _viewModel.IsBusy.Should().BeTrue();
 
         tcs.SetResult(Result<List<CustomerPaymentDto>>.Success(new List<CustomerPaymentDto>()));
         await loadTask;
 
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]

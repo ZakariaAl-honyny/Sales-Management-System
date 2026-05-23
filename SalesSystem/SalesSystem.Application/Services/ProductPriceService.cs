@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Enums;
@@ -24,8 +23,7 @@ public class ProductPriceService : IProductPriceService
 
     public async Task<Result<decimal>> GetPriceByUnitAsync(int productId, UnitType unitType, CancellationToken ct = default)
     {
-        var product = await _uow.Products.Query()
-            .FirstOrDefaultAsync(p => p.Id == productId, ct);
+        var product = await _uow.Products.FirstOrDefaultAsync(p => p.Id == productId, ct);
 
         if (product == null)
         {

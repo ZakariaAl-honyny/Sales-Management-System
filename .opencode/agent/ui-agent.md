@@ -322,3 +322,118 @@ In PurchaseInvoiceEditorView.xaml DataGrid, the "التكلفة" column MUST inc
 - Full-screen `#80000000` dimming rectangle behind centered card
 - Button hover effects via ControlTemplate.Triggers (IsMouseOver, IsPressed)
 - `PositionOverOwner()` in code-behind
+
+### Newest-First Sorting Pattern (v4.6.1)
+
+ALL list ViewModels MUST sort items by newest first:
+
+```csharp
+// CORRECT — add OrderByDescending when populating ObservableCollection
+foreach (var item in result.Value.OrderByDescending(x => x.Id))
+{
+    Items.Add(item);
+}
+
+// For invoices — sort by InvoiceDate descending
+foreach (var item in result.Value.OrderByDescending(x => x.InvoiceDate))
+{
+    Invoices.Add(item);
+}
+```
+
+### Dialog Owner Safety Pattern (v4.6.1)
+
+```csharp
+// CORRECT — guard against self-ownership
+private void PositionOverOwner()
+{
+    var mainWindow = System.Windows.Application.Current.MainWindow;
+    if (mainWindow != null && mainWindow != this)
+    {
+        Owner = mainWindow;
+        Width = Owner.ActualWidth;
+        Height = Owner.ActualHeight;
+        Left = Owner.Left;
+        Top = Owner.Top;
+    }
+    else
+    {
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+    }
+}
+```
+
+### WPF Validation ErrorTemplate Pattern (v4.6.2)
+
+The ErrorTemplate in Styles.xaml provides a consistent validation visual:
+
+```xml
+<ControlTemplate x:Key="ErrorTemplate">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Grid.ColumnSpan="2"
+                BorderBrush="#EF4444" BorderThickness="1.5"
+                CornerRadius="4">
+            <AdornedElementPlaceholder x:Name="Placeholder"/>
+        </Border>
+        <Border Grid.Column="1" Background="#EF4444"
+                CornerRadius="10" Width="20" Height="20"
+                Margin="4,0" VerticalAlignment="Center"
+                ToolTip="{Binding [0].ErrorContent}">
+            <TextBlock Text="!" Foreground="White" 
+                       FontWeight="Bold" FontSize="14"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+        </Border>
+    </Grid>
+</ControlTemplate>
+```
+
+Controls get red border on Validation.HasError:
+```xml
+<Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+    <Style.Triggers>
+        <Trigger Property="Validation.HasError" Value="True">
+            <Setter Property="BorderBrush" Value="#EF4444"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+        </Trigger>
+    </Style.Triggers>
+</Style>
+```
+
+**ViewModel Code Pattern:**
+```csharp
+// In constructor:
+_dialogService = dialogService;
+SetDialogService(_dialogService);
+
+// Property setter with real-time validation:
+public string Name
+{
+    get => _name;
+    set
+    {
+        if (SetProperty(ref _name, value))
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                AddError(nameof(Name), "اسم العميل مطلوب");
+            else
+                ClearErrors(nameof(Name));
+        }
+    }
+}
+
+// Pre-save validation:
+private async Task<bool> ValidateAsync()
+{
+    ClearAllErrors();
+    if (string.IsNullOrWhiteSpace(Name))
+        AddError(nameof(Name), "اسم العميل مطلوب");
+    if (Price <= 0)
+        AddError(nameof(Price), "السعر يجب أن يكون أكبر من صفر");
+    return await ValidateAllAsync();  // Handles dialog + focus
+}
+```

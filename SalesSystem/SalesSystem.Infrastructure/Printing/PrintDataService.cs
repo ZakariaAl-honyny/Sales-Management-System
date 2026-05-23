@@ -66,8 +66,11 @@ public class PrintDataService : IPrintDataService
     private async Task<(string name, string phone, string address, string taxNumber,
         byte[]? logoBytes, decimal taxRate)> LoadStoreInfoAsync(CancellationToken ct)
     {
-        var settings = await GetStoreSettingsAsync(ct);
-        var sysSettings = await GetPrintSystemSettingsAsync(ct);
+        var settingsResult = await GetStoreSettingsAsync(ct);
+        var sysSettingsResult = await GetPrintSystemSettingsAsync(ct);
+
+        var settings = settingsResult.IsSuccess ? settingsResult.Value : null;
+        var sysSettings = sysSettingsResult.IsSuccess ? sysSettingsResult.Value : new List<SystemSetting>();
 
         var storeName = settings?.StoreName ?? "متجري";
         var storePhone = settings?.Phone ?? string.Empty;
@@ -90,15 +93,35 @@ public class PrintDataService : IPrintDataService
         return (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate);
     }
 
-    public async Task<StoreSettings?> GetStoreSettingsAsync(CancellationToken ct = default)
+    public async Task<Result<StoreSettings>> GetStoreSettingsAsync(CancellationToken ct = default)
     {
-        return await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
+        try
+        {
+            var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
+            if (settings == null)
+                return Result<StoreSettings>.Failure("إعدادات المتجر غير موجودة");
+            return Result<StoreSettings>.Success(settings);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading store settings");
+            return Result<StoreSettings>.Failure("فشل في تحميل إعدادات المتجر");
+        }
     }
 
-    public async Task<List<SystemSetting>> GetPrintSystemSettingsAsync(CancellationToken ct = default)
+    public async Task<Result<List<SystemSetting>>> GetPrintSystemSettingsAsync(CancellationToken ct = default)
     {
-        return await _uow.SystemSettings.Query()
-            .Where(s => s.Category == "Print")
-            .ToListAsync(ct);
+        try
+        {
+            var settings = await _uow.SystemSettings.Query()
+                .Where(s => s.Category == "Print")
+                .ToListAsync(ct);
+            return Result<List<SystemSetting>>.Success(settings);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading print system settings");
+            return Result<List<SystemSetting>>.Failure("فشل في تحميل إعدادات الطباعة");
+        }
     }
 }

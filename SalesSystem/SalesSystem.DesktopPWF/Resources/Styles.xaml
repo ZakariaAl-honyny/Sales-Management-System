@@ -125,13 +125,36 @@
     </Style>
 
     <ControlTemplate x:Key="ErrorTemplate">
-        <StackPanel>
-            <AdornedElementPlaceholder x:Name="Placeholder"/>
-            <TextBlock Text="{Binding [0].ErrorContent}" 
-                       Foreground="{StaticResource ErrorBrush}" 
-                       FontSize="11" 
-                       Margin="0,2,0,0"/>
-        </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <!-- Red border wraps the original control (spans both columns) -->
+            <Border x:Name="ErrorBorder"
+                    Grid.Column="0" Grid.ColumnSpan="2"
+                    BorderBrush="#EF4444"
+                    BorderThickness="1.5"
+                    CornerRadius="4"
+                    SnapsToDevicePixels="True">
+                <AdornedElementPlaceholder x:Name="Placeholder"/>
+            </Border>
+            <!-- Red icon badge with error ToolTip -->
+            <Border Grid.Column="1"
+                    Background="#EF4444"
+                    CornerRadius="10"
+                    Width="20" Height="20"
+                    Margin="4,0"
+                    VerticalAlignment="Center"
+                    ToolTip="{Binding ElementName=Placeholder, Path=AdornedElement.(Validation.Errors).[0].ErrorContent}">
+                <TextBlock Text="!"
+                           Foreground="White"
+                           FontWeight="Bold"
+                           FontSize="14"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Border>
+        </Grid>
     </ControlTemplate>
 
     <!-- زر أساسي (Keyed) -->
@@ -299,8 +322,15 @@
         </Setter>
     </Style>
 
-    <!-- حقل نص افتراضي (Implicit) -->
-    <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}"/>
+    <!-- حقل نص افتراضي (Implicit) with validation red border -->
+    <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+        <Style.Triggers>
+            <Trigger Property="Validation.HasError" Value="True">
+                <Setter Property="BorderBrush" Value="#EF4444"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
     <!-- حقل كلمة المرور (Keyed) -->
     <Style x:Key="ModernPasswordBox" TargetType="PasswordBox">
@@ -338,8 +368,15 @@
         </Setter>
     </Style>
 
-    <!-- حقل كلمة مرور افتراضي (Implicit) -->
-    <Style TargetType="PasswordBox" BasedOn="{StaticResource ModernPasswordBox}"/>
+    <!-- حقل كلمة مرور افتراضي (Implicit) with validation red border -->
+    <Style TargetType="PasswordBox" BasedOn="{StaticResource ModernPasswordBox}">
+        <Style.Triggers>
+            <Trigger Property="Validation.HasError" Value="True">
+                <Setter Property="BorderBrush" Value="#EF4444"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
     <!-- تسمية (تم حذف المكرر) -->
 
@@ -572,8 +609,16 @@
         <Setter Property="Height" Value="36"/>
     </Style>
 
-    <!-- ComboBox افتراضي (Implicit) -->
-    <Style TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}"/>
+    <!-- ComboBox افتراضي (Implicit) with validation -->
+    <Style TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}">
+        <Setter Property="Validation.ErrorTemplate" Value="{StaticResource ErrorTemplate}"/>
+        <Style.Triggers>
+            <Trigger Property="Validation.HasError" Value="True">
+                <Setter Property="BorderBrush" Value="#EF4444"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
     <!-- DatePicker عصري (Keyed) -->
     <Style x:Key="ModernDatePicker" TargetType="DatePicker">

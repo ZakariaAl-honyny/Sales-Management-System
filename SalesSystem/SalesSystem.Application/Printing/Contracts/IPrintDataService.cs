@@ -25,10 +25,10 @@ public interface IPrintDataService
     /// <summary>
     /// Gets the store settings for print header info.
     /// </summary>
-    Task<StoreSettings?> GetStoreSettingsAsync(CancellationToken ct = default);
+    Task<Result<StoreSettings>> GetStoreSettingsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Gets the print system settings (LogoPath, TaxRate, StoreTaxNumber).
     /// </summary>
-    Task<List<SystemSetting>> GetPrintSystemSettingsAsync(CancellationToken ct = default);
+    Task<Result<List<SystemSetting>>> GetPrintSystemSettingsAsync(CancellationToken ct = default);
 }

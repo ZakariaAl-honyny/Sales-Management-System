@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using SalesSystem.DesktopPWF.Helpers;
 
 namespace SalesSystem.DesktopPWF.Views.Suppliers;
@@ -21,9 +21,11 @@ public partial class SupplierEditorView : Window
         {
             Dispatcher.InvokeAsync(() =>
             {
-                ValidationFocusBehavior.FindFirstInvalid(this)?.Focus();
+                (ValidationFocusBehavior.FindFirstInvalid(this) ??
+                ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
             });
         };
     }
 }
+
 

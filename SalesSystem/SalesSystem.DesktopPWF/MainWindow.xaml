@@ -186,19 +186,19 @@
                                     <TextBlock Text="مرتجعات المبيعات" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ListBoxItem>
-                            <ListBoxItem x:Name="NavPurchaseReturnsItem" Tag="PurchaseReturns" AutomationProperties.AutomationId="NavPurchaseReturns">
+                            <ListBoxItem x:Name="NavPurchaseReturnsItem" Tag="PurchaseReturns" AutomationProperties.AutomationId="NavPurchaseReturns" ToolTip="إدارة بضائع المشتريات المرتجعة واسترداد المبالغ من الموردين.">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="⏩" FontSize="18" Margin="0,0,12,0"/>
                                     <TextBlock Text="مرتجعات المشتريات" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ListBoxItem>
-                            <ListBoxItem x:Name="NavCategoriesItem" Tag="Categories" AutomationProperties.AutomationId="NavCategories">
+                            <ListBoxItem x:Name="NavCategoriesItem" Tag="Categories" AutomationProperties.AutomationId="NavCategories" ToolTip="إدارة التصنيفات الرئيسية والفرعية للأصناف والمنتجات.">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="📁" FontSize="18" Margin="0,0,12,0"/>
                                     <TextBlock Text="التصنيفات" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ListBoxItem>
-                            <ListBoxItem x:Name="NavUnitsItem" Tag="Units" AutomationProperties.AutomationId="NavUnits">
+                            <ListBoxItem x:Name="NavUnitsItem" Tag="Units" AutomationProperties.AutomationId="NavUnits" ToolTip="إدارة وحدات القياس المستخدمة في المخزون والفواتير.">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="⚖️" FontSize="18" Margin="0,0,12,0"/>
                                     <TextBlock Text="الوحدات" VerticalAlignment="Center"/>

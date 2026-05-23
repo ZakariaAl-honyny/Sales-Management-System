@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.6 Interactive Validation + Audit Enforcement)
+# AGENTS.md — Sales Management System (v4.6.2 — Validation ErrorTemplate & INotifyDataErrorInfo)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -1105,6 +1105,32 @@ The following bugs were fixed in this session:
 | RULE-218 | `DuplicateCode` error constant is REMOVED from `ErrorCodes` — all references replaced with `DuplicateBarcode` or context-specific error codes |
 | RULE-219 | WarehouseService, UnitService, CategoryService MUST NOT return `DuplicateCode` — use appropriate error constants |
 
+### 2.52 Newest-First Sorting (v4.6.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-220 | ALL list ViewModels MUST display newest records first — sort by `Id` descending for entities with auto-increment PK, or by date descending for entities with date fields |
+| RULE-221 | Use `.OrderByDescending(x => x.Id)` when populating `ObservableCollection` from API results — NEVER rely on API return order alone |
+| RULE-222 | Invoice lists MUST sort by `InvoiceDate` descending (newest invoice first) |
+| RULE-223 | Payment lists MUST sort by `Id` descending (newest payment first) |
+
+### 2.53 Dialog Window Owner Safety (v4.6.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-224 | ALL dialog `PositionOverOwner()` methods MUST check `mainWindow != this` before setting `Owner` property — prevents "Cannot set Owner property to itself" error |
+| RULE-225 | When `MainWindow` is null or equals `this`, fall back to `WindowStartupLocation.CenterScreen` — NEVER crash |
+| RULE-226 | NEVER call `System.Windows.Application.Current.MainWindow` before it has been explicitly set in `Application_Startup` — the first Window created by WPF auto-becomes MainWindow |
+
+### 2.54 WPF Validation ErrorTemplate & ValidateAllAsync (v4.6.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-227 | ALL editor ViewModels MUST call `SetDialogService()` in every constructor to enable `ValidateAllAsync()` from ViewModelBase |
+| RULE-228 | Use `INotifyDataErrorInfo` (`AddError`/`ClearErrors`) in property setters for real-time validation — NEVER use parallel `HasXxxError` boolean + computed string properties |
+| RULE-229 | Pre-save validation MUST call `ClearAllErrors()` then `AddError()` for each field, then `await ValidateAllAsync()` from ViewModelBase — this shows the styled validation warning dialog automatically |
+| RULE-230 | The `Validation.ErrorTemplate` in `Styles.xaml` MUST render a red border + ❗ icon badge with `ToolTip` bound to `[0].ErrorContent` — applies to TextBox, PasswordBox, and ComboBox |
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -1219,6 +1245,10 @@ public enum InvoiceTypePrint : byte
 ❌ Missing HasQueryFilter(IsActive) on UnitBarcodeConfiguration
 ❌ Code field on Product/Customer/Supplier Response DTOs
 ❌ DuplicateCode in ErrorCodes
+❌ Setting Window.Owner = this (self-ownership crash)
+❌ Relying on API return order for list display (always sort client-side)
+❌ HasXxxError / XxxError boolean + computed string pattern for validation (use INotifyDataErrorInfo AddError/ClearErrors instead)
+❌ Duplicating validation dialog logic in each Editor ViewModel (use ValidateAllAsync from ViewModelBase)
 ```
 
 ---
@@ -1420,3 +1450,10 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] SettingsViewModel has CostingMethod, IsWeightedAverageSelected, IsLastPriceSelected, IsSupplierPriceSelected properties?
 - [ ] StoreSettingsDto and UpdateSettingsRequest include CostingMethod field?
 - [ ] SettingsController Get/Update support CostingMethod via ISystemSettingsRepository?
+- [ ] Lists sorted newest-first using OrderByDescending?
+- [ ] Dialog PositionOverOwner() guards against self-ownership?
+- [ ] WindowStartupLocation.CenterScreen fallback when no valid owner?
+- [ ] SetDialogService() called in every Editor ViewModel constructor?
+- [ ] All validation uses INotifyDataErrorInfo (no HasXxxError booleans)?
+- [ ] ErrorTemplate renders red border + icon for invalid fields?
+- [ ] ValidateAsync() calls ClearAllErrors() + AddError() + await ValidateAllAsync()?

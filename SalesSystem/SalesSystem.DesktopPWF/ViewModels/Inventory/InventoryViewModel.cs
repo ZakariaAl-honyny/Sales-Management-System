@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Services.Api;
@@ -15,7 +15,6 @@ public class InventoryViewModel : ViewModelBase
     private readonly IInventoryApiService _inventoryService;
     private ObservableCollection<InventoryMovementDto> _movements = new();
     private ObservableCollection<WarehouseStockDto> _stocks = new();
-    private bool _isLoading;
     private string? _searchText;
     private int _currentPage = 1;
     private int _pageSize = 50;
@@ -52,11 +51,6 @@ public class InventoryViewModel : ViewModelBase
         set => SetProperty(ref _stocks, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? SearchText
     {
@@ -97,8 +91,8 @@ get;
 
     private async Task LoadDataAsync()
     {
-        if (IsLoading) return;
-        IsLoading = true;
+        if (IsBusy) return;
+        IsBusy = true;
 
         try
         {
@@ -138,11 +132,15 @@ get;
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
    
 #endregion
 }
+
+
+
+
 

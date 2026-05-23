@@ -93,7 +93,7 @@ public class CustomerEditorViewModelTests : IDisposable
         viewModel.OpeningBalance.Should().Be(0);
         viewModel.Notes.Should().BeEmpty();
         viewModel.IsActive.Should().BeTrue();
-        viewModel.IsLoading.Should().BeFalse();
+        viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -166,21 +166,24 @@ public class CustomerEditorViewModelTests : IDisposable
     #region Validation Tests
 
     [Fact]
-    public void Validate_WhenNameIsEmpty_ReturnsFalse()
+    public void Validate_WhenNameIsEmpty_ProducesValidationError()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object);
-        viewModel.Name = "";
+        // Set a non-empty value first so SetProperty detects the change to empty
+        viewModel.Name = "test";
+        viewModel.Name = string.Empty;
 
-        // Assert - Check HasNameError property
-        viewModel.HasNameError.Should().BeFalse(); // Not yet validated
+        // Assert - INotifyDataErrorInfo validation fires on property change
+        var errors = viewModel.GetErrors("Name").Cast<string>().ToList();
+        errors.Should().Contain(e => e.Contains("اسم العميل مطلوب"));
     }
 
     [Fact]
-    public void Validate_WhenCreditLimitIsNegative_ReturnsFalse()
+    public void Validate_WhenCreditLimitIsNegative_ProducesValidationError()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
@@ -189,12 +192,13 @@ public class CustomerEditorViewModelTests : IDisposable
             _mockDialogService.Object);
         viewModel.CreditLimit = -100;
 
-        // Assert - Check HasCreditLimitError property
-        viewModel.HasCreditLimitError.Should().BeFalse(); // Not yet validated
+        // Assert - INotifyDataErrorInfo validation fires on property change
+        var errors = viewModel.GetErrors("CreditLimit").Cast<string>().ToList();
+        errors.Should().Contain(e => e.Contains("الحد الائتماني"));
     }
 
     [Fact]
-    public void Validate_WhenOpeningBalanceIsNegative_ReturnsFalse()
+    public void Validate_WhenOpeningBalanceIsNegative_ProducesValidationError()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
@@ -203,64 +207,9 @@ public class CustomerEditorViewModelTests : IDisposable
             _mockDialogService.Object);
         viewModel.OpeningBalance = -100;
 
-        // Assert - Check HasOpeningBalanceError property
-        viewModel.HasOpeningBalanceError.Should().BeFalse(); // Not yet validated
-    }
-
-    [Fact]
-    public void NameError_WhenHasNameErrorTrue_ReturnsErrorMessage()
-    {
-        // Arrange
-        var viewModel = new CustomerEditorViewModel(
-            _mockCustomerService.Object,
-            _mockEventBus.Object,
-            _mockDialogService.Object);
-        viewModel.HasNameError = true;
-
-        // Assert
-        viewModel.NameError.Should().Be("الاسم مطلوب");
-    }
-
-    [Fact]
-    public void NameError_WhenHasNameErrorFalse_ReturnsNull()
-    {
-        // Arrange
-        var viewModel = new CustomerEditorViewModel(
-            _mockCustomerService.Object,
-            _mockEventBus.Object,
-            _mockDialogService.Object);
-        viewModel.HasNameError = false;
-
-        // Assert
-        viewModel.NameError.Should().BeNull();
-    }
-
-    [Fact]
-    public void CreditLimitError_WhenHasCreditLimitErrorTrue_ReturnsErrorMessage()
-    {
-        // Arrange
-        var viewModel = new CustomerEditorViewModel(
-            _mockCustomerService.Object,
-            _mockEventBus.Object,
-            _mockDialogService.Object);
-        viewModel.HasCreditLimitError = true;
-
-        // Assert
-        viewModel.CreditLimitError.Should().Be("الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر");
-    }
-
-    [Fact]
-    public void OpeningBalanceError_WhenHasOpeningBalanceErrorTrue_ReturnsErrorMessage()
-    {
-        // Arrange
-        var viewModel = new CustomerEditorViewModel(
-            _mockCustomerService.Object,
-            _mockEventBus.Object,
-            _mockDialogService.Object);
-        viewModel.HasOpeningBalanceError = true;
-
-        // Assert
-        viewModel.OpeningBalanceError.Should().Be("الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
+        // Assert - INotifyDataErrorInfo validation fires on property change
+        var errors = viewModel.GetErrors("OpeningBalance").Cast<string>().ToList();
+        errors.Should().Contain(e => e.Contains("الرصيد الافتتاحي"));
     }
 
     #endregion
@@ -304,21 +253,16 @@ public class CustomerEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object);
-        var propertyChangedEvents = new List<string>();
-        viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        // Act
-        viewModel.IsLoading = true;
 
         // Assert
-        propertyChangedEvents.Should().Contain("IsLoading");
+        viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -461,7 +405,7 @@ public class CustomerEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveCommand_WhenLoading_SetsIsLoadingToTrue()
+    public async Task SaveCommand_WhenLoading_IsBusyReflectsState()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
@@ -469,11 +413,8 @@ public class CustomerEditorViewModelTests : IDisposable
             _mockEventBus.Object,
             _mockDialogService.Object);
 
-        // Act
-        viewModel.IsLoading = true;
-
-        // Assert
-        viewModel.IsLoading.Should().BeTrue();
+        // Assert - IsBusy initially false, managed by ExecuteAsync
+        viewModel.IsBusy.Should().BeFalse();
     }
 
     #endregion

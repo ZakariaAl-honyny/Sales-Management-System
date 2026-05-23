@@ -70,9 +70,9 @@ public class ExceptionMiddleware
             response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             errorResponse = new
             {
-                error = "تعذر الاتصال بقاعدة البيانات. يرجى التحقق من الاتصال والمحاولة مرة أخرى.",
+                error = "تعذر الاتصال بقاعدة البيانات. يرجى التحقق من اتصال الشبكة.",
                 errorCode = "DATABASE_CONNECTION_ERROR",
-                details = GetInnerMessage(exception)
+                details = "تعذر الاتصال بخادم قاعدة البيانات"
             };
         }
         else

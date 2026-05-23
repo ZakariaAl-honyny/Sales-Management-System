@@ -1,5 +1,5 @@
 # Product Requirements Document
-# Sales Management System — Expanded v4.3
+# Sales Management System — v4.6.2
 # Platform: .NET 10 LTS | Year: 2026
 
 ---
@@ -7,7 +7,7 @@
 ## 1. Executive Summary
 
 A local desktop sales management system for small retail shops.
-Built on Clean Architecture + CQRS with WPF Desktop (MVVM) + ASP.NET Core 10 API
+Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 + SQL Server. Designed for future expansion to Web and Mobile.
 
 ---
@@ -15,30 +15,36 @@ Built on Clean Architecture + CQRS with WPF Desktop (MVVM) + ASP.NET Core 10 API
 ## 2. Scope
 
 ### In Scope
-- User authentication with role-based access (Admin/Manager/Cashier)
-- Product management with categories and **dynamic units** (per-product units with conversion factors)
+- User authentication with role-based access (Admin/Manager/Cashier) — JWT with BCrypt
 - **Dynamic Unit of Measure (v4.3)**: ProductUnits with per-unit pricing, unit-specific barcodes, SmartUnitFormatter
-- **Costing Strategy (v4.3)**: WeightedAverage, LastPurchasePrice, SupplierPrice — configurable via SystemSettings
-- **Cash Box Management (v4.3)**: Multi-box cash tracking, immutable transactions, daily closure
+- **Costing Strategy (v4.3)**: WeightedAverage (1), LastPurchasePrice (2), SupplierPrice (3)
+- **Cash Box Management (v4.3)**: Multi-box, immutable CashTransactions, DailyClosure
 - **Product Price History (v4.3)**: Audit trail for every price/cost change
-- Multi-warehouse inventory management
-- Purchase invoices (Cash/Credit/Mixed)
-- Sales invoices (Cash/Credit/Mixed)
-- Sales returns and purchase returns
-- Stock transfers between warehouses
-- Customer and supplier balance tracking
-- Customer and supplier payments
-- Basic reports (daily sales, stock, balances)
-- Invoice printing with store logo (A4 + 80mm thermal)
-- Database backup and restore
-- Audit logging (who did what and when)
+- Multi-warehouse inventory management with stock transfer between warehouses
+- Purchase invoices (Cash/Credit/Mixed) with line-level/invoice-level discounts
+- Sales invoices (Cash/Credit/Mixed) with real-time stock validation
+- Sales returns and purchase returns with quantity validation against originals
+- Customer and supplier balance tracking with payment management
+- **Invoice Printing (v4.3)**: A4 PDF via QuestPDF + 80mm thermal via Win32 raw printing
+- **Auto-Update System (v4.4)**: SHA256-verified, fire-and-forget, GitHub-based
+- **Backup & Restore (v4.4)**: Raw SQL BACKUP DATABASE, scheduled daily at 2 AM
+- **Security & DPAPI (v4.4)**: Encrypted connection strings, DataProtection keys
+- **Windows Service (v4.4)**: API runs as `SalesSystemService` with auto-restart
+- **Database Health Check (v4.5)**: Desktop verifies DB before login; API exposes `/health/database`
+- **Multi-Window Screen Management (v4.5)**: Non-modal editors via ScreenWindowService
+- **WPF Validation ErrorTemplate (v4.6.2)**: Red border + ❗ icon, INotifyDataErrorInfo, ValidateAllAsync()
+- **LogSystemError centralized (v4.6)**: Unified system error logging in ViewModelBase
+- **Identifier Strategy — No Code columns (v4.5.3)**: Auto-increment Id only; Code removed from Product/Customer/Supplier/Warehouse
+- Delete operations with 3-tier strategy (Cancel/Deactivate/Permanent)
+- Audit tracking on all entities (CreatedAt, CreatedByUserId, IsActive)
+- Role-based UI visibility and API authorization
+- Serilog logging for all critical operations
 
 ### Out of Scope (Future Phases)
-- Web interface
-- Mobile application
-- Multi-branch management (full ERP-level branch P&L — future)
-- Full accounting system
-- External integrations
+- Full accounting system with general ledger
+- Multi-branch management with branch-level P&L
+- Web or mobile client
+- External API integrations (payment gateways, e-commerce)
 
 ---
 
@@ -52,21 +58,26 @@ Built on Clean Architecture + CQRS with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Failed login attempts logged
 - Logout clears token from Desktop memory
 
-### 3.2 Product Management (Updated)
+### 3.2 Product Management (v4.6)
 - Add / Edit / Deactivate products (no hard delete)
-- Fields: Code, Barcode, Name, Category, Description
-- **[NEW]** Units: Support `WholesaleUnitId`, `RetailUnitId`, and `ConversionFactor` (e.g., 1 Box = 12 Pieces).
-- Prices: `WholesalePrice`, `RetailPrice` (Replaces generic Sale/Purchase prices).
-- **[NEW]** Inventory Base Rule: All stock math and `MinStock` alerts strictly use the Retail Unit (Smallest Unit).
-- Search by: Name, Code, Barcode
-- Filter by: Category, Active status
+- Identifier: Auto-increment `Id` only — no `Code` field (v4.5.3)
+- Fields: Name, Barcode (unique), Category, Description
+- **Dynamic Units (v4.3)**: Each product has multiple `ProductUnit` entries with per-unit pricing:
+  - One `IsBaseUnit = true` (smallest unit, ConversionFactor=1)
+  - Derived units have ConversionFactor > 1 (e.g., Box=24)
+  - Per-unit: `RetailPrice`, `WholesalePrice`, `UnitName`
+- **UnitBarcodes (v4.3)**: Each product-unit combination can have multiple barcodes
+- Search by: Id, Name, Barcode
+- Filter by: Category, Active status, Warehouse stock
 - Barcode scanner support (keyboard input simulation)
+- **Cost cascade**: When purchase cost updates, all product units recalculate from base unit cost × conversion factor
 
-### 3.3 Warehouse Management
-- Add / Edit / Deactivate warehouses
+### 3.3 Warehouse Management (v4.6)
+- Add / Edit / Deactivate warehouses (no Code field — auto-increment Id only)
 - One warehouse flagged as IsDefault
 - View stock per warehouse per product
-- Stock transfer between warehouses
+- Stock transfer between warehouses (source ≠ destination enforced)
+- `CHECK (Quantity >= 0)` constraint on WarehouseStocks at DB level
 
 ### 3.4 Purchase Invoice
 - Select supplier and destination warehouse
@@ -224,6 +235,83 @@ foreach (var unit in product.Units)
 - Transfer between boxes requires TWO entries (Out from source, In to destination)
 - `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance
 - Every invoice payment references `CashBoxId`
+
+### 3.16 Invoice Printing (v4.3)
+
+- Two print formats: A4 PDF (QuestPDF) + 80mm thermal receipt (ESC/POS)
+- A4: RTL layout with store logo, tax breakdown, invoice details
+- Thermal: 42-char monospaced columns, Windows-1256 encoding for Arabic
+- Desktop calls `PrintController` API — never prints directly (v4.3)
+- Preview A4 in `PdfPreviewWindow` before printing
+- Print settings stored in `SystemSetting` table with `Category = "Print"`
+- Supports: Sales, Purchase, SalesReturn, PurchaseReturn, Test page
+- Logo is optional — missing logo handled gracefully (null check)
+
+### 3.17 Auto-Update System (v4.4)
+
+- Fire-and-forget on startup — never blocks login
+- SHA256 checksum verification before launching installer
+- Skipped version persisted to `%AppData%\SalesSystem\settings.json`
+- Timeout = 8 seconds with silent failure
+- Version comparison via `System.Version` (never string comparison)
+
+### 3.18 Database Backup & Restore (v4.4)
+
+- Backup uses raw SQL `BACKUP DATABASE` — no SMO dependency
+- Restore uses `SINGLE_USER WITH ROLLBACK AFTER 30` — 30s grace period
+- `ScheduledBackupWorker` runs daily at 2:00 AM as `BackgroundService`
+- Backup retention = configurable days (default 30)
+- Restore failure triggers `TrySetMultiUserAsync` recovery
+
+### 3.19 Security & DPAPI (v4.4)
+
+- Connection strings encrypted via DPAPI with `"DPAPI:"` prefix
+- `FirstRunSetupService` encrypts on first run (idempotent)
+- DataProtection keys stored in `%ProgramData%\SalesSystem\DataProtectionKeys`
+- JWT secret from environment variable — throws in production if missing
+- `appsettings.json` writes use atomic pattern: `.tmp` → `File.Replace()` → `.bak`
+
+### 3.20 Windows Service (v4.4)
+
+- API runs as `SalesSystemService` via `UseWindowsService()`
+- Auto-recovery: 3 restarts on failure (1min, 5min, 15min delays)
+- Serilog EventLog sink for Windows Service logging
+- Database migration runs on service startup (auto-migrate)
+
+### 3.21 Database Health Check (v4.5)
+
+- API exposes `GET /api/v1/health` — returns `Database: Connected/Disconnected`
+- API exposes `GET /api/v1/health/database` — checks `DbContext.Database.CanConnectAsync()`
+- Desktop checks DB on startup before showing login via `IDatabaseHealthCheckService`
+- `DatabaseErrorDialog` with Retry/Exit on connection failure
+- `ExceptionMiddleware` detects DB exceptions → returns `503` with `DATABASE_CONNECTION_ERROR`
+
+### 3.22 Multi-Window Screen Management (v4.5)
+
+- Editors open non-modally via `ScreenWindowService.OpenScreen()` — never `ShowDialog()`
+- `ScreenWindow.xaml` hosts any View/ViewModel pair generically
+- Window tracking via `WeakReference<Window>` — no memory leaks
+- Cascade positioning: 30px offset × (count % 10) from MainWindow
+- Auto-titles in Arabic (e.g., "فاتورة بيع") — not English type names
+
+### 3.23 WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2)
+
+- ErrorTemplate in `Styles.xaml`: Red border (#EF4444, 1.5px) + ❗ icon badge
+- ToolTip on error icon bound to `[0].ErrorContent`
+- Applies to TextBox, PasswordBox, ComboBox
+- `ViewModelBase.cs`: `SetDialogService()`, `ValidateAllAsync()`, `ValidateField()`
+- All Editor VMs call `SetDialogService()` in constructors
+- Pre-save validation: `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()`
+- No `HasXxxError` booleans — use `INotifyDataErrorInfo` directly
+- Save buttons always enabled — validate on click with warning dialog
+
+### 3.24 Identifier Strategy — No Code Columns (v4.5.3)
+
+- Product, Customer, Supplier, Warehouse: auto-increment `Id` only
+- No `Code` property on entities, DTOs, or editor ViewModels
+- Search/filter by `Id` (int) or `Name` (string) — never by Code
+- `DuplicateCode` error constant removed from ErrorCodes
+- Code auto-generation services (`DocumentSequenceService` for PRD/CUST/SUP/WH) removed
 
 ---
 
@@ -612,6 +700,104 @@ Restore successfully restores data
 All role restrictions working in both API and Desktop
 text
 
+### Phase 8 — Dynamic UOM & Costing (v4.3)
+Tasks:
+- Implement ProductUnit entity with per-unit pricing and conversion factors
+- Implement UnitBarcode entity for multi-barcode support per product-unit
+- Build UpdateProductPricingService with 3 costing strategies (WeightedAverage, LastPurchasePrice, SupplierPrice)
+- Record all price/cost changes in ProductPriceHistory
+- Enforce ProductMustHaveAtLeastOneUnit rule in Domain
+- Add SmartUnitFormatter (UI-only) for quantity display
+Definition of Done:
+- Products support multiple units with per-unit pricing
+- Purchase posting triggers cost recalculation
+- All cost changes are audited in ProductPriceHistory
+- Cascade cost updates from base unit to all derived units × conversion factor
+text
+
+### Phase 9 — Cash Boxes (v4.3)
+Tasks:
+- Implement CashBox and CashTransaction entities
+- Link CashTransaction to invoices via CashBoxId
+- Enforce CashBox.CurrentBalance >= 0 validation
+- Implement cash transfer between boxes (dual transaction)
+- Build DailyClosure computation
+- Make CashTransactions immutable (offsetting entry for corrections)
+Definition of Done:
+- Cash box balance tracks correctly
+- Invoice payments reference correct cash box
+- Transfer between boxes creates two entries (out + in)
+- Daily closure calculates correctly
+text
+
+### Phase 10 — Print Engine (v4.3)
+Tasks:
+- Implement QuestPDF A4 invoice document (RTL, logo, tax breakdown)
+- Implement Win32 raw printing for 80mm thermal receipts (ESC/POS)
+- Build EscPos command builder (no external NuGet for thermal)
+- Desktop calls PrintController API for all printing (never direct)
+- Add PdfPreviewWindow for A4 preview
+- Store print settings in SystemSetting table (Category = "Print")
+- Handle missing logo gracefully (null check)
+Definition of Done:
+- A4 PDF generates correctly with store details
+- 80mm thermal receipt prints with Arabic text
+- Preview shows before printing
+- PrintResult returned (never throws exceptions)
+text
+
+### Phase 11 — Production Hardening (v4.4)
+Tasks:
+- Implement Auto-Update System (SHA256 verification, fire-and-forget, 8s timeout)
+- Implement DPAPI connection string encryption (ConnectionStringProtector)
+- Implement FirstRunSetupService with atomic file writes
+- Build ScheduledBackupWorker (daily 2 AM, configurable retention)
+- Implement BackupService (raw SQL, no SMO)
+- Configure API as Windows Service (SalesSystemService, auto-recovery)
+- Add Database Health Check endpoint (/health/database)
+- Desktop startup check with DatabaseErrorDialog (Retry/Exit)
+Definition of Done:
+- Updates downloaded and verified via SHA256
+- Connection strings encrypted with "DPAPI:" prefix
+- Backups created and old backups auto-cleaned
+- Windows Service starts with Windows, recovers on failure
+- Desktop shows friendly dialog on DB connection loss
+text
+
+### Phase 12 — Multi-Window & UI Polish (v4.5)
+Tasks:
+- Implement ScreenWindowService for non-modal editor opening
+- Build generic ScreenWindow.xaml (hosts any View/ViewModel)
+- Use WeakReference<Window> for window tracking (no memory leaks)
+- Implement cascade window positioning (30px × count % 10)
+- Add EventBus subscription management (subscribe in OnLoad, dispose in Dispose)
+- Implement newest-first sorting across all list screens
+- Add Arabic ToolTips to all interactive controls
+- Fix dialog self-ownership guard (PositionOverOwner)
+Definition of Done:
+- Editors open non-modally via ScreenWindowService
+- No MessageBox.Show in ViewModels — all via IDialogService
+- All buttons have Arabic ToolTips
+- Lists display newest items first
+text
+
+### Phase 13 — Identifier Strategy & Validation (v4.5.3–v4.6.2)
+Tasks:
+- Remove Code columns from Product, Customer, Supplier, Warehouse entities
+- Remove Code from all DTOs, ViewModels, and API responses
+- Remove DocumentSequenceService for entity codes (keep only for invoices)
+- Remove DuplicateCode from ErrorCodes (keep DuplicateBarcode)
+- Implement WPF ErrorTemplate: Red border + ❗ icon with ToolTip
+- Add INotifyDataErrorInfo standardization (no HasXxxError booleans)
+- Add SetDialogService() + ValidateAllAsync() to ViewModelBase
+- Update all 14 Editor VMs to use INotifyDataErrorInfo pattern
+Definition of Done:
+- No Code property exists anywhere in the system
+- All entities use auto-increment Id as sole identifier
+- Validation shows red border on invalid fields
+- Warning dialog lists all missing fields on save click
+text
+
 
 ---
 
@@ -636,12 +822,12 @@ RETURN FLOW: (reverse of original operation)
 TRANSFER FLOW: (decrease source, increase destination — same transaction)
 PAYMENT FLOW: (decrease balance, no stock change)
 
-Sales Management System — PRD Expanded v4.3 (النسخة النهائية الشاملة)
+Sales Management System — PRD v4.6.2 (النسخة النهائية الشاملة)
 1. معلومات المشروع
 text
 
 الاسم:     Sales Management System
-الإصدار:   v4.3
+الإصدار:   v4.6.2
 التاريخ:   2026
 المعمارية: Clean Architecture + WPF Desktop (MVVM) + ASP.NET Core API
 قاعدة البيانات: SQL Server
@@ -720,20 +906,14 @@ Default schema: **`dbo`**
 
 ---
 
-## D) Products (Updated for Wholesale/Retail)
+## D) Products (v4.6 — No Code, uses ProductUnits)
 ### Columns
 - `Id` int PK
-- `Code` nvarchar(30) null unique
 - `Barcode` nvarchar(50) null unique
 - `Name` nvarchar(150) not null
 - `CategoryId` int null FK
-- `WholesaleUnitId` int null FK
-- `RetailUnitId` int null FK
-- `ConversionFactor` decimal(18,3) not null default 1
-- `WholesalePrice` decimal(18,2) not null default 0
-- `RetailPrice` decimal(18,2) not null default 0
-- `PurchasePrice` decimal(18,2) not null default 0
-- `MinStock` decimal(18,3) not null default 0  -- Tracks by Retail Unit
+- `SupplierPrice` decimal(18,2) not null default 0
+- `ReorderLevel` decimal(18,3) not null default 0
 - `Description` nvarchar(500) null
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
@@ -743,10 +923,9 @@ Default schema: **`dbo`**
 
 ---
 
-## E) Warehouses
+## E) Warehouses (v4.6 — No Code)
 ### Columns
 - `Id` int PK
-- `Code` nvarchar(30) null unique
 - `Name` nvarchar(100) not null
 - `Location` nvarchar(250) null
 - `IsDefault` bit not null default 0
@@ -776,10 +955,9 @@ Default schema: **`dbo`**
 
 ---
 
-## G) Suppliers
+## G) Suppliers (v4.6 — No Code)
 ### Columns
 - `Id` int PK
-- `Code` nvarchar(30) null unique
 - `Name` nvarchar(150) not null
 - `Phone` nvarchar(20) null
 - `Email` nvarchar(100) null
@@ -794,10 +972,9 @@ Default schema: **`dbo`**
 
 ---
 
-## H) Customers
+## H) Customers (v4.6 — No Code)
 ### Columns
 - `Id` int PK
-- `Code` nvarchar(30) null unique
 - `Name` nvarchar(150) not null
 - `Phone` nvarchar(20) null
 - `Email` nvarchar(100) null
@@ -1068,6 +1245,107 @@ Default schema: **`dbo`**
 
 ---
 
+## W) ProductUnits (v4.3 — Dynamic UOM)
+### Columns
+- `Id` int PK
+- `ProductId` int not null FK
+- `UnitName` nvarchar(50) not null (e.g., "Piece", "Box", "Carton")
+- `ConversionFactor` decimal(18,3) not null default 1 (Base=1, Box=24, Carton=144)
+- `RetailPrice` decimal(18,2) not null default 0
+- `WholesalePrice` decimal(18,2) not null default 0
+- `Cost` decimal(18,2) not null default 0 — updated via cost cascade
+- `IsBaseUnit` bit not null default 0 (exactly one per product)
+- `IsActive` bit not null default 1
+- (audit fields)
+### Constraints
+- `UNIQUE(ProductId, UnitName)` — no duplicate unit names per product
+- Product must have at least one unit (Domain enforced)
+
+---
+
+## X) UnitBarcodes (v4.3)
+### Columns
+- `Id` int PK
+- `ProductUnitId` int not null FK
+- `Barcode` nvarchar(50) not null
+- `IsActive` bit not null default 1
+- (audit fields)
+### Constraints
+- `UNIQUE(Barcode)` — global barcode uniqueness
+
+---
+
+## Y) CashBoxes (v4.3)
+### Columns
+- `Id` int PK
+- `Name` nvarchar(100) not null
+- `OpeningBalance` decimal(18,2) not null default 0
+- `CurrentBalance` decimal(18,2) not null default 0
+- `IsDefault` bit not null default 0
+- `IsActive` bit not null default 1
+- (audit fields)
+
+---
+
+## Z) CashTransactions (v4.3 — Immutable)
+### Columns
+- `Id` int PK
+- `CashBoxId` int not null FK
+- `TransactionType` tinyint not null (1=Opening, 2=SalesIncome, 3=Expense, 4=TransferOut, 5=TransferIn, 6=RefundOut, 7=SupplierPayment, 8=CustomerPayment)
+- `Amount` decimal(18,2) not null
+- `BalanceBefore` decimal(18,2) not null
+- `BalanceAfter` decimal(18,2) not null
+- `ReferenceType` nvarchar(30) null (e.g., "SalesInvoice", "Expense")
+- `ReferenceId` int null
+- `Notes` nvarchar(500) null
+- `CreatedByUserId` int null FK
+- `CreatedAt` datetime2 not null
+### Rules
+- Immutable — once created, never edited or deleted
+- Cancellations via offsetting entry only
+
+---
+
+## AA) ProductPriceHistory (v4.3)
+### Columns
+- `Id` int PK
+- `ProductUnitId` int not null FK
+- `OldRetailPrice` decimal(18,2) null
+- `NewRetailPrice` decimal(18,2) null
+- `OldWholesalePrice` decimal(18,2) null
+- `NewWholesalePrice` decimal(18,2) null
+- `OldCost` decimal(18,2) null
+- `NewCost` decimal(18,2) null
+- `ChangedByUserId` int null FK
+- `ChangeReason` nvarchar(200) null
+- `CreatedAt` datetime2 not null
+
+---
+
+## BB) SystemSettings (v4.3)
+### Columns
+- `Id` int PK
+- `Key` nvarchar(100) not null unique
+- `Value` nvarchar(500) null
+- `Category` nvarchar(50) null (e.g., "Print", "General", "Costing")
+- `Description` nvarchar(250) null
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## CC) SystemLog (v4.3)
+### Columns
+- `Id` int PK
+- `Level` nvarchar(20) not null (Information, Warning, Error)
+- `Message` nvarchar(4000) not null
+- `Exception` nvarchar(max) null
+- `UserId` int null FK
+- `Source` nvarchar(200) null
+- `CreatedAt` datetime2 not null
+
+---
+
 # 11) Full SQL Server Implementation Script
 
 ```sql
@@ -1124,11 +1402,10 @@ CREATE TABLE dbo.Categories
     UpdatedAt       DATETIME2     NULL
 );
 
--- 4. Warehouses
+-- 4. Warehouses (v4.6 — No Code)
 CREATE TABLE dbo.Warehouses
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Warehouses PRIMARY KEY,
-    Code            NVARCHAR(30)  NULL,
     Name            NVARCHAR(100) NOT NULL,
     Location        NVARCHAR(250) NULL,
     IsDefault       BIT           NOT NULL CONSTRAINT DF_Warehouses_IsDefault DEFAULT(0),
@@ -1136,23 +1413,18 @@ CREATE TABLE dbo.Warehouses
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_Warehouses_IsActive DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Warehouses_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Warehouses_Code UNIQUE (Code)
+    UpdatedAt       DATETIME2     NULL
 );
 
--- 5. Products
+-- 5. Products (v4.6 — No Code, uses ProductUnits)
 CREATE TABLE dbo.Products
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Products PRIMARY KEY,
-    Code            NVARCHAR(30)  NULL,
     Barcode         NVARCHAR(50)  NULL,
     Name            NVARCHAR(150) NOT NULL,
     CategoryId      INT           NULL REFERENCES dbo.Categories(Id),
-    UnitId          INT           NULL REFERENCES dbo.Units(Id),
-    PurchasePrice   DECIMAL(18,2) NOT NULL DEFAULT 0,
-    SalePrice       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    MinStock        DECIMAL(18,3) NOT NULL DEFAULT 0,
+    SupplierPrice   DECIMAL(18,2) NOT NULL DEFAULT 0,
+    ReorderLevel    DECIMAL(18,3) NOT NULL DEFAULT 0,
     Description     NVARCHAR(500) NULL,
     CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
@@ -1160,7 +1432,6 @@ CREATE TABLE dbo.Products
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Products_CreatedAt DEFAULT(SYSDATETIME()),
     UpdatedAt       DATETIME2     NULL,
 
-    CONSTRAINT UQ_Products_Code UNIQUE (Code),
     CONSTRAINT UQ_Products_Barcode UNIQUE (Barcode)
 );
 
@@ -1181,11 +1452,10 @@ CREATE TABLE dbo.WarehouseStocks
     CONSTRAINT CK_WarehouseStocks_Qty CHECK (Quantity >= 0)
 );
 
--- 7. Suppliers
+-- 7. Suppliers (v4.6 — No Code)
 CREATE TABLE dbo.Suppliers
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Suppliers PRIMARY KEY,
-    Code            NVARCHAR(30)  NULL,
     Name            NVARCHAR(150) NOT NULL,
     Phone           NVARCHAR(20)  NULL,
     Email           NVARCHAR(100) NULL,
@@ -1196,16 +1466,13 @@ CREATE TABLE dbo.Suppliers
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_Suppliers_IsActive DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Suppliers_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Suppliers_Code UNIQUE (Code)
+    UpdatedAt       DATETIME2     NULL
 );
 
--- 8. Customers
+-- 8. Customers (v4.6 — No Code)
 CREATE TABLE dbo.Customers
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Customers PRIMARY KEY,
-    Code            NVARCHAR(30)  NULL,
     Name            NVARCHAR(150) NOT NULL,
     Phone           NVARCHAR(20)  NULL,
     Email           NVARCHAR(100) NULL,
@@ -1216,9 +1483,7 @@ CREATE TABLE dbo.Customers
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL CONSTRAINT DF_Customers_IsActive DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Customers_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Customers_Code UNIQUE (Code)
+    UpdatedAt       DATETIME2     NULL
 );
 
 -- 9. PurchaseInvoices
@@ -1473,6 +1738,114 @@ CREATE TABLE dbo.DocumentSequences
     LastNumber      INT           NOT NULL CONSTRAINT DF_DocumentSequences_LastNumber DEFAULT(0),
     UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_DocumentSequences_UpdatedAt DEFAULT(SYSDATETIME())
 );
+
+-- 24. ProductUnits (v4.3 — Dynamic UOM)
+CREATE TABLE dbo.ProductUnits
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductUnits PRIMARY KEY,
+    ProductId       INT NOT NULL REFERENCES dbo.Products(Id),
+    UnitName        NVARCHAR(50)  NOT NULL,
+    ConversionFactor DECIMAL(18,3) NOT NULL DEFAULT 1,
+    RetailPrice     DECIMAL(18,2) NOT NULL DEFAULT 0,
+    WholesalePrice  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    Cost            DECIMAL(18,2) NOT NULL DEFAULT 0,
+    IsBaseUnit      BIT NOT NULL DEFAULT 0,
+    CreatedByUserId INT NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT NOT NULL CONSTRAINT DF_ProductUnits_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt       DATETIME2 NULL,
+
+    CONSTRAINT UQ_ProductUnits_Product_UnitName UNIQUE (ProductId, UnitName)
+);
+
+-- 25. UnitBarcodes (v4.3)
+CREATE TABLE dbo.UnitBarcodes
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_UnitBarcodes PRIMARY KEY,
+    ProductUnitId   INT NOT NULL REFERENCES dbo.ProductUnits(Id),
+    Barcode         NVARCHAR(50)  NOT NULL,
+    CreatedByUserId INT NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT NOT NULL CONSTRAINT DF_UnitBarcodes_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt       DATETIME2 NULL,
+
+    CONSTRAINT UQ_UnitBarcodes_Barcode UNIQUE (Barcode)
+);
+
+-- 26. CashBoxes (v4.3)
+CREATE TABLE dbo.CashBoxes
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashBoxes PRIMARY KEY,
+    Name            NVARCHAR(100) NOT NULL,
+    OpeningBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    CurrentBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
+    IsDefault       BIT NOT NULL DEFAULT 0,
+    CreatedByUserId INT NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT NOT NULL CONSTRAINT DF_CashBoxes_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt       DATETIME2 NULL
+);
+
+-- 27. CashTransactions (v4.3 — Immutable)
+CREATE TABLE dbo.CashTransactions
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashTransactions PRIMARY KEY,
+    CashBoxId       INT NOT NULL REFERENCES dbo.CashBoxes(Id),
+    TransactionType TINYINT NOT NULL,
+    Amount          DECIMAL(18,2) NOT NULL,
+    BalanceBefore   DECIMAL(18,2) NOT NULL,
+    BalanceAfter    DECIMAL(18,2) NOT NULL,
+    ReferenceType   NVARCHAR(30) NULL,
+    ReferenceId     INT NULL,
+    Notes           NVARCHAR(500) NULL,
+    CreatedByUserId INT NULL REFERENCES dbo.Users(Id),
+    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+
+-- 28. ProductPriceHistory (v4.3)
+CREATE TABLE dbo.ProductPriceHistory
+(
+    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductPriceHistory PRIMARY KEY,
+    ProductUnitId       INT NOT NULL REFERENCES dbo.ProductUnits(Id),
+    OldRetailPrice      DECIMAL(18,2) NULL,
+    NewRetailPrice      DECIMAL(18,2) NULL,
+    OldWholesalePrice   DECIMAL(18,2) NULL,
+    NewWholesalePrice   DECIMAL(18,2) NULL,
+    OldCost             DECIMAL(18,2) NULL,
+    NewCost             DECIMAL(18,2) NULL,
+    ChangedByUserId     INT NULL REFERENCES dbo.Users(Id),
+    ChangeReason        NVARCHAR(200) NULL,
+    CreatedAt           DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+
+-- 29. SystemSettings (v4.3)
+CREATE TABLE dbo.SystemSettings
+(
+    Id          INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemSettings PRIMARY KEY,
+    [Key]       NVARCHAR(100) NOT NULL,
+    [Value]     NVARCHAR(500) NULL,
+    Category    NVARCHAR(50) NULL,
+    Description NVARCHAR(250) NULL,
+    CreatedAt   DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt   DATETIME2 NULL,
+
+    CONSTRAINT UQ_SystemSettings_Key UNIQUE ([Key])
+);
+
+-- 30. SystemLog (v4.3)
+CREATE TABLE dbo.SystemLog
+(
+    Id          INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemLog PRIMARY KEY,
+    [Level]     NVARCHAR(20) NOT NULL,
+    [Message]   NVARCHAR(4000) NOT NULL,
+    [Exception] NVARCHAR(MAX) NULL,
+    UserId      INT NULL REFERENCES dbo.Users(Id),
+    [Source]    NVARCHAR(200) NULL,
+    CreatedAt   DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
 ```
 
 6. Domain Entities — C# Classes
@@ -1500,92 +1873,95 @@ namespace SalesSystem.Domain.Entities;
 
 public class Product : BaseEntity
 {
-    public string? Code { get; private set; }
     public string? Barcode { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int? CategoryId { get; private set; }
-    public int? UnitId { get; private set; }
-    public decimal PurchasePrice { get; private set; }
-    public decimal SalePrice { get; private set; }
-    public decimal MinStock { get; private set; }
+    public decimal SupplierPrice { get; private set; }
+    public decimal ReorderLevel { get; private set; }
     public string? Description { get; private set; }
 
     // Navigation
     public Category? Category { get; private set; }
-    public Unit? Unit { get; private set; }
+    private readonly List<ProductUnit> _units = new();
+    public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
 
     protected Product() { } // EF Core
 
     public static Product Create(
         string name,
-        decimal purchasePrice,
-        decimal salePrice,
-        string? code = null,
+        decimal supplierPrice = 0,
+        decimal reorderLevel = 0,
         string? barcode = null,
         int? categoryId = null,
-        int? unitId = null,
-        decimal minStock = 0,
         string? description = null)
     {
-        // ✅ Validation
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب");
-
-        if (salePrice < 0)
-            throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
-
-        if (purchasePrice < 0)
-            throw new DomainException("سعر الشراء لا يمكن أن يكون سالباً");
-
-        if (minStock < 0)
-            throw new DomainException("الحد الأدنى للمخزون لا يمكن أن يكون سالباً");
+        if (supplierPrice < 0)
+            throw new DomainException("سعر المورد لا يمكن أن يكون سالباً");
+        if (reorderLevel < 0)
+            throw new DomainException("الحد الأدنى لا يمكن أن يكون سالباً");
 
         return new Product
         {
             Name = name.Trim(),
-            PurchasePrice = purchasePrice,
-            SalePrice = salePrice,
-            Code = code?.Trim(),
+            SupplierPrice = supplierPrice,
+            ReorderLevel = reorderLevel,
             Barcode = barcode?.Trim(),
             CategoryId = categoryId,
-            UnitId = unitId,
-            MinStock = minStock,
             Description = description?.Trim()
         };
     }
 
     public void Update(
         string name,
-        decimal purchasePrice,
-        decimal salePrice,
-        string? code,
+        decimal supplierPrice,
+        decimal reorderLevel,
         string? barcode,
         int? categoryId,
-        int? unitId,
-        decimal minStock,
         string? description)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب");
-        if (salePrice < 0)
-            throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
+        if (supplierPrice < 0)
+            throw new DomainException("سعر المورد لا يمكن أن يكون سالباً");
 
         Name = name.Trim();
-        PurchasePrice = purchasePrice;
-        SalePrice = salePrice;
-        Code = code?.Trim();
+        SupplierPrice = supplierPrice;
+        ReorderLevel = reorderLevel;
         Barcode = barcode?.Trim();
         CategoryId = categoryId;
-        UnitId = unitId;
-        MinStock = minStock;
         Description = description?.Trim();
         SetUpdated();
+    }
+
+    public void AddUnit(string unitName, decimal conversionFactor,
+        decimal retailPrice, decimal wholesalePrice, bool isBaseUnit)
+    {
+        if (_units.Any(u => u.UnitName == unitName))
+            throw new DomainException($"الوحدة '{unitName}' موجودة بالفعل");
+        if (isBaseUnit && _units.Any(u => u.IsBaseUnit))
+            throw new DomainException("يوجد بالفعل وحدة أساسية للمنتج");
+
+        var unit = ProductUnit.Create(Id, unitName, conversionFactor,
+            retailPrice, wholesalePrice, isBaseUnit);
+        _units.Add(unit);
     }
 
     public void Deactivate()
     {
         IsActive = false;
         SetUpdated();
+    }
+
+    public void DeleteUnit(int productUnitId)
+    {
+        if (_units.Count <= 1)
+            throw new DomainException("يجب أن يحتوي المنتج على وحدة واحدة على الأقل");
+        var unit = _units.FirstOrDefault(u => u.Id == productUnitId);
+        if (unit == null)
+            throw new DomainException("الوحدة غير موجودة");
+        _units.Remove(unit);
     }
 }
 6.3 WarehouseStock Entity ⚠️ الأهم
@@ -1716,7 +2092,8 @@ public class SalesInvoice : BaseEntity
     }
 
     public void AddItem(int productId, decimal quantity, 
-                        decimal unitPrice, decimal discountAmount = 0)
+                        decimal unitPrice, decimal discountAmount = 0,
+                        int? productUnitId = null, SaleMode saleMode = SaleMode.Retail)
     {
         if (Status != InvoiceStatus.Draft)
             throw new DomainException("لا يمكن تعديل فاتورة مرحَّلة أو ملغاة");
@@ -1732,8 +2109,11 @@ public class SalesInvoice : BaseEntity
         if (lineTotal < 0)
             throw new DomainException("إجمالي السطر لا يمكن أن يكون سالباً");
 
+        // ⚠️ v4.3+ — productUnitId links to ProductUnit for pricing audit
+        // SaleMode: 1=Retail, 2=Wholesale
         var item = SalesInvoiceItem.Create(
-            Id, productId, quantity, unitPrice, discountAmount, lineTotal);
+            Id, productId, quantity, unitPrice, discountAmount, lineTotal,
+            productUnitId, saleMode);
         _items.Add(item);
 
         RecalculateTotals();
@@ -1835,14 +2215,16 @@ public class Result
 // أكواد الأخطاء القياسية
 public static class ErrorCodes
 {
-    public const string NotFound              = "NOT_FOUND";
-    public const string InsufficientStock     = "INSUFFICIENT_STOCK";
-    public const string DuplicateInvoiceNo    = "DUPLICATE_INVOICE_NO";
-    public const string InvalidAmount         = "INVALID_AMOUNT";
-    public const string InvalidQuantity       = "INVALID_QUANTITY";
-    public const string InvoiceAlreadyPosted  = "ALREADY_POSTED";
+    public const string NotFound                = "NOT_FOUND";
+    public const string InsufficientStock       = "INSUFFICIENT_STOCK";
+    public const string DuplicateInvoiceNo      = "DUPLICATE_INVOICE_NO";
+    public const string DuplicateBarcode        = "DUPLICATE_BARCODE";
+    public const string InvalidAmount           = "INVALID_AMOUNT";
+    public const string InvalidQuantity         = "INVALID_QUANTITY";
+    public const string InvoiceAlreadyPosted    = "ALREADY_POSTED";
     public const string InvoiceAlreadyCancelled = "ALREADY_CANCELLED";
-    public const string ValidationError       = "VALIDATION_ERROR";
+    public const string ValidationError         = "VALIDATION_ERROR";
+    public const string DatabaseError           = "DATABASE_ERROR";
 }
 7.2 DTOs الأساسية
 csharp
@@ -1850,19 +2232,25 @@ csharp
 // SalesSystem.Contracts/DTOs/ProductDto.cs
 public record ProductDto(
     int ProductId,
-    string? Code,
     string? Barcode,
     string Name,
     int? CategoryId,
     string? CategoryName,
-    int? UnitId,
-    string? UnitName,
-    decimal PurchasePrice,
-    decimal SalePrice,
-    decimal MinStock,
+    decimal SupplierPrice,
+    decimal ReorderLevel,
     bool IsActive,
-    // المخزون الإجمالي — يُحسب من WarehouseStocks
-    decimal TotalStock
+    decimal TotalStock,
+    List<ProductUnitDto> Units
+);
+
+public record ProductUnitDto(
+    int ProductUnitId,
+    string UnitName,
+    decimal ConversionFactor,
+    decimal RetailPrice,
+    decimal WholesalePrice,
+    decimal Cost,
+    bool IsBaseUnit
 );
 
 // SalesSystem.Contracts/DTOs/WarehouseStockDto.cs
@@ -1925,14 +2313,20 @@ public record SalesInvoiceItemRequest(
 // SalesSystem.Contracts/Requests/Products/CreateProductRequest.cs
 public record CreateProductRequest(
     string Name,
-    string? Code,
     string? Barcode,
     int? CategoryId,
-    int? UnitId,
-    decimal PurchasePrice,
-    decimal SalePrice,
-    decimal MinStock,
-    string? Description
+    decimal SupplierPrice,
+    decimal ReorderLevel,
+    string? Description,
+    List<CreateProductUnitRequest> Units
+);
+
+public record CreateProductUnitRequest(
+    string UnitName,
+    decimal ConversionFactor,
+    decimal RetailPrice,
+    decimal WholesalePrice,
+    bool IsBaseUnit
 );
 8. Application Services — منطق العمل
 8.1 ISalesService Interface
@@ -2582,7 +2976,7 @@ public class SalesInvoiceConfiguration
         builder.HasMany(x => x.Items)
             .WithOne()
             .HasForeignKey(i => i.SalesInvoiceId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict); // ⚠️ v4.6 — NO Cascade delete
     }
 }
 11. API Controllers
@@ -2700,15 +3094,8 @@ public class EventBus : IEventBus
         {
             if (weakRef.TryGetTarget(out var del) && del is Action<T> handler)
             {
-                // ⚠️ تنفيذ على UI Thread
-                if (Application.OpenForms.Count > 0)
-                {
-                    var form = Application.OpenForms[0]!;
-                    if (form.InvokeRequired)
-                        form.BeginInvoke(handler, message);
-                    else
-                        handler(message);
-                }
+                // ⚠️ تنفيذ على UI Thread (WPF)
+                Application.Current.Dispatcher.InvokeAsync(() => handler(message));
             }
         }
     }
@@ -2721,13 +3108,13 @@ public class EventBus : IEventBus
     }
 }
 
-// Messages
+// Messages (ID only — no data payloads per RULE-034)
 public record ProductChangedMessage(int ProductId);
-public record SaleCreatedMessage(int InvoiceId, string InvoiceNo, decimal Total);
-public record PurchaseCreatedMessage(int InvoiceId);
-public record StockChangedMessage(int ProductId, int WarehouseId, decimal NewQuantity);
-public record CustomerBalanceChangedMessage(int CustomerId, decimal NewBalance);
-public record SupplierBalanceChangedMessage(int SupplierId, decimal NewBalance);
+public record SaleInvoiceChangedMessage(int InvoiceId);
+public record PurchaseInvoiceChangedMessage(int InvoiceId);
+public record StockChangedMessage(int ProductId, int WarehouseId);
+public record CustomerBalanceChangedMessage(int CustomerId);
+public record SupplierBalanceChangedMessage(int SupplierId);
 13. قواعد العمل الحرجة — مرجع سريع
 text
 
@@ -2827,6 +3214,46 @@ Phase 7 — Polish
 ├── BackupService
 ├── Settings Screen
 └── Error Handling UI
+
+Phase 8 — Dynamic UOM & Costing (v4.3)
+├── ProductUnits: وحدات ديناميكية لكل منتج مع أسعار منفصلة
+├── UnitBarcodes: باركود لكل وحدة منتج
+├── UpdateProductPricingService: 3 استراتيجيات تسعير
+├── ProductPriceHistory: سجل تغييرات الأسعار والتكلفة
+└── Cost cascade: تحديث تكلفة جميع الوحدات × عامل التحويل
+
+Phase 9 — Cash Boxes (v4.3)
+├── CashBoxes: صناديق نقدية متعددة
+├── CashTransactions: حركات نقدية غير قابلة للتعديل
+├── DailyClosure: إقفال يومي
+└── Transfer: تحويل بين الصناديق (حركتين)
+
+Phase 10 — Print Engine (v4.3)
+├── A4: QuestPDF مع شعار المتجر
+├── Thermal: ESC/POS طباعة حرارية 80mm
+├── API: Desktop يطلب الطباعة عبر PrintController
+├── Preview: معاينة قبل الطباعة
+└── Logo: معالجة غياب الشعار (null check)
+
+Phase 11 — Production (v4.4)
+├── Auto-Update: تحديث تلقائي مع التحقق من SHA256
+├── DPAPI: تشفير connection strings
+├── Backup: نسخ احتياطي تلقائي يومي
+├── Windows Service: تشغيل API كخدمة ويندوز
+└── Health Check: فحص قاعدة البيانات عند بدء التشغيل
+
+Phase 12 — UI Polish (v4.5)
+├── Multi-Window: فتح النوافذ بدون حظر (ScreenWindowService)
+├── ToolTips: تلميحات عربية لجميع الأزرار
+├── Sorting: ترتيب القوائم من الأحدث للأقدم
+└── EventBus: إدارة الاشتراكات (subscribe/dispose)
+
+Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
+├── ID Strategy: إزالة Code من المنتجات والعملاء والموردين والمخازن
+├── ErrorTemplate: إطار أحمر + ❗ مع ToolTip
+├── INotifyDataErrorInfo: تحقق فوري في حقول الإدخال
+├── ValidateAllAsync: تحقق موحد قبل الحفظ
+└── SetDialogService: ربط خدمة الحوار في جميع الـ ViewModels
 15. تعليمات للـ AI Agent
 text
 

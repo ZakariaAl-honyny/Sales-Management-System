@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -142,24 +142,18 @@ public class PaymentService : IPaymentService
 
     public async Task<Result<PagedResult<CustomerPaymentDto>>> GetCustomerPaymentsAsync(string? search, DateTime? from, DateTime? to, int page, int pageSize, CancellationToken ct)
     {
-        var query = _uow.CustomerPayments.Query()
-            .Include(p => p.Customer)
-            .AsQueryable();
+        Expression<Func<CustomerPayment, bool>> predicate = p =>
+            (string.IsNullOrEmpty(search) || p.PaymentNo.Contains(search) || p.Customer!.Name.Contains(search)) &&
+            (!from.HasValue || p.PaymentDate >= from.Value) &&
+            (!to.HasValue || p.PaymentDate <= to.Value);
 
-        if (!string.IsNullOrEmpty(search))
-        {
-            query = query.Where(p => p.PaymentNo.Contains(search) || p.Customer!.Name.Contains(search));
-        }
-
-        if (from.HasValue) query = query.Where(p => p.PaymentDate >= from.Value);
-        if (to.HasValue) query = query.Where(p => p.PaymentDate <= to.Value);
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(p => p.PaymentDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var totalItems = await _uow.CustomerPayments.CountAsync(predicate, ct);
+        var items = await _uow.CustomerPayments.ToListAsync(
+            predicate,
+            q => q.OrderByDescending(p => p.PaymentDate).Skip((page - 1) * pageSize).Take(pageSize),
+            ct,
+            false,
+            "Customer");
 
         var dtos = items.Select(MapToDto).ToList();
         return Result<PagedResult<CustomerPaymentDto>>.Success(PagedResult<CustomerPaymentDto>.Create(dtos, totalItems, page, pageSize));
@@ -167,9 +161,7 @@ public class PaymentService : IPaymentService
 
     public async Task<Result<CustomerPaymentDto>> GetCustomerPaymentByIdAsync(int id, CancellationToken ct)
     {
-        var payment = await _uow.CustomerPayments.Query()
-            .Include(p => p.Customer)
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
+        var payment = await _uow.CustomerPayments.FirstOrDefaultAsync(p => p.Id == id, ct, "Customer");
 
         if (payment == null) return Result<CustomerPaymentDto>.Failure("عملية الدفع غير موجودة", ErrorCodes.NotFound);
 
@@ -267,24 +259,18 @@ public class PaymentService : IPaymentService
 
     public async Task<Result<PagedResult<SupplierPaymentDto>>> GetSupplierPaymentsAsync(string? search, DateTime? from, DateTime? to, int page, int pageSize, CancellationToken ct)
     {
-        var query = _uow.SupplierPayments.Query()
-            .Include(p => p.Supplier)
-            .AsQueryable();
+        Expression<Func<SupplierPayment, bool>> predicate = p =>
+            (string.IsNullOrEmpty(search) || p.PaymentNo.Contains(search) || p.Supplier!.Name.Contains(search)) &&
+            (!from.HasValue || p.PaymentDate >= from.Value) &&
+            (!to.HasValue || p.PaymentDate <= to.Value);
 
-        if (!string.IsNullOrEmpty(search))
-        {
-            query = query.Where(p => p.PaymentNo.Contains(search) || p.Supplier!.Name.Contains(search));
-        }
-
-        if (from.HasValue) query = query.Where(p => p.PaymentDate >= from.Value);
-        if (to.HasValue) query = query.Where(p => p.PaymentDate <= to.Value);
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(p => p.PaymentDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var totalItems = await _uow.SupplierPayments.CountAsync(predicate, ct);
+        var items = await _uow.SupplierPayments.ToListAsync(
+            predicate,
+            q => q.OrderByDescending(p => p.PaymentDate).Skip((page - 1) * pageSize).Take(pageSize),
+            ct,
+            false,
+            "Supplier");
 
         var dtos = items.Select(MapToDto).ToList();
         return Result<PagedResult<SupplierPaymentDto>>.Success(PagedResult<SupplierPaymentDto>.Create(dtos, totalItems, page, pageSize));
@@ -292,9 +278,7 @@ public class PaymentService : IPaymentService
 
     public async Task<Result<SupplierPaymentDto>> GetSupplierPaymentByIdAsync(int id, CancellationToken ct)
     {
-        var payment = await _uow.SupplierPayments.Query()
-            .Include(p => p.Supplier)
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
+        var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(p => p.Id == id, ct, "Supplier");
 
         if (payment == null) return Result<SupplierPaymentDto>.Failure("عملية الدفع غير موجودة", ErrorCodes.NotFound);
 

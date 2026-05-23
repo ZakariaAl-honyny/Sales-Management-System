@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -35,12 +34,8 @@ public class PurchaseService : IPurchaseService
 
     public async Task<Result<PurchaseInvoiceDto>> GetByIdAsync(int id, CancellationToken ct)
     {
-        var invoice = await _uow.PurchaseInvoices.Query()
-            .Include(i => i.Supplier)
-            .Include(i => i.Warehouse)
-            .Include(i => i.Items)
-                .ThenInclude(item => item.Product)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
+            i => i.Id == id, ct, "Supplier", "Warehouse", "Items.Product");
 
         if (invoice == null)
             return Result<PurchaseInvoiceDto>.Failure("فاتورة المشتريات غير موجودة", ErrorCodes.NotFound);
@@ -50,12 +45,8 @@ public class PurchaseService : IPurchaseService
 
     public async Task<Result<PurchaseInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default)
     {
-        var invoice = await _uow.PurchaseInvoices.Query()
-            .Include(i => i.Supplier)
-            .Include(i => i.Warehouse)
-            .Include(i => i.Items)
-                .ThenInclude(item => item.Product)
-            .FirstOrDefaultAsync(i => i.InvoiceNo == invoiceNo, ct);
+        var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
+            i => i.InvoiceNo == invoiceNo, ct, "Supplier", "Warehouse", "Items.Product");
 
         if (invoice == null)
             return Result<PurchaseInvoiceDto>.Failure("فاتورة المشتريات غير موجودة", ErrorCodes.NotFound);
@@ -74,48 +65,37 @@ public class PurchaseService : IPurchaseService
         bool includeInactive = false, 
         CancellationToken ct = default)
     {
-        var query = _uow.PurchaseInvoices.Query()
-            .Include(i => i.Supplier)
-            .Include(i => i.Warehouse)
-            .Include(i => i.Items)
-                .ThenInclude(item => item.Product)
-            .AsQueryable();
+        // Build predicate dynamically
+        var searchLower = string.IsNullOrWhiteSpace(search) ? null : search.Trim().ToLower();
 
-        if (supplierId.HasValue) query = query.Where(i => i.SupplierId == supplierId.Value);
-        if (status.HasValue) query = query.Where(i => (int)i.Status == status.Value);
-        else if (!includeInactive) query = query.Where(i => i.Status != InvoiceStatus.Cancelled);
+        System.Linq.Expressions.Expression<System.Func<PurchaseInvoice, bool>> predicate = i =>
+            (!supplierId.HasValue || i.SupplierId == supplierId.Value) &&
+            (!status.HasValue || (int)i.Status == status.Value) &&
+            (status.HasValue || includeInactive || i.Status != InvoiceStatus.Cancelled) &&
+            (!from.HasValue || i.InvoiceDate >= from.Value) &&
+            (!to.HasValue || i.InvoiceDate <= to.Value) &&
+            (searchLower == null ||
+             i.InvoiceNo.ToLower().Contains(searchLower) ||
+             (i.Supplier != null && i.Supplier.Name.ToLower().Contains(searchLower)) ||
+             (i.SupplierInvoiceNo != null && i.SupplierInvoiceNo.ToLower().Contains(searchLower)) ||
+             (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
+             i.Items.Any(item =>
+                 item.Product.Name.ToLower().Contains(searchLower) ||
+                 item.Product.Barcode.ToLower().Contains(searchLower)));
 
-        if (from.HasValue) query = query.Where(i => i.InvoiceDate >= from.Value);
-        if (to.HasValue) query = query.Where(i => i.InvoiceDate <= to.Value);
+        var includes = new[] { "Supplier", "Warehouse", "Items.Product" };
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var searchLower = search.Trim().ToLower();
-            query = query.Where(i => 
-                i.InvoiceNo.ToLower().Contains(searchLower) ||
-                (i.Supplier != null && i.Supplier.Name.ToLower().Contains(searchLower)) ||
-                (i.SupplierInvoiceNo != null && i.SupplierInvoiceNo.ToLower().Contains(searchLower)) ||
-                (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
-                i.Items.Any(item => 
-                    item.Product.Name.ToLower().Contains(searchLower) ||
-                    item.Product.Barcode.ToLower().Contains(searchLower))
-            );
-        }
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(i => i.InvoiceDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var (items, total) = await _uow.PurchaseInvoices.GetPagedAsync(
+            predicate, q => q.OrderByDescending(i => i.InvoiceDate), page, pageSize, ct, includeInactive, includes);
 
         var dtos = items.Select(MapToDto).ToList();
 
-        return Result<PagedResult<PurchaseInvoiceDto>>.Success(PagedResult<PurchaseInvoiceDto>.Create(dtos, totalItems, page, pageSize));
+        return Result<PagedResult<PurchaseInvoiceDto>>.Success(PagedResult<PurchaseInvoiceDto>.Create(dtos, total, page, pageSize));
     }
 
     public async Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, int userId, CancellationToken ct)
     {
+        await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
             var invoiceNoResult = await _sequenceService.GetNextNumberAsync("PUR", ct);
@@ -155,16 +135,20 @@ public class PurchaseService : IPurchaseService
             await _uow.PurchaseInvoices.AddAsync(invoice, ct);
             await _uow.SaveChangesAsync(ct);
 
+            await transaction.CommitAsync(ct);
+
             _logger.LogInformation("Purchase Invoice created as Draft: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
 
             return await GetByIdAsync(invoice.Id, ct);
         }
         catch (DomainException ex)
         {
+            await transaction.RollbackAsync(ct);
             return Result<PurchaseInvoiceDto>.Failure(ex.Message);
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error creating purchase invoice draft");
             return Result<PurchaseInvoiceDto>.Failure("حدث خطأ أثناء حفظ مسودة الفاتورة");
         }
@@ -172,9 +156,8 @@ public class PurchaseService : IPurchaseService
 
     public async Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request, int userId, CancellationToken ct)
     {
-        var invoice = await _uow.PurchaseInvoices.Query()
-            .Include(i => i.Items)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
+            i => i.Id == id, ct, "Items");
 
         if (invoice == null)
             return Result<PurchaseInvoiceDto>.Failure("فاتورة المشتريات غير موجودة", ErrorCodes.NotFound);
@@ -190,8 +173,6 @@ public class PurchaseService : IPurchaseService
 
             invoice.UpdateTotals(request.DiscountAmount, request.TaxAmount);
             invoice.SetPaidAmount(request.PaidAmount);
-            // In a real scenario, we might need more Update methods on the entity
-            // For now, we'll assume we can update these fields via reflection or adding methods to Domain
             
             // Re-create items (simplest way for draft)
             _uow.PurchaseInvoiceItems.DeleteRange(invoice.Items);
@@ -227,10 +208,8 @@ public class PurchaseService : IPurchaseService
 
     public async Task<Result<PurchaseInvoiceDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
-        var invoice = await _uow.PurchaseInvoices.Query()
-            .Include(i => i.Items)
-                .ThenInclude(item => item.Product)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
+            i => i.Id == id, ct, "Items.Product");
 
         if (invoice == null)
             return Result<PurchaseInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
@@ -241,7 +220,7 @@ public class PurchaseService : IPurchaseService
             return Result<PurchaseInvoiceDto>.Failure("يمكن فقط ترحيل الفواتير المسودة");
         }
 
-return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteAsync(async () =>
         {
             await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
@@ -324,10 +303,8 @@ return await _uow.ExecuteAsync(async () =>
 
     public async Task<Result<PurchaseInvoiceDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
-        var invoice = await _uow.PurchaseInvoices.Query()
-            .Include(i => i.Items)
-                .ThenInclude(item => item.Product)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
+            i => i.Id == id, ct, "Items.Product");
 
         if (invoice == null)
             return Result<PurchaseInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
@@ -431,5 +408,3 @@ return await _uow.ExecuteAsync(async () =>
         );
     }
 }
-
-

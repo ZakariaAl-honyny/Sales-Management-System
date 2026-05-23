@@ -45,13 +45,13 @@
         <Border Grid.Row="1" Padding="16">
             <StackPanel>
                 <TextBlock Text="اسم الوحدة *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+<TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                          Style="{StaticResource ModernTextBox}"
                          Tag="أدخل اسم الوحدة (مثلاً: كرتون، حبة...)"
                          TabIndex="1"
                          helpers:FocusHelper.AdvanceOnEnter="True"
                           AutomationProperties.AutomationId="TxtUnitName"
-                             ToolTip="أدخل اسماً فريداً للوحدة (مثلاً: حبة، كرتون، كيلو) — هذا الحقل مطلوب"/>
+                              ToolTip="أدخل اسماً فريداً للوحدة (مثلاً: حبة، كرتون، كيلو) — هذا الحقل مطلوب"/>
                 <TextBlock Text="مثال: حبة، كرتون، شدة، كيلو" Style="{StaticResource HelperTextStyle}"/>
                 
                 <Border Margin="0,20,0,0" Padding="16" Background="#F8FAFC" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0">

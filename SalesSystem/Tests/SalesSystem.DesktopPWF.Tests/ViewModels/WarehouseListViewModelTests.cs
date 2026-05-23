@@ -62,8 +62,9 @@ public class WarehouseListViewModelTests : IDisposable
 
         await _viewModel.LoadWarehousesAsync();
 
+        // ViewModel sorts by Id descending (newest first)
         _viewModel.Warehouses.Should().HaveCount(2);
-        _viewModel.Warehouses.First().Name.Should().Be("المستودع الرئيسي");
+        _viewModel.Warehouses.First().Name.Should().Be("المستودع الثاني");
         _viewModel.IsBusy.Should().BeFalse();
     }
 

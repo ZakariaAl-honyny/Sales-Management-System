@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -32,12 +31,8 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> GetByIdAsync(int id, CancellationToken ct)
     {
-        var invoice = await _uow.SalesInvoices.Query()
-            .Include(i => i.Customer)
-            .Include(i => i.Warehouse)
-            .Include(i => i.Items)
-                .ThenInclude(item => item.Product)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
+            i => i.Id == id, ct, "Customer", "Warehouse", "Items.Product");
 
         if (invoice == null)
             return Result<SalesInvoiceDto>.Failure("فاتورة المبيعات غير موجودة", ErrorCodes.NotFound);
@@ -47,12 +42,8 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default)
     {
-        var invoice = await _uow.SalesInvoices.Query()
-            .Include(i => i.Customer)
-            .Include(i => i.Warehouse)
-            .Include(i => i.Items)
-                .ThenInclude(item => item.Product)
-            .FirstOrDefaultAsync(i => i.InvoiceNo == invoiceNo, ct);
+        var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
+            i => i.InvoiceNo == invoiceNo, ct, "Customer", "Warehouse", "Items.Product");
 
         if (invoice == null)
             return Result<SalesInvoiceDto>.Failure("فاتورة المبيعات غير موجودة", ErrorCodes.NotFound);
@@ -71,54 +62,39 @@ public class SalesService : ISalesService
         bool includeInactive = false, 
         CancellationToken ct = default)
     {
-        var query = _uow.SalesInvoices.Query()
-            .Include(i => i.Customer)
-            .Include(i => i.Warehouse)
-            .Include(i => i.Items)
-                .ThenInclude(item => item.Product)
-            .AsQueryable();
+        // Build predicate dynamically for search conditions
+        var searchLower = string.IsNullOrWhiteSpace(search) ? null : search.Trim().ToLower();
 
-        if (!includeInactive && !status.HasValue)
-        {
-            query = query.Where(i => i.Status != InvoiceStatus.Cancelled);
-        }
+        System.Linq.Expressions.Expression<System.Func<SalesInvoice, bool>> predicate = i =>
+            (includeInactive || i.Status != InvoiceStatus.Cancelled) &&
+            (!customerId.HasValue || i.CustomerId == customerId.Value) &&
+            (!status.HasValue || (int)i.Status == status.Value) &&
+            (!from.HasValue || i.InvoiceDate >= from.Value) &&
+            (!to.HasValue || i.InvoiceDate <= to.Value) &&
+            (searchLower == null ||
+             i.InvoiceNo.ToLower().Contains(searchLower) ||
+             (i.Customer != null && i.Customer.Name.ToLower().Contains(searchLower)) ||
+             (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
+             i.Items.Any(item =>
+                 item.Product.Name.ToLower().Contains(searchLower) ||
+                 item.Product.Barcode.ToLower().Contains(searchLower)));
 
-        if (customerId.HasValue) query = query.Where(i => i.CustomerId == customerId.Value);
-        if (status.HasValue) query = query.Where(i => (int)i.Status == status.Value);
+        var includes = new[] { "Customer", "Warehouse", "Items.Product" };
 
-        if (from.HasValue) query = query.Where(i => i.InvoiceDate >= from.Value);
-        if (to.HasValue) query = query.Where(i => i.InvoiceDate <= to.Value);
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var searchLower = search.Trim().ToLower();
-            query = query.Where(i => 
-                i.InvoiceNo.ToLower().Contains(searchLower) ||
-                (i.Customer != null && i.Customer.Name.ToLower().Contains(searchLower)) ||
-                (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
-                i.Items.Any(item => 
-                    item.Product.Name.ToLower().Contains(searchLower) ||
-                    item.Product.Barcode.ToLower().Contains(searchLower))
-            );
-        }
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(i => i.InvoiceDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var (items, total) = await _uow.SalesInvoices.GetPagedAsync(
+            predicate, q => q.OrderByDescending(i => i.InvoiceDate), page, pageSize, ct, includeInactive, includes);
 
         var dtos = items.Select(MapToDto).ToList();
 
-        return Result<PagedResult<SalesInvoiceDto>>.Success(PagedResult<SalesInvoiceDto>.Create(dtos, totalItems, page, pageSize));
+        return Result<PagedResult<SalesInvoiceDto>>.Success(PagedResult<SalesInvoiceDto>.Create(dtos, total, page, pageSize));
     }
 
     public async Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, int userId, CancellationToken ct)
     {
+        await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
-            var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
+            var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
             var invoicePrefix = settings?.InvoicePrefix ?? "INV";
             
             var invoiceNoResult = await _sequenceService.GetNextNumberAsync(invoicePrefix, ct);
@@ -157,16 +133,20 @@ public class SalesService : ISalesService
             await _uow.SalesInvoices.AddAsync(invoice, ct);
             await _uow.SaveChangesAsync(ct);
 
+            await transaction.CommitAsync(ct);
+
             _logger.LogInformation("Sales Invoice created as Draft: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
 
             return await GetByIdAsync(invoice.Id, ct);
         }
         catch (DomainException ex)
         {
+            await transaction.RollbackAsync(ct);
             return Result<SalesInvoiceDto>.Failure(ex.Message);
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error creating sales invoice draft");
             return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء حفظ مسودة الفاتورة");
         }
@@ -174,9 +154,8 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> UpdateAsync(int id, UpdateSalesInvoiceRequest request, int userId, CancellationToken ct)
     {
-        var invoice = await _uow.SalesInvoices.Query()
-            .Include(i => i.Items)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
+            i => i.Id == id, ct, "Items");
 
         if (invoice == null)
             return Result<SalesInvoiceDto>.Failure("فاتورة المبيعات غير موجودة", ErrorCodes.NotFound);
@@ -230,10 +209,8 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
-        var invoice = await _uow.SalesInvoices.Query()
-            .Include(i => i.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
+            i => i.Id == id, ct, "Items.Product");
 
         if (invoice == null)
             return Result<SalesInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
@@ -244,7 +221,7 @@ public class SalesService : ISalesService
             return Result<SalesInvoiceDto>.Failure("يمكن فقط ترحيل الفواتير المسودة");
         }
 
-        var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
+        var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
         bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
 
         // 1. Validate Stock BEFORE Transaction
@@ -328,10 +305,8 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
-        var invoice = await _uow.SalesInvoices.Query()
-            .Include(i => i.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(i => i.Id == id, ct);
+        var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
+            i => i.Id == id, ct, "Items.Product");
 
         if (invoice == null)
             return Result<SalesInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
@@ -433,5 +408,3 @@ public class SalesService : ISalesService
         );
     }
 }
-
-

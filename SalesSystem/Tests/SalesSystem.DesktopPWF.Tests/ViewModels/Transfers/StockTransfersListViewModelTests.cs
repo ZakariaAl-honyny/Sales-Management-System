@@ -55,7 +55,7 @@ public class StockTransfersListViewModelTests
     [Fact] public void DateFrom_DefaultValue_IsNull() => _viewModel.DateFrom.Should().BeNull();
     [Fact] public void DateTo_DefaultValue_IsNull() => _viewModel.DateTo.Should().BeNull();
     [Fact] public void StatusFilter_DefaultValue_IsNull() => _viewModel.StatusFilter.Should().BeNull();
-    [Fact] public void IsLoading_DefaultValue_IsFalse() => _viewModel.IsLoading.Should().BeFalse();
+    [Fact] public void IsBusy_DefaultValue_IsFalse() => _viewModel.IsBusy.Should().BeFalse();
     [Fact] public void ErrorMessage_DefaultValue_IsEmpty() => _viewModel.ErrorMessage.Should().BeEmpty();
     [Fact] public void SelectedTransfer_DefaultValue_IsNull() => _viewModel.SelectedTransfer.Should().BeNull();
 
@@ -109,12 +109,10 @@ public class StockTransfersListViewModelTests
     }
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
-        var events = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => events.Add(e.PropertyName ?? string.Empty);
-        _viewModel.IsLoading = true;
-        events.Should().Contain("IsLoading");
+        // IsBusy has protected set in ViewModelBase, managed by ExecuteAsync
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -218,7 +216,7 @@ public class StockTransfersListViewModelTests
         await _viewModel.LoadTransfersAsync();
 
         _viewModel.Transfers.Should().HaveCount(2);
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -231,11 +229,11 @@ public class StockTransfersListViewModelTests
         await _viewModel.LoadTransfersAsync();
 
         _viewModel.ErrorMessage.Should().NotBeEmpty();
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
-    public async Task LoadTransfersAsync_WhenLoading_SetsIsLoadingTrue()
+    public async Task LoadTransfersAsync_WhenLoading_SetsIsBusyTrue()
     {
         var tcs = new TaskCompletionSource<Result<List<StockTransferDto>>>();
         _mockTransferService
@@ -243,12 +241,12 @@ public class StockTransfersListViewModelTests
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadTransfersAsync();
-        _viewModel.IsLoading.Should().BeTrue();
+        _viewModel.IsBusy.Should().BeTrue();
 
         tcs.SetResult(Result<List<StockTransferDto>>.Success(new List<StockTransferDto>()));
         await loadTask;
 
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]

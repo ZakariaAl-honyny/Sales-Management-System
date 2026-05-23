@@ -67,3 +67,22 @@ Quality assurance and test automation specialist for the SalesSystem.
 - Use Fluent API ONLY in test configurations (no DataAnnotations)
 - Use `decimal` for all money/quantity assertions — NEVER float/double
 - Test Arabic error messages exactly as defined in Domain entities
+
+### Newest-First Sorting
+- `LoadProductsOperationAsync_WhenApiReturnsData_SortsByIdDescending`
+- `LoadInvoicesAsync_WhenApiReturnsData_SortsByInvoiceDateDescending`
+- `PositionOverOwner_WhenMainWindowIsSelf_FallsBackToCenterScreen`
+- `PositionOverOwner_WhenMainWindowIsValid_SetsOwner`
+
+### v4.6.2 — WPF Validation ErrorTemplate & INotifyDataErrorInfo
+
+| Test Case | Description | Expected Result |
+|-----------|-------------|-----------------|
+| TC-18-001 | ProductEditor: Empty Name shows red border + ❗ icon | Red border appears on Name field; hovering ❗ shows "اسم المنتج مطلوب" |
+| TC-18-002 | ProductEditor: Enter valid Name clears red border | Red border disappears; ❗ icon removed |
+| TC-18-003 | ProductEditor: Save with empty required fields shows validation dialog | Dialog "بيانات غير مكتملة" appears listing all missing fields; focus moves to first invalid field |
+| TC-18-004 | CustomerEditor: Negative CreditLimit shows red border | Red border + ❗ on CreditLimit; ToolTip shows "الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر" |
+| TC-18-005 | CustomerEditor: Save with empty Name + negative CreditLimit | Validation dialog shows both errors; focus goes to Name field |
+| TC-18-006 | All 14 Editor VMs: SetDialogService() called in constructor | No NullReferenceException when ValidateAllAsync() tries to show dialog |
+| TC-18-007 | ErrorTemplate: TextBox, PasswordBox, ComboBox all show red border on error | Each control type renders red border + ❗ icon when Validation.HasError is true |
+| TC-18-008 | ValidateAllAsync: No errors returns true without dialog | Save proceeds normally; no dialog shown |

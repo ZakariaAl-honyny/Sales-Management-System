@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -31,28 +30,19 @@ public class WarehouseService : IWarehouseService
 
     public async Task<Result<PagedResult<WarehouseDto>>> GetAllAsync(string? search, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _uow.Warehouses.Query();
-        
-        if (includeInactive)
-        {
-            query = query.IgnoreQueryFilters();
-        }
+        System.Linq.Expressions.Expression<System.Func<Warehouse, bool>>? predicate = null;
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(w => w.Name.Contains(search));
+            var s = search;
+            predicate = w => w.Name.Contains(s);
         }
 
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderBy(w => w.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var (items, total) = await _uow.Warehouses.GetPagedAsync(
+            predicate, q => q.OrderBy(w => w.Name), page, pageSize, ct, includeInactive);
 
         var dtos = items.Select(MapToDto).ToList();
-
-        return Result<PagedResult<WarehouseDto>>.Success(PagedResult<WarehouseDto>.Create(dtos, totalItems, page, pageSize));
+        return Result<PagedResult<WarehouseDto>>.Success(PagedResult<WarehouseDto>.Create(dtos, total, page, pageSize));
     }
 
     public async Task<Result<WarehouseDto>> CreateAsync(CreateWarehouseRequest request, CancellationToken ct)
@@ -99,7 +89,7 @@ public class WarehouseService : IWarehouseService
 
     public async Task<Result<WarehouseDto>> UpdateAsync(int id, UpdateWarehouseRequest request, CancellationToken ct)
     {
-        var warehouse = await _uow.Warehouses.Query().IgnoreQueryFilters().FirstOrDefaultAsync(w => w.Id == id, ct);
+        var warehouse = await _uow.Warehouses.FirstOrDefaultIgnoreFiltersAsync(w => w.Id == id, ct);
         if (warehouse == null)
             return Result<WarehouseDto>.Failure("المخزن غير موجود", ErrorCodes.NotFound);
 
@@ -167,17 +157,17 @@ public class WarehouseService : IWarehouseService
 
     public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
     {
-        var warehouse = await _uow.Warehouses.Query().IgnoreQueryFilters().FirstOrDefaultAsync(w => w.Id == id, ct);
+        var warehouse = await _uow.Warehouses.FirstOrDefaultIgnoreFiltersAsync(w => w.Id == id, ct);
         if (warehouse == null)
             return Result.Failure("المخزن غير موجود", ErrorCodes.NotFound);
 
         if (warehouse.IsDefault)
             return Result.Failure("لا يمكن حذف المخزن الافتراضي نهائياً");
 
-        if (await _uow.WarehouseStocks.Query().AnyAsync(ws => ws.WarehouseId == id, ct))
+        if (await _uow.WarehouseStocks.AnyAsync(ws => ws.WarehouseId == id, ct))
             return Result.Failure("لا يمكن حذف المخزن نهائياً لأنه يحتوي على مخزون");
 
-        if (await _uow.StockTransfers.Query().AnyAsync(st => st.FromWarehouseId == id || st.ToWarehouseId == id, ct))
+        if (await _uow.StockTransfers.AnyAsync(st => st.FromWarehouseId == id || st.ToWarehouseId == id, ct))
             return Result.Failure("لا يمكن حذف المخزن نهائياً لأنه مرتبط بتحويلات مخزون");
 
         try
@@ -188,19 +178,17 @@ public class WarehouseService : IWarehouseService
             _logger.LogInformation("Warehouse permanently deleted: {WarehouseId}", id);
             return Result.Success();
         }
-        catch (DbUpdateException ex)
+        catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
         {
             _logger.LogError(ex, "Failed to permanently delete warehouse {WarehouseId} due to database constraint", id);
-            var innerMessage = ex.InnerException?.Message ?? ex.Message;
-            return Result.Failure($"لا يمكن حذف المخزن نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام. ({innerMessage})");
+            return Result.Failure("لا يمكن حذف المخزن نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
         }
     }
 
     private async Task UnsetOtherDefaultsAsync(CancellationToken ct)
     {
-        var defaults = await _uow.Warehouses.Query()
-            .Where(w => w.IsDefault)
-            .ToListAsync(ct);
+        var defaults = await _uow.Warehouses.ToListAsync(
+            w => w.IsDefault, null, ct, false);
 
         foreach (var w in defaults)
         {

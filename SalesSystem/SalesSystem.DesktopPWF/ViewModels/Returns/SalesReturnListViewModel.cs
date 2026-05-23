@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
@@ -29,7 +29,6 @@ public class SalesReturnListViewModel : ViewModelBase
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
-    private bool _isLoading;
     private string? _errorMessage;
 
     public SalesReturnListViewModel()
@@ -115,11 +114,6 @@ public class SalesReturnListViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -158,7 +152,7 @@ public class SalesReturnListViewModel : ViewModelBase
     #region Methods
     public async Task LoadReturnsAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -174,7 +168,7 @@ public class SalesReturnListViewModel : ViewModelBase
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Returns.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Returns.Add(item);
                     }
@@ -184,7 +178,7 @@ public class SalesReturnListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل مرتجعات المبيعات", "SalesReturnListViewModel.LoadReturnsAsync", "[SalesReturnListViewModel.LoadReturnsAsync] Failed to load sales returns list.");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ظ…ط±طھط¬ط¹ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ", "SalesReturnListViewModel.LoadReturnsAsync", "[SalesReturnListViewModel.LoadReturnsAsync] Failed to load sales returns list.");
                 IsEmpty = Returns.Count == 0;
             }
         }
@@ -194,7 +188,7 @@ public class SalesReturnListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -228,7 +222,7 @@ public class SalesReturnListViewModel : ViewModelBase
         var editorVm = App.GetService<SalesReturnEditorViewModel>();
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "مرتجع مبيعات جديد",
+            Title = "ظ…ط±طھط¬ط¹ ظ…ط¨ظٹط¹ط§طھ ط¬ط¯ظٹط¯",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
@@ -248,7 +242,7 @@ public class SalesReturnListViewModel : ViewModelBase
 
         if (dialogService.ShowDialog(invoiceVm) && invoiceVm.SelectedInvoice != null)
         {
-            IsLoading = true;
+            IsBusy = true;
             try
             {
                 var salesInvoiceService = App.GetService<ISalesInvoiceApiService>();
@@ -261,7 +255,7 @@ public class SalesReturnListViewModel : ViewModelBase
                     
                     _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
                     {
-                        Title = "مرتجع مبيعات من فاتورة",
+                        Title = "ظ…ط±طھط¬ط¹ ظ…ط¨ظٹط¹ط§طھ ظ…ظ† ظپط§طھظˆط±ط©",
                         OnClosed = (vm) =>
                         {
                             System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
@@ -272,7 +266,7 @@ public class SalesReturnListViewModel : ViewModelBase
                 {
                     InvokeOnUIThread(() =>
                     {
-                        dialogService.ShowError(fullInvoiceResult.Error ?? "فشل في تحميل تفاصيل الفاتورة");
+                        dialogService.ShowError(fullInvoiceResult.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ طھظپط§طµظٹظ„ ط§ظ„ظپط§طھظˆط±ط©");
                     });
                 }
             }
@@ -284,7 +278,7 @@ public class SalesReturnListViewModel : ViewModelBase
             {
                 InvokeOnUIThread(() =>
                 {
-                    IsLoading = false;
+                    IsBusy = false;
                 });
             }
         }
@@ -297,7 +291,7 @@ public class SalesReturnListViewModel : ViewModelBase
         _ = editorVm.LoadReturnAsync(SelectedReturn.Id);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "عرض مرتجع مبيعات",
+            Title = "ط¹ط±ط¶ ظ…ط±طھط¬ط¹ ظ…ط¨ظٹط¹ط§طھ",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
@@ -324,3 +318,7 @@ public class SalesReturnListViewModel : ViewModelBase
     }
     #endregion
 }
+
+
+
+

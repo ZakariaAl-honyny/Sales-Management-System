@@ -135,5 +135,22 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] SettingsController Get/Update support CostingMethod via ISystemSettingsRepository?
 - [ ] StoreSettingsDto and UpdateSettingsRequest include CostingMethod field?
 
+### Newest-First Sorting (v4.6.1)
+- [ ] All list ViewModels sort by `Id` descending (newest first)?
+- [ ] Invoice lists sort by `InvoiceDate` descending (not Id)?
+- [ ] No reliance on API return order alone?
+
+### Dialog Window Owner Safety (v4.6.1)
+- [ ] All `PositionOverOwner()` methods guard against `mainWindow != this`?
+- [ ] Fallback to `WindowStartupLocation.CenterScreen` when no valid owner?
+- [ ] No dialog sets Owner to itself?
+
+### WPF Validation (v4.6.2)
+- [ ] All Editor VMs call SetDialogService() in constructors?
+- [ ] No HasXxxError boolean + string computed properties?
+- [ ] Validation uses INotifyDataErrorInfo (AddError/ClearErrors)?
+- [ ] ValidateAsync calls ClearAllErrors() + AddError() + await ValidateAllAsync()?
+- [ ] ErrorTemplate applied to TextBox, PasswordBox, ComboBox?
+
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -27,8 +27,8 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<decimal>> GetStockAsync(int productId, int warehouseId, CancellationToken ct)
     {
-        var stock = await _uow.WarehouseStocks.Query()
-            .FirstOrDefaultAsync(ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
+        var stock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
+            ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
 
         if (stock == null)
         {
@@ -60,8 +60,8 @@ public class InventoryService : IInventoryService
 
     public async Task<Result> IncreaseStockAsync(int productId, int warehouseId, decimal quantity, MovementType movementType, string referenceType, int referenceId, decimal? unitCost, int? userId, CancellationToken ct)
     {
-        var stock = await _uow.WarehouseStocks.Query()
-            .FirstOrDefaultAsync(ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
+        var stock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
+            ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
 
         if (stock == null)
         {
@@ -95,8 +95,8 @@ public class InventoryService : IInventoryService
 
     public async Task<Result> DecreaseStockAsync(int productId, int warehouseId, decimal quantity, MovementType movementType, string referenceType, int referenceId, decimal? unitCost, int? userId, CancellationToken ct)
     {
-        var stock = await _uow.WarehouseStocks.Query()
-            .FirstOrDefaultAsync(ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
+        var stock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
+            ws => ws.WarehouseId == warehouseId && ws.ProductId == productId, ct);
 
         if (stock == null)
         {
@@ -134,12 +134,8 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<StockTransferDto>> GetTransferByIdAsync(int id, CancellationToken ct)
     {
-        var transfer = await _uow.StockTransfers.Query()
-            .Include(t => t.FromWarehouse)
-            .Include(t => t.ToWarehouse)
-            .Include(t => t.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(t => t.Id == id, ct);
+        var transfer = await _uow.StockTransfers.FirstOrDefaultAsync(
+            t => t.Id == id, ct, "FromWarehouse", "ToWarehouse", "Items.Product");
 
         if (transfer == null)
             return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
@@ -149,21 +145,18 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<PagedResult<StockTransferDto>>> GetAllTransfersAsync(int? fromWarehouseId, int? toWarehouseId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _uow.StockTransfers.Query()
-            .Include(t => t.FromWarehouse)
-            .Include(t => t.ToWarehouse)
-            .AsQueryable();
+        Expression<Func<StockTransfer, bool>> predicate = t =>
+            (!fromWarehouseId.HasValue || t.FromWarehouseId == fromWarehouseId.Value) &&
+            (!toWarehouseId.HasValue || t.ToWarehouseId == toWarehouseId.Value) &&
+            (includeInactive || t.Status != InvoiceStatus.Cancelled);
 
-        if (fromWarehouseId.HasValue) query = query.Where(t => t.FromWarehouseId == fromWarehouseId.Value);
-        if (toWarehouseId.HasValue) query = query.Where(t => t.ToWarehouseId == toWarehouseId.Value);
-        if (!includeInactive) query = query.Where(t => t.Status != InvoiceStatus.Cancelled);
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(t => t.TransferDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var totalItems = await _uow.StockTransfers.CountAsync(predicate, ct);
+        var items = await _uow.StockTransfers.ToListAsync(
+            predicate,
+            q => q.OrderByDescending(t => t.TransferDate).Skip((page - 1) * pageSize).Take(pageSize),
+            ct,
+            false,
+            "FromWarehouse", "ToWarehouse");
 
         var dtos = items.Select(MapToDto).ToList();
 
@@ -229,18 +222,13 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<IEnumerable<WarehouseStockDto>>> GetWarehouseStockAsync(int warehouseId, string? search, CancellationToken ct)
     {
-        var query = _uow.WarehouseStocks.Query()
-            .Include(s => s.Product)
-                .ThenInclude(p => p!.Unit)
-            .Where(s => s.WarehouseId == warehouseId)
-            .AsQueryable();
+        Expression<Func<WarehouseStock, bool>> predicate = s =>
+            s.WarehouseId == warehouseId &&
+            (string.IsNullOrWhiteSpace(search) || s.Product!.Name.Contains(search));
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            query = query.Where(s => s.Product!.Name.Contains(search));
-        }
+        var items = await _uow.WarehouseStocks.ToListAsync(
+            predicate, null, ct, false, "Product.Unit");
 
-        var items = await query.ToListAsync(ct);
         var dtos = items.Select(s => new WarehouseStockDto(
             s.WarehouseId,
             null,
@@ -256,22 +244,18 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<PagedResult<WarehouseStockDto>>> GetWarehouseStocksAsync(int? warehouseId, int? productId, int page, int pageSize, CancellationToken ct)
     {
-        var query = _uow.WarehouseStocks.Query()
-            .Include(s => s.Product)
-                .ThenInclude(p => p!.Unit)
-            .Include(s => s.Warehouse)
-            .AsQueryable();
+        Expression<Func<WarehouseStock, bool>> predicate = s =>
+            (!warehouseId.HasValue || s.WarehouseId == warehouseId.Value) &&
+            (!productId.HasValue || s.ProductId == productId.Value);
 
-        if (warehouseId.HasValue) query = query.Where(s => s.WarehouseId == warehouseId.Value);
-        if (productId.HasValue) query = query.Where(s => s.ProductId == productId.Value);
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderBy(s => s.Warehouse!.Name)
-            .ThenBy(s => s.Product!.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var totalItems = await _uow.WarehouseStocks.CountAsync(predicate, ct);
+        var items = await _uow.WarehouseStocks.ToListAsync(
+            predicate,
+            q => q.OrderBy(s => s.Warehouse!.Name).ThenBy(s => s.Product!.Name)
+                  .Skip((page - 1) * pageSize).Take(pageSize),
+            ct,
+            false,
+            "Product.Unit", "Warehouse");
 
         var dtos = items.Select(s => new WarehouseStockDto(
             s.WarehouseId,
@@ -288,21 +272,18 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<PagedResult<InventoryMovementDto>>> GetMovementsAsync(int? productId, int? warehouseId, int? movementType, int page, int pageSize, CancellationToken ct)
     {
-        var query = _uow.InventoryMovements.Query()
-            .Include(m => m.Product)
-            .Include(m => m.Warehouse)
-            .AsQueryable();
+        Expression<Func<InventoryMovement, bool>> predicate = m =>
+            (!productId.HasValue || m.ProductId == productId.Value) &&
+            (!warehouseId.HasValue || m.WarehouseId == warehouseId.Value) &&
+            (!movementType.HasValue || (int)m.MovementType == movementType.Value);
 
-        if (productId.HasValue) query = query.Where(m => m.ProductId == productId.Value);
-        if (warehouseId.HasValue) query = query.Where(m => m.WarehouseId == warehouseId.Value);
-        if (movementType.HasValue) query = query.Where(m => (int)m.MovementType == movementType.Value);
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(m => m.MovementDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var totalItems = await _uow.InventoryMovements.CountAsync(predicate, ct);
+        var items = await _uow.InventoryMovements.ToListAsync(
+            predicate,
+            q => q.OrderByDescending(m => m.MovementDate).Skip((page - 1) * pageSize).Take(pageSize),
+            ct,
+            false,
+            "Product", "Warehouse");
 
         var dtos = items.Select(m => new InventoryMovementDto(
             m.Id,
@@ -327,10 +308,8 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<StockTransferDto>> UpdateTransferAsync(int id, UpdateStockTransferRequest request, int userId, CancellationToken ct)
     {
-        var transfer = await _uow.StockTransfers.Query()
-            .Include(t => t.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(t => t.Id == id, ct);
+        var transfer = await _uow.StockTransfers.FirstOrDefaultAsync(
+            t => t.Id == id, ct, "Items.Product");
 
         if (transfer == null)
             return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
@@ -375,10 +354,8 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<StockTransferDto>> PostTransferAsync(int id, int userId, CancellationToken ct)
     {
-        var transfer = await _uow.StockTransfers.Query()
-            .Include(t => t.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(t => t.Id == id, ct);
+        var transfer = await _uow.StockTransfers.FirstOrDefaultAsync(
+            t => t.Id == id, ct, "Items.Product");
 
         if (transfer == null)
             return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
@@ -386,7 +363,7 @@ public class InventoryService : IInventoryService
         if (transfer.Status != InvoiceStatus.Draft)
             return Result<StockTransferDto>.Failure("يمكن فقط ترحيل الحوالات المسودة");
 
-        var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
+        var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
         bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
 
         // 1. Validate Stock
@@ -433,10 +410,8 @@ public class InventoryService : IInventoryService
 
     public async Task<Result<StockTransferDto>> CancelTransferAsync(int id, int userId, CancellationToken ct)
     {
-        var transfer = await _uow.StockTransfers.Query()
-            .Include(t => t.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(t => t.Id == id, ct);
+        var transfer = await _uow.StockTransfers.FirstOrDefaultAsync(
+            t => t.Id == id, ct, "Items.Product");
 
         if (transfer == null)
             return Result<StockTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);

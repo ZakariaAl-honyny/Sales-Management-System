@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -17,7 +17,6 @@ public class PurchaseInvoiceSelectionViewModel : ViewModelBase
     private ICollectionView? _invoicesView;
     private PurchaseInvoiceDto? _selectedInvoice;
     private string _searchText = string.Empty;
-    private bool _isLoading;
 
     public PurchaseInvoiceSelectionViewModel()
     {
@@ -66,11 +65,6 @@ public class PurchaseInvoiceSelectionViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public ICommand SelectCommand { get; }
     public ICommand CancelCommand { get; }
@@ -78,7 +72,7 @@ public class PurchaseInvoiceSelectionViewModel : ViewModelBase
 
     private async Task LoadInvoicesAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         try
         {
             var result = await _invoiceService.GetAllAsync(
@@ -98,7 +92,7 @@ public class PurchaseInvoiceSelectionViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -125,3 +119,7 @@ public class PurchaseInvoiceSelectionViewModel : ViewModelBase
         RequestClose();
     }
 }
+
+
+
+

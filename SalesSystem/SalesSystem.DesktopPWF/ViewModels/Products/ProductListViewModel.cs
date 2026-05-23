@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -27,11 +27,10 @@ public class ProductListViewModel : ViewModelBase
     private ICollectionView? _productsView;
     private ProductDto? _selectedProduct;
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
-    private string _lastUpdateTime = "لم يتم التحديث بعد";
+    private string _lastUpdateTime = "ظ„ظ… ظٹطھظ… ط§ظ„طھط­ط¯ظٹط« ط¨ط¹ط¯";
 
     public ProductListViewModel()
     {
@@ -114,11 +113,6 @@ public class ProductListViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -163,7 +157,7 @@ public class ProductListViewModel : ViewModelBase
     #region Methods
     public async Task LoadProductsAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -175,7 +169,7 @@ public class ProductListViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Products.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Products.Add(item);
                     }
@@ -186,7 +180,7 @@ public class ProductListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المنتجات", "ProductListViewModel.LoadProductsAsync", "[ProductListViewModel.LoadProductsAsync] Failed to load products from API.");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„ظ…ظ†طھط¬ط§طھ", "ProductListViewModel.LoadProductsAsync", "[ProductListViewModel.LoadProductsAsync] Failed to load products from API.");
                 IsEmpty = Products.Count == 0;
             }
         }
@@ -196,7 +190,7 @@ public class ProductListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -251,11 +245,11 @@ public async Task DeleteProductAsync()
     {
         if (SelectedProduct == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"المنتج: {SelectedProduct.Name}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"ط§ظ„ظ…ظ†طھط¬: {SelectedProduct.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -267,11 +261,11 @@ public async Task DeleteProductAsync()
                 {
                     _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
                     await LoadProductsAsync();
-                    _toastService.ShowSuccess("تم إلغاء تنشيط المنتج بنجاح");
+                    _toastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظ…ظ†طھط¬ ط¨ظ†ط¬ط§ط­");
                 }
                 else
                 {
-                    var error = deleteResult.Error ?? "فشل في حذف المنتج";
+                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬";
                     ErrorMessage = error;
                     _toastService.ShowError(error);
                 }
@@ -283,11 +277,11 @@ public async Task DeleteProductAsync()
                 {
                     _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
                     await LoadProductsAsync();
-                    _toastService.ShowSuccess("تم حذف المنتج نهائياً");
+                    _toastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬ ظ†ظ‡ط§ط¦ظٹط§ظ‹");
                 }
                 else
                 {
-                    var error = deleteResult.Error ?? "فشل في حذف المنتج";
+                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬";
                     ErrorMessage = error;
                     _toastService.ShowError(error);
                     LogSystemError($"Hard delete failed for Product {SelectedProduct.Id}: {error}", "ProductListViewModel.DeleteProductAsync");
@@ -300,7 +294,7 @@ public async Task DeleteProductAsync()
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -308,7 +302,7 @@ public async Task DeleteProductAsync()
     {
         if (SelectedProduct == null) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -336,11 +330,11 @@ public async Task DeleteProductAsync()
             {
                 _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
                 await LoadProductsAsync();
-                await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة المنتج بنجاح");
+                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظ†طھط¬ ط¨ظ†ط¬ط§ط­");
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في استعادة المنتج";
+                ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظ†طھط¬";
             }
         }
         catch (Exception ex)
@@ -349,7 +343,7 @@ public async Task DeleteProductAsync()
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
 }
 
@@ -373,3 +367,7 @@ public async Task DeleteProductAsync()
     }
     #endregion
 }
+
+
+
+

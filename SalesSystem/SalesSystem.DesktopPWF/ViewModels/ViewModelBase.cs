@@ -1,4 +1,5 @@
 using SalesSystem.Contracts.Common;
+using SalesSystem.DesktopPWF.Services.App;
 using System.Collections;
 using System.ComponentModel;
 using System.Linq;
@@ -14,8 +15,26 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
 {
     private readonly Dictionary<string, List<string>> _errors = new();
 
+    private IDialogService? _dialogService;
+
+    /// <summary>
+    /// Gets the dialog service for showing user-facing messages.
+    /// Must be set via <see cref="SetDialogService"/> before use.
+    /// </summary>
+    protected IDialogService? DialogService => _dialogService;
+
+    /// <summary>
+    /// Sets the dialog service instance. Call this in derived ViewModel constructors
+    /// after assigning the injected _dialogService field.
+    /// </summary>
+    protected void SetDialogService(IDialogService dialogService)
+    {
+        _dialogService = dialogService;
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
+
     public event Action? CloseRequested;
 
     /// <summary>
@@ -100,6 +119,45 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
     protected void RequestFocusFirstInvalidField()
     {
         FocusFirstInvalidFieldRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// Standardized pre-save validation. Checks INotifyDataErrorInfo.HasErrors.
+    /// If errors exist, shows a validation warning dialog and returns false.
+    /// Override to add custom validation before calling base.
+    /// </summary>
+    protected virtual async Task<bool> ValidateAllAsync()
+    {
+        if (!HasErrors && _errors.Count == 0)
+            return true;
+
+        var errorList = _errors
+            .SelectMany(kvp => kvp.Value)
+            .Select(e => $"• {e}")
+            .ToList();
+
+        if (errorList.Count == 0)
+            return true;
+
+        if (_dialogService != null)
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errorList);
+        }
+
+        RequestFocusFirstInvalidField();
+        return false;
+    }
+
+    /// <summary>
+    /// Validates a single field and adds/clears error via INotifyDataErrorInfo.
+    /// Call this in property setters or in ValidateAllAsync override.
+    /// </summary>
+    protected void ValidateField(Func<bool> isValid, string propertyName, string errorMessage)
+    {
+        if (!isValid())
+            AddError(propertyName, errorMessage);
+        else
+            ClearErrors(propertyName);
     }
 
     /// <summary>

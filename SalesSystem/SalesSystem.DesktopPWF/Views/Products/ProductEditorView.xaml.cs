@@ -21,7 +21,8 @@ public partial class ProductEditorView : Window
         {
             Dispatcher.InvokeAsync(() =>
             {
-                ValidationFocusBehavior.FindFirstInvalid(this)?.Focus();
+                (ValidationFocusBehavior.FindFirstInvalid(this) ??
+                ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
             });
         };
     }

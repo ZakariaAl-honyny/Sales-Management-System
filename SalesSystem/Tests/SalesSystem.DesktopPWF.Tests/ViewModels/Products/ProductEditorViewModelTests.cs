@@ -126,7 +126,7 @@ public class ProductEditorViewModelTests : IDisposable
         viewModel.RetailPrice.Should().Be(0);
         viewModel.MinStock.Should().Be(0);
         viewModel.IsActive.Should().BeTrue();
-        viewModel.IsLoading.Should().BeFalse();
+        viewModel.IsBusy.Should().BeFalse();
         viewModel.Categories.Should().NotBeNull();
         viewModel.Units.Should().NotBeNull();
     }
@@ -228,7 +228,7 @@ public class ProductEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
         // Arrange
         var viewModel = new ProductEditorViewModel(
@@ -237,14 +237,9 @@ public class ProductEditorViewModelTests : IDisposable
             _mockUnitService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object);
-        var propertyChangedEvents = new List<string>();
-        viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        // Act
-        viewModel.IsLoading = true;
 
         // Assert
-        propertyChangedEvents.Should().Contain("IsLoading");
+        viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]

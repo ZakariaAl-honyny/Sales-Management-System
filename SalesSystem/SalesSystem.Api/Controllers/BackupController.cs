@@ -62,8 +62,15 @@ public class BackupController : ControllerBase
         if (string.IsNullOrWhiteSpace(fileName)) return BadRequest("اسم الملف مطلوب");
 
         // We assume files are in the default backup folder
-        var defaultFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
-        var filePath = Path.Combine(defaultFolder, fileName);
+        var defaultFolder = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups"));
+        var filePath = Path.GetFullPath(Path.Combine(defaultFolder, fileName));
+
+        // Path traversal guard — ensure resolved path is within allowed directory
+        if (!filePath.StartsWith(defaultFolder, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "مسار ملف غير صالح" });
+
+        if (!System.IO.File.Exists(filePath))
+            return NotFound(new { error = "ملف النسخة الاحتياطية غير موجود" });
 
         var result = await _backupService.RestoreBackupAsync(filePath, ct);
         return result.IsSuccess

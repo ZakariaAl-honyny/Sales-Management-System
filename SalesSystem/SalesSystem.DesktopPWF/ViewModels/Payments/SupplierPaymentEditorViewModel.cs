@@ -31,7 +31,6 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     private decimal _amount;
     private PaymentType _paymentType = PaymentType.Cash;
     private string _notes = string.Empty;
-    private bool _isLoading;
     private string _errorMessage = string.Empty;
 
     private ObservableCollection<SupplierDto> _suppliers = new();
@@ -52,8 +51,9 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         _paymentPrinter = App.GetService<IPaymentPrinter>();
         _settingsService = App.GetService<ISettingsApiService>();
         _dialogService = dialogService;
+        SetDialogService(dialogService);
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsLoading && !_isReadOnly);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ السداد...")));
         CancelCommand = new RelayCommand(OnCancel);
         PrintCommand = new AsyncRelayCommand(OnPrint, () => _paymentId.HasValue);
         SearchSupplierCommand = new RelayCommand(SearchSupplier, () => !_isReadOnly);
@@ -117,12 +117,6 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         set => SetProperty(ref _notes, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
-
     public string ErrorMessage
     {
         get => _errorMessage;
@@ -180,7 +174,7 @@ private async Task LoadPaymentAsync()
 
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             var result = await _paymentService.GetByIdAsync(_paymentId.Value);
             if (result.IsSuccess)
             {
@@ -202,9 +196,9 @@ private async Task LoadPaymentAsync()
             ErrorMessage = "حدث خطأ غير متوقع أثناء تحميل بيانات السداد";
             await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage);
         }
-finally
+        finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -213,7 +207,7 @@ finally
         RequestClose();
     }
 
-    private async Task SaveAsync()
+    private async Task SaveOperationAsync()
     {
         var errors = new List<string>();
         if (SelectedSupplierId == 0) errors.Add("• المورد مطلوب");
@@ -226,55 +220,42 @@ finally
             return;
         }
 
-        try
+        ErrorMessage = string.Empty;
+
+        Result<SupplierPaymentDto> result;
+
+        if (_paymentId.HasValue)
         {
-            IsLoading = true;
-            ErrorMessage = string.Empty;
-
-            Result<SupplierPaymentDto> result;
-
-            if (_paymentId.HasValue)
-            {
-                var request = new UpdateSupplierPaymentRequest(
-                    SupplierId: SelectedSupplierId,
-                    Amount: Amount,
-                    PaymentMethod: PaymentType,
-                    PaymentDate: PaymentDate,
-                    PurchaseInvoiceId: null,
-                    Notes: Notes);
-                result = await _paymentService.UpdateAsync(_paymentId.Value, request);
-            }
-            else
-            {
-                var request = new CreateSupplierPaymentRequest(
-                    SupplierId: SelectedSupplierId,
-                    Amount: Amount,
-                    PaymentMethod: PaymentType,
-                    PaymentDate: PaymentDate,
-                    PurchaseInvoiceId: null,
-                    Notes: Notes);
-                result = await _paymentService.CreateAsync(request);
-            }
-
-            if (result.IsSuccess)
-            {
-                _eventBus.Publish(new SupplierPaymentChangedMessage(result.Value!.Id));
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
-                await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
-            }
+            var request = new UpdateSupplierPaymentRequest(
+                SupplierId: SelectedSupplierId,
+                Amount: Amount,
+                PaymentMethod: PaymentType,
+                PaymentDate: PaymentDate,
+                PurchaseInvoiceId: null,
+                Notes: Notes);
+            result = await _paymentService.UpdateAsync(_paymentId.Value, request);
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
+            var request = new CreateSupplierPaymentRequest(
+                SupplierId: SelectedSupplierId,
+                Amount: Amount,
+                PaymentMethod: PaymentType,
+                PaymentDate: PaymentDate,
+                PurchaseInvoiceId: null,
+                Notes: Notes);
+            result = await _paymentService.CreateAsync(request);
+        }
+
+        if (result.IsSuccess)
+        {
+            _eventBus.Publish(new SupplierPaymentChangedMessage(result.Value!.Id));
+            RequestClose();
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
             await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
-        }
-        finally
-        {
-            IsLoading = false;
         }
     }
 
@@ -287,7 +268,7 @@ finally
     {
         if (!_paymentId.HasValue) return;
 
-        IsLoading = true;
+        IsBusy = true;
         try
         {
             var settingsResult = await _settingsService.GetSettingsAsync();
@@ -305,7 +286,7 @@ finally
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 }

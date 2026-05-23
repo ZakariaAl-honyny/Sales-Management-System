@@ -37,6 +37,7 @@ public class WarehouseEditorViewModel : ViewModelBase
         _warehouseService = warehouseService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        SetDialogService(dialogService);
 
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, ex => ShowSaveError(ex))));
         CancelCommand = new RelayCommand(Cancel);
@@ -65,7 +66,16 @@ public class WarehouseEditorViewModel : ViewModelBase
     public string Name
     {
         get => _name;
-        set => SetProperty(ref _name, value);
+        set
+        {
+            if (SetProperty(ref _name, value))
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Name), "اسم المستودع مطلوب");
+                else
+                    ClearErrors(nameof(Name));
+            }
+        }
     }
 
     public string Location
@@ -121,7 +131,7 @@ public class WarehouseEditorViewModel : ViewModelBase
     private void ShowSaveError(Exception ex)
     {
         ErrorMessage = HandleException(ex, "WarehouseEditorViewModel.SaveAsync", "[WarehouseEditorViewModel.SaveAsync] Failed to save warehouse.");
-        _ = _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
+        _ = _dialogService.ShowErrorAsync("خطأ في حفظ المستودع", ErrorMessage!);
     }
 
     private async Task SaveOperationAsync()
@@ -171,7 +181,7 @@ public class WarehouseEditorViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المستودع", "WarehouseEditorViewModel.SaveAsync", "[WarehouseEditorViewModel.SaveAsync] Failed to save warehouse.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
+            await _dialogService.ShowErrorAsync("خطأ في حفظ المستودع", ErrorMessage!);
         }
     }
 

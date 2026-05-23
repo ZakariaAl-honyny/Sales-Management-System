@@ -262,10 +262,10 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((StoreSettings?)null);
+            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
         _printDataServiceMock
             .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<SystemSetting>());
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
@@ -280,10 +280,10 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((StoreSettings?)null);
+            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
         _printDataServiceMock
             .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<SystemSetting>());
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("A4 error"));
@@ -301,10 +301,10 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((StoreSettings?)null);
+            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
         _printDataServiceMock
             .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<SystemSetting>());
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("A4 error"));
@@ -325,10 +325,10 @@ public class PrintControllerTests
         var settings = StoreSettings.Create("متجر الاختبار", phone: "0111111111", address: "الرياض");
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(settings);
+            .ReturnsAsync(Result<StoreSettings>.Success(settings));
         _printDataServiceMock
             .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<SystemSetting>());
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
 
         InvoicePrintDto? captured = null;
         _printServiceMock
@@ -349,10 +349,10 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync((StoreSettings?)null);
+            .ReturnsAsync(Result<StoreSettings>.Failure("No settings"));
         _printDataServiceMock
             .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<SystemSetting>());
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
 
         InvoicePrintDto? captured = null;
         _printServiceMock
@@ -384,10 +384,10 @@ public class PrintControllerTests
 
             _printDataServiceMock
                 .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(StoreSettings.Create("متجري"));
+                .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
             _printDataServiceMock
                 .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(sysSettings);
+                .ReturnsAsync(Result<List<SystemSetting>>.Success(sysSettings));
 
             InvoicePrintDto? captured = null;
             _printServiceMock
@@ -413,10 +413,10 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(StoreSettings.Create("متجري"));
+            .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
         _printDataServiceMock
             .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<SystemSetting>());
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
 
         InvoicePrintDto? captured = null;
         _printServiceMock
@@ -441,10 +441,10 @@ public class PrintControllerTests
 
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(StoreSettings.Create("متجري"));
+            .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
         _printDataServiceMock
             .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(sysSettings);
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(sysSettings));
 
         InvoicePrintDto? captured = null;
         _printServiceMock

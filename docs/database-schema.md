@@ -1,5 +1,5 @@
 # Database Schema Design
-# Sales Management System — v4.5.3 (Identifier Strategy Complete — No Code Columns)
+# Sales Management System — v4.6.2 (WPF Validation ErrorTemplate & INotifyDataErrorInfo)
 # Platform: SQL Server 2019+
 # 30+ Tables | decimal-only financials | nvarchar text | Soft delete
 

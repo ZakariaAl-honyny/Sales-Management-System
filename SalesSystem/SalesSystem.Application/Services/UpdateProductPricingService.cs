@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
@@ -30,10 +29,8 @@ public class UpdateProductPricingService : IUpdateProductPricingService
         UpdatePricingRequest request,
         CancellationToken ct = default)
     {
-        var purchasedUnit = await _uow.ProductUnits.Query()
-            .Include(u => u.Product)
-                .ThenInclude(p => p.Units)
-            .FirstOrDefaultAsync(u => u.Id == request.ProductUnitId, ct);
+        var purchasedUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
+            u => u.Id == request.ProductUnitId, ct, "Product.Units");
         
         if (purchasedUnit == null)
             return Result.Failure("وحدة المنتج غير موجودة", "PRODUCT_UNIT_NOT_FOUND");
@@ -134,10 +131,9 @@ public class UpdateProductPricingService : IUpdateProductPricingService
         decimal newQuantityInBaseUnits,
         CancellationToken ct)
     {
-        var currentStock = await _uow.WarehouseStocks.Query()
-            .Where(s => s.ProductId == baseUnit.ProductId)
-            .Select(s => s.Quantity)
-            .FirstOrDefaultAsync(ct);
+        var stockRecord = await _uow.WarehouseStocks.FirstOrDefaultAsync(
+            s => s.ProductId == baseUnit.ProductId, ct);
+        var currentStock = stockRecord?.Quantity ?? 0m;
 
         var oldCost = baseUnit.PurchaseCost;
 

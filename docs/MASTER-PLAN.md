@@ -1782,7 +1782,7 @@ CRITICAL RULES — NEVER VIOLATE:
 ✅ All user-facing errors in Arabic with actionable guidance
 ✅ Price history logged for EVERY cost change (audit trail)
 
-# MASTER-PLAN — Sales Management System (v4.6 Audit & Polish)
+# MASTER-PLAN — Sales Management System (v4.6.2 — Validation ErrorTemplate & INotifyDataErrorInfo)
 
 ## 📋 Core Philosophy
 
@@ -2465,10 +2465,42 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 
 ---
 
+## ✅ Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2)
+
+**Goal**: Standardize validation UI with red border + ❗ icon ErrorTemplate, replace `HasXxxError` boolean pattern with `INotifyDataErrorInfo`, and add `ValidateAllAsync()` to ViewModelBase.
+
+### Key Changes
+- **New ErrorTemplate**: Red border (#EF4444, 1.5px) + ❗ icon badge with ToolTip — applies to TextBox, PasswordBox, ComboBox when `Validation.HasError = true`
+- **ViewModelBase.cs**: Added `SetDialogService(IDialogService)`, `ValidateAllAsync()`, `ValidateField()`
+- **14 Editor VMs**: All call `SetDialogService()` in constructors
+- **ProductEditorViewModel**: Removed 7 `HasXxxError` booleans — real-time `AddError`/`ClearErrors`
+- **CustomerEditorViewModel**: Removed 3 `HasXxxError` booleans — real-time `AddError`/`ClearErrors`
+
+### New Rules (AGENTS.md)
+| Rule | Description |
+|------|-------------|
+| RULE-227 | `SetDialogService()` in every Editor VM constructor |
+| RULE-228 | Use `INotifyDataErrorInfo` (`AddError/ClearErrors`) — no `HasXxxError` booleans |
+| RULE-229 | Pre-save validation: `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()` |
+| RULE-230 | ErrorTemplate: red border + ❗ icon with ToolTip bound to `[0].ErrorContent` |
+
+### File Impact
+| Layer | Files |
+|-------|-------|
+| UI (XAML) | `Resources/Styles.xaml` — new ErrorTemplate + HasError triggers |
+| ViewModels | `ViewModelBase.cs` — SetDialogService, ValidateAllAsync, ValidateField |
+| Editor VMs | 14 files — SetDialogService() in constructors |
+| Refactored VMs | ProductEditor, CustomerEditor — removed HasXxxError pattern |
+| Documentation | AGENTS.md, README.md, 5 subagent files, CHANGELOG.md, MASTER-PLAN.md, CONSTITUTION.md |
+
+---
+
 ## 📝 Version History
 
 | Version | Date | Description |
 |---------|------|-------------|
+| v4.6.2 | 2026-05-23 | WPF Validation ErrorTemplate — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated |
+| v4.6.1 | 2026-05-23 | UI Sorting & Dialog Safety — Newest-first sorting, DatabaseErrorDialog self-owner fix, comprehensive audit |
 | v4.6 | 2026-05-22 | Audit & Polish — LogSystemError centralized, Dialog overlay, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes |
 | v4.5.3 | 2026-05-22 | Identifier Strategy Complete — Code removal (Product, Customer, Supplier, Warehouse) — all entities use auto-increment Id |
 | v4.5.2 | 2026-05-22 | Identifier Strategy — Code removal (Product/Customer/Supplier) |

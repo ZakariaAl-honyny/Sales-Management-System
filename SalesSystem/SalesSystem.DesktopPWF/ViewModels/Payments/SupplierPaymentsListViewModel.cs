@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
@@ -33,7 +33,6 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
-    private bool _isLoading;
     private string _errorMessage = string.Empty;
     private bool _isEmpty;
     private SupplierPaymentDto? _selectedPayment;
@@ -69,11 +68,6 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         set => SetProperty(ref _dateTo, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string ErrorMessage
     {
@@ -123,7 +117,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     {
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             ErrorMessage = string.Empty;
 
             var result = await PaymentService.GetAllAsync(SearchText, DateFrom, DateTo);
@@ -133,7 +127,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Payments.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Payments.Add(item);
                     }
@@ -144,7 +138,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = result.Error ?? "حدث خطأ غير معروف";
+                ErrorMessage = result.Error ?? "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…ط¹ط±ظˆظپ";
                 IsEmpty = Payments.Count == 0;
             }
         }
@@ -154,7 +148,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -169,7 +163,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         var vm = App.GetService<SupplierPaymentEditorViewModel>();
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "سداد مورد جديد",
+            Title = "ط³ط¯ط§ط¯ ظ…ظˆط±ط¯ ط¬ط¯ظٹط¯",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
@@ -183,7 +177,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         var vm = new SupplierPaymentEditorViewModel(SelectedPayment.Id, isReadOnly: true);
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "عرض سداد مورد"
+            Title = "ط¹ط±ط¶ ط³ط¯ط§ط¯ ظ…ظˆط±ط¯"
         });
     }
 
@@ -193,7 +187,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         var vm = new SupplierPaymentEditorViewModel(SelectedPayment.Id);
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "تعديل سداد مورد",
+            Title = "طھط¹ط¯ظٹظ„ ط³ط¯ط§ط¯ ظ…ظˆط±ط¯",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
@@ -205,13 +199,13 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
 
-        var result = await DialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
+        var result = await DialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ظ„ط­ط°ظپ", "ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† ط­ط°ظپ ظ‡ط°ط§ ط§ظ„ط³ط¯ط§ط¯طں");
 
         if (!result) return;
 
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             var deleteResult = await PaymentService.DeleteAsync(SelectedPayment.Id);
 
             if (deleteResult.IsSuccess)
@@ -220,19 +214,19 @@ public class SupplierPaymentsListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = deleteResult.Error ?? "فشل في حذف السداد";
-                await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
+                ErrorMessage = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ط³ط¯ط§ط¯";
+                await DialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط­ط°ظپ", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
             LogSystemError($"Failed to delete supplier payment {SelectedPayment?.Id}", "SupplierPaymentsListViewModel.OnDelete", ex);
-            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
-            await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
+            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ظ„ط­ط°ظپ";
+            await DialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط­ط°ظپ", ErrorMessage);
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -240,7 +234,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
 
-        IsLoading = true;
+        IsBusy = true;
         try
         {
             var settingsResult = await SettingsService.GetSettingsAsync();
@@ -251,11 +245,15 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         catch (Exception ex)
         {
             LogSystemError($"Failed to print supplier payment {SelectedPayment?.Id}", "SupplierPaymentsListViewModel.OnPrint", ex);
-            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
+            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ظ„ط·ط¨ط§ط¹ط©";
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 }
+
+
+
+

@@ -162,3 +162,10 @@ Verify no sensitive data in logs.
 - Check that Settings GET endpoints are restricted to AdminOnly (not accessible by Cashier)
 - Check that LogsController has input size validation
 - Check that CORS is configured if running outside desktop-only mode
+
+### Known Security Gaps (v4.6.1 Audit)
+1. **🔴 Hard Delete for Users exists** at `UsersController.cs:113-123` and `UserService.cs:149-181` — violates RULE-038. Users MUST be soft-deleted only.
+2. **🔴 Hardcoded connection strings** in `appsettings.Development.json:9` and `SalesDbContextFactory.cs:17-18` — use environment variable `SALESSYSTEM_DB_CONNECTION` exclusively.
+3. **🟡 SettingsController** has class-level `[Authorize]` without policy — any authenticated user (including Cashier) could access if a new action is added without explicit policy.
+4. **🟡 Health endpoints** `/api/v1/health` and `/api/v1/health/database` are public and inject `SalesDbContext` — violates clean architecture data flow.
+5. **🟡 JWT secret** falls back to hardcoded string in Development mode at `Program.cs:72`.

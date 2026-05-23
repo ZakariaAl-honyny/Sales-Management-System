@@ -2,9 +2,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
+using SalesSystem.Contracts.Common;
+using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/v1/print")]
 public class PrintController : ControllerBase
@@ -79,6 +82,12 @@ public class PrintController : ControllerBase
         if (!result.IsSuccess)
             return NotFound(new { error = result.Error });
 
+        // Validate file path is in allowed directory
+        var allowedBase = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Exports"));
+        var resolvedPath = Path.GetFullPath(request.FilePath);
+        if (!resolvedPath.StartsWith(allowedBase, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "مسار الحفظ غير صالح. يرجى استخدام مجلد التصدير" });
+
         var saveResult = await _printService.SavePdfAsync(result.Value!, request.FilePath);
         return saveResult.IsSuccess ? Ok(saveResult) : BadRequest(saveResult);
     }
@@ -138,6 +147,12 @@ public class PrintController : ControllerBase
         var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
         if (!result.IsSuccess)
             return NotFound(new { error = result.Error });
+
+        // Validate file path is in allowed directory
+        var allowedBase = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Exports"));
+        var resolvedPath = Path.GetFullPath(request.FilePath);
+        if (!resolvedPath.StartsWith(allowedBase, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "مسار الحفظ غير صالح. يرجى استخدام مجلد التصدير" });
 
         var saveResult = await _printService.SavePdfAsync(result.Value!, request.FilePath);
         return saveResult.IsSuccess ? Ok(saveResult) : BadRequest(saveResult);
@@ -205,8 +220,11 @@ public class PrintController : ControllerBase
         // For the test page, load store info directly since we need it without an invoice.
         // This is the ONLY place that still directly accesses store data.
         // The PrintDataService handles store info for all invoice-based endpoints.
-        var settings = await _printDataService.GetStoreSettingsAsync(ct);
-        var sysSettings = await _printDataService.GetPrintSystemSettingsAsync(ct);
+        var settingsResult = await _printDataService.GetStoreSettingsAsync(ct);
+        var sysSettingsResult = await _printDataService.GetPrintSystemSettingsAsync(ct);
+
+        var settings = settingsResult.IsSuccess ? settingsResult.Value : null;
+        var sysSettings = sysSettingsResult.IsSuccess ? sysSettingsResult.Value : new List<SystemSetting>();
 
         var storeName = settings?.StoreName ?? "متجري";
         var storePhone = settings?.Phone ?? string.Empty;

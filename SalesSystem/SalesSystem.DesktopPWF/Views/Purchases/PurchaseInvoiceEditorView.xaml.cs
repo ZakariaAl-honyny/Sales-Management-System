@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.ViewModels.Purchases;
 
@@ -18,11 +18,13 @@ public partial class PurchaseInvoiceEditorView : Window
     {
         DataContext = viewModel;
 
+        viewModel.CloseRequested += () => Dispatcher.InvokeAsync(() => Close());
         viewModel.FocusFirstInvalidFieldRequested += () =>
         {
             Dispatcher.InvokeAsync(() =>
             {
-                Helpers.ValidationFocusBehavior.FindFirstInvalid(this)?.Focus();
+                (Helpers.ValidationFocusBehavior.FindFirstInvalid(this) ??
+                Helpers.ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
             });
         };
     }
@@ -47,3 +49,4 @@ public partial class PurchaseInvoiceEditorView : Window
         base.OnPreviewKeyDown(e);
     }
 }
+

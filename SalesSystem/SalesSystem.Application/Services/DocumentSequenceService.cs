@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -27,8 +26,8 @@ public class DocumentSequenceService : IDocumentSequenceService
             var year = DateTime.Now.Year;
 
             // Try to find an existing sequence for this prefix and year
-            var sequence = await _uow.DocumentSequences.Query()
-                .FirstOrDefaultAsync(s => s.Prefix == prefix && s.Year == year, ct);
+            var sequence = await _uow.DocumentSequences.FirstOrDefaultAsync(
+                s => s.Prefix == prefix && s.Year == year, ct);
 
             if (sequence == null)
             {

@@ -40,7 +40,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <ComboBox ItemsSource="{Binding Customers}"
-                                      SelectedValue="{Binding SelectedCustomerId}"
+                                      SelectedValue="{Binding SelectedCustomerId, ValidatesOnDataErrors=True}"
                                       SelectedValuePath="Id"
                                       DisplayMemberPath="Name"
                                       Style="{StaticResource ModernComboBox}"
@@ -70,7 +70,7 @@
 
                         <!-- Amount -->
                         <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
+                        <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
                                  Style="{StaticResource ModernTextBox}"
                                  Tag="أدخل المبلغ المستلم"
                                  IsReadOnly="{Binding IsReadOnly}"
@@ -86,7 +86,7 @@
                         <!-- Payment Type -->
                         <TextBlock Text="طريقة الدفع" Style="{StaticResource LabelStyle}"/>
                         <ComboBox ItemsSource="{Binding PaymentTypeOptions}"
-                                  SelectedValue="{Binding PaymentType}"
+                                  SelectedValue="{Binding PaymentType, ValidatesOnDataErrors=True}"
                                   SelectedValuePath="Value"
                                   DisplayMemberPath="Display"
                                   Style="{StaticResource ModernComboBox}"
@@ -98,7 +98,7 @@
 
                         <!-- Notes -->
                         <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                  Style="{StaticResource ModernTextBox}"
                                  Height="80"
                                  TextWrapping="Wrap"

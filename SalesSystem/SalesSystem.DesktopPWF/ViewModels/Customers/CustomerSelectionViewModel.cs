@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -17,7 +17,6 @@ public class CustomerSelectionViewModel : ViewModelBase
     private ICollectionView? _customersView;
     private CustomerDto? _selectedCustomer;
     private string _searchText = string.Empty;
-    private bool _isLoading;
 
     public CustomerSelectionViewModel()
     {
@@ -67,11 +66,6 @@ public class CustomerSelectionViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public ICommand SelectCommand { get; }
     public ICommand CancelCommand { get; }
@@ -80,7 +74,7 @@ public class CustomerSelectionViewModel : ViewModelBase
 
     private async Task LoadCustomersAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         try
         {
             var result = await _customerService.GetAllAsync();
@@ -104,7 +98,7 @@ public class CustomerSelectionViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -133,3 +127,7 @@ public class CustomerSelectionViewModel : ViewModelBase
         RequestClose();
     }
 }
+
+
+
+

@@ -27,7 +27,6 @@ public class CustomerEditorViewModel : ViewModelBase
     private decimal _openingBalance;
     private string _notes = string.Empty;
     private bool _isActive = true;
-    private bool _isLoading;
     private bool _isEditMode;
     private string? _errorMessage;
 
@@ -42,8 +41,9 @@ public class CustomerEditorViewModel : ViewModelBase
         _customerService = customerService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        SetDialogService(dialogService);
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ العميل...")));
         CancelCommand = new RelayCommand(Cancel);
     }
 
@@ -79,7 +79,16 @@ public class CustomerEditorViewModel : ViewModelBase
     public string Name
     {
         get => _name;
-        set => SetProperty(ref _name, value);
+        set
+        {
+            if (SetProperty(ref _name, value))
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Name), "اسم العميل مطلوب");
+                else
+                    ClearErrors(nameof(Name));
+            }
+        }
     }
 
     public string Phone
@@ -109,13 +118,31 @@ public class CustomerEditorViewModel : ViewModelBase
     public decimal CreditLimit
     {
         get => _creditLimit;
-        set => SetProperty(ref _creditLimit, value);
+        set
+        {
+            if (SetProperty(ref _creditLimit, value))
+            {
+                if (value < 0)
+                    AddError(nameof(CreditLimit), "الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر");
+                else
+                    ClearErrors(nameof(CreditLimit));
+            }
+        }
     }
 
     public decimal OpeningBalance
     {
         get => _openingBalance;
-        set => SetProperty(ref _openingBalance, value);
+        set
+        {
+            if (SetProperty(ref _openingBalance, value))
+            {
+                if (value < 0)
+                    AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
+                else
+                    ClearErrors(nameof(OpeningBalance));
+            }
+        }
     }
 
     public string Notes
@@ -130,57 +157,12 @@ public class CustomerEditorViewModel : ViewModelBase
         set => SetProperty(ref _isActive, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
-
     public string? ErrorMessage
     {
         get => _errorMessage;
         set => SetProperty(ref _errorMessage, value);
     }
 
-    // Validation
-    private bool _hasNameError;
-    public bool HasNameError
-    {
-        get => _hasNameError;
-        set
-        {
-            if (SetProperty(ref _hasNameError, value))
-                OnPropertyChanged(nameof(NameError));
-        }
-    }
-
-    public string? NameError => HasNameError ? "الاسم مطلوب" : null;
-
-    private bool _hasCreditLimitError;
-    public bool HasCreditLimitError
-    {
-        get => _hasCreditLimitError;
-        set
-        {
-            if (SetProperty(ref _hasCreditLimitError, value))
-                OnPropertyChanged(nameof(CreditLimitError));
-        }
-    }
-
-    public string? CreditLimitError => HasCreditLimitError ? "الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر" : null;
-
-    private bool _hasOpeningBalanceError;
-    public bool HasOpeningBalanceError
-    {
-        get => _hasOpeningBalanceError;
-        set
-        {
-            if (SetProperty(ref _hasOpeningBalanceError, value))
-                OnPropertyChanged(nameof(OpeningBalanceError));
-        }
-    }
-
-    public string? OpeningBalanceError => HasOpeningBalanceError ? "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر" : null;
     #endregion
 
     #region Commands
@@ -189,86 +171,68 @@ public class CustomerEditorViewModel : ViewModelBase
     #endregion
 
     #region Methods
-    private bool Validate()
+    private async Task<bool> ValidateAsync()
     {
-        HasNameError = string.IsNullOrWhiteSpace(Name);
-        HasCreditLimitError = CreditLimit < 0;
-        HasOpeningBalanceError = OpeningBalance < 0;
+        ClearAllErrors();
 
-        return !HasNameError && !HasCreditLimitError && !HasOpeningBalanceError;
+        if (string.IsNullOrWhiteSpace(Name))
+            AddError(nameof(Name), "اسم العميل مطلوب");
+        if (CreditLimit < 0)
+            AddError(nameof(CreditLimit), "الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر");
+        if (OpeningBalance < 0)
+            AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
+
+        return await ValidateAllAsync();
     }
 
-    private async Task SaveAsync()
+    private async Task SaveOperationAsync()
     {
-        if (!Validate())
-        {
-            var errors = new List<string>();
-            if (HasNameError) errors.Add("• " + NameError);
-            if (HasCreditLimitError) errors.Add("• " + CreditLimitError);
-            if (HasOpeningBalanceError) errors.Add("• " + OpeningBalanceError);
-            
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-            RequestFocusFirstInvalidField();
-            return;
-        }
+        if (!await ValidateAsync()) return;
 
-        IsLoading = true;
         ErrorMessage = null;
 
-        try
+        Result<CustomerDto> result;
+
+        if (IsEditMode)
         {
-            Result<CustomerDto> result;
+            var updateRequest = new UpdateCustomerRequest(
+                Name,
+                string.IsNullOrWhiteSpace(Phone) ? null : Phone,
+                string.IsNullOrWhiteSpace(Email) ? null : Email,
+                string.IsNullOrWhiteSpace(Address) ? null : Address,
+                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
+                CreditLimit,
+                IsActive);
 
-            if (IsEditMode)
-            {
-                var updateRequest = new UpdateCustomerRequest(
-                    Name,
-                    string.IsNullOrWhiteSpace(Phone) ? null : Phone,
-                    string.IsNullOrWhiteSpace(Email) ? null : Email,
-                    string.IsNullOrWhiteSpace(Address) ? null : Address,
-                    string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                    CreditLimit,
-                    IsActive);
-
-                result = await _customerService.UpdateAsync(_customerId, updateRequest);
-            }
-            else
-            {
-                var createRequest = new CreateCustomerRequest(
-                    Name,
-                    string.IsNullOrWhiteSpace(Phone) ? null : Phone,
-                    string.IsNullOrWhiteSpace(Email) ? null : Email,
-                    string.IsNullOrWhiteSpace(Address) ? null : Address,
-                    string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                    OpeningBalance,
-                    CreditLimit);
-
-                result = await _customerService.CreateAsync(createRequest);
-            }
-
-            if (result.IsSuccess && result.Value != null)
-            {
-                // Publish event to notify other modules
-                _eventBus.Publish(new CustomerChangedMessage(result.Value.Id));
-
-                await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث العميل بنجاح" : "تم إضافة العميل بنجاح");
-
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ العميل", "CustomerEditorViewModel.SaveAsync", "[CustomerEditorViewModel.SaveAsync] Failed to save customer.");
-                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
-            }
+            result = await _customerService.UpdateAsync(_customerId, updateRequest);
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "CustomerEditorViewModel.SaveAsync", "[CustomerEditorViewModel.SaveAsync] Failed to save customer.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
+            var createRequest = new CreateCustomerRequest(
+                Name,
+                string.IsNullOrWhiteSpace(Phone) ? null : Phone,
+                string.IsNullOrWhiteSpace(Email) ? null : Email,
+                string.IsNullOrWhiteSpace(Address) ? null : Address,
+                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
+                OpeningBalance,
+                CreditLimit);
+
+            result = await _customerService.CreateAsync(createRequest);
         }
-        finally
+
+        if (result.IsSuccess && result.Value != null)
         {
-            IsLoading = false;
+            // Publish event to notify other modules
+            _eventBus.Publish(new CustomerChangedMessage(result.Value.Id));
+
+            await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث العميل بنجاح" : "تم إضافة العميل بنجاح");
+
+            RequestClose();
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ العميل", "CustomerEditorViewModel.SaveAsync", "[CustomerEditorViewModel.SaveAsync] Failed to save customer.");
+            await _dialogService.ShowErrorAsync("خطأ في حفظ العميل", ErrorMessage!);
         }
     }
 

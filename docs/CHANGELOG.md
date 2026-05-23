@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-05-23
+### Added
+- **v4.6.2 — WPF Validation ErrorTemplate & INotifyDataErrorInfo Standardization**:
+  - New `ErrorTemplate` in `Styles.xaml`: Red border (#EF4444, 1.5px) + ❗ icon badge with ToolTip bound to `[0].ErrorContent` — applies to TextBox, PasswordBox, ComboBox.
+  - `ViewModelBase.cs`: Added `SetDialogService(IDialogService)`, `ValidateAllAsync()`, and `ValidateField()` — standardized pre-save validation dialog + focus.
+  - `ProductEditorViewModel`: Migrated from legacy `HasXxxError` boolean + computed string pattern to pure `INotifyDataErrorInfo` using `AddError()`/`ClearErrors()` in property setters — removed 7 obsolete properties.
+  - `CustomerEditorViewModel`: Same migration — removed 3 obsolete `HasXxxError` boolean properties.
+  - All 14 Editor ViewModels now call `SetDialogService()` in constructors to enable `ValidateAllAsync()`.
+  - `AGENTS.md`: Added RULE-227 to RULE-230 covering `SetDialogService()`, `INotifyDataErrorInfo`, `ValidateAllAsync()`, and `ErrorTemplate`.
+
+### Changed
+- **Validation model**: Replaced `HasXxxError` / `XxxError` boolean + computed string pattern with `INotifyDataErrorInfo` (`AddError`/`ClearErrors`) — real-time validation UI updates with red border on invalid fields.
+- **Pre-save validation**: `ValidateAsync()` now calls `ClearAllErrors()` → `AddError()` for each field → `await ValidateAllAsync()` from ViewModelBase — shows styled validation dialog automatically.
+
+### Files Modified
+- `Resources/Styles.xaml`, `ViewModels/ViewModelBase.cs`, `ViewModels/Products/ProductEditorViewModel.cs`, `ViewModels/Customers/CustomerEditorViewModel.cs`, `ViewModels/Suppliers/SupplierEditorViewModel.cs`, `ViewModels/Categories/CategoryEditorViewModel.cs`, `ViewModels/Units/UnitEditorViewModel.cs`, `ViewModels/WarehouseEditorViewModel.cs`, `ViewModels/Users/UserEditorViewModel.cs`, `ViewModels/Payments/CustomerPaymentEditorViewModel.cs`, `ViewModels/Payments/SupplierPaymentEditorViewModel.cs`, `ViewModels/Transfers/StockTransferEditorViewModel.cs`, `ViewModels/Returns/SalesReturnEditorViewModel.cs`, `ViewModels/Returns/PurchaseReturnEditorViewModel.cs`, `ViewModels/Sales/SalesInvoiceEditorViewModel.cs`, `ViewModels/Purchases/PurchaseInvoiceEditorViewModel.cs`, `AGENTS.md`, `.opencode/agent/code-reviewer.md`, `.opencode/agent/ui-agent.md`, `.opencode/agent/implement-agent.md`, `.opencode/agent/orchestrator.md`, `.opencode/agent/test-engineer.md`, `README.md`, `docs/database-schema.md`, `docs/CHANGELOG.md`, `docs/MASTER-PLAN.md`, `docs/CONSTITUTION.md`
+
 ## [1.8.0] - 2026-05-23
 ### Added
 - **UpdateProductPricingService Returns Result<T>**: Changed from `Task` + throwing exceptions to `Task<Result>` — returns `Result.Failure` with Arabic messages for "unit not found" and "no base unit" instead of `InvalidOperationException`.

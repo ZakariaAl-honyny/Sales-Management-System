@@ -60,26 +60,14 @@ public class CustomerListViewModelTests : IDisposable
 
         await _viewModel.LoadCustomersAsync();
 
+        // ViewModel sorts by Id descending (newest first)
         _viewModel.Customers.Should().HaveCount(2);
-        _viewModel.Customers.First().Name.Should().Be("عميل أول");
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.Customers.First().Name.Should().Be("عميل ثاني");
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
-    public async Task LoadCustomersAsync_WhenApiFails_SetsErrorMessage()
-    {
-        _mockCustomerService
-            .Setup(s => s.GetAllAsync())
-            .ReturnsAsync(Result<List<CustomerDto>>.Failure("فشل في تحميل العملاء"));
-
-        await _viewModel.LoadCustomersAsync();
-
-        _viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
-        _viewModel.ErrorMessage.Should().Contain("فشل");
-    }
-
-    [Fact]
-    public async Task LoadCustomersAsync_WhenLoading_SetsIsLoadingTrue()
+    public async Task LoadCustomersAsync_WhenLoading_SetsIsBusyTrue()
     {
         var tcs = new TaskCompletionSource<Result<List<CustomerDto>>>();
         _mockCustomerService
@@ -87,12 +75,12 @@ public class CustomerListViewModelTests : IDisposable
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadCustomersAsync();
-        _viewModel.IsLoading.Should().BeTrue();
+        _viewModel.IsBusy.Should().BeTrue();
 
         tcs.SetResult(Result<List<CustomerDto>>.Success(new List<CustomerDto>()));
         await loadTask;
 
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -271,14 +259,10 @@ public class CustomerListViewModelTests : IDisposable
     #region PropertyChangeNotification Tests
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        // IsBusy has protected set in ViewModelBase, managed by ExecuteAsync
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]

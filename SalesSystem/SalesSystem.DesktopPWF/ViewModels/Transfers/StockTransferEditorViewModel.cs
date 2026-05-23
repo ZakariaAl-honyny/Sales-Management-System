@@ -36,7 +36,6 @@ public class StockTransferEditorViewModel : ViewModelBase
     private int _toWarehouseId;
     private DateTime _transferDate = DateTime.Today;
     private string _notes = string.Empty;
-    private bool _isLoading;
     private string _errorMessage = string.Empty;
     private string _quickSearchText = string.Empty;
     private InvoiceStatus _status = InvoiceStatus.Draft;
@@ -66,6 +65,7 @@ public class StockTransferEditorViewModel : ViewModelBase
         _productService = productService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        SetDialogService(dialogService);
         _soundService = soundService;
         _inventoryService = inventoryService;
         _barcodeService = barcodeService;
@@ -135,12 +135,6 @@ public class StockTransferEditorViewModel : ViewModelBase
     {
         get => _notes;
         set => SetProperty(ref _notes, value);
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
     }
 
     public string QuickSearchText
@@ -243,9 +237,9 @@ public class StockTransferEditorViewModel : ViewModelBase
     {
         if (!_transferId.HasValue) return;
 
-        try
+        await ExecuteAsync(async () =>
         {
-            IsLoading = true;
+            ErrorMessage = string.Empty;
             var result = await _transferService.GetByIdAsync(_transferId.Value);
             if (result.IsSuccess)
             {
@@ -273,15 +267,7 @@ public class StockTransferEditorViewModel : ViewModelBase
             {
                 ErrorMessage = result.Error ?? "حدث خطأ غير معروف";
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.LoadTransferAsync", $"[StockTransferEditorViewModel.LoadTransferAsync] Failed to load transfer data for ID: {_transferId}");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private void OnAddItem()
@@ -540,9 +526,8 @@ public class StockTransferEditorViewModel : ViewModelBase
             return;
         }
 
-        try
+        await ExecuteAsync(async () =>
         {
-            IsLoading = true;
             ErrorMessage = string.Empty;
 
             var items = Items.Select(i => new CreateStockTransferItemRequest(
@@ -591,16 +576,7 @@ public class StockTransferEditorViewModel : ViewModelBase
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "StockTransferEditorViewModel.SaveAsync", "[StockTransferEditorViewModel.SaveAsync] Failed to save stock transfer.");
                 await _dialogService.ShowErrorAsync("خطأ في حفظ التحويل", ErrorMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.SaveAsync", "[StockTransferEditorViewModel.SaveAsync] Failed to save stock transfer.");
-            await _dialogService.ShowErrorAsync("خطأ في حفظ التحويل", ErrorMessage);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private void OnCancel()
@@ -612,11 +588,9 @@ public class StockTransferEditorViewModel : ViewModelBase
     {
         if (!_transferId.HasValue) return;
 
-        try
+        await ExecuteAsync(async () =>
         {
-            IsLoading = true;
             ErrorMessage = string.Empty;
-
             var result = await _transferService.PostAsync(_transferId.Value);
 
             if (result.IsSuccess)
@@ -629,27 +603,16 @@ public class StockTransferEditorViewModel : ViewModelBase
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "StockTransferEditorViewModel.PostAsync", "[StockTransferEditorViewModel.PostAsync] Failed to post stock transfer.");
                 await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.PostAsync", "[StockTransferEditorViewModel.PostAsync] Failed to post stock transfer.");
-            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task CancelTransferAsync()
     {
         if (!_transferId.HasValue) return;
 
-        try
+        await ExecuteAsync(async () =>
         {
-            IsLoading = true;
             ErrorMessage = string.Empty;
-
             var result = await _transferService.CancelAsync(_transferId.Value);
 
             if (result.IsSuccess)
@@ -662,24 +625,14 @@ public class StockTransferEditorViewModel : ViewModelBase
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "StockTransferEditorViewModel.CancelTransferAsync", "[StockTransferEditorViewModel.CancelTransferAsync] Failed to cancel stock transfer.");
                 await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.CancelTransferAsync", "[StockTransferEditorViewModel.CancelTransferAsync] Failed to cancel stock transfer.");
-            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task PrintA4Async()
     {
         if (!_transferId.HasValue) return;
 
-        IsLoading = true;
-        try
+        await ExecuteAsync(async () =>
         {
             var settingsResult = await _settingsService.GetSettingsAsync();
             if (settingsResult.IsSuccess && settingsResult.Value != null)
@@ -693,16 +646,7 @@ public class StockTransferEditorViewModel : ViewModelBase
                         settingsResult.Value.ToPrintDto());
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "StockTransferEditorViewModel.PrintA4Async", "[StockTransferEditorViewModel.PrintA4Async] Failed to prepare print.");
-            await _dialogService.ShowErrorAsync("خطأ في الطباعة", ErrorMessage);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 }
 

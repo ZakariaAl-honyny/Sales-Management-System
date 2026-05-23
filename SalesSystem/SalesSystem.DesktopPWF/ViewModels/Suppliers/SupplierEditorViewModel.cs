@@ -27,7 +27,6 @@ public class SupplierEditorViewModel : ViewModelBase
     private decimal _openingBalance;
     private string _notes = string.Empty;
     private bool _isActive = true;
-    private bool _isLoading;
     private bool _isEditMode;
     private string? _errorMessage;
 
@@ -42,8 +41,9 @@ public class SupplierEditorViewModel : ViewModelBase
         _supplierService = supplierService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        SetDialogService(dialogService);
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ المورد...")));
         CancelCommand = new RelayCommand(Cancel);
     }
 
@@ -79,7 +79,16 @@ public class SupplierEditorViewModel : ViewModelBase
     public string Name
     {
         get => _name;
-        set => SetProperty(ref _name, value);
+        set
+        {
+            if (SetProperty(ref _name, value))
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Name), "اسم المورد مطلوب");
+                else
+                    ClearErrors(nameof(Name));
+            }
+        }
     }
 
     public string Phone
@@ -115,7 +124,16 @@ public class SupplierEditorViewModel : ViewModelBase
     public decimal OpeningBalance
     {
         get => _openingBalance;
-        set => SetProperty(ref _openingBalance, value);
+        set
+        {
+            if (SetProperty(ref _openingBalance, value))
+            {
+                if (value < 0)
+                    AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
+                else
+                    ClearErrors(nameof(OpeningBalance));
+            }
+        }
     }
 
     public string Notes
@@ -128,12 +146,6 @@ public class SupplierEditorViewModel : ViewModelBase
     {
         get => _isActive;
         set => SetProperty(ref _isActive, value);
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
     }
 
     public string? ErrorMessage
@@ -183,7 +195,7 @@ public class SupplierEditorViewModel : ViewModelBase
         return !HasNameError && !HasOpeningBalanceError;
     }
 
-    private async Task SaveAsync()
+    private async Task SaveOperationAsync()
     {
         if (!Validate())
         {
@@ -196,63 +208,50 @@ public class SupplierEditorViewModel : ViewModelBase
             return;
         }
 
-        IsLoading = true;
         ErrorMessage = null;
 
-        try
+        Result<SupplierDto> result;
+
+        if (IsEditMode)
         {
-            Result<SupplierDto> result;
+            var updateRequest = new UpdateSupplierRequest(
+                Name,
+                string.IsNullOrWhiteSpace(Phone) ? null : Phone,
+                string.IsNullOrWhiteSpace(Email) ? null : Email,
+                string.IsNullOrWhiteSpace(Address) ? null : Address,
+                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
+                CreditLimit,
+                IsActive);
 
-            if (IsEditMode)
-            {
-                var updateRequest = new UpdateSupplierRequest(
-                    Name,
-                    string.IsNullOrWhiteSpace(Phone) ? null : Phone,
-                    string.IsNullOrWhiteSpace(Email) ? null : Email,
-                    string.IsNullOrWhiteSpace(Address) ? null : Address,
-                    string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                    CreditLimit,
-                    IsActive);
-
-                result = await _supplierService.UpdateAsync(_supplierId, updateRequest);
-            }
-            else
-            {
-                var createRequest = new CreateSupplierRequest(
-                    Name,
-                    string.IsNullOrWhiteSpace(Phone) ? null : Phone,
-                    string.IsNullOrWhiteSpace(Email) ? null : Email,
-                    string.IsNullOrWhiteSpace(Address) ? null : Address,
-                    string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                    OpeningBalance,
-                    CreditLimit);
-
-                result = await _supplierService.CreateAsync(createRequest);
-            }
-
-            if (result.IsSuccess && result.Value != null)
-            {
-                // Publish event to notify other modules
-                _eventBus.Publish(new SupplierChangedMessage(result.Value.Id));
-
-                await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث المورد بنجاح" : "تم إضافة المورد بنجاح");
-
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المورد", "SupplierEditorViewModel.SaveAsync", "[SupplierEditorViewModel.SaveAsync] Failed to save supplier.");
-                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
-            }
+            result = await _supplierService.UpdateAsync(_supplierId, updateRequest);
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "SupplierEditorViewModel.SaveAsync", "[SupplierEditorViewModel.SaveAsync] Failed to save supplier.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
+            var createRequest = new CreateSupplierRequest(
+                Name,
+                string.IsNullOrWhiteSpace(Phone) ? null : Phone,
+                string.IsNullOrWhiteSpace(Email) ? null : Email,
+                string.IsNullOrWhiteSpace(Address) ? null : Address,
+                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
+                OpeningBalance,
+                CreditLimit);
+
+            result = await _supplierService.CreateAsync(createRequest);
         }
-        finally
+
+        if (result.IsSuccess && result.Value != null)
         {
-            IsLoading = false;
+            // Publish event to notify other modules
+            _eventBus.Publish(new SupplierChangedMessage(result.Value.Id));
+
+            await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث المورد بنجاح" : "تم إضافة المورد بنجاح");
+
+            RequestClose();
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المورد", "SupplierEditorViewModel.SaveAsync", "[SupplierEditorViewModel.SaveAsync] Failed to save supplier.");
+            await _dialogService.ShowErrorAsync("خطأ في حفظ المورد", ErrorMessage!);
         }
     }
 

@@ -36,7 +36,6 @@ public class ProductEditorViewModel : ViewModelBase
     private decimal _minStock;
     private string _description = string.Empty;
     private bool _isActive = true;
-    private bool _isLoading;
     private bool _isEditMode;
     private string? _errorMessage;
 
@@ -53,8 +52,9 @@ public class ProductEditorViewModel : ViewModelBase
         _unitService = App.GetService<IUnitApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
+        SetDialogService(_dialogService);
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ المنتج...")));
         CancelCommand = new RelayCommand(Cancel);
         LoadLookupDataCommand = new AsyncRelayCommand(LoadLookupDataAsync);
 
@@ -73,8 +73,9 @@ public class ProductEditorViewModel : ViewModelBase
         _unitService = unitService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        SetDialogService(_dialogService);
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ المنتج...")));
         CancelCommand = new RelayCommand(Cancel);
         LoadLookupDataCommand = new AsyncRelayCommand(LoadLookupDataAsync);
 
@@ -156,6 +157,10 @@ public class ProductEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _name, value))
             {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Name), "اسم المنتج مطلوب");
+                else
+                    ClearErrors(nameof(Name));
             }
         }
     }
@@ -163,7 +168,16 @@ public class ProductEditorViewModel : ViewModelBase
     public int? CategoryId
     {
         get => _categoryId;
-        set => SetProperty(ref _categoryId, value);
+        set
+        {
+            if (SetProperty(ref _categoryId, value))
+            {
+                if (!value.HasValue || value.Value <= 0)
+                    AddError(nameof(CategoryId), "يجب اختيار فئة");
+                else
+                    ClearErrors(nameof(CategoryId));
+            }
+        }
     }
 
     public int? UnitId
@@ -175,19 +189,46 @@ public class ProductEditorViewModel : ViewModelBase
     public int? WholesaleUnitId
     {
         get => _wholesaleUnitId;
-        set => SetProperty(ref _wholesaleUnitId, value);
+        set
+        {
+            if (SetProperty(ref _wholesaleUnitId, value))
+            {
+                if (!value.HasValue || value.Value <= 0)
+                    AddError(nameof(WholesaleUnitId), "يجب اختيار وحدة الجملة");
+                else
+                    ClearErrors(nameof(WholesaleUnitId));
+            }
+        }
     }
 
     public int? RetailUnitId
     {
         get => _retailUnitId;
-        set => SetProperty(ref _retailUnitId, value);
+        set
+        {
+            if (SetProperty(ref _retailUnitId, value))
+            {
+                if (!value.HasValue || value.Value <= 0)
+                    AddError(nameof(RetailUnitId), "يجب اختيار وحدة التجزئة");
+                else
+                    ClearErrors(nameof(RetailUnitId));
+            }
+        }
     }
 
     public decimal ConversionFactor
     {
         get => _conversionFactor;
-        set => SetProperty(ref _conversionFactor, value);
+        set
+        {
+            if (SetProperty(ref _conversionFactor, value))
+            {
+                if (value <= 0)
+                    AddError(nameof(ConversionFactor), "معامل التحويل يجب أن يكون أكبر من صفر");
+                else
+                    ClearErrors(nameof(ConversionFactor));
+            }
+        }
     }
 
     public decimal PurchasePrice
@@ -205,13 +246,31 @@ public class ProductEditorViewModel : ViewModelBase
     public decimal WholesalePrice
     {
         get => _wholesalePrice;
-        set => SetProperty(ref _wholesalePrice, value);
+        set
+        {
+            if (SetProperty(ref _wholesalePrice, value))
+            {
+                if (value <= 0)
+                    AddError(nameof(WholesalePrice), "سعر الجملة يجب أن يكون أكبر من صفر");
+                else
+                    ClearErrors(nameof(WholesalePrice));
+            }
+        }
     }
 
     public decimal RetailPrice
     {
         get => _retailPrice;
-        set => SetProperty(ref _retailPrice, value);
+        set
+        {
+            if (SetProperty(ref _retailPrice, value))
+            {
+                if (value <= 0)
+                    AddError(nameof(RetailPrice), "سعر التجزئة يجب أن يكون أكبر من صفر");
+                else
+                    ClearErrors(nameof(RetailPrice));
+            }
+        }
     }
 
     public decimal MinStock
@@ -230,12 +289,6 @@ public class ProductEditorViewModel : ViewModelBase
     {
         get => _isActive;
         set => SetProperty(ref _isActive, value);
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
     }
 
     public string? ErrorMessage
@@ -295,91 +348,6 @@ public class ProductEditorViewModel : ViewModelBase
         }
     }
 
-    // Validation
-    private bool _hasNameError;
-    public bool HasNameError
-    {
-        get => _hasNameError;
-        set
-        {
-            if (SetProperty(ref _hasNameError, value))
-                OnPropertyChanged(nameof(NameError));
-        }
-    }
-
-    private bool _hasRetailPriceError;
-    public bool HasRetailPriceError
-    {
-        get => _hasRetailPriceError;
-        set
-        {
-            if (SetProperty(ref _hasRetailPriceError, value))
-                OnPropertyChanged(nameof(RetailPriceError));
-        }
-    }
-
-    private bool _hasWholesalePriceError;
-    public bool HasWholesalePriceError
-    {
-        get => _hasWholesalePriceError;
-        set
-        {
-            if (SetProperty(ref _hasWholesalePriceError, value))
-                OnPropertyChanged(nameof(WholesalePriceError));
-        }
-    }
-
-    private bool _hasWholesaleUnitError;
-    public bool HasWholesaleUnitError
-    {
-        get => _hasWholesaleUnitError;
-        set
-        {
-            if (SetProperty(ref _hasWholesaleUnitError, value))
-                OnPropertyChanged(nameof(WholesaleUnitError));
-        }
-    }
-
-    private bool _hasConversionFactorError;
-    public bool HasConversionFactorError
-    {
-        get => _hasConversionFactorError;
-        set
-        {
-            if (SetProperty(ref _hasConversionFactorError, value))
-                OnPropertyChanged(nameof(ConversionFactorError));
-        }
-    }
-
-    private bool _hasCategoryError;
-    public bool HasCategoryError
-    {
-        get => _hasCategoryError;
-        set
-        {
-            if (SetProperty(ref _hasCategoryError, value))
-                OnPropertyChanged(nameof(CategoryError));
-        }
-    }
-
-    private bool _hasUnitError;
-    public bool HasUnitError
-    {
-        get => _hasUnitError;
-        set
-        {
-            if (SetProperty(ref _hasUnitError, value))
-                OnPropertyChanged(nameof(UnitError));
-        }
-    }
-
-    public string? NameError => HasNameError ? "الاسم مطلوب" : null;
-    public string? RetailPriceError => HasRetailPriceError ? "سعر التجزئة مطلوب (أكبر من 0)" : null;
-    public string? WholesalePriceError => HasWholesalePriceError ? "سعر الجملة مطلوب (أكبر من 0)" : null;
-    public string? WholesaleUnitError => HasWholesaleUnitError ? "يجب اختيار وحدة الجملة" : null;
-    public string? ConversionFactorError => HasConversionFactorError ? "معامل التحويل مطلوب (أكبر من 0)" : null;
-    public string? CategoryError => HasCategoryError ? "يجب اختيار فئة" : null;
-    public string? UnitError => HasUnitError ? "يجب اختيار وحدة" : null;
     #endregion
 
     #region Commands
@@ -447,109 +415,81 @@ public class ProductEditorViewModel : ViewModelBase
 
     private async Task<bool> ValidateAsync()
     {
-        HasNameError = string.IsNullOrWhiteSpace(Name);
-        HasRetailPriceError = RetailPrice <= 0;
-        HasWholesalePriceError = WholesalePrice <= 0;
-        HasConversionFactorError = ConversionFactor <= 0;
-        HasCategoryError = !CategoryId.HasValue || CategoryId.Value <= 0;
-        HasUnitError = !RetailUnitId.HasValue || RetailUnitId.Value <= 0;
-        HasWholesaleUnitError = !WholesaleUnitId.HasValue || WholesaleUnitId.Value <= 0;
+        ClearAllErrors();
 
-        OnPropertyChanged(nameof(NameError));
-        OnPropertyChanged(nameof(CategoryError));
-        OnPropertyChanged(nameof(UnitError));
-        OnPropertyChanged(nameof(WholesaleUnitError));
-        OnPropertyChanged(nameof(RetailPriceError));
-        OnPropertyChanged(nameof(WholesalePriceError));
-        OnPropertyChanged(nameof(ConversionFactorError));
-        OnPropertyChanged(nameof(HasErrors));
+        // Use INotifyDataErrorInfo to add errors
+        if (string.IsNullOrWhiteSpace(Name))
+            AddError(nameof(Name), "اسم المنتج مطلوب");
+        if (RetailPrice <= 0)
+            AddError(nameof(RetailPrice), "سعر التجزئة يجب أن يكون أكبر من صفر");
+        if (WholesalePrice <= 0)
+            AddError(nameof(WholesalePrice), "سعر الجملة يجب أن يكون أكبر من صفر");
+        if (ConversionFactor <= 0)
+            AddError(nameof(ConversionFactor), "معامل التحويل يجب أن يكون أكبر من صفر");
+        if (!CategoryId.HasValue || CategoryId.Value <= 0)
+            AddError(nameof(CategoryId), "يجب اختيار فئة");
+        if (!RetailUnitId.HasValue || RetailUnitId.Value <= 0)
+            AddError(nameof(RetailUnitId), "يجب اختيار وحدة التجزئة");
+        if (!WholesaleUnitId.HasValue || WholesaleUnitId.Value <= 0)
+            AddError(nameof(WholesaleUnitId), "يجب اختيار وحدة الجملة");
 
-        var errors = new List<string>();
-        if (HasNameError) errors.Add("• " + NameError);
-        if (HasCategoryError) errors.Add("• " + CategoryError);
-        if (HasUnitError) errors.Add("• " + UnitError);
-        if (HasWholesaleUnitError) errors.Add("• " + WholesaleUnitError);
-        if (HasConversionFactorError) errors.Add("• " + ConversionFactorError);
-        if (HasRetailPriceError) errors.Add("• " + RetailPriceError);
-        if (HasWholesalePriceError) errors.Add("• " + WholesalePriceError);
-
-        if (errors.Any())
-        {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-            RequestFocusFirstInvalidField();
-            return false;
-        }
-
-        return true;
+        return await ValidateAllAsync();
     }
 
-    private async Task SaveAsync()
+    private async Task SaveOperationAsync()
     {
         if (!await ValidateAsync())
         {
             return;
         }
 
-        IsLoading = true;
         ErrorMessage = null;
 
-        try
+        Result<ProductDto> result;
+
+        if (IsEditMode)
         {
-            Result<ProductDto> result;
+            var updateRequest = new UpdateProductRequest(
+                Barcode, Name,
+                CategoryId, UnitId,
+                RetailUnitId, WholesaleUnitId,
+                ConversionFactor,
+                PurchasePrice, SalePrice,
+                RetailPrice, WholesalePrice,
+                MinStock, string.IsNullOrWhiteSpace(Description) ? null : Description,
+                IsActive);
 
-            if (IsEditMode)
-            {
-                var updateRequest = new UpdateProductRequest(
-                    Barcode, Name,
-                    CategoryId, UnitId,
-                    RetailUnitId, WholesaleUnitId,
-                    ConversionFactor,
-                    PurchasePrice, SalePrice,
-                    RetailPrice, WholesalePrice,
-                    MinStock, string.IsNullOrWhiteSpace(Description) ? null : Description,
-                    IsActive);
-
-                result = await _productService.UpdateAsync(_productId, updateRequest);
-            }
-            else
-            {
-                var createRequest = new CreateProductRequest(
-                    Barcode, Name,
-                    CategoryId, UnitId,
-                    RetailUnitId, WholesaleUnitId,
-                    ConversionFactor,
-                    PurchasePrice, SalePrice,
-                    RetailPrice, WholesalePrice,
-                    MinStock, string.IsNullOrWhiteSpace(Description) ? null : Description);
-
-                result = await _productService.CreateAsync(createRequest);
-            }
-
-            if (result.IsSuccess && result.Value != null)
-            {
-                // Publish event to notify other modules
-                _eventBus.Publish(new ProductChangedMessage(result.Value.Id));
-
-                await _dialogService.ShowSuccessAsync(
-                    IsEditMode ? "تحديث المنتج" : "إضافة منتج",
-                    IsEditMode ? "تم تحديث المنتج بنجاح" : "تم إضافة المنتج بنجاح");
-
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المنتج", "ProductEditorViewModel.SaveAsync", "[ProductEditorViewModel.SaveAsync] Failed to save product data.");
-                await _dialogService.ShowErrorAsync("خطأ في حفظ المنتج", ErrorMessage);
-            }
+            result = await _productService.UpdateAsync(_productId, updateRequest);
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "ProductEditorViewModel.SaveAsync", "[ProductEditorViewModel.SaveAsync] Failed to save product data.");
+            var createRequest = new CreateProductRequest(
+                Barcode, Name,
+                CategoryId, UnitId,
+                RetailUnitId, WholesaleUnitId,
+                ConversionFactor,
+                PurchasePrice, SalePrice,
+                RetailPrice, WholesalePrice,
+                MinStock, string.IsNullOrWhiteSpace(Description) ? null : Description);
+
+            result = await _productService.CreateAsync(createRequest);
+        }
+
+        if (result.IsSuccess && result.Value != null)
+        {
+            // Publish event to notify other modules
+            _eventBus.Publish(new ProductChangedMessage(result.Value.Id));
+
+            await _dialogService.ShowSuccessAsync(
+                IsEditMode ? "تحديث المنتج" : "إضافة منتج",
+                IsEditMode ? "تم تحديث المنتج بنجاح" : "تم إضافة المنتج بنجاح");
+
+            RequestClose();
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المنتج", "ProductEditorViewModel.SaveAsync", "[ProductEditorViewModel.SaveAsync] Failed to save product data.");
             await _dialogService.ShowErrorAsync("خطأ في حفظ المنتج", ErrorMessage);
-        }
-        finally
-        {
-            IsLoading = false;
         }
     }
 

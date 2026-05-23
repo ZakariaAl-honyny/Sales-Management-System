@@ -642,3 +642,57 @@ public MyEditorView()
     };
 }
 ```
+
+### Newest-First Sorting Pattern (v4.6.1)
+
+```csharp
+// CORRECT — sort by Id descending (newest first)
+InvokeOnUIThread(() =>
+{
+    Items.Clear();
+    foreach (var item in result.Value.OrderByDescending(x => x.Id))
+    {
+        Items.Add(item);
+    }
+});
+
+// CORRECT — invoice lists sort by InvoiceDate descending
+foreach (var item in result.Value.OrderByDescending(x => x.InvoiceDate))
+{
+    Invoices.Add(item);
+}
+```
+
+### Dialog PositionOverOwner Guard (v4.6.1)
+
+```csharp
+// CORRECT — guards against self-ownership
+private void PositionOverOwner()
+{
+    var mainWindow = System.Windows.Application.Current.MainWindow;
+    if (mainWindow != null && mainWindow != this)
+    {
+        Owner = mainWindow;
+        Width = Owner.ActualWidth;
+        Height = Owner.ActualHeight;
+        Left = Owner.Left;
+        Top = Owner.Top;
+    }
+    else
+    {
+        // No valid owner window — center on screen
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+    }
+}
+```
+
+### WPF Validation with INotifyDataErrorInfo (v4.6.2)
+
+When implementing Editor ViewModels:
+
+1. **Constructor**: Call `SetDialogService(_dialogService)` after assigning `_dialogService`
+2. **Property setters**: Use `AddError(nameof(X), "msg")` / `ClearErrors(nameof(X))` for real-time validation UI
+3. **ValidateAsync()**: `ClearAllErrors()` → `AddError()` for each field → `await ValidateAllAsync()`
+4. **Never** create `HasXxxError` boolean + `XxxError` computed string properties — use `INotifyDataErrorInfo` instead
+
+The ErrorTemplate in Styles.xaml renders red border + ❗ icon with ToolTip automatically for any control with `Validation.HasError = true`.

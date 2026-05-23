@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -24,7 +24,6 @@ public class CategoryListViewModel : ViewModelBase
     private ICollectionView? _categoriesView;
     private CategoryDto? _selectedCategory;
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
@@ -92,11 +91,6 @@ public class CategoryListViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -139,7 +133,7 @@ public class CategoryListViewModel : ViewModelBase
 
     public async Task LoadCategoriesAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -151,7 +145,7 @@ public class CategoryListViewModel : ViewModelBase
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Categories.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Categories.Add(item);
                     }
@@ -161,7 +155,7 @@ public class CategoryListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل التصنيفات", "CategoryListViewModel.LoadCategoriesAsync", "[CategoryListViewModel.LoadCategoriesAsync] Failed to load categories list.");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„طھطµظ†ظٹظپط§طھ", "CategoryListViewModel.LoadCategoriesAsync", "[CategoryListViewModel.LoadCategoriesAsync] Failed to load categories list.");
                 IsEmpty = Categories.Count == 0;
             }
         }
@@ -171,7 +165,7 @@ public class CategoryListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -217,11 +211,11 @@ public async Task DeleteCategoryAsync()
     {
         if (SelectedCategory == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"التصنيف: {SelectedCategory.Name}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"ط§ظ„طھطµظ†ظٹظپ: {SelectedCategory.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -232,11 +226,11 @@ public async Task DeleteCategoryAsync()
                 if (deleteResult.IsSuccess)
                 {
                     await LoadCategoriesAsync();
-                    _toastService.ShowSuccess("تم إلغاء تنشيط التصنيف بنجاح");
+                    _toastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„طھطµظ†ظٹظپ ط¨ظ†ط¬ط§ط­");
                 }
                 else
                 {
-                    ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط التصنيف";
+                    ErrorMessage = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„طھطµظ†ظٹظپ";
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -245,11 +239,11 @@ public async Task DeleteCategoryAsync()
                 if (deleteResult.IsSuccess)
                 {
                     await LoadCategoriesAsync();
-                    _toastService.ShowSuccess("تم حذف التصنيف نهائياً");
+                    _toastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„طھطµظ†ظٹظپ ظ†ظ‡ط§ط¦ظٹط§ظ‹");
                 }
                 else
                 {
-                    var error = deleteResult.Error ?? "فشل في حذف التصنيف";
+                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„طھطµظ†ظٹظپ";
                     ErrorMessage = error;
                     LogSystemError($"Hard delete failed for Category {SelectedCategory.Id}: {error}", "CategoryListViewModel.DeleteCategoryAsync");
                 }
@@ -257,12 +251,12 @@ public async Task DeleteCategoryAsync()
         }
         catch (Exception ex)
         {
-            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
+            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ظ„ط­ط°ظپ";
             HandleException(ex, "CategoryListViewModel.DeleteCategoryAsync", $"[CategoryListViewModel.DeleteCategoryAsync] Failed to delete category with ID {SelectedCategory?.Id}.");
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -270,7 +264,7 @@ public async Task DeleteCategoryAsync()
     {
         if (SelectedCategory == null) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -286,22 +280,22 @@ public async Task DeleteCategoryAsync()
             if (result.IsSuccess)
             {
                 await LoadCategoriesAsync();
-                await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة التصنيف بنجاح");
+                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„طھطµظ†ظٹظپ ط¨ظ†ط¬ط§ط­");
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في استعادة التصنيف";
-                await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
+                ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„طھطµظ†ظٹظپ";
+                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط§ط³طھط¹ط§ط¯ط©", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = "حدث خطأ غير متوقع أثناء استعادة التصنيف";
+            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ط³طھط¹ط§ط¯ط© ط§ظ„طھطµظ†ظٹظپ";
             HandleException(ex, "CategoryListViewModel.RestoreCategoryAsync", $"[CategoryListViewModel.RestoreCategoryAsync] Failed to restore category with ID {SelectedCategory?.Id}.");
         }
 finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -324,3 +318,7 @@ finally
     }
     #endregion
 }
+
+
+
+

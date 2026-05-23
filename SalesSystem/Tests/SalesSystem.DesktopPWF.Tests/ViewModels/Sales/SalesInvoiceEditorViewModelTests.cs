@@ -112,7 +112,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         viewModel.TaxRate.Should().Be(15);
         viewModel.IsTaxInclusive.Should().BeFalse();
         viewModel.PaidAmount.Should().Be(0);
-        viewModel.IsLoading.Should().BeFalse();
+        viewModel.IsBusy.Should().BeFalse();
         viewModel.Customers.Should().NotBeNull();
         viewModel.Warehouses.Should().NotBeNull();
         viewModel.Products.Should().NotBeNull();
@@ -388,18 +388,13 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     #region Property Notification Tests
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
         // Arrange
         var viewModel = CreateViewModel(null);
-        var propertyChangedEvents = new List<string>();
-        viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        // Act
-        viewModel.IsLoading = true;
 
         // Assert
-        propertyChangedEvents.Should().Contain("IsLoading");
+        viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]

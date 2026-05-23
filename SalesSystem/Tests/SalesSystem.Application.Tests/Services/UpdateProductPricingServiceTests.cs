@@ -79,22 +79,45 @@ public class UpdateProductPricingServiceTests
     {
         var repoMock = new Mock<IGenericRepository<ProductUnit>>();
         repoMock.Setup(r => r.Query()).Returns(new[] { result }.AsAsyncQueryable());
+        repoMock.Setup(r => r.FirstOrDefaultAsync(
+                It.IsAny<Expression<Func<ProductUnit, bool>>>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string[]>()))
+            .ReturnsAsync((Expression<Func<ProductUnit, bool>> predicate, CancellationToken _, string[] _) =>
+            {
+                var compiled = predicate.Compile();
+                return compiled(result) ? result : null;
+            });
         _uowMock.Setup(u => u.ProductUnits).Returns(repoMock.Object);
     }
 
     private void SetupWarehouseStockQuery(decimal quantity)
     {
         var repoMock = new Mock<IGenericRepository<WarehouseStock>>();
+        var productId = _product.Id > 0 ? _product.Id : 1;
 
         if (quantity > 0)
         {
-            var productId = _product.Id > 0 ? _product.Id : 1;
             var stock = WarehouseStock.Create(warehouseId: 1, productId: productId, quantity: quantity);
             repoMock.Setup(r => r.Query()).Returns(new[] { stock }.AsAsyncQueryable());
+            repoMock.Setup(r => r.FirstOrDefaultAsync(
+                    It.IsAny<Expression<Func<WarehouseStock, bool>>>(),
+                    It.IsAny<CancellationToken>(),
+                    It.IsAny<string[]>()))
+                .ReturnsAsync((Expression<Func<WarehouseStock, bool>> predicate, CancellationToken _, string[] _) =>
+                {
+                    var compiled = predicate.Compile();
+                    return compiled(stock) ? stock : null;
+                });
         }
         else
         {
             repoMock.Setup(r => r.Query()).Returns(Array.Empty<WarehouseStock>().AsAsyncQueryable());
+            repoMock.Setup(r => r.FirstOrDefaultAsync(
+                    It.IsAny<Expression<Func<WarehouseStock, bool>>>(),
+                    It.IsAny<CancellationToken>(),
+                    It.IsAny<string[]>()))
+                .ReturnsAsync((Expression<Func<WarehouseStock, bool>> _, CancellationToken _, string[] _) => null!);
         }
 
         _uowMock.Setup(u => u.WarehouseStocks).Returns(repoMock.Object);
@@ -347,6 +370,11 @@ public class UpdateProductPricingServiceTests
     {
         var repoMock = new Mock<IGenericRepository<ProductUnit>>();
         repoMock.Setup(r => r.Query()).Returns(Array.Empty<ProductUnit>().AsAsyncQueryable());
+        repoMock.Setup(r => r.FirstOrDefaultAsync(
+                It.IsAny<Expression<Func<ProductUnit, bool>>>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string[]>()))
+            .ReturnsAsync((Expression<Func<ProductUnit, bool>> _, CancellationToken _, string[] _) => null!);
         _uowMock.Setup(u => u.ProductUnits).Returns(repoMock.Object);
 
         var request = CreateRequest(productUnitId: 999, newCost: 10, newQty: 1);
@@ -367,7 +395,20 @@ public class UpdateProductPricingServiceTests
 
         _settingsMock.Setup(s => s.GetCostingMethodAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(CostingMethod.LastPurchasePrice);
-        SetupProductUnitQuery(derivedOnly);
+
+        var repoMock = new Mock<IGenericRepository<ProductUnit>>();
+        repoMock.Setup(r => r.Query()).Returns(new[] { derivedOnly }.AsAsyncQueryable());
+        repoMock.Setup(r => r.FirstOrDefaultAsync(
+                It.IsAny<Expression<Func<ProductUnit, bool>>>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string[]>()))
+            .ReturnsAsync((Expression<Func<ProductUnit, bool>> predicate, CancellationToken _, string[] _) =>
+            {
+                var compiled = predicate.Compile();
+                return compiled(derivedOnly) ? derivedOnly : null;
+            });
+        _uowMock.Setup(u => u.ProductUnits).Returns(repoMock.Object);
+
         SetupSaveChanges();
 
         var request = CreateRequest(productUnitId: derivedOnly.Id, newCost: 60, newQty: 5);

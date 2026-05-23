@@ -38,7 +38,7 @@
                         
 
                         <TextBlock Text="اسم المنتج *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" 
+                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                  Style="{StaticResource ModernTextBox}" 
                                  Tag="أدخل اسم المنتج بالكامل" 
                                  TabIndex="2"
@@ -50,7 +50,7 @@
 
                         <TextBlock Text="الفئة *" Style="{StaticResource LabelStyle}"/>
                         <ComboBox ItemsSource="{Binding Categories}"
-                                  SelectedValue="{Binding CategoryId}"
+                                  SelectedValue="{Binding CategoryId, ValidatesOnDataErrors=True}"
                                   SelectedValuePath="Id"
                                   DisplayMemberPath="Name"
                                   Style="{StaticResource ModernComboBox}"
@@ -60,7 +60,7 @@
                         <Border Height="8"/>
 
                         <TextBlock Text="الوصف" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" 
+                        <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                  Style="{StaticResource ModernTextBox}" 
                                  TextWrapping="Wrap" 
                                  AcceptsReturn="True" 
@@ -82,7 +82,7 @@
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                 <TextBlock Text="وحدة البيع (تجزئة) *" Style="{StaticResource LabelStyle}"/>
                                 <ComboBox ItemsSource="{Binding Units}"
-                                          SelectedValue="{Binding RetailUnitId}"
+                                          SelectedValue="{Binding RetailUnitId, ValidatesOnDataErrors=True}"
                                           SelectedValuePath="Id"
                                           DisplayMemberPath="Name"
                                           Style="{StaticResource ModernComboBox}"
@@ -93,7 +93,7 @@
                             <StackPanel Grid.Column="1" Margin="8,0,8,0">
                                 <TextBlock Text="وحدة الجملة *" Style="{StaticResource LabelStyle}"/>
                                 <ComboBox ItemsSource="{Binding Units}"
-                                          SelectedValue="{Binding WholesaleUnitId}"
+                                          SelectedValue="{Binding WholesaleUnitId, ValidatesOnDataErrors=True}"
                                           SelectedValuePath="Id"
                                           DisplayMemberPath="Name"
                                           Style="{StaticResource ModernComboBox}"
@@ -103,7 +103,7 @@
 
                             <StackPanel Grid.Column="2" Margin="8,0,0,0">
                                 <TextBlock Text="معامل التحويل (جملة->تجزئة) *" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding ConversionFactor, UpdateSourceTrigger=PropertyChanged, StringFormat=N3}" 
+                                <TextBox Text="{Binding ConversionFactor, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          TabIndex="7"
                                          ToolTip="عدد وحدات التجزئة في وحدة الجملة (مثلاً 12 قطعة في الكرتون) — هذا الحقل إلزامي"/>
@@ -125,7 +125,7 @@
                             
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                 <TextBlock Text="سعر التجزئة *" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding RetailPrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
+                                <TextBox Text="{Binding RetailPrice, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"
                                          TabIndex="8"
@@ -135,7 +135,7 @@
 
                             <StackPanel Grid.Column="1" Margin="8,0,8,0">
                                 <TextBlock Text="سعر الجملة *" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding WholesalePrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
+                                <TextBox Text="{Binding WholesalePrice, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"
                                          TabIndex="9"
@@ -145,7 +145,7 @@
 
                             <StackPanel Grid.Column="2" Margin="8,0,0,0">
                                 <TextBlock Text="سعر التكلفة (تجزئة)" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding PurchasePrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
+                                <TextBox Text="{Binding PurchasePrice, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          TabIndex="10"/>
                             </StackPanel>
@@ -160,7 +160,7 @@
                             
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                 <TextBlock Text="الباركود" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding Barcode, UpdateSourceTrigger=PropertyChanged}" 
+                                <TextBox Text="{Binding Barcode, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          TabIndex="11"
                                          ToolTip="الباركود (رقم المنتج العالمي) — يجب أن يكون فريداً لكل منتج. إذا كان المنتج ليس له باركود، اتركه فارغاً"/>
@@ -169,7 +169,7 @@
 
                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                 <TextBlock Text="تنبيه المخزون المنخفض (بالتجزئة)" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding MinStock, UpdateSourceTrigger=PropertyChanged, StringFormat=N3}" 
+                                <TextBox Text="{Binding MinStock, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
                                          Style="{StaticResource ModernTextBox}" 
                                          TabIndex="12"/>
                             </StackPanel>

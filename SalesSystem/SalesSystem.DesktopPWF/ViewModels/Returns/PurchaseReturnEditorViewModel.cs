@@ -34,7 +34,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ObservableCollection<PurchaseReturnItemViewModel> _items = new();
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private bool _isEditMode;
     private string? _errorMessage;
     private InvoiceStatus _status = InvoiceStatus.Draft;
@@ -53,6 +52,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         _soundService = App.GetService<ISoundService>();
         _logger = App.GetService<Microsoft.Extensions.Logging.ILogger<PurchaseReturnEditorViewModel>>();
         _dialogService = App.GetService<IDialogService>();
+        SetDialogService(_dialogService);
 
         InitializeCommands();
         _ = LoadInitialDataAsync();
@@ -133,12 +133,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         set => SetProperty(ref _items, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
-
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -209,9 +203,9 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             return;
         }
 
-        IsLoading = true;
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var result = await _invoiceService.GetAllAsync(search: SearchText, status: 2, pageSize: 2);
             
             if (result.IsSuccess && result.Value != null && result.Value.Count == 1)
@@ -227,22 +221,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                     return;
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            HandleException(ex, "PurchaseReturnEditorViewModel.SearchInvoiceAsync", "[PurchaseReturnEditorViewModel.SearchInvoiceAsync] Error searching purchase invoice.");
-            InvokeOnUIThread(() =>
-            {
-                ErrorMessage = "حدث خطأ أثناء البحث عن الفاتورة";
-            });
-        }
-        finally
-        {
-            InvokeOnUIThread(() =>
-            {
-                IsLoading = false;
-            });
-        }
+        });
 
         ShowInvoiceSelectionDialog();
     }
@@ -266,9 +245,9 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
 
     private async Task LoadFullInvoiceAsync(int invoiceId)
     {
-        IsLoading = true;
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var result = await _invoiceService.GetByIdAsync(invoiceId);
             if (result.IsSuccess && result.Value != null)
             {
@@ -284,34 +263,18 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                     ErrorMessage = result.Error ?? "فشل في تحميل تفاصيل الفاتورة";
                 });
             }
-        }
-        catch (Exception ex)
-        {
-            HandleException(ex, "PurchaseReturnEditorViewModel.LoadFullPurchaseInvoiceAsync", "[PurchaseReturnEditorViewModel.LoadFullPurchaseInvoiceAsync] Error loading full purchase invoice details.");
-            InvokeOnUIThread(() =>
-            {
-                ErrorMessage = "حدث خطأ غير متوقع أثناء تحميل تفاصيل الفاتورة";
-            });
-        }
-        finally
-        {
-            InvokeOnUIThread(() =>
-            {
-                IsLoading = false;
-            });
-        }
+        });
     }
 
     public async Task LoadReturnAsync(int id)
     {
         _returnId = id;
         IsEditMode = true;
-        IsLoading = true;
-        ErrorMessage = null;
 
-        try
+        await ExecuteAsync(async () =>
         {
-            await LoadInitialDataAsync(); // Load warehouses
+            ErrorMessage = null;
+            await LoadInitialDataAsync();
 
             var result = await _returnService.GetByIdAsync(id);
             if (result.IsSuccess && result.Value != null)
@@ -322,14 +285,12 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 SelectedWarehouseId = dto.WarehouseId;
                 Status = (InvoiceStatus)dto.Status;
 
-                // Load invoice details if linked
                 if (dto.PurchaseInvoiceId.HasValue)
                 {
                     var invResult = await _invoiceService.GetByIdAsync(dto.PurchaseInvoiceId.Value);
                     if (invResult.IsSuccess) SelectedInvoice = invResult.Value;
                 }
 
-                // Populate items
                 Items.Clear();
                 foreach (var item in dto.Items)
                 {
@@ -351,22 +312,12 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             {
                 ErrorMessage = "فشل في تحميل بيانات المرتجع";
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = "حدث خطأ أثناء تحميل البيانات";
-            _logger.LogError(ex, "Error loading purchase return {Id}", id);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task LoadInitialDataAsync()
     {
-        IsLoading = true;
-        try
+        await ExecuteAsync(async () =>
         {
             var warehouseResult = await _warehouseService.GetAllAsync();
             if (warehouseResult.IsSuccess && warehouseResult.Value != null)
@@ -374,11 +325,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 Warehouses = new ObservableCollection<WarehouseDto>(warehouseResult.Value);
                 if (Warehouses.Any()) SelectedWarehouseId = Warehouses.First().Id;
             }
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private void UpdateItemsFromInvoice()
@@ -457,11 +404,9 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     {
         if (!await Validate()) return;
 
-        IsLoading = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var request = new CreatePurchaseReturnRequest(
                 PurchaseInvoiceId: SelectedInvoice?.Id,
                 SupplierId: SelectedInvoice?.SupplierId ?? 0,
@@ -490,16 +435,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المرتجع", "PurchaseReturnEditorViewModel.SaveAsync", "[PurchaseReturnEditorViewModel.SaveAsync] Failed to save purchase return.");
                 await _dialogService.ShowErrorAsync("خطأ في حفظ المرتجع", ErrorMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "PurchaseReturnEditorViewModel.SaveAsync", "[PurchaseReturnEditorViewModel.SaveAsync] Failed to save purchase return.");
-            await _dialogService.ShowErrorAsync("خطأ في حفظ المرتجع", ErrorMessage);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task PostAsync()
@@ -514,9 +450,9 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         var confirm = await _dialogService.ShowConfirmationAsync("تأكيد الترحيل - تحليل الأثر", confirmMessage);
         if (!confirm) return;
 
-        IsLoading = true;
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var result = await _returnService.PostAsync(_returnId.Value);
             if (result.IsSuccess)
             {
@@ -529,11 +465,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 ErrorMessage = result.Error ?? "فشل في ترحيل المرتجع";
                 await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task CancelReturnAsync()
@@ -543,9 +475,9 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         var confirm = await _dialogService.ShowConfirmationAsync("تأكيد الإلغاء", "هل أنت متأكد من إلغاء هذا المرتجع؟");
         if (!confirm) return;
 
-        IsLoading = true;
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var result = await _returnService.CancelAsync(_returnId.Value);
             if (result.IsSuccess)
             {
@@ -558,19 +490,14 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 ErrorMessage = result.Error ?? "فشل في إلغاء المرتجع";
                 await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task PrintA4Async()
     {
         if (!_returnId.HasValue) return;
 
-        IsLoading = true;
-        try
+        await ExecuteAsync(async () =>
         {
             var settingsResult = await _settingsService.GetSettingsAsync();
             if (!settingsResult.IsSuccess || settingsResult.Value == null) return;
@@ -583,16 +510,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 returnResult.Value.Items.ToPrintDtos(),
                 returnResult.Value.ToTotalsPrintDto(),
                 settingsResult.Value.ToPrintDto());
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error preparing print for purchase return {Id}", _returnId);
-            await _dialogService.ShowErrorAsync("خطأ في الطباعة", "حدث خطأ أثناء تحضير الطباعة");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     public async Task<bool> ProcessBarcodeAsync(string barcode)

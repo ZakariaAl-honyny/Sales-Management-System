@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels.Base;
 using System.Collections.ObjectModel;
@@ -26,7 +26,6 @@ public class UserListViewModel : AdminOnlyViewModel
     private ICollectionView? _usersView;
     private UserDto? _selectedUser;
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
@@ -99,11 +98,6 @@ public class UserListViewModel : AdminOnlyViewModel
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -144,7 +138,7 @@ public class UserListViewModel : AdminOnlyViewModel
     #region Methods
     public async Task LoadUsersAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -156,7 +150,7 @@ public class UserListViewModel : AdminOnlyViewModel
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Users.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Users.Add(item);
                     }
@@ -166,7 +160,7 @@ public class UserListViewModel : AdminOnlyViewModel
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستخدمين", "UserListViewModel.LoadUsersAsync", "[UserListViewModel.LoadUsersAsync] Failed to load users list.");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ†", "UserListViewModel.LoadUsersAsync", "[UserListViewModel.LoadUsersAsync] Failed to load users list.");
                 IsEmpty = Users.Count == 0;
             }
         }
@@ -177,7 +171,7 @@ public class UserListViewModel : AdminOnlyViewModel
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -224,18 +218,18 @@ public class UserListViewModel : AdminOnlyViewModel
 
         if (SelectedUser.Id == CurrentUserId)
         {
-            await _dialogService.ShowErrorAsync("خطأ في تعطيل الحساب", "لا يمكنك تعطيل حسابك الخاص. يرجى طلب مسؤول آخر للقيام بذلك.");
+            await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ طھط¹ط·ظٹظ„ ط§ظ„ط­ط³ط§ط¨", "ظ„ط§ ظٹظ…ظƒظ†ظƒ طھط¹ط·ظٹظ„ ط­ط³ط§ط¨ظƒ ط§ظ„ط®ط§طµ. ظٹط±ط¬ظ‰ ط·ظ„ط¨ ظ…ط³ط¤ظˆظ„ ط¢ط®ط± ظ„ظ„ظ‚ظٹط§ظ… ط¨ط°ظ„ظƒ.");
             return;
         }
 
         if (SelectedUser.IsActive)
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
-                "تأكيد تعطيل الحساب",
-                $"هل أنت متأكد من تعطيل حساب المستخدم: {SelectedUser.FullName}؟");
+                "طھط£ظƒظٹط¯ طھط¹ط·ظٹظ„ ط§ظ„ط­ط³ط§ط¨",
+                $"ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† طھط¹ط·ظٹظ„ ط­ط³ط§ط¨ ط§ظ„ظ…ط³طھط®ط¯ظ…: {SelectedUser.FullName}طں");
             if (!confirmed) return;
 
-            IsLoading = true;
+            IsBusy = true;
             ErrorMessage = null;
 
             try
@@ -244,11 +238,11 @@ public class UserListViewModel : AdminOnlyViewModel
                 if (result.IsSuccess)
                 {
                     await LoadUsersAsync();
-                    _toastService.ShowSuccess("تم تعطيل الحساب بنجاح");
+                    _toastService.ShowSuccess("طھظ… طھط¹ط·ظٹظ„ ط§ظ„ط­ط³ط§ط¨ ط¨ظ†ط¬ط§ط­");
                 }
                 else
                 {
-                    ErrorMessage = result.Error ?? "فشل في تعطيل الحساب";
+                    ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ طھط¹ط·ظٹظ„ ط§ظ„ط­ط³ط§ط¨";
                 }
             }
             catch (Exception ex)
@@ -257,17 +251,17 @@ public class UserListViewModel : AdminOnlyViewModel
             }
             finally
             {
-                IsLoading = false;
+                IsBusy = false;
             }
         }
         else
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
-                "تأكيد تفعيل الحساب",
-                $"هل أنت متأكد من تفعيل حساب المستخدم: {SelectedUser.FullName}؟");
+                "طھط£ظƒظٹط¯ طھظپط¹ظٹظ„ ط§ظ„ط­ط³ط§ط¨",
+                $"ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† طھظپط¹ظٹظ„ ط­ط³ط§ط¨ ط§ظ„ظ…ط³طھط®ط¯ظ…: {SelectedUser.FullName}طں");
             if (!confirmed) return;
 
-            IsLoading = true;
+            IsBusy = true;
             ErrorMessage = null;
 
             try
@@ -283,11 +277,11 @@ public class UserListViewModel : AdminOnlyViewModel
                 if (result.IsSuccess)
                 {
                     await LoadUsersAsync();
-                    _toastService.ShowSuccess("تم تفعيل الحساب بنجاح");
+                    _toastService.ShowSuccess("طھظ… طھظپط¹ظٹظ„ ط§ظ„ط­ط³ط§ط¨ ط¨ظ†ط¬ط§ط­");
                 }
                 else
                 {
-                    ErrorMessage = result.Error ?? "فشل في تفعيل الحساب";
+                    ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ طھظپط¹ظٹظ„ ط§ظ„ط­ط³ط§ط¨";
                 }
             }
             catch (Exception ex)
@@ -296,7 +290,7 @@ public class UserListViewModel : AdminOnlyViewModel
             }
             finally
             {
-                IsLoading = false;
+                IsBusy = false;
             }
         }
     }
@@ -306,11 +300,11 @@ public class UserListViewModel : AdminOnlyViewModel
         if (SelectedUser == null) return;
 
         var confirmed = await _dialogService.ShowConfirmationAsync(
-            "تأكيد إعادة تعيين كلمة المرور",
-            $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}؟\n\nسيتم تعيين كلمة المرور الافتراضية: 123456");
+            "طھط£ظƒظٹط¯ ط¥ط¹ط§ط¯ط© طھط¹ظٹظٹظ† ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±",
+            $"ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† ط¥ط¹ط§ط¯ط© طھط¹ظٹظٹظ† ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ظ„ظ„ظ…ط³طھط®ط¯ظ…: {SelectedUser.FullName}طں\n\nط³ظٹطھظ… طھط¹ظٹظٹظ† ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط§ظپطھط±ط§ط¶ظٹط©: 123456");
         if (!confirmed) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -325,12 +319,12 @@ public class UserListViewModel : AdminOnlyViewModel
             var result = await _userService.UpdateAsync(SelectedUser.Id, request);
             if (result.IsSuccess)
             {
-                _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}");
+                _toastService.ShowSuccess($"طھظ… ط¥ط¹ط§ط¯ط© طھط¹ظٹظٹظ† ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ظ„ظ„ظ…ط³طھط®ط¯ظ…: {SelectedUser.FullName}");
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في إعادة تعيين كلمة المرور";
-                await _dialogService.ShowErrorAsync("خطأ في إعادة تعيين كلمة المرور", ErrorMessage);
+                ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط¥ط¹ط§ط¯ط© طھط¹ظٹظٹظ† ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±";
+                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط¥ط¹ط§ط¯ط© طھط¹ظٹظٹظ† ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±", ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -339,7 +333,7 @@ public class UserListViewModel : AdminOnlyViewModel
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -362,3 +356,7 @@ public class UserListViewModel : AdminOnlyViewModel
     }
     #endregion
 }
+
+
+
+

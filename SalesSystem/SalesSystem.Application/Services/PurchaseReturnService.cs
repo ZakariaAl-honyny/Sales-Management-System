@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -31,12 +31,8 @@ public class PurchaseReturnService : IPurchaseReturnService
 
     public async Task<Result<PurchaseReturnDto>> GetByIdAsync(int id, CancellationToken ct)
     {
-        var pr = await _uow.PurchaseReturns.Query()
-            .Include(r => r.Supplier)
-            .Include(r => r.Warehouse)
-            .Include(r => r.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+        var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
+            r => r.Id == id, ct, "Supplier", "Warehouse", "Items.Product");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود", ErrorCodes.NotFound);
@@ -46,24 +42,17 @@ public class PurchaseReturnService : IPurchaseReturnService
 
     public async Task<Result<PagedResult<PurchaseReturnDto>>> GetAllAsync(int? supplierId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _uow.PurchaseReturns.Query()
-            .Include(r => r.Supplier)
-            .Include(r => r.Warehouse)
-            .AsQueryable();
+        Expression<Func<PurchaseReturn, bool>> predicate = r =>
+            (includeInactive || r.Status != InvoiceStatus.Cancelled) &&
+            (!supplierId.HasValue || r.SupplierId == supplierId.Value);
 
-        if (!includeInactive)
-        {
-            query = query.Where(r => r.Status != (InvoiceStatus)3); // 3 = Cancelled
-        }
-
-        if (supplierId.HasValue) query = query.Where(r => r.SupplierId == supplierId.Value);
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(r => r.ReturnDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var totalItems = await _uow.PurchaseReturns.CountAsync(predicate, ct);
+        var items = await _uow.PurchaseReturns.ToListAsync(
+            predicate,
+            q => q.OrderByDescending(r => r.ReturnDate).Skip((page - 1) * pageSize).Take(pageSize),
+            ct,
+            false,
+            "Supplier", "Warehouse");
 
         var dtos = items.Select(MapToDto).ToList();
 
@@ -75,9 +64,8 @@ public class PurchaseReturnService : IPurchaseReturnService
         // 1. Validation
         if (request.PurchaseInvoiceId.HasValue)
         {
-            var invoice = await _uow.PurchaseInvoices.Query()
-                .Include(i => i.Items)
-                .FirstOrDefaultAsync(i => i.Id == request.PurchaseInvoiceId.Value, ct);
+            var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
+                i => i.Id == request.PurchaseInvoiceId.Value, ct, "Items");
 
             if (invoice == null) return Result<PurchaseReturnDto>.Failure("الفاتورة الأصلية غير موجودة");
 
@@ -93,7 +81,7 @@ public class PurchaseReturnService : IPurchaseReturnService
         }
 
         // 1b. Stock Validation BEFORE transaction
-        var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
+        var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
         bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
 
         foreach (var item in request.Items)
@@ -157,15 +145,13 @@ public class PurchaseReturnService : IPurchaseReturnService
 
     public async Task<Result<PurchaseReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
-        var pr = await _uow.PurchaseReturns.Query()
-            .Include(r => r.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+        var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
+            r => r.Id == id, ct, "Items.Product");
 
         if (pr == null) return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
         if (pr.Status != InvoiceStatus.Draft) return Result<PurchaseReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
 
-        var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
+        var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
         bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
 
         // Stock Validation BEFORE transaction
@@ -233,10 +219,8 @@ public class PurchaseReturnService : IPurchaseReturnService
 
     public async Task<Result<PurchaseReturnDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
-        var pr = await _uow.PurchaseReturns.Query()
-            .Include(r => r.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+        var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
+            r => r.Id == id, ct, "Items.Product");
 
         if (pr == null) return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
         if (pr.Status == InvoiceStatus.Cancelled) return await GetByIdAsync(id, ct);

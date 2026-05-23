@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Data;
@@ -33,7 +33,6 @@ public class StockTransfersListViewModel : ViewModelBase
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
     private byte? _statusFilter;
-    private bool _isLoading;
     private string _errorMessage = string.Empty;
     private bool _isEmpty;
     private ICollectionView? _transfersView;
@@ -75,11 +74,6 @@ public class StockTransfersListViewModel : ViewModelBase
         set => SetProperty(ref _statusFilter, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string ErrorMessage
     {
@@ -132,10 +126,10 @@ public class StockTransfersListViewModel : ViewModelBase
 
     public ObservableCollection<StatusOption> StatusOptions { get; } = new()
     {
-        new StatusOption(null, "الكل"),
-        new StatusOption((byte)InvoiceStatus.Draft, "مسودة"),
-        new StatusOption((byte)InvoiceStatus.Posted, "مفتوحة"),
-        new StatusOption((byte)InvoiceStatus.Cancelled, "ملغاة")
+        new StatusOption(null, "ط§ظ„ظƒظ„"),
+        new StatusOption((byte)InvoiceStatus.Draft, "ظ…ط³ظˆط¯ط©"),
+        new StatusOption((byte)InvoiceStatus.Posted, "ظ…ظپطھظˆط­ط©"),
+        new StatusOption((byte)InvoiceStatus.Cancelled, "ظ…ظ„ط؛ط§ط©")
     };
 
     public ICommand AddCommand { get; }
@@ -150,7 +144,7 @@ public class StockTransfersListViewModel : ViewModelBase
     {
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             ErrorMessage = string.Empty;
 
             var result = await TransferService.GetAllAsync(SearchText, DateFrom, DateTo, StatusFilter, IncludeInactive);
@@ -160,7 +154,7 @@ public class StockTransfersListViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Transfers.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Transfers.Add(item);
                     }
@@ -171,7 +165,7 @@ public class StockTransfersListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل التحويلات", "StockTransfersListViewModel.LoadTransfersAsync", "[StockTransfersListViewModel.LoadTransfersAsync] Failed to load stock transfers list.");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„طھط­ظˆظٹظ„ط§طھ", "StockTransfersListViewModel.LoadTransfersAsync", "[StockTransfersListViewModel.LoadTransfersAsync] Failed to load stock transfers list.");
                 IsEmpty = Transfers.Count == 0;
             }
         }
@@ -181,7 +175,7 @@ public class StockTransfersListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -219,7 +213,7 @@ public class StockTransfersListViewModel : ViewModelBase
         var vm = App.GetService<StockTransferEditorViewModel>();
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "نقل مخزون جديد",
+            Title = "ظ†ظ‚ظ„ ظ…ط®ط²ظˆظ† ط¬ط¯ظٹط¯",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadTransfersAsync());
@@ -233,7 +227,7 @@ public class StockTransfersListViewModel : ViewModelBase
         var vm = new StockTransferEditorViewModel(SelectedTransfer.Id, isReadOnly: true);
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "عرض نقل مخزون"
+            Title = "ط¹ط±ط¶ ظ†ظ‚ظ„ ظ…ط®ط²ظˆظ†"
         });
     }
 
@@ -243,7 +237,7 @@ public class StockTransfersListViewModel : ViewModelBase
         var vm = new StockTransferEditorViewModel(SelectedTransfer.Id);
         ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            Title = "تعديل نقل مخزون",
+            Title = "طھط¹ط¯ظٹظ„ ظ†ظ‚ظ„ ظ…ط®ط²ظˆظ†",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadTransfersAsync());
@@ -255,13 +249,13 @@ public class StockTransfersListViewModel : ViewModelBase
     {
         if (SelectedTransfer == null) return;
 
-        var result = await DialogService.ShowConfirmationAsync("تأكيد الترحيل", "هل أنت متأكد من ترحيل هذا التحويل؟ سيتم نقل المخزون بين المستودعات.");
+        var result = await DialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ظ„طھط±ط­ظٹظ„", "ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† طھط±ط­ظٹظ„ ظ‡ط°ط§ ط§ظ„طھط­ظˆظٹظ„طں ط³ظٹطھظ… ظ†ظ‚ظ„ ط§ظ„ظ…ط®ط²ظˆظ† ط¨ظٹظ† ط§ظ„ظ…ط³طھظˆط¯ط¹ط§طھ.");
 
         if (!result) return;
 
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             var postResult = await TransferService.PostAsync(SelectedTransfer.Id);
 
             if (postResult.IsSuccess)
@@ -270,8 +264,8 @@ public class StockTransfersListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل التحويل", "StockTransfersListViewModel.OnPost");
-                await DialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
+                ErrorMessage = HandleFailure(postResult.Error ?? "ظپط´ظ„ ظپظٹ طھط±ط­ظٹظ„ ط§ظ„طھط­ظˆظٹظ„", "StockTransfersListViewModel.OnPost");
+                await DialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„طھط±ط­ظٹظ„", ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -280,7 +274,7 @@ public class StockTransfersListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -288,13 +282,13 @@ public class StockTransfersListViewModel : ViewModelBase
     {
         if (SelectedTransfer == null) return;
 
-        var result = await DialogService.ShowConfirmationAsync("تأكيد الإلغاء", "هل أنت متأكد من إلغاء هذا التحويل؟ سيتم إرجاع المخزون.");
+        var result = await DialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ظ„ط¥ظ„ط؛ط§ط،", "ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† ط¥ظ„ط؛ط§ط، ظ‡ط°ط§ ط§ظ„طھط­ظˆظٹظ„طں ط³ظٹطھظ… ط¥ط±ط¬ط§ط¹ ط§ظ„ظ…ط®ط²ظˆظ†.");
 
         if (!result) return;
 
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             var cancelResult = await TransferService.CancelAsync(SelectedTransfer.Id);
 
             if (cancelResult.IsSuccess)
@@ -303,8 +297,8 @@ public class StockTransfersListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(cancelResult.Error ?? "فشل في إلغاء التحويل", "StockTransfersListViewModel.OnCancel");
-                await DialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
+                ErrorMessage = HandleFailure(cancelResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، ط§ظ„طھط­ظˆظٹظ„", "StockTransfersListViewModel.OnCancel");
+                await DialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط¥ظ„ط؛ط§ط،", ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -313,7 +307,7 @@ public class StockTransfersListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -321,7 +315,7 @@ public class StockTransfersListViewModel : ViewModelBase
     {
         if (SelectedTransfer == null) return;
 
-        IsLoading = true;
+        IsBusy = true;
         try
         {
             var settingsResult = await SettingsService.GetSettingsAsync();
@@ -337,11 +331,11 @@ public class StockTransfersListViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+            ErrorMessage = $"ط®ط·ط£ ظپظٹ ط§ظ„ط·ط¨ط§ط¹ط©: {ex.Message}";
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 }
@@ -350,3 +344,7 @@ public class StockTransfersListViewModel : ViewModelBase
 /// Status display option
 /// </summary>
 public record StatusOption(byte? Value, string Display);
+
+
+
+

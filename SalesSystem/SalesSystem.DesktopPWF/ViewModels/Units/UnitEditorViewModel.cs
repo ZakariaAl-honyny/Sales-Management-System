@@ -15,7 +15,6 @@ public class UnitEditorViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private string _name = string.Empty;
-    private bool _isLoading;
     private string? _errorMessage;
     private string _windowTitle = "إضافة وحدة جديدة";
 
@@ -24,6 +23,7 @@ public class UnitEditorViewModel : ViewModelBase
         _unitService = App.GetService<IUnitApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
+        SetDialogService(_dialogService);
         InitializeCommands();
     }
 
@@ -38,7 +38,7 @@ public class UnitEditorViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ الوحدة...")));
         CancelCommand = new RelayCommand(() => RequestClose());
     }
 
@@ -49,14 +49,14 @@ public class UnitEditorViewModel : ViewModelBase
         get => _name;
         set
         {
-            SetProperty(ref _name, value);
+            if (SetProperty(ref _name, value))
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Name), "اسم الوحدة مطلوب");
+                else
+                    ClearErrors(nameof(Name));
+            }
         }
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
     }
 
     public string? ErrorMessage
@@ -82,46 +82,33 @@ public class UnitEditorViewModel : ViewModelBase
 
     #region Methods
 
-    private async Task SaveAsync()
+    private async Task SaveOperationAsync()
     {
         if (!await ValidateAsync()) return;
 
-        IsLoading = true;
         ErrorMessage = null;
 
-        try
+        Result<UnitDto> result;
+        if (_unitDto == null)
         {
-            Result<UnitDto> result;
-            if (_unitDto == null)
-            {
-                var request = new CreateUnitRequest(Name, null);
-                result = await _unitService.CreateAsync(request);
-            }
-            else
-            {
-                var request = new UpdateUnitRequest(Name, _unitDto.Symbol, _unitDto.IsActive);
-                result = await _unitService.UpdateAsync(_unitDto.Id, request);
-            }
+            var request = new CreateUnitRequest(Name, null);
+            result = await _unitService.CreateAsync(request);
+        }
+        else
+        {
+            var request = new UpdateUnitRequest(Name, _unitDto.Symbol, _unitDto.IsActive);
+            result = await _unitService.UpdateAsync(_unitDto.Id, request);
+        }
 
-            if (result.IsSuccess && result.Value != null)
-            {
-                _eventBus.Publish(new UnitChangedMessage(result.Value.Id));
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ الوحدة", "UnitEditorViewModel.SaveAsync");
-                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
-            }
-        }
-        catch (Exception ex)
+        if (result.IsSuccess && result.Value != null)
         {
-            ErrorMessage = HandleException(ex, "UnitEditorViewModel.SaveAsync", "Failed to save unit data.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
+            _eventBus.Publish(new UnitChangedMessage(result.Value.Id));
+            RequestClose();
         }
-        finally
+        else
         {
-            IsLoading = false;
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ الوحدة", "UnitEditorViewModel.SaveAsync");
+            await _dialogService.ShowErrorAsync("خطأ في حفظ الوحدة", ErrorMessage!);
         }
     }
 

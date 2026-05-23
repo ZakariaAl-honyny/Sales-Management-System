@@ -16,7 +16,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.7-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6.2-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -420,6 +420,8 @@ dotnet run
 | **Phase 13** | **Interactive Validation** — Remove CanExecute blocking, on-click warning dialogs, field ToolTips, required `*` markers, unique field explanations | ✅ **Completed** |
 | **Phase 14** | **Audit & Polish** — LogSystemError centralized, Dialog overlay + hover, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes | ✅ **Completed** |
 | **Phase 16** | **Audit & Service Layer Purity** — Result pattern enforcement, decimal precision fix, FK Restrict, Controller purity, FluentValidators, CostingMethod UI, Price Sync Indicators | ✅ **Completed** |
+| **v4.6.1** | **UI Sorting & Dialog Safety** — Newest-first sorting across 14 ViewModels, DatabaseErrorDialog self-owner fix, comprehensive system audit | ✅ **Completed** |
+| **v4.6.2** | **WPF Validation ErrorTemplate** — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -601,11 +603,74 @@ dotnet run
 
 ---
 
+## 🆕 What's New in v4.6.2 — Validation ErrorTemplate & INotifyDataErrorInfo
+
+| Feature | Description |
+|---------|-------------|
+| **Newest-First Sorting** | ALL 14 list ViewModels now sort records with newest first — products, customers, suppliers, warehouses, categories, units, users, returns, transfers, and payments sort by `Id` descending; invoices sort by `InvoiceDate` descending |
+| **Files Updated** | `ProductListViewModel`, `CustomerListViewModel`, `SupplierListViewModel`, `WarehouseListViewModel`, `CategoryListViewModel`, `UnitListViewModel`, `UserListViewModel`, `SalesReturnListViewModel`, `PurchaseReturnListViewModel`, `StockTransfersListViewModel`, `CustomerPaymentsListViewModel`, `SupplierPaymentsListViewModel`, `SalesInvoiceListViewModel`, `PurchaseInvoiceListViewModel` |
+| **DatabaseErrorDialog Bug Fix** | Fixed "Cannot set Owner property to itself" crash on startup — `PositionOverOwner()` now guards against `MainWindow == this` and falls back to `CenterScreen` |
+| **Full System Audit** | Code Reviewer, Database Engineer, and Security Auditor subagents performed comprehensive audits — 79/83 code review pass, 12/17 DB schema pass, 8/10 security pass |
+| **Audit Findings Documented** | Key issues found: 16 entity configs missing `HasQueryFilter`, `CashBox` missing `OpeningBalance`, `BaseConversionFactor` precision wrong, User hard delete endpoint exists, hardcoded connection strings |
+
+### Newest-First Sorting — Complete List
+
+| ViewModel | Sort Field | Reason |
+|-----------|-----------|--------|
+| ProductListViewModel | `Id` descending | Auto-increment PK = newest first |
+| CustomerListViewModel | `Id` descending | Auto-increment PK = newest first |
+| SupplierListViewModel | `Id` descending | Auto-increment PK = newest first |
+| WarehouseListViewModel | `Id` descending | Auto-increment PK = newest first |
+| CategoryListViewModel | `Id` descending | Auto-increment PK = newest first |
+| UnitListViewModel | `Id` descending | Auto-increment PK = newest first |
+| UserListViewModel | `Id` descending | Auto-increment PK = newest first |
+| SalesReturnListViewModel | `Id` descending | Auto-increment PK = newest first |
+| PurchaseReturnListViewModel | `Id` descending | Auto-increment PK = newest first |
+| StockTransfersListViewModel | `Id` descending | Auto-increment PK = newest first |
+| CustomerPaymentsListViewModel | `Id` descending | Auto-increment PK = newest first |
+| SupplierPaymentsListViewModel | `Id` descending | Auto-increment PK = newest first |
+| SalesInvoiceListViewModel | `InvoiceDate` descending | Most recent invoices first |
+| PurchaseInvoiceListViewModel | `InvoiceDate` descending | Most recent invoices first |
+
+---
+
+## 🆕 What's New in v4.6.2 — WPF Validation ErrorTemplate & INotifyDataErrorInfo
+
+| Feature | Description |
+|---------|-------------|
+| **Red Border + ❗ Icon on Invalid Fields** | New `Validation.ErrorTemplate` in `Styles.xaml` wraps invalid TextBox/PasswordBox/ComboBox fields in a red border with a red ❗ badge icon — hover shows the error message via ToolTip bound to `[0].ErrorContent` |
+| **INotifyDataErrorInfo Standardized** | All Editor ViewModels now use `AddError/ClearErrors` in property setters for real-time validation — replaces legacy `HasXxxError` boolean + computed string pattern |
+| **ValidateAllAsync() Base Method** | `ViewModelBase` now provides a reusable `ValidateAllAsync()` that checks `HasErrors`, shows the validation warning dialog, and calls `RequestFocusFirstInvalidField()` — no more duplicated dialog logic in each Editor VM |
+| **14 Editor VMs Updated** | All 14 Editor ViewModels now call `SetDialogService()` in constructors to enable the base validation infrastructure |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `Resources/Styles.xaml` | New `ErrorTemplate` with red border + ❗ icon + ToolTip; Validation.HasError triggers on TextBox, PasswordBox, ComboBox |
+| `ViewModels/ViewModelBase.cs` | Added `SetDialogService()`, `ValidateAllAsync()`, `ValidateField()` |
+| `ViewModels/Products/ProductEditorViewModel.cs` | Refactored: removed 7 `HasXxxError` booleans, uses pure INotifyDataErrorInfo |
+| `ViewModels/Customers/CustomerEditorViewModel.cs` | Refactored: removed 3 `HasXxxError` booleans, uses pure INotifyDataErrorInfo |
+| `ViewModels/Suppliers/SupplierEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Categories/CategoryEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Units/UnitEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/WarehouseEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Users/UserEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Payments/CustomerPaymentEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Payments/SupplierPaymentEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Transfers/StockTransferEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Returns/SalesReturnEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Returns/PurchaseReturnEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Sales/SalesInvoiceEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Purchases/PurchaseInvoiceEditorViewModel.cs` | Added `SetDialogService()` |
+
+---
+
 ## 🤝 Contributing
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 218 non-negotiable rules (RULE-001 to RULE-219)
+1. Read [`AGENTS.md`](AGENTS.md) — all 230 non-negotiable rules (RULE-001 to RULE-230)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

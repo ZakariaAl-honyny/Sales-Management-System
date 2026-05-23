@@ -166,7 +166,7 @@ public class WarehouseListViewModel : ViewModelBase
             await InvokeOnUIThreadAsync(async () =>
             {
                 Warehouses.Clear();
-                foreach (var item in result.Value)
+                foreach (var item in result.Value.OrderByDescending(x => x.Id))
                 {
                     Warehouses.Add(item);
                 }

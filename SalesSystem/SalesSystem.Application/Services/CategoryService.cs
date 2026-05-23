@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -31,35 +30,26 @@ public class CategoryService : ICategoryService
 
     public async Task<Result<PagedResult<CategoryDto>>> GetAllAsync(string? search, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _uow.Categories.Query();
-        
-        if (includeInactive)
-        {
-            query = query.IgnoreQueryFilters();
-        }
+        System.Linq.Expressions.Expression<System.Func<Category, bool>>? predicate = null;
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(c => c.Name.Contains(search));
+            var s = search;
+            predicate = c => c.Name.Contains(s);
         }
 
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderBy(c => c.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var (items, total) = await _uow.Categories.GetPagedAsync(
+            predicate, q => q.OrderBy(c => c.Name), page, pageSize, ct, includeInactive);
 
         var dtos = items.Select(MapToDto).ToList();
-
-        return Result<PagedResult<CategoryDto>>.Success(PagedResult<CategoryDto>.Create(dtos, totalItems, page, pageSize));
+        return Result<PagedResult<CategoryDto>>.Success(PagedResult<CategoryDto>.Create(dtos, total, page, pageSize));
     }
 
     public async Task<Result<CategoryDto>> CreateAsync(CreateCategoryRequest request, CancellationToken ct)
     {
         try
         {
-            if (await _uow.Categories.Query().AnyAsync(c => c.Name == request.Name, ct))
+            if (await _uow.Categories.AnyAsync(c => c.Name == request.Name, ct))
                 return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", "DUPLICATE_CATEGORY_NAME");
 
             var category = Category.Create(request.Name, request.Description, null);
@@ -86,11 +76,11 @@ public class CategoryService : ICategoryService
     {
         try
         {
-            var category = await _uow.Categories.Query().IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, ct);
+            var category = await _uow.Categories.FirstOrDefaultIgnoreFiltersAsync(c => c.Id == id, ct);
             if (category == null)
                 return Result<CategoryDto>.Failure("الفئة غير موجودة", ErrorCodes.NotFound);
 
-            if (await _uow.Categories.Query().AnyAsync(c => c.Name == request.Name && c.Id != id, ct))
+            if (await _uow.Categories.AnyAsync(c => c.Name == request.Name && c.Id != id, ct))
                 return Result<CategoryDto>.Failure("اسم الفئة مستخدم بالفعل", "DUPLICATE_CATEGORY_NAME");
 
             category.Update(request.Name, request.Description, null);
@@ -122,7 +112,7 @@ public class CategoryService : ICategoryService
         if (category == null)
             return Result.Failure("الفئة غير موجودة", ErrorCodes.NotFound);
 
-        if (await _uow.Products.Query().AnyAsync(p => p.CategoryId == id, ct))
+        if (await _uow.Products.AnyAsync(p => p.CategoryId == id, ct))
             return Result.Failure("لا يمكن حذف الفئة لأنها مرتبطة بمنتجات");
 
         await _uow.Categories.SoftDeleteAsync(id, ct);
@@ -134,11 +124,11 @@ public class CategoryService : ICategoryService
 
     public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
     {
-        var category = await _uow.Categories.Query().IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, ct);
+        var category = await _uow.Categories.FirstOrDefaultIgnoreFiltersAsync(c => c.Id == id, ct);
         if (category == null)
             return Result.Failure("الفئة غير موجودة", ErrorCodes.NotFound);
 
-        if (await _uow.Products.Query().AnyAsync(p => p.CategoryId == id, ct))
+        if (await _uow.Products.AnyAsync(p => p.CategoryId == id, ct))
             return Result.Failure("لا يمكن حذف الفئة نهائياً لأنها مرتبطة بمنتجات");
 
         try
@@ -149,11 +139,10 @@ public class CategoryService : ICategoryService
             _logger.LogInformation("Category permanently deleted: {CategoryId}", id);
             return Result.Success();
         }
-        catch (DbUpdateException ex)
+        catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
         {
             _logger.LogError(ex, "Failed to permanently delete category {CategoryId} due to database constraint", id);
-            var innerMessage = ex.InnerException?.Message ?? ex.Message;
-            return Result.Failure($"لا يمكن حذف الفئة نهائياً. قد تكون مرتبطة ببيانات أخرى في النظام. ({innerMessage})");
+            return Result.Failure("لا يمكن حذف الفئة نهائياً. قد تكون مرتبطة ببيانات أخرى في النظام.");
         }
     }
 

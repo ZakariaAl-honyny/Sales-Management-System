@@ -168,7 +168,7 @@ public partial class MainWindow : Window
 
             if (!checkResult.IsSuccess)
             {
-                _ = _dialogService.ShowErrorAsync("خطأ", $"تعذر الاتصال بخادم التحديثات.\n{checkResult.Error}");
+                _ = _dialogService.ShowErrorAsync("خطأ في فحص التحديثات", $"تعذر الاتصال بخادم التحديثات.\n{checkResult.Error}");
                 return;
             }
 

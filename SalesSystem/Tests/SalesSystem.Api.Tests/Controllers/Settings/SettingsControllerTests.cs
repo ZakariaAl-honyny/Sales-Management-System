@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Api.Controllers;
-using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Domain.Enums;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Tests.Controllers.Settings;
@@ -14,16 +14,14 @@ namespace SalesSystem.Api.Tests.Controllers.Settings;
 public class SettingsControllerTests
 {
     private readonly Mock<IStoreSettingsService> _settingsServiceMock;
-    private readonly Mock<ISystemSettingsRepository> _systemSettingsMock;
     private readonly Mock<ILogger<SettingsController>> _loggerMock;
     private readonly SettingsController _controller;
 
     public SettingsControllerTests()
     {
         _settingsServiceMock = new Mock<IStoreSettingsService>();
-        _systemSettingsMock = new Mock<ISystemSettingsRepository>();
         _loggerMock = new Mock<ILogger<SettingsController>>();
-        _controller = new SettingsController(_settingsServiceMock.Object, _systemSettingsMock.Object);
+        _controller = new SettingsController(_settingsServiceMock.Object);
 
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, "1") };
         var identity = new ClaimsIdentity(claims);
@@ -32,6 +30,14 @@ public class SettingsControllerTests
         {
             HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = principal }
         };
+
+        // Setup default costing method responses
+        _settingsServiceMock
+            .Setup(x => x.GetCostingMethodAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<CostingMethod?>.Success(CostingMethod.WeightedAverage));
+        _settingsServiceMock
+            .Setup(x => x.SetCostingMethodAsync(It.IsAny<CostingMethod>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
     }
 
     [Fact]

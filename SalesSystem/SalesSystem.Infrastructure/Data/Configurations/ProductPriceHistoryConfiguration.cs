@@ -33,5 +33,15 @@ public class ProductPriceHistoryConfiguration : IEntityTypeConfiguration<Product
 
         builder.Property(x => x.ChangedBy)
             .IsRequired();
+
+        builder.HasOne<ProductUnit>()
+            .WithMany()
+            .HasForeignKey(x => x.ProductUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(x => x.ChangedBy)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

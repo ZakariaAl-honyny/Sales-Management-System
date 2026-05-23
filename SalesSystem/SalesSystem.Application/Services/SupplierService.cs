@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -33,29 +32,19 @@ public class SupplierService : ISupplierService
 
     public async Task<Result<PagedResult<SupplierDto>>> GetAllAsync(string? search, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _uow.Suppliers.Query();
-        
-        if (includeInactive)
-        {
-            query = query.IgnoreQueryFilters();
-        }
+        System.Linq.Expressions.Expression<System.Func<Supplier, bool>>? predicate = null;
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(s => s.Name.Contains(search) ||
-                                    (s.Phone != null && s.Phone.Contains(search)));
+            var s = search;
+            predicate = sup => sup.Name.Contains(s) || (sup.Phone != null && sup.Phone.Contains(s));
         }
 
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderBy(s => s.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var (items, total) = await _uow.Suppliers.GetPagedAsync(
+            predicate, q => q.OrderBy(s => s.Name), page, pageSize, ct, includeInactive);
 
         var dtos = items.Select(MapToDto).ToList();
-
-        return Result<PagedResult<SupplierDto>>.Success(PagedResult<SupplierDto>.Create(dtos, totalItems, page, pageSize));
+        return Result<PagedResult<SupplierDto>>.Success(PagedResult<SupplierDto>.Create(dtos, total, page, pageSize));
     }
 
     public async Task<Result<SupplierDto>> CreateAsync(CreateSupplierRequest request, CancellationToken ct)
@@ -95,7 +84,7 @@ public class SupplierService : ISupplierService
     {
         try
         {
-            var supplier = await _uow.Suppliers.Query().IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == id, ct);
+            var supplier = await _uow.Suppliers.FirstOrDefaultIgnoreFiltersAsync(s => s.Id == id, ct);
             if (supplier == null)
                 return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
@@ -148,14 +137,14 @@ public class SupplierService : ISupplierService
 
     public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
     {
-        var supplier = await _uow.Suppliers.Query().IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == id, ct);
+        var supplier = await _uow.Suppliers.FirstOrDefaultIgnoreFiltersAsync(s => s.Id == id, ct);
         if (supplier == null)
             return Result.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
-        if (await _uow.PurchaseInvoices.Query().AnyAsync(pi => pi.SupplierId == id, ct))
+        if (await _uow.PurchaseInvoices.AnyAsync(pi => pi.SupplierId == id, ct))
             return Result.Failure("لا يمكن حذف المورد نهائياً لأنه مرتبط بفواتير شراء");
 
-        if (await _uow.SupplierPayments.Query().AnyAsync(sp => sp.SupplierId == id, ct))
+        if (await _uow.SupplierPayments.AnyAsync(sp => sp.SupplierId == id, ct))
             return Result.Failure("لا يمكن حذف المورد نهائياً لأنه مرتبط بسندات صرف");
 
         try
@@ -166,11 +155,10 @@ public class SupplierService : ISupplierService
             _logger.LogInformation("Supplier permanently deleted: {SupplierId}", id);
             return Result.Success();
         }
-        catch (DbUpdateException ex)
+        catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
         {
             _logger.LogError(ex, "Failed to permanently delete supplier {SupplierId} due to database constraint", id);
-            var innerMessage = ex.InnerException?.Message ?? ex.Message;
-            return Result.Failure($"لا يمكن حذف المورد نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام. ({innerMessage})");
+            return Result.Failure("لا يمكن حذف المورد نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
         }
     }
 
