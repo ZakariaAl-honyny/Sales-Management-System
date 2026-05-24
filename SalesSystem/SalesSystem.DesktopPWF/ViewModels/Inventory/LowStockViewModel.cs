@@ -103,7 +103,7 @@ public class LowStockViewModel : ViewModelBase
                 {
                     Warehouses.Clear();
                     // Add "All Warehouses" option
-                    Warehouses.Add(new WarehouseDto(0, "ظƒظ„ ط§ظ„ظ…ط®ط§ط²ظ†", string.Empty, true, true));
+                    Warehouses.Add(new WarehouseDto(0, "كل المخازن", string.Empty, true, true));
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
                     
@@ -136,13 +136,13 @@ public class LowStockViewModel : ViewModelBase
             }
             else
             {
-                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„ط¨ظٹط§ظ†ط§طھ", result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ طھظ‚ط±ظٹط± ط§ظ„ظ…ط®ط²ظˆظ† ط§ظ„ظ…ظ†ط®ظپط¶");
+                await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", result.Error ?? "فشل في تحميل تقرير المخزون المنخفض");
             }
         }
         catch (Exception ex)
         {
             LogSystemError("Failed to load low stock report", "LowStockViewModel.LoadDataAsync", ex);
-            await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„ط¨ظٹط§ظ†ط§طھ", "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، طھط­ظ…ظٹظ„ ط§ظ„طھظ‚ط±ظٹط±. ظٹط±ط¬ظ‰ ط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", "حدث خطأ غير متوقع أثناء تحميل التقرير. يرجى المحاولة مرة أخرى.");
         }
         finally
         {
@@ -154,7 +154,7 @@ public class LowStockViewModel : ViewModelBase
     {
         if (Items.Count == 0)
         {
-            await _dialogService.ShowWarningAsync("طھظ†ط¨ظٹظ‡", "ظ„ط§ طھظˆط¬ط¯ ط¨ظٹط§ظ†ط§طھ ظ„طھطµط¯ظٹط±ظ‡ط§");
+            await _dialogService.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
             return;
         }
 
@@ -173,15 +173,15 @@ public class LowStockViewModel : ViewModelBase
                     var worksheet = workbook.Worksheets.Add("Low Stock");
                     
                     // Headers
-                    worksheet.Cell(1, 1).Value = "ظƒظˆط¯ ط§ظ„ظ…ظ†طھط¬";
-                    worksheet.Cell(1, 2).Value = "ط§ط³ظ… ط§ظ„ظ…ظ†طھط¬";
-                    worksheet.Cell(1, 3).Value = "ط§ظ„ظپط¦ط©";
-                    worksheet.Cell(1, 4).Value = "ط§ظ„ظ…ط³طھظˆط¯ط¹";
-                    worksheet.Cell(1, 5).Value = "ط§ظ„ظ…ط®ط²ظˆظ† ط§ظ„ط­ط§ظ„ظٹ (طھط¬ط²ط¦ط©)";
-                    worksheet.Cell(1, 6).Value = "طھظ†ط¨ظٹظ‡ ط§ظ„ظ…ط®ط²ظˆظ† (طھط¬ط²ط¦ط©)";
-                    worksheet.Cell(1, 7).Value = "ط§ظ„ط¹ط¬ط² (طھط¬ط²ط¦ط©)";
-                    worksheet.Cell(1, 8).Value = "ط§ظ„ط·ظ„ط¨ ط§ظ„ظ…ظ‚طھط±ط­ (ط¬ظ…ظ„ط©)";
-                    worksheet.Cell(1, 9).Value = "ط§ظ„ط·ظ„ط¨ ط§ظ„ظ…ظ‚طھط±ط­ (طھط¬ط²ط¦ط©)";
+                    worksheet.Cell(1, 1).Value = "كود المنتج";
+                    worksheet.Cell(1, 2).Value = "اسم المنتج";
+                    worksheet.Cell(1, 3).Value = "الفئة";
+                    worksheet.Cell(1, 4).Value = "المستودع";
+                    worksheet.Cell(1, 5).Value = "المخزون الحالي (تجزئة)";
+                    worksheet.Cell(1, 6).Value = "تنبيه المخزون (تجزئة)";
+                    worksheet.Cell(1, 7).Value = "العجز (تجزئة)";
+                    worksheet.Cell(1, 8).Value = "الطلب المقترح (جملة)";
+                    worksheet.Cell(1, 9).Value = "الطلب المقترح (تجزئة)";
 
                     // Data
                     for (int i = 0; i < Items.Count; i++)
@@ -206,20 +206,20 @@ public class LowStockViewModel : ViewModelBase
 
                     workbook.SaveAs(saveFileDialog.FileName);
                 }
-                await _dialogService.ShowInfoAsync("ظ†ط¬ط§ط­", "طھظ… طھطµط¯ظٹط± ط§ظ„ظ…ظ„ظپ ط¨ظ†ط¬ط§ط­");
+                await _dialogService.ShowInfoAsync("نجاح", "تم تصدير الملف بنجاح");
             }
         }
         catch (Exception ex)
         {
             LogSystemError("Failed to export low stock report to Excel", "LowStockViewModel.ExportToExcel", ex);
-            await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ طھطµط¯ظٹط± ط§ظ„ظ…ظ„ظپ", "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، طھطµط¯ظٹط± ط§ظ„ظ…ظ„ظپ. ظٹط±ط¬ظ‰ ط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰.");
+            await _dialogService.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
         }
     }
 
     private async void Print()
     {
         // Printing logic using a print service or simple PDF export
-        await _dialogService.ShowInfoAsync("ظ…ط¹ظ„ظˆظ…ط§طھ", "ط¬ط§ط±ظٹ طھط¬ظ‡ظٹط² ط§ظ„ط·ط¨ط§ط¹ط©...");
+        await _dialogService.ShowInfoAsync("معلومات", "جاري تجهيز الطباعة...");
     }
 }
 
