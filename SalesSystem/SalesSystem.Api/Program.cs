@@ -105,6 +105,7 @@ builder.Services.AddDbContext<SalesDbContext>((serviceProvider, options) =>
 builder.Services.AddScoped<IConnectionStringProtector, ConnectionStringProtector>();
 builder.Services.AddScoped<FirstRunSetupService>();
 builder.Services.AddScoped<SecureDbContextFactory>();
+builder.Services.Configure<BackupSettings>(builder.Configuration.GetSection(BackupSettings.SectionName));
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddHostedService<ScheduledBackupWorker>();
 builder.Services.AddUpdateServices(builder.Configuration);

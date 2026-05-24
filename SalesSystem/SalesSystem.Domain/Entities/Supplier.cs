@@ -82,6 +82,6 @@ public class Supplier : BaseEntity
         TaxNumber = taxNumber;
         CreditLimit = creditLimit;
         SetUpdatedBy(updatedByUserId);
-        UpdatedAt = DateTime.UtcNow;
+        UpdateTimestamp();
     }
 }

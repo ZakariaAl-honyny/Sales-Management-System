@@ -37,5 +37,7 @@ public class WarehouseStockConfiguration : IEntityTypeConfiguration<WarehouseSto
             .WithMany(p => p.WarehouseStocks)
             .HasForeignKey(ws => ws.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(ws => ws.IsActive);
     }
 }

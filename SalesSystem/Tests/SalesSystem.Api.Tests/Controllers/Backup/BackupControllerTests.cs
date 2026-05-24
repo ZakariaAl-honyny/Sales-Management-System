@@ -1,7 +1,7 @@
 using System.IO;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Application.Interfaces.Services;
@@ -21,12 +21,9 @@ public class BackupControllerTests
         _backupServiceMock = new Mock<IBackupService>();
         _backupDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups"));
 
-        var configMock = new Mock<IConfiguration>();
-        configMock
-            .Setup(x => x["Backup:DefaultBackupPath"])
-            .Returns(_backupDir);
+        var backupSettings = Options.Create(new BackupSettings { DefaultBackupPath = _backupDir });
 
-        _controller = new BackupController(_backupServiceMock.Object, configMock.Object);
+        _controller = new BackupController(_backupServiceMock.Object, backupSettings);
     }
 
     [Fact]

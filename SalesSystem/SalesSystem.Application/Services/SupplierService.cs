@@ -11,13 +11,11 @@ namespace SalesSystem.Application.Services;
 public class SupplierService : ISupplierService
 {
     private readonly IUnitOfWork _uow;
-    private readonly IDocumentSequenceService _sequenceService;
     private readonly ILogger<SupplierService> _logger;
 
-    public SupplierService(IUnitOfWork uow, IDocumentSequenceService sequenceService, ILogger<SupplierService> logger)
+    public SupplierService(IUnitOfWork uow, ILogger<SupplierService> logger)
     {
         _uow = uow;
-        _sequenceService = sequenceService;
         _logger = logger;
     }
 

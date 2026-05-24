@@ -11,13 +11,11 @@ namespace SalesSystem.Application.Services;
 public class CustomerService : ICustomerService
 {
     private readonly IUnitOfWork _uow;
-    private readonly IDocumentSequenceService _sequenceService;
     private readonly ILogger<CustomerService> _logger;
 
-    public CustomerService(IUnitOfWork uow, IDocumentSequenceService sequenceService, ILogger<CustomerService> logger)
+    public CustomerService(IUnitOfWork uow, ILogger<CustomerService> logger)
     {
         _uow = uow;
-        _sequenceService = sequenceService;
         _logger = logger;
     }
 

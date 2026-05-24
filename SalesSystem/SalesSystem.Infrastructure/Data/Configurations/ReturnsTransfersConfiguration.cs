@@ -31,6 +31,8 @@ public class SalesReturnConfiguration : IEntityTypeConfiguration<SalesReturn>
             .WithOne(i => i.SalesReturn)
             .HasForeignKey(i => i.SalesReturnId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(sr => sr.IsActive);
     }
 }
 
@@ -50,6 +52,8 @@ public class SalesReturnItemConfiguration : IEntityTypeConfiguration<SalesReturn
             .WithMany()
             .HasForeignKey(sri => sri.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(sri => sri.IsActive);
     }
 }
 
@@ -80,6 +84,8 @@ public class PurchaseReturnConfiguration : IEntityTypeConfiguration<PurchaseRetu
             .WithOne(i => i.PurchaseReturn)
             .HasForeignKey(i => i.PurchaseReturnId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(pr => pr.IsActive);
     }
 }
 
@@ -99,6 +105,8 @@ public class PurchaseReturnItemConfiguration : IEntityTypeConfiguration<Purchase
             .WithMany()
             .HasForeignKey(pri => pri.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(pri => pri.IsActive);
     }
 }
 
@@ -127,6 +135,8 @@ public class StockTransferConfiguration : IEntityTypeConfiguration<StockTransfer
             .WithOne(i => i.StockTransfer)
             .HasForeignKey(i => i.StockTransferId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(st => st.IsActive);
     }
 }
 
@@ -143,5 +153,7 @@ public class StockTransferItemConfiguration : IEntityTypeConfiguration<StockTran
             .WithMany()
             .HasForeignKey(sti => sti.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(sti => sti.IsActive);
     }
 }

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Controllers;
@@ -18,11 +20,12 @@ public class BackupController : ControllerBase
 
     public BackupController(
         IBackupService backupService,
-        IConfiguration configuration)
+        IOptions<BackupSettings> backupOptions)
     {
         _backupService = backupService;
-        _backupFolder = configuration["Backup:DefaultBackupPath"]
-            ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
+        _backupFolder = backupOptions.Value.DefaultBackupPath;
+        if (string.IsNullOrWhiteSpace(_backupFolder))
+            _backupFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
     }
 
     /// <summary>

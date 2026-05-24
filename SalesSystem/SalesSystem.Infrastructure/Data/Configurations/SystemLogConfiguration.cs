@@ -27,5 +27,7 @@ public class SystemLogConfiguration : IEntityTypeConfiguration<SystemLog>
 
         builder.Property(e => e.MachineName)
             .HasMaxLength(100);
+
+        builder.HasQueryFilter(e => e.IsActive);
     }
 }

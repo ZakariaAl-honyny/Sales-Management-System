@@ -18,6 +18,11 @@ public class CashTransactionConfiguration : IEntityTypeConfiguration<CashTransac
         builder.HasIndex(x => x.CashBoxId);
         builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId });
 
+        builder.HasOne(ct => ct.CashBox)
+            .WithMany(cb => cb.Transactions)
+            .HasForeignKey(ct => ct.CashBoxId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(x => x.IsActive).HasDefaultValue(true);
         builder.HasQueryFilter(x => x.IsActive);
     }

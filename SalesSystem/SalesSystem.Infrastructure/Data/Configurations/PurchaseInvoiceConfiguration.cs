@@ -44,6 +44,8 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasQueryFilter(pi => pi.IsActive);
+
+        builder.ToTable(t => t.HasCheckConstraint("CHK_PurchaseInvoices_PaidAmount", "[PaidAmount] >= 0 AND [PaidAmount] <= [TotalAmount]"));
     }
 }
 
@@ -63,5 +65,7 @@ public class PurchaseInvoiceItemConfiguration : IEntityTypeConfiguration<Purchas
             .WithMany()
             .HasForeignKey(pii => pii.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(pii => pii.IsActive);
     }
 }

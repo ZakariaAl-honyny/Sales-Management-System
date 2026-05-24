@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
-using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
@@ -22,7 +21,6 @@ public class ProductServiceTests : IDisposable
     private readonly ITestOutputHelper _output;
     private readonly TestDbContext _dbContext;
     private readonly Mock<IUnitOfWork> _mockUow;
-    private readonly Mock<IDocumentSequenceService> _mockSequenceService;
     private readonly Mock<ILogger<ProductService>> _mockLogger;
 
     private readonly ProductService _sut;
@@ -39,7 +37,6 @@ public class ProductServiceTests : IDisposable
         _dbContext = new TestDbContext(options);
 
         _mockUow = new Mock<IUnitOfWork>();
-        _mockSequenceService = new Mock<IDocumentSequenceService>();
         _mockLogger = new Mock<ILogger<ProductService>>();
 
         _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
@@ -52,7 +49,7 @@ public class ProductServiceTests : IDisposable
                 return 1;
             });
 
-        _sut = new ProductService(_mockUow.Object, _mockSequenceService.Object, _mockLogger.Object);
+        _sut = new ProductService(_mockUow.Object, _mockLogger.Object);
     }
 
     public void Dispose()
