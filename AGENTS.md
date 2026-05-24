@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/007-production-readiness/plan.md](specs/007-production-readiness/plan.md)
+**Active Feature Plan**: [specs/008-dynamic-uom-costing/plan.md](specs/008-dynamic-uom-costing/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
