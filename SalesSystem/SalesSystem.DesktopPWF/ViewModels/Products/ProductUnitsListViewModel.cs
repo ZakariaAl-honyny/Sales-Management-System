@@ -53,10 +53,14 @@ public class ProductUnitsListViewModel : ViewModelBase
     {
         RefreshCommand = new AsyncRelayCommand(LoadUnitsAsync);
         AddCommand = new RelayCommand(AddUnit);
-        EditCommand = new RelayCommand(EditUnit, () => SelectedUnit != null);
-        DeleteCommand = new AsyncRelayCommand(DeleteUnitAsync, () => SelectedUnit != null);
+        EditCommand = new RelayCommand(EditUnit);
+        DeleteCommand = new AsyncRelayCommand(DeleteUnitAsync);
+    }
 
+    public void OnNavigatedTo()
+    {
         _eventBus.Subscribe<ProductChangedMessage>(OnProductChanged);
+        _ = LoadUnitsAsync();
     }
 
     #region Properties
@@ -70,14 +74,7 @@ public class ProductUnitsListViewModel : ViewModelBase
     public ProductUnitDto? SelectedUnit
     {
         get => _selectedUnit;
-        set
-        {
-            if (SetProperty(ref _selectedUnit, value))
-            {
-                (EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                (DeleteCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-            }
-        }
+        set => SetProperty(ref _selectedUnit, value);
     }
 
     public int ProductId
@@ -113,38 +110,30 @@ public class ProductUnitsListViewModel : ViewModelBase
 
     public async Task LoadUnitsAsync()
     {
-        IsBusy = true;
+        await ExecuteAsync(LoadUnitsOperationAsync);
+    }
+
+    private async Task LoadUnitsOperationAsync()
+    {
         ErrorMessage = null;
+        var result = await _unitService.GetByProductIdAsync(ProductId);
 
-        try
+        if (result.IsSuccess && result.Value != null)
         {
-            var result = await _unitService.GetByProductIdAsync(ProductId);
-
-            if (result.IsSuccess && result.Value != null)
+            InvokeOnUIThread(() =>
             {
-                InvokeOnUIThread(() =>
+                Units.Clear();
+                foreach (var item in result.Value.OrderBy(x => x.ConversionFactor))
                 {
-                    Units.Clear();
-                    foreach (var item in result.Value.OrderBy(x => x.ConversionFactor))
-                    {
-                        Units.Add(item);
-                    }
-                    IsEmpty = Units.Count == 0;
-                });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل وحدات القياس", "ProductUnitsListViewModel.LoadUnitsAsync", "[ProductUnitsListViewModel.LoadUnitsAsync] Failed to load product units from API.");
+                    Units.Add(item);
+                }
                 IsEmpty = Units.Count == 0;
-            }
+            });
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "ProductUnitsListViewModel.LoadUnitsAsync", "[ProductUnitsListViewModel.LoadUnitsAsync] Failed to load product units from API.");
-        }
-        finally
-        {
-            IsBusy = false;
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل وحدات القياس", "ProductUnitsListViewModel.LoadUnitsOperationAsync", "[ProductUnitsListViewModel.LoadUnitsOperationAsync] Failed to load product units from API.");
+            IsEmpty = Units.Count == 0;
         }
     }
 
@@ -181,41 +170,33 @@ public class ProductUnitsListViewModel : ViewModelBase
         });
     }
 
-    private async Task DeleteUnitAsync()
+    public async Task DeleteUnitAsync()
     {
         if (SelectedUnit == null) return;
 
         var strategy = await _dialogService.ShowDeleteConfirmationAsync($"الوحدة: {SelectedUnit.UnitName}");
-
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsBusy = true;
+        var unitId = SelectedUnit.Id;
+        await ExecuteAsync(() => DeleteUnitOperationAsync(unitId, strategy));
+    }
+
+    private async Task DeleteUnitOperationAsync(int unitId, DeleteStrategy strategy)
+    {
         ErrorMessage = null;
+        var deleteResult = await _unitService.DeleteUnitAsync(ProductId, unitId, strategy);
 
-        try
+        if (deleteResult.IsSuccess)
         {
-            var deleteResult = await _unitService.DeleteUnitAsync(ProductId, SelectedUnit.Id, strategy);
-
-            if (deleteResult.IsSuccess)
-            {
-                _eventBus.Publish(new ProductChangedMessage(ProductId));
-                await LoadUnitsAsync();
-                _toastService.ShowSuccess("تم حذف الوحدة بنجاح");
-            }
-            else
-            {
-                var error = deleteResult.Error ?? "فشل في حذف الوحدة";
-                ErrorMessage = error;
-                _toastService.ShowError(error);
-            }
+            _eventBus.Publish(new ProductChangedMessage(ProductId));
+            await LoadUnitsAsync();
+            _toastService.ShowSuccess("تم حذف الوحدة بنجاح");
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "ProductUnitsListViewModel.DeleteUnitAsync", $"[ProductUnitsListViewModel.DeleteUnitAsync] Failed to delete unit with ID {SelectedUnit.Id}.");
-        }
-        finally
-        {
-            IsBusy = false;
+            var error = deleteResult.Error ?? "فشل في حذف الوحدة";
+            ErrorMessage = error;
+            _toastService.ShowError(error);
         }
     }
 

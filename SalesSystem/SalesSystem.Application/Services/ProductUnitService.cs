@@ -79,6 +79,7 @@ public class ProductUnitService : IProductUnitService
 
             product.AddUnit(unit);
             await _uow.ProductUnits.AddAsync(unit, ct);
+            await _uow.SaveChangesAsync(ct);
 
             var history = ProductPriceHistory.CreateWithDetails(
                 unit.Id,
@@ -88,7 +89,6 @@ public class ProductUnitService : IProductUnitService
                 "إنشاء وحدة جديدة",
                 0);
             await _uow.ProductPriceHistory.AddAsync(history, ct);
-
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Unit {UnitName} added to product {ProductId}", unit.UnitName, productId);
@@ -237,7 +237,7 @@ public class ProductUnitService : IProductUnitService
                 unit.UnitName,
                 unit.BaseConversionFactor,
                 unit.SalesPrice,
-                unit.SalesPrice);
+                unit.WholesalePrice);
 
             return Result<BarcodeResolutionDto>.Success(dto);
         }
@@ -297,7 +297,7 @@ public class ProductUnitService : IProductUnitService
             unit.UnitName,
             unit.BaseConversionFactor,
             unit.SalesPrice,
-            unit.SalesPrice,
+            unit.WholesalePrice,
             unit.PurchaseCost,
             unit.IsBaseUnit,
             unit.IsActive)

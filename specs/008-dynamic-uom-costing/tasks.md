@@ -123,7 +123,7 @@ description: "Task list for Dynamic UOM & Costing Engine (v4.3)"
 
 - [x] T042 [P] Add Arabic ToolTips to all interactive controls in XAML files — ✅ Applied — RULE-031
 
-- [ ] T043 Update `docs/CHANGELOG.md` with v4.3 entry *(pending)*
+- [x] T043 Update `docs/CHANGELOG.md` with v4.3 entry — FILE: `docs/CHANGELOG.md`
 
 ---
 
