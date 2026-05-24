@@ -125,6 +125,14 @@ description: "Task list for Dynamic UOM & Costing Engine (v4.3)"
 
 - [x] T043 Update `docs/CHANGELOG.md` with v4.3 entry — FILE: `docs/CHANGELOG.md`
 
+- [x] T044 [P] Code Review — 34 files reviewed, 8 violations found and fixed (WholesalePrice property, MapToDto/ResolveBarcodeAsync mapping, PriceHistory FK ordering, ViewModel ExecuteAsync patterns, EF precision/max-length config, EventBus lifecycle, CanExecute predicate removal, Math.Round precision) — RULE-001, RULE-002, RULE-006, RULE-012, RULE-041, RULE-055, RULE-059, RULE-141
+
+- [x] T045 Final build verification: `dotnet build` — 0 errors, 0 warnings ✅
+
+- [x] T046 Final test verification: `dotnet test` — 203/203 Application tests + 623/623 API tests passing (16 pre-existing integration tests skipped) ✅
+
+- [x] T047 Push to GitHub — Branch `008-dynamic-uom-costing`, commit `308be42` pushed ✅
+
 ---
 
 ## Dependencies & Execution Order
@@ -148,7 +156,10 @@ description: "Task list for Dynamic UOM & Costing Engine (v4.3)"
 1. ✅ Phase 2: Foundational
 2. ✅ Phase 3: US1 — Units, pricing, barcodes
 3. ✅ Phase 4: US2 — Cost recalculation on purchase
-4. ✅ STOP AND VALIDATE — Build: 0 errors, Tests: 8/8 pricing tests passing
+4. ✅ Phase 7: Polish — Authorization, ToolTips, CHANGELOG
+5. ✅ Code Review — 34 files reviewed, 8 violations fixed
+6. ✅ Final Verification — Build: 0 errors, 0 warnings | Tests: 826/826 passing
+7. ✅ Pushed to GitHub — Branch `008-dynamic-uom-costing`, commit `308be42`
 
 ---
 

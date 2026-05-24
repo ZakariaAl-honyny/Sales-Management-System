@@ -30,6 +30,7 @@ public class SalesServiceTests : IDisposable
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IInventoryService> _mockInventoryService;
     private readonly Mock<IDocumentSequenceService> _mockSequenceService;
+    private readonly Mock<ICashBoxService> _cashBoxServiceMock;
     private readonly Mock<ILogger<SalesService>> _mockLogger;
     private int _saveChangesCallCount = 0;
 
@@ -49,6 +50,7 @@ public class SalesServiceTests : IDisposable
         _mockUow = new Mock<IUnitOfWork>();
         _mockInventoryService = new Mock<IInventoryService>();
         _mockSequenceService = new Mock<IDocumentSequenceService>();
+        _cashBoxServiceMock = new Mock<ICashBoxService>();
         _mockLogger = new Mock<ILogger<SalesService>>();
 
         _mockUow.Setup(u => u.SalesInvoices).Returns(new InMemoryEfCoreRepository<SalesInvoice>(_dbContext));
@@ -103,6 +105,7 @@ public class SalesServiceTests : IDisposable
             _mockUow.Object,
             _mockInventoryService.Object,
             _mockSequenceService.Object,
+            _cashBoxServiceMock.Object,
             _mockLogger.Object);
     }
 

@@ -28,7 +28,7 @@ public class CashTransactionTests
         transaction.BalanceAfter.Should().Be(1500m);
         transaction.ReferenceType.Should().Be("SalesInvoice");
         transaction.ReferenceId.Should().Be(42);
-        transaction.CreatedBy.Should().Be(3);
+        transaction.CreatedByUserId.Should().Be(3);
         transaction.Notes.Should().Be("Cash sale");
     }
 

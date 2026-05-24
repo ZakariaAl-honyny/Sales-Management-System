@@ -227,6 +227,7 @@ public class SalesInvoicesControllerTests : ControllerTestBase
     private static CreateSalesInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
         CustomerId: 1,
+        CashBoxId: null,
         InvoiceDate: null,
         DueDate: null,
         PaymentType: PaymentType.Cash,

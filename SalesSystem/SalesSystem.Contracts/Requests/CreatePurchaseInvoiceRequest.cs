@@ -8,6 +8,7 @@ public record CreatePurchaseInvoiceRequest(
     DateTime? InvoiceDate,
     DateOnly? DueDate,
     PaymentType PaymentType,
+    int? CashBoxId,
     decimal DiscountAmount,
     decimal TaxAmount,
     decimal PaidAmount,

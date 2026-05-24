@@ -15,4 +15,5 @@ public record StockTransferChangedMessage(int TransferId);
 public record CustomerPaymentChangedMessage(int PaymentId);
 public record SupplierPaymentChangedMessage(int PaymentId);
 public record StockChangedMessage(int ProductId, int WarehouseId);
+public record CashBoxChangedMessage(int CashBoxId);
 

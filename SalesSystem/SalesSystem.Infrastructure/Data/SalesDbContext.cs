@@ -35,6 +35,7 @@ public class SalesDbContext : DbContext
     public DbSet<UnitBarcode> UnitBarcodes => Set<UnitBarcode>();
     public DbSet<CashBox> CashBoxes => Set<CashBox>();
     public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
+    public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
 

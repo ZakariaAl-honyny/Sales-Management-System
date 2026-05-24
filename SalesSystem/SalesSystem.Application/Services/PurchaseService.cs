@@ -17,6 +17,7 @@ public class PurchaseService : IPurchaseService
     private readonly IDocumentSequenceService _sequenceService;
     private readonly IStoreSettingsService _settingsService;
     private readonly IUpdateProductPricingService _pricingService;
+    private readonly ICashBoxService _cashBoxService;
     private readonly ILogger<PurchaseService> _logger;
 
     public PurchaseService(
@@ -25,6 +26,7 @@ public class PurchaseService : IPurchaseService
         IDocumentSequenceService sequenceService,
         IStoreSettingsService settingsService,
         IUpdateProductPricingService pricingService,
+        ICashBoxService cashBoxService,
         ILogger<PurchaseService> logger)
     {
         _uow = uow;
@@ -32,6 +34,7 @@ public class PurchaseService : IPurchaseService
         _sequenceService = sequenceService;
         _settingsService = settingsService;
         _pricingService = pricingService;
+        _cashBoxService = cashBoxService;
         _logger = logger;
     }
 
@@ -107,14 +110,15 @@ public class PurchaseService : IPurchaseService
 
             var invoice = PurchaseInvoice.Create(
                 invoiceNoResult.Value!,
-                request.WarehouseId,
                 request.SupplierId,
+                request.WarehouseId,
                 request.InvoiceDate,
                 request.DueDate,
                 (Domain.Enums.PaymentType)request.PaymentType,
                 request.DiscountAmount,
                 request.SupplierInvoiceNo,
-                request.Notes
+                request.Notes,
+                cashBoxId: request.CashBoxId
             );
 
             invoice.SetCreatedBy(userId);
@@ -319,6 +323,25 @@ public class PurchaseService : IPurchaseService
                     supplier.IncreaseBalance(invoice.DueAmount);
                 }
 
+                // Record cash transaction for supplier payment
+                if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
+                {
+                    var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
+                        invoice.CashBoxId.Value,
+                        invoice.PaidAmount,
+                        CashTransactionType.SupplierPayment,
+                        "PurchaseInvoice",
+                        invoice.Id,
+                        userId,
+                        ct);
+
+                    if (!cashResult.IsSuccess)
+                    {
+                        _logger.LogWarning("Cash transaction recording failed for purchase invoice {InvoiceNo} (ID: {Id}): {Error}",
+                            invoice.InvoiceNo, invoice.Id, cashResult.Error);
+                    }
+                }
+
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
@@ -387,6 +410,25 @@ public class PurchaseService : IPurchaseService
                         if (supplier != null)
                         {
                             supplier.DecreaseBalance(invoice.DueAmount);
+                        }
+                    }
+
+                    // Create offsetting cash transaction
+                    if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
+                    {
+                        var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
+                            invoice.CashBoxId.Value,
+                            invoice.PaidAmount,
+                            CashTransactionType.CustomerPayment,
+                            "PurchaseInvoiceCancel",
+                            invoice.Id,
+                            userId,
+                            ct);
+
+                        if (!cashResult.IsSuccess)
+                        {
+                            await transaction.RollbackAsync(ct);
+                            return Result<PurchaseInvoiceDto>.Failure(cashResult.Error ?? "فشل في تسجيل الحركة النقدية العكسية");
                         }
                     }
                 }

@@ -32,6 +32,11 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
             .HasForeignKey(si => si.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(si => si.CashBox)
+            .WithMany()
+            .HasForeignKey(si => si.CashBoxId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(si => si.Items)
             .WithOne(i => i.SalesInvoice)
             .HasForeignKey(i => i.SalesInvoiceId)

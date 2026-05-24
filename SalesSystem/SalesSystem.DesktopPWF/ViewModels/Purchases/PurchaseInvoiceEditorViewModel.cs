@@ -6,6 +6,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels;
@@ -26,6 +27,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
     private readonly ISoundService _soundService;
     private readonly IBarcodeInputService _barcodeService;
+    private readonly ICashBoxApiService _cashBoxService;
 
     private int? _invoiceId;
     private string? _invoiceNo;
@@ -50,6 +52,8 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private ObservableCollection<SupplierDto> _suppliers = new();
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ObservableCollection<ProductDto> _products = new();
+    private ObservableCollection<CashBoxDto> _cashBoxes = new();
+    private CashBoxDto? _selectedCashBox;
 
     public PurchaseInvoiceEditorViewModel(
         IPurchaseInvoiceApiService invoiceService,
@@ -62,6 +66,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         IDialogService dialogService,
         ISoundService soundService,
         IBarcodeInputService barcodeService,
+        ICashBoxApiService cashBoxService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -76,6 +81,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         SetDialogService(dialogService);
         _soundService = soundService;
         _barcodeService = barcodeService;
+        _cashBoxService = cashBoxService;
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
@@ -99,34 +105,52 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             }
         });
 
-        InitializeAsync();
+        _ = InitializeAsync();
     }
 
-    private async void InitializeAsync()
+    private async Task InitializeAsync()
+    {
+        await ExecuteAsync(InitializeOperationAsync, "جاري تحميل البيانات...");
+    }
+
+    private async Task InitializeOperationAsync()
+    {
+        await LoadReferenceDataAsync();
+        await LoadCashBoxesAsync();
+
+        if (_isEditMode)
+        {
+            await LoadInvoiceAsync();
+        }
+        else
+        {
+            // Select default warehouse before adding line
+            if (Warehouses.Any())
+            {
+                var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
+                SelectedWarehouseId = defaultWarehouse.Id;
+            }
+            AddLine();
+        }
+    }
+
+    private async Task LoadCashBoxesAsync()
     {
         try
         {
-            await LoadReferenceDataAsync();
-
-            if (_isEditMode)
+            var result = await _cashBoxService.GetAllAsync();
+            if (result.IsSuccess && result.Value != null)
             {
-                await LoadInvoiceAsync();
+                CashBoxes = new ObservableCollection<CashBoxDto>(result.Value.Where(c => c.IsActive).OrderByDescending(x => x.Id));
             }
             else
             {
-                // Select default warehouse before adding line
-                if (Warehouses.Any())
-                {
-                    var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
-                    SelectedWarehouseId = defaultWarehouse.Id;
-                }
-                AddLine();
+                LogSystemError("فشل في تحميل الصناديق النقدية", "LoadCashBoxesAsync");
             }
         }
         catch (Exception ex)
         {
-            Serilog.Log.Error(ex, "Error in {Method}", nameof(InitializeAsync));
-            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحميل بيانات فاتورة الشراء");
+            LogSystemError("فشل في تحميل الصناديق النقدية", "LoadCashBoxesAsync", ex);
         }
     }
 
@@ -142,6 +166,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             App.GetService<IDialogService>(),
             App.GetService<ISoundService>(),
             App.GetService<IBarcodeInputService>(),
+            App.GetService<ICashBoxApiService>(),
             invoiceId,
             isReadOnly)
     {
@@ -172,6 +197,18 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     {
         get => _products;
         set => SetProperty(ref _products, value);
+    }
+
+    public ObservableCollection<CashBoxDto> CashBoxes
+    {
+        get => _cashBoxes;
+        set => SetProperty(ref _cashBoxes, value);
+    }
+
+    public CashBoxDto? SelectedCashBox
+    {
+        get => _selectedCashBox;
+        set => SetProperty(ref _selectedCashBox, value);
     }
 
     public ObservableCollection<PurchaseInvoiceLineViewModel> Items
@@ -478,6 +515,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                     Items.Add(lineVm);
                 }
 
+                // TODO: Restore CashBoxId when DTO supports it
                 RecalculateTotals();
             }
             else
@@ -628,6 +666,9 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         if (SelectedSupplierId <= 0)
             errors.Add("• يجب اختيار المورد");
 
+        if (SelectedCashBox == null && PaidAmount > 0)
+            errors.Add("• يجب اختيار الصندوق النقدي عند وجود مبلغ مدفوع");
+
         if (errors.Any())
         {
             await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
@@ -657,6 +698,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             InvoiceDate,
             null, // DueDate
             (PaymentType)SelectedPaymentType,
+            SelectedCashBox?.Id,
             InvoiceDiscount,
             TaxAmount,
             PaidAmount,

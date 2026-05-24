@@ -33,6 +33,11 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
             .HasForeignKey(pi => pi.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(pi => pi.CashBox)
+            .WithMany()
+            .HasForeignKey(pi => pi.CashBoxId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(pi => pi.Items)
             .WithOne(i => i.PurchaseInvoice)
             .HasForeignKey(i => i.PurchaseInvoiceId)

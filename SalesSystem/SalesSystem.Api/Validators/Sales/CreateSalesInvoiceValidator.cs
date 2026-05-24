@@ -41,6 +41,11 @@ public class CreateSalesInvoiceValidator : AbstractValidator<CreateSalesInvoiceR
                 .WithMessage("ملاحظات الصنف لا يمكن أن تتجاوز 200 حرف");
         });
 
+        // Business Rule: If paying, CashBoxId is required
+        RuleFor(x => x.CashBoxId)
+            .NotNull().When(x => x.PaidAmount > 0)
+            .WithMessage("يجب اختيار صندوق نقدي عند وجود مبلغ مدفوع");
+
         // Business Rule: If payment type is Credit, CustomerId is usually required in logic, 
         // but some shops allow "General Customer" credit. 
         // Constitution says: if invoice.DueAmount > 0 load customer. So we should enforce it here if possible.

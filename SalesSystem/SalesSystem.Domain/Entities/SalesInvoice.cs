@@ -9,6 +9,7 @@ public class SalesInvoice : BaseEntity
     public string InvoiceNo { get; private set; } = string.Empty;
     public int? CustomerId { get; private set; }
     public int WarehouseId { get; private set; }
+    public int? CashBoxId { get; private set; }
     public DateTime InvoiceDate { get; private set; }
     public DateOnly? DueDate { get; private set; }
     public PaymentType PaymentType { get; private set; }
@@ -23,6 +24,7 @@ public class SalesInvoice : BaseEntity
 
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
+    public virtual CashBox? CashBox { get; private set; }
     public virtual List<SalesInvoiceItem> Items { get; private set; } = new();
 
     private SalesInvoice() { }
@@ -36,6 +38,7 @@ public class SalesInvoice : BaseEntity
         PaymentType paymentType = PaymentType.Cash,
         decimal discountAmount = 0,
         string? notes = null,
+        int? cashBoxId = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(invoiceNo))
@@ -51,6 +54,7 @@ public class SalesInvoice : BaseEntity
         {
             InvoiceNo = invoiceNo,
             WarehouseId = warehouseId,
+            CashBoxId = cashBoxId,
             CustomerId = customerId,
             InvoiceDate = invoiceDate ?? DateTime.UtcNow,
             DueDate = dueDate,

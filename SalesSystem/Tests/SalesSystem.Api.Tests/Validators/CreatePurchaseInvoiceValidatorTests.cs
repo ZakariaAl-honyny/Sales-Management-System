@@ -622,6 +622,7 @@ public class CreatePurchaseInvoiceValidatorTests
         InvoiceDate: DateTime.UtcNow.AddDays(-1),
         DueDate: null,
         PaymentType: PaymentType.Cash,
+        CashBoxId: 1,
         DiscountAmount: 0,
         TaxAmount: 0,
         PaidAmount: 100m,

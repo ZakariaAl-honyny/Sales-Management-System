@@ -6,6 +6,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels;
@@ -31,6 +32,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly ISoundService _soundService;
     private readonly IInventoryApiService _inventoryService;
     private readonly IBarcodeInputService _barcodeService;
+    private readonly ICashBoxApiService _cashBoxService;
 
     private int? _invoiceId;
     private string? _invoiceNo;
@@ -55,6 +57,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private ObservableCollection<CustomerDto> _customers = new();
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ObservableCollection<ProductDto> _products = new();
+    private ObservableCollection<CashBoxDto> _cashBoxes = new();
+    private CashBoxDto? _selectedCashBox;
 
     public SalesInvoiceEditorViewModel(
         ISalesInvoiceApiService invoiceService,
@@ -69,6 +73,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         ISoundService soundService,
         IInventoryApiService inventoryService,
         IBarcodeInputService barcodeService,
+        ICashBoxApiService cashBoxService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -85,6 +90,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _soundService = soundService;
         _inventoryService = inventoryService;
         _barcodeService = barcodeService;
+        _cashBoxService = cashBoxService;
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
@@ -125,6 +131,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     {
         await LoadReferenceDataAsync();
         await LoadSettingsAsync();
+        await LoadCashBoxesAsync();
 
         if (_isEditMode)
         {
@@ -158,6 +165,26 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         }
     }
 
+    private async Task LoadCashBoxesAsync()
+    {
+        try
+        {
+            var result = await _cashBoxService.GetAllAsync();
+            if (result.IsSuccess && result.Value != null)
+            {
+                CashBoxes = new ObservableCollection<CashBoxDto>(result.Value.Where(c => c.IsActive).OrderByDescending(x => x.Id));
+            }
+            else if (result.Error != null)
+            {
+                LogSystemError("فشل في تحميل الصناديق النقدية", "LoadCashBoxesAsync");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تحميل الصناديق النقدية", "LoadCashBoxesAsync", ex);
+        }
+    }
+
     public SalesInvoiceEditorViewModel(int? invoiceId = null, bool isReadOnly = false)
         : this(
             App.GetService<ISalesInvoiceApiService>(),
@@ -172,6 +199,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             App.GetService<ISoundService>(),
             App.GetService<IInventoryApiService>(),
             App.GetService<IBarcodeInputService>(),
+            App.GetService<ICashBoxApiService>(),
             invoiceId,
             isReadOnly)
     {
@@ -202,6 +230,18 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     {
         get => _products;
         set => SetProperty(ref _products, value);
+    }
+
+    public ObservableCollection<CashBoxDto> CashBoxes
+    {
+        get => _cashBoxes;
+        set => SetProperty(ref _cashBoxes, value);
+    }
+
+    public CashBoxDto? SelectedCashBox
+    {
+        get => _selectedCashBox;
+        set => SetProperty(ref _selectedCashBox, value);
     }
 
     public ObservableCollection<InvoiceLineViewModel> Items
@@ -509,6 +549,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     Items.Add(lineVm);
                 }
 
+                // TODO: Restore CashBoxId when DTO supports it
                 RecalculateTotals();
             }
             else
@@ -718,6 +759,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         if (SelectedPaymentType == (byte)PaymentType.Credit && !SelectedCustomerId.HasValue)
             errors.Add("• يجب اختيار العميل للفواتير الآجلة");
 
+        if (SelectedCashBox == null && PaidAmount > 0)
+            errors.Add("• يجب اختيار الصندوق النقدي عند وجود مبلغ مدفوع");
+
         if (errors.Any())
         {
             await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
@@ -744,6 +788,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         return new CreateSalesInvoiceRequest(
             SelectedWarehouseId,
             SelectedCustomerId,
+            SelectedCashBox?.Id,
             InvoiceDate,
             null,
             (PaymentType)SelectedPaymentType,

@@ -210,7 +210,15 @@
                             <TextBlock Text="طريقة الدفع" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding PaymentTypeOptions}" SelectedValue="{Binding SelectedPaymentType}" 
                                       SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,12"/>
-                            
+
+                            <TextBlock Text="الصندوق النقدي *" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox ItemsSource="{Binding CashBoxes}"
+                                      SelectedItem="{Binding SelectedCashBox}"
+                                      DisplayMemberPath="BoxName"
+                                      Style="{StaticResource ModernComboBox}"
+                                      Margin="0,0,0,12"
+                                      ToolTip="اختر الصندوق النقدي الذي سيتم إيداع المبلغ المدفوع فيه"/>
+
                             <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}"/>
                             <TextBox Text="{Binding Notes}" Height="60" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8,4"/>
                         </StackPanel>
@@ -323,7 +331,7 @@
                             Style="{StaticResource DangerButton}" 
                             Padding="12,0" 
                             Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"
-                            ToolTip="حذف الفاتورة"/>
+                            ToolTip="إلغاء الفاتورة — لا يمكن التراجع عن هذه العملية وسيتم عكس الأرصدة"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 
