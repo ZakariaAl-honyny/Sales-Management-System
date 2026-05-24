@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/009-cash-boxes/plan.md](specs/009-cash-boxes/plan.md)
+**Active Feature Plan**: [specs/010-print-engine/plan.md](specs/010-print-engine/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
