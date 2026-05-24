@@ -15,7 +15,7 @@
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="⚠️ حدث خطأ غير متوقع" FontSize="18" FontWeight="Bold" Foreground="#D32F2F" Margin="0,0,0,10"/>
         <TextBlock Grid.Row="1" Text="{Binding}" TextWrapping="Wrap" FontSize="13" Foreground="#333"/>
-        <Button Grid.Row="2" Content="موافق" Width="120" Height="35" HorizontalAlignment="Center"
+        <Button ToolTip="تأكيد العملية" Grid.Row="2" Content="موافق" Width="120" Height="35" HorizontalAlignment="Center"
                 Background="#1976D2" Foreground="White" FontSize="14"
                 Click="OkButton_Click" Margin="0,10,0,0"/>
     </Grid>

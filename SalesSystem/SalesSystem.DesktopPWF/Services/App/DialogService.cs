@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using SalesSystem.DesktopPWF.Views.Dialogs;
 
@@ -27,7 +28,7 @@ public class DialogService : IDialogService
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             var dialog = new InfoDialog(message, title);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
         });
     }
@@ -37,7 +38,7 @@ public class DialogService : IDialogService
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             var dialog = new WarningDialog(message);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
         });
     }
@@ -47,7 +48,7 @@ public class DialogService : IDialogService
         System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             var dialog = new ErrorDialog(message);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
         });
     }
@@ -57,7 +58,7 @@ public class DialogService : IDialogService
         return System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
             var dialog = new ConfirmationDialog(message);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
             return dialog.Confirmed;
         });
@@ -105,9 +106,10 @@ public class DialogService : IDialogService
                     };
                 }
 
-                if (System.Windows.Application.Current.MainWindow != null && System.Windows.Application.Current.MainWindow != window)
+                var owner = GetActiveWindow();
+                if (owner != null && owner != window)
                 {
-                    window.Owner = System.Windows.Application.Current.MainWindow;
+                    window.Owner = owner;
                 }
                 var result = window.ShowDialog();
                 var drProp = viewModel.GetType().GetProperty("DialogResult");
@@ -126,7 +128,7 @@ public class DialogService : IDialogService
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new InfoDialog(message, title);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
         }).Task;
     }
@@ -136,7 +138,7 @@ public class DialogService : IDialogService
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new ErrorDialog(message);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
         }).Task;
     }
@@ -146,7 +148,7 @@ public class DialogService : IDialogService
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new SuccessDialog(message);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
         }).Task;
     }
@@ -156,7 +158,7 @@ public class DialogService : IDialogService
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new WarningDialog(message);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
         }).Task;
     }
@@ -166,7 +168,7 @@ public Task<bool> ShowConfirmationAsync(string title, string message)
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new ConfirmationDialog(message);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
             return dialog.Confirmed;
         }).Task;
@@ -177,7 +179,7 @@ public Task<bool> ShowConfirmationAsync(string title, string message)
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new ValidationErrorsDialog(title, errors);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
         }).Task;
     }
@@ -187,9 +189,22 @@ public Task<bool> ShowConfirmationAsync(string title, string message)
         return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
         {
             var dialog = new DeleteConfirmationDialog(itemDescription);
-            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.Owner = GetActiveWindow();
             dialog.ShowDialog();
             return dialog.SelectedStrategy;
         }).Task;
+    }
+
+    /// <summary>
+    /// Resolves the active window for dialog ownership.
+    /// Prevents self-ownership (InvalidOperationException) by checking
+    /// the candidate owner is not the dialog itself.
+    /// </summary>
+    private static Window GetActiveWindow()
+    {
+        var active = System.Windows.Application.Current.Windows
+            .OfType<Window>()
+            .FirstOrDefault(x => x.IsActive);
+        return active ?? System.Windows.Application.Current.MainWindow;
     }
 }

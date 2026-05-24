@@ -23,7 +23,7 @@ public partial class DashboardView : Page
 
     private void DashboardView_Unloaded(object sender, RoutedEventArgs e)
     {
-        _viewModel.Unsubscribe();
+        _viewModel.Cleanup();
     }
 }
 

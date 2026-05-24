@@ -20,6 +20,7 @@ public class UserListViewModel : AdminOnlyViewModel
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
+    private readonly IScreenWindowService _screenWindowService;
     private readonly ISessionService _sessionService;
 
     private ObservableCollection<UserDto> _users = new();
@@ -43,6 +44,7 @@ public class UserListViewModel : AdminOnlyViewModel
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
         _sessionService = sessionService;
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         InitializeCommands();
     }
@@ -186,11 +188,17 @@ public class UserListViewModel : AdminOnlyViewModel
 
     private void AddUser()
     {
-        var editorVm = new UserEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        var editorVm = App.GetService<UserEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadUsersAsync();
-        }
+            Title = "مستخدم جديد",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadUsersAsync());
+            }
+        });
     }
 
     private void EditUser()
@@ -198,10 +206,16 @@ public class UserListViewModel : AdminOnlyViewModel
         if (SelectedUser == null) return;
 
         var editorVm = new UserEditorViewModel(SelectedUser);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadUsersAsync();
-        }
+            Title = "تعديل المستخدم",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadUsersAsync());
+            }
+        });
     }
 
     public async Task ToggleStatusAsync()

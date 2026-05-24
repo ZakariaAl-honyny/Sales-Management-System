@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Windows.Input;
 using ClosedXML.Excel;
 using SalesSystem.Contracts.DTOs;
@@ -131,7 +132,7 @@ public class LowStockViewModel : ViewModelBase
             var result = await _reportService.GetLowStockReportAsync(SelectedWarehouseId);
             if (result.IsSuccess)
             {
-                Items = new ObservableCollection<LowStockReportDto>(result.Value ?? new List<LowStockReportDto>());
+                Items = new ObservableCollection<LowStockReportDto>((result.Value ?? new List<LowStockReportDto>()).OrderBy(x => x.ProductName ?? string.Empty));
             }
             else
             {

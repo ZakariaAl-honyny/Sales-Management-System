@@ -72,7 +72,7 @@
                 <!-- Buttons - Error state -->
                 <StackPanel x:Name="ErrorButtonsPanel" Grid.Row="2" Orientation="Horizontal"
                             HorizontalAlignment="Center" Margin="0,12,0,0">
-                    <Button x:Name="RetryButton" Content="إعادة المحاولة" Width="130" Height="38"
+                    <Button ToolTip="إعادة محاولة الاتصال بقاعدة البيانات" x:Name="RetryButton" Content="إعادة المحاولة" Width="130" Height="38"
                             Background="#E65100" Foreground="White" FontWeight="SemiBold"
                             BorderThickness="0" Cursor="Hand" Click="RetryButton_Click" Margin="0,0,10,0">
                         <Button.Template>
@@ -92,7 +92,7 @@
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
-                    <Button x:Name="ExitButton" Content="خروج" Width="100" Height="38"
+                    <Button ToolTip="الخروج من التطبيق" x:Name="ExitButton" Content="خروج" Width="100" Height="38"
                             Background="#9E9E9E" Foreground="White" FontWeight="SemiBold"
                             BorderThickness="0" Cursor="Hand" Click="ExitButton_Click">
                         <Button.Template>
@@ -117,7 +117,7 @@
                 <!-- Buttons - Retrying state (only Exit) -->
                 <StackPanel x:Name="RetryingButtonsPanel" Grid.Row="2" Orientation="Horizontal"
                             HorizontalAlignment="Center" Margin="0,12,0,0" Visibility="Collapsed">
-                    <Button x:Name="CancelRetryButton" Content="إلغاء" Width="100" Height="38"
+                    <Button ToolTip="إلغاء العملية الحالية" x:Name="CancelRetryButton" Content="إلغاء" Width="100" Height="38"
                             Background="#9E9E9E" Foreground="White" FontWeight="SemiBold"
                             BorderThickness="0" Cursor="Hand" Click="ExitButton_Click">
                         <Button.Template>

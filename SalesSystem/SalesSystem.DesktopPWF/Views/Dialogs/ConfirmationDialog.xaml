@@ -36,7 +36,7 @@
                 </ScrollViewer>
 
                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
-                    <Button x:Name="NoButton" Content="لا"
+                    <Button ToolTip="رفض العملية" x:Name="NoButton" Content="لا"
                             Width="100" Height="36" Margin="0,0,12,0"
                             Background="#9E9E9E" Foreground="White" FontWeight="SemiBold"
                             BorderThickness="0" Cursor="Hand" Click="NoButton_Click">
@@ -58,7 +58,7 @@
                         </Button.Template>
                     </Button>
 
-                    <Button x:Name="YesButton" Content="نعم"
+                    <Button ToolTip="تأكيد العملية" x:Name="YesButton" Content="نعم"
                             Width="100" Height="36"
                             Background="#1976D2" Foreground="White" FontWeight="SemiBold"
                             BorderThickness="0" Cursor="Hand" Click="YesButton_Click">

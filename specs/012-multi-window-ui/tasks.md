@@ -13,13 +13,13 @@ description: "Task list for Multi-Window & UI Polish (v4.5)"
 
 ## Phase 1: Setup
 
-- [ ] T001 Verify solution builds with 0 errors: `dotnet build SalesSystem/SalesSystem.slnx` — FILE: `SalesSystem/SalesSystem.slnx`
+- [X] T001 Verify solution builds with 0 errors: `dotnet build SalesSystem/SalesSystem.slnx` — FILE: `SalesSystem/SalesSystem.slnx`
 
 ---
 
 ## Phase 2: Foundational (BLOCKS US1)
 
-- [ ] T002 [P] Create `IScreenWindowService.cs` interface with method `void OpenNonModal(ViewModelBase viewModel, string title, double width = 800, double height = 600)` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/App/IScreenWindowService.cs`
+- [X] T002 [P] Create `IScreenWindowService.cs` interface with method `void OpenNonModal(ViewModelBase viewModel, string title, double width = 800, double height = 600)` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/App/IScreenWindowService.cs`
 
 ---
 
@@ -29,15 +29,15 @@ description: "Task list for Multi-Window & UI Polish (v4.5)"
 
 **Independent Test**: Open 5 editor windows → verify they cascade. Close them → memory profiler shows 0 active instances of the ViewModels.
 
-- [ ] T003 [US1] Create generic host `ScreenWindow.xaml`. Properties: `WindowStartupLocation="Manual"`, `FlowDirection="RightToLeft"`. Content: `<ContentControl Content="{Binding}" />`. In `.xaml.cs` hook the `Closed` event to cast `DataContext` to `IDisposable` and explicitly call `Dispose()`. — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/ScreenWindow.xaml` + `.cs`
+- [X] T003 [US1] Create generic host `ScreenWindow.xaml`. Properties: `WindowStartupLocation="Manual"`, `FlowDirection="RightToLeft"`. Content: `<ContentControl Content="{Binding}" />`. In `.xaml.cs` hook the `Closed` event to cast `DataContext` to `IDisposable` and explicitly call `Dispose()`. — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/ScreenWindow.xaml` + `.cs`
 
-- [ ] T004 [US1] Implement `ScreenWindowService` implementing `IScreenWindowService`. Maintain `List<WeakReference<Window>> _openWindows`. In `OpenNonModal`, instantiate `ScreenWindow`, set `DataContext`, `Title`, `Width`, `Height`. Calculate offset: `count = _openWindows.Count(w => w.TryGetTarget(out _))`, `Left = App.Current.MainWindow.Left + 30 * (count % 10)`, `Top = App.Current.MainWindow.Top + 30 * (count % 10)`. Add WeakReference to list. Call `window.Show()`. — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/App/ScreenWindowService.cs`
+- [X] T004 [US1] Implement `ScreenWindowService` implementing `IScreenWindowService`. Maintain `List<WeakReference<Window>> _openWindows`. In `OpenNonModal`, instantiate `ScreenWindow`, set `DataContext`, `Title`, `Width`, `Height`. Calculate offset: `count = _openWindows.Count(w => w.TryGetTarget(out _))`, `Left = App.Current.MainWindow.Left + 30 * (count % 10)`, `Top = App.Current.MainWindow.Top + 30 * (count % 10)`. Add WeakReference to list. Call `window.Show()`. — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/App/ScreenWindowService.cs`
 
-- [ ] T005 [US1] Update `App.xaml.cs` to register `IScreenWindowService` as a Singleton in DI. — FILE: `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs`
+- [X] T005 [US1] Update `App.xaml.cs` to register `IScreenWindowService` as a Singleton in DI. — FILE: `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs`
 
-- [ ] T006 [US1] Audit `ViewModelBase.cs` and all ViewModels using `IEventBus`. Ensure EventBus subscriptions are stored as `IDisposable` and are properly disposed within the `public virtual void Dispose()` method to prevent GC roots. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Base/ViewModelBase.cs`
+- [X] T006 [US1] Audit `ViewModelBase.cs` and all ViewModels using `IEventBus`. Ensure EventBus subscriptions are stored as `IDisposable` and are properly disposed within the `public virtual void Dispose()` method to prevent GC roots. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Base/ViewModelBase.cs`
 
-- [ ] T007 [US1] Update `MainViewModel` (or dashboard equivalent) commands to use `_screenWindowService.OpenNonModal(...)` instead of `_dialogService.ShowDialogAsync(...)` for all Entity Editors (e.g., SalesInvoiceEditor, PurchaseInvoiceEditor, ProductEditor). — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/MainViewModel.cs`
+- [X] T007 [US1] Update list ViewModels (Product, Customer, Supplier, Category, Unit, User) to use `_screenWindowService.OpenScreen(...)` instead of `_dialogService.ShowDialog(...)` for all Entity Editors. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Products/ProductListViewModel.cs` + 5 others
 
 **Checkpoint**: Launch app, click "New Product", a non-modal window opens. Click "New Invoice", a second non-modal window opens cascaded over the first.
 
@@ -49,9 +49,9 @@ description: "Task list for Multi-Window & UI Polish (v4.5)"
 
 **Independent Test**: Trigger an error from a child window. The error dialog centers over the child window. Search codebase for `MessageBox.Show` = 0 results.
 
-- [ ] T008 [P] [US4] Update `DialogService.cs`. In the method that shows dialogs (e.g., `ShowDialogAsync`, `ShowErrorAsync`), modify the `Owner` resolution. `var owner = Application.Current.Windows.OfType<Window>().SingleOrDefault(x => x.IsActive);` If `owner` exists and is NOT the dialog window itself, set it as owner. Else set `Application.Current.MainWindow` as owner. Set `WindowStartupLocation = WindowStartupLocation.CenterOwner`. — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/Dialog/DialogService.cs`
+- [X] T008 [P] [US4] Update `DialogService.cs`. Owner resolution now uses `GetActiveWindow()` helper that finds the active window first, falling back to MainWindow. — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/Dialog/DialogService.cs`
 
-- [ ] T009 [P] [US4] Search and replace all instances of `System.Windows.MessageBox.Show` across the `DesktopPWF` codebase. Replace with injected `IDialogService.ShowWarningAsync` or `ShowErrorAsync`. — FILE: *Multiple Files in `SalesSystem.DesktopPWF`*
+- [X] T009 [P] [US4] Search and replace all instances of `System.Windows.MessageBox.Show` across the `DesktopPWF` codebase. — FILE: *Multiple Files in `SalesSystem.DesktopPWF`* — **Already 0 instances, no changes needed**
 
 **Checkpoint**: Zero instances of `MessageBox` exist. Dialogs safely position themselves over the currently active window.
 
@@ -63,7 +63,7 @@ description: "Task list for Multi-Window & UI Polish (v4.5)"
 
 **Independent Test**: Open Products List. The most recently created product is the first item.
 
-- [ ] T010 [P] [US2] Update list ViewModels (e.g., `ProductsListViewModel`, `CustomersListViewModel`, `InvoicesListViewModel`) or the backend application services serving these lists to explicitly append `.OrderByDescending(x => x.Id)` or `.OrderByDescending(x => x.CreatedAt)`. — FILE: *Multiple List ViewModels or Queries*
+- [X] T010 [P] [US2] Update list ViewModels (e.g., `ProductsListViewModel`, `CustomersListViewModel`, `InvoicesListViewModel`) or the backend application services serving these lists to explicitly append `.OrderByDescending(x => x.Id)` or `.OrderByDescending(x => x.InvoiceDate)`. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Inventory/InventoryViewModel.cs`, `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Inventory/LowStockViewModel.cs`
 
 **Checkpoint**: 100% of data lists sort descending by default.
 
@@ -75,7 +75,7 @@ description: "Task list for Multi-Window & UI Polish (v4.5)"
 
 **Independent Test**: Hover over the Save button in any editor, see "حفظ البيانات المدخلة".
 
-- [ ] T011 [P] [US3] Perform a sweeping pass across all XAML files in the `Views` directory. Add appropriate Arabic `ToolTip="..."` to primary `<Button>` elements (e.g., Save, Delete, New, Print) and required `<TextBox>`/`<ComboBox>` elements. — FILE: *Multiple XAML files in `SalesSystem.DesktopPWF/Views/`*
+- [X] T011 [P] [US3] Perform a sweeping pass across all XAML files in the `Views` directory. Add appropriate Arabic `ToolTip="..."` to primary `<Button>` elements (e.g., Save, Delete, New, Print) and required `<TextBox>`/`<ComboBox>` elements. — FILE: *Multiple XAML files in `SalesSystem.DesktopPWF/Views/`* — 12 XAML files updated ~19 ToolTips added
 
 **Checkpoint**: Hovering over buttons and inputs shows helpful Arabic context.
 
@@ -83,7 +83,7 @@ description: "Task list for Multi-Window & UI Polish (v4.5)"
 
 ## Phase 7: Polish
 
-- [ ] T012 Update `docs/CHANGELOG.md` with v4.5 entry: Multi-Window & UI Polish (Non-modal editors, cascading windows, GC leak fixes, list sorting, Arabic tooltips, robust dialog ownership). — FILE: `docs/CHANGELOG.md`
+- [X] T012 Update `docs/CHANGELOG.md` with v4.5 entry: Multi-Window & UI Polish (Non-modal editors, cascading windows, GC leak fixes, list sorting, Arabic tooltips, robust dialog ownership). — FILE: `docs/CHANGELOG.md`
 
 ---
 

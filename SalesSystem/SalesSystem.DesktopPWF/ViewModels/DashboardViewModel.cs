@@ -298,8 +298,9 @@ public class DashboardViewModel : ViewModelBase
     #endregion
 
     #region Cleanup
-    public void Unsubscribe()
+    public override void Cleanup()
     {
+        base.Cleanup();
         _eventBus.Unsubscribe<SaleInvoiceChangedMessage>(OnSaleInvoiceChanged);
         _eventBus.Unsubscribe<ProductChangedMessage>(OnProductChanged);
         _eventBus.Unsubscribe<StockChangedMessage>(OnStockChanged);

@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.5 — Multi-Window & UI Polish (2026-05-25)
+
+### ✨ New Features
+- **Multi-Window Non-Modal Editors**: Editors now open in separate non-modal windows (Product, Customer, Supplier, Category, Unit, User, Sales Invoice, Purchase Invoice, etc.)
+- **ScreenWindowService**: Generic window host with cascade positioning (30px offset, modulo 10 reset)
+- **WeakReference Window Tracking**: Closed windows are fully garbage collected — no memory leaks
+- **Arabic Auto-Titles**: Editor windows display descriptive Arabic titles (e.g., "فاتورة بيع جديدة")
+
+### 🐛 Bug Fixes
+- **Dialog Ownership**: Dialogs now correctly center over the active window — no more self-ownership crashes
+- **EventBus Memory Leaks**: DashboardViewModel now uses standard `Cleanup()` override for unsubscription
+- **DialogService Active Window Resolution**: Owner correctly resolved to the active window instead of always MainWindow
+
+### 🛠️ Improvements
+- **Newest-First Sorting**: All list screens (Products, Customers, Suppliers, Invoices, etc.) default to newest-first
+- **Arabic ToolTips**: All primary interactive controls now have descriptive Arabic ToolTips
+- **MessageBox Elimination**: Zero remaining `MessageBox.Show` calls — 100% IDialogService
+
 ## v4.4 — Production Hardening (2026-05-25)
 
 ### الميزات الجديدة

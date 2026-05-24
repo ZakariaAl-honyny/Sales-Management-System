@@ -228,7 +228,7 @@ public class DashboardViewModelTests : IDisposable
             It.IsAny<int>(),
             It.IsAny<CancellationToken>()), Times.AtLeastOnce);
 
-        viewModel.Unsubscribe();
+        viewModel.Cleanup();
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class DashboardViewModelTests : IDisposable
         // Verify dashboard data was refreshed
         _mockDashboardService.Verify(x => x.GetSummaryAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
 
-        viewModel.Unsubscribe();
+        viewModel.Cleanup();
     }
 
     [Fact]
@@ -284,15 +284,15 @@ public class DashboardViewModelTests : IDisposable
         // Verify dashboard data was refreshed (stock changes affect dashboard)
         _mockDashboardService.Verify(x => x.GetSummaryAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
 
-        viewModel.Unsubscribe();
+        viewModel.Cleanup();
     }
 
     [Fact]
-    public void Unsubscribe_RemovesEventHandlers()
+    public void Cleanup_RemovesEventHandlers()
     {
         var viewModel = CreateViewModel();
 
-        viewModel.Unsubscribe();
+        viewModel.Cleanup();
 
         _mockEventBus.Verify(x => x.Unsubscribe<SaleInvoiceChangedMessage>(It.IsAny<Action<SaleInvoiceChangedMessage>>()), Times.Once);
         _mockEventBus.Verify(x => x.Unsubscribe<ProductChangedMessage>(It.IsAny<Action<ProductChangedMessage>>()), Times.Once);
