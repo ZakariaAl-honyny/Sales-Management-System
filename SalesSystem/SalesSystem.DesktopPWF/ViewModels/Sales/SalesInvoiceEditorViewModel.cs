@@ -9,6 +9,7 @@ using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models.Printing;
@@ -26,14 +27,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly IWarehouseApiService _warehouseService;
     private readonly IProductApiService _productService;
     private readonly ISettingsApiService _settingsService;
-    private readonly IInvoicePrinter _invoicePrinter;
-    private readonly IReceiptPrinter _receiptPrinter;
     private readonly IDialogService _dialogService;
     private readonly ISoundService _soundService;
     private readonly IInventoryApiService _inventoryService;
     private readonly IBarcodeInputService _barcodeService;
     private readonly ICashBoxApiService _cashBoxService;
     private readonly IPrintApiService _printApiService;
+    private readonly IToastNotificationService _toastService;
 
     private int? _invoiceId;
     private string? _invoiceNo;
@@ -68,14 +68,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         IWarehouseApiService warehouseService,
         IProductApiService productService,
         ISettingsApiService settingsService,
-        IInvoicePrinter invoicePrinter,
-        IReceiptPrinter receiptPrinter,
         IDialogService dialogService,
         ISoundService soundService,
         IInventoryApiService inventoryService,
         IBarcodeInputService barcodeService,
         ICashBoxApiService cashBoxService,
         IPrintApiService printApiService,
+        IToastNotificationService toastService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -85,8 +84,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _warehouseService = warehouseService;
         _productService = productService;
         _settingsService = settingsService;
-        _invoicePrinter = invoicePrinter;
-        _receiptPrinter = receiptPrinter;
         _dialogService = dialogService;
         SetDialogService(dialogService);
         _soundService = soundService;
@@ -94,6 +91,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _barcodeService = barcodeService;
         _cashBoxService = cashBoxService;
         _printApiService = printApiService;
+        _toastService = toastService;
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
@@ -104,7 +102,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         AddLineCommand = new RelayCommand(AddLine);
         RemoveLineCommand = new RelayCommand(RemoveLine, CanRemoveLine);
         PrintA4Command = new AsyncRelayCommand(PrintA4Async);
-        PrintReceiptCommand = new AsyncRelayCommand(PrintReceiptAsync);
+        PrintThermalCommand = new AsyncRelayCommand(PrintThermalAsync);
         SearchProductCommand = new RelayCommand(SearchProduct);
         SearchProductSingleCommand = new RelayCommand(SearchProductSingle);
         SearchCustomerCommand = new RelayCommand(SearchCustomer);
@@ -196,14 +194,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             App.GetService<IWarehouseApiService>(),
             App.GetService<IProductApiService>(),
             App.GetService<ISettingsApiService>(),
-            App.GetService<IInvoicePrinter>(),
-            App.GetService<IReceiptPrinter>(),
             App.GetService<IDialogService>(),
             App.GetService<ISoundService>(),
             App.GetService<IInventoryApiService>(),
             App.GetService<IBarcodeInputService>(),
             App.GetService<ICashBoxApiService>(),
             App.GetService<IPrintApiService>(),
+            App.GetService<IToastNotificationService>(),
             invoiceId,
             isReadOnly)
     {
@@ -440,7 +437,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     public ICommand AddLineCommand { get; }
     public ICommand RemoveLineCommand { get; }
     public ICommand PrintA4Command { get; }
-    public ICommand PrintReceiptCommand { get; }
+    public ICommand PrintThermalCommand { get; }
     public ICommand SearchProductCommand { get; }          // Continuous: stays open
     public ICommand SearchProductSingleCommand { get; }    // Single: closes after one pick
     public ICommand SearchCustomerCommand { get; }
@@ -696,39 +693,35 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         });
     }
 
-    private async Task PrintReceiptAsync()
+    private async Task PrintThermalAsync()
     {
-        await PrepareAndPrint(_receiptPrinter);
-    }
+        if (!_invoiceId.HasValue)
+        {
+            await _dialogService.ShowWarningAsync("طباعة إيصال", "يجب حفظ الفاتورة أولاً قبل الطباعة");
+            return;
+        }
 
-    private async Task PrepareAndPrint(IPrinterService printer)
-    {
-        if (!_invoiceId.HasValue) return;
+        if (_status != (byte)InvoiceStatus.Posted)
+        {
+            await _dialogService.ShowWarningAsync("طباعة إيصال", "يجب ترحيل الفاتورة أولاً قبل طباعة الإيصال الحراري");
+            return;
+        }
 
         await ExecuteAsync(async () =>
         {
-            var settingsResult = await _settingsService.GetSettingsAsync();
-            if (!settingsResult.IsSuccess || settingsResult.Value == null)
+            ErrorMessage = null;
+            var result = await _printApiService.PrintSalesThermalAsync(_invoiceId!.Value);
+            if (result.IsSuccess)
             {
-                var error = HandleFailure(settingsResult.Error ?? "فشل في تحميل إعدادات المتجر", "SalesInvoiceEditorViewModel.PrepareAndPrint", "[SalesInvoiceEditorViewModel.PrepareAndPrint] Failed to load store settings for printing.");
-                await _dialogService.ShowErrorAsync("خطأ في الطباعة", error);
-                return;
+                _toastService.ShowSuccess("تم إرسال الإيصال إلى الطابعة الحرارية بنجاح");
             }
-            
-            var invoiceResult = await _invoiceService.GetByIdAsync(_invoiceId.Value);
-            if (!invoiceResult.IsSuccess || invoiceResult.Value == null)
+            else
             {
-                var error = HandleFailure(invoiceResult.Error ?? "فشل في تحميل بيانات الفاتورة", "SalesInvoiceEditorViewModel.PrepareAndPrint", $"[SalesInvoiceEditorViewModel.PrepareAndPrint] Failed to load invoice data for printing ID {_invoiceId}.");
-                await _dialogService.ShowErrorAsync("خطأ في الطباعة", error);
-                return;
+                ErrorMessage = HandleFailure(result.Error ?? "فشلت طباعة الإيصال الحراري",
+                    "SalesInvoiceEditorViewModel.PrintThermalAsync",
+                    $"[SalesInvoiceEditorViewModel.PrintThermalAsync] Thermal print failed for invoice ID {_invoiceId}.");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة الحرارية", ErrorMessage!);
             }
-
-            var storeInfo = settingsResult.Value.ToPrintDto();
-            var invoice = invoiceResult.Value.ToPrintDto();
-            var items = invoiceResult.Value.Items.ToPrintDtos();
-            var totals = invoiceResult.Value.ToTotalsPrintDto();
-
-            printer.PrintPreview(invoice, items, totals, storeInfo);
         });
     }
 
@@ -1125,10 +1118,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
     private void UpdateCommandStates()
     {
-        (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PostCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintA4Command as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintReceiptCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        // No-op: buttons remain enabled per interactive validation pattern (RULE-059)
     }
     #endregion
 }

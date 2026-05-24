@@ -6,9 +6,12 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Infrastructure.Printing;
@@ -22,15 +25,18 @@ public class PrintDataService : IPrintDataService
     private readonly IUnitOfWork _uow;
     private readonly InvoicePrintDtoBuilder _builder;
     private readonly ILogger<PrintDataService> _logger;
+    private readonly ISystemSettingsRepository _systemSettingsRepo;
 
     public PrintDataService(
         IUnitOfWork uow,
         InvoicePrintDtoBuilder builder,
-        ILogger<PrintDataService> logger)
+        ILogger<PrintDataService> logger,
+        ISystemSettingsRepository systemSettingsRepo)
     {
         _uow = uow;
         _builder = builder;
         _logger = logger;
+        _systemSettingsRepo = systemSettingsRepo;
     }
 
     public async Task<Result<InvoicePrintDto>> GetSalesInvoicePrintDataAsync(int invoiceId, CancellationToken ct = default)
@@ -69,8 +75,10 @@ public class PrintDataService : IPrintDataService
         var settingsResult = await GetStoreSettingsAsync(ct);
         var sysSettingsResult = await GetPrintSystemSettingsAsync(ct);
 
-        var settings = settingsResult.IsSuccess ? settingsResult.Value : null;
-        var sysSettings = sysSettingsResult.IsSuccess ? sysSettingsResult.Value : new List<SystemSetting>();
+        var settings = settingsResult.IsSuccess && settingsResult.Value != null ? settingsResult.Value : null;
+        var sysSettings = sysSettingsResult.IsSuccess && sysSettingsResult.Value != null
+            ? sysSettingsResult.Value
+            : new List<SystemSetting>();
 
         var storeName = settings?.StoreName ?? "متجري";
         var storePhone = settings?.Phone ?? string.Empty;
@@ -123,5 +131,79 @@ public class PrintDataService : IPrintDataService
             _logger.LogError(ex, "Error loading print system settings");
             return Result<List<SystemSetting>>.Failure("فشل في تحميل إعدادات الطباعة");
         }
+    }
+
+    // ─── Print Settings Management ────────────────────────────────────────
+
+    public async Task<Result<PrintSettingsDto>> GetPrintSettingsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var sysSettingsResult = await GetPrintSystemSettingsAsync(ct);
+            var sysSettings = sysSettingsResult.IsSuccess && sysSettingsResult.Value != null
+                ? sysSettingsResult.Value
+                : new List<SystemSetting>();
+
+            var thermalPrinterName = GetSettingValue(sysSettings, "ThermalPrinterName", "");
+            var a4PrinterName = GetSettingValue(sysSettings, "A4PrinterName", "");
+            var logoPath = GetSettingValue(sysSettings, "LogoPath", "");
+            var storeTaxNumber = GetSettingValue(sysSettings, "StoreTaxNumber", "");
+            var taxRateStr = GetSettingValue(sysSettings, "TaxRate", "15");
+            var autoPrintStr = GetSettingValue(sysSettings, "AutoPrintOnPost", "false");
+            var receiptHeader = GetSettingValue(sysSettings, "ReceiptHeader", "");
+            var receiptFooter = GetSettingValue(sysSettings, "ReceiptFooter", "");
+            var escPosCodePageStr = GetSettingValue(sysSettings, "EscPosCodePage", "22");
+
+            decimal.TryParse(taxRateStr, out var taxRate);
+            bool.TryParse(autoPrintStr, out var autoPrintOnPost);
+            int.TryParse(escPosCodePageStr, out var escPosCodePage);
+
+            var dto = new PrintSettingsDto(
+                thermalPrinterName,
+                a4PrinterName,
+                logoPath,
+                storeTaxNumber,
+                taxRate,
+                autoPrintOnPost,
+                receiptHeader,
+                receiptFooter,
+                escPosCodePage);
+
+            return Result<PrintSettingsDto>.Success(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading print settings");
+            return Result<PrintSettingsDto>.Failure("فشل في تحميل إعدادات الطباعة");
+        }
+    }
+
+    public async Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            await _systemSettingsRepo.SetStringAsync("ThermalPrinterName", request.ThermalPrinterName ?? "", ct: ct);
+            await _systemSettingsRepo.SetStringAsync("A4PrinterName", request.A4PrinterName ?? "", ct: ct);
+            await _systemSettingsRepo.SetStringAsync("LogoPath", request.LogoPath ?? "", ct: ct);
+            await _systemSettingsRepo.SetStringAsync("StoreTaxNumber", request.StoreTaxNumber ?? "", ct: ct);
+            await _systemSettingsRepo.SetStringAsync("TaxRate", request.TaxRate.ToString("F2"), ct: ct);
+            await _systemSettingsRepo.SetStringAsync("AutoPrintOnPost", request.AutoPrintOnPost.ToString().ToLower(), ct: ct);
+            await _systemSettingsRepo.SetStringAsync("ReceiptHeader", request.ReceiptHeader ?? "", ct: ct);
+            await _systemSettingsRepo.SetStringAsync("ReceiptFooter", request.ReceiptFooter ?? "", ct: ct);
+            await _systemSettingsRepo.SetStringAsync("EscPosCodePage", request.EscPosCodePage.ToString(), ct: ct);
+
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating print settings");
+            return Result.Failure("فشل في حفظ إعدادات الطباعة");
+        }
+    }
+
+    private static string GetSettingValue(List<SystemSetting> settings, string key, string defaultValue)
+    {
+        return settings.FirstOrDefault(s =>
+            s.SettingKey.Equals(key, StringComparison.OrdinalIgnoreCase))?.SettingValue ?? defaultValue;
     }
 }

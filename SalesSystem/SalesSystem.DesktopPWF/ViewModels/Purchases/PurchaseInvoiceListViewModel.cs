@@ -63,9 +63,9 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         EditCommand = new RelayCommand(EditInvoice, () => SelectedInvoice != null && SelectedInvoice.Status == (byte)InvoiceStatus.Draft);
         PostCommand = new AsyncRelayCommand(PostInvoiceAsync, () => SelectedInvoice != null && SelectedInvoice.Status == (byte)InvoiceStatus.Draft);
         CancelCommand = new AsyncRelayCommand(CancelInvoiceAsync, () => SelectedInvoice != null && SelectedInvoice.Status == (byte)InvoiceStatus.Posted);
-        PrintPreviewCommand = new AsyncRelayCommand(PrintPreviewAsync, () => IsPrintAllowed());
-        PrintA4Command = new AsyncRelayCommand(PrintA4Async, () => IsPrintAllowed());
-        PrintThermalCommand = new AsyncRelayCommand(PrintThermalAsync, () => IsPrintAllowed());
+        PrintPreviewCommand = new AsyncRelayCommand(PrintPreviewAsync);
+        PrintA4Command = new AsyncRelayCommand(PrintA4Async);
+        PrintThermalCommand = new AsyncRelayCommand(PrintThermalAsync);
 
         // Default date range (last 30 days)
         DateFrom = DateTime.Today.AddDays(-30);
@@ -228,7 +228,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ظپظˆط§طھظٹط± ط§ظ„ط´ط±ط§ط،", "PurchaseInvoiceListViewModel.LoadInvoicesAsync", "[PurchaseInvoiceListViewModel.LoadInvoicesAsync] Failed to load purchase invoices list.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل فواتير الشراء", "PurchaseInvoiceListViewModel.LoadInvoicesAsync", "[PurchaseInvoiceListViewModel.LoadInvoicesAsync] Failed to load purchase invoices list.");
                 IsEmpty = Invoices.Count == 0;
             }
         }
@@ -275,7 +275,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         var editorVm = App.GetService<PurchaseInvoiceEditorViewModel>();
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "ظپط§طھظˆط±ط© ط´ط±ط§ط، ط¬ط¯ظٹط¯ط©",
+            Title = "فاتورة شراء جديدة",
             OnClosed = (vm) =>
             {
                 if (vm is PurchaseInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
@@ -294,7 +294,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         var editorVm = new PurchaseInvoiceEditorViewModel(SelectedInvoice.Id, isReadOnly: true);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "ط¹ط±ط¶ ظپط§طھظˆط±ط© ط´ط±ط§ط،"
+            Title = "عرض فاتورة شراء"
         });
     }
 
@@ -305,7 +305,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         var editorVm = new PurchaseInvoiceEditorViewModel(SelectedInvoice.Id);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "طھط¹ط¯ظٹظ„ ظپط§طھظˆط±ط© ط´ط±ط§ط،",
+            Title = "تعديل فاتورة شراء",
             OnClosed = (vm) =>
             {
                 _eventBus.Publish(new PurchaseInvoiceChangedMessage(SelectedInvoice.Id));
@@ -318,7 +318,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
     {
         if (SelectedInvoice == null) return;
 
-        var result = await _dialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ظ„طھط±ط­ظٹظ„", $"ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط© ط±ظ‚ظ…: {SelectedInvoice.Id}طں\nط³ظٹطھظ… ط¥ط¶ط§ظپط© ط§ظ„ظƒظ…ظٹط§طھ ظ„ظ„ظ…ط®ط²ظˆظ†.");
+        var result = await _dialogService.ShowConfirmationAsync("تأكيد الترحيل", $"هل أنت متأكد من ترحيل الفاتورة رقم: {SelectedInvoice.Id}?\nسيتم إضافة الكميات للمخزون.");
 
         if (!result) return;
 
@@ -332,15 +332,15 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
             if (postResult.IsSuccess)
             {
                 IsBusy = false;
-                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط© ط¨ظ†ط¬ط§ط­");
+                await _dialogService.ShowSuccessAsync("نجاح", "تم ترحيل الفاتورة بنجاح");
                 _eventBus.Publish(new PurchaseInvoiceChangedMessage(SelectedInvoice.Id));
                 await LoadInvoicesAsync();
             }
             else
             {
                 IsBusy = false;
-                ErrorMessage = HandleFailure(postResult.Error ?? "ظپط´ظ„ ظپظٹ طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط©", "PurchaseInvoiceListViewModel.PostInvoiceAsync", $"[PurchaseInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm purchase invoice ID {SelectedInvoice.Id}.");
-                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„طھط±ط­ظٹظ„", ErrorMessage);
+                ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "PurchaseInvoiceListViewModel.PostInvoiceAsync", $"[PurchaseInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm purchase invoice ID {SelectedInvoice.Id}.");
+                await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -357,7 +357,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
     {
         if (SelectedInvoice == null) return;
 
-        var result = await _dialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ظ„ط¥ظ„ط؛ط§ط،", $"ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط© ط±ظ‚ظ…: {SelectedInvoice.Id}طں\nط³ظٹطھظ… ط®طµظ… ط§ظ„ظƒظ…ظٹط§طھ ظ…ظ† ط§ظ„ظ…ط®ط²ظˆظ†.");
+        var result = await _dialogService.ShowConfirmationAsync("تأكيد الإلغاء", $"هل أنت متأكد من إلغاء الفاتورة رقم: {SelectedInvoice.Id}?\nسيتم خصم الكميات من المخزون.");
 
         if (!result) return;
 
@@ -371,15 +371,15 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
             if (cancelResult.IsSuccess)
             {
                 IsBusy = false;
-                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط© ط¨ظ†ط¬ط§ط­");
+                await _dialogService.ShowSuccessAsync("نجاح", "تم إلغاء الفاتورة بنجاح");
                 _eventBus.Publish(new PurchaseInvoiceChangedMessage(SelectedInvoice.Id));
                 await LoadInvoicesAsync();
             }
             else
             {
                 IsBusy = false;
-                ErrorMessage = HandleFailure(cancelResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط©", "PurchaseInvoiceListViewModel.CancelInvoiceAsync", $"[PurchaseInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel purchase invoice ID {SelectedInvoice.Id}.");
-                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط¥ظ„ط؛ط§ط،", ErrorMessage);
+                ErrorMessage = HandleFailure(cancelResult.Error ?? "فشل في إلغاء الفاتورة", "PurchaseInvoiceListViewModel.CancelInvoiceAsync", $"[PurchaseInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel purchase invoice ID {SelectedInvoice.Id}.");
+                await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -394,70 +394,51 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
 
     // â”€â”€â”€ Print Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    private bool IsPrintAllowed() => SelectedInvoice != null
-        && SelectedInvoice.Status == (byte)InvoiceStatus.Posted
-        && !IsBusy;
-
     private async Task PrintPreviewAsync()
     {
         if (SelectedInvoice == null) return;
-        try
+        await ExecuteAsync(async () =>
         {
-            IsBusy = true;
-            var result = await _printService.GetPurchasePreviewDataAsync(SelectedInvoice.Id);
+            var result = await _printService.GetPurchaseA4PdfAsync(SelectedInvoice.Id);
             if (result.IsSuccess && result.Value != null)
             {
-                var preview = new Views.Common.PdfPreviewWindow(result.Value.TempFilePath, result.Value.InvoiceNumber, SelectedInvoice.Id, isPurchase: true);
+                var preview = new Views.Common.PdfPreviewWindow(result.Value, SelectedInvoice.InvoiceNo, SelectedInvoice.Id, isPurchase: true);
                 preview.ShowDialog();
             }
             else
             {
-                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط·ط¨ط§ط¹ط©",
-                    result.Error ?? "طھط¹ط°ط± ظپطھط­ ظ…ط¹ط§ظٹظ†ط© ط§ظ„ط·ط¨ط§ط¹ط©");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
+                    result.Error ?? "تعذر فتح معاينة الطباعة");
             }
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     private async Task PrintA4Async()
     {
         if (SelectedInvoice == null) return;
-        try
+        await ExecuteAsync(async () =>
         {
-            IsBusy = true;
             var result = await _printService.PrintPurchaseA4Async(SelectedInvoice.Id);
             if (!result.IsSuccess)
             {
-                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط·ط¨ط§ط¹ط©",
-                    result.Error ?? "ظپط´ظ„طھ ط§ظ„ط·ط¨ط§ط¹ط©");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
+                    result.Error ?? "فشلت الطباعة");
             }
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     private async Task PrintThermalAsync()
     {
         if (SelectedInvoice == null) return;
-        try
+        await ExecuteAsync(async () =>
         {
-            IsBusy = true;
             var result = await _printService.PrintPurchaseThermalAsync(SelectedInvoice.Id);
             if (!result.IsSuccess)
             {
-                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط·ط¨ط§ط¹ط©",
-                    result.Error ?? "ظپط´ظ„طھ ط§ظ„ط·ط¨ط§ط¹ط© ط§ظ„ط­ط±ط§ط±ظٹط©");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
+                    result.Error ?? "فشلت الطباعة الحرارية");
             }
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     private void UpdateCommandStates()
@@ -466,9 +447,6 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         (EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (PostCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (CancelCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintPreviewCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintA4Command as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-        (PrintThermalCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private void OnInvoiceChanged(PurchaseInvoiceChangedMessage msg)

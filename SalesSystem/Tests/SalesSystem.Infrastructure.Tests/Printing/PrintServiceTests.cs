@@ -60,7 +60,7 @@ public class PrintServiceTests
     {
         var invoice = CreateTestInvoice();
 
-        var result = await _service.ShowPreviewAsync(invoice);
+            var result = await _service.PreviewA4Async(invoice);
 
         result.IsSuccess.Should().BeTrue();
         result.OutputFilePath.Should().NotBeNullOrWhiteSpace();
@@ -72,7 +72,7 @@ public class PrintServiceTests
     {
         var invoice = CreateTestInvoice();
 
-        var result = await _service.ShowPreviewAsync(invoice);
+        var result = await _service.PreviewA4Async(invoice);
 
         result.IsSuccess.Should().BeTrue();
         File.Exists(result.OutputFilePath).Should().BeTrue();
@@ -83,7 +83,7 @@ public class PrintServiceTests
     {
         var invoice = CreateTestInvoice(logoBytes: new byte[] { 0, 1, 2, 3, 4 });
 
-        var result = await _service.ShowPreviewAsync(invoice);
+        var result = await _service.PreviewA4Async(invoice);
 
         result.IsSuccess.Should().BeFalse();
         result.ErrorMessage.Should().Contain("تعذر فتح معاينة الطباعة");

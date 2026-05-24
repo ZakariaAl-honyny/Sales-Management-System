@@ -382,14 +382,10 @@ public interface IBackupApiService
 
 public interface IPrintApiService
 {
-    Task<Result> PreviewSalesAsync(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintSalesA4Async(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintSalesThermalAsync(int invoiceId, CancellationToken ct = default);
-    Task<Result<PrintPreviewData>> GetSalesPreviewDataAsync(int invoiceId, CancellationToken ct = default);
-    Task<Result> PreviewPurchaseAsync(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintPurchaseA4Async(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintPurchaseThermalAsync(int invoiceId, CancellationToken ct = default);
-    Task<Result<PrintPreviewData>> GetPurchasePreviewDataAsync(int invoiceId, CancellationToken ct = default);
     Task<Result> TestPrintAsync(CancellationToken ct = default);
 
     /// <summary>
@@ -417,4 +413,4 @@ public record HealthCheckResult
     public bool IsApiReachable { get; init; }
 }
 
-public record PrintPreviewData(string TempFilePath, string InvoiceNumber);
+

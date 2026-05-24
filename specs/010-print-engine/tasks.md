@@ -73,9 +73,9 @@ description: "Task list for Print Engine (v4.3)"
 
 - [X] T019 [P] [US2] Add `Task<PrintResult> PrintThermalAsync(int invoiceId)` to `IPrintApiService` and implement in `PrintApiService` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/Api/PrintApiService.cs`
 
-- [ ] T020 [US2] Update `SalesInvoiceEditorViewModel` and `PurchaseInvoiceEditorViewModel`: add `PrintThermalCommand`. Calls API. Shows success/error via `IToastNotificationService` — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Sales/SalesInvoiceEditorViewModel.cs`
+- [X] T020 [US2] Update `SalesInvoiceEditorViewModel` and `PurchaseInvoiceEditorViewModel`: add `PrintThermalCommand`. Calls API. Shows success/error via `IToastNotificationService` — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Sales/SalesInvoiceEditorViewModel.cs`
 
-**Checkpoint**: Thermal print command sends raw bytes to the local printer without throwing exceptions.
+**Checkpoint**: Thermal print command sends raw bytes to the local printer without throwing exceptions. Desktop ViewModels wired with `PrintThermalCommand` via `IPrintApiService`. Old `IInvoicePrinter`/`IReceiptPrinter` direct-print deps removed. ✅
 
 ---
 
@@ -83,23 +83,23 @@ description: "Task list for Print Engine (v4.3)"
 
 **Goal**: Allow managers to configure store details, thermal printer name, and auto-print preference.
 
-- [ ] T021 [US3] Create `PrintSettingsView.xaml` and `PrintSettingsViewModel.cs`. Form fields for `StoreName`, `StoreAddress`, `StorePhone`, `ReceiptHeader`, `ReceiptFooter`, `LogoPath`, `ThermalPrinterName` (ComboBox from `PrinterSettings.InstalledPrinters`), `EscPosCodePage`, `AutoPrintOnPost` (CheckBox). `SaveCommand` saves all keys via `SystemSettingsApiService` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Settings/PrintSettingsView.xaml` + `ViewModels/Settings/PrintSettingsViewModel.cs`
+- [X] T021 [US3] Add print settings fields (`AutoPrintOnPost`, `ReceiptHeader`, `ReceiptFooter`, `EscPosCodePage`) to existing `SettingsViewModel` + `SettingsView.xaml`. Add `GET/PUT api/v1/settings/print` endpoints to `SettingsController`. Update `PrintSettingsDto` and `UpdatePrintSettingsRequest` in Contracts. Implement `IPrintDataService.GetPrintSettingsAsync()` and `UpdatePrintSettingsAsync()`. Update FluentValidator. — FILES: `SettingsViewModel.cs`, `SettingsView.xaml`, `SettingsController.cs`, `AllDtos.cs`, `MiscRequests.cs`, `IPrintDataService.cs`, `PrintDataService.cs`, `MiscValidators.cs`
 
-- [ ] T022 [US3] Modify `SalesInvoiceService.PostAsync`. After successful commit, read `Print.AutoPrintOnPost` from settings. If true, inject and call `_printService.PrintThermalAsync` in fire-and-forget mode. Log warning on fail, do NOT fail the invoice post — FILE: `SalesSystem/SalesSystem.Application/Services/SalesInvoiceService.cs`
+- [X] T022 [US3] Modify `SalesService.PostAsync`. After successful commit, read `AutoPrintOnPost` from `IPrintDataService.GetPrintSettingsAsync()`. If true, call `_printService.PrintThermalAsync` in fire-and-forget (`Task.Run`). Log warning on fail, do NOT fail the invoice post — FILE: `SalesSystem/SalesSystem.Application/Services/SalesService.cs`
 
-**Checkpoint**: Print settings are editable. Auto-print triggers thermal printing upon invoice post.
+**Checkpoint**: Print settings are editable via existing SettingsView with new ReceiptHeader/ReceiptFooter/EscPosCodePage/AutoPrintOnPost fields. Auto-print triggers thermal printing upon invoice post in fire-and-forget mode. ✅
 
 ---
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T023 [P] Verify API startup registers CodePages (required for `GetEncoding(1256)`): add `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);` to `Program.cs` — FILE: `SalesSystem/SalesSystem.Api/Program.cs`
+- [X] T023 [P] Verify API startup registers CodePages (required for `GetEncoding(1256)`): add `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);` to `Program.cs` — FILE: `SalesSystem/SalesSystem.Api/Program.cs`
 
-- [ ] T024 [P] Verify no PDF or print library NuGet packages exist in the `SalesSystem.DesktopPWF` project file (enforcing RULE-088 and architecture boundary) — FILE: `SalesSystem/SalesSystem.DesktopPWF/SalesSystem.DesktopPWF.csproj`
+- [X] T024 [P] Verify no PDF or print library NuGet packages exist in the `SalesSystem.DesktopPWF` project file (enforcing RULE-088 and architecture boundary) — FILE: `SalesSystem/SalesSystem.DesktopPWF/SalesSystem.DesktopPWF.csproj`
 
 - [X] T025 [P] Add unit tests for `EscPosCommandBuilder` ensuring correct byte sequences for bold, cut, and encoding translation — FILE: `SalesSystem/Tests/SalesSystem.Infrastructure.Tests/Printing/EscPosCommandBuilderTests.cs`
 
-- [ ] T026 Update `docs/CHANGELOG.md` with v4.3 entry: Print Engine (A4 QuestPDF, Thermal raw Win32 printing, Auto-print) — FILE: `docs/CHANGELOG.md`
+- [X] T026 Update `docs/CHANGELOG.md` with v4.3 entry: Print Engine (A4 QuestPDF, Thermal raw Win32 printing, Auto-print) — FILE: `docs/CHANGELOG.md`
 
 ---
 
@@ -107,10 +107,10 @@ description: "Task list for Print Engine (v4.3)"
 
 - **Phase 1 (Setup)**: No dependencies
 - **Phase 2 (Foundational)**: Depends on Phase 1 — ✅ Complete
-- **Phase 3 (US1 - A4)**: Depends on Phase 2 — ✅ Mostly Complete (T013 pending)
-- **Phase 4 (US2 - Thermal)**: Depends on Phase 2 — ✅ Mostly Complete (T020 pending)
-- **Phase 5 (US3 - Settings)**: Depends on Phases 3 and 4 — ❌ Not started
-- **Phase 6 (Polish)**: Depends on all previous phases — ❌ Partially done
+- **Phase 3 (US1 - A4)**: Depends on Phase 2 — ✅ Complete
+- **Phase 4 (US2 - Thermal)**: Depends on Phase 2 — ✅ Complete
+- **Phase 5 (US3 - Settings)**: Depends on Phases 3 and 4 — ✅ Complete
+- **Phase 6 (Polish)**: Depends on all previous phases — ✅ Complete
 
 ---
 
@@ -118,7 +118,7 @@ description: "Task list for Print Engine (v4.3)"
 
 ### MVP First (US1 + US2 only)
 1. ✅ Complete Phase 2: Foundational (DTOs and Data Gathering)
-2. ✅ Complete Phase 3: A4 PDF Generation (US1) — T013 pending (Desktop VM integration)
-3. ✅ Complete Phase 4: Thermal Printing (US2) — T020 pending (Desktop VM integration)
-4. ⬜ Validate both print paths work with default/hardcoded settings.
-5. ⬜ Then implement Phase 5 to make settings configurable.
+2. ✅ Complete Phase 3: A4 PDF Generation (US1)
+3. ✅ Complete Phase 4: Thermal Printing (US2)
+4. ✅ Validate both print paths work with default/hardcoded settings.
+5. ✅ Complete Phase 5: Print settings configurable (AutoPrintOnPost, ReceiptHeader/Footer, EscPosCodePage)

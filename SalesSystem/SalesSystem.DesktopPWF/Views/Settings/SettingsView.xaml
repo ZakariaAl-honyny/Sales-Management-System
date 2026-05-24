@@ -167,28 +167,64 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,16">
                                 <TextBlock Text="طابعة A4" Style="{StaticResource LabelStyle}"/>
                                 <ComboBox ItemsSource="{Binding InstalledPrinters}"
                                           SelectedItem="{Binding A4PrinterName}"
-                                          AutomationProperties.AutomationId="CmbA4Printer"/>
+                                          AutomationProperties.AutomationId="CmbA4Printer"
+                                          ToolTip="اختيار طابعة A4 لطباعة الفواتير — يجب أن تكون الطابعة مثبتة على هذا الجهاز"/>
                             </StackPanel>
 
                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="12,0,0,16">
                                 <TextBlock Text="الطابعة الحرارية (80mm)" Style="{StaticResource LabelStyle}"/>
                                 <ComboBox ItemsSource="{Binding InstalledPrinters}"
                                           SelectedItem="{Binding ThermalPrinterName}"
-                                          AutomationProperties.AutomationId="CmbThermalPrinter"/>
+                                          AutomationProperties.AutomationId="CmbThermalPrinter"
+                                          ToolTip="اختيار الطابعة الحرارية (80mm) لإيصالات البيع — تأكد من تعريف الطابعة في النظام"/>
                             </StackPanel>
 
-                            <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,16">
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,12,16">
+                                <TextBlock Text="رأس الإيصال الحراري" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding ReceiptHeader, UpdateSourceTrigger=PropertyChanged}"
+                                         MaxLength="200"
+                                         ToolTip="يظهر في أعلى الإيصال الحراري (مثال: أهلاً بكم في متجر النجمة)"
+                                         AutomationProperties.AutomationId="TxtReceiptHeader"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="1" Margin="12,0,0,16">
+                                <TextBlock Text="تذييل الإيصال الحراري" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding ReceiptFooter, UpdateSourceTrigger=PropertyChanged}"
+                                         MaxLength="200"
+                                         ToolTip="يظهر في أسفل الإيصال الحراري (مثال: شكراً لتسوقكم معنا)"
+                                         AutomationProperties.AutomationId="TxtReceiptFooter"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,12,16">
+                                <TextBlock Text="كود صفحة ESC/POS" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding EscPosCodePage, TargetNullValue=22}"
+                                         ToolTip="كود الصفحة للطابعة الحرارية — 22 = IBM864 يدعم اللغة العربية"
+                                         AutomationProperties.AutomationId="TxtEscPosCodePage"/>
+                            </StackPanel>
+
+                            <CheckBox Grid.Row="3" Grid.ColumnSpan="2"
+                                      Content="🖨️ طباعة إيصال حراري تلقائياً بعد الترحيل"
+                                      IsChecked="{Binding AutoPrintOnPost}"
+                                      Margin="0,0,0,16"
+                                      ToolTip="عند ترحيل فاتورة بيع، يتم إرسال إيصال حراري تلقائياً إلى الطابعة المحددة"
+                                      AutomationProperties.AutomationId="ChkAutoPrintOnPost"/>
+
+                            <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,0,0,16">
                                 <TextBlock Text="الرقم الضريبي (للفاتورة)" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding StoreTaxNumber}" AutomationProperties.AutomationId="TxtStoreTaxNumber"/>
+                                <TextBox Text="{Binding StoreTaxNumber}" AutomationProperties.AutomationId="TxtStoreTaxNumber"
+                                         ToolTip="الرقم الضريبي للمنشأة — يظهر على الفواتير والإيصالات المطبوعة"/>
                             </StackPanel>
 
-                            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,12,0">
+                            <StackPanel Grid.Row="5" Grid.Column="0" Margin="0,0,12,0">
                                 <TextBlock Text="شعار المتجر" Style="{StaticResource LabelStyle}"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -200,7 +236,7 @@
                                 </Grid>
                             </StackPanel>
 
-                            <Button Grid.Row="3" Grid.ColumnSpan="2"
+                            <Button Grid.Row="6" Grid.ColumnSpan="2"
                                     Command="{Binding TestPrintCommand}"
                                     Style="{StaticResource PrimaryButton}"
                                     Margin="0,8,0,0"
@@ -270,7 +306,7 @@
                             IsDefault="True"
                             TabIndex="11"
                             AutomationProperties.AutomationId="BtnSaveSettings"
-                            ToolTip="حفظ إعدادات النظام"/>
+                            ToolTip="حفظ جميع إعدادات النظام بما في ذلك إعدادات الطباعة وطريقة احتساب التكلفة — سيتم تطبيق التغييرات فوراً"/>
                 </StackPanel>
             </Grid>
         </Border>

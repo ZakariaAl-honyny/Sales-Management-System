@@ -26,7 +26,7 @@ public class PrintService : IPrintService
     // ═══════════════════════════════════════════════
     // SHOW PREVIEW
     // ═══════════════════════════════════════════════
-    public async Task<PrintResult> ShowPreviewAsync(InvoicePrintDto invoice)
+    public async Task<PrintResult> PreviewA4Async(InvoicePrintDto invoice)
     {
         try
         {

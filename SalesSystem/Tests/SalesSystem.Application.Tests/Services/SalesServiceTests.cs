@@ -5,6 +5,8 @@ using Moq;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Application.Printing;
+using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -32,6 +34,8 @@ public class SalesServiceTests : IDisposable
     private readonly Mock<IDocumentSequenceService> _mockSequenceService;
     private readonly Mock<ICashBoxService> _cashBoxServiceMock;
     private readonly Mock<ILogger<SalesService>> _mockLogger;
+    private readonly Mock<IPrintDataService> _mockPrintDataService = new();
+    private readonly Mock<IPrintService> _mockPrintService = new();
     private int _saveChangesCallCount = 0;
 
     private readonly SalesService _sut;
@@ -106,6 +110,8 @@ public class SalesServiceTests : IDisposable
             _mockInventoryService.Object,
             _mockSequenceService.Object,
             _cashBoxServiceMock.Object,
+            _mockPrintDataService.Object,
+            _mockPrintService.Object,
             _mockLogger.Object);
     }
 

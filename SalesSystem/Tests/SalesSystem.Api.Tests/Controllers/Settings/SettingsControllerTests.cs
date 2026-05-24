@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
@@ -15,14 +16,16 @@ namespace SalesSystem.Api.Tests.Controllers.Settings;
 public class SettingsControllerTests
 {
     private readonly Mock<IStoreSettingsService> _settingsServiceMock;
+    private readonly Mock<IPrintDataService> _printSettingsServiceMock;
     private readonly Mock<ILogger<SettingsController>> _loggerMock;
     private readonly SettingsController _controller;
 
     public SettingsControllerTests()
     {
         _settingsServiceMock = new Mock<IStoreSettingsService>();
+        _printSettingsServiceMock = new Mock<IPrintDataService>();
         _loggerMock = new Mock<ILogger<SettingsController>>();
-        _controller = new SettingsController(_settingsServiceMock.Object);
+        _controller = new SettingsController(_settingsServiceMock.Object, _printSettingsServiceMock.Object);
 
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, "1") };
         var identity = new ClaimsIdentity(claims);

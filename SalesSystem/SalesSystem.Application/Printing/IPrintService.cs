@@ -8,7 +8,7 @@ public interface IPrintService
     /// <summary>
     /// Generates PDF preview and opens WPF preview window.
     /// </summary>
-    Task<PrintResult> ShowPreviewAsync(InvoicePrintDto invoice);
+    Task<PrintResult> PreviewA4Async(InvoicePrintDto invoice);
 
     /// <summary>
     /// Generates PDF and sends directly to configured A4 printer.

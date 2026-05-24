@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Printing.Contracts;
@@ -31,4 +33,15 @@ public interface IPrintDataService
     /// Gets the print system settings (LogoPath, TaxRate, StoreTaxNumber).
     /// </summary>
     Task<Result<List<SystemSetting>>> GetPrintSystemSettingsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets all print settings as a PrintSettingsDto.
+    /// Reads from SystemSettings (Category="Print") and StoreSettings.
+    /// </summary>
+    Task<Result<PrintSettingsDto>> GetPrintSettingsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates all print settings via upsert into SystemSettings (Category="Print").
+    /// </summary>
+    Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default);
 }

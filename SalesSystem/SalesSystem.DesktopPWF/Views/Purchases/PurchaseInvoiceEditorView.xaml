@@ -321,6 +321,14 @@
                             Padding="16,0"
                             ToolTip="طباعة فاتورة بصيغة A4"/>
 
+                    <Button Content="🧾 وصل" 
+                            Command="{Binding PrintThermalCommand}" 
+                            Style="{StaticResource SecondaryButton}" 
+                            Margin="0,0,8,0" 
+                            TabIndex="15" 
+                            Padding="16,0"
+                            ToolTip="طباعة إيصال حراري"/>
+
                     <Separator Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
 
                     <Button Content="🚫 إلغاء" 

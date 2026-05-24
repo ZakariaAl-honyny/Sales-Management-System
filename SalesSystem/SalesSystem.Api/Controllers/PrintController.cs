@@ -34,7 +34,7 @@ public class PrintController : ControllerBase
         if (!result.IsSuccess)
             return NotFound(new { error = result.Error });
 
-        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
+        var previewResult = await _printService.PreviewA4Async(result.Value!);
         return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
@@ -60,18 +60,6 @@ public class PrintController : ControllerBase
 
         var printResult = await _printService.PrintThermalAsync(result.Value!);
         return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
-    }
-
-    [HttpPost("preview-data/sales/{id:int}")]
-    [Authorize(Policy = "AllStaff")]
-    public async Task<IActionResult> GetSalesPreviewData(int id, CancellationToken ct)
-    {
-        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
-        if (!result.IsSuccess)
-            return NotFound(new { error = result.Error });
-
-        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
-        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
     [HttpPost("save/sales/{id:int}")]
@@ -100,7 +88,7 @@ public class PrintController : ControllerBase
         if (!result.IsSuccess)
             return NotFound(new { error = result.Error });
 
-        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
+        var previewResult = await _printService.PreviewA4Async(result.Value!);
         return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
@@ -126,18 +114,6 @@ public class PrintController : ControllerBase
 
         var printResult = await _printService.PrintThermalAsync(result.Value!);
         return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
-    }
-
-    [HttpPost("preview-data/purchase/{id:int}")]
-    [Authorize(Policy = "ManagerAndAbove")]
-    public async Task<IActionResult> GetPurchasePreviewData(int id, CancellationToken ct)
-    {
-        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
-        if (!result.IsSuccess)
-            return NotFound(new { error = result.Error });
-
-        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
-        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
     [HttpPost("save/purchase/{id:int}")]

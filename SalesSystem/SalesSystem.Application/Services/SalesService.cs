@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Application.Printing;
+using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
@@ -16,6 +18,8 @@ public class SalesService : ISalesService
     private readonly IInventoryService _inventoryService;
     private readonly IDocumentSequenceService _sequenceService;
     private readonly ICashBoxService _cashBoxService;
+    private readonly IPrintDataService _printDataService;
+    private readonly IPrintService _printService;
     private readonly ILogger<SalesService> _logger;
 
     public SalesService(
@@ -23,12 +27,16 @@ public class SalesService : ISalesService
         IInventoryService inventoryService,
         IDocumentSequenceService sequenceService,
         ICashBoxService cashBoxService,
+        IPrintDataService printDataService,
+        IPrintService printService,
         ILogger<SalesService> logger)
     {
         _uow = uow;
         _inventoryService = inventoryService;
         _sequenceService = sequenceService;
         _cashBoxService = cashBoxService;
+        _printDataService = printDataService;
+        _printService = printService;
         _logger = logger;
     }
 
@@ -310,7 +318,38 @@ public class SalesService : ISalesService
 
                 _logger.LogInformation("Sales Invoice posted: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
 
-                return await GetByIdAsync(invoice.Id, ct);
+                var postedResult = await GetByIdAsync(invoice.Id, ct);
+
+                // Fire-and-forget auto-print if enabled — failure MUST NOT roll back the post
+                if (postedResult.IsSuccess && postedResult.Value != null)
+                {
+                    var capturedInvoiceId = invoice.Id;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var settingsResult = await _printDataService.GetPrintSettingsAsync(CancellationToken.None);
+                            if (settingsResult.IsSuccess && settingsResult.Value != null && settingsResult.Value.AutoPrintOnPost)
+                            {
+                                var printDataResult = await _printDataService.GetSalesInvoicePrintDataAsync(capturedInvoiceId, CancellationToken.None);
+                                if (printDataResult.IsSuccess && printDataResult.Value != null)
+                                {
+                                    var printResult = await _printService.PrintThermalAsync(printDataResult.Value);
+                                    if (!printResult.IsSuccess)
+                                    {
+                                        _logger.LogWarning("Auto-print failed for invoice {InvoiceId}: {Error}", capturedInvoiceId, printResult.ErrorMessage);
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Auto-print error for invoice {InvoiceId}", capturedInvoiceId);
+                        }
+                    }, CancellationToken.None);
+                }
+
+                return postedResult;
             }
             catch (DomainException ex)
             {

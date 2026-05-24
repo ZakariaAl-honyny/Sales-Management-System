@@ -283,7 +283,11 @@ public record PrintSettingsDto(
     string A4PrinterName,
     string LogoPath,
     string StoreTaxNumber,
-    decimal TaxRate);
+    decimal TaxRate,
+    bool AutoPrintOnPost,
+    string ReceiptHeader,
+    string ReceiptFooter,
+    int EscPosCodePage);
 
 public record StoreSettingsDto(
     int Id,

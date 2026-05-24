@@ -114,14 +114,6 @@ public partial class PdfPreviewWindow : Window
         Close();
     }
 
-    /// <summary>
-    /// Returns the invoice ID passed through the constructor.
-    /// </summary>
-    private int ExtractInvoiceId()
-    {
-        return _invoiceId;
-    }
-
     private static void TryDeleteFile(string path)
     {
         try

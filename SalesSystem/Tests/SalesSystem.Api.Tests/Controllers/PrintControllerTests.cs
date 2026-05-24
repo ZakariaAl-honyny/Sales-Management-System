@@ -94,7 +94,7 @@ public class PrintControllerTests
             .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
-            .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
+            .Setup(x => x.PreviewA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
 
         var result = await _controller.PreviewSalesInvoice(1, CancellationToken.None);
@@ -124,7 +124,7 @@ public class PrintControllerTests
             .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
-            .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
+            .Setup(x => x.PreviewA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("الطابعة غير متصلة"));
 
         var result = await _controller.PreviewSalesInvoice(1, CancellationToken.None);
@@ -232,7 +232,7 @@ public class PrintControllerTests
             .Setup(x => x.GetPurchaseInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSamplePurchaseDto()));
         _printServiceMock
-            .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
+            .Setup(x => x.PreviewA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
 
         var result = await _controller.PreviewPurchaseInvoice(1, CancellationToken.None);

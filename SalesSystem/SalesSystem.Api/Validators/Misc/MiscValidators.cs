@@ -52,5 +52,14 @@ public class UpdatePrintSettingsRequestValidator : AbstractValidator<UpdatePrint
         RuleFor(x => x.TaxRate)
             .GreaterThanOrEqualTo(0).WithMessage("نسبة الضريبة لا يمكن أن تكون سالبة")
             .LessThanOrEqualTo(100).WithMessage("نسبة الضريبة لا يمكن أن تتجاوز 100%");
+
+        RuleFor(x => x.ReceiptHeader)
+            .MaximumLength(200).WithMessage("رأس الإيصال لا يمكن أن يتجاوز 200 حرف");
+
+        RuleFor(x => x.ReceiptFooter)
+            .MaximumLength(200).WithMessage("ذيل الإيصال لا يمكن أن يتجاوز 200 حرف");
+
+        RuleFor(x => x.EscPosCodePage)
+            .InclusiveBetween(0, 255).WithMessage("رمز صفحة ESC/POS يجب أن يكون بين 0 و 255");
     }
 }

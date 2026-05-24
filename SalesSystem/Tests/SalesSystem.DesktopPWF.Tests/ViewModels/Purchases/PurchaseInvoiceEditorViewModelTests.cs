@@ -14,6 +14,7 @@ using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels.Purchases;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models.Printing;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 
 public class PurchaseInvoiceEditorViewModelTests : IDisposable
 {
@@ -23,12 +24,12 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<IProductApiService> _mockProductService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<ISettingsApiService> _mockSettingsService;
-    private readonly Mock<IInvoicePrinter> _mockInvoicePrinter;
     private readonly Mock<IDialogService> _mockDialogService;
     private readonly Mock<ISoundService> _mockSoundService;
     private readonly Mock<IBarcodeInputService> _mockBarcodeInputService;
     private readonly Mock<ICashBoxApiService> _cashBoxApiServiceMock;
     private readonly Mock<IPrintApiService> _printApiServiceMock;
+    private readonly Mock<IToastNotificationService> _mockToastService;
     private readonly PurchaseInvoiceEditorViewModel _viewModel;
 
     public PurchaseInvoiceEditorViewModelTests()
@@ -39,12 +40,12 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
         _mockProductService = new Mock<IProductApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockSettingsService = new Mock<ISettingsApiService>();
-        _mockInvoicePrinter = new Mock<IInvoicePrinter>();
         _mockDialogService = new Mock<IDialogService>();
         _mockSoundService = new Mock<ISoundService>();
         _mockBarcodeInputService = new Mock<IBarcodeInputService>();
         _cashBoxApiServiceMock = new Mock<ICashBoxApiService>();
         _printApiServiceMock = new Mock<IPrintApiService>();
+        _mockToastService = new Mock<IToastNotificationService>();
 
         var suppliers = new List<SupplierDto>
         {
@@ -75,12 +76,12 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             _mockWarehouseService.Object,
             _mockProductService.Object,
             _mockSettingsService.Object,
-            _mockInvoicePrinter.Object,
             _mockDialogService.Object,
             _mockSoundService.Object,
             _mockBarcodeInputService.Object,
             _cashBoxApiServiceMock.Object,
-            _printApiServiceMock.Object);
+            _printApiServiceMock.Object,
+            _mockToastService.Object);
     }
 
     public void Dispose() { }
@@ -94,7 +95,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
         var vmWithId = new PurchaseInvoiceEditorViewModel(
             _mockInvoiceService.Object, _mockEventBus.Object, _mockSupplierService.Object,
             _mockWarehouseService.Object, _mockProductService.Object, _mockSettingsService.Object,
-            _mockInvoicePrinter.Object, _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _cashBoxApiServiceMock.Object, _printApiServiceMock.Object, invoiceId: 1);
+            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _cashBoxApiServiceMock.Object, _printApiServiceMock.Object, _mockToastService.Object, invoiceId: 1);
         vmWithId.IsEditMode.Should().BeTrue();
     }
 
@@ -121,7 +122,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
         var vm = new PurchaseInvoiceEditorViewModel(
             _mockInvoiceService.Object, _mockEventBus.Object, _mockSupplierService.Object,
             _mockWarehouseService.Object, _mockProductService.Object, _mockSettingsService.Object,
-            _mockInvoicePrinter.Object, _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _cashBoxApiServiceMock.Object, _printApiServiceMock.Object, invoiceId: 1);
+            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _cashBoxApiServiceMock.Object, _printApiServiceMock.Object, _mockToastService.Object, invoiceId: 1);
 
         await Task.Delay(100);
         vm.SelectedWarehouseId.Should().Be(1);

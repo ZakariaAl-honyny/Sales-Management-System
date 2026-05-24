@@ -51,6 +51,11 @@ builder.Host.UseSerilog((context, config) =>
 });
 
 // ============================================
+// 0b. Code Pages Encoding (for Arabic thermal printing - Windows-1256)
+// ============================================
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+// ============================================
 // 1. Data Protection (DPAPI)
 // ============================================
 var keyDir = Path.Combine(
