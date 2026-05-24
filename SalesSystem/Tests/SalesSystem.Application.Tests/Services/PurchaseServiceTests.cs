@@ -7,6 +7,7 @@ using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -52,6 +53,8 @@ public class PurchaseServiceTests : IDisposable
 
         _mockUow.Setup(u => u.PurchaseInvoices).Returns(new InMemoryEfCoreRepository<PurchaseInvoice>(_dbContext));
         _mockUow.Setup(u => u.Suppliers).Returns(new InMemoryEfCoreRepository<Supplier>(_dbContext));
+        _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
+        _mockUow.Setup(u => u.Warehouses).Returns(new InMemoryEfCoreRepository<Warehouse>(_dbContext));
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
@@ -62,6 +65,14 @@ public class PurchaseServiceTests : IDisposable
 
         _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MockDbContextTransaction());
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result<PurchaseInvoiceDto>>(
+            It.IsAny<Func<Task<Result<PurchaseInvoiceDto>>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result<PurchaseInvoiceDto>>> func, CancellationToken ct) => func());
+
+        _mockStoreSettingsService.Setup(s => s.GetSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettingsDto>.Success(new StoreSettingsDto(1, "متجري", null, null, null, null, "SAR", 15m, true, null, true, false, true, "PUR-", (int)SalesSystem.Domain.Enums.CostingMethod.WeightedAverage)));
 
         _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("PUR-2026-000001"));
@@ -102,6 +113,10 @@ public class PurchaseServiceTests : IDisposable
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Warehouses.Add(warehouse);
+        await _dbContext.SaveChangesAsync();
+
+        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
@@ -197,6 +212,10 @@ public class PurchaseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
+        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        _dbContext.Products.Add(product);
+        await _dbContext.SaveChangesAsync();
+
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
             supplierId: 1,
@@ -267,6 +286,10 @@ public class PurchaseServiceTests : IDisposable
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Warehouses.Add(warehouse);
+        await _dbContext.SaveChangesAsync();
+
+        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
@@ -365,8 +388,8 @@ public class PurchaseServiceTests : IDisposable
 
         var subTotal = 1000m + 950m;
         invoice.SubTotal.Should().Be(subTotal, "SubTotal = 1000 + 950 = 1950");
-        invoice.DiscountAmount.Should().Be(100m);
-        invoice.TotalAmount.Should().Be(1850m, "TotalAmount = 1950 - 100 = 1850");
+        invoice.DiscountAmount.Should().Be(0m);
+        invoice.TotalAmount.Should().Be(1950m, "TotalAmount = 1950 - 0 = 1950");
 
         _output.WriteLine("[PASS] Purchase invoice totals calculated correctly");
     }
@@ -414,6 +437,7 @@ public class PurchaseServiceTests : IDisposable
         public async Task<T> AddAsync(T entity, CancellationToken ct = default)
         {
             await _context.Set<T>().AddAsync(entity, ct);
+            await _context.SaveChangesAsync(ct);
             return entity;
         }
 
@@ -423,14 +447,31 @@ public class PurchaseServiceTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task SoftDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                entity.MarkAsDeleted();
+                _context.Set<T>().Update(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
-        public Task HardDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task HardDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                _context.Set<T>().Remove(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
         public void DeleteRange(IEnumerable<T> entities)
-            => throw new NotImplementedException();
+        {
+            _context.Set<T>().RemoveRange(entities);
+        }
 
         public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
             => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));

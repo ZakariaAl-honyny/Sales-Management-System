@@ -1,5 +1,7 @@
 namespace SalesSystem.Contracts.Requests;
 
+public record RestoreBackupRequest(string FileName);
+
 public record ReportFilterRequest(
     DateTime? DateFrom, DateTime? DateTo,
     int? CustomerId, int? SupplierId,

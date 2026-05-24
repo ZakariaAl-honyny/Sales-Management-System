@@ -31,7 +31,7 @@ public class CustomersControllerTests : ControllerTestBase
 
         var result = await _controller.GetAll(null, 1, 10, false, CancellationToken.None);
 
-        result.Should().BeOfType<OkObjectResult>();
+        result.Result.Should().BeOfType<OkObjectResult>();
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public class CustomersControllerTests : ControllerTestBase
 
         var result = await _controller.GetAll(null, 1, 10, false, CancellationToken.None);
 
-        result.Should().BeOfType<BadRequestObjectResult>();
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public class CustomersControllerTests : ControllerTestBase
 
         var result = await _controller.GetById(1, CancellationToken.None);
 
-        result.Should().BeOfType<OkObjectResult>();
+        result.Result.Should().BeOfType<OkObjectResult>();
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class CustomersControllerTests : ControllerTestBase
 
         var result = await _controller.GetById(999, CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundObjectResult>();
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class CustomersControllerTests : ControllerTestBase
 
         var result = await _controller.Create(request, CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.Result.Should().BeOfType<CreatedAtActionResult>();
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class CustomersControllerTests : ControllerTestBase
 
         var result = await _controller.Create(request, CancellationToken.None);
 
-        result.Should().BeOfType<BadRequestObjectResult>();
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]

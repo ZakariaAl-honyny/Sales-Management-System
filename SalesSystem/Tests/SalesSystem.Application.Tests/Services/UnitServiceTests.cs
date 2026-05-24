@@ -182,7 +182,7 @@ public class UnitServiceTests : IDisposable
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Product", 10m, 100m, barcode: "P001", categoryId: unit.Id);
+        var product = Product.Create("Product", 10m, 100m, barcode: "P001", retailUnitId: unit.Id);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -264,6 +264,7 @@ public class UnitServiceTests : IDisposable
         public async Task<T> AddAsync(T entity, CancellationToken ct = default)
         {
             await _context.Set<T>().AddAsync(entity, ct);
+            await _context.SaveChangesAsync(ct);
             return entity;
         }
 
@@ -273,14 +274,31 @@ public class UnitServiceTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task SoftDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                entity.MarkAsDeleted();
+                _context.Set<T>().Update(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
-        public Task HardDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task HardDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                _context.Set<T>().Remove(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
         public void DeleteRange(IEnumerable<T> entities)
-            => throw new NotImplementedException();
+        {
+            _context.Set<T>().RemoveRange(entities);
+        }
 
         public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
             => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));

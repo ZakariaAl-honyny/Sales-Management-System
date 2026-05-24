@@ -8,6 +8,10 @@ mode: all
 
 # Code Reviewer
 
+## Arabic Encoding Requirement
+
+All Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text. If you encounter garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file has encoding corruption. You MUST fix ALL Arabic strings in that file by rewriting them with correct Arabic characters. Always verify your output files are saved with UTF-8 encoding.
+
 ## Role
 Code quality and convention enforcement for the Sales Management System.
 
@@ -174,6 +178,10 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] No CS1540 errors (protected member access via base class)?
 - [ ] No async void patterns in commands (use AsyncRelayCommand + ExecuteAsync)?
 - [ ] FallbackErrorDialog exists for unhandled exceptions?
+
+### Arabic Encoding
+- [ ] All Arabic string literals are valid UTF-8 (no mojibake like `ط§ظ„ط³ظ„ط§ظ…`)?
+- [ ] No Arabic strings appear garbled in the diff?
 
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`

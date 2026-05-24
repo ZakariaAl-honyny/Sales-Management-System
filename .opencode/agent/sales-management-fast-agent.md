@@ -8,6 +8,10 @@ mode: subagent
 
 # Sales Management System — Fast Agent
 
+## Arabic Encoding Requirement
+
+All Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text. If you encounter garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file has encoding corruption. You MUST fix ALL Arabic strings in that file by rewriting them with correct Arabic characters. Always verify your output files are saved with UTF-8 encoding.
+
 You fix simple errors and clean code. You do NOT add new features.
 
 ## MUST READ FIRST
@@ -83,3 +87,19 @@ When fixing hard delete operations:
 1. Wrap `_uow.Products.Remove(entity)` + `SaveChangesAsync()` in `try/catch (DbUpdateException)`
 2. Log via `_logger.LogError(ex, "Cannot delete {Entity} {Id}: {Error}", name, id, ex.InnerException?.Message)`
 3. Return `Result.Failure("لا يمكن حذف هذا العنصر لأنه مرتبط بمعاملات أخرى", ErrorCodes.ReferencedByOtherEntities)`
+
+### Arabic Encoding Fixes
+
+When fixing garbled Arabic:
+1. Identify files with mojibake (e.g., `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام` or `ط§ط®طھط¨ط§ط±` instead of `اختبار`)
+2. Rewrite ALL string literals in that file from scratch with correct UTF-8 Arabic characters
+3. Verify the file is saved with UTF-8 encoding (BOM recommended)
+4. Check 3-5 Arabic strings in the diff to confirm they read correctly in Arabic
+
+## Quick Fixes
+
+When asked to fix code quickly, always check for and fix:
+1. Garbled Arabic strings (mojibake encoding corruption)
+2. `MessageBox.Show` → `IDialogService` replacements
+3. Direct `HttpClient` → typed service class replacements
+4. Shadowed `_dialogService` fields → use base class `DialogService` property

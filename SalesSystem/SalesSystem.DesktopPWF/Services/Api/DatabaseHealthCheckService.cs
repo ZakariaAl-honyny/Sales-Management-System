@@ -38,6 +38,19 @@ public class DatabaseHealthCheckService : IDatabaseHealthCheckService
                 };
             }
 
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            if (contentType == null || !contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase))
+            {
+                var body = await response.Content.ReadAsStringAsync(ct);
+                Serilog.Log.Warning("Health endpoint returned non-JSON response: {ContentType} — body: {Body}", contentType, body);
+                return new HealthCheckResult
+                {
+                    IsApiReachable = true,
+                    IsDatabaseConnected = false,
+                    ErrorMessage = "استجابة غير متوقعة من الخادم"
+                };
+            }
+
             var result = await response.Content.ReadFromJsonAsync<HealthDbResponse>(ct);
             var isConnected = result?.Status == "connected";
 
@@ -81,7 +94,7 @@ public class DatabaseHealthCheckService : IDatabaseHealthCheckService
             {
                 IsApiReachable = false,
                 IsDatabaseConnected = false,
-                ErrorMessage = $"حدث خطأ غير متوقع: {ex.Message}"
+                ErrorMessage = "حدث خطأ غير متوقع أثناء التحقق من اتصال قاعدة البيانات"
             };
         }
     }

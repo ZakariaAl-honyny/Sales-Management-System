@@ -292,11 +292,23 @@ public class ProductServiceTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task SoftDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await GetByIdAsync(id, ct);
+            if (entity != null)
+            {
+                entity.MarkAsDeleted();
+            }
+        }
 
-        public Task HardDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task HardDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await GetByIdAsync(id, ct);
+            if (entity != null)
+            {
+                _context.Set<T>().Remove(entity);
+            }
+        }
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();

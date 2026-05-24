@@ -42,7 +42,7 @@ text
 │  ✅ Handler / Controller                                        │
 └─────────────────────────────────────────────────────────────────┘
 
-## 🚦 Security Implementation Status (v4.6.2)
+## 🚦 Security Implementation Status (v4.6.4)
 
 | Layer | Feature | Status | Notes |
 |-------|---------|--------|-------|
@@ -59,14 +59,14 @@ text
 | 5 | Refresh Token Rotation | ❌ Not Implemented | Not implemented |
 | 5 | Token Reuse Detection | ❌ Not Implemented | Not implemented |
 | 5 | `RefreshTokens` table | ❌ Not Implemented | Not in database |
-| 6 | **Rate Limiting** | ✅ **NEW in v4.6.2** | Login: 5/15min, Global: 100/min (added just now) |
+| 6 | **Rate Limiting** | ✅ **v4.6.4** | Login: 5/15min, Global: 100/min |
 | 6 | Account Lockout | ❌ Not Implemented | Planned for future |
 | 7 | Audit Middleware | ❌ Not Implemented | Serilog file logging used instead |
 | 7 | `AuditLogs` table | ❌ Not Implemented | Not in database |
 | 7 | `ProductPriceHistory` | ✅ Implemented | Price change audit trail |
-| — | Soft Delete (Users) | ✅ **FIXED in v4.6.2** | `PermanentDeleteAsync` returns `Result.Failure` |
-| — | Connection String Security | ✅ **FIXED in v4.6.2** | Env var only; removed from `appsettings.Development.json` |
-| — | FluentValidation | ✅ **ENHANCED in v4.6.2** | All 7 validators enhanced with additional rules |
+| — | Soft Delete (Users) | ✅ **v4.6.4** | `PermanentDeleteAsync` returns `Result.Failure` |
+| — | Connection String Security | ✅ **v4.6.4** | Env var only; removed from `appsettings.Development.json` |
+| — | FluentValidation | ✅ **v4.6.4** | All 7 validators enhanced with additional rules |
 
 🗂️ Phase 0: Database Schema & Setup
 Task 0.1 — Security Tables
@@ -1460,7 +1460,7 @@ app.UseExceptionHandler(errorApp =>
 });
 📦 Final Summary
 
-## ✅ Implemented (v4.6.2)
+## ✅ Implemented (v4.6.4)
 - **HTTPS + HSTS** — Force HTTPS redirect in Program.cs, HSTS enabled in production
 - **CORS** — Desktop-only origins (`localhost:5221`, `localhost:5222`), strict headers
 - **JWT Authentication** — `SALESSYSTEM_JWT_SECRET` from environment variable, `ClockSkew = Zero`, `RequireExpirationTime = true`

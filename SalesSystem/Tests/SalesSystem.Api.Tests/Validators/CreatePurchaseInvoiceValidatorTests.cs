@@ -593,10 +593,33 @@ public class CreatePurchaseInvoiceValidatorTests
 
     #endregion
 
+    #region PaymentType Validation (TC-20-007)
+
+    [Theory]
+    [InlineData(1, true)]  // PaymentType.Cash
+    [InlineData(2, true)]  // PaymentType.Credit
+    [InlineData(3, true)]  // PaymentType.Mixed
+    [InlineData(999, false)]
+    public void GivenPaymentType_WhenValidating_ThenIsInEnumChecked(int paymentTypeValue, bool isValid)
+    {
+        var paymentType = (PaymentType)paymentTypeValue;
+        var request = CreateValidRequest() with { PaymentType = paymentType };
+
+        var result = _validator.TestValidate(request);
+
+        if (isValid)
+            result.ShouldNotHaveValidationErrorFor(x => x.PaymentType);
+        else
+            result.ShouldHaveValidationErrorFor(x => x.PaymentType)
+                .WithErrorMessage("نوع الدفع غير صحيح");
+    }
+
+    #endregion
+
     private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
         SupplierId: 1,
-        InvoiceDate: DateTime.Now,
+        InvoiceDate: DateTime.UtcNow.AddDays(-1),
         DueDate: null,
         PaymentType: PaymentType.Cash,
         DiscountAmount: 0,

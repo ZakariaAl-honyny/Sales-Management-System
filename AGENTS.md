@@ -1194,6 +1194,16 @@ public interface ISoundService
 | RULE-247 | `appsettings.Development.json` MUST NOT contain plaintext connection strings — use `SALESSYSTEM_DB_CONNECTION` env var |
 | RULE-248 | All connection string values in config files MUST be empty strings with a `_comment` property explaining env var usage |
 
+### 2.62 Garbled Arabic Text Prevention (v4.6.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-249 | ALL Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text — NEVER paste Arabic text through non-UTF-8 terminals or editors that re-encode characters |
+| RULE-250 | Before committing any C# file containing Arabic strings, verify the file is saved with UTF-8 encoding (BOM recommended) — use `file --mime-encoding` or editor's "Save with Encoding" feature |
+| RULE-251 | If viewing a file shows garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file was saved with the wrong encoding — rewrite ALL string literals from scratch with correct Arabic characters |
+| RULE-252 | Editor ViewModels and any file with user-facing messages MUST be checked for Arabic encoding integrity at code review time |
+| RULE-253 | When reviewing PRs, spot-check 3-5 Arabic string literals by reading them aloud in the diff — if any look like `ط§ط®طھط¨ط§ط±` instead of `اختبار`, flag the entire file for encoding review |
+
 ---
 
 ## 3. Enums (Use These EXACT Values)
@@ -1316,6 +1326,7 @@ public enum InvoiceTypePrint : byte
 ❌ Login endpoint without rate limiting (use `[EnableRateLimiting("LoginPolicy")]`)
 ❌ Unhandled exception dialog without FallbackErrorDialog (use thread-safe dialog overlay)
 ❌ Duplicating validation dialog logic in each Editor ViewModel (use ValidateAllAsync from ViewModelBase)
+❌ Committing C# files with garbled Arabic (mojibake) — always verify UTF-8 encoding
 ```
 
 ---

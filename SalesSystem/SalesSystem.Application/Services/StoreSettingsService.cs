@@ -35,7 +35,7 @@ public sealed class StoreSettingsService : IStoreSettingsService
             await _uow.SaveChangesAsync(ct);
         }
 
-        return Result<StoreSettingsDto>.Success(MapToDto(settings));
+        return Result<StoreSettingsDto>.Success(await MapToDto(settings, ct));
     }
 
     public async Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, int userId, CancellationToken ct = default)
@@ -80,13 +80,23 @@ public sealed class StoreSettingsService : IStoreSettingsService
                     request.AutoUpdatePrices,
                     request.InvoicePrefix);
 
-                await _uow.StoreSettings.UpdateAsync(settings, ct);
             }
 
             await _uow.SaveChangesAsync(ct);
+
+            try
+            {
+                var costingMethod = (Domain.Enums.CostingMethod)request.CostingMethod;
+                await _systemSettingsRepo.SetCostingMethodAsync(costingMethod, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to persist costing method");
+            }
+
             _logger.LogInformation("Store settings updated by user {UserId}", userId);
 
-            return Result<StoreSettingsDto>.Success(MapToDto(settings));
+            return Result<StoreSettingsDto>.Success(await MapToDto(settings, ct));
         }
         catch (DomainException ex)
         {
@@ -128,19 +138,24 @@ public sealed class StoreSettingsService : IStoreSettingsService
         }
     }
 
-    private static StoreSettingsDto MapToDto(StoreSettings s) => new(
-        s.Id,
-        s.StoreName,
-        s.Phone,
-        s.Address,
-        s.LogoPath,
-        s.Email,
-        s.CurrencyCode,
-        s.DefaultTaxRate,
-        s.IsTaxEnabled,
-        s.TaxNumber,
-        s.EnableStockAlerts,
-        s.AllowNegativeStock,
-        s.AutoUpdatePrices,
-        s.InvoicePrefix);
+    private async Task<StoreSettingsDto> MapToDto(StoreSettings s, CancellationToken ct)
+    {
+        var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
+        return new StoreSettingsDto(
+            s.Id,
+            s.StoreName,
+            s.Phone,
+            s.Address,
+            s.LogoPath,
+            s.Email,
+            s.CurrencyCode,
+            s.DefaultTaxRate,
+            s.IsTaxEnabled,
+            s.TaxNumber,
+            s.EnableStockAlerts,
+            s.AllowNegativeStock,
+            s.AutoUpdatePrices,
+            s.InvoicePrefix,
+            (int)costingMethod);
+    }
 }

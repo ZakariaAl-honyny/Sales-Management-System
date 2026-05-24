@@ -73,13 +73,9 @@ public class SettingsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
-        var method = (CostingMethod)request.Method;
-        if (!Enum.IsDefined(typeof(CostingMethod), method))
-            return BadRequest(new { error = "طريقة التكلفة غير صالحة" });
-
-        var result = await _settingsService.SetCostingMethodAsync(method, userId, ct);
+        var result = await _settingsService.SetCostingMethodAsync((CostingMethod)request.Method, userId, ct);
         if (result.IsSuccess)
-            return Ok((int)method);
+            return Ok(new { method = (int)request.Method });
         return BadRequest(new { error = result.Error });
     }
 

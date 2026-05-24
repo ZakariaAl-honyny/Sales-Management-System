@@ -7,6 +7,7 @@ using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -50,6 +51,8 @@ public class SalesReturnServiceTests : IDisposable
         _mockUow.Setup(u => u.SalesReturns).Returns(new InMemoryEfCoreRepository<SalesReturn>(_dbContext));
         _mockUow.Setup(u => u.SalesInvoices).Returns(new InMemoryEfCoreRepository<SalesInvoice>(_dbContext));
         _mockUow.Setup(u => u.Customers).Returns(new InMemoryEfCoreRepository<Customer>(_dbContext));
+        _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
+        _mockUow.Setup(u => u.Warehouses).Returns(new InMemoryEfCoreRepository<Warehouse>(_dbContext));
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
@@ -60,6 +63,11 @@ public class SalesReturnServiceTests : IDisposable
 
         _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MockDbContextTransaction());
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result<SalesReturnDto>>(
+            It.IsAny<Func<Task<Result<SalesReturnDto>>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result<SalesReturnDto>>> func, CancellationToken ct) => func());
 
         _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("SR-2026-000001"));
@@ -117,19 +125,22 @@ public class SalesReturnServiceTests : IDisposable
         result.IsSuccess.Should().BeTrue();
         result.Value!.TotalAmount.Should().Be(200m, "2 * 100 = 200");
 
+        result = await _sut.PostAsync(result.Value.Id, userId: 1, CancellationToken.None);
+        result.IsSuccess.Should().BeTrue();
+
         _mockInventoryService.Verify(i => i.IncreaseStockAsync(
             productId: 1,
             warehouseId: 1,
             quantity: 2m,
             movementType: MovementType.SaleReturnIn,
             "SalesReturn",
-            It.IsAny<int>(),
+            result.Value.Id,
             100m,
             1,
             It.IsAny<CancellationToken>()), Times.Once,
-            "Stock should increase for returned items");
+            "Stock should increase for returned items after posting");
 
-        _output.WriteLine("[PASS] Sales return creates and increases stock");
+        _output.WriteLine("[PASS] Sales return creates, posts, and increases stock");
     }
 
     [Fact]
@@ -199,11 +210,14 @@ public class SalesReturnServiceTests : IDisposable
         );
 
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
-
         result.IsSuccess.Should().BeTrue();
+
+        result = await _sut.PostAsync(result.Value.Id, userId: 1, CancellationToken.None);
+        result.IsSuccess.Should().BeTrue();
+
         customer.CurrentBalance.Should().Be(800m, "Customer owed 1000, return worth 200, now owes 800");
 
-        _output.WriteLine("[PASS] Sales return decreases customer balance");
+        _output.WriteLine("[PASS] Sales return posts and decreases customer balance");
     }
 
     [Fact]

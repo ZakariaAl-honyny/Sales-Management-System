@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Services.Api;

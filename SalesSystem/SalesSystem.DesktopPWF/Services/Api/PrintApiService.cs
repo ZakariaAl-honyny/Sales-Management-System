@@ -67,4 +67,11 @@ public class PrintApiService : ApiServiceBase, IPrintApiService
             () => _httpClient.PostAsync($"api/v1/print/preview-data/purchase/{invoiceId}", null, ct),
             "PrintApiService.GetPurchasePreviewDataAsync");
     }
+
+    public async Task<Result> TestPrintAsync(CancellationToken ct = default)
+    {
+        return await ExecuteCommandAsync(
+            () => _httpClient.PostAsync("api/v1/print/test", null, ct),
+            "PrintApiService.TestPrintAsync");
+    }
 }

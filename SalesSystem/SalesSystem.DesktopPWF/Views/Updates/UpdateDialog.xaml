@@ -251,6 +251,7 @@
                             Content="تخطي هذا الإصدار"
                             Style="{StaticResource GhostButtonStyle}"
                             Command="{Binding SkipVersionCommand}"
+                            ToolTip="تجاهل هذا الإصدار وعدم التذكير به مرة أخرى"
                             Visibility="{Binding CanSkip,
                                          Converter={StaticResource BoolToVisibility}}"/>
 
@@ -258,6 +259,7 @@
                             Content="إلغاء التحميل"
                             Style="{StaticResource DangerGhostButtonStyle}"
                             Command="{Binding CancelDownloadCommand}"
+                            ToolTip="إيقاف عملية التحميل الجاري"
                             Visibility="{Binding IsDownloading,
                                          Converter={StaticResource BoolToVisibility}}"/>
 
@@ -269,6 +271,7 @@
                         <Button Content="تذكيري لاحقاً"
                                 Style="{StaticResource GhostButtonStyle}"
                                 Command="{Binding RemindLaterCommand}"
+                                ToolTip="إغلاق النافذة والتذكير بالتحديث لاحقاً"
                                 Margin="0,0,8,0"
                                 Visibility="{Binding CanSkip,
                                              Converter={StaticResource BoolToVisibility}}"/>
@@ -276,6 +279,7 @@
                         <Button Content="{Binding DownloadButtonText}"
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Command="{Binding DownloadAndInstallCommand}"
+                                ToolTip="بدء تحميل التحديث وتثبيته تلقائياً بعد اكتمال التحميل"
                                 MinWidth="160"/>
                     </StackPanel>
                 </Grid>

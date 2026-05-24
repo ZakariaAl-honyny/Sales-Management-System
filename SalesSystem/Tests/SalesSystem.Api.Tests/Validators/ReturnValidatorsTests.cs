@@ -116,7 +116,7 @@ public class ReturnValidatorsTests
             SalesInvoiceId: 1,
             CustomerId: 1,
             WarehouseId: 1,
-            ReturnDate: DateTime.Now,
+            ReturnDate: DateTime.UtcNow.AddDays(-1),
             Notes: "Return note",
             Items: new List<ReturnItemRequest>
             {
@@ -244,7 +244,7 @@ public class ReturnValidatorsTests
             PurchaseInvoiceId: 1,
             SupplierId: 1,
             WarehouseId: 1,
-            ReturnDate: DateTime.Now,
+            ReturnDate: DateTime.UtcNow.AddDays(-1),
             Notes: "Purchase return note",
             Items: new List<ReturnItemRequest>
             {
@@ -407,7 +407,7 @@ public class ReturnValidatorsTests
             SalesInvoiceId: 1,
             CustomerId: 1,
             WarehouseId: 1,
-            ReturnDate: DateTime.Now,
+            ReturnDate: DateTime.UtcNow.AddDays(-1),
             Notes: "Return note",
             Items: new List<ReturnItemRequest>
             {

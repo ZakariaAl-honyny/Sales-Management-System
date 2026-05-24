@@ -31,7 +31,7 @@ public class CategoriesControllerTests : ControllerTestBase
 
         var result = await _controller.GetAll(null, 1, 10, false, CancellationToken.None);
 
-        result.Should().BeOfType<OkObjectResult>();
+        result.Result.Should().BeOfType<OkObjectResult>();
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public class CategoriesControllerTests : ControllerTestBase
 
         var result = await _controller.GetAll(null, 1, 10, false, CancellationToken.None);
 
-        result.Should().BeOfType<BadRequestObjectResult>();
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]

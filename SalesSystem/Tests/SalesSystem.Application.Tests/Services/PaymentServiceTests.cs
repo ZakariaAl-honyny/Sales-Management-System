@@ -7,6 +7,7 @@ using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -56,6 +57,21 @@ public class PaymentServiceTests : IDisposable
 
         _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MockDbContextTransaction());
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result<CustomerPaymentDto>>(
+            It.IsAny<Func<Task<Result<CustomerPaymentDto>>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result<CustomerPaymentDto>>> func, CancellationToken ct) => func());
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result<SupplierPaymentDto>>(
+            It.IsAny<Func<Task<Result<SupplierPaymentDto>>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result<SupplierPaymentDto>>> func, CancellationToken ct) => func());
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result>(
+            It.IsAny<Func<Task<Result>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result>> func, CancellationToken ct) => func());
 
         _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("CP-2026-000001"));
@@ -223,7 +239,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.CustomerPayments.Add(payment2);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.GetCustomerPaymentsAsync(null, null, null, 1, 10, ct: CancellationToken.None);
+        var result = await _sut.GetCustomerPaymentsAsync("Customer 1", null, null, 1, 10, ct: CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Items.Should().HaveCount(1);
@@ -253,7 +269,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.SupplierPayments.Add(payment2);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.GetSupplierPaymentsAsync(null, null, null, 1, 10, ct: CancellationToken.None);
+        var result = await _sut.GetSupplierPaymentsAsync("Supplier 2", null, null, 1, 10, ct: CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Items.Should().HaveCount(1);
@@ -302,6 +318,7 @@ public class PaymentServiceTests : IDisposable
         public async Task<T> AddAsync(T entity, CancellationToken ct = default)
         {
             await _context.Set<T>().AddAsync(entity, ct);
+            await _context.SaveChangesAsync(ct);
             return entity;
         }
 
@@ -311,14 +328,31 @@ public class PaymentServiceTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task SoftDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                entity.MarkAsDeleted();
+                _context.Set<T>().Update(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
-        public Task HardDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task HardDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                _context.Set<T>().Remove(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
         public void DeleteRange(IEnumerable<T> entities)
-            => throw new NotImplementedException();
+        {
+            _context.Set<T>().RemoveRange(entities);
+        }
 
         public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
             => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));

@@ -1,3 +1,4 @@
+using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.Services.App;
 
@@ -142,7 +143,8 @@ public class UpdateDialogViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            DownloadStatusText = $"خطأ: {ex.Message}";
+            DownloadStatusText = "حدث خطأ أثناء التحميل";
+            LogSystemError("Update download failed", "UpdateDialogViewModel.DownloadAndInstallAsync", ex);
             IsDownloading = false;
         }
     }

@@ -3,7 +3,6 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
-using Serilog;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
@@ -17,7 +16,7 @@ public class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsApiService _settingsService;
     private readonly IBackupApiService _backupService;
-    private readonly IDialogService _dialogService;
+    private readonly IPrintApiService _printService;
 
     private string _companyName = string.Empty;
     private string? _taxNumber;
@@ -43,7 +42,8 @@ public class SettingsViewModel : ViewModelBase
     {
         _settingsService = App.GetService<ISettingsApiService>();
         _backupService = App.GetService<IBackupApiService>();
-        _dialogService = App.GetService<IDialogService>();
+        _printService = App.GetService<IPrintApiService>();
+        SetDialogService(App.GetService<IDialogService>());
 
         LoadCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadSettingsOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.LoadSettingsAsync", "[SettingsViewModel.LoadSettingsAsync] Failed to load system settings."))));
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveSettingsOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Unexpected error during save."))));
@@ -215,7 +215,7 @@ public class SettingsViewModel : ViewModelBase
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "ط§ط®طھط± ط´ط¹ط§ط± ط§ظ„ظ…طھط¬ط±",
+            Title = "اختيار شعار المتجر",
             Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp",
             Multiselect = false
         };
@@ -223,7 +223,7 @@ public class SettingsViewModel : ViewModelBase
         if (dialog.ShowDialog() == true)
         {
             LogoPath = dialog.FileName;
-            StatusMessage = "âœ… طھظ… ط§ط®طھظٹط§ط± ط§ظ„ط´ط¹ط§ط±";
+            StatusMessage = "✅ تم اختيار الشعار";
         }
     }
 
@@ -231,18 +231,16 @@ public class SettingsViewModel : ViewModelBase
     {
         StatusMessage = string.Empty;
 
-        var httpClient = App.GetService<System.Net.Http.HttpClient>();
-        var response = await httpClient.PostAsync("api/v1/print/test", null);
-        if (response.IsSuccessStatusCode)
+        var result = await _printService.TestPrintAsync();
+        if (result.IsSuccess)
         {
-            StatusMessage = "âœ… طھظ…طھ ط·ط¨ط§ط¹ط© ط§ظ„ط§ط®طھط¨ط§ط± ط¨ظ†ط¬ط§ط­";
+            StatusMessage = "✅ تمت طباعة الاختبار بنجاح";
         }
         else
         {
-            var errorBody = await response.Content.ReadAsStringAsync();
-            Serilog.Log.Warning("Print test failed. Status: {StatusCode}, Body: {Body}", response.StatusCode, errorBody);
-            StatusMessage = "â‌Œ ظپط´ظ„طھ ط·ط¨ط§ط¹ط© ط§ظ„ط§ط®طھط¨ط§ط±";
-            await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط·ط¨ط§ط¹ط©", "ظپط´ظ„ ط§ط®طھط¨ط§ط± ط§ظ„ط·ط¨ط§ط¹ط©. ظٹط±ط¬ظ‰ ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ ط§ظ„ط·ط§ط¨ط¹ط© ظˆط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰.");
+            LogSystemError($"Print test failed: {result.Error}", "SettingsViewModel.TestPrintOperationAsync");
+            StatusMessage = "فشلت طباعة الاختبار";
+            await DialogService.ShowErrorAsync("خطأ في الطباعة", "فشل اختبار الطباعة. يرجى التحقق من إعدادات الطابعة والمحاولة مرة أخرى.");
         }
     }
 
@@ -282,7 +280,7 @@ public class SettingsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Serilog.Log.Warning(ex, "Failed to load print settings");
+            LogSystemError("Failed to load print settings", "SettingsViewModel.LoadSettingsOperationAsync", ex);
         }
     }
 
@@ -292,18 +290,18 @@ public class SettingsViewModel : ViewModelBase
         {
             var errors = new List<string>
             {
-                "â€¢ ط§ط³ظ… ط§ظ„ظ…ظ†ط´ط£ط© ظ…ط·ظ„ظˆط¨"
+                "• اسم المنشأة مطلوب"
             };
-            StatusMessage = "ظٹط±ط¬ظ‰ ط¥ط¯ط®ط§ظ„ ط§ط³ظ… ط§ظ„ظ…ظ†ط´ط£ط©";
-            string errorMsg = "ظٹط±ط¬ظ‰ ط¥ظƒظ…ط§ظ„ ط§ظ„ط¨ظٹط§ظ†ط§طھ ط§ظ„ط¥ظ„ط²ط§ظ…ظٹط© ط§ظ„طھط§ظ„ظٹط©:\n\n" + string.Join("\n", errors);
-            await _dialogService.ShowWarningAsync("ط¨ظٹط§ظ†ط§طھ ط؛ظٹط± ظ…ظƒطھظ…ظ„ط©", errorMsg);
+            StatusMessage = "يرجى إدخال اسم المنشأة";
+            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
+            await DialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
             return;
         }
 
         if (DefaultTaxRate < 0 || DefaultTaxRate > 100)
         {
-            StatusMessage = "ظ†ط³ط¨ط© ط§ظ„ط¶ط±ظٹط¨ط© ظٹط¬ط¨ ط£ظ† طھظƒظˆظ† ط¨ظٹظ† 0 ظˆ 100";
-            await _dialogService.ShowWarningAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط¨ظٹط§ظ†ط§طھ", StatusMessage);
+            StatusMessage = "نسبة الضريبة يجب أن تكون بين 0 و 100";
+            await DialogService.ShowWarningAsync("خطأ في البيانات", StatusMessage);
             return;
         }
 
@@ -339,30 +337,30 @@ public class SettingsViewModel : ViewModelBase
                 PrintTaxRate);
             await _settingsService.UpdatePrintSettingsAsync(printRequest);
 
-            StatusMessage = "âœ… طھظ… ط­ظپط¸ ط§ظ„ط¥ط¹ط¯ط§ط¯ط§طھ ط¨ظ†ط¬ط§ط­";
+            StatusMessage = "✅ تم حفظ الإعدادات بنجاح";
             _ = Task.Delay(3000).ContinueWith(_ => StatusMessage = string.Empty);
         }
         else
         {
-            StatusMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ ط­ظپط¸ ط§ظ„ط¥ط¹ط¯ط§ط¯ط§طھ", "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Failed to update system settings.");
-            await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط­ظپط¸", StatusMessage);
+            StatusMessage = HandleFailure(result.Error ?? "فشل في حفظ الإعدادات", "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Failed to update system settings.");
+            await DialogService.ShowErrorAsync("خطأ في الحفظ", StatusMessage);
         }
     }
 
     private async Task CreateBackupOperationAsync()
     {
-        StatusMessage = "ط¬ط§ط±ظٹ ط¥ظ†ط´ط§ط، ظ†ط³ط®ط© ط§ط­طھظٹط§ط·ظٹط©...";
+        StatusMessage = "جاري إنشاء نسخة احتياطية...";
 
         var result = await _backupService.CreateBackupAsync();
         if (result.IsSuccess)
         {
-            StatusMessage = "âœ… طھظ… ط¥ظ†ط´ط§ط، ط§ظ„ظ†ط³ط®ط© ط§ظ„ط§ط­طھظٹط§ط·ظٹط© ط¨ظ†ط¬ط§ط­";
+            StatusMessage = "✅ تم إنشاء النسخة الاحتياطية بنجاح";
             await RefreshBackupListAsync();
         }
         else
         {
-            StatusMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ†ط´ط§ط، ط§ظ„ظ†ط³ط®ط© ط§ظ„ط§ط­طھظٹط§ط·ظٹط©";
-            await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ظ†ط³ط® ط§ظ„ط§ط­طھظٹط§ط·ظٹ", StatusMessage);
+            StatusMessage = result.Error ?? "فشل في إنشاء النسخة الاحتياطية";
+            await DialogService.ShowErrorAsync("خطأ في النسخ الاحتياطي", StatusMessage);
         }
     }
 
@@ -386,24 +384,24 @@ public class SettingsViewModel : ViewModelBase
     {
         if (string.IsNullOrEmpty(SelectedBackup)) return;
 
-        var confirm = await _dialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ†ط³ط®ط© ط§ظ„ط§ط­طھظٹط§ط·ظٹط©", $"âڑ ï¸ڈ طھظ†ط¨ظٹظ‡: ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ†ط³ط®ط© ط§ظ„ط§ط­طھظٹط§ط·ظٹط© '{SelectedBackup}' ط³ظٹط¤ط¯ظٹ ط¥ظ„ظ‰ ط§ط³طھط¨ط¯ط§ظ„ ظ‚ط§ط¹ط¯ط© ط§ظ„ط¨ظٹط§ظ†ط§طھ ط§ظ„ط­ط§ظ„ظٹط© طھظ…ط§ظ…ط§ظ‹ ظˆط¥ط؛ظ„ط§ظ‚ ط¬ظ…ظٹط¹ ط§ظ„ط§طھطµط§ظ„ط§طھ ط§ظ„ظ†ط´ط·ط©.\n\nظ‡ظ„ طھط±ظٹط¯ ط§ظ„ط§ط³طھظ…ط±ط§ط±طں");
+        var confirm = await DialogService.ShowConfirmationAsync("تأكيد استعادة النسخة الاحتياطية", $"⚠️ تنبيه: استعادة النسخة الاحتياطية '{SelectedBackup}' سيؤدي إلى استبدال قاعدة البيانات الحالية تماماً وإغلاق جميع الاتصالات النشطة.\n\nهل تريد الاستمرار؟");
 
         if (!confirm) return;
 
-        StatusMessage = "ط¬ط§ط±ظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ†ط³ط®ط© ط§ظ„ط§ط­طھظٹط§ط·ظٹط©... ظ‚ط¯ ظٹط³طھط؛ط±ظ‚ ظ‡ط°ط§ ظˆظ‚طھط§ظ‹.";
+        StatusMessage = "جاري استعادة النسخة الاحتياطية... قد يستغرق هذا وقتاً.";
 
         var result = await _backupService.RestoreBackupAsync(SelectedBackup);
         if (result.IsSuccess)
         {
-            StatusMessage = "âœ… طھظ… ط§ط³طھط¹ط§ط¯ط© ظ‚ط§ط¹ط¯ط© ط§ظ„ط¨ظٹط§ظ†ط§طھ ط¨ظ†ط¬ط§ط­. ط³ظٹطھظ… ط¥ط؛ظ„ط§ظ‚ ط§ظ„ظ†ط¸ط§ظ… ظ„ط¥ط¹ط§ط¯ط© ط§ظ„طھط­ظ…ظٹظ„.";
-            await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­ ط§ظ„ط§ط³طھط¹ط§ط¯ط©", StatusMessage);
+            StatusMessage = "✅ تم استعادة قاعدة البيانات بنجاح. سيتم إغلاق النظام لإعادة التحميل.";
+            await DialogService.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
 
             System.Windows.Application.Current.Shutdown();
         }
         else
         {
-            StatusMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ†ط³ط®ط© ط§ظ„ط§ط­طھظٹط§ط·ظٹط©";
-            await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط§ط³طھط¹ط§ط¯ط©", StatusMessage);
+            StatusMessage = result.Error ?? "فشل في استعادة النسخة الاحتياطية";
+            await DialogService.ShowErrorAsync("خطأ في الاستعادة", StatusMessage);
         }
     }
     #endregion

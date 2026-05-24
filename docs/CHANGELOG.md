@@ -2,20 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.9.2] - 2026-05-23
+## [1.10.0] - 2026-05-24
 ### Added
-- **v4.6.4 — Security Hardening & Code Quality**:
+- **v4.6.4 — Security Hardening & Code Quality** (Phase 7 & 8):
   - **Rate Limiting**: Added `AddRateLimiter` with `LoginPolicy` (5 attempts per 15 min per IP) and global policy (100 req/min). Arabic 429 response with `RATE_LIMIT_EXCEEDED` code.
   - **User Hard-Delete Guarded**: `UserService.PermanentDeleteAsync()` now returns `Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي")` — enforces RULE-038 (soft delete only).
   - **Connection String Security**: Removed plaintext SQL connection string from `appsettings.Development.json`. Uses `SALESSYSTEM_DB_CONNECTION` env var only per RULE-040.
   - **FluentValidator Enhancements**: Enhanced all 7 invoice/payment/transfer validators with additional rules: `PaymentType.IsInEnum()`, date not future, `Notes.MaxLength(500)`, `DiscountAmount >= 0`.
   - **FallbackErrorDialog**: Added `FallbackErrorDialog.xaml` for thread-safe unhandled exception display.
   - **Security-Plan.md**: Comprehensive 7-layer security document with implementation status table.
+  - **Phase 4 Verification (US2 Backup/Restore)**: Full review + fixes — BackupViewModel constructor injection, RestoreBackupRequest DTO + FluentValidation, BackupController path alignment, BackupApiService JSON body.
+  - **Phase 5 Verification (US3 Settings & Users)**: Confirmed all 10 tasks (T018–T027) already implemented. Fixed garbled Arabic strings in UserListViewModel.cs (9 strings corrected). Validator updated: CreateUserRequest Password MinLength 6→8, UserName MaxLength 50→100.
+  - **Phase 6-7 Verification (US4 DPAPI + US5 Auto-Update)**: Confirmed all 6 tasks (T028–T033) already implemented. Fixed UpdaterService.LocalSettingsPath to use `%AppData%\SalesSystem\settings.json` (was `Path.GetTempPath()\...`).
+  - **Phase 7 Code Review (v4.6.4)**: 6-agent code review of all 39 Phase 7 files. Fixed 12 violations across Program.cs, HealthController, BackupService, 2 new validators, UserListViewModel, DatabaseHealthCheckService, UpdaterService (duplicate interface + AppData path), UpdateDialogViewModel/XAML.
+  - **Phase 8 Code Review (v4.6.4)**: 6-agent code review of all Phase 8 files. Fixed 8 violations: empty catch blocks in Desktop UpdaterService, English→Arabic error messages in Result.Failure, direct Serilog calls→LogSystemError in SettingsViewModel/UpdateDialogViewModel, duplicate UpdateSettingsRequestValidator removed from MiscValidators.cs, null guard added to RestoreBackupRequestValidator.Must(), ex.Message removed from FallbackErrorDialog.
 
 ### Fixed
 - **Build Warnings (10 CS0109)**: Removed unnecessary `new` keyword from `_dialogService` in 5 ViewModels.
 - **Build Errors (4 CS1540)**: Fixed protected member access via `((ViewModelBase)this).DialogService` in ReportsViewModel, StockTransfersListViewModel, SupplierPaymentsListViewModel.
 - **Test Compilation**: Fixed 2 errors in `PurchaseInvoicesControllerTests.cs` (missing `using SalesSystem.Contracts.Enums`).
+- **Desktop UpdaterService**: Empty catch blocks documented with comments (`LoadVersionFileUrl`, `LoadLocalSettings`). All 6 English `Result.Failure` error messages replaced with Arabic (RULE-171/172).
+- **SettingsViewModel**: Replaced 2× direct `Serilog.Log.Warning` calls with `LogSystemError()` from ViewModelBase (RULE-201).
+- **UpdateDialogViewModel**: Replaced direct `Serilog.Log.Error` with `LogSystemError()` (RULE-201).
+- **MiscValidators.cs**: Removed duplicate `UpdateSettingsRequestValidator` class (duplicate exists in dedicated file at Validators/UpdateSettingsRequestValidator.cs).
+- **RestoreBackupRequestValidator**: Added null guard to `.Must(f => f.EndsWith(...))` to prevent NullReferenceException.
+- **App.xaml.cs**: Removed `e.Exception.Message` from FallbackErrorDialog user-facing message (RULE-171).
+- **ConnectionStringProtector.cs**: Deleted old file from `Infrastructure/Security/` — moved to `Infrastructure/Services/`.
 
 ### Tests
 - **5 New Tests**: SetDialogService constructor test, ValidateAsync empty name, ValidateAsync valid name clears errors, ValidateAsync multiple errors, Post_AlreadyPostedInvoice_ThrowsDomainException.

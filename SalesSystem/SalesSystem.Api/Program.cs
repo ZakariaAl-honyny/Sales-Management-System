@@ -1,6 +1,7 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -64,10 +65,6 @@ builder.Services.AddDataProtection()
 // ============================================
 // 2. Read Configuration
 // ============================================
-var connectionString = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION");
-if (string.IsNullOrEmpty(connectionString))
-    throw new InvalidOperationException("SALESSYSTEM_DB_CONNECTION environment variable is not set. Please configure it before starting the application.");
-
 var jwtSecret = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_SECRET")
     ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
         ? "ThisIsASecretKeyThatIsLongEnoughForHS256Algorithm!"
@@ -85,10 +82,13 @@ var jwtSettings = new JwtSettings
 };
 
 // ============================================
-// 3. DbContext with retry on failure
+// 3. DbContext with Secure Factory and retry on failure
 // ============================================
-builder.Services.AddDbContext<SalesDbContext>(options =>
-    options.UseSqlServer(connectionString, sqlOptions =>
+builder.Services.AddDbContext<SalesDbContext>((serviceProvider, options) =>
+{
+    var factory = serviceProvider.GetRequiredService<SecureDbContextFactory>();
+    var connString = factory.GetDecryptedConnectionString();
+    options.UseSqlServer(connString, sqlOptions =>
     {
         sqlOptions.EnableRetryOnFailure(
             maxRetryCount: 3,
@@ -96,7 +96,8 @@ builder.Services.AddDbContext<SalesDbContext>(options =>
             errorNumbersToAdd: new[] { 2, 233, 233 }
         );
         sqlOptions.CommandTimeout(30);
-    }));
+    });
+});
 
 // ============================================
 // 3b. Security & Backup DI Registrations
@@ -231,6 +232,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddHttpClient();
+builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>
@@ -297,13 +299,6 @@ async Task InitializeDatabaseAsync(SalesDbContext db, Microsoft.Extensions.Loggi
         }
         else
         {
-            var alreadySeeded = await CheckIfSeededAsync(db);
-            if (alreadySeeded)
-            {
-                logger.LogInformation("Database already initialized. Skipping seed...");
-                return;
-            }
-
             try
             {
                 await db.Database.MigrateAsync();
@@ -314,88 +309,11 @@ async Task InitializeDatabaseAsync(SalesDbContext db, Microsoft.Extensions.Loggi
             }
         }
 
-        await SeedDataAsync(db, logger);
+        await DbSeeder.SeedAsync(db, logger);
     }
     catch (Exception ex)
     {
         logger.LogError(ex, "Database initialization error: {Message}", ex.Message);
-    }
-}
-
-async Task<bool> CheckIfSeededAsync(SalesDbContext db)
-{
-    try
-    {
-        var count = await db.Users.CountAsync();
-        return count > 0;
-    }
-    catch
-    {
-        return false;
-    }
-}
-
-async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger logger)
-{
-    try
-    {
-        var existingUser = await db.Users.FindAsync(1);
-        if (existingUser != null)
-        {
-            logger.LogInformation("Database already seeded. Skipping...");
-            return;
-        }
-    }
-    catch
-    {
-    }
-
-    try
-    {
-        var adminUser = User.Create(
-            userName: "admin",
-            passwordHash: BCrypt.Net.BCrypt.HashPassword("admin123", workFactor: 12),
-            fullName: "Administrator",
-            role: UserRole.Admin,
-            createdByUserId: null
-        );
-        db.Users.Add(adminUser);
-
-        var warehouse = Warehouse.Create(
-            name: "المخزن الرئيسي",
-            location: null,
-            isDefault: true,
-            createdByUserId: null
-        );
-        db.Warehouses.Add(warehouse);
-
-        var cashCustomer = Customer.Create(
-            name: "عميل نقدي",
-            openingBalance: 0,
-            createdByUserId: null
-        );
-        db.Customers.Add(cashCustomer);
-
-        db.Units.Add(Unit.Create("قطعة", "pcs", null));
-        db.Units.Add(Unit.Create("كيلو", "kg", null));
-        db.Units.Add(Unit.Create("لتر", "ltr", null));
-        db.Units.Add(Unit.Create("متر", "m", null));
-        db.Units.Add(Unit.Create("صندوق", "box", null));
-
-        db.DocumentSequences.Add(DocumentSequence.Create("INV", "INV", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("PUR", "PUR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("SR", "SR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("PR", "PR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("TRF", "TRF", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("CP", "CP", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("SP", "SP", 2026));
-
-        await db.SaveChangesAsync();
-        logger.LogInformation("Seed data completed successfully.");
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Error seeding data: {Message}", ex.Message);
     }
 }
 
@@ -413,43 +331,7 @@ app.UseAuthorization();
 
 app.UseHttpsRedirection();
 
-// Health check - also checks database connectivity
-app.MapGet("/api/v1/health", async (SalesDbContext db) =>
-{
-    var dbConnected = false;
-    try
-    {
-        dbConnected = await db.Database.CanConnectAsync();
-    }
-    catch
-    {
-        // DB not reachable
-    }
 
-    return new
-    {
-        Status = dbConnected ? "OK" : "Degraded",
-        Database = dbConnected ? "Connected" : "Disconnected",
-        Version = "1.0",
-        Timestamp = DateTime.UtcNow
-    };
-}).WithName("HealthCheck");
-
-// Dedicated database health check
-app.MapGet("/api/v1/health/database", async (SalesDbContext db) =>
-{
-    try
-    {
-        var canConnect = await db.Database.CanConnectAsync();
-        if (canConnect)
-            return Results.Json(new { status = "connected", message = "Database is reachable" });
-        return Results.Json(new { status = "disconnected", message = "Database is not reachable" }, statusCode: 503);
-    }
-    catch (Exception ex)
-    {
-        return Results.Json(new { status = "error", message = ex.Message }, statusCode: 503);
-    }
-}).WithName("DatabaseHealthCheck");
 
 app.MapControllers();
 

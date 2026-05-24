@@ -390,6 +390,7 @@ public interface IPrintApiService
     Task<Result> PrintPurchaseA4Async(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintPurchaseThermalAsync(int invoiceId, CancellationToken ct = default);
     Task<Result<PrintPreviewData>> GetPurchasePreviewDataAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result> TestPrintAsync(CancellationToken ct = default);
 }
 
 public interface IDatabaseHealthCheckService

@@ -35,6 +35,7 @@ public class UpdaterService : IUpdaterService
         }
         catch
         {
+            // Silently fall back to default — appsettings.json may not exist on first run
         }
         return "https://your-server.com/updates/version.json";
     }
@@ -53,7 +54,7 @@ public class UpdaterService : IUpdaterService
             if (!response.IsSuccessStatusCode)
             {
                 Serilog.Log.Warning("Update server returned {Status}", response.StatusCode);
-                return Result<UpdateCheckResult>.Failure($"Server returned {response.StatusCode}");
+                return Result<UpdateCheckResult>.Failure("تعذر التحقق من التحديثات — الخادم غير متاح");
             }
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);
@@ -62,7 +63,7 @@ public class UpdaterService : IUpdaterService
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (updateInfo == null)
-                return Result<UpdateCheckResult>.Failure("Invalid version.json format");
+                return Result<UpdateCheckResult>.Failure("تنسيق ملف التحديثات غير صالح");
 
             var currentVersion = GetCurrentVersion().Value ?? "0.0.0";
             var skippedVersion = GetSkippedVersion().Value ?? string.Empty;
@@ -87,17 +88,17 @@ public class UpdaterService : IUpdaterService
         catch (OperationCanceledException)
         {
             Serilog.Log.Warning("Update check timed out");
-            return Result<UpdateCheckResult>.Failure("Connection timeout");
+            return Result<UpdateCheckResult>.Failure("انتهت مهلة الاتصال — تحقق من اتصال الإنترنت");
         }
         catch (HttpRequestException ex)
         {
             Serilog.Log.Warning(ex, "No internet connection for update check");
-            return Result<UpdateCheckResult>.Failure("No internet connection");
+            return Result<UpdateCheckResult>.Failure("لا يوجد اتصال بالإنترنت");
         }
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "Unexpected error during update check");
-            return Result<UpdateCheckResult>.Failure(ex.Message);
+            return Result<UpdateCheckResult>.Failure("حدث خطأ غير متوقع أثناء التحقق من التحديثات");
         }
     }
 
@@ -175,7 +176,7 @@ public class UpdaterService : IUpdaterService
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "Download failed");
-            return Result<string>.Failure($"Download failed: {ex.Message}");
+            return Result<string>.Failure("فشل تحميل التحديث — تحقق من الاتصال وحاول مجدداً");
         }
     }
 
@@ -258,7 +259,10 @@ public class UpdaterService : IUpdaterService
     }
 
     private static string LocalSettingsPath =>
-        Path.Combine(Path.GetTempPath(), "SalesSystemUpdate", "localsettings.json");
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "SalesSystem",
+            "settings.json");
 
     private static Dictionary<string, string> LoadLocalSettings()
     {
@@ -274,6 +278,7 @@ public class UpdaterService : IUpdaterService
         }
         catch
         {
+            // Settings file may not exist yet — return empty on first run
         }
         return new Dictionary<string, string>();
     }

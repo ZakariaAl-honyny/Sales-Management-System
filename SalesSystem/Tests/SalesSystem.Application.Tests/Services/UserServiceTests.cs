@@ -7,6 +7,7 @@ using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -156,7 +157,7 @@ public class UserServiceTests
 
         var user = User.Create("testuser", "hash123", "Original Name", UserRole.Admin);
 
-        _mockUow.Setup(u => u.Users.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+        _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync(user);
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -179,7 +180,7 @@ public class UserServiceTests
 
         var user = User.Create("testuser", "oldhash", "Test User", UserRole.Admin);
 
-        _mockUow.Setup(u => u.Users.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+        _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync(user);
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -201,7 +202,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] UpdateAsync_NonExistentUser_ReturnsNotFound");
 
-        _mockUow.Setup(u => u.Users.GetByIdAsync(999, It.IsAny<CancellationToken>()))
+        _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync((User?)null);
 
         var request = new SalesSystem.Contracts.Requests.UpdateUserRequest("Updated", (byte)UserRole.Admin, true, null);
@@ -298,7 +299,7 @@ public class UserServiceTests
             User.Create("user3", "hash3", "User Three", UserRole.Cashier)
         };
 
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
+        _mockUow.Setup(u => u.Users.ToListAsync(It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync(users);
 
         var result = await _sut.GetAllAsync(false, CancellationToken.None);

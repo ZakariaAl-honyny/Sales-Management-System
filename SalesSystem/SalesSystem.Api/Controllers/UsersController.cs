@@ -116,7 +116,6 @@ public class UsersController : ControllerBase
     /// Use DELETE api/v1/users/{id} (soft delete) instead.
     /// </remarks>
     [HttpDelete("permanent/{id:int}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)

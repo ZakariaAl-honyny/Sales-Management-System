@@ -66,17 +66,17 @@ public class DocumentSequenceService : IDocumentSequenceService
     {
         return prefix.ToUpper() switch
         {
-            "INV" => "Sales Invoice",
-            "PUR" => "Purchase Invoice",
-            "SR" => "Sales Return",
-            "PR" => "Purchase Return",
-            "TRF" => "Stock Transfer",
-            "CP" => "Customer Payment",
-            "SP" => "Supplier Payment",
-            "PRD" => "Product",
-            "CUST" => "Customer",
-            "SUP" => "Supplier",
-            _ => "Other"
+            "INV" => "فاتورة مبيعات",
+            "PUR" => "فاتورة مشتريات",
+            "SR" => "مرتجع مبيعات",
+            "PR" => "مرتجع مشتريات",
+            "TRF" => "تحويل مخزني",
+            "CP" => "سند قبض عميل",
+            "SP" => "سند صرف مورد",
+            "PRD" => "منتج",
+            "CUST" => "عميل",
+            "SUP" => "مورد",
+            _ => "أخرى"
         };
     }
 }

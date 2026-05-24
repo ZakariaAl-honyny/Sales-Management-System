@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-Security%20Hardening-2ECC71?style=for-the-badge" alt="Status"/>
+  <img src="https://img.shields.io/badge/Status-v4.6.4%20Complete-2ECC71?style=for-the-badge" alt="Status"/>
 </p>
 
 <p align="center">
@@ -680,6 +680,10 @@ dotnet run
 | **Build Warning Fixes** | Resolved 10 CS0109 warnings (unnecessary `new` keyword) and 4 CS1540 errors (protected member access) across 8 ViewModel files |
 | **Test Coverage** | 50 test files re-enabled and compiling. 5 new tests: SetDialogService constructor, ValidateAsync (empty/valid/multiple), Post_AlreadyPostedInvoice |
 | **Security-Plan.md** | Comprehensive 7-layer security architecture document with implementation status table tracking what's done vs planned |
+| 🔒 **Rate Limiting & Brute-Force Protection** | 5 attempts/15min per IP, 100 req/min global — with Arabic 429 response |
+| 🔒 **User Hard-Delete Protection** | Soft-delete only, `PermanentDeleteAsync` returns `Result.Failure` |
+| 🔒 **Connection String Security** | Environment variables only, no plaintext in config files |
+| 🌐 **Arabic Encoding Integrity** | UTF-8 enforcement, garbled text auto-detection and fixes across multiple ViewModels |
 
 ---
 
@@ -695,6 +699,19 @@ dotnet run
 | **CS0108 Hiding Warnings Fixed** | Eliminated compiler warnings by removing shadowed `DialogService` properties in list ViewModels and using `SetDialogService()` base method |
 | **Arabic Encoding Restored** | Corrected garbled Arabic string literals in `StockTransfersListViewModel.cs` and `SupplierPaymentsListViewModel.cs` |
 | **Async Void Refactored** | Standardized asynchronous execution flows by wrapping critical `async void` operations in ViewModels with safe try-catch patterns |
+
+---
+
+## 📜 Version History
+
+### v4.6.4 — Security Hardening & Code Quality (Current)
+- **Rate Limiting**: Login limited to 5 attempts/15min per IP, global 100 req/min
+- **User Hard-Delete Protection**: PermanentDeleteAsync always returns Failure
+- **Connection String Security**: No plaintext connection strings in config files
+- **Arabic Encoding Fixes**: Detected and fixed garbled Arabic across multiple ViewModels
+- **Build Quality**: CS0109/CS1540 warnings eliminated, async void patterns removed
+- **FallbackErrorDialog**: Thread-safe dialog for unhandled exceptions
+- **FluentValidation Enhancement**: All invoice/payment/transfer requests validated
 
 ---
 

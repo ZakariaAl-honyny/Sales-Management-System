@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Serilog;
+using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
@@ -115,6 +116,7 @@ public partial class App : System.Windows.Application
             var dialog = new Views.Dialogs.DatabaseErrorDialog(
                 result.ErrorMessage ?? "تعذر الاتصال بقاعدة البيانات",
                 () => healthService.CheckAsync());
+
             dialog.ShowDialog();
             return dialog.RetryClicked;
         });
@@ -123,7 +125,8 @@ public partial class App : System.Windows.Application
     }
 
     private void Application_Exit(object sender, ExitEventArgs e)
-    {
+    {   
+
         Log.Information("Application shutting down");
         Log.CloseAndFlush();
     }
@@ -229,6 +232,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<ReportsViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<CostingMethodSettingsViewModel>();
+        services.AddTransient<BackupViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()
@@ -281,7 +285,7 @@ public partial class App : System.Windows.Application
         Log.Error(e.Exception, errorMessage);
 
         new Views.Dialogs.FallbackErrorDialog(
-            $"حدث خطأ غير متوقع في واجهة المستخدم: {e.Exception.Message}\n\nتم تسجيل التفاصيل التشخيصية للذكاء الاصطناعي في ملف Logs.")
+            "حدث خطأ غير متوقع في التطبيق. تم تسجيل التفاصيل في ملف السجلات.")
             .ShowDialog();
 
         e.Handled = true;

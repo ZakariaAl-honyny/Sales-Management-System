@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using SalesSystem.Application.Interfaces.Services;
 
 namespace SalesSystem.Infrastructure.Security;
 
@@ -24,7 +25,13 @@ public sealed class FirstRunSetupService
 
         if (string.IsNullOrWhiteSpace(currentValue))
         {
-            _logger.LogWarning("Connection string is empty — check appsettings.json");
+            // Fallback to environment variable if appsettings is empty
+            currentValue = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION");
+        }
+
+        if (string.IsNullOrWhiteSpace(currentValue))
+        {
+            _logger.LogWarning("Connection string is empty — check appsettings.json or SALESSYSTEM_DB_CONNECTION environment variable");
             return;
         }
 
@@ -34,7 +41,7 @@ public sealed class FirstRunSetupService
             return;
         }
 
-        var encrypted = _protector.Encrypt(currentValue);
+        var encrypted = _protector.Protect(currentValue);
         UpdateAppSettings(ConfigKey, encrypted);
 
         _logger.LogInformation("Connection string encrypted and saved on first run");
@@ -53,16 +60,27 @@ public sealed class FirstRunSetupService
                 "appsettings.json");
         }
 
+        if (!File.Exists(appSettingsPath))
+        {
+            File.WriteAllText(appSettingsPath, "{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\"\n    }\n  }\n}", System.Text.Encoding.UTF8);
+        }
+
         var json = File.ReadAllText(appSettingsPath);
         var dict = JsonSerializer.Deserialize<Dictionary<string, object?>>(json)!;
 
-        if (dict.TryGetValue("ConnectionStrings", out var csObj))
+        Dictionary<string, string> csDict;
+        if (dict.TryGetValue("ConnectionStrings", out var csObj) && csObj != null)
         {
-            var csDict = JsonSerializer.Deserialize<Dictionary<string, string>>(
+            csDict = JsonSerializer.Deserialize<Dictionary<string, string>>(
                 JsonSerializer.Serialize(csObj))!;
-            csDict["DefaultConnection"] = value;
-            dict["ConnectionStrings"] = csDict;
         }
+        else
+        {
+            csDict = new Dictionary<string, string>();
+        }
+
+        csDict["DefaultConnection"] = value;
+        dict["ConnectionStrings"] = csDict;
 
         var newJson = JsonSerializer.Serialize(dict,
             new JsonSerializerOptions { WriteIndented = true });

@@ -7,6 +7,7 @@ using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -52,6 +53,13 @@ public class SalesServiceTests : IDisposable
 
         _mockUow.Setup(u => u.SalesInvoices).Returns(new InMemoryEfCoreRepository<SalesInvoice>(_dbContext));
         _mockUow.Setup(u => u.Customers).Returns(new InMemoryEfCoreRepository<Customer>(_dbContext));
+        _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
+        _mockUow.Setup(u => u.Warehouses).Returns(new InMemoryEfCoreRepository<Warehouse>(_dbContext));
+
+        var storeSettingsMock = new Mock<IGenericRepository<StoreSettings>>();
+        storeSettingsMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<StoreSettings, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StoreSettings)null!);
+        _mockUow.Setup(u => u.StoreSettings).Returns(storeSettingsMock.Object);
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Callback(() =>
@@ -86,6 +94,11 @@ public class SalesServiceTests : IDisposable
             It.IsAny<decimal?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
+        _mockUow.Setup(u => u.ExecuteAsync<Result<SalesInvoiceDto>>(
+            It.IsAny<Func<Task<Result<SalesInvoiceDto>>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result<SalesInvoiceDto>>> func, CancellationToken ct) => func());
+
         _sut = new SalesService(
             _mockUow.Object,
             _mockInventoryService.Object,
@@ -104,6 +117,13 @@ public class SalesServiceTests : IDisposable
     public async Task GivenInsufficientStock_WhenPosting_ThenReturnsFailureBeforeTransaction()
     {
         _output.WriteLine("[TEST] GivenInsufficientStock_WhenPosting_ThenReturnsFailureBeforeTransaction");
+
+        // Setup warehouse and product for navigation property fixup
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
+        var product = Product.Create("Test Product", 10m, 100m);
+        _dbContext.Warehouses.Add(warehouse);
+        _dbContext.Products.Add(product);
+        await _dbContext.SaveChangesAsync();
 
         // Create invoice
         var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
@@ -319,16 +339,16 @@ public class SalesServiceTests : IDisposable
     }
 
     [Fact]
-    public void GivenNegativeTaxAmount_WhenSetting_ThenThrowsArgumentException()
+    public void GivenNegativeTaxAmount_WhenSetting_ThenThrowsDomainException()
     {
-        _output.WriteLine("[TEST] GivenNegativeTaxAmount_WhenSetting_ThenThrowsArgumentException");
+        _output.WriteLine("[TEST] GivenNegativeTaxAmount_WhenSetting_ThenThrowsDomainException");
 
         var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m));
 
         var action = () => invoice.SetTaxAmount(-10m);
 
-        action.Should().Throw<ArgumentException>();
+        action.Should().Throw<Domain.Exceptions.DomainException>();
 
         _output.WriteLine("[PASS] SetTaxAmount rejects negative values");
     }
@@ -410,6 +430,7 @@ public class SalesServiceTests : IDisposable
         public async Task<T> AddAsync(T entity, CancellationToken ct = default)
         {
             await _context.Set<T>().AddAsync(entity, ct);
+            await _context.SaveChangesAsync(ct);
             return entity;
         }
 
@@ -419,14 +440,31 @@ public class SalesServiceTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task SoftDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                entity.MarkAsDeleted();
+                _context.Set<T>().Update(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
-        public Task HardDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task HardDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                _context.Set<T>().Remove(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
         public void DeleteRange(IEnumerable<T> entities)
-            => throw new NotImplementedException();
+        {
+            _context.Set<T>().RemoveRange(entities);
+        }
 
         public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
             => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));

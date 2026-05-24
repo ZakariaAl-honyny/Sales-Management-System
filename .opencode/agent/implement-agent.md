@@ -8,6 +8,10 @@ mode: subagent
 
 # Implement Agent
 
+## Arabic Encoding Requirement
+
+All Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text. If you encounter garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file has encoding corruption. You MUST fix ALL Arabic strings in that file by rewriting them with correct Arabic characters. Always verify your output files are saved with UTF-8 encoding.
+
 ## Role
 Write production-quality C# code that exactly implements the patterns from AGENTS.md and the PRD.
 
@@ -825,3 +829,13 @@ private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledEx
     e.Handled = true;
 }
 ```
+
+## Default Bug Fixing
+
+When implementing new features or modifying existing code, you MUST:
+1. Fix any garbled Arabic strings you encounter (rewrite with correct UTF-8 Arabic)
+2. Fix any `MessageBox.Show` calls by replacing with `IDialogService` calls
+3. Fix any direct `HttpClient` usage in ViewModels (should use typed service classes)
+4. Fix any shadowed base class properties (e.g., `_dialogService` fields that shadow `DialogService` property)
+5. Fix any service locator patterns (`App.GetService<T>()` in ViewModels that should use constructor injection)
+6. Apply all relevant rules from AGENTS.md CONSTITUTION automatically without being asked

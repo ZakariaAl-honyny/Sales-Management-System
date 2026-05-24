@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
-using SalesSystem.Infrastructure.Security;
+using SalesSystem.Application.Interfaces.Services;
+using System;
 
 namespace SalesSystem.Infrastructure.Persistence;
 
@@ -27,6 +28,6 @@ public sealed class SecureDbContextFactory
             throw new InvalidOperationException(
                 "Connection string 'DefaultConnection' not found in configuration or environment variables");
 
-        return _protector.Decrypt(rawValue);
+        return _protector.Unprotect(rawValue);
     }
 }

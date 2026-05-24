@@ -7,6 +7,7 @@ using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -51,6 +52,18 @@ public class PurchaseReturnServiceTests : IDisposable
         _mockUow.Setup(u => u.PurchaseInvoices).Returns(new InMemoryEfCoreRepository<PurchaseInvoice>(_dbContext));
         _mockUow.Setup(u => u.Suppliers).Returns(new InMemoryEfCoreRepository<Supplier>(_dbContext));
         _mockUow.Setup(u => u.WarehouseStocks).Returns(new InMemoryEfCoreRepository<WarehouseStock>(_dbContext));
+        _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
+        _mockUow.Setup(u => u.Warehouses).Returns(new InMemoryEfCoreRepository<Warehouse>(_dbContext));
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result<PurchaseReturnDto>>(
+            It.IsAny<Func<Task<Result<PurchaseReturnDto>>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result<PurchaseReturnDto>>> func, CancellationToken ct) => func());
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result>(
+            It.IsAny<Func<Task<Result>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result>> func, CancellationToken ct) => func());
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
@@ -58,6 +71,11 @@ public class PurchaseReturnServiceTests : IDisposable
                 await _dbContext.SaveChangesAsync();
                 return 1;
             });
+
+        var storeSettingsMock = new Mock<IGenericRepository<StoreSettings>>();
+        storeSettingsMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<StoreSettings, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StoreSettings)null!);
+        _mockUow.Setup(u => u.StoreSettings).Returns(storeSettingsMock.Object);
 
         _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MockDbContextTransaction());
@@ -113,10 +131,13 @@ public class PurchaseReturnServiceTests : IDisposable
             }
         );
 
-        var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
+        var createResult = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.TotalAmount.Should().Be(100m, "2 * 50 = 100");
+        createResult.IsSuccess.Should().BeTrue();
+        createResult.Value!.TotalAmount.Should().Be(100m, "2 * 50 = 100");
+
+        var postResult = await _sut.PostAsync(createResult.Value.Id, userId: 1, CancellationToken.None);
+        postResult.IsSuccess.Should().BeTrue();
 
         _mockInventoryService.Verify(i => i.DecreaseStockAsync(
             productId: 1,
@@ -158,9 +179,12 @@ public class PurchaseReturnServiceTests : IDisposable
             }
         );
 
-        var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
+        var createResult = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
+        createResult.IsSuccess.Should().BeTrue();
 
-        result.IsSuccess.Should().BeTrue();
+        var postResult = await _sut.PostAsync(createResult.Value!.Id, userId: 1, CancellationToken.None);
+        postResult.IsSuccess.Should().BeTrue();
+
         supplier.CurrentBalance.Should().Be(4500m, "We owed supplier 5000, return worth 500, now owe 4500");
 
         _output.WriteLine("[PASS] Purchase return decreases supplier balance");
@@ -383,6 +407,7 @@ public class PurchaseReturnServiceTests : IDisposable
         public async Task<T> AddAsync(T entity, CancellationToken ct = default)
         {
             await _context.Set<T>().AddAsync(entity, ct);
+            await _context.SaveChangesAsync(ct);
             return entity;
         }
 
@@ -392,14 +417,31 @@ public class PurchaseReturnServiceTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task SoftDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                entity.MarkAsDeleted();
+                _context.Set<T>().Update(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
-        public Task HardDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task HardDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                _context.Set<T>().Remove(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
         public void DeleteRange(IEnumerable<T> entities)
-            => throw new NotImplementedException();
+        {
+            _context.Set<T>().RemoveRange(entities);
+        }
 
         public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
             => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));

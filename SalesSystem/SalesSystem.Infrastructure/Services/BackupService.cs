@@ -70,7 +70,7 @@ public sealed class BackupService : IBackupService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating database backup");
-            return Result<string>.Failure("حدث خطأ أثناء إنشاء النسخة الاحتياطية: " + ex.Message);
+            return Result<string>.Failure("حدث خطأ أثناء إنشاء النسخة الاحتياطية");
         }
     }
 
@@ -127,7 +127,7 @@ public sealed class BackupService : IBackupService
 
             await TrySetMultiUserAsync(ct);
 
-            return Result.Failure("حدث خطأ أثناء استعادة النسخة الاحتياطية: " + ex.Message);
+            return Result.Failure("حدث خطأ أثناء استعادة النسخة الاحتياطية");
         }
     }
 
@@ -176,7 +176,7 @@ public sealed class BackupService : IBackupService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Backup cleanup failed");
-            return Result.Failure("حدث خطأ أثناء تنظيف النسخ الاحتياطية القديمة: " + ex.Message);
+            return Result.Failure("حدث خطأ أثناء تنظيف النسخ الاحتياطية القديمة");
         }
     }
 

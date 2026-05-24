@@ -38,10 +38,10 @@ public class CreateUserRequestValidatorTests
     }
 
     [Fact]
-    public void GivenUserNameExceeds50Chars_WhenValidating_ThenFailsWithMaxLengthError()
+    public void GivenUserNameExceeds100Chars_WhenValidating_ThenFailsWithMaxLengthError()
     {
         // Arrange
-        var longUserName = new string('a', 51);
+        var longUserName = new string('a', 101);
         var request = CreateValidRequest() with { UserName = longUserName };
 
         // Act
@@ -49,7 +49,7 @@ public class CreateUserRequestValidatorTests
 
         // Assert
         result.ShouldHaveValidationErrorFor(x => x.UserName)
-            .WithErrorMessage("اسم المستخدم يجب ألا يتجاوز 50 حرفاً");
+            .WithErrorMessage("اسم المستخدم يجب ألا يتجاوز 100 حرفاً");
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class CreateUserRequestValidatorTests
     [InlineData("   ", false)]
     [InlineData(null, false)]
     [InlineData("12345", false)]
-    [InlineData("123456", true)]
+    [InlineData("12345678", true)]
     [InlineData("password123", true)]
     public void GivenPassword_WhenValidating_ThenCorrectResult(string? password, bool isValid)
     {
@@ -312,7 +312,7 @@ public class UpdateUserRequestValidatorTests
 
     [Theory]
     [InlineData("12345", false)] // 5 chars
-    [InlineData("123456", true)]  // 6 chars - minimum
+    [InlineData("12345678", true)]  // 8 chars - minimum
     [InlineData("newpassword", true)]
     public void GivenPassword_WhenValidating_ThenCorrectResult(string? password, bool isValid)
     {
@@ -327,7 +327,7 @@ public class UpdateUserRequestValidatorTests
             result.ShouldNotHaveValidationErrorFor(x => x.Password);
         else
             result.ShouldHaveValidationErrorFor(x => x.Password)
-                .WithErrorMessage("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+                .WithErrorMessage("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
     }
 
     #endregion
