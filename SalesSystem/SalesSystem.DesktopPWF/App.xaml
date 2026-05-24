@@ -48,6 +48,7 @@
             <converters:InvoiceStatusToStringConverter x:Key="InvoiceStatusToStringConverter"/>
             <converters:SaleModeToBrushConverter x:Key="SaleModeToBrushConverter"/>
             <converters:SaleModeToStringConverter x:Key="SaleModeToStringConverter"/>
+            <converters:StringListJoinConverter x:Key="StringListJoinConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

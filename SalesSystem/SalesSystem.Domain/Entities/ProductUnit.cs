@@ -1,4 +1,5 @@
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
@@ -146,6 +147,21 @@ public class ProductUnit : BaseEntity
     }
 
     /// <summary>
+    /// Updates unit name and sales price. Does NOT change ConversionFactor or IsBaseUnit.
+    /// </summary>
+    public void Update(string unitName, decimal retailPrice, decimal wholesalePrice)
+    {
+        if (string.IsNullOrWhiteSpace(unitName))
+            throw new DomainException("اسم الوحدة لا يمكن أن يكون فارغاً");
+        if (retailPrice < 0)
+            throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
+
+        UnitName = unitName.Trim();
+        SalesPrice = Math.Round(retailPrice, 2);
+        UpdateTimestamp();
+    }
+
+    /// <summary>
     /// Adds a barcode to this unit. If marked as default, unmarks others.
     /// </summary>
     public void AddBarcode(string barcodeValue, bool isDefault = false,
@@ -177,4 +193,23 @@ public class ProductUnit : BaseEntity
     /// </summary>
     public decimal CalculateSalesPriceFromBaseUnitPrice(decimal baseUnitPrice)
         => baseUnitPrice * BaseConversionFactor;
+
+    /// <summary>
+    /// Gets the appropriate price based on sale mode (Retail or Wholesale).
+    /// Uses SalesPrice for both modes in the current implementation.
+    /// </summary>
+    public decimal GetPriceByUnit(SaleMode mode)
+        => SalesPrice;
+
+    /// <summary>
+    /// Updates the average cost of this unit.
+    /// </summary>
+    public void UpdateCost(decimal newCost)
+    {
+        if (newCost < 0)
+            throw new DomainException("التكلفة لا يمكن أن تكون سالبة");
+
+        PurchaseCost = Math.Round(newCost, 2);
+        LastPurchasePrice = Math.Round(newCost, 2);
+    }
 }
