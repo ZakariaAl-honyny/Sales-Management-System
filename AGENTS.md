@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/011-production-hardening/plan.md](specs/011-production-hardening/plan.md)
+**Active Feature Plan**: [specs/012-multi-window-ui/plan.md](specs/012-multi-window-ui/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
