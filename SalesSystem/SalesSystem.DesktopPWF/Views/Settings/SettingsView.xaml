@@ -254,7 +254,7 @@
                 </Border>
 
                 <!-- Database Maintenance -->
-                <Border Style="{StaticResource CardStyle}">
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
                     <StackPanel>
                         <TextBlock Text="💾 صيانة قاعدة البيانات (النسخ الاحتياطي)" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
                         
@@ -291,6 +291,68 @@
                                 Padding="20,10"
                                 AutomationProperties.AutomationId="BtnCreateBackup"
                                 ToolTip="إنشاء نسخة احتياطية فورية"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Backup & Update Settings -->
+                <Border Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <TextBlock Text="⚙️ إعدادات النسخ الاحتياطي والتحديث" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,16">
+                                <TextBlock Text="مجلد النسخ الاحتياطي" Style="{StaticResource LabelStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding BackupPath}"
+                                             ToolTip="المسار الافتراضي لحفظ ملفات النسخ الاحتياطي (.bak)"
+                                             AutomationProperties.AutomationId="TxtBackupPath"/>
+                                    <Button Grid.Column="1" Content="تصفح..." Margin="8,0,0,0"
+                                            Command="{Binding BrowseBackupPathCommand}"
+                                            ToolTip="اختيار مجلد النسخ الاحتياطي"
+                                            AutomationProperties.AutomationId="BtnBrowseBackupPath"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="0" Grid.Column="1" Margin="12,0,0,16">
+                                <TextBlock Text="وقت النسخ الاحتياطي التلقائي" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding BackupScheduleTime}" 
+                                         ToolTip="الوقت المحدد لعمل النسخ الاحتياطي التلقائي يومياً — صيغة HH:mm (مثال: 02:00)"
+                                         AutomationProperties.AutomationId="TxtBackupScheduleTime"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,12,16">
+                                <TextBlock Text="الاحتفاظ بالنسخ (أيام)" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding BackupRetentionDays}"
+                                         ToolTip="عدد الأيام للاحتفاظ بنسخ الاحتياط — يتم حذف النسخ الأقدم تلقائياً"
+                                         AutomationProperties.AutomationId="TxtBackupRetentionDays"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="1" Margin="12,0,0,16">
+                                <TextBlock Text="رابط خادم التحديثات" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding UpdateServerUrl}"
+                                         ToolTip="رابط خادم التحديثات التلقائية — يجب أن يكون متاحاً عبر HTTP/HTTPS"
+                                         AutomationProperties.AutomationId="TxtUpdateServerUrl"/>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2"
+                                       Text="تنبيه: سيتم تطبيق إعدادات النسخ الاحتياطي والتحديث بعد حفظ الإعدادات."
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12" TextWrapping="Wrap"/>
+                        </Grid>
                     </StackPanel>
                 </Border>
             </StackPanel>

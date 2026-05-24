@@ -20,7 +20,7 @@ public class CreateSupplierRequestValidatorTests
     public void GivenSupplierName_WhenValidating_ThenCorrectResult(string? name, bool isValid)
     {
         // Arrange
-        var request = CreateValidRequest() with { Name = name };
+        var request = CreateValidRequest() with { Name = name! };
 
         // Act
         var result = _validator.TestValidate(request);
@@ -206,7 +206,7 @@ public class UpdateSupplierRequestValidatorTests
     public void GivenSupplierName_WhenValidating_ThenCorrectResult(string? name, bool isValid)
     {
         // Arrange
-        var request = CreateValidRequest() with { Name = name };
+        var request = CreateValidRequest() with { Name = name! };
 
         // Act
         var result = _validator.TestValidate(request);

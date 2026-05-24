@@ -86,8 +86,9 @@ public class PurchaseService : IPurchaseService
              (i.SupplierInvoiceNo != null && i.SupplierInvoiceNo.ToLower().Contains(searchLower)) ||
              (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
              i.Items.Any(item =>
-                 item.Product.Name.ToLower().Contains(searchLower) ||
-                 item.Product.Barcode.ToLower().Contains(searchLower)));
+                 item.Product != null && (
+                     item.Product.Name.ToLower().Contains(searchLower) ||
+                     (item.Product.Barcode ?? "").ToLower().Contains(searchLower))));
 
         var includes = new[] { "Supplier", "Warehouse", "Items.Product" };
 

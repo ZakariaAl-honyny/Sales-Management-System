@@ -13,19 +13,19 @@ description: "Task list for Production Hardening (v4.4)"
 
 ## Phase 1: Setup
 
-- [ ] T001 Verify solution builds with 0 errors: `dotnet build SalesSystem/SalesSystem.slnx` — FILE: `SalesSystem/SalesSystem.slnx`
+- [X] T001 Verify solution builds with 0 errors: `dotnet build SalesSystem/SalesSystem.slnx` — FILE: `SalesSystem/SalesSystem.slnx`
 
 ---
 
 ## Phase 2: Foundational (BLOCKS all user stories)
 
-- [ ] T002 [P] Add `HealthCheckDto` record to Contracts: `{ string Status, string DatabaseStatus, DateTime Timestamp }` — FILE: `SalesSystem/SalesSystem.Contracts/Responses/HealthCheckDto.cs`
+- [X] T002 [P] Add `HealthCheckDto` record to Contracts: `{ string Status, string DatabaseStatus, DateTime Timestamp }` — FILE: `SalesSystem/SalesSystem.Contracts/Responses/HealthCheckDto.cs`
 
-- [ ] T003 [P] Add `UpdateManifest` class to Contracts: `{ string Version, string DownloadUrl, string Sha256Hash, string? ReleaseNotes }` — FILE: `SalesSystem/SalesSystem.Contracts/Responses/UpdateManifest.cs`
+- [X] T003 [P] Add `UpdateManifest` class to Contracts: `{ string Version, string DownloadUrl, string Sha256Hash, string? ReleaseNotes }` — FILE: `SalesSystem/SalesSystem.Contracts/Responses/UpdateManifest.cs`
 
-- [ ] T004 [P] Add `IConnectionStringProtector` interface with `string Encrypt(string plaintext)` and `string Decrypt(string ciphertext)` — FILE: `SalesSystem/SalesSystem.Application/Interfaces/Security/IConnectionStringProtector.cs`
+- [X] T004 [P] Add `IConnectionStringProtector` interface — ALREADY EXISTS at `SalesSystem/SalesSystem.Application/Interfaces/Services/IConnectionStringProtector.cs`
 
-- [ ] T005 [P] Add `IBackupService` interface: `Task<Result> BackupNowAsync(CancellationToken ct)` — FILE: `SalesSystem/SalesSystem.Application/Interfaces/Services/IBackupService.cs`
+- [X] T005 [P] Add `IBackupService` interface — ALREADY EXISTS at `SalesSystem/SalesSystem.Application/Interfaces/Services/IBackupService.cs`
 
 **Checkpoint**: `dotnet build` passes with all new interfaces added.
 
@@ -37,9 +37,9 @@ description: "Task list for Production Hardening (v4.4)"
 
 **Independent Test**: Set a plaintext connection string in `appsettings.json` → Run the API once → Inspect the file → Value starts with `"DPAPI:"` → Restart the API → Connects to the database normally.
 
-- [ ] T006 [US3] Implement `DpapiConnectionStringProtector` implementing `IConnectionStringProtector`. `Encrypt`: uses `ProtectedData.Protect(Encoding.UTF8.GetBytes(plaintext), null, DataProtectionScope.LocalMachine)` → returns `"DPAPI:" + Convert.ToBase64String(...)`. `Decrypt`: strips `"DPAPI:"` prefix → `ProtectedData.Unprotect(...)` → returns plaintext. Wrap both in try/catch returning `Result` — FILE: `SalesSystem/SalesSystem.Infrastructure/Security/DpapiConnectionStringProtector.cs`
+- [X] T006 [US3] Implement `DpapiConnectionStringProtector` — ALREADY IMPLEMENTED as `ConnectionStringProtector` at `SalesSystem/SalesSystem.Infrastructure/Services/ConnectionStringProtector.cs`. Uses `ProtectedData.Protect`/`Unprotect` with `DataProtectionScope.LocalMachine`, `"DPAPI:"` prefix, Base64 encoding. Full DPAPI implementation with `IsEncrypted`, `Protect`, `Unprotect` matching the interface.
 
-- [ ] T007 [US3] Add startup encryption logic in `Program.cs`: Before `builder.Build()`, read the raw connection string value. If it does NOT start with `"DPAPI:"`, call `protector.Encrypt(value)`, then atomically rewrite `appsettings.json` using `System.Text.Json` (write to `appsettings.json.tmp` → `File.Move` with overwrite). NEVER log the plaintext value (RULE-037). Register `IConnectionStringProtector` → `DpapiConnectionStringProtector` as Singleton. If it DOES start with `"DPAPI:"`, call `protector.Decrypt(value)` and use the result as the connection string — FILE: `SalesSystem/SalesSystem.Api/Program.cs`
+- [X] T007 [US3] DPAPI startup encryption — ALREADY IMPLEMENTED via `FirstRunSetupService.EnsureConnectionStringEncrypted()` at `SalesSystem/SalesSystem.Infrastructure/Security/FirstRunSetupService.cs`. Uses atomic write pattern (`.tmp` → `File.Replace()`). `SecureDbContextFactory.GetDecryptedConnectionString()` at `Infrastructure/Persistence/SecureDbContextFactory.cs` handles decryption. DI registered at `Program.cs:110`. NEVER logs plaintext values (RULE-037).
 
 **Checkpoint**: Inspect `appsettings.json` — connection string starts with `"DPAPI:"`. API starts and connects to DB successfully.
 
@@ -49,15 +49,15 @@ description: "Task list for Production Hardening (v4.4)"
 
 **Goal**: API installs as a Windows Service that starts with Windows, auto-recovers from crashes, and exposes an unauthenticated `/api/health` endpoint.
 
-**Independent Test**: Call `GET http://localhost:5000/api/health` → Returns `{ Status: "Healthy", DatabaseStatus: "Reachable" }`. Stop SQL Server → Call again → Returns `{ Status: "Unhealthy", DatabaseStatus: "Unreachable" }` with HTTP 503.
+**Independent Test**: Call `GET http://localhost:5221/api/health` → Returns `{ Status: "Healthy", DatabaseStatus: "Reachable" }`. Stop SQL Server → Call again → Returns `{ Status: "Unhealthy", DatabaseStatus: "Unreachable" }` with HTTP 503.
 
-- [ ] T008 [US2] Add `Microsoft.Extensions.Hosting.WindowsServices` NuGet if not already referenced and add `builder.Host.UseWindowsService()` to `Program.cs`. Also register `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)` at startup — FILE: `SalesSystem/SalesSystem.Api/Program.cs`, `SalesSystem/SalesSystem.Api/SalesSystem.Api.csproj`
+- [X] T008 [US2] `UseWindowsService()` + `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)` — ALREADY IMPLEMENTED in `Program.cs` (lines 41-44, 56)
 
-- [ ] T009 [P] [US2] Implement `DatabaseHealthCheck` implementing `IHealthCheck`. In `CheckHealthAsync`: open a `SqlConnection` using the configured connection string, execute `SELECT 1`, return `HealthCheckResult.Healthy("Reachable")` on success or `HealthCheckResult.Unhealthy("Unreachable")` on exception. Connection timeout: 3 seconds — FILE: `SalesSystem/SalesSystem.Infrastructure/Health/DatabaseHealthCheck.cs`
+- [X] T009 [P] [US2] `DatabaseHealthCheck` created at `SalesSystem/SalesSystem.Infrastructure/Health/DatabaseHealthCheck.cs`. Uses raw ADO.NET with `SqlConnection`, 3-second timeout, `SELECT 1` heartbeat. Returns `Healthy("Reachable")` / `Unhealthy("Unreachable")`.
 
-- [ ] T010 [P] [US2] Create `HealthController` with route `[Route("api/health")]`. NO `[Authorize]`. `GET /` calls `IHealthCheckService` (injected `HealthCheckService` from `Microsoft.Extensions.Diagnostics.HealthChecks`). Maps `Healthy` → 200, `Unhealthy` → 503. Returns `HealthCheckDto` — FILE: `SalesSystem/SalesSystem.Api/Controllers/HealthController.cs`
+- [X] T010 [P] [US2] `HealthController` updated at `SalesSystem/SalesSystem.Api/Controllers/HealthController.cs`. Now uses `HealthCheckService` (not raw DbContext). Route `api/v1/health`. `[AllowAnonymous]`. Returns `HealthCheckDto`. `GET /` → 200/503. `GET /database` → 200/503.
 
-- [ ] T011 [US2] Register health checks in `Program.cs`: `builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database")`. Register health check middleware. Ensure the `/api/health` route is excluded from `[Authorize]` global policies — FILE: `SalesSystem/SalesSystem.Api/Program.cs`
+- [X] T011 [US2] Health checks registered in `Program.cs` (lines 157-158). `builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database")`. `[AllowAnonymous]` on controller handles auth exclusion.
 
 **Checkpoint**: `GET /api/health` returns 200 when DB is reachable, 503 when unreachable.
 
@@ -69,13 +69,13 @@ description: "Task list for Production Hardening (v4.4)"
 
 **Independent Test**: Set `Backup.ScheduleTime = "00:01"` (1 minute from now) → Wait → `.bak` file appears in `Backup.Path` → Create a `.bak` file with `LastWriteTime` older than retention → After the next backup run, the old file is gone.
 
-- [ ] T012 [US1] Implement `BackupService` (implements `IBackupService`). Inject `IConfiguration`, `ILogger<BackupService>`. In `BackupNowAsync`: (1) read `Backup.Path` and `Backup.RetentionDays` from `ISystemSettingsRepository`. (2) Ensure directory exists (`Directory.CreateDirectory`). (3) Build filename `SalesSystemDb_{DateTime.Now:yyyy-MM-dd_HH-mm}.bak`. (4) Open `SqlConnection` and execute `BACKUP DATABASE [{dbName}] TO DISK = N'{fullPath}'`. (5) Delete `.bak` files in the directory where `LastWriteTime < DateTime.Now.AddDays(-retentionDays)`. (6) Log result via Serilog. Wrap all in try/catch returning `Result` — FILE: `SalesSystem/SalesSystem.Application/Services/BackupService.cs`
+- [X] T012 [US1] `BackupService` — ALREADY IMPLEMENTED at `SalesSystem/SalesSystem.Infrastructure/Services/BackupService.cs`. Full implementation: raw SQL `BACKUP DATABASE` with COMPRESSION, `RestoreBackupAsync` with SINGLE_USER/ROLLBACK AFTER 30/RESTORE/MULTI_USER recovery, `GetBackupListAsync`, `DeleteOldBackupsAsync`. All return `Result<T>`/`Result`. Tries `TrySetMultiUserAsync` on restore failure.
 
-- [ ] T013 [US1] Implement `ScheduledBackupWorker` extending `BackgroundService`. Inject `IBackupService`, `ILogger`. In `ExecuteAsync`: (1) Read `Backup.ScheduleTime` (HH:mm) from settings. (2) Calculate milliseconds until next occurrence using `TimeSpan`. (3) `await Task.Delay(delay, stoppingToken)`. (4) Call `_backupService.BackupNowAsync(stoppingToken)`. (5) Loop. Log each run. Handle `OperationCanceledException` gracefully on shutdown — FILE: `SalesSystem/SalesSystem.Infrastructure/BackgroundWorkers/ScheduledBackupWorker.cs`
+- [X] T013 [US1] `ScheduledBackupWorker` — ALREADY IMPLEMENTED at `SalesSystem/SalesSystem.Infrastructure/Backup/ScheduledBackupWorker.cs`. `BackgroundService` with 2:00 AM schedule loop, `IServiceScopeFactory` for scoped service, calls `CreateBackupAsync` then `DeleteOldBackupsAsync`. Handles `OperationCanceledException`. Serilog logging.
 
-- [ ] T014 [US1] Register services in DI: `builder.Services.AddScoped<IBackupService, BackupService>()`. Register Worker: `builder.Services.AddHostedService<ScheduledBackupWorker>()`. Add `Backup.*` and `Update.ServerUrl` default rows to the database seeder if not already present — FILE: `SalesSystem/SalesSystem.Infrastructure/DependencyInjection.cs`, `SalesSystem/SalesSystem.Api/Program.cs`
+- [X] T014 [US1] DI Registration — ALREADY REGISTERED in `Program.cs` (lines 113-116): `Configure<BackupSettings>`, `AddScoped<IBackupService, BackupService>()`, `AddHostedService<ScheduledBackupWorker>()`, `AddUpdateServices()`.
 
-- [ ] T015 [P] [US1] Add `POST /api/v1/admin/backup` endpoint to trigger backup immediately (admin-only convenience endpoint). Calls `IBackupService.BackupNowAsync`. Returns 200 OK with `Result` — FILE: `SalesSystem/SalesSystem.Api/Controllers/AdminController.cs` (create if not exists)
+- [X] T015 [P] [US1] Backup API endpoint — ALREADY IMPLEMENTED as `BackupController` at `SalesSystem/SalesSystem.Api/Controllers/BackupController.cs`. Route `api/v1/backup`, `[Authorize(Policy = "AdminOnly")]`. Endpoints: `POST /create` (create backup), `GET /list` (list backups), `POST /restore` (restore with path traversal guard).
 
 **Checkpoint**: Background worker starts on API launch. Manual `POST /api/v1/admin/backup` → `.bak` file created. Old `.bak` files beyond retention window are cleaned up.
 
@@ -87,13 +87,13 @@ description: "Task list for Production Hardening (v4.4)"
 
 **Independent Test**: Stop the API → Launch the Desktop → `DatabaseErrorDialog` appears within 5 seconds with "إعادة المحاولة" and "إغلاق" buttons → Start the API → Click "إعادة المحاولة" → Main window loads normally.
 
-- [ ] T016 [P] [US4] Create `IHealthApiService` interface + `HealthApiService` using `IHttpClientFactory`. Method: `Task<bool> CheckHealthAsync(CancellationToken ct)`. Uses `GET http://localhost:{port}/api/health` with 5-second `CancellationToken`. Returns `true` on 200, `false` on any error or timeout — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/Api/HealthApiService.cs`
+- [X] T016 [P] [US4] Health check service — ALREADY IMPLEMENTED as `IDatabaseHealthCheckService` / `DatabaseHealthCheckService` at `Services/Api/DatabaseHealthCheckService.cs`. Uses `GET api/v1/health/database`, handles `HttpRequestException`/`TaskCanceledException`, returns `HealthCheckResult` with `IsDatabaseConnected`/`IsApiReachable`/`ErrorMessage`. Arabic error messages.
 
-- [ ] T017 [P] [US4] Create `DatabaseErrorDialog.xaml` + `DatabaseErrorDialogViewModel.cs`. Orange/red theme, warning icon ⚠. Text: `"تعذر الاتصال بالخادم. يرجى التحقق من تشغيل الخدمة والمحاولة مرة أخرى."`. Buttons: `"إعادة المحاولة"` and `"إغلاق"`. ViewModel exposes `RetryCommand` and `CloseCommand`. CloseCommand calls `Application.Current.Shutdown()` — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Dialogs/DatabaseErrorDialog.xaml` + `ViewModels/Dialogs/DatabaseErrorDialogViewModel.cs`
+- [X] T017 [P] [US4] `DatabaseErrorDialog` — ALREADY IMPLEMENTED at `Views/Dialogs/DatabaseErrorDialog.xaml` + `.xaml.cs`. Orange/red theme, ⚠ warning icon, Arabic text, retry/exit buttons, retrying state with ProgressBar, proper `PositionOverOwner()` guard against self-ownership (RULE-224).
 
-- [ ] T018 [US4] Modify `App.xaml.cs.OnStartup`: Before `MainWindow` is created, create a `CancellationTokenSource(TimeSpan.FromSeconds(5))`. Call `healthApiService.CheckHealthAsync(cts.Token)`. If `false`, show `DatabaseErrorDialog` as a retry loop (keep retrying until success or user closes). Only after a successful health check, proceed to create and show `MainWindow` — FILE: `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs`
+- [X] T018 [US4] `App.xaml.cs` startup health check — ALREADY IMPLEMENTED at `App.xaml.cs:106-126`. `CheckDatabaseConnectionAsync()` calls `IDatabaseHealthCheckService.CheckAsync()`, shows `DatabaseErrorDialog` on failure, returns `true`/`false`. On failure: `Log.Fatal` + `Environment.Exit(1)`.
 
-- [ ] T019 [US4] Register `IHealthApiService` → `HealthApiService` in Desktop DI — FILE: `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs`
+- [X] T019 [US4] DI Registration — ALREADY REGISTERED at `App.xaml.cs:200`: `services.AddSingleton<IDatabaseHealthCheckService, DatabaseHealthCheckService>()`.
 
 **Checkpoint**: Stop API → Launch Desktop → Arabic error dialog appears → Start API → Retry → Main window loads.
 
@@ -105,9 +105,9 @@ description: "Task list for Production Hardening (v4.4)"
 
 **Independent Test**: Set `Update.ServerUrl` → Host `update-manifest.json` with a higher version number → Launch Desktop → Toast appears: `"تحديث جاهز — أعد تشغيل البرنامج"`. Host manifest with wrong SHA256 → Launch Desktop → No toast, partial download file deleted.
 
-- [ ] T020 [US5] Implement `UpdateService`. Inject `IHttpClientFactory`, `IToastNotificationService`, `ISystemSettingsApiService`, `ILogger`. Method `Task CheckAndUpdateAsync(CancellationToken ct)`. Logic: (1) Read `Update.ServerUrl` from settings. If empty, return. (2) `using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8))`. (3) `GET {url}/update-manifest.json` with combined `CancellationToken`. (4) Deserialize to `UpdateManifest`. (5) Compare `manifest.Version` with `Assembly.GetEntryAssembly().GetName().Version.ToString()`. If same or older, return. (6) `GET {manifest.DownloadUrl}` → save bytes to `Path.GetTempFileName() + ".exe"`. (7) Compute `SHA256.HashData(fileBytes)` → compare with `manifest.Sha256Hash` (hex string). (8) If mismatch: `File.Delete(tempPath)`, log Serilog warning, return. (9) If match: `_toastService.ShowInfo("تحديث جاهز — أعد تشغيل البرنامج")`. Wrap entire method in try/catch — failure is always silent (log only) — FILE: `SalesSystem/SalesSystem.DesktopPWF/Services/App/UpdateService.cs`
+- [X] T020 [US5] `UpdateService` — ALREADY IMPLEMENTED as `UpdaterService` at `SalesSystem/SalesSystem.DesktopPWF/Services/App/UpdaterService.cs`. Full implementation: 8-second timeout via `CancellationTokenSource`, `CheckForUpdatesAsync` fetches version.json, SHA256 checksum verification, download with progress reporting, skipped version persisted to `%AppData%\SalesSystem\settings.json`. All return `Result<T>`. Arabic error messages. Serilog logging.
 
-- [ ] T021 [US5] After `MainWindow` is shown in `App.xaml.cs.OnStartup`, fire `Task.Run(() => _updateService.CheckAndUpdateAsync(CancellationToken.None))` — no await, no blocking. Register `UpdateService` as singleton in DI — FILE: `SalesSystem/SalesSystem.DesktopPWF/App.xaml.cs`
+- [X] T021 [US5] Background update check — ALREADY IMPLEMENTED at `App.xaml.cs:88` (`_ = ScheduleBackgroundUpdateCheckAsync()`). Fires after MainWindow shown, 3-second initial delay, silent failure handling. `IUpdaterService` → `UpdaterService` registered as singleton at line 165.
 
 **Checkpoint**: Update URL configured → Desktop loads normally (update runs in background) → Toast appears if update available → Wrong SHA256 → No toast, temp file deleted.
 
@@ -115,13 +115,13 @@ description: "Task list for Production Hardening (v4.4)"
 
 ## Phase 8: Polish
 
-- [ ] T022 [P] Add backup settings fields to `SettingsView.xaml` and `SettingsViewModel.cs`: `BackupPath` (TextBox + folder browse button), `BackupScheduleTime` (TextBox HH:mm), `BackupRetentionDays` (TextBox numeric), `UpdateServerUrl` (TextBox). SaveCommand calls existing SystemSettings update endpoint — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Settings/SettingsView.xaml` + `ViewModels/SettingsViewModel.cs`
+- [X] T022 [P] Add backup settings fields to `SettingsView.xaml` and `SettingsViewModel.cs`: `BackupPath` (TextBox + folder browse button), `BackupScheduleTime` (TextBox HH:mm), `BackupRetentionDays` (TextBox numeric), `UpdateServerUrl` (TextBox). SaveCommand calls existing SystemSettings update endpoint — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Settings/SettingsView.xaml` + `ViewModels/SettingsViewModel.cs`
 
-- [ ] T023 [P] Verify all Serilog logging: check that `DpapiConnectionStringProtector`, `BackupService`, `ScheduledBackupWorker`, and `UpdateService` all use Serilog `ILogger<T>` and that no decrypted connection string or password appears in any log message (RULE-035, RULE-037)
+- [X] T023 [P] Verify all Serilog logging: checked `ConnectionStringProtector`, `BackupService`, `ScheduledBackupWorker`, `UpdaterService`, `DatabaseHealthCheck`, `HealthController`, `FirstRunSetupService`. 3 files fixed — `ConnectionStringProtector` (added ILogger + try-catch), `UpdaterService` (migrated from Serilog.Log statics to ILogger DI), `DatabaseHealthCheck` (added ILogger + logging catch). All 7 now pass. No secrets logged anywhere (RULE-035, RULE-037).
 
-- [ ] T024 [P] Create `sc.exe` installation script: `install-service.ps1` that runs `sc.exe create`, `sc.exe failure` with the 3-restart recovery policy, and `sc.exe start` — FILE: `SalesSystem/scripts/install-service.ps1`
+- [X] T024 [P] Create `sc.exe` installation script: `install-service.ps1` — FILE: `SalesSystem/scripts/install-service.ps1`
 
-- [ ] T025 Update `docs/CHANGELOG.md` with v4.4 entry: Production Hardening (DPAPI encryption, Windows Service, daily backup, Desktop health check dialog, silent auto-update) — FILE: `docs/CHANGELOG.md`
+- [X] T025 Update `docs/CHANGELOG.md` with v4.4 entry: Production Hardening (DPAPI encryption, Windows Service, daily backup, Desktop health check dialog, silent auto-update) — FILE: `docs/CHANGELOG.md`
 
 ---
 

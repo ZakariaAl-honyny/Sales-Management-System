@@ -304,7 +304,11 @@ public record StoreSettingsDto(
     bool AllowNegativeStock,
     bool AutoUpdatePrices,
     string InvoicePrefix,
-    int CostingMethod = 1);
+    int CostingMethod = 1,
+    string? BackupPath = null,
+    string? BackupScheduleTime = "02:00",
+    int BackupRetentionDays = 30,
+    string? UpdateServerUrl = null);
 
 public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
 

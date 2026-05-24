@@ -152,6 +152,12 @@ builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================
+// 4b. Health Checks
+// ============================================
+builder.Services.AddHealthChecks()
+    .AddCheck<SalesSystem.Infrastructure.Health.DatabaseHealthCheck>("database");
+
+// ============================================
 // 5. JWT Authentication
 // ============================================
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -134,7 +134,7 @@ public class SalesReturnServiceTests : IDisposable
             quantity: 2m,
             movementType: MovementType.SaleReturnIn,
             "SalesReturn",
-            result.Value.Id,
+            result.Value!.Id,
             100m,
             1,
             It.IsAny<CancellationToken>()), Times.Once,
@@ -212,7 +212,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
         result.IsSuccess.Should().BeTrue();
 
-        result = await _sut.PostAsync(result.Value.Id, userId: 1, CancellationToken.None);
+        result = await _sut.PostAsync(result.Value!.Id, userId: 1, CancellationToken.None);
         result.IsSuccess.Should().BeTrue();
 
         customer.CurrentBalance.Should().Be(800m, "Customer owed 1000, return worth 200, now owes 800");

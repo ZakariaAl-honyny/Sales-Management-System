@@ -94,6 +94,12 @@ public sealed class StoreSettingsService : IStoreSettingsService
                 _logger.LogWarning(ex, "Failed to persist costing method");
             }
 
+            // Persist backup & update settings via key-value store
+            await _systemSettingsRepo.SetStringAsync("Backup.BackupPath", request.BackupPath ?? "", userId, ct);
+            await _systemSettingsRepo.SetStringAsync("Backup.ScheduleTime", request.BackupScheduleTime ?? "02:00", userId, ct);
+            await _systemSettingsRepo.SetStringAsync("Backup.RetentionDays", request.BackupRetentionDays.ToString(), userId, ct);
+            await _systemSettingsRepo.SetStringAsync("Update.ServerUrl", request.UpdateServerUrl ?? "", userId, ct);
+
             _logger.LogInformation("Store settings updated by user {UserId}", userId);
 
             return Result<StoreSettingsDto>.Success(await MapToDto(settings, ct));
@@ -141,6 +147,11 @@ public sealed class StoreSettingsService : IStoreSettingsService
     private async Task<StoreSettingsDto> MapToDto(StoreSettings s, CancellationToken ct)
     {
         var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
+        var backupPath = await _systemSettingsRepo.GetStringAsync("Backup.BackupPath", "", ct);
+        var scheduleTime = await _systemSettingsRepo.GetStringAsync("Backup.ScheduleTime", "02:00", ct);
+        var retentionStr = await _systemSettingsRepo.GetStringAsync("Backup.RetentionDays", "30", ct);
+        _ = int.TryParse(retentionStr, out var retentionDays);
+        var updateServerUrl = await _systemSettingsRepo.GetStringAsync("Update.ServerUrl", "", ct);
         return new StoreSettingsDto(
             s.Id,
             s.StoreName,
@@ -156,6 +167,10 @@ public sealed class StoreSettingsService : IStoreSettingsService
             s.AllowNegativeStock,
             s.AutoUpdatePrices,
             s.InvoicePrefix,
-            (int)costingMethod);
+            (int)costingMethod,
+            backupPath,
+            scheduleTime,
+            retentionDays,
+            updateServerUrl);
     }
 }

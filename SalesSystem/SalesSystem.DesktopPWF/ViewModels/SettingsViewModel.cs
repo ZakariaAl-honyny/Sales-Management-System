@@ -41,6 +41,10 @@ public class SettingsViewModel : ViewModelBase
     private string _receiptFooter = string.Empty;
     private int _escPosCodePage = 22;
     private bool _autoPrintOnPost;
+    private string _backupPath = string.Empty;
+    private string _backupScheduleTime = "02:00";
+    private int _backupRetentionDays = 30;
+    private string _updateServerUrl = string.Empty;
 
     public SettingsViewModel()
     {
@@ -55,6 +59,7 @@ public class SettingsViewModel : ViewModelBase
         RestoreBackupCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(RestoreBackupOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.RestoreBackupAsync", "[SettingsViewModel.RestoreBackupAsync] Unexpected error."))), () => !string.IsNullOrEmpty(SelectedBackup));
         BrowseLogoCommand = new RelayCommand(_ => BrowseLogo());
         TestPrintCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(TestPrintOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.TestPrintAsync", "[SettingsViewModel.TestPrintAsync] Test print failed."))));
+        BrowseBackupPathCommand = new RelayCommand(_ => BrowseBackupPath());
 
         _ = ExecuteAsync(LoadSettingsOperationAsync);
         _ = RefreshBackupListAsync();
@@ -246,6 +251,32 @@ public class SettingsViewModel : ViewModelBase
             .ToList();
     #endregion
 
+    #region Backup & Update Properties
+    public string BackupPath
+    {
+        get => _backupPath;
+        set => SetProperty(ref _backupPath, value);
+    }
+
+    public string BackupScheduleTime
+    {
+        get => _backupScheduleTime;
+        set => SetProperty(ref _backupScheduleTime, value);
+    }
+
+    public int BackupRetentionDays
+    {
+        get => _backupRetentionDays;
+        set => SetProperty(ref _backupRetentionDays, value);
+    }
+
+    public string UpdateServerUrl
+    {
+        get => _updateServerUrl;
+        set => SetProperty(ref _updateServerUrl, value);
+    }
+    #endregion
+
     #region Commands
     public AsyncRelayCommand LoadCommand { get; }
     public AsyncRelayCommand SaveCommand { get; }
@@ -253,6 +284,7 @@ public class SettingsViewModel : ViewModelBase
     public AsyncRelayCommand RestoreBackupCommand { get; }
     public ICommand BrowseLogoCommand { get; }
     public ICommand TestPrintCommand { get; }
+    public ICommand BrowseBackupPathCommand { get; }
     #endregion
 
     #region Logic
@@ -273,6 +305,21 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
+    private void BrowseBackupPath()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "اختيار مجلد النسخ الاحتياطي",
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            BackupPath = dialog.FolderName;
+            StatusMessage = "✅ تم اختيار مجلد النسخ الاحتياطي";
+        }
+    }
+
     private async Task TestPrintOperationAsync()
     {
         StatusMessage = string.Empty;
@@ -286,7 +333,7 @@ public class SettingsViewModel : ViewModelBase
         {
             LogSystemError($"Print test failed: {result.Error}", "SettingsViewModel.TestPrintOperationAsync");
             StatusMessage = "فشلت طباعة الاختبار";
-            await DialogService.ShowErrorAsync("خطأ في الطباعة", "فشل اختبار الطباعة. يرجى التحقق من إعدادات الطابعة والمحاولة مرة أخرى.");
+            await DialogService!.ShowErrorAsync("خطأ في الطباعة", "فشل اختبار الطباعة. يرجى التحقق من إعدادات الطابعة والمحاولة مرة أخرى.");
         }
     }
 
@@ -309,6 +356,10 @@ public class SettingsViewModel : ViewModelBase
             AutoUpdatePrices = s.AutoUpdatePrices;
             InvoicePrefix = s.InvoicePrefix;
             CostingMethod = s.CostingMethod;
+            BackupPath = s.BackupPath ?? string.Empty;
+            BackupScheduleTime = s.BackupScheduleTime ?? "02:00";
+            BackupRetentionDays = s.BackupRetentionDays;
+            UpdateServerUrl = s.UpdateServerUrl ?? string.Empty;
         }
 
         try
@@ -344,14 +395,14 @@ public class SettingsViewModel : ViewModelBase
             };
             StatusMessage = "يرجى إدخال اسم المنشأة";
             string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            await DialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
+            await DialogService!.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
             return;
         }
 
         if (DefaultTaxRate < 0 || DefaultTaxRate > 100)
         {
             StatusMessage = "نسبة الضريبة يجب أن تكون بين 0 و 100";
-            await DialogService.ShowWarningAsync("خطأ في البيانات", StatusMessage);
+            await DialogService!.ShowWarningAsync("خطأ في البيانات", StatusMessage);
             return;
         }
 
@@ -371,7 +422,11 @@ public class SettingsViewModel : ViewModelBase
             AllowNegativeStock,
             AutoUpdatePrices,
             InvoicePrefix,
-            CostingMethod
+            CostingMethod,
+            BackupPath,
+            BackupScheduleTime,
+            BackupRetentionDays,
+            UpdateServerUrl
         );
 
         var result = await _settingsService.UpdateSettingsAsync(request);
@@ -394,7 +449,7 @@ public class SettingsViewModel : ViewModelBase
             {
                 StatusMessage = HandleFailure(printResult.Error ?? "فشل في حفظ إعدادات الطباعة",
                     "SettingsViewModel.SaveSettingsAsync");
-                await DialogService.ShowErrorAsync("خطأ في حفظ إعدادات الطباعة", StatusMessage);
+                await DialogService!.ShowErrorAsync("خطأ في حفظ إعدادات الطباعة", StatusMessage);
                 return;
             }
 
@@ -404,7 +459,7 @@ public class SettingsViewModel : ViewModelBase
         else
         {
             StatusMessage = HandleFailure(result.Error ?? "فشل في حفظ الإعدادات", "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Failed to update system settings.");
-            await DialogService.ShowErrorAsync("خطأ في الحفظ", StatusMessage);
+            await DialogService!.ShowErrorAsync("خطأ في الحفظ", StatusMessage);
         }
     }
 
@@ -421,7 +476,7 @@ public class SettingsViewModel : ViewModelBase
         else
         {
             StatusMessage = result.Error ?? "فشل في إنشاء النسخة الاحتياطية";
-            await DialogService.ShowErrorAsync("خطأ في النسخ الاحتياطي", StatusMessage);
+            await DialogService!.ShowErrorAsync("خطأ في النسخ الاحتياطي", StatusMessage);
         }
     }
 
@@ -445,7 +500,7 @@ public class SettingsViewModel : ViewModelBase
     {
         if (string.IsNullOrEmpty(SelectedBackup)) return;
 
-        var confirm = await DialogService.ShowConfirmationAsync("تأكيد استعادة النسخة الاحتياطية", $"⚠️ تنبيه: استعادة النسخة الاحتياطية '{SelectedBackup}' سيؤدي إلى استبدال قاعدة البيانات الحالية تماماً وإغلاق جميع الاتصالات النشطة.\n\nهل تريد الاستمرار؟");
+        var confirm = await DialogService!.ShowConfirmationAsync("تأكيد استعادة النسخة الاحتياطية", $"⚠️ تنبيه: استعادة النسخة الاحتياطية '{SelectedBackup}' سيؤدي إلى استبدال قاعدة البيانات الحالية تماماً وإغلاق جميع الاتصالات النشطة.\n\nهل تريد الاستمرار؟");
 
         if (!confirm) return;
 
@@ -455,14 +510,14 @@ public class SettingsViewModel : ViewModelBase
         if (result.IsSuccess)
         {
             StatusMessage = "✅ تم استعادة قاعدة البيانات بنجاح. سيتم إغلاق النظام لإعادة التحميل.";
-            await DialogService.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
+            await DialogService!.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
 
             System.Windows.Application.Current.Shutdown();
         }
         else
         {
             StatusMessage = result.Error ?? "فشل في استعادة النسخة الاحتياطية";
-            await DialogService.ShowErrorAsync("خطأ في الاستعادة", StatusMessage);
+            await DialogService!.ShowErrorAsync("خطأ في الاستعادة", StatusMessage);
         }
     }
     #endregion

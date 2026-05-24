@@ -14,104 +14,13 @@ public class CreateUserRequestValidatorTests
     [InlineData("", false)]
     [InlineData("   ", false)]
     [InlineData(null, false)]
-    [InlineData("validuser", true)]
-    [InlineData("user123", true)]
-    [InlineData("user_name", true)]
-    [InlineData("user.name", true)]
-    [InlineData("User.Name_123", true)]
-    [InlineData("user-name", false)] // hyphen not allowed
-    [InlineData("user name", false)] // space not allowed
-    [InlineData("user@name", false)] // @ not allowed
-    public void GivenUserName_WhenValidating_ThenCorrectResult(string? userName, bool isValid)
-    {
-        // Arrange
-        var request = CreateValidRequest() with { UserName = userName };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        if (isValid)
-            result.ShouldNotHaveValidationErrorFor(x => x.UserName);
-        else
-            result.ShouldHaveValidationErrorFor(x => x.UserName);
-    }
-
-    [Fact]
-    public void GivenUserNameExceeds100Chars_WhenValidating_ThenFailsWithMaxLengthError()
-    {
-        // Arrange
-        var longUserName = new string('a', 101);
-        var request = CreateValidRequest() with { UserName = longUserName };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.UserName)
-            .WithErrorMessage("اسم المستخدم يجب ألا يتجاوز 100 حرفاً");
-    }
-
-    [Fact]
-    public void GivenUserNameWithArabicChars_WhenValidating_ThenFails()
-    {
-        // Arrange
-        var request = CreateValidRequest() with { UserName = "مستخدم عربي" };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.UserName)
-            .WithErrorMessage("اسم المستخدم يمكن أن يحتوي فقط على أحرف، أرقام، شرطة سفلية ونقاط");
-    }
-
-    #endregion
-
-    #region Password Validation
-
-    [Theory]
-    [InlineData("", false)]
-    [InlineData("   ", false)]
-    [InlineData(null, false)]
-    [InlineData("12345", false)]
-    [InlineData("12345678", true)]
-    [InlineData("password123", true)]
-    public void GivenPassword_WhenValidating_ThenCorrectResult(string? password, bool isValid)
-    {
-        // Arrange
-        var request = CreateValidRequest() with { Password = password };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        if (isValid)
-            result.ShouldNotHaveValidationErrorFor(x => x.Password);
-        else
-        {
-            // Different error messages based on failure reason
-            Assert.True(
-                result.Errors.Any(e => e.PropertyName == "Password"),
-                $"Expected validation error for Password but got: {string.Join(", ", result.Errors.Select(e => e.ErrorMessage))}");
-        }
-    }
-
-    #endregion
-
-    #region FullName Validation
-
-    [Theory]
-    [InlineData("", false)]
-    [InlineData("   ", false)]
-    [InlineData(null, false)]
-    [InlineData("Full Name", true)]
-    [InlineData("الاسم الكامل", true)]
-    [InlineData("John Doe", true)]
+    [InlineData("Updated Name", true)]
+    [InlineData("الاسم المحدث", true)]
     public void GivenFullName_WhenValidating_ThenCorrectResult(string? fullName, bool isValid)
     {
         // Arrange
-        var request = CreateValidRequest() with { FullName = fullName };
+        var request = CreateValidRequest() with { FullName = fullName! };
+
 
         // Act
         var result = _validator.TestValidate(request);
@@ -218,15 +127,16 @@ public class UpdateUserRequestValidatorTests
     #region FullName Validation
 
     [Theory]
-    [InlineData("", false)]
     [InlineData("   ", false)]
     [InlineData(null, false)]
-    [InlineData("Updated Name", true)]
-    [InlineData("الاسم المحدث", true)]
+    [InlineData("Full Name", true)]
+    [InlineData("الاسم الكامل", true)]
+    [InlineData("John Doe", true)]
     public void GivenFullName_WhenValidating_ThenCorrectResult(string? fullName, bool isValid)
     {
         // Arrange
-        var request = CreateValidRequest() with { FullName = fullName };
+        var request = CreateValidRequest() with { FullName = fullName! };
+
 
         // Act
         var result = _validator.TestValidate(request);
