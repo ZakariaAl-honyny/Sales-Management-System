@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/008-dynamic-uom-costing/plan.md](specs/008-dynamic-uom-costing/plan.md)
+**Active Feature Plan**: [specs/009-cash-boxes/plan.md](specs/009-cash-boxes/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
