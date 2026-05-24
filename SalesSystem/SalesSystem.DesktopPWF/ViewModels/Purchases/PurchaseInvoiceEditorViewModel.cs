@@ -9,6 +9,7 @@ using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models.Printing;
@@ -23,11 +24,12 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private readonly IWarehouseApiService _warehouseService;
     private readonly IProductApiService _productService;
     private readonly ISettingsApiService _settingsService;
-    private readonly IInvoicePrinter _invoicePrinter;
     private readonly IDialogService _dialogService;
     private readonly ISoundService _soundService;
     private readonly IBarcodeInputService _barcodeService;
     private readonly ICashBoxApiService _cashBoxService;
+    private readonly IPrintApiService _printApiService;
+    private readonly IToastNotificationService _toastService;
 
     private int? _invoiceId;
     private string? _invoiceNo;
@@ -62,11 +64,12 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         IWarehouseApiService warehouseService,
         IProductApiService productService,
         ISettingsApiService settingsService,
-        IInvoicePrinter invoicePrinter,
         IDialogService dialogService,
         ISoundService soundService,
         IBarcodeInputService barcodeService,
         ICashBoxApiService cashBoxService,
+        IPrintApiService printApiService,
+        IToastNotificationService toastService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -76,12 +79,13 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         _warehouseService = warehouseService;
         _productService = productService ?? throw new ArgumentNullException(nameof(productService));
         _settingsService = settingsService;
-        _invoicePrinter = invoicePrinter;
         _dialogService = dialogService;
         SetDialogService(dialogService);
         _soundService = soundService;
         _barcodeService = barcodeService;
         _cashBoxService = cashBoxService;
+        _printApiService = printApiService;
+        _toastService = toastService;
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
@@ -104,6 +108,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 await ProcessBarcodeAsync(code);
             }
         });
+        PrintThermalCommand = new AsyncRelayCommand(PrintThermalAsync);
 
         _ = InitializeAsync();
     }
@@ -162,11 +167,12 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             App.GetService<IWarehouseApiService>(),
             App.GetService<IProductApiService>(),
             App.GetService<ISettingsApiService>(),
-            App.GetService<IInvoicePrinter>(),
             App.GetService<IDialogService>(),
             App.GetService<ISoundService>(),
             App.GetService<IBarcodeInputService>(),
             App.GetService<ICashBoxApiService>(),
+            App.GetService<IPrintApiService>(),
+            App.GetService<IToastNotificationService>(),
             invoiceId,
             isReadOnly)
     {
@@ -413,6 +419,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     public ICommand SearchProductSingleCommand { get; }
     public ICommand SearchSupplierCommand { get; }
     public ICommand ProcessBarcodeCommand { get; }
+    public ICommand PrintThermalCommand { get; }
     #endregion
 
     #region Methods
@@ -600,22 +607,69 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     private async Task PrintA4Async()
     {
-        if (!_invoiceId.HasValue) return;
+        if (!_invoiceId.HasValue)
+        {
+            await _dialogService.ShowWarningAsync("طباعة فاتورة الشراء", "يجب حفظ الفاتورة أولاً قبل الطباعة");
+            return;
+        }
+
+        if (_status != (byte)InvoiceStatus.Posted)
+        {
+            await _dialogService.ShowWarningAsync("طباعة فاتورة الشراء", "يجب ترحيل الفاتورة أولاً قبل طباعة A4");
+            return;
+        }
 
         await ExecuteAsync(async () =>
         {
-            var settingsResult = await _settingsService.GetSettingsAsync();
-            if (settingsResult.IsSuccess && settingsResult.Value != null)
+            ErrorMessage = null;
+            var result = await _printApiService.GetPurchaseA4PdfAsync(_invoiceId!.Value);
+            if (result.IsSuccess && result.Value != null)
             {
-                var invoiceResult = await _invoiceService.GetByIdAsync(_invoiceId.Value);
-                if (invoiceResult.IsSuccess && invoiceResult.Value != null)
-                {
-                    _invoicePrinter.PrintPreview(
-                        invoiceResult.Value.ToPrintDto(),
-                        invoiceResult.Value.Items.ToPrintDtos(),
-                        invoiceResult.Value.ToTotalsPrintDto(),
-                        settingsResult.Value.ToPrintDto());
-                }
+                var previewWindow = new Views.Common.PdfPreviewWindow(
+                    result.Value,
+                    _invoiceNo ?? $"#{_invoiceId}",
+                    _invoiceId!.Value,
+                    isPurchase: true);
+                previewWindow.ShowDialog();
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل ملف PDF",
+                    "PurchaseInvoiceEditorViewModel.PrintA4Async",
+                    $"[PurchaseInvoiceEditorViewModel.PrintA4Async] Failed to get A4 PDF for purchase invoice ID {_invoiceId}.");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة", ErrorMessage!);
+            }
+        });
+    }
+
+    private async Task PrintThermalAsync()
+    {
+        if (!_invoiceId.HasValue)
+        {
+            await _dialogService.ShowWarningAsync("طباعة إيصال", "يجب حفظ الفاتورة أولاً قبل الطباعة");
+            return;
+        }
+
+        if (_status != (byte)InvoiceStatus.Posted)
+        {
+            await _dialogService.ShowWarningAsync("طباعة إيصال", "يجب ترحيل الفاتورة أولاً قبل طباعة الإيصال الحراري");
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            ErrorMessage = null;
+            var result = await _printApiService.PrintPurchaseThermalAsync(_invoiceId!.Value);
+            if (result.IsSuccess)
+            {
+                _toastService.ShowSuccess("تم إرسال الإيصال إلى الطابعة الحرارية بنجاح");
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(result.Error ?? "فشلت طباعة الإيصال الحراري",
+                    "PurchaseInvoiceEditorViewModel.PrintThermalAsync",
+                    $"[PurchaseInvoiceEditorViewModel.PrintThermalAsync] Thermal print failed for invoice ID {_invoiceId}.");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة الحرارية", ErrorMessage!);
             }
         });
     }
@@ -922,6 +976,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     private void UpdateCommandStates()
     {
+        // No-op: buttons remain enabled per interactive validation pattern (RULE-059)
     }
     #endregion
 }

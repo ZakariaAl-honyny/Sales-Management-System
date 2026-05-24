@@ -12,13 +12,6 @@ public class PrintApiService : ApiServiceBase, IPrintApiService
     {
     }
 
-    public async Task<Result> PreviewSalesAsync(int invoiceId, CancellationToken ct = default)
-    {
-        return await ExecuteCommandAsync(
-            () => _httpClient.PostAsync($"api/v1/print/preview/sales/{invoiceId}", null, ct),
-            "PrintApiService.PreviewSalesAsync");
-    }
-
     public async Task<Result> PrintSalesA4Async(int invoiceId, CancellationToken ct = default)
     {
         return await ExecuteCommandAsync(
@@ -31,20 +24,6 @@ public class PrintApiService : ApiServiceBase, IPrintApiService
         return await ExecuteCommandAsync(
             () => _httpClient.PostAsync($"api/v1/print/thermal/sales/{invoiceId}", null, ct),
             "PrintApiService.PrintSalesThermalAsync");
-    }
-
-    public async Task<Result<PrintPreviewData>> GetSalesPreviewDataAsync(int invoiceId, CancellationToken ct = default)
-    {
-        return await ExecuteAsync<PrintPreviewData>(
-            () => _httpClient.PostAsync($"api/v1/print/preview-data/sales/{invoiceId}", null, ct),
-            "PrintApiService.GetSalesPreviewDataAsync");
-    }
-
-    public async Task<Result> PreviewPurchaseAsync(int invoiceId, CancellationToken ct = default)
-    {
-        return await ExecuteCommandAsync(
-            () => _httpClient.PostAsync($"api/v1/print/preview/purchase/{invoiceId}", null, ct),
-            "PrintApiService.PreviewPurchaseAsync");
     }
 
     public async Task<Result> PrintPurchaseA4Async(int invoiceId, CancellationToken ct = default)
@@ -61,17 +40,64 @@ public class PrintApiService : ApiServiceBase, IPrintApiService
             "PrintApiService.PrintPurchaseThermalAsync");
     }
 
-    public async Task<Result<PrintPreviewData>> GetPurchasePreviewDataAsync(int invoiceId, CancellationToken ct = default)
-    {
-        return await ExecuteAsync<PrintPreviewData>(
-            () => _httpClient.PostAsync($"api/v1/print/preview-data/purchase/{invoiceId}", null, ct),
-            "PrintApiService.GetPurchasePreviewDataAsync");
-    }
-
     public async Task<Result> TestPrintAsync(CancellationToken ct = default)
     {
         return await ExecuteCommandAsync(
             () => _httpClient.PostAsync("api/v1/print/test", null, ct),
             "PrintApiService.TestPrintAsync");
+    }
+
+    public async Task<Result<string>> GetSalesA4PdfAsync(int invoiceId, CancellationToken ct = default)
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await _httpClient.GetAsync($"api/v1/print/generate-a4/sales/{invoiceId}", ct);
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+                var tempPath = System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(),
+                    $"Invoice_{invoiceId}_{DateTime.Now:HHmmss}.pdf");
+                await System.IO.File.WriteAllBytesAsync(tempPath, bytes, ct);
+                return Result<string>.Success(tempPath);
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync(ct);
+            Serilog.Log.Warning("GetSalesA4PdfAsync API failure: {StatusCode} - {Content}",
+                response.StatusCode, errorContent);
+            return Result<string>.Failure("فشل في تحميل ملف PDF", response.StatusCode.ToString());
+        }
+        catch (Exception ex)
+        {
+            return HandleConnectionError<string>(ex, "PrintApiService.GetSalesA4PdfAsync");
+        }
+    }
+
+    public async Task<Result<string>> GetPurchaseA4PdfAsync(int invoiceId, CancellationToken ct = default)
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await _httpClient.GetAsync($"api/v1/print/generate-a4/purchase/{invoiceId}", ct);
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+                var tempPath = System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(),
+                    $"Invoice_{invoiceId}_{DateTime.Now:HHmmss}.pdf");
+                await System.IO.File.WriteAllBytesAsync(tempPath, bytes, ct);
+                return Result<string>.Success(tempPath);
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync(ct);
+            Serilog.Log.Warning("GetPurchaseA4PdfAsync API failure: {StatusCode} - {Content}",
+                response.StatusCode, errorContent);
+            return Result<string>.Failure("فشل في تحميل ملف PDF", response.StatusCode.ToString());
+        }
+        catch (Exception ex)
+        {
+            return HandleConnectionError<string>(ex, "PrintApiService.GetPurchaseA4PdfAsync");
+        }
     }
 }

@@ -1,6 +1,6 @@
 namespace SalesSystem.Application.Printing.Contracts;
 
-public enum InvoiceTypePrint
+public enum InvoiceTypePrint : byte
 {
     Sales = 1,
     Purchase = 2,

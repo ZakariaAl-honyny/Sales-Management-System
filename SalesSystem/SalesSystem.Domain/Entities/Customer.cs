@@ -83,6 +83,6 @@ public class Customer : BaseEntity
         TaxNumber = taxNumber;
         CreditLimit = creditLimit;
         SetUpdatedBy(updatedByUserId);
-        UpdatedAt = DateTime.UtcNow;
+        UpdateTimestamp();
     }
 }

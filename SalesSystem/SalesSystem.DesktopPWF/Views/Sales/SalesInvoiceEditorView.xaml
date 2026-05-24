@@ -310,7 +310,7 @@
                             ToolTip="طباعة فاتورة بصيغة A4"/>
 
                     <Button Content="🧾 وصل" 
-                            Command="{Binding PrintReceiptCommand}" 
+                            Command="{Binding PrintThermalCommand}" 
                             Style="{StaticResource SecondaryButton}" 
                             Margin="0,0,12,0" 
                             TabIndex="16" 

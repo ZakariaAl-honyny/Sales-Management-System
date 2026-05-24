@@ -11,6 +11,7 @@ namespace SalesSystem.Domain.Entities;
 public class CashBox : BaseEntity
 {
     public string BoxName { get; private set; } = string.Empty;
+    public decimal OpeningBalance { get; private set; }
     public decimal CurrentBalance { get; private set; }
     public int? BranchId { get; private set; }
     public string CurrencyCode { get; private set; } = "SAR";

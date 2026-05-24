@@ -1,6 +1,6 @@
 using FluentValidation.TestHelper;
 using SalesSystem.Api.Validators;
-using SalesSystem.Contracts.Requests.Auth;
+using SalesSystem.Contracts.Requests;
 using Xunit;
 
 namespace SalesSystem.Api.Tests.Validators;

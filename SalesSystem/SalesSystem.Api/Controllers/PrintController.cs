@@ -34,7 +34,7 @@ public class PrintController : ControllerBase
         if (!result.IsSuccess)
             return NotFound(new { error = result.Error });
 
-        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
+        var previewResult = await _printService.PreviewA4Async(result.Value!);
         return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
@@ -60,18 +60,6 @@ public class PrintController : ControllerBase
 
         var printResult = await _printService.PrintThermalAsync(result.Value!);
         return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
-    }
-
-    [HttpPost("preview-data/sales/{id:int}")]
-    [Authorize(Policy = "AllStaff")]
-    public async Task<IActionResult> GetSalesPreviewData(int id, CancellationToken ct)
-    {
-        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
-        if (!result.IsSuccess)
-            return NotFound(new { error = result.Error });
-
-        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
-        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
     [HttpPost("save/sales/{id:int}")]
@@ -100,7 +88,7 @@ public class PrintController : ControllerBase
         if (!result.IsSuccess)
             return NotFound(new { error = result.Error });
 
-        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
+        var previewResult = await _printService.PreviewA4Async(result.Value!);
         return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
     }
 
@@ -128,18 +116,6 @@ public class PrintController : ControllerBase
         return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
     }
 
-    [HttpPost("preview-data/purchase/{id:int}")]
-    [Authorize(Policy = "ManagerAndAbove")]
-    public async Task<IActionResult> GetPurchasePreviewData(int id, CancellationToken ct)
-    {
-        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
-        if (!result.IsSuccess)
-            return NotFound(new { error = result.Error });
-
-        var previewResult = await _printService.ShowPreviewAsync(result.Value!);
-        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
-    }
-
     [HttpPost("save/purchase/{id:int}")]
     [Authorize(Policy = "ManagerAndAbove")]
     public async Task<IActionResult> SavePurchasePdf(int id, [FromBody] SavePdfRequest request, CancellationToken ct)
@@ -156,6 +132,40 @@ public class PrintController : ControllerBase
 
         var saveResult = await _printService.SavePdfAsync(result.Value!, request.FilePath);
         return saveResult.IsSuccess ? Ok(saveResult) : BadRequest(saveResult);
+    }
+
+    // ═══════════════════════════════════════════════
+    // GENERATE A4 PDF (Returns raw PDF bytes)
+    // ═══════════════════════════════════════════════
+
+    [HttpGet("generate-a4/sales/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
+    public async Task<IActionResult> GenerateSalesA4Pdf(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var pdfResult = await _printService.GenerateA4PdfBytesAsync(result.Value!);
+        if (!pdfResult.IsSuccess)
+            return BadRequest(new { error = pdfResult.Error });
+
+        return File(pdfResult.Value, "application/pdf", $"Invoice_{id}.pdf");
+    }
+
+    [HttpGet("generate-a4/purchase/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> GeneratePurchaseA4Pdf(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var pdfResult = await _printService.GenerateA4PdfBytesAsync(result.Value!);
+        if (!pdfResult.IsSuccess)
+            return BadRequest(new { error = pdfResult.Error });
+
+        return File(pdfResult.Value, "application/pdf", $"PurchaseInvoice_{id}.pdf");
     }
 
     /// <summary>

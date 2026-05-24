@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
@@ -13,10 +14,14 @@ namespace SalesSystem.Api.Controllers;
 public class SettingsController : ControllerBase
 {
     private readonly IStoreSettingsService _settingsService;
+    private readonly IPrintDataService _printSettingsService;
 
-    public SettingsController(IStoreSettingsService settingsService)
+    public SettingsController(
+        IStoreSettingsService settingsService,
+        IPrintDataService printSettingsService)
     {
         _settingsService = settingsService;
+        _printSettingsService = printSettingsService;
     }
 
     [HttpGet]
@@ -80,5 +85,24 @@ public class SettingsController : ControllerBase
     }
 
     // ─── Print Settings Endpoints ────────────
-    // Note: Print settings handled via dedicated PrintController endpoints.
+
+    [HttpGet("print")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> GetPrintSettings(CancellationToken ct)
+    {
+        var result = await _printSettingsService.GetPrintSettingsAsync(ct);
+        if (result.IsSuccess && result.Value != null)
+            return Ok(result.Value);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    [HttpPut("print")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> UpdatePrintSettings([FromBody] UpdatePrintSettingsRequest request, CancellationToken ct)
+    {
+        var result = await _printSettingsService.UpdatePrintSettingsAsync(request, ct);
+        if (result.IsSuccess)
+            return Ok(new { message = "تم حفظ إعدادات الطباعة بنجاح" });
+        return BadRequest(new { error = result.Error });
+    }
 }

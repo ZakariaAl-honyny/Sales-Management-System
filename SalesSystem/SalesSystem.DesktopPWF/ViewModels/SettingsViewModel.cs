@@ -37,6 +37,10 @@ public class SettingsViewModel : ViewModelBase
     private string _logoPath = string.Empty;
     private string _storeTaxNumber = string.Empty;
     private decimal _printTaxRate;
+    private string _receiptHeader = string.Empty;
+    private string _receiptFooter = string.Empty;
+    private int _escPosCodePage = 22;
+    private bool _autoPrintOnPost;
 
     public SettingsViewModel()
     {
@@ -193,6 +197,48 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _printTaxRate, value);
     }
 
+    public string ReceiptHeader
+    {
+        get => _receiptHeader;
+        set
+        {
+            if (SetProperty(ref _receiptHeader, value))
+            {
+                ValidateField(() => value?.Length <= 200, nameof(ReceiptHeader), "رأس الإيصال يجب ألا يتجاوز 200 حرف");
+            }
+        }
+    }
+
+    public string ReceiptFooter
+    {
+        get => _receiptFooter;
+        set
+        {
+            if (SetProperty(ref _receiptFooter, value))
+            {
+                ValidateField(() => value?.Length <= 200, nameof(ReceiptFooter), "تذييل الإيصال يجب ألا يتجاوز 200 حرف");
+            }
+        }
+    }
+
+    public int EscPosCodePage
+    {
+        get => _escPosCodePage;
+        set
+        {
+            if (SetProperty(ref _escPosCodePage, value))
+            {
+                ValidateField(() => value >= 0 && value <= 255, nameof(EscPosCodePage), "كود صفحة ESC/POS يجب أن يكون بين 0 و 255");
+            }
+        }
+    }
+
+    public bool AutoPrintOnPost
+    {
+        get => _autoPrintOnPost;
+        set => SetProperty(ref _autoPrintOnPost, value);
+    }
+
     public List<string> InstalledPrinters { get; } =
         System.Drawing.Printing.PrinterSettings.InstalledPrinters
             .Cast<string>()
@@ -276,6 +322,10 @@ public class SettingsViewModel : ViewModelBase
                 LogoPath = p.LogoPath;
                 StoreTaxNumber = p.StoreTaxNumber;
                 PrintTaxRate = p.TaxRate;
+                ReceiptHeader = p.ReceiptHeader ?? string.Empty;
+                ReceiptFooter = p.ReceiptFooter ?? string.Empty;
+                EscPosCodePage = p.EscPosCodePage;
+                AutoPrintOnPost = p.AutoPrintOnPost;
             }
         }
         catch (Exception ex)
@@ -334,8 +384,19 @@ public class SettingsViewModel : ViewModelBase
                 A4PrinterName,
                 LogoPath,
                 StoreTaxNumber,
-                PrintTaxRate);
-            await _settingsService.UpdatePrintSettingsAsync(printRequest);
+                PrintTaxRate,
+                AutoPrintOnPost,
+                ReceiptHeader,
+                ReceiptFooter,
+                EscPosCodePage);
+            var printResult = await _settingsService.UpdatePrintSettingsAsync(printRequest);
+            if (!printResult.IsSuccess)
+            {
+                StatusMessage = HandleFailure(printResult.Error ?? "فشل في حفظ إعدادات الطباعة",
+                    "SettingsViewModel.SaveSettingsAsync");
+                await DialogService.ShowErrorAsync("خطأ في حفظ إعدادات الطباعة", StatusMessage);
+                return;
+            }
 
             StatusMessage = "✅ تم حفظ الإعدادات بنجاح";
             _ = Task.Delay(3000).ContinueWith(_ => StatusMessage = string.Empty);

@@ -21,6 +21,8 @@ public class CustomerPaymentConfiguration : IEntityTypeConfiguration<CustomerPay
             .WithMany()
             .HasForeignKey(cp => cp.CustomerId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(cp => cp.IsActive);
     }
 }
 
@@ -41,6 +43,8 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
             .WithMany()
             .HasForeignKey(sp => sp.SupplierId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(sp => sp.IsActive);
     }
 }
 
@@ -70,6 +74,8 @@ public class InventoryMovementConfiguration : IEntityTypeConfiguration<Inventory
             .WithMany()
             .HasForeignKey(im => im.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(im => im.IsActive);
     }
 }
 
@@ -85,9 +91,11 @@ public class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreSettings
         builder.Property(ss => ss.LogoPath).HasMaxLength(255);
         builder.Property(ss => ss.Email).HasMaxLength(100);
         builder.Property(ss => ss.CurrencyCode).IsRequired().HasMaxLength(10);
-        builder.Property(ss => ss.DefaultTaxRate).HasPrecision(5, 2);
+        builder.Property(ss => ss.DefaultTaxRate).HasPrecision(18, 2);
         builder.Property(ss => ss.TaxNumber).HasMaxLength(50);
         builder.Property(ss => ss.InvoicePrefix).HasMaxLength(20).HasDefaultValue("INV");
+
+        builder.HasQueryFilter(ss => ss.IsActive);
     }
 }
 
@@ -102,5 +110,7 @@ public class DocumentSequenceConfiguration : IEntityTypeConfiguration<DocumentSe
         builder.Property(ds => ds.Prefix).IsRequired().HasMaxLength(10);
         builder.Property(ds => ds.Year).IsRequired();
         builder.Property(ds => ds.LastNumber).IsRequired();
+
+        builder.HasQueryFilter(ds => ds.IsActive);
     }
 }

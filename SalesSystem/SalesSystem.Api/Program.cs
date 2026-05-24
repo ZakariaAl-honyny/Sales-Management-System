@@ -51,6 +51,11 @@ builder.Host.UseSerilog((context, config) =>
 });
 
 // ============================================
+// 0b. Code Pages Encoding (for Arabic thermal printing - Windows-1256)
+// ============================================
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+// ============================================
 // 1. Data Protection (DPAPI)
 // ============================================
 var keyDir = Path.Combine(
@@ -105,6 +110,7 @@ builder.Services.AddDbContext<SalesDbContext>((serviceProvider, options) =>
 builder.Services.AddScoped<IConnectionStringProtector, ConnectionStringProtector>();
 builder.Services.AddScoped<FirstRunSetupService>();
 builder.Services.AddScoped<SecureDbContextFactory>();
+builder.Services.Configure<BackupSettings>(builder.Configuration.GetSection(BackupSettings.SectionName));
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddHostedService<ScheduledBackupWorker>();
 builder.Services.AddUpdateServices(builder.Configuration);

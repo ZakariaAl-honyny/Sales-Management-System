@@ -1,5 +1,5 @@
 using FluentValidation;
-using SalesSystem.Contracts.Requests.Auth;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Validators;
 

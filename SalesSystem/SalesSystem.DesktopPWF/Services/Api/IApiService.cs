@@ -382,15 +382,23 @@ public interface IBackupApiService
 
 public interface IPrintApiService
 {
-    Task<Result> PreviewSalesAsync(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintSalesA4Async(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintSalesThermalAsync(int invoiceId, CancellationToken ct = default);
-    Task<Result<PrintPreviewData>> GetSalesPreviewDataAsync(int invoiceId, CancellationToken ct = default);
-    Task<Result> PreviewPurchaseAsync(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintPurchaseA4Async(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintPurchaseThermalAsync(int invoiceId, CancellationToken ct = default);
-    Task<Result<PrintPreviewData>> GetPurchasePreviewDataAsync(int invoiceId, CancellationToken ct = default);
     Task<Result> TestPrintAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets A4 PDF bytes for a sales invoice from the API and saves to a temp file.
+    /// Returns the temp file path on success.
+    /// </summary>
+    Task<Result<string>> GetSalesA4PdfAsync(int invoiceId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets A4 PDF bytes for a purchase invoice from the API and saves to a temp file.
+    /// Returns the temp file path on success.
+    /// </summary>
+    Task<Result<string>> GetPurchaseA4PdfAsync(int invoiceId, CancellationToken ct = default);
 }
 
 public interface IDatabaseHealthCheckService
@@ -405,4 +413,4 @@ public record HealthCheckResult
     public bool IsApiReachable { get; init; }
 }
 
-public record PrintPreviewData(string TempFilePath, string InvoiceNumber);
+

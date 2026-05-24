@@ -11,6 +11,7 @@ using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services;
 using SalesSystem.DesktopPWF.Services.Api;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels.Sales;
 
 /// <summary>
@@ -24,13 +25,13 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<IWarehouseApiService> _mockWarehouseService;
     private readonly Mock<IProductApiService> _mockProductService;
     private readonly Mock<ISettingsApiService> _mockSettingsService;
-    private readonly Mock<IInvoicePrinter> _mockInvoicePrinter;
-    private readonly Mock<IReceiptPrinter> _mockReceiptPrinter;
     private readonly Mock<IDialogService> _mockDialogService;
     private readonly Mock<ISoundService> _mockSoundService;
     private readonly Mock<IInventoryApiService> _mockInventoryService;
     private readonly Mock<IBarcodeInputService> _mockBarcodeInputService;
     private readonly Mock<ICashBoxApiService> _cashBoxApiServiceMock;
+    private readonly Mock<IPrintApiService> _printApiServiceMock;
+    private readonly Mock<IToastNotificationService> _mockToastService;
 
     public SalesInvoiceEditorViewModelTests()
     {
@@ -40,13 +41,13 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         _mockWarehouseService = new Mock<IWarehouseApiService>();
         _mockProductService = new Mock<IProductApiService>();
         _mockSettingsService = new Mock<ISettingsApiService>();
-        _mockInvoicePrinter = new Mock<IInvoicePrinter>();
-        _mockReceiptPrinter = new Mock<IReceiptPrinter>();
         _mockDialogService = new Mock<IDialogService>();
         _mockSoundService = new Mock<ISoundService>();
         _mockInventoryService = new Mock<IInventoryApiService>();
         _mockBarcodeInputService = new Mock<IBarcodeInputService>();
         _cashBoxApiServiceMock = new Mock<ICashBoxApiService>();
+        _printApiServiceMock = new Mock<IPrintApiService>();
+        _mockToastService = new Mock<IToastNotificationService>();
     }
 
     public void Dispose()
@@ -585,13 +586,13 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _mockWarehouseService.Object,
             _mockProductService.Object,
             _mockSettingsService.Object,
-            _mockInvoicePrinter.Object,
-            _mockReceiptPrinter.Object,
             _mockDialogService.Object,
             _mockSoundService.Object,
             _mockInventoryService.Object,
             _mockBarcodeInputService.Object,
             _cashBoxApiServiceMock.Object,
+            _printApiServiceMock.Object,
+            _mockToastService.Object,
             invoiceId);
     }
 

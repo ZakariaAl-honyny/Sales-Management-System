@@ -1,4 +1,5 @@
 using SalesSystem.Application.Printing.Contracts;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Application.Printing;
 
@@ -7,7 +8,7 @@ public interface IPrintService
     /// <summary>
     /// Generates PDF preview and opens WPF preview window.
     /// </summary>
-    Task<PrintResult> ShowPreviewAsync(InvoicePrintDto invoice);
+    Task<PrintResult> PreviewA4Async(InvoicePrintDto invoice);
 
     /// <summary>
     /// Generates PDF and sends directly to configured A4 printer.
@@ -23,6 +24,12 @@ public interface IPrintService
     /// Saves PDF to user-chosen file path.
     /// </summary>
     Task<PrintResult> SavePdfAsync(InvoicePrintDto invoice, string filePath);
+
+    /// <summary>
+    /// Generates raw A4 PDF bytes for the given invoice data.
+    /// Returns Result with byte array for direct download or further processing.
+    /// </summary>
+    Task<Result<byte[]>> GenerateA4PdfBytesAsync(InvoicePrintDto invoice);
 }
 
 /// <summary>

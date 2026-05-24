@@ -43,6 +43,8 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasQueryFilter(si => si.IsActive);
+
+        builder.ToTable(t => t.HasCheckConstraint("CHK_SalesInvoices_PaidAmount", "[PaidAmount] >= 0 AND [PaidAmount] <= [TotalAmount]"));
     }
 }
 
@@ -63,5 +65,7 @@ public class SalesInvoiceItemConfiguration : IEntityTypeConfiguration<SalesInvoi
             .WithMany()
             .HasForeignKey(sii => sii.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasQueryFilter(sii => sii.IsActive);
     }
 }

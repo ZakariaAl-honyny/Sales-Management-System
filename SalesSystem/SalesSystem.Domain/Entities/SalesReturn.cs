@@ -28,6 +28,8 @@ public class SalesReturnItem : BaseEntity
             throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
         if (unitPrice < 0)
             throw new DomainException("سعر الوحدة لا يمكن أن يكون سالباً.");
+        if (discountAmount < 0)
+            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
 
         var item = new SalesReturnItem
         {
