@@ -158,6 +158,40 @@ public class PrintController : ControllerBase
         return saveResult.IsSuccess ? Ok(saveResult) : BadRequest(saveResult);
     }
 
+    // ═══════════════════════════════════════════════
+    // GENERATE A4 PDF (Returns raw PDF bytes)
+    // ═══════════════════════════════════════════════
+
+    [HttpGet("generate-a4/sales/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
+    public async Task<IActionResult> GenerateSalesA4Pdf(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetSalesInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var pdfResult = await _printService.GenerateA4PdfBytesAsync(result.Value!);
+        if (!pdfResult.IsSuccess)
+            return BadRequest(new { error = pdfResult.Error });
+
+        return File(pdfResult.Value, "application/pdf", $"Invoice_{id}.pdf");
+    }
+
+    [HttpGet("generate-a4/purchase/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> GeneratePurchaseA4Pdf(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetPurchaseInvoicePrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var pdfResult = await _printService.GenerateA4PdfBytesAsync(result.Value!);
+        if (!pdfResult.IsSuccess)
+            return BadRequest(new { error = pdfResult.Error });
+
+        return File(pdfResult.Value, "application/pdf", $"PurchaseInvoice_{id}.pdf");
+    }
+
     /// <summary>
     /// Prints a test page to verify printer connectivity.
     /// </summary>

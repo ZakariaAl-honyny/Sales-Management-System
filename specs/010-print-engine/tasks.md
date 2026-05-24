@@ -51,7 +51,7 @@ description: "Task list for Print Engine (v4.3)"
 
 - [X] T012 [P] [US1] Create `PdfPreviewWindow.xaml` + `PdfPreviewViewModel.cs`. Window displays text: "تم إنشاء ملف PDF بنجاح." Buttons: "فتح الملف" (calls `Process.Start(PdfFilePath)`), "إغلاق" — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/PdfPreviewWindow.xaml` + `ViewModels/PdfPreviewViewModel.cs`
 
-- [ ] T013 [US1] Update `SalesInvoiceEditorViewModel` and `PurchaseInvoiceEditorViewModel`: add `PrintA4Command` (enabled if Id > 0 & Posted). Calls `IPrintApiService.GetA4PdfAsync`. On success, opens `PdfPreviewWindow` via WindowService — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Sales/SalesInvoiceEditorViewModel.cs`
+- [X] T013 [US1] Update `SalesInvoiceEditorViewModel` and `PurchaseInvoiceEditorViewModel`: add `PrintA4Command` (enabled if Id > 0 & Posted). Calls `IPrintApiService.GetA4PdfAsync` (renamed to `GetSalesA4PdfAsync`/`GetPurchaseA4PdfAsync`). On success, opens `PdfPreviewWindow` with invoice ID for button actions — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Sales/SalesInvoiceEditorViewModel.cs`
 
 **Checkpoint**: Clicking A4 print on a posted invoice generates a PDF on the API, saves it to temp on Desktop, and opens the preview window.
 

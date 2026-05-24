@@ -74,4 +74,58 @@ public class PrintApiService : ApiServiceBase, IPrintApiService
             () => _httpClient.PostAsync("api/v1/print/test", null, ct),
             "PrintApiService.TestPrintAsync");
     }
+
+    public async Task<Result<string>> GetSalesA4PdfAsync(int invoiceId, CancellationToken ct = default)
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await _httpClient.GetAsync($"api/v1/print/generate-a4/sales/{invoiceId}", ct);
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+                var tempPath = System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(),
+                    $"Invoice_{invoiceId}_{DateTime.Now:HHmmss}.pdf");
+                await System.IO.File.WriteAllBytesAsync(tempPath, bytes, ct);
+                return Result<string>.Success(tempPath);
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync(ct);
+            Serilog.Log.Warning("GetSalesA4PdfAsync API failure: {StatusCode} - {Content}",
+                response.StatusCode, errorContent);
+            return Result<string>.Failure("فشل في تحميل ملف PDF", response.StatusCode.ToString());
+        }
+        catch (Exception ex)
+        {
+            return HandleConnectionError<string>(ex, "PrintApiService.GetSalesA4PdfAsync");
+        }
+    }
+
+    public async Task<Result<string>> GetPurchaseA4PdfAsync(int invoiceId, CancellationToken ct = default)
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await _httpClient.GetAsync($"api/v1/print/generate-a4/purchase/{invoiceId}", ct);
+            if (response.IsSuccessStatusCode)
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+                var tempPath = System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(),
+                    $"Invoice_{invoiceId}_{DateTime.Now:HHmmss}.pdf");
+                await System.IO.File.WriteAllBytesAsync(tempPath, bytes, ct);
+                return Result<string>.Success(tempPath);
+            }
+
+            var errorContent = await response.Content.ReadAsStringAsync(ct);
+            Serilog.Log.Warning("GetPurchaseA4PdfAsync API failure: {StatusCode} - {Content}",
+                response.StatusCode, errorContent);
+            return Result<string>.Failure("فشل في تحميل ملف PDF", response.StatusCode.ToString());
+        }
+        catch (Exception ex)
+        {
+            return HandleConnectionError<string>(ex, "PrintApiService.GetPurchaseA4PdfAsync");
+        }
+    }
 }

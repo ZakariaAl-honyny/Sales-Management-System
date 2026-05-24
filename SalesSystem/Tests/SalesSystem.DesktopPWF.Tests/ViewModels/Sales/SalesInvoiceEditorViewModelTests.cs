@@ -31,6 +31,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<IInventoryApiService> _mockInventoryService;
     private readonly Mock<IBarcodeInputService> _mockBarcodeInputService;
     private readonly Mock<ICashBoxApiService> _cashBoxApiServiceMock;
+    private readonly Mock<IPrintApiService> _printApiServiceMock;
 
     public SalesInvoiceEditorViewModelTests()
     {
@@ -47,6 +48,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         _mockInventoryService = new Mock<IInventoryApiService>();
         _mockBarcodeInputService = new Mock<IBarcodeInputService>();
         _cashBoxApiServiceMock = new Mock<ICashBoxApiService>();
+        _printApiServiceMock = new Mock<IPrintApiService>();
     }
 
     public void Dispose()
@@ -592,6 +594,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _mockInventoryService.Object,
             _mockBarcodeInputService.Object,
             _cashBoxApiServiceMock.Object,
+            _printApiServiceMock.Object,
             invoiceId);
     }
 

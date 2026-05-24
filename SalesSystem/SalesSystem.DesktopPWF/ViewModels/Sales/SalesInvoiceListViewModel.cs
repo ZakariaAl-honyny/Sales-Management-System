@@ -419,7 +419,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
             var result = await _printService.GetSalesPreviewDataAsync(SelectedInvoice.Id);
             if (result.IsSuccess && result.Value != null)
             {
-                var preview = new Views.Common.PdfPreviewWindow(result.Value.TempFilePath, result.Value.InvoiceNumber);
+                var preview = new Views.Common.PdfPreviewWindow(result.Value.TempFilePath, result.Value.InvoiceNumber, SelectedInvoice.Id);
                 preview.ShowDialog();
             }
             else

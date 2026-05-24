@@ -407,7 +407,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
             var result = await _printService.GetPurchasePreviewDataAsync(SelectedInvoice.Id);
             if (result.IsSuccess && result.Value != null)
             {
-                var preview = new Views.Common.PdfPreviewWindow(result.Value.TempFilePath, result.Value.InvoiceNumber);
+                var preview = new Views.Common.PdfPreviewWindow(result.Value.TempFilePath, result.Value.InvoiceNumber, SelectedInvoice.Id, isPurchase: true);
                 preview.ShowDialog();
             }
             else

@@ -5,6 +5,7 @@ using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Infrastructure.Printing.A4;
 using SalesSystem.Application.Interfaces.Repositories;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Infrastructure.Printing.Thermal;
 
 namespace SalesSystem.Infrastructure.Printing;
@@ -156,6 +157,27 @@ public class PrintService : IPrintService
                 invoice.InvoiceNumber);
             return PrintResult.Failure(
                 $"تعذر حفظ ملف PDF:\n{GetUserFriendlyError(ex)}");
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // GENERATE A4 PDF BYTES
+    // ═══════════════════════════════════════════════
+    public async Task<Result<byte[]>> GenerateA4PdfBytesAsync(InvoicePrintDto invoice)
+    {
+        try
+        {
+            var bytes = await Task.Run(() =>
+            {
+                var document = new A4InvoiceDocument(invoice);
+                return document.GeneratePdf();
+            });
+            return Result<byte[]>.Success(bytes);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate PDF for invoice {Invoice}", invoice.InvoiceNumber);
+            return Result<byte[]>.Failure("فشل في إنشاء ملف PDF");
         }
     }
 

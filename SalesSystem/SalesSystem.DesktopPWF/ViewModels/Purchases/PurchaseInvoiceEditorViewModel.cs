@@ -28,6 +28,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private readonly ISoundService _soundService;
     private readonly IBarcodeInputService _barcodeService;
     private readonly ICashBoxApiService _cashBoxService;
+    private readonly IPrintApiService _printApiService;
 
     private int? _invoiceId;
     private string? _invoiceNo;
@@ -67,6 +68,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         ISoundService soundService,
         IBarcodeInputService barcodeService,
         ICashBoxApiService cashBoxService,
+        IPrintApiService printApiService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -82,6 +84,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         _soundService = soundService;
         _barcodeService = barcodeService;
         _cashBoxService = cashBoxService;
+        _printApiService = printApiService;
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
@@ -167,6 +170,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             App.GetService<ISoundService>(),
             App.GetService<IBarcodeInputService>(),
             App.GetService<ICashBoxApiService>(),
+            App.GetService<IPrintApiService>(),
             invoiceId,
             isReadOnly)
     {
@@ -600,22 +604,37 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     private async Task PrintA4Async()
     {
-        if (!_invoiceId.HasValue) return;
+        if (!_invoiceId.HasValue)
+        {
+            await _dialogService.ShowWarningAsync("طباعة فاتورة الشراء", "يجب حفظ الفاتورة أولاً قبل الطباعة");
+            return;
+        }
+
+        if (_status != (byte)InvoiceStatus.Posted)
+        {
+            await _dialogService.ShowWarningAsync("طباعة فاتورة الشراء", "يجب ترحيل الفاتورة أولاً قبل طباعة A4");
+            return;
+        }
 
         await ExecuteAsync(async () =>
         {
-            var settingsResult = await _settingsService.GetSettingsAsync();
-            if (settingsResult.IsSuccess && settingsResult.Value != null)
+            ErrorMessage = null;
+            var result = await _printApiService.GetPurchaseA4PdfAsync(_invoiceId!.Value);
+            if (result.IsSuccess && result.Value != null)
             {
-                var invoiceResult = await _invoiceService.GetByIdAsync(_invoiceId.Value);
-                if (invoiceResult.IsSuccess && invoiceResult.Value != null)
-                {
-                    _invoicePrinter.PrintPreview(
-                        invoiceResult.Value.ToPrintDto(),
-                        invoiceResult.Value.Items.ToPrintDtos(),
-                        invoiceResult.Value.ToTotalsPrintDto(),
-                        settingsResult.Value.ToPrintDto());
-                }
+                var previewWindow = new Views.Common.PdfPreviewWindow(
+                    result.Value,
+                    _invoiceNo ?? $"#{_invoiceId}",
+                    _invoiceId!.Value,
+                    isPurchase: true);
+                previewWindow.ShowDialog();
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل ملف PDF",
+                    "PurchaseInvoiceEditorViewModel.PrintA4Async",
+                    $"[PurchaseInvoiceEditorViewModel.PrintA4Async] Failed to get A4 PDF for purchase invoice ID {_invoiceId}.");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة", ErrorMessage!);
             }
         });
     }

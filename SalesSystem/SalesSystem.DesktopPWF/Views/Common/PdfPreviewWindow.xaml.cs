@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using SalesSystem.Contracts.Common;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 
@@ -14,14 +15,18 @@ public partial class PdfPreviewWindow : Window
 {
     private readonly string _pdfPath;
     private readonly string _invoiceNumber;
+    private readonly int _invoiceId;
+    private readonly bool _isPurchase;
     private IDialogService? _dialogService;
     private IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
 
-    public PdfPreviewWindow(string pdfPath, string invoiceNumber)
+    public PdfPreviewWindow(string pdfPath, string invoiceNumber, int invoiceId, bool isPurchase = false)
     {
         InitializeComponent();
         _pdfPath = pdfPath;
         _invoiceNumber = invoiceNumber;
+        _invoiceId = invoiceId;
+        _isPurchase = isPurchase;
         InvoiceNumberText.Text = $"فاتورة: {invoiceNumber}";
 
         Loaded += OnLoaded;
@@ -55,11 +60,19 @@ public partial class PdfPreviewWindow : Window
             Mouse.OverrideCursor = Cursors.Wait;
             var printService = App.GetService<IPrintApiService>();
 
-            // Extract invoice ID from preview data
-            var result = await printService.PrintSalesA4Async(ExtractInvoiceId());
+            Result result;
+            if (_isPurchase)
+                result = await printService.PrintPurchaseA4Async(_invoiceId);
+            else
+                result = await printService.PrintSalesA4Async(_invoiceId);
+
             if (!result.IsSuccess)
             {
                 _ = DialogService.ShowErrorAsync("خطأ في الطباعة", result.Error ?? "حدث خطأ أثناء الطباعة");
+            }
+            else
+            {
+                _ = DialogService.ShowSuccessAsync("نجاح", "تم إرسال الفاتورة إلى الطابعة بنجاح");
             }
         }
         finally
@@ -75,10 +88,19 @@ public partial class PdfPreviewWindow : Window
             Mouse.OverrideCursor = Cursors.Wait;
             var printService = App.GetService<IPrintApiService>();
 
-            var result = await printService.PrintSalesThermalAsync(ExtractInvoiceId());
+            Result result;
+            if (_isPurchase)
+                result = await printService.PrintPurchaseThermalAsync(_invoiceId);
+            else
+                result = await printService.PrintSalesThermalAsync(_invoiceId);
+
             if (!result.IsSuccess)
             {
                 _ = DialogService.ShowErrorAsync("خطأ في الطباعة", result.Error ?? "حدث خطأ أثناء الطباعة");
+            }
+            else
+            {
+                _ = DialogService.ShowSuccessAsync("نجاح", "تم إرسال الفاتورة إلى الطابعة بنجاح");
             }
         }
         finally
@@ -93,14 +115,11 @@ public partial class PdfPreviewWindow : Window
     }
 
     /// <summary>
-    /// Extracts invoice ID from the temp file name format: Invoice_{INVOICENUMBER}_{TIMESTAMP}.pdf
-    /// This is a best-effort approach. For production, pass the ID through constructor.
+    /// Returns the invoice ID passed through the constructor.
     /// </summary>
     private int ExtractInvoiceId()
     {
-        // Try to parse from filename or just return 0
-        // The full print flow should ideally pass the invoice ID
-        return 0;
+        return _invoiceId;
     }
 
     private static void TryDeleteFile(string path)
