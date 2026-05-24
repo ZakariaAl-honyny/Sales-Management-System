@@ -244,6 +244,27 @@ public class SaleModeToBrushConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts List&lt;string&gt; to comma-separated string for display
+/// </summary>
+public class StringListJoinConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is System.Collections.IList list)
+        {
+            var items = list.Cast<object>().Select(x => x?.ToString()).Where(x => !string.IsNullOrEmpty(x));
+            return string.Join("، ", items);
+        }
+        return string.Empty;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
 /// Converts SaleMode byte to Arabic string
 /// </summary>
 public class SaleModeToStringConverter : IValueConverter

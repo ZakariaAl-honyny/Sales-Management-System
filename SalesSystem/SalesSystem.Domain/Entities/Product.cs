@@ -111,6 +111,25 @@ public class Product : BaseEntity
                 $"أدخل كم وحدة صغرى بداخل كل وحدة أكبر.");
     }
 
+    /// <summary>
+    /// Removes a unit from the product. Guards against removing the last active unit.
+    /// </summary>
+    public void RemoveUnit(ProductUnit unit)
+    {
+        if (_units.Count(u => u.IsActive) <= 1 && unit.IsActive)
+            throw new DomainException("يجب أن يكون للمنتج وحدة قياس واحدة على الأقل");
+
+        _units.Remove(unit);
+    }
+
+    /// <summary>
+    /// Adds a unit to the product.
+    /// </summary>
+    public void AddUnit(ProductUnit unit)
+    {
+        _units.Add(unit);
+    }
+
     public static Product Create(
         string name,
         decimal purchasePrice,

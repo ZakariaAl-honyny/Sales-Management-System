@@ -16,6 +16,7 @@ public class PurchaseService : IPurchaseService
     private readonly IInventoryService _inventoryService;
     private readonly IDocumentSequenceService _sequenceService;
     private readonly IStoreSettingsService _settingsService;
+    private readonly IUpdateProductPricingService _pricingService;
     private readonly ILogger<PurchaseService> _logger;
 
     public PurchaseService(
@@ -23,12 +24,14 @@ public class PurchaseService : IPurchaseService
         IInventoryService inventoryService,
         IDocumentSequenceService sequenceService,
         IStoreSettingsService settingsService,
+        IUpdateProductPricingService pricingService,
         ILogger<PurchaseService> logger)
     {
         _uow = uow;
         _inventoryService = inventoryService;
         _sequenceService = sequenceService;
         _settingsService = settingsService;
+        _pricingService = pricingService;
         _logger = logger;
     }
 
@@ -265,6 +268,42 @@ public class PurchaseService : IPurchaseService
                     {
                         await transaction.RollbackAsync(ct);
                         return Result<PurchaseInvoiceDto>.Failure(stockResult.Error!);
+                    }
+                }
+
+                // Auto-update product costs via pricing service
+                foreach (var item in invoice.Items)
+                {
+                    if (item.Product == null) continue;
+
+                    try
+                    {
+                        var baseUnit = item.Product.GetBaseUnit();
+                        var retailQty = item.Product.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+                        var retailUnitCost = item.Product.GetRetailQuantityEquivalent(1, item.Mode) > 0
+                            ? item.UnitCost / item.Product.GetRetailQuantityEquivalent(1, item.Mode)
+                            : item.UnitCost;
+
+                        var result = await _pricingService.UpdateFromPurchaseAsync(
+                            new UpdatePricingRequest(
+                                ProductUnitId: baseUnit.Id,
+                                NewPurchaseCost: retailUnitCost,
+                                NewQuantityPurchased: retailQty,
+                                NewSalesPrice: null,
+                                InvoiceId: invoice.Id,
+                                ChangedBy: userId
+                            ), ct);
+
+                        if (!result.IsSuccess)
+                        {
+                            _logger.LogWarning("Cost update for product {ProductId} from invoice {InvoiceNo} failed: {Error}",
+                                item.ProductId, invoice.InvoiceNo, result.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Cost update failed for product {ProductId} from invoice {InvoiceNo}",
+                            item.ProductId, invoice.InvoiceNo);
                     }
                 }
 

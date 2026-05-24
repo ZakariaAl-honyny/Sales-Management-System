@@ -12,6 +12,8 @@ public class ProductPriceHistoryConfiguration : IEntityTypeConfiguration<Product
 
         builder.HasKey(x => x.Id);
 
+        // ─── Legacy fields (backward compatibility) ──────────────────────
+
         builder.Property(x => x.ChangeType)
             .HasMaxLength(50)
             .IsRequired();
@@ -25,6 +27,31 @@ public class ProductPriceHistoryConfiguration : IEntityTypeConfiguration<Product
         builder.Property(x => x.NewValue)
             .HasPrecision(18, 2);
 
+        // ─── Detailed price history fields ───────────────────────────────
+
+        builder.Property(x => x.OldRetailPrice)
+            .HasPrecision(18, 2);
+
+        builder.Property(x => x.NewRetailPrice)
+            .HasPrecision(18, 2);
+
+        builder.Property(x => x.OldWholesalePrice)
+            .HasPrecision(18, 2);
+
+        builder.Property(x => x.NewWholesalePrice)
+            .HasPrecision(18, 2);
+
+        builder.Property(x => x.OldAvgCost)
+            .HasPrecision(18, 2);
+
+        builder.Property(x => x.NewAvgCost)
+            .HasPrecision(18, 2);
+
+        builder.Property(x => x.ChangeReason)
+            .HasMaxLength(500);
+
+        // ─── Timestamp & required fields ─────────────────────────────────
+
         builder.Property(x => x.ChangedAt)
             .IsRequired();
 
@@ -33,6 +60,11 @@ public class ProductPriceHistoryConfiguration : IEntityTypeConfiguration<Product
 
         builder.Property(x => x.ChangedBy)
             .IsRequired();
+
+        builder.Property(x => x.ChangedByUserId)
+            .IsRequired();
+
+        // ─── Foreign keys ────────────────────────────────────────────────
 
         builder.HasOne<ProductUnit>()
             .WithMany()
@@ -43,5 +75,14 @@ public class ProductPriceHistoryConfiguration : IEntityTypeConfiguration<Product
             .WithMany()
             .HasForeignKey(x => x.ChangedBy)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(x => x.ChangedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ─── Soft delete filter ──────────────────────────────────────────
+
+        builder.HasQueryFilter(x => x.IsActive);
     }
 }

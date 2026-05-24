@@ -185,6 +185,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IBackupApiService, BackupApiService>();
         services.AddSingleton<IInventoryApiService, InventoryApiService>();
         services.AddSingleton<ILogsApiService, LogsApiService>();
+        services.AddSingleton<IProductUnitApiService, ProductUnitApiService>();
 
         // Printing
         services.AddSingleton<Services.App.IInvoicePrinter, Services.Printing.InvoicePrinter>();
@@ -233,6 +234,8 @@ public partial class App : System.Windows.Application
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<CostingMethodSettingsViewModel>();
         services.AddTransient<BackupViewModel>();
+        services.AddTransient<ProductUnitEditorViewModel>();
+        services.AddTransient<ProductUnitsListViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
+using System.Linq;
 
 namespace SalesSystem.Infrastructure.Data;
 
@@ -85,6 +86,24 @@ public static class DbSeeder
         db.DocumentSequences.Add(DocumentSequence.Create("TRF", "TRF", 2026));
         db.DocumentSequences.Add(DocumentSequence.Create("CP", "CP", 2026));
         db.DocumentSequences.Add(DocumentSequence.Create("SP", "SP", 2026));
+
+        // 8. Product base units for existing products without any ProductUnit
+        var productsWithoutUnits = await db.Products
+            .Where(p => !db.ProductUnits.Any(pu => pu.ProductId == p.Id))
+            .ToListAsync();
+
+        foreach (var product in productsWithoutUnits)
+        {
+            db.ProductUnits.Add(ProductUnit.CreateBaseUnit(
+                product.Id,
+                "قطعة",
+                product.RetailPrice,
+                product.PurchasePrice
+            ));
+        }
+
+        if (productsWithoutUnits.Any())
+            logger?.LogInformation("Seeded base ProductUnits for {Count} products", productsWithoutUnits.Count);
 
         await db.SaveChangesAsync();
         logger?.LogInformation("Seed data completed successfully.");

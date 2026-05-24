@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.11.0] - 2026-05-24
+### Added
+- **v4.3 — Dynamic UOM & Costing Engine** (Phase 2–4 MVP):
+  - **ProductUnit Entity**: Multi-unit support per product with `UnitName`, `ConversionFactor`, per-unit `SalesPrice`/`PurchaseCost`, `IsBaseUnit` flag. Guard clauses and factory methods.
+  - **UnitBarcode Entity**: Scannable barcodes linked to specific product units. Global unique index enforcement.
+  - **ProductPriceHistory Entity**: Immutable audit log tracking every price/cost change with `OldValue`, `NewValue`, `ChangeReason`, `ChangedByUserId`.
+  - **Costing Strategies**: Three methods via `SystemSettings.CostingMethod` — WeightedAverage (`(oldStock×oldCost + newQty×newCost)/(oldStock+newQty)`), LastPurchasePrice, SupplierPrice. Cost cascade to all derived units.
+  - **Product Unit API**: `GET/POST/PUT/DELETE /api/v1/products/{id}/units` endpoints with FluentValidation, `[Authorize]` policies.
+  - **Barcode Resolution API**: `GET /api/v1/barcodes/{barcode}` resolves barcode to product + unit + price in <100ms.
+  - **Desktop UI**: ProductUnitEditorView/ViewModel with INotifyDataErrorInfo validation, ProductUnitsListView with DataGrid, all Arabic ToolTips, EventBus integration.
+  - **Purchase Cost Hook**: `PurchaseService.PostAsync` triggers `UpdateProductPricingService` per line item — best-effort (never blocks invoice posting).
+  - **DbSeeder Migration**: Seeds base "قطعة" ProductUnit for all existing products without units.
+  - **8 Unit Tests**: WeightedAverage w/ stock, w/ zero stock, LastPurchasePrice, SupplierPrice, cost cascade, missing unit/base unit errors.
+
 ## [1.10.0] - 2026-05-24
 ### Added
 - **v4.6.4 — Security Hardening & Code Quality** (Phase 7 & 8):

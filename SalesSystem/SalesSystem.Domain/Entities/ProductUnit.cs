@@ -1,4 +1,5 @@
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
@@ -21,6 +22,7 @@ public class ProductUnit : BaseEntity
 
     public bool IsBaseUnit { get; private set; }
     public decimal SalesPrice { get; private set; }
+    public decimal WholesalePrice { get; private set; }
     public decimal PurchaseCost { get; private set; }
     public decimal SupplierPrice { get; private set; }
     public decimal LastPurchasePrice { get; private set; }
@@ -56,6 +58,7 @@ public class ProductUnit : BaseEntity
             BaseConversionFactor = 1,
             IsBaseUnit = true,
             SalesPrice = salesPrice,
+            WholesalePrice = salesPrice,
             PurchaseCost = purchaseCost,
             SupplierPrice = 0,
             LastPurchasePrice = purchaseCost,
@@ -73,6 +76,7 @@ public class ProductUnit : BaseEntity
         decimal baseConversionFactor,
         decimal salesPrice = 0,
         decimal purchaseCost = 0,
+        decimal wholesalePrice = 0,
         int sortOrder = 1)
     {
         if (string.IsNullOrWhiteSpace(unitName))
@@ -90,6 +94,7 @@ public class ProductUnit : BaseEntity
             BaseConversionFactor = baseConversionFactor,
             IsBaseUnit = false,
             SalesPrice = salesPrice,
+            WholesalePrice = wholesalePrice,
             PurchaseCost = purchaseCost,
             SupplierPrice = 0,
             LastPurchasePrice = purchaseCost,
@@ -117,7 +122,7 @@ public class ProductUnit : BaseEntity
 
         var oldCost = PurchaseCost;
         LastPurchasePrice = newCost;
-        PurchaseCost = Math.Round(newCost, 4);
+        PurchaseCost = Math.Round(newCost, 2);
         return oldCost;
     }
 
@@ -130,7 +135,7 @@ public class ProductUnit : BaseEntity
             throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
 
         var oldPrice = SalesPrice;
-        SalesPrice = Math.Round(newPrice, 4);
+        SalesPrice = Math.Round(newPrice, 2);
         return oldPrice;
     }
 
@@ -142,7 +147,25 @@ public class ProductUnit : BaseEntity
         if (newPrice < 0)
             throw new DomainException("سعر المورد لا يمكن أن يكون سالباً");
 
-        SupplierPrice = Math.Round(newPrice, 4);
+        SupplierPrice = Math.Round(newPrice, 2);
+    }
+
+    /// <summary>
+    /// Updates unit name and sales price. Does NOT change ConversionFactor or IsBaseUnit.
+    /// </summary>
+    public void Update(string unitName, decimal retailPrice, decimal wholesalePrice)
+    {
+        if (string.IsNullOrWhiteSpace(unitName))
+            throw new DomainException("اسم الوحدة لا يمكن أن يكون فارغاً");
+        if (retailPrice < 0)
+            throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
+        if (wholesalePrice < 0)
+            throw new DomainException("سعر الجملة لا يمكن أن يكون سالباً");
+
+        UnitName = unitName.Trim();
+        SalesPrice = Math.Round(retailPrice, 2);
+        WholesalePrice = Math.Round(wholesalePrice, 2);
+        UpdateTimestamp();
     }
 
     /// <summary>
@@ -177,4 +200,22 @@ public class ProductUnit : BaseEntity
     /// </summary>
     public decimal CalculateSalesPriceFromBaseUnitPrice(decimal baseUnitPrice)
         => baseUnitPrice * BaseConversionFactor;
+
+    /// <summary>
+    /// Gets the appropriate price based on sale mode (Retail or Wholesale).
+    /// </summary>
+    public decimal GetPriceByUnit(SaleMode mode)
+        => mode == SaleMode.Wholesale ? WholesalePrice : SalesPrice;
+
+    /// <summary>
+    /// Updates the average cost of this unit.
+    /// </summary>
+    public void UpdateCost(decimal newCost)
+    {
+        if (newCost < 0)
+            throw new DomainException("التكلفة لا يمكن أن تكون سالبة");
+
+        PurchaseCost = Math.Round(newCost, 2);
+        LastPurchasePrice = Math.Round(newCost, 2);
+    }
 }
