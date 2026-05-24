@@ -22,7 +22,6 @@ public class CashTransaction : BaseEntity
     public string? ReferenceType { get; private set; } // e.g., "SalesInvoice", "PurchaseInvoice"
     public int? ReferenceId { get; private set; }
     public string? Notes { get; private set; }
-    public int CreatedBy { get; private set; }
 
     // Navigation
     public CashBox CashBox { get; private set; } = null!;
@@ -43,7 +42,7 @@ public class CashTransaction : BaseEntity
         int createdBy,
         string? notes)
     {
-        return new CashTransaction
+        var tx = new CashTransaction
         {
             CashBoxId = cashBoxId,
             TransactionType = type,
@@ -52,9 +51,10 @@ public class CashTransaction : BaseEntity
             BalanceAfter = balanceAfter,
             ReferenceType = referenceType,
             ReferenceId = referenceId,
-            CreatedBy = createdBy,
             Notes = notes,
             CreatedAt = DateTime.UtcNow
         };
+        tx.SetCreatedBy(createdBy);
+        return tx;
     }
 }

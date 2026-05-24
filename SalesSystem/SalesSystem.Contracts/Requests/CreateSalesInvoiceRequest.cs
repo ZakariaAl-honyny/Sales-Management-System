@@ -5,6 +5,7 @@ namespace SalesSystem.Contracts.Requests;
 public record CreateSalesInvoiceRequest(
     int WarehouseId,
     int? CustomerId,
+    int? CashBoxId,
     DateTime? InvoiceDate,
     DateOnly? DueDate,
     PaymentType PaymentType,

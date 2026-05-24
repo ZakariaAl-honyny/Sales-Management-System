@@ -31,6 +31,7 @@ public class PurchaseServiceTests : IDisposable
     private readonly Mock<IDocumentSequenceService> _mockSequenceService;
     private readonly Mock<IStoreSettingsService> _mockStoreSettingsService;
     private readonly Mock<IUpdateProductPricingService> _mockPricingService;
+    private readonly Mock<ICashBoxService> _cashBoxServiceMock;
     private readonly Mock<ILogger<PurchaseService>> _mockLogger;
 
     private readonly PurchaseService _sut;
@@ -51,6 +52,7 @@ public class PurchaseServiceTests : IDisposable
         _mockSequenceService = new Mock<IDocumentSequenceService>();
         _mockStoreSettingsService = new Mock<IStoreSettingsService>();
         _mockPricingService = new Mock<IUpdateProductPricingService>();
+        _cashBoxServiceMock = new Mock<ICashBoxService>();
         _mockLogger = new Mock<ILogger<PurchaseService>>();
 
         _mockUow.Setup(u => u.PurchaseInvoices).Returns(new InMemoryEfCoreRepository<PurchaseInvoice>(_dbContext));
@@ -97,6 +99,7 @@ public class PurchaseServiceTests : IDisposable
             _mockSequenceService.Object,
             _mockStoreSettingsService.Object,
             _mockPricingService.Object,
+            _cashBoxServiceMock.Object,
             _mockLogger.Object);
     }
 

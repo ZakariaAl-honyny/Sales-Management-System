@@ -24,6 +24,7 @@ using SalesSystem.DesktopPWF.ViewModels.Categories;
 using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
+using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 
@@ -186,6 +187,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IInventoryApiService, InventoryApiService>();
         services.AddSingleton<ILogsApiService, LogsApiService>();
         services.AddSingleton<IProductUnitApiService, ProductUnitApiService>();
+        services.AddSingleton<ICashBoxApiService, CashBoxApiService>();
 
         // Printing
         services.AddSingleton<Services.App.IInvoicePrinter, Services.Printing.InvoicePrinter>();
@@ -236,6 +238,13 @@ public partial class App : System.Windows.Application
         services.AddTransient<BackupViewModel>();
         services.AddTransient<ProductUnitEditorViewModel>();
         services.AddTransient<ProductUnitsListViewModel>();
+
+        // Cash Box ViewModels
+        services.AddTransient<CashBoxEditorViewModel>();
+        services.AddTransient<CashBoxesListViewModel>();
+        services.AddTransient<CashBoxTransactionsViewModel>();
+        services.AddTransient<CashTransferViewModel>();
+        services.AddTransient<DailyClosureViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()

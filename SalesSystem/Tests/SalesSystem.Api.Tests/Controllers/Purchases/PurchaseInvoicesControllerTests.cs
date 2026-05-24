@@ -215,6 +215,7 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         InvoiceDate: null,
         DueDate: null,
         PaymentType: PaymentType.Cash,
+        CashBoxId: null,
         DiscountAmount: 10.00m,
         TaxAmount: 28.50m,
         PaidAmount: 100.00m,

@@ -32,6 +32,11 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
             .MaximumLength(500).When(x => x.Notes != null)
             .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
 
+        // Business Rule: If paying, CashBoxId is required
+        RuleFor(x => x.CashBoxId)
+            .NotNull().When(x => x.PaidAmount > 0)
+            .WithMessage("يجب اختيار صندوق نقدي عند وجود مبلغ مدفوع");
+
         RuleFor(x => x.Items).NotEmpty().WithMessage("يجب إضافة صنف واحد على الأقل");
 
         RuleForEach(x => x.Items).ChildRules(item =>

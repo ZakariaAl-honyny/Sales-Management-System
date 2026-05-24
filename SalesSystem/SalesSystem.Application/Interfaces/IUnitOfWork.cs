@@ -34,6 +34,7 @@ public interface IUnitOfWork
     IGenericRepository<CashBox> CashBoxes { get; }
     IGenericRepository<CashTransaction> CashTransactions { get; }
     IGenericRepository<SystemSetting> SystemSettings { get; }
+    IGenericRepository<DailyClosure> DailyClosures { get; }
     IGenericRepository<ProductPriceHistory> ProductPriceHistory { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);

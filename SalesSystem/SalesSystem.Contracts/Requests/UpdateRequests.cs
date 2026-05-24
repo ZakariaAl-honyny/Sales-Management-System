@@ -37,6 +37,7 @@ public record UpdatePurchaseInvoiceRequest(
     decimal DiscountAmount,
     decimal TaxAmount,
     decimal PaidAmount,
+    int? CashBoxId,
     string? Notes,
     string? SupplierInvoiceNo,
     List<CreatePurchaseInvoiceItemRequest> Items);
@@ -50,5 +51,6 @@ public record UpdateSalesInvoiceRequest(
     decimal DiscountAmount,
     decimal TaxAmount,
     decimal PaidAmount,
+    int? CashBoxId,
     string? Notes,
     List<CreateSalesInvoiceItemRequest> Items);

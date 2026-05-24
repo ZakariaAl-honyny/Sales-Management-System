@@ -44,6 +44,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<CashTransaction>? _cashTransactions;
     private IGenericRepository<SystemSetting>? _systemSettings;
     private IGenericRepository<UnitBarcode>? _unitBarcodes;
+    private IGenericRepository<DailyClosure>? _dailyClosures;
     private IGenericRepository<ProductPriceHistory>? _productPriceHistory;
 
     public UnitOfWork(SalesDbContext context)
@@ -79,6 +80,7 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<CashTransaction> CashTransactions => _cashTransactions ??= new GenericRepository<CashTransaction>(_context);
     public IGenericRepository<SystemSetting> SystemSettings => _systemSettings ??= new GenericRepository<SystemSetting>(_context);
     public IGenericRepository<UnitBarcode> UnitBarcodes => _unitBarcodes ??= new GenericRepository<UnitBarcode>(_context);
+    public IGenericRepository<DailyClosure> DailyClosures => _dailyClosures ??= new GenericRepository<DailyClosure>(_context);
     public IGenericRepository<ProductPriceHistory> ProductPriceHistory => _productPriceHistory ??= new GenericRepository<ProductPriceHistory>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)

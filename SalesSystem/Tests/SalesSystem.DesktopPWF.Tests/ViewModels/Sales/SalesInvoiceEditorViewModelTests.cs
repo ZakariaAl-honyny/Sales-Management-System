@@ -10,6 +10,7 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.ViewModels.Sales;
 
 /// <summary>
@@ -29,6 +30,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<ISoundService> _mockSoundService;
     private readonly Mock<IInventoryApiService> _mockInventoryService;
     private readonly Mock<IBarcodeInputService> _mockBarcodeInputService;
+    private readonly Mock<ICashBoxApiService> _cashBoxApiServiceMock;
 
     public SalesInvoiceEditorViewModelTests()
     {
@@ -44,6 +46,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         _mockSoundService = new Mock<ISoundService>();
         _mockInventoryService = new Mock<IInventoryApiService>();
         _mockBarcodeInputService = new Mock<IBarcodeInputService>();
+        _cashBoxApiServiceMock = new Mock<ICashBoxApiService>();
     }
 
     public void Dispose()
@@ -588,6 +591,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _mockSoundService.Object,
             _mockInventoryService.Object,
             _mockBarcodeInputService.Object,
+            _cashBoxApiServiceMock.Object,
             invoiceId);
     }
 

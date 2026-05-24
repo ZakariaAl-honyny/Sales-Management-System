@@ -17,5 +17,8 @@ public class CashTransactionConfiguration : IEntityTypeConfiguration<CashTransac
         builder.Property(x => x.Notes).HasMaxLength(500);
         builder.HasIndex(x => x.CashBoxId);
         builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId });
+
+        builder.Property(x => x.IsActive).HasDefaultValue(true);
+        builder.HasQueryFilter(x => x.IsActive);
     }
 }

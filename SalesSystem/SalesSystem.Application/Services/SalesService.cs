@@ -15,17 +15,20 @@ public class SalesService : ISalesService
     private readonly IUnitOfWork _uow;
     private readonly IInventoryService _inventoryService;
     private readonly IDocumentSequenceService _sequenceService;
+    private readonly ICashBoxService _cashBoxService;
     private readonly ILogger<SalesService> _logger;
 
     public SalesService(
         IUnitOfWork uow,
         IInventoryService inventoryService,
         IDocumentSequenceService sequenceService,
+        ICashBoxService cashBoxService,
         ILogger<SalesService> logger)
     {
         _uow = uow;
         _inventoryService = inventoryService;
         _sequenceService = sequenceService;
+        _cashBoxService = cashBoxService;
         _logger = logger;
     }
 
@@ -109,7 +112,8 @@ public class SalesService : ISalesService
                 request.DueDate,
                 (Domain.Enums.PaymentType)request.PaymentType,
                 request.DiscountAmount,
-                request.Notes
+                request.Notes,
+                cashBoxId: request.CashBoxId
             );
 
             invoice.SetCreatedBy(userId);
@@ -282,6 +286,25 @@ public class SalesService : ISalesService
                     customer.IncreaseBalance(invoice.DueAmount);
                 }
 
+                // 5. Record cash transaction if payment is linked to a cash box
+                if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
+                {
+                    var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
+                        invoice.CashBoxId.Value,
+                        invoice.PaidAmount,
+                        CashTransactionType.SalesIncome,
+                        "SalesInvoice",
+                        invoice.Id,
+                        userId,
+                        ct);
+
+                    if (!cashResult.IsSuccess)
+                    {
+                        _logger.LogWarning("Cash transaction recording failed for invoice {InvoiceNo} (ID: {Id}): {Error}",
+                            invoice.InvoiceNo, invoice.Id, cashResult.Error);
+                    }
+                }
+
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
@@ -349,6 +372,25 @@ public class SalesService : ISalesService
                         if (customer != null)
                         {
                             customer.DecreaseBalance(invoice.DueAmount);
+                        }
+                    }
+
+                    // Create offsetting cash transaction if invoice had cash box
+                    if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
+                    {
+                        var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
+                            invoice.CashBoxId.Value,
+                            invoice.PaidAmount,
+                            CashTransactionType.RefundOut,
+                            "SalesInvoiceCancel",
+                            invoice.Id,
+                            userId,
+                            ct);
+
+                        if (!cashResult.IsSuccess)
+                        {
+                            _logger.LogWarning("Cash transaction recording failed during cancellation of invoice {InvoiceNo} (ID: {Id}): {Error}",
+                                invoice.InvoiceNo, invoice.Id, cashResult.Error);
                         }
                     }
                 }

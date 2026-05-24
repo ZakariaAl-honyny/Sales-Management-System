@@ -13,6 +13,10 @@ public class UpdateSalesInvoiceValidator : AbstractValidator<UpdateSalesInvoiceR
         RuleFor(x => x.PaidAmount)
             .GreaterThanOrEqualTo(0).WithMessage("المبلغ المدفوع لا يمكن أن يكون سالباً");
 
+        RuleFor(x => x.CashBoxId)
+            .NotNull().When(x => x.PaidAmount > 0)
+            .WithMessage("يجب اختيار الصندوق النقدي عند وجود مبلغ مدفوع");
+
         RuleFor(x => x.DiscountAmount)
             .GreaterThanOrEqualTo(0).WithMessage("الخصم لا يمكن أن يكون سالباً");
 
