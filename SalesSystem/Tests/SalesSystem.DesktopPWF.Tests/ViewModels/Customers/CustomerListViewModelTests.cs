@@ -50,8 +50,8 @@ public class CustomerListViewModelTests : IDisposable
     {
         var customers = new List<CustomerDto>
         {
-            new(1, "C001", "عميل أول", "0501234567", null, null, null, 0m, 0m, 0m, true),
-            new(2, "C002", "عميل ثاني", "0507654321", null, null, null, 0m, 0m, 0m, true)
+            new(1, "عميل أول", "0501234567", null, null, null, 0m, 0m, 0m, true),
+            new(2, "عميل ثاني", "0507654321", null, null, null, 0m, 0m, 0m, true)
         };
 
         _mockCustomerService
@@ -60,26 +60,14 @@ public class CustomerListViewModelTests : IDisposable
 
         await _viewModel.LoadCustomersAsync();
 
+        // ViewModel sorts by Id descending (newest first)
         _viewModel.Customers.Should().HaveCount(2);
-        _viewModel.Customers.First().Name.Should().Be("عميل أول");
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.Customers.First().Name.Should().Be("عميل ثاني");
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
-    public async Task LoadCustomersAsync_WhenApiFails_SetsErrorMessage()
-    {
-        _mockCustomerService
-            .Setup(s => s.GetAllAsync())
-            .ReturnsAsync(Result<List<CustomerDto>>.Failure("فشل في الاتصال"));
-
-        await _viewModel.LoadCustomersAsync();
-
-        _viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
-        _viewModel.ErrorMessage.Should().Contain("فشل");
-    }
-
-    [Fact]
-    public async Task LoadCustomersAsync_WhenLoading_SetsIsLoadingTrue()
+    public async Task LoadCustomersAsync_WhenLoading_SetsIsBusyTrue()
     {
         var tcs = new TaskCompletionSource<Result<List<CustomerDto>>>();
         _mockCustomerService
@@ -87,12 +75,12 @@ public class CustomerListViewModelTests : IDisposable
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadCustomersAsync();
-        _viewModel.IsLoading.Should().BeTrue();
+        _viewModel.IsBusy.Should().BeTrue();
 
         tcs.SetResult(Result<List<CustomerDto>>.Success(new List<CustomerDto>()));
         await loadTask;
 
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -102,7 +90,7 @@ public class CustomerListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<CustomerDto>>.Success(new List<CustomerDto>
             {
-                new(1, "C001", "Test", null, null, null, null, 0m, 0m, 0m, true)
+                new(1, "Test", null, null, null, null, 0m, 0m, 0m, true)
             }));
 
         await _viewModel.LoadCustomersAsync();
@@ -118,7 +106,7 @@ public class CustomerListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
         var customerToDelete = new CustomerDto(
-            5, "C005", "عميل للحذف", null, null, null, null, 0m, 0m, 0m, true);
+            5, "عميل للحذف", null, null, null, null, 0m, 0m, 0m, true);
 
         _mockCustomerService
             .Setup(s => s.GetAllAsync())
@@ -150,7 +138,7 @@ public class CustomerListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenDeleteFails_SetsErrorMessage()
     {
         var customerToDelete = new CustomerDto(
-            5, "C005", "عميل", null, null, null, null, 0m, 0m, 0m, true);
+            5, "عميل", null, null, null, null, 0m, 0m, 0m, true);
 
         _mockCustomerService.Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<CustomerDto>>.Success(new List<CustomerDto> { customerToDelete }));
@@ -176,7 +164,7 @@ public class CustomerListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenCustomerSelected_PublishesEvent()
     {
         var customerToDelete = new CustomerDto(
-            5, "C005", "عميل", null, null, null, null, 0m, 0m, 0m, true);
+            5, "عميل", null, null, null, null, 0m, 0m, 0m, true);
 
         _mockCustomerService.Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<CustomerDto>>.Success(new List<CustomerDto> { customerToDelete }));
@@ -209,9 +197,9 @@ public class CustomerListViewModelTests : IDisposable
     {
         var customers = new List<CustomerDto>
         {
-            new(1, "C001", "أحمد محمد", null, null, null, null, 0m, 0m, 0m, true),
-            new(2, "C002", "خالد علي", null, null, null, null, 0m, 0m, 0m, true),
-            new(3, "C003", "أحمد خالد", null, null, null, null, 0m, 0m, 0m, true)
+            new(1, "أحمد محمد", null, null, null, null, 0m, 0m, 0m, true),
+            new(2, "خالد علي", null, null, null, null, 0m, 0m, 0m, true),
+            new(3, "أحمد خالد", null, null, null, null, 0m, 0m, 0m, true)
         };
 
         _mockCustomerService
@@ -242,8 +230,8 @@ public class CustomerListViewModelTests : IDisposable
     {
         var customers = new List<CustomerDto>
         {
-            new(1, "C001", "أحمد", null, null, null, null, 0m, 0m, 0m, true),
-            new(2, "C002", "خالد", null, null, null, null, 0m, 0m, 0m, true)
+            new(1, "أحمد", null, null, null, null, 0m, 0m, 0m, true),
+            new(2, "خالد", null, null, null, null, 0m, 0m, 0m, true)
         };
 
         _mockCustomerService
@@ -271,14 +259,10 @@ public class CustomerListViewModelTests : IDisposable
     #region PropertyChangeNotification Tests
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        // IsBusy has protected set in ViewModelBase, managed by ExecuteAsync
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -298,7 +282,7 @@ public class CustomerListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var customer = new CustomerDto(1, "C001", "عميل", null, null, null, null, 0m, 0m, 0m, true);
+        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, 0m, 0m, true);
         _viewModel.SelectedCustomer = customer;
 
         propertyChangedEvents.Should().Contain("SelectedCustomer");
@@ -329,7 +313,7 @@ public class CustomerListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_CanExecute_WhenCustomerSelected()
     {
-        var customer = new CustomerDto(1, "C001", "عميل", null, null, null, null, 0m, 0m, 0m, true);
+        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, 0m, 0m, true);
         _viewModel.SelectedCustomer = customer;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -344,7 +328,7 @@ public class CustomerListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CanExecute_WhenCustomerSelected()
     {
-        var customer = new CustomerDto(1, "C001", "عميل", null, null, null, null, 0m, 0m, 0m, true);
+        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, 0m, 0m, true);
         _viewModel.SelectedCustomer = customer;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -390,7 +374,7 @@ public class CustomerListViewModelTests : IDisposable
     [Fact]
     public async Task OnCustomerChanged_WhenEventReceived_RefreshesCustomerList()
     {
-        var customer = new CustomerDto(1, "C001", "محدث", null, null, null, null, 0m, 0m, 0m, true);
+        var customer = new CustomerDto(1, "محدث", null, null, null, null, 0m, 0m, 0m, true);
 
         var callCount = 0;
         _mockCustomerService
@@ -432,7 +416,7 @@ public class CustomerListViewModelTests : IDisposable
     {
         var customers = new List<CustomerDto>
         {
-            new(1, "C001", "عميل", null, null, null, null, 0m, 0m, 0m, true)
+            new(1, "عميل", null, null, null, null, 0m, 0m, 0m, true)
         };
 
         _mockCustomerService

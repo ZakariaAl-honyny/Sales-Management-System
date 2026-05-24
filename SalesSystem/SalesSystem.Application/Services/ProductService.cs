@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -24,11 +23,8 @@ public class ProductService : IProductService
 
     public async Task<Result<ProductDto>> GetByIdAsync(int id, CancellationToken ct)
     {
-        var product = await _uow.Products.Query()
-            .Include(p => p.Category)
-            .Include(p => p.RetailUnit)
-            .Include(p => p.WholesaleUnit)
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
+        var product = await _uow.Products.FirstOrDefaultAsync(
+            p => p.Id == id, ct, "Category", "RetailUnit", "WholesaleUnit");
 
         if (product == null)
             return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
@@ -38,69 +34,33 @@ public class ProductService : IProductService
 
     public async Task<Result<PagedResult<ProductDto>>> GetAllAsync(string? search, int? categoryId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _uow.Products.Query();
-        
-        if (includeInactive)
-        {
-            query = query.IgnoreQueryFilters();
-        }
+        // Build predicate for the search conditions only (IsActive is handled by query filter)
+        var searchVal = search;
+        System.Linq.Expressions.Expression<System.Func<Product, bool>> predicate = p =>
+            (string.IsNullOrWhiteSpace(searchVal) || p.Name.Contains(searchVal) ||
+             (p.Barcode != null && p.Barcode.Contains(searchVal))) &&
+            (!categoryId.HasValue || p.CategoryId == categoryId.Value);
 
-        query = query.Include(p => p.Category)
-                     .Include(p => p.RetailUnit)
-                     .Include(p => p.WholesaleUnit)
-                     .AsQueryable();
+        var includes = new[] { "Category", "RetailUnit", "WholesaleUnit" };
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            query = query.Where(p => p.Name.Contains(search) ||
-                                    (p.Code != null && p.Code.Contains(search)) ||
-                                    (p.Barcode != null && p.Barcode.Contains(search)));
-        }
-
-        if (categoryId.HasValue)
-        {
-            query = query.Where(p => p.CategoryId == categoryId.Value);
-        }
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderBy(p => p.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var (items, total) = await _uow.Products.GetPagedAsync(
+            predicate, q => q.OrderBy(p => p.Name), page, pageSize, ct, includeInactive, includes);
 
         var dtos = items.Select(MapToDto).ToList();
-
-        return Result<PagedResult<ProductDto>>.Success(PagedResult<ProductDto>.Create(dtos, totalItems, page, pageSize));
+        return Result<PagedResult<ProductDto>>.Success(PagedResult<ProductDto>.Create(dtos, total, page, pageSize));
     }
 
     public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest request, CancellationToken ct)
     {
         try
         {
-            string? code = request.Code;
-            if (string.IsNullOrWhiteSpace(code))
-            {
-                var codeResult = await _sequenceService.GetNextNumberAsync("PRD", ct);
-                if (!codeResult.IsSuccess)
-                    return Result<ProductDto>.Failure(codeResult.Error ?? "حدث خطأ أثناء توليد الكود");
-                code = codeResult.Value;
-            }
-
             // Normalize barcode: treat empty/whitespace as null to avoid unique index conflicts
             string? barcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
-
-            // Validate code uniqueness (including inactive products)
-            if (await _uow.Products.Query().IgnoreQueryFilters().AnyAsync(p => p.Code == code, ct))
-            {
-                _logger.LogWarning("Product creation failed: Duplicate code {Code} (including inactive)", code);
-                return Result<ProductDto>.Failure("كود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateCode);
-            }
 
             // Validate barcode uniqueness only when a barcode was actually provided
             if (barcode != null)
             {
-                if (await _uow.Products.Query().IgnoreQueryFilters().AnyAsync(p => p.Barcode == barcode, ct))
+                if (await _uow.Products.AnyIgnoreFiltersAsync(p => p.Barcode == barcode, ct))
                 {
                     _logger.LogWarning("Product creation failed: Duplicate barcode {Barcode} (including inactive)", barcode);
                     return Result<ProductDto>.Failure("باركود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateBarcode);
@@ -114,7 +74,6 @@ public class ProductService : IProductService
                 request.WholesalePrice,
                 request.ConversionFactor,
                 request.MinStock,
-                code,
                 barcode,          // Use normalized barcode (null if empty)
                 request.CategoryId,
                 request.RetailUnitId,
@@ -151,23 +110,17 @@ public class ProductService : IProductService
     {
         try
         {
-            var product = await _uow.Products.Query().IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, ct);
+            var product = await _uow.Products.FirstOrDefaultIgnoreFiltersAsync(p => p.Id == id, ct);
             if (product == null)
                 return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
             // Normalize barcode: treat empty/whitespace as null to avoid unique index conflicts
             string? barcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
 
-            if (!string.IsNullOrWhiteSpace(request.Code) && request.Code != product.Code)
-            {
-                if (await _uow.Products.Query().IgnoreQueryFilters().AnyAsync(p => p.Code == request.Code && p.Id != id, ct))
-                    return Result<ProductDto>.Failure("كود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateCode);
-            }
-
             // Validate barcode uniqueness only when a real barcode was provided
             if (barcode != null && barcode != product.Barcode)
             {
-                if (await _uow.Products.Query().IgnoreQueryFilters().AnyAsync(p => p.Barcode == barcode && p.Id != id, ct))
+                if (await _uow.Products.AnyIgnoreFiltersAsync(p => p.Barcode == barcode && p.Id != id, ct))
                     return Result<ProductDto>.Failure("باركود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateBarcode);
             }
 
@@ -178,7 +131,6 @@ public class ProductService : IProductService
                 request.WholesalePrice,
                 request.ConversionFactor,
                 request.MinStock,
-                request.Code,
                 barcode,          // Use normalized barcode (null if empty)
                 request.CategoryId,
                 request.RetailUnitId,
@@ -232,23 +184,31 @@ public class ProductService : IProductService
 
     public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
     {
-        var product = await _uow.Products.Query().IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, ct);
+        var product = await _uow.Products.FirstOrDefaultIgnoreFiltersAsync(p => p.Id == id, ct);
         if (product == null)
             return Result.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
-        var hasSalesItems = await _uow.SalesInvoiceItems.Query().AnyAsync(i => i.ProductId == id, ct);
+        var hasSalesItems = await _uow.SalesInvoiceItems.AnyAsync(i => i.ProductId == id, ct);
         if (hasSalesItems)
             return Result.Failure("لا يمكن حذف المنتج نهائياً لأنه مرتبط بعمليات بيع");
 
-        var hasPurchaseItems = await _uow.PurchaseInvoiceItems.Query().AnyAsync(i => i.ProductId == id, ct);
+        var hasPurchaseItems = await _uow.PurchaseInvoiceItems.AnyAsync(i => i.ProductId == id, ct);
         if (hasPurchaseItems)
             return Result.Failure("لا يمكن حذف المنتج نهائياً لأنه مرتبط بعمليات شراء");
 
-        await _uow.Products.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        try
+        {
+            await _uow.Products.HardDeleteAsync(id, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Product permanently deleted: {ProductId}", id);
-        return Result.Success();
+            _logger.LogInformation("Product permanently deleted: {ProductId}", id);
+            return Result.Success();
+        }
+        catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
+        {
+            _logger.LogError(ex, "Failed to permanently delete product {ProductId} due to database constraint", id);
+            return Result.Failure("لا يمكن حذف المنتج نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
+        }
     }
 
     public async Task<Result<ProductDto>> GetByBarcodeAsync(string barcode, CancellationToken ct)
@@ -256,11 +216,8 @@ public class ProductService : IProductService
         if (string.IsNullOrWhiteSpace(barcode))
             return Result<ProductDto>.Failure("الباركود مطلوب");
 
-        var product = await _uow.Products.Query()
-            .Include(p => p.Category)
-            .Include(p => p.RetailUnit)
-            .Include(p => p.WholesaleUnit)
-            .FirstOrDefaultAsync(p => p.Barcode == barcode, ct);
+        var product = await _uow.Products.FirstOrDefaultAsync(
+            p => p.Barcode == barcode, ct, "Category", "RetailUnit", "WholesaleUnit");
 
         if (product == null)
             return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
@@ -272,7 +229,6 @@ public class ProductService : IProductService
     {
         return new ProductDto(
             p.Id,
-            p.Code,
             p.Barcode,
             p.Name,
             p.CategoryId,

@@ -72,8 +72,9 @@ public class LoginRequestValidatorTests
     [InlineData(null, false)]
     [InlineData("", false)]
     [InlineData("   ", false)]
-    [InlineData("ab", false)] // Less than 3 chars
-    [InlineData("abc", true)] // Exactly 3 chars
+    [InlineData("ab", false)] // Less than 6 chars
+    [InlineData("abcde", false)] // 5 chars, less than 6
+    [InlineData("abcdef", true)] // Exactly 6 chars
     [InlineData("password123", true)]
     [InlineData("كلمة مرور", true)]
     public void GivenPassword_WhenValidating_ThenCorrectResult(string? password, bool isValid)
@@ -94,7 +95,7 @@ public class LoginRequestValidatorTests
                     .WithErrorMessage("كلمة المرور مطلوبة");
             else
                 result.ShouldHaveValidationErrorFor(x => x.Password)
-                    .WithErrorMessage("كلمة المرور يجب أن تكون 3 أحرف على الأقل");
+                    .WithErrorMessage("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
         }
     }
 
@@ -133,7 +134,7 @@ public class LoginRequestValidatorTests
     public void GivenMixedLanguageData_WhenValidating_ThenPasses()
     {
         // Arrange
-        var request = new LoginRequest("مستخدم123", "كلمة3");
+        var request = new LoginRequest("مستخدم123", "كلمة مرور123");
 
         // Act
         var result = _validator.TestValidate(request);
@@ -161,24 +162,24 @@ public class LoginRequestValidatorTests
     }
 
     [Fact]
-    public void GivenPasswordWithExactly2Chars_WhenValidating_ThenFails()
+    public void GivenPasswordWithExactly5Chars_WhenValidating_ThenFails()
     {
         // Arrange
-        var request = new LoginRequest("admin", "ab");
+        var request = new LoginRequest("admin", "abcde");
 
         // Act
         var result = _validator.TestValidate(request);
 
         // Assert
         result.ShouldHaveValidationErrorFor(x => x.Password)
-            .WithErrorMessage("كلمة المرور يجب أن تكون 3 أحرف على الأقل");
+            .WithErrorMessage("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
     }
 
     [Fact]
-    public void GivenPasswordWithExactly3Chars_WhenValidating_ThenPasses()
+    public void GivenPasswordWithExactly6Chars_WhenValidating_ThenPasses()
     {
         // Arrange
-        var request = new LoginRequest("admin", "abc");
+        var request = new LoginRequest("admin", "abcdef");
 
         // Act
         var result = _validator.TestValidate(request);

@@ -7,8 +7,10 @@ using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -50,6 +52,18 @@ public class PurchaseReturnServiceTests : IDisposable
         _mockUow.Setup(u => u.PurchaseInvoices).Returns(new InMemoryEfCoreRepository<PurchaseInvoice>(_dbContext));
         _mockUow.Setup(u => u.Suppliers).Returns(new InMemoryEfCoreRepository<Supplier>(_dbContext));
         _mockUow.Setup(u => u.WarehouseStocks).Returns(new InMemoryEfCoreRepository<WarehouseStock>(_dbContext));
+        _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
+        _mockUow.Setup(u => u.Warehouses).Returns(new InMemoryEfCoreRepository<Warehouse>(_dbContext));
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result<PurchaseReturnDto>>(
+            It.IsAny<Func<Task<Result<PurchaseReturnDto>>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result<PurchaseReturnDto>>> func, CancellationToken ct) => func());
+
+        _mockUow.Setup(u => u.ExecuteAsync<Result>(
+            It.IsAny<Func<Task<Result>>>(),
+            It.IsAny<CancellationToken>()))
+            .Returns((Func<Task<Result>> func, CancellationToken ct) => func());
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
@@ -57,6 +71,11 @@ public class PurchaseReturnServiceTests : IDisposable
                 await _dbContext.SaveChangesAsync();
                 return 1;
             });
+
+        var storeSettingsMock = new Mock<IGenericRepository<StoreSettings>>();
+        storeSettingsMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<StoreSettings, bool>>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((StoreSettings)null!);
+        _mockUow.Setup(u => u.StoreSettings).Returns(storeSettingsMock.Object);
 
         _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MockDbContextTransaction());
@@ -70,7 +89,7 @@ public class PurchaseReturnServiceTests : IDisposable
             It.IsAny<decimal?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
-        _mockInventoryService.Setup(i => i.ValidateStockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()))
+        _mockInventoryService.Setup(i => i.ValidateStockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
         _sut = new PurchaseReturnService(
@@ -92,31 +111,33 @@ public class PurchaseReturnServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesReturnWithStockDecrease");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest
-        {
-            WarehouseId = 1,
-            SupplierId = 1,
-            PurchaseInvoiceId = null,
-            ReturnDate = DateTime.Now,
-            Notes = "Return for defective item",
-            Items = new List<SalesSystem.Contracts.Requests.PurchaseReturnItemRequest>
+        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest(
+            PurchaseInvoiceId: null,
+            SupplierId: 1,
+            WarehouseId: 1,
+            ReturnDate: DateTime.Now,
+            Notes: "Return for defective item",
+            Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new() { ProductId = 1, Quantity = 2m, UnitPrice = 50m, UnitCost = 50m, DiscountAmount = 0m, Notes = null }
+                new(ProductId: 1, Quantity: 2m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
             }
-        };
+        );
 
-        var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
+        var createResult = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value!.TotalAmount.Should().Be(100m, "2 * 50 = 100");
+        createResult.IsSuccess.Should().BeTrue();
+        createResult.Value!.TotalAmount.Should().Be(100m, "2 * 50 = 100");
+
+        var postResult = await _sut.PostAsync(createResult.Value.Id, userId: 1, CancellationToken.None);
+        postResult.IsSuccess.Should().BeTrue();
 
         _mockInventoryService.Verify(i => i.DecreaseStockAsync(
             productId: 1,
@@ -138,30 +159,32 @@ public class PurchaseReturnServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_SupplierWithBalance_DecreasesBalance");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
-        var supplier = Supplier.Create("Test Supplier", openingBalance: 5000m, code: "S001", phone: null, email: null, address: null, createdByUserId: null);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
+        var supplier = Supplier.Create("Test Supplier", openingBalance: 5000m, phone: null, email: null, address: null, createdByUserId: null);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest
-        {
-            WarehouseId = 1,
-            SupplierId = 1,
-            PurchaseInvoiceId = null,
-            ReturnDate = DateTime.Now,
-            Notes = null,
-            Items = new List<SalesSystem.Contracts.Requests.PurchaseReturnItemRequest>
+        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest(
+            PurchaseInvoiceId: null,
+            SupplierId: 1,
+            WarehouseId: 1,
+            ReturnDate: DateTime.Now,
+            Notes: null,
+            Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new() { ProductId = 1, Quantity = 5m, UnitPrice = 100m, UnitCost = 100m, DiscountAmount = 0m, Notes = null }
+                new(ProductId: 1, Quantity: 5m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
             }
-        };
+        );
 
-        var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
+        var createResult = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
+        createResult.IsSuccess.Should().BeTrue();
 
-        result.IsSuccess.Should().BeTrue();
+        var postResult = await _sut.PostAsync(createResult.Value!.Id, userId: 1, CancellationToken.None);
+        postResult.IsSuccess.Should().BeTrue();
+
         supplier.CurrentBalance.Should().Be(4500m, "We owed supplier 5000, return worth 500, now owe 4500");
 
         _output.WriteLine("[PASS] Purchase return decreases supplier balance");
@@ -172,8 +195,8 @@ public class PurchaseReturnServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_WithOriginalInvoice_ValidatesQuantities");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -182,11 +205,10 @@ public class PurchaseReturnServiceTests : IDisposable
 
         var invoice = PurchaseInvoice.Create(
             "PUR-2026-000001",
-            warehouseId: 1,
             supplierId: 1,
-            DateTime.Now,
-            DateTime.Now.AddDays(30),
-            DomainPaymentType.Cash,
+            warehouseId: 1,
+            invoiceDate: DateTime.Now,
+            dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
             notes: null
         );
@@ -196,18 +218,17 @@ public class PurchaseReturnServiceTests : IDisposable
         _dbContext.PurchaseInvoices.Add(invoice);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest
-        {
-            WarehouseId = 1,
-            SupplierId = 1,
-            PurchaseInvoiceId = 1,
-            ReturnDate = DateTime.Now,
-            Notes = null,
-            Items = new List<SalesSystem.Contracts.Requests.PurchaseReturnItemRequest>
+        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest(
+            PurchaseInvoiceId: 1,
+            SupplierId: 1,
+            WarehouseId: 1,
+            ReturnDate: DateTime.Now,
+            Notes: null,
+            Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new() { ProductId = 1, Quantity = 10m, UnitPrice = 50m, UnitCost = 50m, DiscountAmount = 0m, Notes = null } // Exceeds original
+                new(ProductId: 1, Quantity: 10m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null) // Exceeds original
             }
-        };
+        );
 
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
@@ -222,24 +243,23 @@ public class PurchaseReturnServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_NonExistentOriginalInvoice_ReturnsFailure");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest
-        {
-            WarehouseId = 1,
-            SupplierId = 1,
-            PurchaseInvoiceId = 999, // Non-existent
-            ReturnDate = DateTime.Now,
-            Notes = null,
-            Items = new List<SalesSystem.Contracts.Requests.PurchaseReturnItemRequest>
+        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest(
+            PurchaseInvoiceId: 999,
+            SupplierId: 1,
+            WarehouseId: 1,
+            ReturnDate: DateTime.Now,
+            Notes: null,
+            Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new() { ProductId = 1, Quantity = 1m, UnitPrice = 50m, UnitCost = 50m, DiscountAmount = 0m, Notes = null }
+                new(ProductId: 1, Quantity: 1m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
             }
-        };
+        );
 
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
@@ -254,8 +274,8 @@ public class PurchaseReturnServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_InsufficientStock_ReturnsFailure");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -267,21 +287,20 @@ public class PurchaseReturnServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Setup validation to fail
-        _mockInventoryService.Setup(i => i.ValidateStockAsync(1, 1, 10m, It.IsAny<CancellationToken>()))
+        _mockInventoryService.Setup(i => i.ValidateStockAsync(1, 1, 10m, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Failure("الكمية المتوفرة أقل من الكمية المطلوبة"));
 
-        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest
-        {
-            WarehouseId = 1,
-            SupplierId = 1,
-            PurchaseInvoiceId = null,
-            ReturnDate = DateTime.Now,
-            Notes = null,
-            Items = new List<SalesSystem.Contracts.Requests.PurchaseReturnItemRequest>
+        var request = new SalesSystem.Contracts.Requests.CreatePurchaseReturnRequest(
+            PurchaseInvoiceId: null,
+            SupplierId: 1,
+            WarehouseId: 1,
+            ReturnDate: DateTime.Now,
+            Notes: null,
+            Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new() { ProductId = 1, Quantity = 10m, UnitPrice = 50m, UnitCost = 50m, DiscountAmount = 0m, Notes = null }
+                new(ProductId: 1, Quantity: 10m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
             }
-        };
+        );
 
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
@@ -300,8 +319,8 @@ public class PurchaseReturnServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingReturn_ReturnsDto");
 
-        var warehouse = Warehouse.Create("Main Warehouse", true);
-        var supplier = Supplier.Create("Test Supplier", 0m, "S001", null, null, null, null, null);
+        var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
+        var supplier = Supplier.Create("Test Supplier", 0m);
         var product = Product.Create("Test Product", 10m, 100m);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -315,9 +334,9 @@ public class PurchaseReturnServiceTests : IDisposable
             purchaseInvoiceId: null,
             returnDate: DateTime.Now,
             notes: "Test return",
-            createdByUserId: 1
+            userId: 1
         );
-        returnEntity.AddItem(productId: 1, quantity: 1m, unitPrice: 50m, discountAmount: 0m, notes: null);
+        returnEntity.AddItem(productId: 1, quantity: 1m, unitCost: 50m, discountAmount: 0m, notes: null);
         _dbContext.PurchaseReturns.Add(returnEntity);
         await _dbContext.SaveChangesAsync();
 
@@ -388,6 +407,7 @@ public class PurchaseReturnServiceTests : IDisposable
         public async Task<T> AddAsync(T entity, CancellationToken ct = default)
         {
             await _context.Set<T>().AddAsync(entity, ct);
+            await _context.SaveChangesAsync(ct);
             return entity;
         }
 
@@ -397,14 +417,75 @@ public class PurchaseReturnServiceTests : IDisposable
             return Task.CompletedTask;
         }
 
-        public Task SoftDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                entity.MarkAsDeleted();
+                _context.Set<T>().Update(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
-        public Task HardDeleteAsync(int id, CancellationToken ct = default)
-            => throw new NotImplementedException();
+        public async Task HardDeleteAsync(int id, CancellationToken ct = default)
+        {
+            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            if (entity != null)
+            {
+                _context.Set<T>().Remove(entity);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
 
         public void DeleteRange(IEnumerable<T> entities)
-            => throw new NotImplementedException();
+        {
+            _context.Set<T>().RemoveRange(entities);
+        }
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

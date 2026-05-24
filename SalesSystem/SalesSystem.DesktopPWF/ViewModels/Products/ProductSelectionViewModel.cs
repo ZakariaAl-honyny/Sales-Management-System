@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -18,12 +18,11 @@ public class ProductSelectionItemViewModel
 {
     public ProductDto Product { get; }
     public decimal Stock { get; set; }
-    public string StockDisplay => Stock > 0 ? Stock.ToString("N3") : "—";
+    public string StockDisplay => Stock > 0 ? Stock.ToString("N3") : "â€”";
 
     // Delegated properties for XAML column bindings
     public int Id => Product.Id;
     public string Name => Product.Name;
-    public string? Code => Product.Code;
     public string? Barcode => Product.Barcode;
     public string? CategoryName => Product.CategoryName;
     public decimal RetailPrice => Product.RetailPrice;
@@ -54,7 +53,6 @@ public class ProductSelectionViewModel : ViewModelBase
     private ICollectionView? _productsView;
     private ProductSelectionItemViewModel? _selectedItem;
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private bool _isStockLoading;
 
     /// <summary>
@@ -81,7 +79,7 @@ public class ProductSelectionViewModel : ViewModelBase
         _ = LoadProductsAsync();
     }
 
-    // ── Properties ────────────────────────────────────────────────────────────
+    // â”€â”€ Properties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     public ObservableCollection<ProductSelectionItemViewModel> Products
     {
@@ -105,7 +103,7 @@ public class ProductSelectionViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Convenience property — returns the underlying ProductDto of the selected row.</summary>
+    /// <summary>Convenience property â€” returns the underlying ProductDto of the selected row.</summary>
     public ProductDto? SelectedProduct => SelectedItem?.Product;
 
     public string SearchText
@@ -118,11 +116,6 @@ public class ProductSelectionViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public bool IsStockLoading
     {
@@ -132,18 +125,18 @@ public class ProductSelectionViewModel : ViewModelBase
 
     public bool ShowStockColumn => _warehouseId > 0;
 
-    // ── Commands ──────────────────────────────────────────────────────────────
+    // â”€â”€ Commands â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     public ICommand SelectCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand SearchCommand { get; }
     public ICommand ScanBarcodeCommand { get; }
 
-    // ── Methods ───────────────────────────────────────────────────────────────
+    // â”€â”€ Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private async Task LoadProductsAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         try
         {
             var result = await _productService.GetAllAsync(false);
@@ -160,9 +153,9 @@ public class ProductSelectionViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
 
-            // Fetch stock in background — does NOT block the UI
+            // Fetch stock in background â€” does NOT block the UI
             if (_warehouseId > 0)
                 _ = LoadStockAsync();
         }
@@ -188,7 +181,7 @@ public class ProductSelectionViewModel : ViewModelBase
         }
         catch
         {
-            // Stock display is optional — swallow errors silently
+            // Stock display is optional â€” swallow errors silently
         }
         finally
         {
@@ -203,7 +196,6 @@ public class ProductSelectionViewModel : ViewModelBase
 
         var search = SearchText.Trim().ToLower();
         return item.Name.ToLower().Contains(search)
-            || (item.Code?.ToLower().Contains(search) ?? false)
             || (item.Barcode?.ToLower().Contains(search) ?? false)
             || (item.CategoryName?.ToLower().Contains(search) ?? false);
     }
@@ -216,8 +208,7 @@ public class ProductSelectionViewModel : ViewModelBase
 
         var search = SearchText.Trim().ToLower();
         var match = Products.FirstOrDefault(p =>
-            (p.Barcode != null && p.Barcode.ToLower() == search) ||
-            (p.Code != null    && p.Code.ToLower()    == search));
+            (p.Barcode != null && p.Barcode.ToLower() == search));
 
         if (match != null)
         {
@@ -235,7 +226,7 @@ public class ProductSelectionViewModel : ViewModelBase
     {
         if (SelectedItem != null)
             OnProductSelected?.Invoke(SelectedItem.Product);
-        // RequestClose() intentionally omitted — allows continuous selection mode.
+        // RequestClose() intentionally omitted â€” allows continuous selection mode.
         // Callers that need single-pick mode call CloseDialog() explicitly.
     }
 
@@ -248,3 +239,7 @@ public class ProductSelectionViewModel : ViewModelBase
     /// <summary>Called by callers that operate in single-pick mode to close the window.</summary>
     public void CloseDialog() => RequestClose();
 }
+
+
+
+

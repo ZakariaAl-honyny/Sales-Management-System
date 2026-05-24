@@ -1,5 +1,6 @@
 using FluentValidation;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Api.Validators.Misc;
 
@@ -25,36 +26,13 @@ public class ReportFilterRequestValidator : AbstractValidator<ReportFilterReques
     }
 }
 
-public class UpdateSettingsRequestValidator : AbstractValidator<UpdateSettingsRequest>
+public class UpdateCostingMethodRequestValidator : AbstractValidator<UpdateCostingMethodRequest>
 {
-    public UpdateSettingsRequestValidator()
+    public UpdateCostingMethodRequestValidator()
     {
-        RuleFor(x => x.StoreName)
-            .NotEmpty().WithMessage("اسم المحل مطلوب")
-            .MaximumLength(200).WithMessage("اسم المحل لا يمكن أن يتجاوز 200 حرف");
-
-        RuleFor(x => x.Address)
-            .MaximumLength(500).WithMessage("العنوان لا يمكن أن يتجاوز 500 حرف");
-
-        RuleFor(x => x.Phone)
-            .MaximumLength(20).WithMessage("رقم الهاتف لا يمكن أن يتجاوز 20 حرف");
-
-        RuleFor(x => x.Email)
-            .EmailAddress().WithMessage("البريد الإلكتروني غير صحيح")
-            .MaximumLength(100).WithMessage("البريد الإلكتروني لا يمكن أن يتجاوز 100 حرف")
-            .When(x => !string.IsNullOrEmpty(x.Email));
-
-        RuleFor(x => x.Currency)
-            .NotEmpty().WithMessage("العملة مطلوبة")
-            .MaximumLength(10).WithMessage("رمز العملة لا يمكن أن يتجاوز 10 أحرف");
-
-        RuleFor(x => x.DefaultTaxRate)
-            .GreaterThanOrEqualTo(0).WithMessage("نسبة الضريبة لا يمكن أن تكون سالبة")
-            .LessThanOrEqualTo(100).WithMessage("نسبة الضريبة لا يمكن أن تتجاوز 100%");
-
-        RuleFor(x => x.InvoicePrefix)
-            .NotEmpty().WithMessage("بادئة الفاتورة مطلوبة")
-            .MaximumLength(10).WithMessage("بادئة الفاتورة لا يمكن أن تتجاوز 10 أحرف");
+        RuleFor(x => x.Method)
+            .Must(m => Enum.IsDefined(typeof(CostingMethod), m))
+            .WithMessage("طريقة التكلفة غير صالحة");
     }
 }
 

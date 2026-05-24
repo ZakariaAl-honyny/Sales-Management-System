@@ -41,9 +41,15 @@ public class ReportTypeItem
 /// </summary>
 public class ReportsViewModel : ViewModelBase
 {
-    private readonly IReportApiService _reportApiService;
-    private readonly IWarehouseApiService _warehouseService;
-    private readonly IDialogService _dialogService;
+    private IReportApiService? _reportApiService;
+    private IWarehouseApiService? _warehouseService;
+    private IReportApiService ReportApiService => _reportApiService ??= App.GetService<IReportApiService>();
+    private IWarehouseApiService WarehouseService => _warehouseService ??= App.GetService<IWarehouseApiService>();
+
+    // Uses 'new' to suppress CS0108 (inherited member hiding).
+    // Test uses SetField("_dialogService", mock) before property is accessed.
+    private new IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+    private IDialogService? _dialogService;
 
     private ReportType _selectedReportType;
     private DateTime _dateFrom;
@@ -56,10 +62,6 @@ public class ReportsViewModel : ViewModelBase
 
     public ReportsViewModel()
     {
-        _reportApiService = App.GetService<IReportApiService>();
-        _warehouseService = App.GetService<IWarehouseApiService>();
-        _dialogService = App.GetService<IDialogService>();
-
         ReportTypes = new ObservableCollection<ReportTypeItem>
         {
             new() { Type = ReportType.Sales, DisplayName = "تقرير المبيعات" },
@@ -90,13 +92,13 @@ public class ReportsViewModel : ViewModelBase
     {
         try
         {
-            var result = await _warehouseService.GetAllAsync();
+            var result = await WarehouseService.GetAllAsync();
             if (result.IsSuccess && result.Value != null)
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                InvokeOnUIThread(() =>
                 {
                     Warehouses.Clear();
-                    Warehouses.Add(new WarehouseDto(0, null, "كل المخازن", string.Empty, true, true));
+                    Warehouses.Add(new WarehouseDto(0, "كل المخازن", string.Empty, true, true));
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
                     
@@ -240,7 +242,7 @@ public class ReportsViewModel : ViewModelBase
     private void ShowReportError(Exception ex)
     {
         var userMsg = HandleException(ex, "ReportsViewModel.GenerateReportAsync", $"[ReportsViewModel.GenerateReportAsync] Failed to generate report of type {SelectedReportType}.");
-        _ = _dialogService.ShowErrorAsync("خطأ", userMsg);
+        _ = DialogService.ShowErrorAsync("خطأ في التقرير", userMsg);
     }
 
     private async Task GenerateReportOperationAsync()
@@ -252,7 +254,7 @@ public class ReportsViewModel : ViewModelBase
 
         DataTable table = new DataTable();
         
-        System.Windows.Application.Current.Dispatcher.Invoke(() => ReportColumns.Clear());
+        InvokeOnUIThread(() => ReportColumns.Clear());
 
         switch (SelectedReportType)
         {
@@ -265,7 +267,7 @@ public class ReportsViewModel : ViewModelBase
             case ReportType.LowStock: await GenerateLowStockReportAsync(table); break;
         }
 
-        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        InvokeOnUIThread(() =>
         {
             ReportData = table;
             HasSearched = true;
@@ -304,7 +306,7 @@ public class ReportsViewModel : ViewModelBase
         AddColumn(table, "المدفوع");
         AddColumn(table, "المتبقي");
 
-        var result = await _reportApiService.GetSalesReportAsync(SelectedWarehouseId, DateFrom, DateTo);
+        var result = await ReportApiService.GetSalesReportAsync(SelectedWarehouseId, DateFrom, DateTo);
 
         if (result.IsSuccess && result.Value != null)
         {
@@ -347,7 +349,7 @@ public class ReportsViewModel : ViewModelBase
         AddColumn(table, "المدفوع");
         AddColumn(table, "المتبقي");
 
-        var result = await _reportApiService.GetPurchasesReportAsync(SelectedWarehouseId, DateFrom, DateTo);
+        var result = await ReportApiService.GetPurchasesReportAsync(SelectedWarehouseId, DateFrom, DateTo);
 
         if (result.IsSuccess && result.Value != null)
         {
@@ -389,7 +391,7 @@ public class ReportsViewModel : ViewModelBase
         AddColumn(table, "سعر الشراء");
         AddColumn(table, "القيمة الإجمالية");
 
-        var result = await _reportApiService.GetStockReportAsync(SelectedWarehouseId);
+        var result = await ReportApiService.GetStockReportAsync(SelectedWarehouseId);
 
         if (result.IsSuccess && result.Value != null)
         {
@@ -397,7 +399,6 @@ public class ReportsViewModel : ViewModelBase
             foreach (var stock in result.Value)
             {
                 var row = table.NewRow();
-                row["رمز المنتج"] = stock.ProductCode;
                 row["اسم المنتج"] = stock.ProductName;
                 row["الفئة"] = stock.CategoryName;
                 row["الوحدة"] = stock.UnitName;
@@ -429,14 +430,13 @@ public class ReportsViewModel : ViewModelBase
         AddColumn(table, "إجمالي المدفوعات");
         AddColumn(table, "الرصيد الحالي");
 
-        var result = await _reportApiService.GetCustomerBalancesReportAsync();
+        var result = await ReportApiService.GetCustomerBalancesReportAsync();
 
         if (result.IsSuccess && result.Value != null)
         {
             foreach (var cb in result.Value)
             {
                 var row = table.NewRow();
-                row["رمز العميل"] = cb.CustomerCode;
                 row["اسم العميل"] = cb.CustomerName;
                 row["الرصيد الافتتاحي"] = cb.OpeningBalance;
                 row["إجمالي المبيعات"] = cb.TotalSales;
@@ -465,14 +465,13 @@ public class ReportsViewModel : ViewModelBase
         AddColumn(table, "إجمالي المدفوعات");
         AddColumn(table, "الرصيد الحالي");
 
-        var result = await _reportApiService.GetSupplierBalancesReportAsync();
+        var result = await ReportApiService.GetSupplierBalancesReportAsync();
 
         if (result.IsSuccess && result.Value != null)
         {
             foreach (var sb in result.Value)
             {
                 var row = table.NewRow();
-                row["رمز المورد"] = sb.SupplierCode;
                 row["اسم المورد"] = sb.SupplierName;
                 row["الرصيد الافتتاحي"] = sb.OpeningBalance;
                 row["إجمالي المشتريات"] = sb.TotalPurchases;
@@ -497,8 +496,8 @@ public class ReportsViewModel : ViewModelBase
         AddColumn(table, "البيان");
         AddColumn(table, "المبلغ");
 
-        var salesResult = await _reportApiService.GetSalesReportAsync(SelectedWarehouseId, DateFrom, DateTo);
-        var purchasesResult = await _reportApiService.GetPurchasesReportAsync(SelectedWarehouseId, DateFrom, DateTo);
+        var salesResult = await ReportApiService.GetSalesReportAsync(SelectedWarehouseId, DateFrom, DateTo);
+        var purchasesResult = await ReportApiService.GetPurchasesReportAsync(SelectedWarehouseId, DateFrom, DateTo);
 
         if (!salesResult.IsSuccess)
         {
@@ -549,14 +548,13 @@ public class ReportsViewModel : ViewModelBase
         AddColumn(table, "النقص (كرتون)");
         AddColumn(table, "باقي التجزئة");
 
-        var result = await _reportApiService.GetLowStockReportAsync(SelectedWarehouseId);
+        var result = await ReportApiService.GetLowStockReportAsync(SelectedWarehouseId);
 
         if (result.IsSuccess && result.Value != null)
         {
             foreach (var low in result.Value)
             {
                 var row = table.NewRow();
-                row["رمز المنتج"] = low.ProductCode;
                 row["اسم المنتج"] = low.ProductName;
                 row["المخزن"] = low.WarehouseName;
                 row["المخزون الحالي"] = low.CurrentRetailQty;
@@ -580,7 +578,7 @@ public class ReportsViewModel : ViewModelBase
     private void AddColumn(DataTable table, string columnName)
     {
         table.Columns.Add(columnName);
-        System.Windows.Application.Current.Dispatcher.Invoke(() => ReportColumns.Add(table.Columns[columnName]!));
+        InvokeOnUIThread(() => ReportColumns.Add(table.Columns[columnName]!));
     }
     #endregion
 
@@ -650,7 +648,7 @@ public class ReportsViewModel : ViewModelBase
                 });
 
                 Log.Information("Report exported to Excel: {FileName}", dialog.FileName);
-                await _dialogService.ShowSuccessAsync("نجاح", "تم التصدير بنجاح");
+                await DialogService.ShowSuccessAsync("نجاح", "تم تصدير التقرير إلى Excel بنجاح");
             }
             catch (Exception ex)
             {
@@ -705,7 +703,7 @@ public class ReportsViewModel : ViewModelBase
                 });
 
                 Log.Information("Report exported to CSV: {FileName}", dialog.FileName);
-                await _dialogService.ShowSuccessAsync("نجاح", "تم التصدير بنجاح");
+                await DialogService.ShowSuccessAsync("نجاح", "تم تصدير التقرير إلى CSV بنجاح");
             }
             catch (Exception ex)
             {

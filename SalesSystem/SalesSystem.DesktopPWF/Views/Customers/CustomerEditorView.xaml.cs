@@ -1,4 +1,5 @@
-using System.Windows;
+﻿using System.Windows;
+using SalesSystem.DesktopPWF.Helpers;
 
 namespace SalesSystem.DesktopPWF.Views.Customers;
 
@@ -16,6 +17,15 @@ public partial class CustomerEditorView : Window
     {
         DataContext = viewModel;
         viewModel.CloseRequested += () => Close();
+        viewModel.FocusFirstInvalidFieldRequested += () =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                (ValidationFocusBehavior.FindFirstInvalid(this) ??
+                ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
+            });
+        };
     }
 }
+
 

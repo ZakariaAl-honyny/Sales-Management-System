@@ -1,5 +1,7 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +11,7 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Printing;
+using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Infrastructure;
@@ -62,9 +65,6 @@ builder.Services.AddDataProtection()
 // ============================================
 // 2. Read Configuration
 // ============================================
-var connectionString = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION")
-    ?? "Server=.;Database=SalesSystemDb;Trusted_Connection=true;TrustServerCertificate=true;";
-
 var jwtSecret = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_SECRET")
     ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
         ? "ThisIsASecretKeyThatIsLongEnoughForHS256Algorithm!"
@@ -82,10 +82,13 @@ var jwtSettings = new JwtSettings
 };
 
 // ============================================
-// 3. DbContext with retry on failure
+// 3. DbContext with Secure Factory and retry on failure
 // ============================================
-builder.Services.AddDbContext<SalesDbContext>(options =>
-    options.UseSqlServer(connectionString, sqlOptions =>
+builder.Services.AddDbContext<SalesDbContext>((serviceProvider, options) =>
+{
+    var factory = serviceProvider.GetRequiredService<SecureDbContextFactory>();
+    var connString = factory.GetDecryptedConnectionString();
+    options.UseSqlServer(connString, sqlOptions =>
     {
         sqlOptions.EnableRetryOnFailure(
             maxRetryCount: 3,
@@ -93,7 +96,8 @@ builder.Services.AddDbContext<SalesDbContext>(options =>
             errorNumbersToAdd: new[] { 2, 233, 233 }
         );
         sqlOptions.CommandTimeout(30);
-    }));
+    });
+});
 
 // ============================================
 // 3b. Security & Backup DI Registrations
@@ -119,6 +123,8 @@ builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IDocumentSequenceService, DocumentSequenceService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
+builder.Services.AddScoped<IBarcodeLookupService, BarcodeLookupService>();
+builder.Services.AddScoped<IProductPriceService, ProductPriceService>();
 builder.Services.AddScoped<ISalesService, SalesService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<ISalesReturnService, SalesReturnService>();
@@ -132,7 +138,9 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ISystemSettingsRepository, SystemSettingsRepository>();
 builder.Services.AddScoped<IUpdateProductPricingService, UpdateProductPricingService>();
 builder.Services.AddScoped<IPrintService, PrintService>();
+builder.Services.AddScoped<IPrintDataService, PrintDataService>();
 builder.Services.AddScoped<InvoicePrintDtoBuilder>();
+builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================
@@ -167,8 +175,64 @@ builder.Services.AddAuthorization(opts =>
 // ============================================
 // 7. Other Services
 // ============================================
+// CORS — Restrict to localhost for security
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DesktopOnly", policy =>
+        policy.WithOrigins("http://localhost:5221", "http://localhost:5222")
+              .AllowAnyHeader()
+              .AllowAnyMethod());
+});
+
 builder.Services.AddControllers();
+
+// Layer 6: Rate Limiting — brute-force protection
+builder.Services.AddRateLimiter(options =>
+{
+    // Global: 100 requests per minute per IP
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        context => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Strict policy for login endpoint: 5 attempts per 15 minutes
+    options.AddPolicy("LoginPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0
+            }));
+
+    // Arabic response when rate limit exceeded
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+        context.HttpContext.Response.ContentType = "application/json";
+
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                retryAfter.TotalSeconds.ToString("0");
+        }
+
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            Error = "تم تجاوز الحد المسموح من الطلبات. حاول مجدداً بعد قليل",
+            Code = "RATE_LIMIT_EXCEEDED"
+        }, ct);
+    };
+});
+
 builder.Services.AddHttpClient();
+builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>
@@ -235,13 +299,6 @@ async Task InitializeDatabaseAsync(SalesDbContext db, Microsoft.Extensions.Loggi
         }
         else
         {
-            var alreadySeeded = await CheckIfSeededAsync(db);
-            if (alreadySeeded)
-            {
-                logger.LogInformation("Database already initialized. Skipping seed...");
-                return;
-            }
-
             try
             {
                 await db.Database.MigrateAsync();
@@ -252,90 +309,11 @@ async Task InitializeDatabaseAsync(SalesDbContext db, Microsoft.Extensions.Loggi
             }
         }
 
-        await SeedDataAsync(db, logger);
+        await DbSeeder.SeedAsync(db, logger);
     }
     catch (Exception ex)
     {
         logger.LogError(ex, "Database initialization error: {Message}", ex.Message);
-    }
-}
-
-async Task<bool> CheckIfSeededAsync(SalesDbContext db)
-{
-    try
-    {
-        var count = await db.Users.CountAsync();
-        return count > 0;
-    }
-    catch
-    {
-        return false;
-    }
-}
-
-async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger logger)
-{
-    try
-    {
-        var existingUser = await db.Users.FindAsync(1);
-        if (existingUser != null)
-        {
-            logger.LogInformation("Database already seeded. Skipping...");
-            return;
-        }
-    }
-    catch
-    {
-    }
-
-    try
-    {
-        var adminUser = User.Create(
-            userName: "admin",
-            passwordHash: BCrypt.Net.BCrypt.HashPassword("admin123", workFactor: 12),
-            fullName: "Administrator",
-            role: UserRole.Admin,
-            createdByUserId: null
-        );
-        db.Users.Add(adminUser);
-
-        var warehouse = Warehouse.Create(
-            name: "المخزن الرئيسي",
-            code: "WH-001",
-            location: null,
-            isDefault: true,
-            createdByUserId: null
-        );
-        db.Warehouses.Add(warehouse);
-
-        var cashCustomer = Customer.Create(
-            name: "عميل نقدي",
-            code: "CASH",
-            openingBalance: 0,
-            createdByUserId: null
-        );
-        db.Customers.Add(cashCustomer);
-
-        db.Units.Add(Unit.Create("قطعة", "pcs", null));
-        db.Units.Add(Unit.Create("كيلو", "kg", null));
-        db.Units.Add(Unit.Create("لتر", "ltr", null));
-        db.Units.Add(Unit.Create("متر", "m", null));
-        db.Units.Add(Unit.Create("صندوق", "box", null));
-
-        db.DocumentSequences.Add(DocumentSequence.Create("INV", "INV", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("PUR", "PUR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("SR", "SR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("PR", "PR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("TRF", "TRF", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("CP", "CP", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("SP", "SP", 2026));
-
-        await db.SaveChangesAsync();
-        logger.LogInformation("Seed data completed successfully.");
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Error seeding data: {Message}", ex.Message);
     }
 }
 
@@ -344,14 +322,16 @@ async Task SeedDataAsync(SalesDbContext db, Microsoft.Extensions.Logging.ILogger
 // ============================================
 app.UseMiddleware<ExceptionMiddleware>();
 
+app.UseCors("DesktopOnly");
+
+app.UseRateLimiter();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseHttpsRedirection();
 
-// Health check
-app.MapGet("/api/v1/health", () => new { Status = "OK", Version = "1.0", Timestamp = DateTime.UtcNow })
-    .WithName("HealthCheck");
+
 
 app.MapControllers();
 

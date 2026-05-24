@@ -130,43 +130,6 @@ public class CreateSupplierRequestValidatorTests
 
     #endregion
 
-    #region Code Validation
-
-    [Theory]
-    [InlineData(null, true)]
-    [InlineData("", true)]
-    [InlineData("SUPP001", true)]
-    [InlineData("كود123", true)]
-    public void GivenCode_WhenValidating_ThenCorrectResult(string? code, bool isValid)
-    {
-        // Arrange
-        var request = CreateValidRequest() with { Code = code };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        if (isValid)
-            result.ShouldNotHaveValidationErrorFor(x => x.Code);
-    }
-
-    [Fact]
-    public void GivenCodeExceeds30Chars_WhenValidating_ThenFailsWithMaxLengthError()
-    {
-        // Arrange
-        var longCode = new string('S', 31);
-        var request = CreateValidRequest() with { Code = longCode };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Code)
-            .WithErrorMessage("كود المورد لا يمكن أن يتجاوز 30 حرف");
-    }
-
-    #endregion
-
     #region Arabic Text Handling
 
     [Fact]
@@ -189,7 +152,6 @@ public class CreateSupplierRequestValidatorTests
         var request = CreateValidRequest() with
         {
             Name = "Supplier Name - اسم",
-            Code = "S001-كود",
             Phone = "+201234567890"
         };
 
@@ -221,7 +183,6 @@ public class CreateSupplierRequestValidatorTests
 
     private static CreateSupplierRequest CreateValidRequest() => new(
         Name: "Valid Supplier",
-        Code: "SUPP001",
         Phone: "01234567890",
         Email: "supplier@example.com",
         Address: "Test Address",
@@ -351,25 +312,6 @@ public class UpdateSupplierRequestValidatorTests
 
     #endregion
 
-    #region Code Validation
-
-    [Fact]
-    public void GivenCodeExceeds30Chars_WhenValidating_ThenFailsWithMaxLengthError()
-    {
-        // Arrange
-        var longCode = new string('S', 31);
-        var request = CreateValidRequest() with { Code = longCode };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Code)
-            .WithErrorMessage("كود المورد لا يمكن أن يتجاوز 30 حرف");
-    }
-
-    #endregion
-
     #region Arabic Text Handling - Update
 
     [Theory]
@@ -411,7 +353,6 @@ public class UpdateSupplierRequestValidatorTests
         var request = CreateValidRequest() with
         {
             Name = "Supplier Updated - اسم",
-            Code = "S001-كود",
             Phone = "+201234567890"
         };
 
@@ -456,7 +397,6 @@ public class UpdateSupplierRequestValidatorTests
 
     private static UpdateSupplierRequest CreateValidRequest() => new(
         Name: "Updated Supplier",
-        Code: "SUPP001",
         Phone: "01234567890",
         Email: "updated@supplier.com",
         Address: "Updated Address",

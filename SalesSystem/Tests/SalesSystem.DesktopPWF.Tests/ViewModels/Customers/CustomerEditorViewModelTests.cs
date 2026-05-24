@@ -9,6 +9,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels.Customers;
 
 /// <summary>
@@ -18,11 +19,13 @@ public class CustomerEditorViewModelTests : IDisposable
 {
     private readonly Mock<ICustomerApiService> _mockCustomerService;
     private readonly Mock<IEventBus> _mockEventBus;
+    private readonly Mock<IDialogService> _mockDialogService;
 
     public CustomerEditorViewModelTests()
     {
         _mockCustomerService = new Mock<ICustomerApiService>();
         _mockEventBus = new Mock<IEventBus>();
+        _mockDialogService = new Mock<IDialogService>();
     }
 
     public void Dispose()
@@ -37,7 +40,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange & Act
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.SaveCommand.Should().NotBeNull();
@@ -50,7 +54,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange & Act
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.IsEditMode.Should().BeFalse();
@@ -60,10 +65,10 @@ public class CustomerEditorViewModelTests : IDisposable
     public void Constructor_WithCustomerDto_SetsIsEditModeTrue()
     {
         // Arrange
-        var customer = CreateTestCustomerDto(1, "CUST-001", "عميل تجريبي");
+        var customer = CreateTestCustomerDto(1, "عميل تجريبي");
 
         // Act - Use the service-based constructor
-        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object);
+        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object, _mockDialogService.Object);
 
         // Assert
         viewModel.IsEditMode.Should().BeTrue();
@@ -75,10 +80,10 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange & Act
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
-        viewModel.Code.Should().BeEmpty();
         viewModel.Name.Should().BeEmpty();
         viewModel.Phone.Should().BeEmpty();
         viewModel.Email.Should().BeEmpty();
@@ -88,7 +93,7 @@ public class CustomerEditorViewModelTests : IDisposable
         viewModel.OpeningBalance.Should().Be(0);
         viewModel.Notes.Should().BeEmpty();
         viewModel.IsActive.Should().BeTrue();
-        viewModel.IsLoading.Should().BeFalse();
+        viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -97,7 +102,6 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var customer = new CustomerDto(
             Id: 1,
-            Code: "CUST-001",
             Name: "عميل تجريبي",
             Phone: "0501234567",
             Email: "test@example.com",
@@ -109,11 +113,10 @@ public class CustomerEditorViewModelTests : IDisposable
             IsActive: false);
 
         // Act
-        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object);
+        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object, _mockDialogService.Object);
 
         // Assert - field is private, we verify via IsEditMode being true
         viewModel.IsEditMode.Should().BeTrue();
-        viewModel.Code.Should().Be("CUST-001");
         viewModel.Name.Should().Be("عميل تجريبي");
         viewModel.Phone.Should().Be("0501234567");
         viewModel.Email.Should().Be("test@example.com");
@@ -129,7 +132,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
         viewModel.Title.Should().Be("إضافة عميل جديد");
@@ -141,7 +145,6 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var customer = new CustomerDto(
             Id: 1,
-            Code: "CUST-001",
             Name: "عميل تجريبي",
             Phone: null,
             Email: null,
@@ -152,7 +155,7 @@ public class CustomerEditorViewModelTests : IDisposable
             CreditLimit: 0,
             IsActive: true);
 
-        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object);
+        var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object, _mockDialogService.Object);
 
         // Assert
         viewModel.Title.Should().Be("تعديل عميل");
@@ -163,94 +166,131 @@ public class CustomerEditorViewModelTests : IDisposable
     #region Validation Tests
 
     [Fact]
-    public void Validate_WhenNameIsEmpty_ReturnsFalse()
+    public void Validate_WhenNameIsEmpty_ProducesValidationError()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
-        viewModel.Name = "";
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+        // Set a non-empty value first so SetProperty detects the change to empty
+        viewModel.Name = "test";
+        viewModel.Name = string.Empty;
 
-        // Assert - Check HasNameError property
-        viewModel.HasNameError.Should().BeFalse(); // Not yet validated
+        // Assert - INotifyDataErrorInfo validation fires on property change
+        var errors = viewModel.GetErrors("Name").Cast<string>().ToList();
+        errors.Should().Contain(e => e.Contains("اسم العميل مطلوب"));
     }
 
     [Fact]
-    public void Validate_WhenCreditLimitIsNegative_ReturnsFalse()
+    public void Validate_WhenCreditLimitIsNegative_ProducesValidationError()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.CreditLimit = -100;
 
-        // Assert - Check HasCreditLimitError property
-        viewModel.HasCreditLimitError.Should().BeFalse(); // Not yet validated
+        // Assert - INotifyDataErrorInfo validation fires on property change
+        var errors = viewModel.GetErrors("CreditLimit").Cast<string>().ToList();
+        errors.Should().Contain(e => e.Contains("الحد الائتماني"));
     }
 
     [Fact]
-    public void Validate_WhenOpeningBalanceIsNegative_ReturnsFalse()
+    public void Validate_WhenOpeningBalanceIsNegative_ProducesValidationError()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.OpeningBalance = -100;
 
-        // Assert - Check HasOpeningBalanceError property
-        viewModel.HasOpeningBalanceError.Should().BeFalse(); // Not yet validated
+        // Assert - INotifyDataErrorInfo validation fires on property change
+        var errors = viewModel.GetErrors("OpeningBalance").Cast<string>().ToList();
+        errors.Should().Contain(e => e.Contains("الرصيد الافتتاحي"));
+    }
+
+    #endregion
+
+    #region INotifyDataErrorInfo / ValidateAsync Tests (v4.6.2)
+
+    [Fact]
+    public void SetDialogService_Constructor_CallsSetDialogService()
+    {
+        // Arrange & Act
+        var vm = new CustomerEditorViewModel(
+            _mockCustomerService.Object,
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+
+        // Assert — SetDialogService is called in constructor; VM created without exception
+        vm.Should().NotBeNull();
+        vm.SaveCommand.Should().NotBeNull();
     }
 
     [Fact]
-    public void NameError_WhenHasNameErrorTrue_ReturnsErrorMessage()
+    public async Task ValidateAsync_WhenNameIsEmpty_AddsNameError()
     {
         // Arrange
-        var viewModel = new CustomerEditorViewModel(
+        var vm = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
-        viewModel.HasNameError = true;
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+        vm.Name = string.Empty;
+
+        // Act
+        var isValid = await InvokeValidateAsync(vm);
 
         // Assert
-        viewModel.NameError.Should().Be("الاسم مطلوب");
+        isValid.Should().BeFalse();
+        var errors = vm.GetErrors("Name").Cast<string>().ToList();
+        errors.Should().Contain(e => e.Contains("اسم"));
     }
 
     [Fact]
-    public void NameError_WhenHasNameErrorFalse_ReturnsNull()
+    public async Task ValidateAsync_WhenNameIsValid_ClearsNameError()
     {
         // Arrange
-        var viewModel = new CustomerEditorViewModel(
+        var vm = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
-        viewModel.HasNameError = false;
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+        vm.Name = "زبون تجريبي"; // Valid name
+
+        // Act
+        var isValid = await InvokeValidateAsync(vm);
 
         // Assert
-        viewModel.NameError.Should().BeNull();
+        isValid.Should().BeTrue();
+        var errors = vm.GetErrors("Name").Cast<string>().ToList();
+        errors.Should().BeEmpty();
     }
 
     [Fact]
-    public void CreditLimitError_WhenHasCreditLimitErrorTrue_ReturnsErrorMessage()
+    public async Task ValidateAsync_WithMultipleErrors_ReturnsFalse()
     {
         // Arrange
-        var viewModel = new CustomerEditorViewModel(
+        var vm = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
-        viewModel.HasCreditLimitError = true;
+            _mockEventBus.Object,
+            _mockDialogService.Object);
+        vm.Name = string.Empty;
+        vm.CreditLimit = -500;
+        vm.OpeningBalance = -100;
+
+        // Act
+        var isValid = await InvokeValidateAsync(vm);
 
         // Assert
-        viewModel.CreditLimitError.Should().Be("الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر");
-    }
-
-    [Fact]
-    public void OpeningBalanceError_WhenHasOpeningBalanceErrorTrue_ReturnsErrorMessage()
-    {
-        // Arrange
-        var viewModel = new CustomerEditorViewModel(
-            _mockCustomerService.Object,
-            _mockEventBus.Object);
-        viewModel.HasOpeningBalanceError = true;
-
-        // Assert
-        viewModel.OpeningBalanceError.Should().Be("الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
+        isValid.Should().BeFalse();
+        var nameErrors = vm.GetErrors("Name").Cast<string>().ToList();
+        nameErrors.Should().Contain(e => e.Contains("اسم"));
+        var creditErrors = vm.GetErrors("CreditLimit").Cast<string>().ToList();
+        creditErrors.Should().Contain(e => e.Contains("الحد الائتماني"));
+        var balanceErrors = vm.GetErrors("OpeningBalance").Cast<string>().ToList();
+        balanceErrors.Should().Contain(e => e.Contains("الرصيد الافتتاحي"));
     }
 
     #endregion
@@ -263,7 +303,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -280,7 +321,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -292,20 +334,16 @@ public class CustomerEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
-        var propertyChangedEvents = new List<string>();
-        viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        // Act
-        viewModel.IsLoading = true;
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Assert
-        propertyChangedEvents.Should().Contain("IsLoading");
+        viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -314,7 +352,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -326,29 +365,13 @@ public class CustomerEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Code_Set_NotifiesPropertyChanged()
-    {
-        // Arrange
-        var viewModel = new CustomerEditorViewModel(
-            _mockCustomerService.Object,
-            _mockEventBus.Object);
-        var propertyChangedEvents = new List<string>();
-        viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        // Act
-        viewModel.Code = "CUST-001";
-
-        // Assert
-        propertyChangedEvents.Should().Contain("Code");
-    }
-
-    [Fact]
     public void Phone_Set_NotifiesPropertyChanged()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -365,7 +388,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -382,7 +406,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -399,7 +424,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -420,7 +446,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.Name = ""; // Invalid - name is empty
 
         // Assert - Validation not triggered yet
@@ -433,7 +460,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         viewModel.Name = "عميل جديد";
         viewModel.CreditLimit = 5000;
 
@@ -447,7 +475,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Act
         viewModel.ErrorMessage = "فشل في الحفظ";
@@ -457,18 +486,16 @@ public class CustomerEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveCommand_WhenLoading_SetsIsLoadingToTrue()
+    public async Task SaveCommand_WhenLoading_IsBusyReflectsState()
     {
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
-        // Act
-        viewModel.IsLoading = true;
-
-        // Assert
-        viewModel.IsLoading.Should().BeTrue();
+        // Assert - IsBusy initially false, managed by ExecuteAsync
+        viewModel.IsBusy.Should().BeFalse();
     }
 
     #endregion
@@ -481,7 +508,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
         var closeRequestedInvoked = false;
         viewModel.CloseRequested += () => closeRequestedInvoked = true;
 
@@ -498,7 +526,8 @@ public class CustomerEditorViewModelTests : IDisposable
         // Arrange
         var viewModel = new CustomerEditorViewModel(
             _mockCustomerService.Object,
-            _mockEventBus.Object);
+            _mockEventBus.Object,
+            _mockDialogService.Object);
 
         // Act & Assert
         viewModel.CancelCommand.CanExecute(null).Should().BeTrue();
@@ -510,12 +539,10 @@ public class CustomerEditorViewModelTests : IDisposable
 
     private static CustomerDto CreateTestCustomerDto(
         int id,
-        string code,
         string name)
     {
         return new CustomerDto(
             Id: id,
-            Code: code,
             Name: name,
             Phone: null,
             Email: null,
@@ -525,6 +552,22 @@ public class CustomerEditorViewModelTests : IDisposable
             CurrentBalance: 0,
             CreditLimit: 0,
             IsActive: true);
+    }
+
+    /// <summary>
+    /// Invokes the private ValidateAsync method on CustomerEditorViewModel via reflection.
+    /// </summary>
+    private static async Task<bool> InvokeValidateAsync(CustomerEditorViewModel vm)
+    {
+        var method = typeof(CustomerEditorViewModel).GetMethod(
+            "ValidateAsync",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        if (method == null)
+            throw new InvalidOperationException("ValidateAsync method not found on CustomerEditorViewModel");
+
+        var task = (Task<bool>)method.Invoke(vm, null)!;
+        return await task;
     }
 
     #endregion

@@ -2,7 +2,6 @@ namespace SalesSystem.Contracts.Requests;
 
 public record CreateCustomerRequest(
     string Name,
-    string? Code,
     string? Phone,
     string? Email,
     string? Address,
@@ -13,7 +12,6 @@ public record CreateCustomerRequest(
 
 public record UpdateCustomerRequest(
     string Name,
-    string? Code,
     string? Phone,
     string? Email,
     string? Address,

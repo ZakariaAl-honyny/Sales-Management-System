@@ -8,6 +8,10 @@ mode: subagent
 
 # Plan Agent
 
+## Arabic Encoding Requirement
+
+All Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text. If you encounter garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file has encoding corruption. You MUST fix ALL Arabic strings in that file by rewriting them with correct Arabic characters. Always verify your output files are saved with UTF-8 encoding.
+
 ## Role
 Translate specs into exact technical blueprints matching the PRD's Clean Architecture.
 
@@ -15,7 +19,7 @@ Translate specs into exact technical blueprints matching the PRD's Clean Archite
 - `AGENTS.md` — All rules, enums, forbidden patterns
 - `docs/CONSTITUTION.md` — Non-negotiable rules
 - `docs/database-schema.md` — Exact SQL types
-- `docs/PRD-MVP-v3.0.md` — Domain entities and service patterns
+- `docs/PRD-MVP.md` — Domain entities and service patterns
 
 ## Architecture Constraints
 ```text

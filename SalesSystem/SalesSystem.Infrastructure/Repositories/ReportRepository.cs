@@ -87,7 +87,6 @@ public class ReportRepository : IReportRepository
             .ThenBy(s => s.Product!.Name)
             .Select(s => new StockReportDto(
                 s.ProductId,
-                s.Product!.Code ?? string.Empty,
                 s.Product!.Name,
                 s.Product!.Category != null ? s.Product!.Category.Name : "General",
                 s.Product!.Unit != null ? s.Product!.Unit.Name : "-",
@@ -117,7 +116,6 @@ public class ReportRepository : IReportRepository
             var deficit = s.ReorderLevel - s.Quantity;
             return new LowStockReportDto(
                 s.ProductId,
-                product.Code,
                 product.Name,
                 product.Category?.Name ?? "General",
                 s.Warehouse!.Name,
@@ -144,7 +142,6 @@ public class ReportRepository : IReportRepository
             .OrderBy(c => c.Name)
             .Select(c => new CustomerBalanceReportDto(
                 c.Id,
-                c.Code ?? string.Empty,
                 c.Name,
                 c.OpeningBalance,
                 _context.SalesInvoices.Where(i => i.CustomerId == c.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.TotalAmount),
@@ -167,7 +164,6 @@ public class ReportRepository : IReportRepository
             .OrderBy(s => s.Name)
             .Select(s => new SupplierBalanceReportDto(
                 s.Id,
-                s.Code ?? string.Empty,
                 s.Name,
                 s.OpeningBalance,
                 _context.PurchaseInvoices.Where(i => i.SupplierId == s.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.TotalAmount),

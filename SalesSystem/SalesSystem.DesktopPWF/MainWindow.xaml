@@ -21,42 +21,52 @@
 
         <!-- شريط القوائم Menu Bar -->
         <Menu Grid.Row="0" Background="White" Padding="5">
-            <MenuItem Header="ملف">
-                <MenuItem Header="الملف الشخصي" Click="ProfileMenuItem_Click"/>
+            <MenuItem Header="ملف" ToolTip="قائمة الملف">
+                <MenuItem Header="الملف الشخصي" ToolTip="عرض معلومات المستخدم الحالي" Click="ProfileMenuItem_Click"/>
                 <Separator/>
-                <MenuItem Header="فحص التحديثات" Click="CheckForUpdatesMenuItem_Click"/>
+                <MenuItem Header="فحص التحديثات" ToolTip="التحقق من وجود إصدار جديد للنظام" Click="CheckForUpdatesMenuItem_Click"/>
                 <Separator/>
-                <MenuItem Header="تسجيل الخروج" Click="BtnLogout_Click"/>
+                <MenuItem Header="تسجيل الخروج" ToolTip="تسجيل الخروج من النظام" Click="BtnLogout_Click"/>
             </MenuItem>
-            <MenuItem Header="المبيعات">
-                <MenuItem Header="فواتير البيع" Click="SalesInvoicesMenuItem_Click"/>
-                <MenuItem Header="إرجاع المبيعات" Click="SalesReturnsMenuItem_Click"/>
+            <MenuItem Header="المبيعات" ToolTip="قائمة المبيعات">
+                <MenuItem Header="فواتير البيع" ToolTip="عرض وإدارة فواتير البيع" Click="SalesInvoicesMenuItem_Click"/>
+                <MenuItem Header="إرجاع المبيعات" ToolTip="إدارة مرتجعات المبيعات" Click="SalesReturnsMenuItem_Click"/>
                 <Separator/>
-                <MenuItem Header="تسديد ديون العملاء" Click="CustomerPaymentsMenuItem_Click"/>
-            </MenuItem>
-            <MenuItem Header="المشتريات">
-                <MenuItem Header="فواتير الشراء" Click="PurchaseInvoicesMenuItem_Click"/>
-                <MenuItem Header="إرجاع المشتريات" Click="PurchaseReturnsMenuItem_Click"/>
+                <MenuItem Header="تسديد ديون العملاء" ToolTip="تسجيل المبالغ المستلمة من العملاء" Click="CustomerPaymentsMenuItem_Click"/>
                 <Separator/>
-                <MenuItem Header="تسديد ديون الموردين" Click="SupplierPaymentsMenuItem_Click"/>
+                <MenuItem Header="فتح نافذة مبيعات جديدة" ToolTip="فتح نافذة مبيعات مستقلة في نافذة منفصلة" Click="OpenNewSalesWindow_Click"/>
             </MenuItem>
-            <MenuItem Header="المستودعات">
-                <MenuItem Header="إدارة المستودعات" Click="WarehousesMenuItem_Click"/>
+            <MenuItem Header="المشتريات" ToolTip="قائمة المشتريات">
+                <MenuItem Header="فواتير الشراء" ToolTip="عرض وإدارة فواتير الشراء" Click="PurchaseInvoicesMenuItem_Click"/>
+                <MenuItem Header="إرجاع المشتريات" ToolTip="إدارة مرتجعات المشتريات" Click="PurchaseReturnsMenuItem_Click"/>
                 <Separator/>
-                <MenuItem Header="نقل المخزون" Click="StockTransfersMenuItem_Click"/>
-            </MenuItem>
-            <MenuItem Header="التقارير">
-                <MenuItem Header="تقرير المبيعات" Tag="Reports" Click="ReportMenuItem_Click"/>
-                <MenuItem Header="تقرير المشتريات" Tag="Reports" Click="ReportMenuItem_Click"/>
-                <MenuItem Header="تقرير المخزون" Tag="Inventory" Click="ReportMenuItem_Click"/>
-                <MenuItem Header="تقرير الأرباح والخسائر" Tag="Reports" Click="ReportMenuItem_Click"/>
-            </MenuItem>
-            <MenuItem Header="الإعدادات" x:Name="SettingsMenuItem">
-                <MenuItem Header="إدارة المنتجات" Click="ProductsMenuItem_Click"/>
-                <MenuItem Header="إدارة العملاء" Click="CustomersMenuItem_Click"/>
-                <MenuItem Header="إدارة الموردين" Click="SuppliersMenuItem_Click"/>
+                <MenuItem Header="تسديد ديون الموردين" ToolTip="تسجيل المبالغ المدفوعة للموردين" Click="SupplierPaymentsMenuItem_Click"/>
                 <Separator/>
-                <MenuItem Header="إدارة المستخدمين" Click="UsersMenuItem_Click"/>
+                <MenuItem Header="فتح نافذة مشتريات جديدة" ToolTip="فتح نافذة مشتريات مستقلة في نافذة منفصلة" Click="OpenNewPurchasesWindow_Click"/>
+            </MenuItem>
+            <MenuItem Header="المستودعات" ToolTip="قائمة المستودعات">
+                <MenuItem Header="إدارة المستودعات" ToolTip="إدارة الفروع والمستودعات" Click="WarehousesMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="نقل المخزون" ToolTip="إدارة عمليات نقل البضائع بين المستودعات" Click="StockTransfersMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="فتح نافذة مستودعات جديدة" ToolTip="فتح نافذة مستودعات مستقلة في نافذة منفصلة" Click="OpenNewWarehousesWindow_Click"/>
+            </MenuItem>
+            <MenuItem Header="التقارير" ToolTip="قائمة التقارير">
+                <MenuItem Header="تقرير المبيعات" ToolTip="عرض تقارير المبيعات" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="تقرير المشتريات" ToolTip="عرض تقارير المشتريات" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="تقرير المخزون" ToolTip="عرض تقارير المخزون" Tag="Inventory" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="تقرير الأرباح والخسائر" ToolTip="عرض تقارير الأرباح والخسائر" Tag="Reports" Click="ReportMenuItem_Click"/>
+            </MenuItem>
+            <MenuItem Header="الإعدادات" ToolTip="قائمة الإعدادات" x:Name="SettingsMenuItem">
+                <MenuItem Header="إدارة المنتجات" ToolTip="إدارة قائمة المنتجات والأسعار" Click="ProductsMenuItem_Click"/>
+                <MenuItem Header="إدارة العملاء" ToolTip="إدارة بيانات العملاء" Click="CustomersMenuItem_Click"/>
+                <MenuItem Header="إدارة الموردين" ToolTip="إدارة بيانات الموردين" Click="SuppliersMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="إدارة المستخدمين" ToolTip="إدارة حسابات المستخدمين والصلاحيات" Click="UsersMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="فتح نافذة منتجات جديدة" ToolTip="فتح نافذة منتجات مستقلة في نافذة منفصلة" Click="OpenNewProductsWindow_Click"/>
+                <MenuItem Header="فتح نافذة عملاء جديدة" ToolTip="فتح نافذة عملاء مستقلة في نافذة منفصلة" Click="OpenNewCustomersWindow_Click"/>
+                <MenuItem Header="فتح نافذة موردين جديدة" ToolTip="فتح نافذة موردين مستقلة في نافذة منفصلة" Click="OpenNewSuppliersWindow_Click"/>
             </MenuItem>
         </Menu>
 
@@ -176,19 +186,19 @@
                                     <TextBlock Text="مرتجعات المبيعات" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ListBoxItem>
-                            <ListBoxItem x:Name="NavPurchaseReturnsItem" Tag="PurchaseReturns" AutomationProperties.AutomationId="NavPurchaseReturns">
+                            <ListBoxItem x:Name="NavPurchaseReturnsItem" Tag="PurchaseReturns" AutomationProperties.AutomationId="NavPurchaseReturns" ToolTip="إدارة بضائع المشتريات المرتجعة واسترداد المبالغ من الموردين.">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="⏩" FontSize="18" Margin="0,0,12,0"/>
                                     <TextBlock Text="مرتجعات المشتريات" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ListBoxItem>
-                            <ListBoxItem x:Name="NavCategoriesItem" Tag="Categories" AutomationProperties.AutomationId="NavCategories">
+                            <ListBoxItem x:Name="NavCategoriesItem" Tag="Categories" AutomationProperties.AutomationId="NavCategories" ToolTip="إدارة التصنيفات الرئيسية والفرعية للأصناف والمنتجات.">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="📁" FontSize="18" Margin="0,0,12,0"/>
                                     <TextBlock Text="التصنيفات" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ListBoxItem>
-                            <ListBoxItem x:Name="NavUnitsItem" Tag="Units" AutomationProperties.AutomationId="NavUnits">
+                            <ListBoxItem x:Name="NavUnitsItem" Tag="Units" AutomationProperties.AutomationId="NavUnits" ToolTip="إدارة وحدات القياس المستخدمة في المخزون والفواتير.">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="⚖️" FontSize="18" Margin="0,0,12,0"/>
                                     <TextBlock Text="الوحدات" VerticalAlignment="Center"/>

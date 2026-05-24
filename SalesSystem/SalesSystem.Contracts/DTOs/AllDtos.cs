@@ -8,7 +8,6 @@ public record CategoryDto(int Id, string Name, string? Description, bool IsActiv
 
 public record ProductDto(
     int Id,
-    string? Code,
     string? Barcode,
     string Name,
     int? CategoryId,
@@ -28,7 +27,7 @@ public record ProductDto(
     string? Description,
     bool IsActive);
 
-public record WarehouseDto(int Id, string? Code, string Name, string? Location, bool IsDefault, bool IsActive);
+public record WarehouseDto(int Id, string Name, string? Location, bool IsDefault, bool IsActive);
 
 public record WarehouseStockDto(
     int WarehouseId,
@@ -39,9 +38,9 @@ public record WarehouseStockDto(
     decimal Quantity,
     decimal ReorderLevel);
 
-public record SupplierDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive);
+public record SupplierDto(int Id, string Name, string? Phone, string? Email, string? Address, string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive);
 
-public record CustomerDto(int Id, string? Code, string Name, string? Phone, string? Email, string? Address, string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive)
+public record CustomerDto(int Id, string Name, string? Phone, string? Email, string? Address, string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive)
 {
     public bool IsBalanceNegative 
     { 
@@ -86,7 +85,7 @@ public record SalesInvoiceDto(
     };
 }
 
-public record SalesInvoiceItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
+public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName,
     decimal Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
@@ -131,7 +130,7 @@ public record PurchaseInvoiceDto(
     };
 }
 
-public record PurchaseInvoiceItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
+public record PurchaseInvoiceItemDto(int Id, int ProductId, string ProductName,
     decimal Quantity,
     decimal UnitCost,
     decimal DiscountAmount,
@@ -163,7 +162,7 @@ public record SalesReturnDto(
     };
 }
 
-public record SalesReturnItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
+public record SalesReturnItemDto(int Id, int ProductId, string ProductName,
     decimal Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
@@ -195,7 +194,7 @@ public record PurchaseReturnDto(
     };
 }
 
-public record PurchaseReturnItemDto(int Id, int ProductId, string? ProductCode, string ProductName,
+public record PurchaseReturnItemDto(int Id, int ProductId, string ProductName,
     decimal Quantity,
     decimal UnitCost,
     decimal DiscountAmount,
@@ -222,7 +221,7 @@ public record StockTransferDto(
     };
 }
 
-public record StockTransferItemDto(int Id, int ProductId, string? ProductCode, string ProductName, decimal Quantity, byte Mode, string? Notes);
+public record StockTransferItemDto(int Id, int ProductId, string ProductName, decimal Quantity, byte Mode, string? Notes);
 
 public record CustomerPaymentDto(
     int Id,
@@ -300,7 +299,8 @@ public record StoreSettingsDto(
     bool EnableStockAlerts,
     bool AllowNegativeStock,
     bool AutoUpdatePrices,
-    string InvoicePrefix);
+    string InvoicePrefix,
+    int CostingMethod = 1);
 
 public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
 
@@ -343,7 +343,6 @@ public record PurchaseReportDto(
 
 public record StockReportDto(
     int ProductId,
-    string ProductCode,
     string ProductName,
     string CategoryName,
     string UnitName,
@@ -356,7 +355,6 @@ public record StockReportDto(
 
 public record CustomerBalanceReportDto(
     int CustomerId,
-    string CustomerCode,
     string CustomerName,
     decimal OpeningBalance,
     decimal TotalSales,
@@ -368,7 +366,6 @@ public record CustomerBalanceReportDto(
 
 public record SupplierBalanceReportDto(
     int SupplierId,
-    string SupplierCode,
     string SupplierName,
     decimal OpeningBalance,
     decimal TotalPurchases,
@@ -389,7 +386,6 @@ public record ProductMovementReportDto(
 
 public record LowStockReportDto(
     int     ProductId,
-    string? ProductCode,
     string  ProductName,
     string? CategoryName,
     string  WarehouseName,

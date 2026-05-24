@@ -10,7 +10,19 @@ public partial class ConfirmationDialog : Window
     {
         InitializeComponent();
         MessageText.Text = message;
+        PositionOverOwner();
+    }
+
+    private void PositionOverOwner()
+    {
         Owner = System.Windows.Application.Current.MainWindow;
+        if (Owner != null)
+        {
+            Width = Owner.ActualWidth;
+            Height = Owner.ActualHeight;
+            Left = Owner.Left;
+            Top = Owner.Top;
+        }
     }
 
     private void YesButton_Click(object sender, RoutedEventArgs e)

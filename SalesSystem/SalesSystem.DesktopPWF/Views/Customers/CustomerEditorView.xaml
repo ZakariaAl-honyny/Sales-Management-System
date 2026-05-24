@@ -36,29 +36,31 @@
 
                         <!-- Name -->
                         <TextBlock Text="اسم العميل *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" 
+<TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                  Style="{StaticResource ModernTextBox}" 
                                  Tag="أدخل الاسم الكامل للعميل" 
                                  TabIndex="2"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtCustomerName"/>
+                                 AutomationProperties.AutomationId="TxtCustomerName"
+                              ToolTip="الاسم الكامل للعميل — هذا الحقل إلزامي ولا يمكن أن يكون فارغاً"/>
                         <TextBlock Text="{Binding NameError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibility}}"/>
                         <Border Height="12"/>
 
                         <!-- Phone -->
                         <TextBlock Text="رقم الهاتف" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}" 
+<TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                  Style="{StaticResource ModernTextBox}" 
                                  Tag="05xxxxxxxx (10 أرقام)" 
                                  TabIndex="3"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtCustomerPhone"/>
+                                 AutomationProperties.AutomationId="TxtCustomerPhone"
+                              ToolTip="رقم جوال العميل — يُستخدم للتواصل وإرسال إشعارات الفواتير"/>
                         <TextBlock Text="مثال: 0512345678 - سيتم استخدامه للتواصل وإرسال الفواتير" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="12"/>
 
                         <!-- Address -->
                         <TextBlock Text="العنوان (اختياري)" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}" 
+<TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                  Style="{StaticResource ModernTextBox}" 
                                  Tag="المدينة، الحي، الشارع، أو اسم معلم قريب" 
                                  Height="60" 
@@ -67,7 +69,8 @@
                                  VerticalContentAlignment="Top" 
                                  TabIndex="4"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtCustomerAddress"/>
+                                 AutomationProperties.AutomationId="TxtCustomerAddress"
+                              ToolTip="العنوان التفصيلي ليس إلزامياً ولكن يساعد في التوصيل"/>
                         <TextBlock Text="أدخل تفاصيل مكان سكن أو عمل العميل ليتمكن موظفو التوصيل من العثور عليه بسهولة." Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="12"/>
 
@@ -79,23 +82,25 @@
                             
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                 <TextBlock Text="الرقم الضريبي" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding TaxNumber, UpdateSourceTrigger=PropertyChanged}" 
-                                         Style="{StaticResource ModernTextBox}" 
-                                         Tag="15 رقم"
-                                         TabIndex="5"
-                                         helpers:FocusHelper.AdvanceOnEnter="True"
-                                         AutomationProperties.AutomationId="TxtCustomerTaxNumber"/>
+<TextBox Text="{Binding TaxNumber, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
+                                          Style="{StaticResource ModernTextBox}" 
+                                          Tag="15 رقم"
+                                          TabIndex="5"
+                                          helpers:FocusHelper.AdvanceOnEnter="True"
+                                          AutomationProperties.AutomationId="TxtCustomerTaxNumber"
+                              ToolTip="الرقم الضريبي للعميل — يستخدم في إصدار الفواتير الضريبية"/>
                                 <TextBlock Text="الرقم الضريبي الخاص بالمنشأة" Style="{StaticResource HelperTextStyle}"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                 <TextBlock Text="الحد الائتماني" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding CreditLimit, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
-                                         Style="{StaticResource ModernTextBox}" 
-                                         Tag="0.00"
-                                         TabIndex="6"
-                                         helpers:FocusHelper.AdvanceOnEnter="True"
-                                         AutomationProperties.AutomationId="TxtCustomerCreditLimit"/>
+<TextBox Text="{Binding CreditLimit, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
+                                          Style="{StaticResource ModernTextBox}" 
+                                          Tag="0.00"
+                                          TabIndex="6"
+                                          helpers:FocusHelper.AdvanceOnEnter="True"
+                                          AutomationProperties.AutomationId="TxtCustomerCreditLimit"
+                              ToolTip="أقصى مبلغ يمكن أن يدين به العميل — أدخل 0 إذا كنت لا تريد تحديد حد"/>
                                 <TextBlock Text="أقصى مبلغ مديونية مسموح به" Style="{StaticResource HelperTextStyle}"/>
                             </StackPanel>
                         </Grid>
@@ -104,12 +109,13 @@
                         <!-- Opening Balance -->
                         <StackPanel Visibility="{Binding IsEditMode, Converter={StaticResource InverseBoolToVisibility}}">
                             <TextBlock Text="الرصيد الافتتاحي (رصيد سابق)" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding OpeningBalance, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" 
-                                     Style="{StaticResource ModernTextBox}" 
-                                     Tag="0.00"
-                                     TabIndex="7"
-                                     helpers:FocusHelper.AdvanceOnEnter="True"
-                                     AutomationProperties.AutomationId="TxtCustomerOpeningBalance"/>
+<TextBox Text="{Binding OpeningBalance, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
+                                      Style="{StaticResource ModernTextBox}" 
+                                      Tag="0.00"
+                                      TabIndex="7"
+                                      helpers:FocusHelper.AdvanceOnEnter="True"
+                                      AutomationProperties.AutomationId="TxtCustomerOpeningBalance"
+                              ToolTip="رصيد سابق للعميل قبل استخدام النظام — أدخل المبلغ الذي يدين به العميل"/>
                             <TextBlock Text="إذا كان العميل مدين لك بمبلغ سابق قبل البدء في استخدام هذا النظام، أدخله هنا كـ 'رصيد افتتاحي'." Style="{StaticResource HelperTextStyle}"/>
                             <Border Height="12"/>
                         </StackPanel>
@@ -139,7 +145,8 @@
                             Margin="0,0,12,0"
                             IsDefault="True"
                             TabIndex="9"
-                            AutomationProperties.AutomationId="BtnSaveCustomer">
+                            AutomationProperties.AutomationId="BtnSaveCustomer"
+                            ToolTip="حفظ البيانات المدخلة">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,8,0" Stretch="Uniform"/>
                             <TextBlock Text="حفظ البيانات"/>
@@ -150,7 +157,8 @@
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
                             TabIndex="10"
-                            AutomationProperties.AutomationId="BtnCancelCustomer"/>
+                            AutomationProperties.AutomationId="BtnCancelCustomer"
+                            ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 

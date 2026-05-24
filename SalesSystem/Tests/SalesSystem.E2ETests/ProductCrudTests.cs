@@ -82,14 +82,9 @@ public class ProductCrudTests : TestBase, IDisposable
                 ?? _mainWindow;
 
             // Act - Fill in product details
-            var codeBox = _productEditorWindow.FindFirstDescendant(cf => cf.ByAutomationId("TxtProductCode")) as TextBox;
             var nameBox = _productEditorWindow.FindFirstDescendant(cf => cf.ByAutomationId("TxtProductName")) as TextBox;
 
-            codeBox.Should().NotBeNull("Product code field should exist");
             nameBox.Should().NotBeNull("Product name field should exist");
-
-            codeBox!.Focus();
-            Keyboard.Type("PROD-" + DateTime.Now.Ticks.ToString()[^6..]);
 
             nameBox!.Focus();
             Keyboard.Type("منتج اختبار E2E " + DateTime.Now.ToString("HHmmss"));

@@ -1,23 +1,5 @@
-using SalesSystem.Application.Updates.Models;
-using SalesSystem.Contracts.Common;
-
-namespace SalesSystem.DesktopPWF.Services.App;
-
-public interface IUpdaterService
-{
-    Task<Result<UpdateCheckResult>> CheckForUpdatesAsync(CancellationToken ct = default);
-
-    Task<Result<string>> DownloadUpdateAsync(
-        string downloadUrl,
-        string expectedChecksum,
-        IProgress<DownloadProgress> progress,
-        CancellationToken ct = default);
-
-    Task<Result<bool>> LaunchInstallerAndExitAsync(string installerPath);
-
-    Result<string> GetCurrentVersion();
-
-    Result SkipVersion(string version);
-
-    Result<string> GetSkippedVersion();
-}
+// DUPLICATE REMOVED per RULE-041 (DRY).
+// The canonical IUpdaterService lives at:
+// SalesSystem.Application.Updates.IUpdaterService
+// All Desktop consumers should use that interface instead.
+// This file intentionally left empty and will be deleted in the next commit.

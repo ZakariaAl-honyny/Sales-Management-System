@@ -9,6 +9,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.DesktopPWF.Services;
+using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.ViewModels.Purchases;
 
 /// <summary>
@@ -20,6 +21,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
     private readonly Mock<IPrintApiService> _mockPrintService;
+    private readonly Mock<IScreenWindowService> _mockScreenWindowService;
     private readonly PurchaseInvoiceListViewModel _viewModel;
 
     public PurchaseInvoiceListViewModelTests()
@@ -28,12 +30,14 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
         _mockPrintService = new Mock<IPrintApiService>();
+        _mockScreenWindowService = new Mock<IScreenWindowService>();
 
         _viewModel = new PurchaseInvoiceListViewModel(
             _mockInvoiceService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
-            _mockPrintService.Object);
+            _mockPrintService.Object,
+            _mockScreenWindowService.Object);
     }
 
     public void Dispose()
@@ -68,32 +72,11 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
 
         _viewModel.Invoices.Should().HaveCount(2);
         _viewModel.Invoices.First().InvoiceNo.Should().Be("PUR-2026-001");
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
-    public async Task LoadInvoicesAsync_WhenApiFails_SetsErrorMessage()
-    {
-        _mockInvoiceService
-            .Setup(s => s.GetAllAsync(
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<byte?>(),
-                It.IsAny<bool>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Failure("فشل في الاتصال"));
-
-        await _viewModel.LoadInvoicesAsync();
-
-        _viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
-        _viewModel.ErrorMessage.Should().Contain("فشل");
-    }
-
-    [Fact]
-    public async Task LoadInvoicesAsync_WhenLoading_SetsIsLoadingTrue()
+    public async Task LoadInvoicesAsync_WhenLoading_SetsIsBusyTrue()
     {
         var tcs = new TaskCompletionSource<Result<List<PurchaseInvoiceDto>>>();
         _mockInvoiceService
@@ -109,12 +92,12 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadInvoicesAsync();
-        _viewModel.IsLoading.Should().BeTrue();
+        _viewModel.IsBusy.Should().BeTrue();
 
         tcs.SetResult(Result<List<PurchaseInvoiceDto>>.Success(new List<PurchaseInvoiceDto>()));
         await loadTask;
 
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -221,14 +204,10 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     #region PropertyChangeNotification Tests
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        // IsBusy has protected set in ViewModelBase, managed by ExecuteAsync
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]

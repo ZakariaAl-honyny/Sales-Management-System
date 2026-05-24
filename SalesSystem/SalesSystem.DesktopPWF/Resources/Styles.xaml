@@ -125,13 +125,36 @@
     </Style>
 
     <ControlTemplate x:Key="ErrorTemplate">
-        <StackPanel>
-            <AdornedElementPlaceholder x:Name="Placeholder"/>
-            <TextBlock Text="{Binding [0].ErrorContent}" 
-                       Foreground="{StaticResource ErrorBrush}" 
-                       FontSize="11" 
-                       Margin="0,2,0,0"/>
-        </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <!-- Red border wraps the original control (spans both columns) -->
+            <Border x:Name="ErrorBorder"
+                    Grid.Column="0" Grid.ColumnSpan="2"
+                    BorderBrush="#EF4444"
+                    BorderThickness="1.5"
+                    CornerRadius="4"
+                    SnapsToDevicePixels="True">
+                <AdornedElementPlaceholder x:Name="Placeholder"/>
+            </Border>
+            <!-- Red icon badge with error ToolTip -->
+            <Border Grid.Column="1"
+                    Background="#EF4444"
+                    CornerRadius="10"
+                    Width="20" Height="20"
+                    Margin="4,0"
+                    VerticalAlignment="Center"
+                    ToolTip="{Binding ElementName=Placeholder, Path=AdornedElement.(Validation.Errors).[0].ErrorContent}">
+                <TextBlock Text="!"
+                           Foreground="White"
+                           FontWeight="Bold"
+                           FontSize="14"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Border>
+        </Grid>
     </ControlTemplate>
 
     <!-- زر أساسي (Keyed) -->
@@ -299,8 +322,15 @@
         </Setter>
     </Style>
 
-    <!-- حقل نص افتراضي (Implicit) -->
-    <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}"/>
+    <!-- حقل نص افتراضي (Implicit) with validation red border -->
+    <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+        <Style.Triggers>
+            <Trigger Property="Validation.HasError" Value="True">
+                <Setter Property="BorderBrush" Value="#EF4444"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
     <!-- حقل كلمة المرور (Keyed) -->
     <Style x:Key="ModernPasswordBox" TargetType="PasswordBox">
@@ -338,8 +368,15 @@
         </Setter>
     </Style>
 
-    <!-- حقل كلمة مرور افتراضي (Implicit) -->
-    <Style TargetType="PasswordBox" BasedOn="{StaticResource ModernPasswordBox}"/>
+    <!-- حقل كلمة مرور افتراضي (Implicit) with validation red border -->
+    <Style TargetType="PasswordBox" BasedOn="{StaticResource ModernPasswordBox}">
+        <Style.Triggers>
+            <Trigger Property="Validation.HasError" Value="True">
+                <Setter Property="BorderBrush" Value="#EF4444"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
     <!-- تسمية (تم حذف المكرر) -->
 
@@ -572,8 +609,16 @@
         <Setter Property="Height" Value="36"/>
     </Style>
 
-    <!-- ComboBox افتراضي (Implicit) -->
-    <Style TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}"/>
+    <!-- ComboBox افتراضي (Implicit) with validation -->
+    <Style TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}">
+        <Setter Property="Validation.ErrorTemplate" Value="{StaticResource ErrorTemplate}"/>
+        <Style.Triggers>
+            <Trigger Property="Validation.HasError" Value="True">
+                <Setter Property="BorderBrush" Value="#EF4444"/>
+                <Setter Property="BorderThickness" Value="1.5"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
 
     <!-- DatePicker عصري (Keyed) -->
     <Style x:Key="ModernDatePicker" TargetType="DatePicker">
@@ -777,6 +822,82 @@
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- ============================================ -->
+    <!-- أنماط نوافذ الحوار (Dialog Styles) v4.6       -->
+    <!-- ============================================ -->
+
+    <!-- غلاف الحوار الأساسي (للاستخدام داخل نوافذ الحوار) -->
+    <Style x:Key="DialogOverlayStyle" TargetType="Rectangle">
+        <Setter Property="Fill" Value="#80000000"/>
+    </Style>
+
+    <!-- بطاقة الحوار المركزية -->
+    <Style x:Key="DialogCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="White"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Padding" Value="28"/>
+        <Setter Property="Effect" Value="{StaticResource DeepShadow}"/>
+    </Style>
+
+    <!-- رأس الحوار (أيقونة + عنوان) -->
+    <Style x:Key="DialogHeaderStyle" TargetType="StackPanel">
+        <Setter Property="Orientation" Value="Horizontal"/>
+        <Setter Property="Margin" Value="0,0,0,16"/>
+    </Style>
+
+    <!-- أيقونة الحوار -->
+    <Style x:Key="DialogIconBorderStyle" TargetType="Border">
+        <Setter Property="CornerRadius" Value="25"/>
+        <Setter Property="Width" Value="50"/>
+        <Setter Property="Height" Value="50"/>
+    </Style>
+
+    <!-- نص عنوان الحوار -->
+    <Style x:Key="DialogTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="12,0,0,0"/>
+    </Style>
+
+    <!-- زر الحوار الأساسي (Generic with hover) -->
+    <!-- ملاحظة: كل زر حوار يحدد لونه الخاص، لكن هذا النمط يوفر المحفزات -->
+    <Style x:Key="DialogButtonBaseStyle" TargetType="Button">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="MinWidth" Value="100"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Border" Background="{TemplateBinding Background}" 
+                            CornerRadius="8" Padding="14,8">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{Binding Path=Background, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Null}}"/>
+                            <!-- Note: Individual dialog XAML files override this trigger with specific colors -->
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Border" Property="Opacity" Value="0.85"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- قائمة الأخطاء في حوار التحقق -->
+    <Style x:Key="ValidationErrorItemStyle" TargetType="TextBlock">
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="#333"/>
+        <Setter Property="LineHeight" Value="22"/>
     </Style>
 
 </ResourceDictionary>

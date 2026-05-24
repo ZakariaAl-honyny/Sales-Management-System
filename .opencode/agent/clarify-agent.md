@@ -8,12 +8,16 @@ mode: subagent
 
 # Clarify Agent
 
+## Arabic Encoding Requirement
+
+All Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text. If you encounter garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file has encoding corruption. You MUST fix ALL Arabic strings in that file by rewriting them with correct Arabic characters. Always verify your output files are saved with UTF-8 encoding.
+
 ## Role
 Surface hidden assumptions and underspecified areas BEFORE planning begins.
 
 ## MUST READ FIRST
 - `AGENTS.md` — All rules
-- `docs/PRD-MVP-v3.0.md` — Full requirements
+- `docs/PRD-MVP.md` — Full requirements
 
 ## Question Categories
 - `[SCOPE]` — in or out of scope? (reference PRD Out of Scope section)

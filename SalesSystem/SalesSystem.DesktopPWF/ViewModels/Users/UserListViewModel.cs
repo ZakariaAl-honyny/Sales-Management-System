@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels.Base;
 using System.Collections.ObjectModel;
@@ -26,7 +26,6 @@ public class UserListViewModel : AdminOnlyViewModel
     private ICollectionView? _usersView;
     private UserDto? _selectedUser;
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
@@ -50,7 +49,7 @@ public class UserListViewModel : AdminOnlyViewModel
 
     private void InitializeCommands()
     {
-        RefreshCommand = new AsyncRelayCommand(LoadUsersAsync);
+        RefreshCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadUsersOperationAsync)));
         AddCommand = new RelayCommand(AddUser);
         EditCommand = new RelayCommand(EditUser, () => SelectedUser != null);
         ToggleStatusCommand = new AsyncRelayCommand(ToggleStatusAsync, () => SelectedUser != null);
@@ -99,11 +98,6 @@ public class UserListViewModel : AdminOnlyViewModel
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -142,42 +136,34 @@ public class UserListViewModel : AdminOnlyViewModel
     #endregion
 
     #region Methods
-    public async Task LoadUsersAsync()
+    /// <summary>
+    /// Public method for loading users (used by RefreshCommand and event handlers).
+    /// </summary>
+    public Task LoadUsersAsync() => ExecuteAsync(LoadUsersOperationAsync);
+
+    private async Task LoadUsersOperationAsync()
     {
-        IsLoading = true;
         ErrorMessage = null;
 
-        try
-        {
-            var result = await _userService.GetAllAsync(IncludeInactive);
+        var result = await _userService.GetAllAsync(IncludeInactive);
 
-            if (result.IsSuccess && result.Value != null)
+        if (result.IsSuccess && result.Value != null)
+        {
+            await InvokeOnUIThreadAsync(async () =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Users.Clear();
+                foreach (var item in result.Value.OrderByDescending(x => x.Id))
                 {
-                    Users.Clear();
-                    foreach (var item in result.Value)
-                    {
-                        Users.Add(item);
-                    }
-                    SetupCollectionView();
-                    IsEmpty = Users.Count == 0;
-                });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستخدمين", "UserListViewModel.LoadUsersAsync", "[UserListViewModel.LoadUsersAsync] Failed to load users list.");
+                    Users.Add(item);
+                }
+                SetupCollectionView();
                 IsEmpty = Users.Count == 0;
-            }
+            });
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "UserListViewModel.LoadUsersAsync", "[UserListViewModel.LoadUsersAsync] Failed to load users list.");
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستخدمين", "UserListViewModel.LoadUsersOperationAsync", "[UserListViewModel.LoadUsersOperationAsync] Failed to load users list.");
             IsEmpty = Users.Count == 0;
-        }
-        finally
-        {
-            IsLoading = false;
         }
     }
 
@@ -224,7 +210,7 @@ public class UserListViewModel : AdminOnlyViewModel
 
         if (SelectedUser.Id == CurrentUserId)
         {
-            await _dialogService.ShowErrorAsync("خطأ", "لا يمكنك تعطيل حسابك الخاص. يرجى طلب مسؤول آخر للقيام بذلك.");
+            await _dialogService.ShowErrorAsync("خطأ في تعطيل الحساب", "لا يمكنك تعطيل حسابك الخاص. يرجى طلب مسؤول آخر للقيام بذلك.");
             return;
         }
 
@@ -235,30 +221,8 @@ public class UserListViewModel : AdminOnlyViewModel
                 $"هل أنت متأكد من تعطيل حساب المستخدم: {SelectedUser.FullName}؟");
             if (!confirmed) return;
 
-            IsLoading = true;
-            ErrorMessage = null;
-
-            try
-            {
-                var result = await _userService.DeleteAsync(SelectedUser.Id);
-                if (result.IsSuccess)
-                {
-                    await LoadUsersAsync();
-                    _toastService.ShowSuccess("تم تعطيل الحساب بنجاح");
-                }
-                else
-                {
-                    ErrorMessage = result.Error ?? "فشل في تعطيل الحساب";
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorMessage = HandleException(ex, "UserListViewModel.ToggleStatusAsync", $"[UserListViewModel.ToggleStatusAsync] Failed to toggle user status for ID {SelectedUser?.Id}.");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
+            await ExecuteAsync(DeactivateUserOperationAsync,
+                ex => LogSystemError($"Failed to deactivate user ID {SelectedUser.Id}", "UserListViewModel.DeactivateUserOperationAsync", ex));
         }
         else
         {
@@ -267,37 +231,47 @@ public class UserListViewModel : AdminOnlyViewModel
                 $"هل أنت متأكد من تفعيل حساب المستخدم: {SelectedUser.FullName}؟");
             if (!confirmed) return;
 
-            IsLoading = true;
-            ErrorMessage = null;
+            await ExecuteAsync(ActivateUserOperationAsync,
+                ex => LogSystemError($"Failed to activate user ID {SelectedUser.Id}", "UserListViewModel.ActivateUserOperationAsync", ex));
+        }
+    }
 
-            try
-            {
-                var request = new UpdateUserRequest(
-                    FullName: SelectedUser.FullName,
-                    Role: SelectedUser.Role,
-                    IsActive: true,
-                    Password: null
-                );
+    private async Task DeactivateUserOperationAsync()
+    {
+        ErrorMessage = null;
 
-                var result = await _userService.UpdateAsync(SelectedUser.Id, request);
-                if (result.IsSuccess)
-                {
-                    await LoadUsersAsync();
-                    _toastService.ShowSuccess("تم تفعيل الحساب بنجاح");
-                }
-                else
-                {
-                    ErrorMessage = result.Error ?? "فشل في تفعيل الحساب";
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorMessage = HandleException(ex, "UserListViewModel.ToggleStatusAsync", $"[UserListViewModel.ToggleStatusAsync] Failed to restore user with ID {SelectedUser?.Id}.");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
+        var result = await _userService.DeleteAsync(SelectedUser!.Id);
+        if (result.IsSuccess)
+        {
+            await LoadUsersOperationAsync();
+            _toastService.ShowSuccess("تم تعطيل الحساب بنجاح");
+        }
+        else
+        {
+            ErrorMessage = result.Error ?? "فشل في تعطيل الحساب";
+        }
+    }
+
+    private async Task ActivateUserOperationAsync()
+    {
+        ErrorMessage = null;
+
+        var request = new UpdateUserRequest(
+            FullName: SelectedUser!.FullName,
+            Role: SelectedUser.Role,
+            IsActive: true,
+            Password: null
+        );
+
+        var result = await _userService.UpdateAsync(SelectedUser.Id, request);
+        if (result.IsSuccess)
+        {
+            await LoadUsersOperationAsync();
+            _toastService.ShowSuccess("تم تفعيل الحساب بنجاح");
+        }
+        else
+        {
+            ErrorMessage = result.Error ?? "فشل في تفعيل الحساب";
         }
     }
 
@@ -310,36 +284,30 @@ public class UserListViewModel : AdminOnlyViewModel
             $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}؟\n\nسيتم تعيين كلمة المرور الافتراضية: 123456");
         if (!confirmed) return;
 
-        IsLoading = true;
+        await ExecuteAsync(ResetPasswordOperationAsync,
+            ex => LogSystemError($"Failed to reset password for user ID {SelectedUser.Id}", "UserListViewModel.ResetPasswordOperationAsync", ex));
+    }
+
+    private async Task ResetPasswordOperationAsync()
+    {
         ErrorMessage = null;
 
-        try
-        {
-            var request = new UpdateUserRequest(
-                FullName: SelectedUser.FullName,
-                Role: SelectedUser.Role,
-                IsActive: SelectedUser.IsActive,
-                Password: "123456"
-            );
+        var request = new UpdateUserRequest(
+            FullName: SelectedUser!.FullName,
+            Role: SelectedUser.Role,
+            IsActive: SelectedUser.IsActive,
+            Password: "123456"
+        );
 
-            var result = await _userService.UpdateAsync(SelectedUser.Id, request);
-            if (result.IsSuccess)
-            {
-                _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}");
-            }
-            else
-            {
-                ErrorMessage = result.Error ?? "فشل في إعادة تعيين كلمة المرور";
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
-            }
-        }
-        catch (Exception ex)
+        var result = await _userService.UpdateAsync(SelectedUser.Id, request);
+        if (result.IsSuccess)
         {
-            ErrorMessage = HandleException(ex, "UserListViewModel.ResetPasswordAsync", $"[UserListViewModel.ResetPasswordAsync] Failed to reset password for user ID {SelectedUser?.Id}.");
+            _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}");
         }
-        finally
+        else
         {
-            IsLoading = false;
+            ErrorMessage = result.Error ?? "فشل في إعادة تعيين كلمة المرور";
+            await _dialogService.ShowErrorAsync("خطأ في إعادة تعيين كلمة المرور", ErrorMessage);
         }
     }
 
@@ -350,10 +318,7 @@ public class UserListViewModel : AdminOnlyViewModel
 
     private void OnUserChanged(UserChangedMessage msg)
     {
-        System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
-        {
-            await LoadUsersAsync();
-        });
+        System.Windows.Application.Current.Dispatcher.InvokeAsync((Func<Task>)(async () => await LoadUsersAsync()));
     }
 
     public override void Cleanup()

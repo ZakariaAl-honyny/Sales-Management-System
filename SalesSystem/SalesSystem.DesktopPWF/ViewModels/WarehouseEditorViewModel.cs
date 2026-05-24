@@ -1,5 +1,5 @@
+using System.Collections.Generic;
 using SalesSystem.DesktopPWF.Messaging.Messages;
-using System.Windows;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -16,9 +16,9 @@ public class WarehouseEditorViewModel : ViewModelBase
 {
     private readonly IWarehouseApiService _warehouseService;
     private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
 
     private int _warehouseId;
-    private string _code = string.Empty;
     private string _name = string.Empty;
     private string _location = string.Empty;
     private bool _isDefault;
@@ -28,24 +28,25 @@ public class WarehouseEditorViewModel : ViewModelBase
 
 
     public WarehouseEditorViewModel()
-        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>())
+        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
     {
     }
 
-    public WarehouseEditorViewModel(IWarehouseApiService warehouseService, IEventBus eventBus)
+    public WarehouseEditorViewModel(IWarehouseApiService warehouseService, IEventBus eventBus, IDialogService dialogService)
     {
         _warehouseService = warehouseService;
         _eventBus = eventBus;
+        _dialogService = dialogService;
+        SetDialogService(dialogService);
 
-        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, ex => ShowSaveError(ex))), () => CanSave);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, ex => ShowSaveError(ex))));
         CancelCommand = new RelayCommand(Cancel);
     }
 
     public WarehouseEditorViewModel(WarehouseDto warehouse)
-        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>())
+        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
     {
         _warehouseId = warehouse.Id;
-        _code = warehouse.Code ?? string.Empty;
         _name = warehouse.Name;
         _location = warehouse.Location ?? string.Empty;
         _isDefault = warehouse.IsDefault;
@@ -62,12 +63,6 @@ public class WarehouseEditorViewModel : ViewModelBase
         set => SetProperty(ref _isEditMode, value);
     }
 
-    public string Code
-    {
-        get => _code;
-        set => SetProperty(ref _code, value);
-    }
-
     public string Name
     {
         get => _name;
@@ -75,8 +70,10 @@ public class WarehouseEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _name, value))
             {
-                OnPropertyChanged(nameof(CanSave));
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Name), "اسم المستودع مطلوب");
+                else
+                    ClearErrors(nameof(Name));
             }
         }
     }
@@ -117,7 +114,6 @@ public class WarehouseEditorViewModel : ViewModelBase
     }
 
     public string? NameError => HasNameError ? "الاسم مطلوب" : null;
-    public bool CanSave => !HasErrors && !string.IsNullOrWhiteSpace(Name);
     #endregion
 
     #region Commands
@@ -129,16 +125,13 @@ public class WarehouseEditorViewModel : ViewModelBase
     private bool Validate()
     {
         HasNameError = string.IsNullOrWhiteSpace(Name);
-        OnPropertyChanged(nameof(HasErrors));
-        OnPropertyChanged(nameof(CanSave));
-        (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         return !HasNameError;
     }
 
     private void ShowSaveError(Exception ex)
     {
         ErrorMessage = HandleException(ex, "WarehouseEditorViewModel.SaveAsync", "[WarehouseEditorViewModel.SaveAsync] Failed to save warehouse.");
-        System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+        _ = _dialogService.ShowErrorAsync("خطأ في حفظ المستودع", ErrorMessage!);
     }
 
     private async Task SaveOperationAsync()
@@ -148,8 +141,8 @@ public class WarehouseEditorViewModel : ViewModelBase
             var errors = new List<string>();
             if (HasNameError) errors.Add("• " + NameError);
 
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            System.Windows.MessageBox.Show(errorMsg, "بيانات غير مكتملة", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return;
         }
 
@@ -161,7 +154,6 @@ public class WarehouseEditorViewModel : ViewModelBase
         {
             var updateRequest = new UpdateWarehouseRequest(
                 Name,
-                string.IsNullOrWhiteSpace(Code) ? null : Code,
                 string.IsNullOrWhiteSpace(Location) ? null : Location,
                 IsDefault,
                 IsActive);
@@ -172,7 +164,6 @@ public class WarehouseEditorViewModel : ViewModelBase
         {
             var createRequest = new CreateWarehouseRequest(
                 Name,
-                string.IsNullOrWhiteSpace(Code) ? null : Code,
                 string.IsNullOrWhiteSpace(Location) ? null : Location,
                 IsDefault);
 
@@ -183,18 +174,14 @@ public class WarehouseEditorViewModel : ViewModelBase
         {
             _eventBus.Publish(new WarehouseChangedMessage(result.Value.Id));
 
-            System.Windows.MessageBox.Show(
-                IsEditMode ? "تم تحديث المستودع بنجاح" : "تم إضافة المستودع بنجاح",
-                "نجاح",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث المستودع بنجاح" : "تم إضافة المستودع بنجاح");
 
             RequestClose();
         }
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المستودع", "WarehouseEditorViewModel.SaveAsync", "[WarehouseEditorViewModel.SaveAsync] Failed to save warehouse.");
-            System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            await _dialogService.ShowErrorAsync("خطأ في حفظ المستودع", ErrorMessage!);
         }
     }
 

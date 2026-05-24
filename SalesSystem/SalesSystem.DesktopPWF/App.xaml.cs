@@ -5,6 +5,7 @@ using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Serilog;
+using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
@@ -20,6 +21,7 @@ using SalesSystem.DesktopPWF.ViewModels.Payments;
 using SalesSystem.DesktopPWF.ViewModels.Returns;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
 using SalesSystem.DesktopPWF.ViewModels.Categories;
+using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
 using SalesSystem.DesktopPWF.Views.Updates;
@@ -48,7 +50,7 @@ public partial class App : System.Windows.Application
         return _serviceProvider.GetRequiredService<T>();
     }
 
-    private void Application_Startup(object sender, StartupEventArgs e)
+    private async void Application_Startup(object sender, StartupEventArgs e)
     {
         // Setup Serilog
         SetupLogging();
@@ -60,6 +62,16 @@ public partial class App : System.Windows.Application
         var services = new ServiceCollection();
         ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
+
+        // Check API and database connectivity before showing UI
+        var canConnect = await CheckDatabaseConnectionAsync();
+        if (!canConnect)
+        {
+            Log.Fatal("Application shutting down due to database connection failure");
+            Log.CloseAndFlush();
+            Environment.Exit(1);
+            return;
+        }
 
         // Check authentication and show appropriate window
         var sessionService = _serviceProvider.GetRequiredService<ISessionService>();
@@ -85,8 +97,36 @@ public partial class App : System.Windows.Application
         Log.Information("Application started successfully");
     }
 
-    private void Application_Exit(object sender, ExitEventArgs e)
+    /// <summary>
+    /// Checks API and database connectivity before startup.
+    /// Shows error dialog if connection fails, with retry option.
+    /// Returns true if database is reachable, false to shut down.
+    /// </summary>
+    private async Task<bool> CheckDatabaseConnectionAsync()
     {
+        var healthService = _serviceProvider!.GetRequiredService<IDatabaseHealthCheckService>();
+
+        var result = await healthService.CheckAsync();
+
+        if (result.IsDatabaseConnected)
+            return true;
+
+        var retry = await Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new Views.Dialogs.DatabaseErrorDialog(
+                result.ErrorMessage ?? "تعذر الاتصال بقاعدة البيانات",
+                () => healthService.CheckAsync());
+
+            dialog.ShowDialog();
+            return dialog.RetryClicked;
+        });
+
+        return retry;
+    }
+
+    private void Application_Exit(object sender, ExitEventArgs e)
+    {   
+
         Log.Information("Application shutting down");
         Log.CloseAndFlush();
     }
@@ -114,6 +154,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ISessionService, SessionService>();
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IScreenWindowService, ScreenWindowService>();
         services.AddSingleton<IEventBus, EventBus>();
         services.AddSingleton<ISoundService, SoundService>();
         services.AddSingleton<IBarcodeInputService, BarcodeInputService>();
@@ -152,6 +193,9 @@ public partial class App : System.Windows.Application
         services.AddSingleton<Services.App.ITransferPrinter, Services.Printing.TransferPrinter>();
         services.AddSingleton<IPrintApiService, PrintApiService>();
 
+        // Health check
+        services.AddSingleton<IDatabaseHealthCheckService, DatabaseHealthCheckService>();
+
         // ViewModels
         services.AddTransient<LoginWindowViewModel>();
         services.AddTransient<DashboardViewModel>();
@@ -187,6 +231,8 @@ public partial class App : System.Windows.Application
         services.AddTransient<UnitEditorViewModel>();
         services.AddTransient<ReportsViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<CostingMethodSettingsViewModel>();
+        services.AddTransient<BackupViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()
@@ -238,11 +284,9 @@ public partial class App : System.Windows.Application
         var errorMessage = $"[UI THREAD EXCEPTION] Location: {e.Exception.Source} -> {e.Exception.TargetSite}. Context: WPF Dispatcher Unhandled Exception.";
         Log.Error(e.Exception, errorMessage);
 
-        System.Windows.MessageBox.Show(
-            $"حدث خطأ غير متوقع في واجهة المستخدم: {e.Exception.Message}\n\nتم تسجيل التفاصيل التشخيصية للذكاء الاصطناعي في ملف Logs.",
-            "خطأ في النظام (PWF)",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
+        new Views.Dialogs.FallbackErrorDialog(
+            "حدث خطأ غير متوقع في التطبيق. تم تسجيل التفاصيل في ملف السجلات.")
+            .ShowDialog();
 
         e.Handled = true;
     }
@@ -288,12 +332,13 @@ public partial class App : System.Windows.Application
 
             var result = await updaterService.CheckForUpdatesAsync();
 
-            if (!result.IsSuccess || !result.Value.UpdateAvailable || result.Value.UpdateInfo == null)
+            var updateValue = result.Value;
+            if (!result.IsSuccess || updateValue == null || !updateValue.UpdateAvailable || updateValue.UpdateInfo == null)
                 return;
 
             await Dispatcher.InvokeAsync(() =>
             {
-                ShowUpdateDialog(result.Value.UpdateInfo);
+                ShowUpdateDialog(updateValue!.UpdateInfo);
             });
         }
         catch (Exception ex)

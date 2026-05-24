@@ -16,6 +16,6 @@ public record PurchaseInvoiceResponse(
 );
 
 public record PurchaseInvoiceItemResponse(
-    int Id, int ProductId, string ProductName, string ProductCode,
+    int Id, int ProductId, string ProductName,
     decimal Quantity, decimal UnitCost, decimal DiscountAmount, decimal LineTotal
 );

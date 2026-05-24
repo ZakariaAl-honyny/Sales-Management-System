@@ -38,7 +38,7 @@ public class CustomerPaymentsControllerTests
             new(1, "CP-2026-000001", 1, "عميل 1", 100.00m, (byte)PaymentType.Cash, DateTime.Now, null, "دفعة أولى"),
             new(2, "CP-2026-000002", 1, "عميل 1", 50.00m, (byte)PaymentType.Cash, DateTime.Now, null, "دفعة ثانية")
         };
-        var pagedResult = new PagedResult<CustomerPaymentDto>(payments, 2, 1, 10);
+        var pagedResult = PagedResult<CustomerPaymentDto>.Create(payments, 2, 1, 10);
 
         _paymentServiceMock
             .Setup(x => x.GetCustomerPaymentsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -162,7 +162,7 @@ public class SupplierPaymentsControllerTests
             new(1, "SP-2026-000001", 1, "مورد 1", 200.00m, (byte)PaymentType.Cash, DateTime.Now, null, "دفعة أولى"),
             new(2, "SP-2026-000002", 1, "مورد 1", 150.00m, (byte)PaymentType.Cash, DateTime.Now, null, "دفعة ثانية")
         };
-        var pagedResult = new PagedResult<SupplierPaymentDto>(payments, 2, 1, 10);
+        var pagedResult = PagedResult<SupplierPaymentDto>.Create(payments, 2, 1, 10);
 
         _paymentServiceMock
             .Setup(x => x.GetSupplierPaymentsAsync(It.IsAny<string>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))

@@ -271,7 +271,6 @@ public class DashboardViewModel : ViewModelBase
                 {
                     LowStockItems.Add(new LowStockItem
                     {
-                        ProductCode = item.ProductCode ?? string.Empty,
                         ProductName = item.ProductName,
                         CurrentStock = item.CurrentRetailQty,
                         MinStock = item.ReorderLevelRetailQty
@@ -328,7 +327,6 @@ public class RecentInvoiceItem
 /// </summary>
 public class LowStockItem
 {
-    public string ProductCode { get; set; } = string.Empty;
     public string ProductName { get; set; } = string.Empty;
     public decimal CurrentStock { get; set; }
     public decimal MinStock { get; set; }

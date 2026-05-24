@@ -34,48 +34,52 @@
                     <StackPanel>
                         <!-- Username -->
                         <TextBlock Text="اسم المستخدم *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+<TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                  Style="{StaticResource ModernTextBox}"
                                  Tag="مثال: ahmed_2024"
                                  TabIndex="1"
                                  IsEnabled="{Binding IsEditMode, Converter={StaticResource InverseBoolConverter}}"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtUserUsername"/>
+                                 AutomationProperties.AutomationId="TxtUserUsername"
+                              ToolTip="اسم المستخدم للدخول — يجب أن يكون فريداً ولا يمكن تكراره. يُستخدم مع كلمة المرور لتسجيل الدخول"/>
                         <TextBlock Text="اسم فريد يُستخدم للدخول إلى النظام" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="20"/>
 
                         <!-- Full Name -->
                         <TextBlock Text="الاسم بالكامل *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding FullName, UpdateSourceTrigger=PropertyChanged}"
+<TextBox Text="{Binding FullName, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                  Style="{StaticResource ModernTextBox}"
                                  Tag="الاسم الثلاثي للموظف"
                                  TabIndex="2"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtUserFullName"/>
+                                 AutomationProperties.AutomationId="TxtUserFullName"
+                              ToolTip="الاسم الكامل للمستخدم — يظهر في الفواتير والتقارير"/>
                         <TextBlock Text="يظهر هذا الاسم في الفواتير والتقارير" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="20"/>
 
                         <!-- Password -->
                         <TextBlock Text="كلمة المرور *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
+<TextBox Text="{Binding Password, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                  Style="{StaticResource ModernTextBox}"
                                  Tag="أدخل كلمة مرور قوية"
                                  TabIndex="3"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtUserPassword"/>
+                                 AutomationProperties.AutomationId="TxtUserPassword"
+                              ToolTip="كلمة المرور مطلوبة عند إنشاء مستخدم جديد. اتركها فارغة عند التعديل إذا كنت لا تريد تغييرها"/>
                         <TextBlock Text="اتركه فارغاً عند التعديل إذا كنت لا تريد تغيير كلمة المرور" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="20"/>
 
                         <!-- Role -->
                         <TextBlock Text="الصلاحية" Style="{StaticResource LabelStyle}"/>
-                        <ComboBox ItemsSource="{Binding RoleOptions}"
-                                  SelectedValue="{Binding Role}"
+<ComboBox ItemsSource="{Binding RoleOptions}"
+                                  SelectedValue="{Binding Role, ValidatesOnDataErrors=True}"
                                   SelectedValuePath="Value"
                                   DisplayMemberPath="Display"
                                   Style="{StaticResource ModernComboBox}"
                                   TabIndex="4"
                                   helpers:FocusHelper.AdvanceOnEnter="True"
-                                  AutomationProperties.AutomationId="CbUserRole"/>
+                                  AutomationProperties.AutomationId="CbUserRole"
+                              ToolTip="تحدد صلاحيات المستخدم — مدير نظام (كل الصلاحيات)، مدير (مشرف)، كاشير (مبيعات فقط)"/>
                         <TextBlock Text="تحدد الصلاحية ما يمكن للمستخدم رؤيته أو تعديله في النظام" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="20"/>
 
@@ -104,7 +108,8 @@
                             Margin="0,0,12,0"
                             IsDefault="True"
                             TabIndex="6"
-                            AutomationProperties.AutomationId="BtnSaveUser">
+                            AutomationProperties.AutomationId="BtnSaveUser"
+                            ToolTip="حفظ البيانات المدخلة">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,8,0" Stretch="Uniform"/>
                             <TextBlock Text="حفظ المستخدم"/>
@@ -115,7 +120,8 @@
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
                             TabIndex="7"
-                            AutomationProperties.AutomationId="BtnCancelUser"/>
+                            AutomationProperties.AutomationId="BtnCancelUser"
+                            ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 

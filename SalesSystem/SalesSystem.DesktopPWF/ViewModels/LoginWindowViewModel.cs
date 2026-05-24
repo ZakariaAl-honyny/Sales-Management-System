@@ -85,21 +85,24 @@ public class LoginWindowViewModel : ViewModelBase
                 response.UserId,
                 (UserRole)response.Role);
 
-            await InvokeOnUIThreadAsync(async () =>
+            if (System.Windows.Application.Current != null)
             {
-                var mainWindow = new MainWindow();
-                mainWindow.Show();
-                System.Windows.Application.Current.MainWindow = mainWindow;
-
-                foreach (Window window in System.Windows.Application.Current.Windows)
+                await InvokeOnUIThreadAsync(async () =>
                 {
-                    if (window is LoginWindow)
+                    var mainWindow = new MainWindow();
+                    mainWindow.Show();
+                    System.Windows.Application.Current.MainWindow = mainWindow;
+
+                    foreach (Window window in System.Windows.Application.Current.Windows)
                     {
-                        window.Close();
-                        break;
+                        if (window is LoginWindow)
+                        {
+                            window.Close();
+                            break;
+                        }
                     }
-                }
-            });
+                });
+            }
         }
         else
         {

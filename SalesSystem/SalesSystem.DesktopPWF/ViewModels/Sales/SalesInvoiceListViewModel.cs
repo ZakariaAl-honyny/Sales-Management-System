@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
@@ -24,6 +24,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
     private readonly IProductApiService _productService;
     private readonly IDialogService _dialogService;
     private readonly IPrintApiService _printService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<SalesInvoiceDto> _invoices = new();
     private ICollectionView? _invoicesView;
@@ -32,7 +33,6 @@ public class SalesInvoiceListViewModel : ViewModelBase
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
     private int? _statusFilter;
-    private bool _isLoading;
     private string? _errorMessage;
     private bool _isEmpty;
 
@@ -44,7 +44,8 @@ public class SalesInvoiceListViewModel : ViewModelBase
             App.GetService<IWarehouseApiService>(),
             App.GetService<IProductApiService>(),
             App.GetService<IDialogService>(),
-            App.GetService<IPrintApiService>())
+            App.GetService<IPrintApiService>(),
+            App.GetService<IScreenWindowService>())
     {
     }
 
@@ -55,7 +56,8 @@ public class SalesInvoiceListViewModel : ViewModelBase
         IWarehouseApiService warehouseService,
         IProductApiService productService,
         IDialogService dialogService,
-        IPrintApiService printService)
+        IPrintApiService printService,
+        IScreenWindowService screenWindowService)
     {
         _invoiceService = invoiceService ?? throw new ArgumentNullException(nameof(invoiceService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
@@ -64,6 +66,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
         _productService = productService ?? throw new ArgumentNullException(nameof(productService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _printService = printService ?? throw new ArgumentNullException(nameof(printService));
+        _screenWindowService = screenWindowService ?? throw new ArgumentNullException(nameof(screenWindowService));
 
         // Initialize commands
         RefreshCommand = new AsyncRelayCommand(LoadInvoicesAsync);
@@ -158,11 +161,6 @@ public class SalesInvoiceListViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -215,7 +213,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
     #region Methods
     public async Task LoadInvoicesAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -232,7 +230,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Invoices.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.InvoiceDate))
                     {
                         Invoices.Add(item);
                     }
@@ -242,7 +240,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل فواتير البيع", "SalesInvoiceListViewModel.LoadInvoicesAsync", "[SalesInvoiceListViewModel.LoadInvoicesAsync] Failed to load sales invoices list.");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ظپظˆط§طھظٹط± ط§ظ„ط¨ظٹط¹", "SalesInvoiceListViewModel.LoadInvoicesAsync", "[SalesInvoiceListViewModel.LoadInvoicesAsync] Failed to load sales invoices list.");
                 IsEmpty = Invoices.Count == 0;
             }
         }
@@ -252,7 +250,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -286,16 +284,19 @@ public class SalesInvoiceListViewModel : ViewModelBase
 
     private void AddNewInvoice()
     {
-        var editorVm = new SalesInvoiceEditorViewModel();
-        var editorWindow = new SalesInvoiceEditorView { DataContext = editorVm };
-        editorVm.CloseRequested += () => editorWindow.DialogResult = true;
-
-        if (editorWindow.ShowDialog() == true)
+        var editorVm = App.GetService<SalesInvoiceEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            if (editorVm.InvoiceId.HasValue)
-                _eventBus.Publish(new SaleInvoiceChangedMessage(editorVm.InvoiceId.Value));
-            _ = LoadInvoicesAsync();
-        }
+            Title = "ظپط§طھظˆط±ط© ط¨ظٹط¹ ط¬ط¯ظٹط¯ط©",
+            OnClosed = (vm) =>
+            {
+                if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+                {
+                    _eventBus.Publish(new SaleInvoiceChangedMessage(editor.InvoiceId.Value));
+                    System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+                }
+            }
+        });
     }
 
     private void ViewInvoice()
@@ -303,7 +304,10 @@ public class SalesInvoiceListViewModel : ViewModelBase
         if (SelectedInvoice == null) return;
 
         var editorVm = new SalesInvoiceEditorViewModel(SelectedInvoice.Id, isReadOnly: true);
-        _dialogService.ShowDialog(editorVm);
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
+        {
+            Title = "ط¹ط±ط¶ ظپط§طھظˆط±ط© ط¨ظٹط¹"
+        });
     }
 
     private void EditInvoice()
@@ -311,22 +315,26 @@ public class SalesInvoiceListViewModel : ViewModelBase
         if (SelectedInvoice == null) return;
 
         var editorVm = new SalesInvoiceEditorViewModel(SelectedInvoice.Id);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _eventBus.Publish(new SaleInvoiceChangedMessage(SelectedInvoice.Id));
-            _ = LoadInvoicesAsync();
-        }
+            Title = "طھط¹ط¯ظٹظ„ ظپط§طھظˆط±ط© ط¨ظٹط¹",
+            OnClosed = (vm) =>
+            {
+                _eventBus.Publish(new SaleInvoiceChangedMessage(SelectedInvoice.Id));
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+            }
+        });
     }
 
     private async Task PostInvoiceAsync()
     {
         if (SelectedInvoice == null) return;
 
-        var result = await _dialogService.ShowConfirmationAsync("تأكيد الترحيل", $"هل أنت متأكد من ترحيل الفاتورة رقم: {SelectedInvoice.Id}؟\nسيتم خصم الكميات من المخزون.");
+        var result = await _dialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ظ„طھط±ط­ظٹظ„", $"ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط© ط±ظ‚ظ…: {SelectedInvoice.Id}طں\nط³ظٹطھظ… ط®طµظ… ط§ظ„ظƒظ…ظٹط§طھ ظ…ظ† ط§ظ„ظ…ط®ط²ظˆظ†.");
 
         if (!result) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -335,16 +343,16 @@ public class SalesInvoiceListViewModel : ViewModelBase
 
             if (postResult.IsSuccess)
             {
-                IsLoading = false;
-                await _dialogService.ShowSuccessAsync("نجاح", "تم ترحيل الفاتورة بنجاح");
+                IsBusy = false;
+                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط© ط¨ظ†ط¬ط§ط­");
                 _eventBus.Publish(new SaleInvoiceChangedMessage(SelectedInvoice.Id));
                 await LoadInvoicesAsync();
             }
             else
             {
-                IsLoading = false;
-                ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "SalesInvoiceListViewModel.PostInvoiceAsync", $"[SalesInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm sales invoice ID {SelectedInvoice.Id}.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                IsBusy = false;
+                ErrorMessage = HandleFailure(postResult.Error ?? "ظپط´ظ„ ظپظٹ طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط©", "SalesInvoiceListViewModel.PostInvoiceAsync", $"[SalesInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm sales invoice ID {SelectedInvoice.Id}.");
+                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„طھط±ط­ظٹظ„", ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -353,7 +361,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -361,11 +369,11 @@ public class SalesInvoiceListViewModel : ViewModelBase
     {
         if (SelectedInvoice == null) return;
 
-        var result = await _dialogService.ShowConfirmationAsync("تأكيد الإلغاء", $"هل أنت متأكد من إلغاء الفاتورة رقم: {SelectedInvoice.Id}؟\nسيتم إعادة الكميات للمخزون.");
+        var result = await _dialogService.ShowConfirmationAsync("طھط£ظƒظٹط¯ ط§ظ„ط¥ظ„ط؛ط§ط،", $"ظ‡ظ„ ط£ظ†طھ ظ…طھط£ظƒط¯ ظ…ظ† ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط© ط±ظ‚ظ…: {SelectedInvoice.Id}طں\nط³ظٹطھظ… ط¥ط¹ط§ط¯ط© ط§ظ„ظƒظ…ظٹط§طھ ظ„ظ„ظ…ط®ط²ظˆظ†.");
 
         if (!result) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -374,16 +382,16 @@ public class SalesInvoiceListViewModel : ViewModelBase
 
             if (cancelResult.IsSuccess)
             {
-                IsLoading = false;
-                await _dialogService.ShowSuccessAsync("نجاح", "تم إلغاء الفاتورة بنجاح");
+                IsBusy = false;
+                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط© ط¨ظ†ط¬ط§ط­");
                 _eventBus.Publish(new SaleInvoiceChangedMessage(SelectedInvoice.Id));
                 await LoadInvoicesAsync();
             }
             else
             {
-                IsLoading = false;
-                ErrorMessage = HandleFailure(cancelResult.Error ?? "فشل في إلغاء الفاتورة", "SalesInvoiceListViewModel.CancelInvoiceAsync", $"[SalesInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel sales invoice ID {SelectedInvoice.Id}.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+                IsBusy = false;
+                ErrorMessage = HandleFailure(cancelResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط©", "SalesInvoiceListViewModel.CancelInvoiceAsync", $"[SalesInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel sales invoice ID {SelectedInvoice.Id}.");
+                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط¥ظ„ط؛ط§ط،", ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -392,22 +400,22 @@ public class SalesInvoiceListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
-    // ─── Print Methods ────────────────────────────
+    // â”€â”€â”€ Print Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private bool IsPrintAllowed() => SelectedInvoice != null
         && SelectedInvoice.Status == (byte)InvoiceStatus.Posted
-        && !IsLoading;
+        && !IsBusy;
 
     private async Task PrintPreviewAsync()
     {
         if (SelectedInvoice == null) return;
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             var result = await _printService.GetSalesPreviewDataAsync(SelectedInvoice.Id);
             if (result.IsSuccess && result.Value != null)
             {
@@ -416,13 +424,13 @@ public class SalesInvoiceListViewModel : ViewModelBase
             }
             else
             {
-                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
-                    result.Error ?? "تعذر فتح معاينة الطباعة");
+                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط·ط¨ط§ط¹ط©",
+                    result.Error ?? "طھط¹ط°ط± ظپطھط­ ظ…ط¹ط§ظٹظ†ط© ط§ظ„ط·ط¨ط§ط¹ط©");
             }
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -431,17 +439,17 @@ public class SalesInvoiceListViewModel : ViewModelBase
         if (SelectedInvoice == null) return;
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             var result = await _printService.PrintSalesA4Async(SelectedInvoice.Id);
             if (!result.IsSuccess)
             {
-                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
-                    result.Error ?? "فشلت الطباعة");
+                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط·ط¨ط§ط¹ط©",
+                    result.Error ?? "ظپط´ظ„طھ ط§ظ„ط·ط¨ط§ط¹ط©");
             }
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -450,17 +458,17 @@ public class SalesInvoiceListViewModel : ViewModelBase
         if (SelectedInvoice == null) return;
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             var result = await _printService.PrintSalesThermalAsync(SelectedInvoice.Id);
             if (!result.IsSuccess)
             {
-                await _dialogService.ShowErrorAsync("خطأ في الطباعة",
-                    result.Error ?? "فشلت الطباعة الحرارية");
+                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط·ط¨ط§ط¹ط©",
+                    result.Error ?? "ظپط´ظ„طھ ط§ظ„ط·ط¨ط§ط¹ط© ط§ظ„ط­ط±ط§ط±ظٹط©");
             }
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -498,3 +506,7 @@ public class StatusItem
     public int? Value { get; set; }
     public string Display { get; set; } = string.Empty;
 }
+
+
+
+

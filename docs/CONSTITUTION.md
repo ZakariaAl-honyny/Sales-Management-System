@@ -1,5 +1,5 @@
 # Project Constitution — Sales Management System
-# Version: 2.2 (v4.3) | Platform: .NET 10 LTS | Date: 2026
+# Version: 2.4 (v4.6.2) | Platform: .NET 10 LTS | Date: 2026
 
 ---
 
@@ -285,20 +285,86 @@ _toastService.ShowInfo("تم التحديث");               // Blue, 3s
 
 ---
 
-### 2.17 Real-Time UI Validation (v4.2)
+### 2.17 Real-Time UI Validation (v4.6.2)
 
 **ViewModelBase implements INotifyDataErrorInfo:**
 ```csharp
 public void AddError(string propertyName, string errorMessage);
 public void ClearErrors(string propertyName);
+public void ClearAllErrors();
 public bool HasErrors { get; }
 ```
 
-**Save Button CanExecute:**
-```csharp
-public bool CanSave => !HasErrors && !string.IsNullOrWhiteSpace(Name);
-// Button.IsEnabled="{Binding CanSave}"
+**v4.6.2 Enhancement — ErrorTemplate + ValidateAllAsync:**
+
+```xml
+<!-- ErrorTemplate in Styles.xaml — red border + ❗ icon -->
+<ControlTemplate x:Key="ErrorTemplate">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Grid.ColumnSpan="2"
+                BorderBrush="#EF4444" BorderThickness="1.5" CornerRadius="4">
+            <AdornedElementPlaceholder x:Name="Placeholder"/>
+        </Border>
+        <Border Grid.Column="1" Background="#EF4444"
+                CornerRadius="10" Width="20" Height="20"
+                Margin="4,0" VerticalAlignment="Center"
+                ToolTip="{Binding [0].ErrorContent}">
+            <TextBlock Text="!" Foreground="White" FontWeight="Bold"
+                       FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+    </Grid>
+</ControlTemplate>
 ```
+
+```csharp
+// ViewModelBase.cs — new methods
+public void SetDialogService(IDialogService dialogService) { ... }
+public async Task<bool> ValidateAllAsync() { ... }  // Shows dialog + focuses first error
+public void ValidateField<T>(T value, string propertyName, Func<T, string?> validationRule) { ... }
+
+// Editor VM constructor pattern:
+_dialogService = dialogService;
+SetDialogService(_dialogService);
+
+// Property setter — real-time INotifyDataErrorInfo:
+private string _name;
+public string Name
+{
+    get => _name;
+    set
+    {
+        if (SetProperty(ref _name, value))
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                AddError(nameof(Name), "اسم العميل مطلوب");
+            else
+                ClearErrors(nameof(Name));
+        }
+    }
+}
+
+// Pre-save validation — buttons ALWAYS enabled, validate on click:
+private async Task<bool> ValidateAsync()
+{
+    ClearAllErrors();
+    if (string.IsNullOrWhiteSpace(Name))
+        AddError(nameof(Name), "اسم المنتج مطلوب");
+    // ... more fields ...
+    return await ValidateAllAsync();  // Shows styled dialog + focuses first invalid field
+}
+```
+
+**Key behavioral rules:**
+- Save/Post buttons are ALWAYS enabled — NO `CanExecute` predicate
+- `CanSave` property is REMOVED from ViewModels
+- `HasErrors` is for UI red-border styling only, NOT for button disabling
+- `SetDialogService()` MUST be called in every Editor VM constructor
+- `ValidateAllAsync()` shows a styled warning dialog listing ALL errors, then focuses the first invalid field
+- Use `ClearAllErrors()` + `AddError()` then `await ValidateAllAsync()` for pre-save validation
 
 **Validation Error Messages (Arabic):**
 - "الاسم مطلوب"
@@ -557,6 +623,21 @@ Step 7: Quality validation (all checklist items must PASS)
 ### WPF UI
 - [ ] DialogService used (not raw MessageBox)
 - [ ] Toast notifications for minor success messages
-- [ ] INotifyDataErrorInfo with HasErrors property
-- [ ] Save buttons disabled when form has errors
-- [ ] Red border styles on invalid fields
+- [ ] INotifyDataErrorInfo with AddError/ClearErrors/ClearAllErrors
+- [ ] Save buttons ALWAYS enabled (no CanExecute) — validate on click with ValidateAllAsync
+- [ ] ErrorTemplate in Styles.xaml (red border + ❗ icon) applied to TextBox/PasswordBox/ComboBox
+- [ ] SetDialogService() called in every Editor VM constructor
+- [ ] No HasXxxError / CanSave boolean properties — use INotifyDataErrorInfo instead
+
+---
+
+## 9. FORBIDDEN — Never Do These
+
+The following patterns are strictly prohibited:
+
+| Pattern | Why It's Forbidden | Use Instead |
+|---------|-------------------|-------------|
+| `HasXxxError` / `XxxError` boolean + computed string pattern | Duplicates INotifyDataErrorInfo, error-prone | Use `AddError()`/`ClearErrors()` from INotifyDataErrorInfo |
+| Missing `SetDialogService()` call in Editor VM constructors | `ValidateAllAsync()` silently fails without a dialog service reference | Call `SetDialogService(_dialogService)` in every constructor |
+| Duplicating validation dialog logic in each Editor ViewModel | Violates DRY, each editor reimplements warning dialog | Use `ValidateAllAsync()` from ViewModelBase |
+| `Save buttons disabled when form has errors` | Blocks user from seeing why save fails; poor UX | Buttons ALWAYS enabled — validate on click with styled warning dialog |

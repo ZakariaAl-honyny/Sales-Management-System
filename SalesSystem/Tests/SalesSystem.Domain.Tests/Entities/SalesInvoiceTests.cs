@@ -229,6 +229,30 @@ public class SalesInvoiceTests
     }
 
     [Fact]
+    public void Post_AlreadyPostedInvoice_ThrowsDomainException()
+    {
+        // Arrange
+        var invoice = SalesInvoice.Create(
+            invoiceNo: "INV-2026-000001",
+            warehouseId: 1,
+            createdByUserId: 1
+        );
+
+        var item = SalesInvoiceItem.Create(
+            productId: 1,
+            quantity: 1,
+            unitPrice: 100m
+        );
+        invoice.AddItem(item);
+        invoice.Post(); // First post succeeds
+
+        // Act & Assert
+        var action = () => invoice.Post();
+        action.Should().Throw<DomainException>()
+            .WithMessage("فقط الفواتير المسودة يمكن ترحيلها.");
+    }
+
+    [Fact]
     public void Cancel_GivenPostedInvoice_ShouldTransitionToCancelled()
     {
         var invoice = SalesInvoice.Create(

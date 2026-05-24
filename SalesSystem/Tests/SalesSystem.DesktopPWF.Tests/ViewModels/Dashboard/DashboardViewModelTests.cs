@@ -106,24 +106,14 @@ public class DashboardViewModelTests : IDisposable
     public async Task RefreshCommand_WhenAlreadyExecuting_DoesNotReload()
     {
         var callCount = 0;
+        var pendingTcs = new TaskCompletionSource<Result<DashboardSummaryDto>>();
 
         _mockDashboardService
             .Setup(x => x.GetSummaryAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() =>
+            .Returns(() =>
             {
                 callCount++;
-                return Result<DashboardSummaryDto>.Success(new DashboardSummaryDto(
-                    TotalSalesToday: 0m,
-                    NumberOfSalesToday: 0,
-                    TotalPurchasesToday: 0m,
-                    LowStockItemsCount: 0,
-                    ActiveCustomersCount: 0,
-                    ActiveSuppliersCount: 0,
-                    TotalProductsCount: 0,
-                    TotalReceivables: 0m,
-                    TotalPayables: 0m,
-                    TotalSalesMonth: 0m,
-                    TotalPurchasesMonth: 0m));
+                return pendingTcs.Task;
             });
 
         _mockSalesService
@@ -144,12 +134,20 @@ public class DashboardViewModelTests : IDisposable
 
         var viewModel = CreateViewModel();
 
-        // First execution
+        // First execution — keep it pending via TaskCompletionSource
         viewModel.RefreshCommand.Execute(null);
         await Task.Delay(50);
 
-        // Second execution while first is still running should be ignored by AsyncRelayCommand
+        // Second execution while first is still running — should be ignored by AsyncRelayCommand
         viewModel.RefreshCommand.Execute(null);
+
+        // Now let the first execution complete
+        var summary = new DashboardSummaryDto(
+            TotalSalesToday: 0m, NumberOfSalesToday: 0, TotalPurchasesToday: 0m,
+            LowStockItemsCount: 0, ActiveCustomersCount: 0, ActiveSuppliersCount: 0,
+            TotalProductsCount: 0, TotalReceivables: 0m, TotalPayables: 0m,
+            TotalSalesMonth: 0m, TotalPurchasesMonth: 0m);
+        pendingTcs.SetResult(Result<DashboardSummaryDto>.Success(summary));
         await Task.Delay(200);
 
         callCount.Should().Be(1, "concurrent execution should be prevented by AsyncRelayCommand");
@@ -404,7 +402,6 @@ public class DashboardViewModelTests : IDisposable
     {
         return new CustomerDto(
             Id: id,
-            Code: $"C{id:D4}",
             Name: name,
             Phone: null,
             Email: null,
@@ -420,7 +417,6 @@ public class DashboardViewModelTests : IDisposable
     {
         return new SupplierDto(
             Id: id,
-            Code: $"S{id:D4}",
             Name: name,
             Phone: null,
             Email: null,
@@ -436,7 +432,6 @@ public class DashboardViewModelTests : IDisposable
     {
         return new ProductDto(
             Id: id,
-            Code: $"P{id:D4}",
             Barcode: null,
             Name: name,
             CategoryId: 1,

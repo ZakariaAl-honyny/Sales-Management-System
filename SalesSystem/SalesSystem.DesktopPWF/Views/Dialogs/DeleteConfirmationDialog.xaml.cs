@@ -11,7 +11,19 @@ public partial class DeleteConfirmationDialog : Window
     {
         InitializeComponent();
         ItemNameText.Text = itemName;
+        PositionOverOwner();
+    }
+
+    private void PositionOverOwner()
+    {
         Owner = System.Windows.Application.Current.MainWindow;
+        if (Owner != null)
+        {
+            Width = Owner.ActualWidth;
+            Height = Owner.ActualHeight;
+            Left = Owner.Left;
+            Top = Owner.Top;
+        }
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)

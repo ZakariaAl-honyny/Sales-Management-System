@@ -10,8 +10,6 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     {
         builder.ToTable("Suppliers");
         builder.HasKey(s => s.Id);
-        builder.Property(s => s.Code).HasMaxLength(30);
-        builder.HasIndex(s => s.Code).IsUnique();
         builder.Property(s => s.Name).IsRequired().HasMaxLength(150);
         builder.Property(s => s.Phone).HasMaxLength(20);
         builder.Property(s => s.Email).HasMaxLength(100);
@@ -30,8 +28,6 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
     {
         builder.ToTable("Customers");
         builder.HasKey(c => c.Id);
-        builder.Property(c => c.Code).HasMaxLength(30);
-        builder.HasIndex(c => c.Code).IsUnique();
         builder.Property(c => c.Name).IsRequired().HasMaxLength(150);
         builder.Property(c => c.Phone).HasMaxLength(20);
         builder.Property(c => c.Email).HasMaxLength(100);

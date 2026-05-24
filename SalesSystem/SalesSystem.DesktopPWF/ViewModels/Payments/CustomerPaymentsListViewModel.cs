@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
@@ -17,17 +17,28 @@ namespace SalesSystem.DesktopPWF.ViewModels.Payments;
 /// </summary>
 public class CustomerPaymentsListViewModel : ViewModelBase
 {
-    private readonly ICustomerPaymentApiService _paymentService;
-    private readonly ICustomerApiService _customerService;
-    private readonly IDialogService _dialogService;
-    private readonly INavigationService _navigationService;
-    private readonly IPaymentPrinter _paymentPrinter;
-    private readonly ISettingsApiService _settingsService;
+    private ICustomerPaymentApiService? _paymentService;
+    private ICustomerApiService? _customerService;
+    private INavigationService? _navigationService;
+    private IPaymentPrinter? _paymentPrinter;
+    private ISettingsApiService? _settingsService;
+    private IScreenWindowService? _screenWindowService;
+
+    private ICustomerPaymentApiService PaymentService => _paymentService ??= App.GetService<ICustomerPaymentApiService>();
+    private ICustomerApiService CustomerService => _customerService ??= App.GetService<ICustomerApiService>();
+    private INavigationService NavigationService => _navigationService ??= App.GetService<INavigationService>();
+    private IPaymentPrinter PaymentPrinter => _paymentPrinter ??= App.GetService<IPaymentPrinter>();
+    private ISettingsApiService SettingsService => _settingsService ??= App.GetService<ISettingsApiService>();
+    private IScreenWindowService ScreenWindowService => _screenWindowService ??= App.GetService<IScreenWindowService>();
+
+    // Uses 'new' to suppress CS0108 (inherited member hiding).
+    // Test uses SetField("_dialogService", mock) before property is accessed.
+    private new IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+    private IDialogService? _dialogService;
 
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
-    private bool _isLoading;
     private string _errorMessage = string.Empty;
     private bool _isEmpty;
     private CustomerPaymentDto? _selectedPayment;
@@ -36,13 +47,6 @@ public class CustomerPaymentsListViewModel : ViewModelBase
 
     public CustomerPaymentsListViewModel()
     {
-        _paymentService = App.GetService<ICustomerPaymentApiService>();
-        _customerService = App.GetService<ICustomerApiService>();
-        _dialogService = App.GetService<IDialogService>();
-        _navigationService = App.GetService<INavigationService>();
-        _paymentPrinter = App.GetService<IPaymentPrinter>();
-        _settingsService = App.GetService<ISettingsApiService>();
-
         NewCommand = new RelayCommand(OnNew);
         ViewCommand = new RelayCommand(OnView, () => SelectedPayment != null);
         EditCommand = new RelayCommand(OnEdit, () => SelectedPayment != null);
@@ -70,11 +74,6 @@ public class CustomerPaymentsListViewModel : ViewModelBase
         set => SetProperty(ref _dateTo, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string ErrorMessage
     {
@@ -124,21 +123,29 @@ public class CustomerPaymentsListViewModel : ViewModelBase
     {
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             ErrorMessage = string.Empty;
 
-            var result = await _paymentService.GetAllAsync(SearchText, DateFrom, DateTo);
+            var result = await PaymentService.GetAllAsync(SearchText, DateFrom, DateTo);
 
             if (result.IsSuccess && result.Value != null)
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                InvokeOnUIThread(() =>
                 {
                     Payments.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Payments.Add(item);
                     }
-                    SetupCollectionView();
+                    try
+                    {
+                        SetupCollectionView();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // WPF CollectionView requires a running Dispatcher â€” skip in non-WPF contexts
+                        PaymentsView = null;
+                    }
                     IsEmpty = Payments.Count == 0;
                     OnPropertyChanged(nameof(PaymentsCount));
                 });
@@ -155,7 +162,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -167,42 +174,53 @@ public class CustomerPaymentsListViewModel : ViewModelBase
 
     private void OnNew()
     {
-        var vm = new CustomerPaymentEditorViewModel();
-        if (_dialogService.ShowDialog(vm))
+        var vm = App.GetService<CustomerPaymentEditorViewModel>();
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            _ = LoadPaymentsAsync();
-        }
+            Title = "سداد عميل جديد",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
+            }
+        });
     }
 
     private void OnView()
     {
         if (SelectedPayment == null) return;
         var vm = new CustomerPaymentEditorViewModel(SelectedPayment.Id, isReadOnly: true);
-        _dialogService.ShowDialog(vm);
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        {
+            Title = "عرض سداد عميل"
+        });
     }
 
     private void OnEdit()
     {
         if (SelectedPayment == null) return;
         var vm = new CustomerPaymentEditorViewModel(SelectedPayment.Id);
-        if (_dialogService.ShowDialog(vm))
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            _ = LoadPaymentsAsync();
-        }
+            Title = "تعديل سداد عميل",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
+            }
+        });
     }
 
     private async Task OnDelete()
     {
         if (SelectedPayment == null) return;
 
-        var result = await _dialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
+        var result = await DialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
 
         if (!result) return;
 
         try
         {
-            IsLoading = true;
-            var deleteResult = await _paymentService.DeleteAsync(SelectedPayment.Id);
+            IsBusy = true;
+            var deleteResult = await PaymentService.DeleteAsync(SelectedPayment.Id);
 
             if (deleteResult.IsSuccess)
             {
@@ -211,16 +229,18 @@ public class CustomerPaymentsListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = deleteResult.Error ?? "فشل في حذف السداد";
-                await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
+                await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            LogSystemError($"Failed to delete customer payment {SelectedPayment?.Id}", "CustomerPaymentsListViewModel.OnDelete", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
+            await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -228,21 +248,26 @@ public class CustomerPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
 
-        IsLoading = true;
+        IsBusy = true;
         try
         {
-            var settingsResult = await _settingsService.GetSettingsAsync();
+            var settingsResult = await SettingsService.GetSettingsAsync();
             if (!settingsResult.IsSuccess || settingsResult.Value == null) return;
 
-            _paymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
+            PaymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+            LogSystemError($"Failed to print customer payment {SelectedPayment?.Id}", "CustomerPaymentsListViewModel.OnPrint", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 }
+
+
+
+

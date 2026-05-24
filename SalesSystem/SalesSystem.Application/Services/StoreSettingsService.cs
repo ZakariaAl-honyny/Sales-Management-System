@@ -1,21 +1,25 @@
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
 public sealed class StoreSettingsService : IStoreSettingsService
 {
     private readonly IUnitOfWork _uow;
+    private readonly ISystemSettingsRepository _systemSettingsRepo;
     private readonly ILogger<StoreSettingsService> _logger;
 
-    public StoreSettingsService(IUnitOfWork uow, ILogger<StoreSettingsService> logger)
+    public StoreSettingsService(IUnitOfWork uow, ISystemSettingsRepository systemSettingsRepo, ILogger<StoreSettingsService> logger)
     {
         _uow = uow;
+        _systemSettingsRepo = systemSettingsRepo;
         _logger = logger;
     }
 
@@ -31,7 +35,7 @@ public sealed class StoreSettingsService : IStoreSettingsService
             await _uow.SaveChangesAsync(ct);
         }
 
-        return Result<StoreSettingsDto>.Success(MapToDto(settings));
+        return Result<StoreSettingsDto>.Success(await MapToDto(settings, ct));
     }
 
     public async Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, int userId, CancellationToken ct = default)
@@ -76,13 +80,23 @@ public sealed class StoreSettingsService : IStoreSettingsService
                     request.AutoUpdatePrices,
                     request.InvoicePrefix);
 
-                await _uow.StoreSettings.UpdateAsync(settings, ct);
             }
 
             await _uow.SaveChangesAsync(ct);
+
+            try
+            {
+                var costingMethod = (Domain.Enums.CostingMethod)request.CostingMethod;
+                await _systemSettingsRepo.SetCostingMethodAsync(costingMethod, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to persist costing method");
+            }
+
             _logger.LogInformation("Store settings updated by user {UserId}", userId);
 
-            return Result<StoreSettingsDto>.Success(MapToDto(settings));
+            return Result<StoreSettingsDto>.Success(await MapToDto(settings, ct));
         }
         catch (DomainException ex)
         {
@@ -95,19 +109,53 @@ public sealed class StoreSettingsService : IStoreSettingsService
         }
     }
 
-    private static StoreSettingsDto MapToDto(StoreSettings s) => new(
-        s.Id,
-        s.StoreName,
-        s.Phone,
-        s.Address,
-        s.LogoPath,
-        s.Email,
-        s.CurrencyCode,
-        s.DefaultTaxRate,
-        s.IsTaxEnabled,
-        s.TaxNumber,
-        s.EnableStockAlerts,
-        s.AllowNegativeStock,
-        s.AutoUpdatePrices,
-        s.InvoicePrefix);
+    public async Task<Result<CostingMethod?>> GetCostingMethodAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
+            return Result<CostingMethod?>.Success(costingMethod);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading costing method");
+            return Result<CostingMethod?>.Failure("فشل في تحميل طريقة التكلفة");
+        }
+    }
+
+    public async Task<Result> SetCostingMethodAsync(CostingMethod method, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _systemSettingsRepo.SetCostingMethodAsync(method, ct);
+            _logger.LogInformation("Costing method updated by user {UserId}", userId);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving costing method");
+            return Result.Failure("فشل في حفظ طريقة التكلفة");
+        }
+    }
+
+    private async Task<StoreSettingsDto> MapToDto(StoreSettings s, CancellationToken ct)
+    {
+        var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
+        return new StoreSettingsDto(
+            s.Id,
+            s.StoreName,
+            s.Phone,
+            s.Address,
+            s.LogoPath,
+            s.Email,
+            s.CurrencyCode,
+            s.DefaultTaxRate,
+            s.IsTaxEnabled,
+            s.TaxNumber,
+            s.EnableStockAlerts,
+            s.AllowNegativeStock,
+            s.AutoUpdatePrices,
+            s.InvoicePrefix,
+            (int)costingMethod);
+    }
 }

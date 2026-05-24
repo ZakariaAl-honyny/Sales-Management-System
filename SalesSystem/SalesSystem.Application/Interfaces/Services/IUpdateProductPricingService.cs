@@ -1,8 +1,10 @@
+using SalesSystem.Contracts.Common;
+
 namespace SalesSystem.Application.Interfaces.Services;
 
 public interface IUpdateProductPricingService
 {
-    Task UpdateFromPurchaseAsync(
+    Task<Result> UpdateFromPurchaseAsync(
         UpdatePricingRequest request,
         CancellationToken ct = default);
 }

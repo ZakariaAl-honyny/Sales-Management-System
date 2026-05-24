@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.Extensions.Configuration;
 using SalesSystem.Infrastructure.Data;
-using SalesSystem.Infrastructure.Security;
 
 namespace SalesSystem.Infrastructure;
 
@@ -16,23 +14,11 @@ public class SalesDbContextFactory : IDesignTimeDbContextFactory<SalesDbContext>
 
         if (string.IsNullOrEmpty(connectionString))
         {
-            connectionString = "Server=.;Database=SalesSystemDb;Trusted_Connection=True;TrustServerCertificate=True;";
+            connectionString = "Server=.;Database=SalesSystemDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true";
         }
 
         optionsBuilder.UseSqlServer(connectionString);
 
         return new SalesDbContext(optionsBuilder.Options);
-    }
-
-    public static string GetDecryptedConnectionString(
-        IConnectionStringProtector protector,
-        IConfiguration configuration)
-    {
-        var rawValue = configuration.GetConnectionString("DefaultConnection")
-            ?? Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION")
-            ?? throw new InvalidOperationException(
-                "Connection string 'DefaultConnection' not found in configuration or environment");
-
-        return protector.Decrypt(rawValue);
     }
 }

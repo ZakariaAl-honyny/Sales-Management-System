@@ -12,7 +12,6 @@ public class SupplierTests
         var supplier = Supplier.Create(
             name: "Test Supplier",
             openingBalance: 0,
-            code: "S001",
             phone: "1234567890",
             email: "supplier@example.com",
             address: "Supplier Address",
@@ -22,7 +21,6 @@ public class SupplierTests
         supplier.Name.Should().Be("Test Supplier");
         supplier.OpeningBalance.Should().Be(0);
         supplier.CurrentBalance.Should().Be(0);
-        supplier.Code.Should().Be("S001");
         supplier.Phone.Should().Be("1234567890");
         supplier.Email.Should().Be("supplier@example.com");
         supplier.Address.Should().Be("Supplier Address");
@@ -182,7 +180,6 @@ public class SupplierTests
     {
         var supplier = Supplier.Create(
             name: "Original Name",
-            code: "S001",
             phone: "1111111111",
             email: "old@example.com",
             address: "Old Address",
@@ -191,7 +188,6 @@ public class SupplierTests
 
         supplier.Update(
             name: "Updated Name",
-            code: "S002",
             phone: "2222222222",
             email: "new@example.com",
             address: "New Address",
@@ -201,7 +197,6 @@ public class SupplierTests
         );
 
         supplier.Name.Should().Be("Updated Name");
-        supplier.Code.Should().Be("S002");
         supplier.Phone.Should().Be("2222222222");
         supplier.Email.Should().Be("new@example.com");
         supplier.Address.Should().Be("New Address");
@@ -215,7 +210,6 @@ public class SupplierTests
             createdByUserId: 1
         );
 
-        supplier.Code.Should().BeNull();
         supplier.Phone.Should().BeNull();
         supplier.Email.Should().BeNull();
         supplier.Address.Should().BeNull();

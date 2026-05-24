@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Services.Api;
@@ -15,6 +16,7 @@ public partial class MainWindow : Window
 {
     private readonly ISessionService _session;
     private readonly IDialogService _dialogService;
+    private bool _isLoggingOut;
 
     public MainWindow()
     {
@@ -25,6 +27,12 @@ public partial class MainWindow : Window
         UpdateUserInfo();
         ApplyPermissions();
         NavigateTo("Dashboard");
+
+        Closed += (s, e) =>
+        {
+            if (!_isLoggingOut)
+                System.Windows.Application.Current.Shutdown();
+        };
     }
 
     private void UpdateUserInfo()
@@ -157,21 +165,22 @@ public partial class MainWindow : Window
             var updaterService = App.GetService<IUpdaterService>();
             IsEnabled = false;
 
-            var result = await updaterService.CheckForUpdatesAsync();
+            var checkResult = await updaterService.CheckForUpdatesAsync();
 
-            if (!result.IsSuccess)
+            if (!checkResult.IsSuccess)
             {
-                _ = _dialogService.ShowErrorAsync("خطأ", $"تعذر الاتصال بخادم التحديثات.\n{result.Error}");
+                _ = _dialogService.ShowErrorAsync("خطأ في فحص التحديثات", $"تعذر الاتصال بخادم التحديثات.\n{checkResult.Error}");
                 return;
             }
 
-            if (!result.Value.UpdateAvailable || result.Value.UpdateInfo == null)
+            var value = checkResult.Value;
+            if (value == null || !value.UpdateAvailable || value.UpdateInfo == null)
             {
                 _ = _dialogService.ShowSuccessAsync("تحديث", $"برنامجك محدّث!\nتعمل على أحدث إصدار: {updaterService.GetCurrentVersion().Value}");
                 return;
             }
 
-            var vm = new UpdateDialogViewModel(updaterService, result.Value.UpdateInfo);
+            var vm = new UpdateDialogViewModel(updaterService, value.UpdateInfo);
             var dialog = new UpdateDialog(vm) { Owner = this };
             dialog.ShowDialog();
         }
@@ -191,6 +200,7 @@ public partial class MainWindow : Window
         var confirmed = await _dialogService.ShowConfirmationAsync("تسجيل الخروج", "هل أنت متأكد من تسجيل الخروج؟");
         if (confirmed)
         {
+            _isLoggingOut = true;
             _session.ClearSession();
             var loginWindow = new LoginWindow();
             loginWindow.Show();
@@ -219,4 +229,38 @@ public partial class MainWindow : Window
     private void CustomerPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("CustomerPayments");
     private void SupplierPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("SupplierPayments");
     private void InventoryStatusMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Inventory");
+
+    private void OpenPageInNewWindow(string title, string tag)
+    {
+        FrameworkElement? page = tag switch
+        {
+            "Sales" => new Views.Sales.SalesInvoicesListView(),
+            "Purchases" => new Views.Purchases.PurchaseInvoicesListView(),
+            "Products" => new Views.Products.ProductsListView(),
+            "Customers" => new Views.Customers.CustomersListView(),
+            "Suppliers" => new Views.Suppliers.SuppliersListView(),
+            "Warehouses" => new Views.WarehousesView(),
+            _ => null
+        };
+
+        if (page == null) return;
+
+        var screenWindow = new Views.ScreenWindow();
+        screenWindow.SetContent(page, page.DataContext);
+
+        var screenService = App.GetService<IScreenWindowService>();
+        screenService.OpenWindow(screenWindow, new ScreenWindowOptions
+        {
+            Title = title,
+            Width = 1000,
+            Height = 700
+        });
+    }
+
+    private void OpenNewSalesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المبيعات", "Sales");
+    private void OpenNewPurchasesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المشتريات", "Purchases");
+    private void OpenNewWarehousesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المستودعات", "Warehouses");
+    private void OpenNewProductsWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المنتجات", "Products");
+    private void OpenNewCustomersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("العملاء", "Customers");
+    private void OpenNewSuppliersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("الموردين", "Suppliers");
 }

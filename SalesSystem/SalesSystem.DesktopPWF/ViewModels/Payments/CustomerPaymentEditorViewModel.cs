@@ -32,7 +32,6 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
     private decimal _amount;
     private PaymentType _paymentType = PaymentType.Cash;
     private string _notes = string.Empty;
-    private bool _isLoading;
     private string _errorMessage = string.Empty;
 
     private ObservableCollection<CustomerDto> _customers = new();
@@ -53,8 +52,9 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
         _paymentPrinter = App.GetService<IPaymentPrinter>();
         _settingsService = App.GetService<ISettingsApiService>();
         _dialogService = dialogService;
+        SetDialogService(dialogService);
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsLoading && !_isReadOnly);
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ السداد...")));
         CancelCommand = new RelayCommand(OnCancel);
         PrintCommand = new AsyncRelayCommand(OnPrint, () => _paymentId.HasValue);
         SearchCustomerCommand = new RelayCommand(SearchCustomer, () => !_isReadOnly);
@@ -64,10 +64,18 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
 
     private async void InitializeAsync()
     {
-        await LoadCustomersAsync();
-        if (_paymentId.HasValue)
+        try
         {
-            await LoadPaymentAsync();
+            await LoadCustomersAsync();
+            if (_paymentId.HasValue)
+            {
+                await LoadPaymentAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Error in {Method}", nameof(InitializeAsync));
+            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحميل بيانات السداد");
         }
     }
 
@@ -116,12 +124,6 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
     {
         get => _notes;
         set => SetProperty(ref _notes, value);
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
     }
 
     public string ErrorMessage
@@ -181,7 +183,7 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
 
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             var result = await _paymentService.GetByIdAsync(_paymentId.Value);
             if (result.IsSuccess)
             {
@@ -199,16 +201,17 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            LogSystemError($"Failed to load customer payment {_paymentId}", "CustomerPaymentEditorViewModel.LoadPaymentAsync", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء تحميل بيانات السداد";
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage);
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
-    private async Task SaveAsync()
+    private async Task SaveOperationAsync()
     {
         var errors = new List<string>();
         if (SelectedCustomerId == 0) errors.Add("• العميل مطلوب");
@@ -216,60 +219,47 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
 
         if (errors.Any())
         {
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            await _dialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return;
         }
 
-        try
+        ErrorMessage = string.Empty;
+
+        Result<CustomerPaymentDto> result;
+
+        if (_paymentId.HasValue)
         {
-            IsLoading = true;
-            ErrorMessage = string.Empty;
-
-            Result<CustomerPaymentDto> result;
-
-            if (_paymentId.HasValue)
-            {
-                var request = new UpdateCustomerPaymentRequest(
-                    CustomerId: SelectedCustomerId,
-                    Amount: Amount,
-                    PaymentMethod: PaymentType,
-                    PaymentDate: PaymentDate,
-                    SalesInvoiceId: null,
-                    Notes: Notes);
-                result = await _paymentService.UpdateAsync(_paymentId.Value, request);
-            }
-            else
-            {
-                var request = new CreateCustomerPaymentRequest(
-                    CustomerId: SelectedCustomerId,
-                    Amount: Amount,
-                    PaymentMethod: PaymentType,
-                    PaymentDate: PaymentDate,
-                    SalesInvoiceId: null,
-                    Notes: Notes);
-                result = await _paymentService.CreateAsync(request);
-            }
-
-            if (result.IsSuccess)
-            {
-                _eventBus.Publish(new CustomerPaymentChangedMessage(result.Value!.Id));
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "CustomerPaymentEditorViewModel.SaveAsync", "[CustomerPaymentEditorViewModel.SaveAsync] Failed to save customer payment.");
-                await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
-            }
+            var request = new UpdateCustomerPaymentRequest(
+                CustomerId: SelectedCustomerId,
+                Amount: Amount,
+                PaymentMethod: PaymentType,
+                PaymentDate: PaymentDate,
+                SalesInvoiceId: null,
+                Notes: Notes);
+            result = await _paymentService.UpdateAsync(_paymentId.Value, request);
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "CustomerPaymentEditorViewModel.SaveAsync", "[CustomerPaymentEditorViewModel.SaveAsync] Failed to save customer payment.");
-            await _dialogService.ShowErrorAsync("خطأ", ErrorMessage);
+            var request = new CreateCustomerPaymentRequest(
+                CustomerId: SelectedCustomerId,
+                Amount: Amount,
+                PaymentMethod: PaymentType,
+                PaymentDate: PaymentDate,
+                SalesInvoiceId: null,
+                Notes: Notes);
+            result = await _paymentService.CreateAsync(request);
         }
-        finally
+
+        if (result.IsSuccess)
         {
-            IsLoading = false;
+            _eventBus.Publish(new CustomerPaymentChangedMessage(result.Value!.Id));
+            RequestClose();
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "CustomerPaymentEditorViewModel.SaveAsync", "[CustomerPaymentEditorViewModel.SaveAsync] Failed to save customer payment.");
+            await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
         }
     }
 
@@ -282,7 +272,7 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
     {
         if (!_paymentId.HasValue) return;
 
-        IsLoading = true;
+        IsBusy = true;
         try
         {
             var settingsResult = await _settingsService.GetSettingsAsync();
@@ -295,11 +285,12 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+            LogSystemError($"Failed to print customer payment {_paymentId}", "CustomerPaymentEditorViewModel.OnPrint", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 }

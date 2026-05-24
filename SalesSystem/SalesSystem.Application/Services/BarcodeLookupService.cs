@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Application.Services;
 
@@ -16,34 +16,37 @@ public class BarcodeLookupService : IBarcodeLookupService
         _logger = logger;
     }
 
-    public async Task<BarcodeSearchResult?> LookupAsync(
+    public async Task<Result<BarcodeSearchResult>> LookupByBarcodeAsync(
         string barcode,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(barcode)) return null;
+        if (string.IsNullOrWhiteSpace(barcode))
+            return Result<BarcodeSearchResult>.Failure("الباركود مطلوب", ErrorCodes.ValidationError);
 
         var normalized = barcode.Trim().ToUpperInvariant();
 
-        var result = await _uow.UnitBarcodes.Query()
-            .Include(b => b.ProductUnit)
-                .ThenInclude(pu => pu.Product)
-            .Where(b => b.BarcodeValue == normalized)
-            .Select(b => new BarcodeSearchResult(
-                b.ProductUnit.ProductId,
-                b.ProductUnit.Product.Name,
-                b.ProductUnitId,
-                b.ProductUnit.UnitName,
-                b.ProductUnit.BaseConversionFactor,
-                b.ProductUnit.IsBaseUnit,
-                b.ProductUnit.SalesPrice,
-                b.ProductUnit.PurchaseCost,
-                0m
-            ))
-            .FirstOrDefaultAsync(ct);
+        var result = await _uow.UnitBarcodes.FirstOrDefaultAsync(
+            b => b.BarcodeValue == normalized,
+            ct,
+            "ProductUnit", "ProductUnit.Product");
 
         if (result == null)
+        {
             _logger.LogWarning("Barcode not found: {Barcode}", normalized);
+            return Result<BarcodeSearchResult>.Failure("الباركود غير موجود", ErrorCodes.NotFound);
+        }
 
-        return result;
+        var productUnit = result.ProductUnit;
+        return Result<BarcodeSearchResult>.Success(new BarcodeSearchResult(
+            productUnit.ProductId,
+            productUnit.Product?.Name ?? "",
+            result.ProductUnitId,
+            productUnit.UnitName,
+            productUnit.BaseConversionFactor,
+            productUnit.IsBaseUnit,
+            productUnit.SalesPrice,
+            productUnit.PurchaseCost,
+            0m
+        ));
     }
 }

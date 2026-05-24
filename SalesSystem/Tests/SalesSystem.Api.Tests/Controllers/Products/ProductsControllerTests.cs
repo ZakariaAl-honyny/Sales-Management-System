@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
+using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -164,38 +165,52 @@ public class ProductsControllerTests : ControllerTestBase
 
     private static ProductDto CreateProductDto(int id) => new(
         Id: id,
-        Code: $"P{id:D3}",
         Barcode: null,
         Name: $"منتج {id}",
         CategoryId: 1,
         CategoryName: "تصنيف",
         UnitId: 1,
         UnitName: "قطعة",
+        WholesaleUnitId: null,
+        WholesaleUnitName: null,
+        RetailUnitId: null,
+        RetailUnitName: null,
+        ConversionFactor: 1,
         PurchasePrice: 50.00m,
         SalePrice: 100.00m,
+        WholesalePrice: 80.00m,
+        RetailPrice: 100.00m,
         MinStock: 10.00m,
         Description: null,
         IsActive: true);
 
     private static CreateProductRequest CreateValidRequest() => new(
-        Code: "P001",
         Barcode: null,
         Name: "منتج جديد",
         CategoryId: 1,
         UnitId: 1,
+        RetailUnitId: null,
+        WholesaleUnitId: null,
+        ConversionFactor: 1,
         PurchasePrice: 50.00m,
         SalePrice: 100.00m,
+        RetailPrice: 100.00m,
+        WholesalePrice: 80.00m,
         MinStock: 10.00m,
         Description: null);
 
     private static UpdateProductRequest UpdateValidRequest() => new(
-        Code: "P001",
         Barcode: null,
         Name: "منتج محدث",
         CategoryId: 1,
         UnitId: 1,
+        RetailUnitId: null,
+        WholesaleUnitId: null,
+        ConversionFactor: 1,
         PurchasePrice: 55.00m,
         SalePrice: 110.00m,
+        RetailPrice: 110.00m,
+        WholesalePrice: 90.00m,
         MinStock: 15.00m,
         Description: "وصف محدث",
         IsActive: true);

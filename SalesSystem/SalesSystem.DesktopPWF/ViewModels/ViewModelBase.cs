@@ -1,6 +1,8 @@
 using SalesSystem.Contracts.Common;
+using SalesSystem.DesktopPWF.Services.App;
 using System.Collections;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
@@ -13,9 +15,33 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
 {
     private readonly Dictionary<string, List<string>> _errors = new();
 
+    private IDialogService? _dialogService;
+
+    /// <summary>
+    /// Gets the dialog service for showing user-facing messages.
+    /// Must be set via <see cref="SetDialogService"/> before use.
+    /// </summary>
+    protected IDialogService? DialogService => _dialogService;
+
+    /// <summary>
+    /// Sets the dialog service instance. Call this in derived ViewModel constructors
+    /// after assigning the injected _dialogService field.
+    /// </summary>
+    protected void SetDialogService(IDialogService dialogService)
+    {
+        _dialogService = dialogService;
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
+
     public event Action? CloseRequested;
+
+    /// <summary>
+    /// Fired when validation fails and user closes the validation dialog.
+    /// View code-behind should subscribe to auto-focus the first invalid field.
+    /// </summary>
+    public event Action? FocusFirstInvalidFieldRequested;
 
     public bool HasErrors => _errors.Count > 0;
 
@@ -87,6 +113,65 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
     }
 
     /// <summary>
+    /// Fires FocusFirstInvalidFieldRequested so the View can focus the first error field
+    /// after a validation failure dialog is dismissed.
+    /// </summary>
+    protected void RequestFocusFirstInvalidField()
+    {
+        FocusFirstInvalidFieldRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// Standardized pre-save validation. Checks INotifyDataErrorInfo.HasErrors.
+    /// If errors exist, shows a validation warning dialog and returns false.
+    /// Override to add custom validation before calling base.
+    /// </summary>
+    protected virtual async Task<bool> ValidateAllAsync()
+    {
+        if (!HasErrors && _errors.Count == 0)
+            return true;
+
+        var errorList = _errors
+            .SelectMany(kvp => kvp.Value)
+            .Select(e => $"• {e}")
+            .ToList();
+
+        if (errorList.Count == 0)
+            return true;
+
+        if (_dialogService != null)
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errorList);
+        }
+
+        RequestFocusFirstInvalidField();
+        return false;
+    }
+
+    /// <summary>
+    /// Validates a single field and adds/clears error via INotifyDataErrorInfo.
+    /// Call this in property setters or in ValidateAllAsync override.
+    /// </summary>
+    protected void ValidateField(Func<bool> isValid, string propertyName, string errorMessage)
+    {
+        if (!isValid())
+            AddError(propertyName, errorMessage);
+        else
+            ClearErrors(propertyName);
+    }
+
+    /// <summary>
+    /// Logs a system-level error to the AI_Error_Log.txt file (Serilog Error level).
+    /// Use for hard delete failures, API communication errors, and other system issues
+    /// that AI agents should be able to read and diagnose automatically.
+    /// </summary>
+    protected void LogSystemError(string message, string context, Exception? ex = null)
+    {
+        string logMessage = $"[{context}] {message}";
+        Serilog.Log.Error(ex, logMessage);
+    }
+
+    /// <summary>
     /// Handles an exception by logging it locally and sending it to the API
     /// </summary>
     protected string HandleException(Exception ex, string context, string? logMessage = null, string? userMessage = null)
@@ -122,7 +207,33 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
         // Do NOT send business validation failures to API
         // These are normal user messages, not system errors
 
-        return error;
+        // Transform common error patterns to user-friendly Arabic
+        if (string.IsNullOrEmpty(error))
+            return "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.";
+
+        if (error.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+            error.Contains("مهلة", StringComparison.OrdinalIgnoreCase))
+            return "انتهت مهلة الاتصال. يرجى التحقق من اتصال الشبكة والمحاولة مرة أخرى.";
+
+        if (error.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+            error.Contains("internet", StringComparison.OrdinalIgnoreCase) ||
+            error.Contains("اتصال", StringComparison.OrdinalIgnoreCase))
+            return "حدث خطأ في الاتصال. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.";
+
+        if (error.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+            error.Contains("غير موجود", StringComparison.OrdinalIgnoreCase))
+            return "العنصر المطلوب غير موجود. قد يكون قد تم حذفه من قبل مستخدم آخر.";
+
+        // Return the original error if it's already in Arabic (meaningful)
+        if (ContainsArabic(error))
+            return error;
+
+        return $"حدث خطأ أثناء تنفيذ العملية. يرجى المحاولة مرة أخرى.";
+    }
+
+    private static bool ContainsArabic(string text)
+    {
+        return text.Any(c => c >= 0x0600 && c <= 0x06FF || c >= 0x0750 && c <= 0x077F || c >= 0x08A0 && c <= 0x08FF);
     }
 
     private async Task SendRemoteLogAsync(string level, string message, Exception? ex, string context)
@@ -228,7 +339,7 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
             var result = await operation();
             if (!result.IsSuccess)
             {
-                HandleFailure(result.Error, "ExecuteResultAsync");
+                HandleFailure(result.Error ?? "حدث خطأ غير معروف", "ExecuteResultAsync");
                 return null;
             }
             return result.Value;

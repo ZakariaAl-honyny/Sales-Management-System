@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Windows;
 using SalesSystem.DesktopPWF.Views.Dialogs;
 
@@ -16,6 +17,7 @@ public interface IDialogService
     Task ShowWarningAsync(string title, string message);
     Task<bool> ShowConfirmationAsync(string title, string message);
     Task<DeleteStrategy> ShowDeleteConfirmationAsync(string itemDescription);
+    Task ShowValidationErrorsAsync(string title, List<string> errors);
 }
 
 public class DialogService : IDialogService
@@ -81,7 +83,13 @@ public class DialogService : IDialogService
                             var dialogResult = dialogResultProp.GetValue(viewModel) as bool?;
                             if (dialogResult == true)
                             {
-                                try { window.DialogResult = true; } catch { }
+                                try { window.DialogResult = true; }
+                                catch
+                                {
+                                    // Intentionally swallowed: setting DialogResult on a window opened non-modally
+                                    // (via ScreenWindowService) will throw InvalidOperationException.
+                                    // This is normal and expected — the closeHandler fires regardless.
+                                }
                             }
                         }
                         window.Close();
@@ -161,6 +169,16 @@ public Task<bool> ShowConfirmationAsync(string title, string message)
             dialog.Owner = System.Windows.Application.Current.MainWindow;
             dialog.ShowDialog();
             return dialog.Confirmed;
+        }).Task;
+    }
+
+    public Task ShowValidationErrorsAsync(string title, List<string> errors)
+    {
+        return System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new ValidationErrorsDialog(title, errors);
+            dialog.Owner = System.Windows.Application.Current.MainWindow;
+            dialog.ShowDialog();
         }).Task;
     }
 

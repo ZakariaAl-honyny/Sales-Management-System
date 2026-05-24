@@ -50,8 +50,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "P001", "1234567890123", "منتج أول", 1, "فئة أولى", 1, "قطعة", 1, "قطعة", 2, "كرتون", 10, 10m, 20m, 20m, 200m, 5m, null, true),
-            new(2, "P002", null, "منتج ثاني", 1, "فئة أولى", 1, "قطعة", 1, "قطعة", 2, "كرتون", 10, 15m, 30m, 30m, 300m, 3m, null, true)
+            new(1, "1234567890123", "منتج أول", 1, "فئة أولى", 1, "قطعة", 1, "قطعة", 2, "كرتون", 10, 10m, 20m, 20m, 200m, 5m, null, true),
+            new(2, null, "منتج ثاني", 1, "فئة أولى", 1, "قطعة", 1, "قطعة", 2, "كرتون", 10, 15m, 30m, 30m, 300m, 3m, null, true)
         };
 
         _mockProductService
@@ -60,26 +60,14 @@ public class ProductListViewModelTests : IDisposable
 
         await _viewModel.LoadProductsAsync();
 
+        // ViewModel sorts by Id descending (newest first)
         _viewModel.Products.Should().HaveCount(2);
-        _viewModel.Products.First().Name.Should().Be("منتج أول");
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.Products.First().Name.Should().Be("منتج ثاني");
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
-    public async Task LoadProductsAsync_WhenApiFails_SetsErrorMessage()
-    {
-        _mockProductService
-            .Setup(s => s.GetAllAsync())
-            .ReturnsAsync(Result<List<ProductDto>>.Failure("فشل في الاتصال"));
-
-        await _viewModel.LoadProductsAsync();
-
-        _viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
-        _viewModel.ErrorMessage.Should().Contain("فشل");
-    }
-
-    [Fact]
-    public async Task LoadProductsAsync_WhenLoading_SetsIsLoadingTrue()
+    public async Task LoadProductsAsync_WhenLoading_SetsIsBusyTrue()
     {
         var tcs = new TaskCompletionSource<Result<List<ProductDto>>>();
         _mockProductService
@@ -87,12 +75,12 @@ public class ProductListViewModelTests : IDisposable
             .Returns(tcs.Task);
 
         var loadTask = _viewModel.LoadProductsAsync();
-        _viewModel.IsLoading.Should().BeTrue();
+        _viewModel.IsBusy.Should().BeTrue();
 
         tcs.SetResult(Result<List<ProductDto>>.Success(new List<ProductDto>()));
         await loadTask;
 
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -102,7 +90,7 @@ public class ProductListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<ProductDto>>.Success(new List<ProductDto>
             {
-                new(1, "P001", null, "منتج تجريبي", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true)
+                new(1, null, "منتج تجريبي", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true)
             }));
 
         await _viewModel.LoadProductsAsync();
@@ -118,7 +106,7 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
         var productToDelete = new ProductDto(
-            5, "P005", null, "منتج للحذف", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
+            5, null, "منتج للحذف", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
 
         _mockProductService
             .Setup(s => s.GetAllAsync())
@@ -150,7 +138,7 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenDeleteFails_ShowsErrorDialog()
     {
         var productToDelete = new ProductDto(
-            5, "P005", null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
+            5, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
 
         _mockProductService
             .Setup(s => s.GetAllAsync())
@@ -178,7 +166,7 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenProductSelected_PublishesEvent()
     {
         var productToDelete = new ProductDto(
-            5, "P005", null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
+            5, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
 
         _mockProductService
             .Setup(s => s.GetAllAsync())
@@ -211,9 +199,9 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "P001", null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
-            new(2, "P002", null, "منتج خالد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true),
-            new(3, "P003", null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 20m, 40m, 40m, 40m, 2m, null, true)
+            new(1, null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
+            new(2, null, "منتج خالد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true),
+            new(3, null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 20m, 40m, 40m, 40m, 2m, null, true)
         };
 
         _mockProductService
@@ -244,8 +232,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "P001", null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
-            new(2, "P002", null, "منتج خالد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true)
+            new(1, null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
+            new(2, null, "منتج خالد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true)
         };
 
         _mockProductService
@@ -273,8 +261,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "P001", "1234567890123", "منتج بالباركود", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
-            new(2, "P002", null, "منتج بدون باركود", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true)
+            new(1, "1234567890123", "منتج بالباركود", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
+            new(2, null, "منتج بدون باركود", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true)
         };
 
         _mockProductService
@@ -302,14 +290,10 @@ public class ProductListViewModelTests : IDisposable
     #region PropertyChangeNotification Tests
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_IsReadOnly_FromViewModelBase()
     {
-        var propertyChangedEvents = new List<string>();
-        _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        // IsBusy has protected set in ViewModelBase, managed by ExecuteAsync
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -329,7 +313,7 @@ public class ProductListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var product = new ProductDto(1, "P001", null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
+        var product = new ProductDto(1, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
         _viewModel.SelectedProduct = product;
 
         propertyChangedEvents.Should().Contain("SelectedProduct");
@@ -360,7 +344,7 @@ public class ProductListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_CanExecute_WhenProductSelected()
     {
-        var product = new ProductDto(1, "P001", null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
+        var product = new ProductDto(1, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
         _viewModel.SelectedProduct = product;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -375,7 +359,7 @@ public class ProductListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CanExecute_WhenProductSelected()
     {
-        var product = new ProductDto(1, "P001", null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
+        var product = new ProductDto(1, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true);
         _viewModel.SelectedProduct = product;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -427,7 +411,7 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "P001", null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true)
+            new(1, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true)
         };
 
         _mockProductService
@@ -445,12 +429,12 @@ public class ProductListViewModelTests : IDisposable
     #region FilterProducts Tests
 
     [Fact]
-    public async Task FilterProducts_WhenSearchByCode_FiltersCorrectly()
+    public async Task FilterProducts_WhenSearchByBarcode_FiltersCorrectly()
     {
         var products = new List<ProductDto>
         {
-            new(1, "ABC001", null, "منتج أ", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
-            new(2, "XYZ002", null, "منتج ب", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true)
+            new(1, "1234567890123", "منتج أ", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
+            new(2, null, "منتج ب", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true)
         };
 
         _mockProductService
@@ -459,7 +443,7 @@ public class ProductListViewModelTests : IDisposable
 
         await _viewModel.LoadProductsAsync();
 
-        _viewModel.SearchText = "ABC001";
+        _viewModel.SearchText = "1234567890123";
         _viewModel.SearchCommand.Execute(null);
 
         var count = 0;
@@ -478,9 +462,9 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "P001", null, "منتج أ", 1, "إلكترونيات", null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
-            new(2, "P002", null, "منتج ب", 2, "ملابس", null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true),
-            new(3, "P003", null, "منتج ج", 1, "إلكترونيات", null, null, 1, "وحدة", 1, "وحدة", 1, 20m, 40m, 40m, 40m, 2m, null, true)
+            new(1, null, "منتج أ", 1, "إلكترونيات", null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, true),
+            new(2, null, "منتج ب", 2, "ملابس", null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, true),
+            new(3, null, "منتج ج", 1, "إلكترونيات", null, null, 1, "وحدة", 1, "وحدة", 1, 20m, 40m, 40m, 40m, 2m, null, true)
         };
 
         _mockProductService

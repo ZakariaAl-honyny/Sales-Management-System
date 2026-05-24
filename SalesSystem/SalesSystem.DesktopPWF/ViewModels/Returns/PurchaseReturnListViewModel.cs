@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
@@ -21,6 +21,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
     private readonly IPurchaseReturnApiService _returnService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<PurchaseReturnDto> _returns = new();
     private ICollectionView? _returnsView;
@@ -28,7 +29,6 @@ public class PurchaseReturnListViewModel : ViewModelBase
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
-    private bool _isLoading;
     private string? _errorMessage;
 
     public PurchaseReturnListViewModel()
@@ -36,6 +36,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
         _returnService = App.GetService<IPurchaseReturnApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         InitializeCommands();
 
@@ -108,11 +109,6 @@ public class PurchaseReturnListViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -159,7 +155,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
     #region Methods
     public async Task LoadReturnsAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -175,7 +171,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Returns.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Returns.Add(item);
                     }
@@ -185,7 +181,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل مرتجعات المشتريات", "PurchaseReturnListViewModel.LoadReturnsAsync", "[PurchaseReturnListViewModel.LoadReturnsAsync] Failed to load purchase returns list.");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ظ…ط±طھط¬ط¹ط§طھ ط§ظ„ظ…ط´طھط±ظٹط§طھ", "PurchaseReturnListViewModel.LoadReturnsAsync", "[PurchaseReturnListViewModel.LoadReturnsAsync] Failed to load purchase returns list.");
                 IsEmpty = Returns.Count == 0;
             }
         }
@@ -195,7 +191,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -226,11 +222,15 @@ public class PurchaseReturnListViewModel : ViewModelBase
 
     private void AddNewReturn()
     {
-        var editorVm = new PurchaseReturnEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        var editorVm = App.GetService<PurchaseReturnEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadReturnsAsync();
-        }
+            Title = "ظ…ط±طھط¬ط¹ ظ…ط´طھط±ظٹط§طھ ط¬ط¯ظٹط¯",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
+            }
+        });
     }
 
     private async void SearchInvoiceForReturn()
@@ -245,7 +245,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
 
         if (dialogService.ShowDialog(invoiceVm) && invoiceVm.SelectedInvoice != null)
         {
-            IsLoading = true;
+            IsBusy = true;
             try
             {
                 var invoiceService = App.GetService<IPurchaseInvoiceApiService>();
@@ -253,14 +253,15 @@ public class PurchaseReturnListViewModel : ViewModelBase
                 
                 if (fullInvoiceResult.IsSuccess && fullInvoiceResult.Value != null)
                 {
-                    InvokeOnUIThread(() =>
+                    var editorVm = new PurchaseReturnEditorViewModel();
+                    editorVm.SelectedInvoice = fullInvoiceResult.Value;
+                    
+                    _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
                     {
-                        var editorVm = new PurchaseReturnEditorViewModel();
-                        editorVm.SelectedInvoice = fullInvoiceResult.Value;
-                        
-                        if (dialogService.ShowDialog(editorVm))
+                        Title = "ظ…ط±طھط¬ط¹ ظ…ط´طھط±ظٹط§طھ ظ…ظ† ظپط§طھظˆط±ط©",
+                        OnClosed = (vm) =>
                         {
-                            _ = LoadReturnsAsync();
+                            System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
                         }
                     });
                 }
@@ -268,7 +269,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
                 {
                     InvokeOnUIThread(() =>
                     {
-                        dialogService.ShowError(fullInvoiceResult.Error ?? "فشل في تحميل تفاصيل الفاتورة");
+                        dialogService.ShowError(fullInvoiceResult.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ طھظپط§طµظٹظ„ ط§ظ„ظپط§طھظˆط±ط©");
                     });
                 }
             }
@@ -280,7 +281,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
             {
                 InvokeOnUIThread(() =>
                 {
-                    IsLoading = false;
+                    IsBusy = false;
                 });
             }
         }
@@ -291,10 +292,14 @@ public class PurchaseReturnListViewModel : ViewModelBase
         if (SelectedReturn == null) return;
         var editorVm = new PurchaseReturnEditorViewModel();
         _ = editorVm.LoadReturnAsync(SelectedReturn.Id);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadReturnsAsync();
-        }
+            Title = "ط¹ط±ط¶ ظ…ط±طھط¬ط¹ ظ…ط´طھط±ظٹط§طھ",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
+            }
+        });
     }
 
     private void UpdateCommandStates()
@@ -316,3 +321,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
     }
     #endregion
 }
+
+
+
+

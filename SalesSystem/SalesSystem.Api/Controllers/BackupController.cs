@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -13,10 +14,15 @@ namespace SalesSystem.Api.Controllers;
 public class BackupController : ControllerBase
 {
     private readonly IBackupService _backupService;
+    private readonly string _backupFolder;
 
-    public BackupController(IBackupService backupService)
+    public BackupController(
+        IBackupService backupService,
+        IConfiguration configuration)
     {
         _backupService = backupService;
+        _backupFolder = configuration["Backup:DefaultBackupPath"]
+            ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
     }
 
     /// <summary>
@@ -51,19 +57,25 @@ public class BackupController : ControllerBase
     /// <summary>
     /// Restores database from a specific backup file
     /// </summary>
-    /// <param name="fileName">Backup filename</param>
+    /// <param name="request">Backup file name</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Success message</returns>
     [HttpPost("restore")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Restore([FromQuery] string fileName, CancellationToken ct)
+    public async Task<IActionResult> Restore([FromBody] RestoreBackupRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(fileName)) return BadRequest("اسم الملف مطلوب");
+        if (string.IsNullOrWhiteSpace(request.FileName))
+            return BadRequest(new { error = "اسم ملف النسخة الاحتياطية مطلوب" });
 
-        // We assume files are in the default backup folder
-        var defaultFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
-        var filePath = Path.Combine(defaultFolder, fileName);
+        var filePath = Path.GetFullPath(Path.Combine(_backupFolder, request.FileName));
+
+        // Path traversal guard — ensure resolved path is within allowed directory
+        if (!filePath.StartsWith(_backupFolder, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { error = "مسار ملف غير صالح" });
+
+        if (!System.IO.File.Exists(filePath))
+            return NotFound(new { error = "ملف النسخة الاحتياطية غير موجود" });
 
         var result = await _backupService.RestoreBackupAsync(filePath, ct);
         return result.IsSuccess

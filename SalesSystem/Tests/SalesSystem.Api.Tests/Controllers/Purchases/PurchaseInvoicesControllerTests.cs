@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using FluentAssertions;
+using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Tests.Controllers.Purchases;
@@ -199,25 +201,27 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         TotalAmount: 218.50m,
         PaidAmount: 100.00m,
         DueAmount: 118.50m,
+        SupplierInvoiceNo: null,
         Notes: null,
         Status: status,
         Items: new List<PurchaseInvoiceItemDto>
         {
-            new(id * 10, 1, null, "منتج اختبار", 5.000m, 40.00m, 0.00m, 200.00m)
+            new(id * 10, 1, "منتج اختبار", 5.000m, 40.00m, 0.00m, 200.00m, 1)
         });
 
     private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(
-        SupplierId: 1,
         WarehouseId: 1,
+        SupplierId: 1,
         InvoiceDate: null,
         DueDate: null,
         PaymentType: PaymentType.Cash,
         DiscountAmount: 10.00m,
-        TaxRate: 15.00m,
+        TaxAmount: 28.50m,
         PaidAmount: 100.00m,
         Notes: null,
+        SupplierInvoiceNo: null,
         Items: new List<CreatePurchaseInvoiceItemRequest>
         {
-            new(ProductId: 1, Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, Notes: null)
+            new(ProductId: 1, Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, Mode: SaleMode.Retail, Notes: null)
         });
 }

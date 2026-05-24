@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.5 Refactored)
+# AGENTS.md — Sales Management System (v4.6.4 — Security Hardening & Code Quality)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/006-printing/plan.md](specs/006-printing/plan.md)
+**Active Feature Plan**: [specs/008-dynamic-uom-costing/plan.md](specs/008-dynamic-uom-costing/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
@@ -436,32 +436,64 @@ public interface IToastNotificationService
 | RULE | DIRECTIVE |
 |------|-----------|
 | RULE-058 | ViewModelBase implements `INotifyDataErrorInfo` |
-| RULE-059 | Save buttons disabled via `CanExecute` when HasErrors |
+| RULE-058 | ViewModelBase implements `INotifyDataErrorInfo` |
+| RULE-059 | **InterActive Validation** — Save buttons ALWAYS enabled (no CanExecute blocking). On click, `Validate()` shows styled warning dialog with ALL missing/incorrect fields listed. Required fields marked with `*` and input fields have ToolTips explaining validation rules. Unique fields (barcode, username) have explicit uniqueness explanation. |
 
-**Implementation:**
+**Pattern — Enable buttons, validate on click with clear warning:**
 ```csharp
-// ViewModelBase methods
-public void AddError(string propertyName, string errorMessage);
-public void ClearErrors(string propertyName);
-public void ClearAllErrors();
-public bool HasErrors { get; }
+// CORRECT — button always enabled, validate on click
+SaveCommand = new AsyncRelayCommand(SaveAsync);  // NO CanExecute predicate
+
+private bool Validate()
+{
+    var errors = new List<string>();
+    if (string.IsNullOrWhiteSpace(Name))
+        errors.Add("• اسم المنتج مطلوب");
+    if (Price <= 0)
+        errors.Add("• السعر يجب أن يكون أكبر من صفر");
+    
+    if (errors.Any())
+    {
+        _ = _dialogService.ShowWarningAsync(
+            "بيانات غير مكتملة",
+            "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors));
+        return false;
+    }
+    return true;
+}
+
+private async Task SaveAsync()
+{
+    if (!Validate()) return;
+    // ... save logic
+}
 ```
 
-**XAML Red Border Style:**
+**XAML Pattern — Always enabled, ToolTips explain rules:**
 ```xml
-<Style x:Key="ValidationTextBoxStyle" TargetType="TextBox">
-    <Setter Property="Validation.ErrorTemplate">
-        <Setter.Value>
-            <ControlTemplate>
-                <DockPanel>
-                    <Border BorderBrush="Red" BorderThickness="1">
-                        <AdornedElementPlaceholder/>
-                    </Border>
-                </DockPanel>
-            </ControlTemplate>
-        </Setter.Value>
-    </Setter>
-</Style>
+<TextBlock Text="اسم المنتج *" Style="{StaticResource LabelStyle}"/>
+<TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+         ToolTip="أدخل اسم المنتج — هذا الحقل إلزامي"
+         Style="{StaticResource ModernTextBox}"/>
+<TextBlock Text="{Binding NameError}" Foreground="{StaticResource ErrorBrush}" 
+           Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibility}}"/>
+
+<!-- Unique field explanation -->
+<TextBox Text="{Binding Barcode}"
+         ToolTip="الباركود — يجب أن يكون فريداً لكل منتج"
+         Style="{StaticResource ModernTextBox}"/>
+<TextBlock Text="الباركود يجب أن يكون فريداً — لا يمكن تكرار نفس الرمز لمنتجين مختلفين" 
+           Style="{StaticResource HelperTextStyle}"/>
+
+<!-- Save button — no IsEnabled binding -->
+<Button Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}"
+        ToolTip="حفظ البيانات المدخلة">
+```
+
+**WRONG — Never disable buttons:**
+```csharp
+SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave);     // ❌ WRONG
+Button IsEnabled="{Binding CanSave}"                                // ❌ WRONG
 ```
 
 **Validation Rules (Arabic):**
@@ -815,13 +847,362 @@ private async Task LoadProductsAsync()
 | RULE-149 | Legacy WinForms project is DELETED — all code rebuilt in DesktopPWF (WPF) |
 | RULE-150 | MASTER-PLAN.md reflects actual Clean Architecture (Layered) — NOT aspirational |
 
-### 2.38 Dialog Service Enhancement (v4.4)
+### 2.38 Database Health Check & Graceful Error Handling (v4.5)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-151 | API MUST expose `GET /api/v1/health/database` endpoint that checks DB connectivity via `DbContext.Database.CanConnectAsync()` |
+| RULE-152 | `GET /api/v1/health` MUST include `Database` field (`Connected`/`Disconnected`) — NEVER return static `OK` |
+| RULE-153 | Desktop MUST check database connectivity on startup BEFORE showing login window — use `IDatabaseHealthCheckService` |
+| RULE-154 | On DB connection failure, Desktop MUST show `DatabaseErrorDialog` with Retry/Exit buttons — NEVER crash silently |
+| RULE-155 | `ExceptionMiddleware` MUST detect DB connection exceptions (`InvalidOperationException` with connection string message, `SqlException`) and return `503 Service Unavailable` with `DATABASE_CONNECTION_ERROR` code |
+| RULE-156 | `ExceptionMiddleware` MUST use `IsDatabaseConnectionException()` helper — checks exception type name (avoids hard dependency on SQL Server packages) |
+| RULE-157 | `SecureDbContextFactory.GetDecryptedConnectionString()` MUST fall back to `SALESSYSTEM_DB_CONNECTION` environment variable — NEVER throw on missing config alone |
+| RULE-158 | Desktop `DatabaseErrorDialog` MUST provide retry loop — user can retry or exit, application NEVER blocks indefinitely |
+| RULE-159 | `DatabaseHealthCheckService` MUST catch `HttpRequestException` and `TaskCanceledException` — return `HealthCheckResult` with Arabic error messages |
+
+**Desktop Startup Flow:**
+```csharp
+// App.xaml.cs
+private async Task<bool> CheckDatabaseConnectionAsync()
+{
+    var healthService = _serviceProvider!.GetRequiredService<IDatabaseHealthCheckService>();
+
+    while (true)
+    {
+        var result = await healthService.CheckAsync();
+        if (result.IsDatabaseConnected) return true;
+
+        var retry = await Dispatcher.InvokeAsync(() =>
+        {
+            var dialog = new DatabaseErrorDialog(result.ErrorMessage);
+            dialog.Owner = MainWindow;
+            dialog.ShowDialog();
+            return dialog.RetryClicked;
+        });
+
+        if (!retry) return false;
+        await Task.Delay(1000);
+    }
+}
+```
+
+**API Health Check Pattern:**
+```csharp
+app.MapGet("/api/v1/health", async (SalesDbContext db) =>
+{
+    var dbConnected = false;
+    try { dbConnected = await db.Database.CanConnectAsync(); } catch { }
+    return new { Status = dbConnected ? "OK" : "Degraded", Database = dbConnected ? "Connected" : "Disconnected", Version = "1.0", Timestamp = DateTime.UtcNow };
+});
+
+app.MapGet("/api/v1/health/database", async (SalesDbContext db) =>
+{
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync();
+        if (canConnect) return Results.Json(new { status = "connected" });
+        return Results.Json(new { status = "disconnected" }, statusCode: 503);
+    }
+    catch (Exception ex) { return Results.Json(new { status = "error", message = ex.Message }, statusCode: 503); }
+});
+```
+
+**ExceptionMiddleware DB Detection Pattern:**
+```csharp
+private static bool IsDatabaseConnectionException(Exception ex)
+{
+    if (ex is InvalidOperationException && 
+        (ex.Message.Contains("Connection string", StringComparison.OrdinalIgnoreCase) ||
+         ex.Message.Contains("Cannot open database", StringComparison.OrdinalIgnoreCase)))
+        return true;
+    if (ex.InnerException != null) return IsDatabaseConnectionException(ex.InnerException);
+    var typeName = ex.GetType().FullName ?? "";
+    return typeName.Contains("SqlException", StringComparison.Ordinal) ||
+           typeName.Contains("SqlClient", StringComparison.Ordinal);
+}
+```
+
+### 2.39 Dialog Service Enhancement (v4.4)
 
 | RULE | DIRECTIVE |
 |------|-----------|
 | RULE-138 | `IDialogService` has `ShowInfoAsync` method — blue theme, info icon |
 | RULE-139 | ALL sync dialog methods use styled dialogs — NEVER raw `MessageBox.Show` |
 | RULE-140 | `UpdateDialogViewModel` implements `IDisposable` — disposes `_downloadCts` |
+
+### 2.40 Multi-Window Screen Management (v4.5)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-160 | Use `IScreenWindowService` / `ScreenWindowService` for ALL non-modal window opening — NEVER create + ShowDialog directly |
+| RULE-161 | Editors MUST open non-modally via `ScreenWindowService.OpenScreen(viewModel, options)` — NEVER `ShowDialog()` |
+| RULE-162 | ScreenWindow hosts any View/ViewModel pair in a generic `ScreenWindow.xaml` — NEVER create per-screen Window classes |
+| RULE-163 | Window tracking uses `WeakReference<Window>` — NEVER strong references (prevent memory leaks) |
+| RULE-164 | Cascade positioning: new windows offset 30px × (count % 10) from MainWindow |
+| RULE-165 | `OnClosed` callback MUST marshal UI operations via `Application.Current.Dispatcher.InvokeAsync()` |
+| RULE-166 | ViewModel lifecycle: `CloseRequested` → close window → `Cleanup()` → fire `OnClosed` — ALL handled by ScreenWindowService |
+| RULE-167 | Auto-titles use Arabic names (e.g., "فاتورة بيع") — NEVER English or type names |
+| RULE-168 | MainWindow MUST provide "فتح نافذة جديدة" menu items for opening list screens in new windows |
+| RULE-169 | ScreenWindowService resolves View by naming convention: `ViewModel` → `View` in FullName (same as DialogService) |
+| RULE-170 | `OpenWindow(Window)` overload for pre-created windows — `OpenScreen(object viewModel)` for convention-based resolution |
+
+**Correct pattern — opening an editor non-modally:**
+```csharp
+// CORRECT — use ScreenWindowService
+private void AddNewInvoice()
+{
+    var editorVm = App.GetService<SalesInvoiceEditorViewModel>();
+    _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
+    {
+        Title = "فاتورة بيع جديدة",
+        OnClosed = (vm) =>
+        {
+            if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+            {
+                _eventBus.Publish(new SaleInvoiceChangedMessage(editor.InvoiceId.Value));
+                Application.Current.Dispatcher.InvokeAsync(() => _ = LoadInvoicesAsync());
+            }
+        }
+    });
+}
+
+// WRONG — NEVER do this (modal, blocks MainWindow)
+private void AddNewInvoice()
+{
+    var editorVm = new SalesInvoiceEditorViewModel();
+    var editorWindow = new SalesInvoiceEditorView { DataContext = editorVm };
+    editorVm.CloseRequested += () => editorWindow.DialogResult = true;
+    if (editorWindow.ShowDialog() == true) { /* ... */ }  // ❌ BLOCKS
+}
+```
+
+**Opening a list screen in a new window:**
+```csharp
+private void OpenNewSalesWindow_Click(object sender, RoutedEventArgs e)
+{
+    var page = new Views.Sales.SalesInvoicesListView();
+    var window = new Views.ScreenWindow();
+    window.SetContent(page, page.DataContext);
+    App.GetService<IScreenWindowService>().OpenWindow(window, new ScreenWindowOptions
+    {
+        Title = "المبيعات", Width = 1000, Height = 700
+    });
+}
+```
+
+### 2.41 Error Message Best Practices (v4.5.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-171 | ALL catch blocks in ViewModels MUST use `Serilog.Log.Error(ex, context)` — NEVER show `ex.Message` in user-facing dialogs |
+| RULE-172 | `HandleFailure()` in ViewModelBase MUST transform common errors (timeout, network, not found) into user-friendly Arabic — NEVER pass raw English error text to users |
+| RULE-173 | Dialog titles MUST be screen-specific (e.g., `"خطأ في حفظ الفاتورة"`) — NEVER use generic `"خطأ"` alone |
+| RULE-174 | `MessageBox.Show` is FORBIDDEN in ViewModels — ALL user-facing messages go through `IDialogService` |
+| RULE-175 | ALL `IDialogService` calls must use the `Async` suffix methods (`ShowErrorAsync`, `ShowSuccessAsync`) — NEVER the sync overloads |
+| RULE-176 | Success messages MUST name the action (e.g., `"تم تصدير التقرير إلى Excel بنجاح"`) — NEVER `"تم التصدير بنجاح"` |
+| RULE-177 | Raw HTTP response bodies MUST NEVER be shown in user-facing dialogs — always log them via Serilog and show a friendly message instead |
+
+The following bugs were fixed in this session:
+- **CustomerListViewModel** — replaced manual `new CustomerEditorView { DataContext = vm }` + `window.ShowDialog()` with `_dialogService.ShowDialog(vm)` (violated RULE-160/161)
+- **CustomerListViewModel** — replaced `System.Windows.MessageBox.Show()` in `RestoreCustomerAsync()` with `_dialogService.ShowSuccessAsync()` / `HandleFailure()` (violated RULE-174)
+- **SupplierListViewModel** — `AddSupplier()` and `EditSupplier()` ignored `_dialogService.ShowDialog()` return value, causing list to never refresh (violated RULE-006/RULE-141)
+- **SupplierListViewModel** — replaced `System.Windows.MessageBox.Show()` in `RestoreSupplierAsync()` with `_dialogService.ShowSuccessAsync()` / `HandleFailure()` (violated RULE-174)
+- **ProductEditorViewModel** — added `IDialogService` dependency and replaced 4× `System.Windows.MessageBox.Show()` in `SaveAsync()` with proper async dialog calls (violated RULE-174)
+- **ProductEditorViewModelTests** — updated 19 constructor calls with `Mock<IDialogService>` parameter
+
+### 2.42 Application Shutdown (v4.5.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-178 | `App.xaml` MUST use `ShutdownMode="OnExplicitShutdown"` — NEVER `OnLastWindowClose` (hidden ScreenWindow instances keep the app alive) |
+| RULE-179 | `LoginWindow.CloseButton_Click` MUST call `Application.Current.Shutdown()` — NEVER `Close()` (which only closes the window) |
+| RULE-180 | `MainWindow.Closed` event MUST call `System.Windows.Application.Current.Shutdown()` — except during logout (guarded by `_isLoggingOut` flag) |
+| RULE-181 | Logout flow: set `_isLoggingOut = true`, clear session, open new LoginWindow, then `this.Close()` — prevents shutdown during logout |
+
+**Related fix:** `MainWindow.xaml.cs` — `_isLoggingOut` flag prevents `Application.Current.Shutdown()` during logout flow. Navigation permissions verified via `CanNavigateTo()` in `NavigationList_SelectionChanged`.
+
+### 2.43 UI ToolTips (v4.5.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-185 | ALL interactive controls (Button, MenuItem, ListBoxItem) MUST have an Arabic `ToolTip` that explains what the control does — NEVER leave a tooltip-less button |
+| RULE-186 | ToolTips MUST be user-action-oriented (e.g., `"فتح شاشة إضافة منتج جديد"`) — NEVER just repeat the button text (e.g., not `"منتج جديد"`) |
+| RULE-187 | Action buttons (Save, Post, Cancel, Delete, Print) MUST explain consequences — e.g., `"ترحيل العملية نهائياً — سيتم تحديث المخزون والرصيد"` |
+| RULE-188 | Navigation MenuItems in MainWindow MUST describe the destination screen — e.g., `"عرض وإدارة فواتير البيع"` |
+| RULE-189 | Empty-state buttons (e.g., "➕ إضافة أول منتج") MUST have ToolTip — these are often the user's first interaction |
+| RULE-190 | Error dismiss ("✕") buttons MUST have ToolTip `"إخفاء رسالة الخطأ"` |
+
+### 2.44 Logging Separation Policy (v4.5.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-182 | `Log.Error` reserved for **system errors only**: DB connection failures, API unreachable, JSON parse crashes, unhandled exceptions, file I/O failures — NEVER for user input validation failures |
+| RULE-183 | `Log.Warning` for **user mistakes**: validation errors (e.g., "الاسم مطلوب"), business rule violations (e.g., "المخزون غير كافٍ"), "not found" from user input — NEVER log these at Error level |
+| RULE-184 | `HandleResponseAsync` must check `ContentType == "application/json"` before parsing error responses — prevent `JsonException` crash on empty/HTML 404 bodies |
+
+### 2.45 Identifier Strategy — Complete (v4.5.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-191 | Product, Customer, Supplier, and Warehouse MUST NOT have a `Code` column — use auto-increment `Id` (int PK) as the sole identifier |
+| RULE-192 | Search/filter by `Id` (int) or `Name` (string) only — NEVER filter by a Code string column |
+| RULE-193 | Invoice line items carry `ProductId` (int FK) — `ProductCode` is removed as it was a denormalized duplicate |
+| RULE-194 | Report DTOs (StockReport, CustomerBalance, SupplierBalance, LowStock) MUST NOT include Code fields — use Id + Name instead |
+| RULE-195 | Code auto-generation services (`DocumentSequenceService` for PRD/CUST/SUP/WH) are REMOVED — no manual or auto-generated code needed |
+| RULE-196 | Editor ViewModels (Product, Customer, Supplier, Warehouse) MUST NOT have a `Code` property — remove all UI fields and validation for Code |
+| RULE-197 | `DuplicateCode` error constant is REMOVED from ErrorCodes — only `DuplicateBarcode` remains for barcode uniqueness validation |
+| RULE-198 | `WarehouseResponse` DTO MUST NOT have a `Code` field — it was removed in v4.5.3 |
+
+### 2.46 Centralized LogSystemError Pattern (v4.6)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-199 | `LogSystemError()` is the ONLY method for system error logging in ALL ViewModels — NEVER call `Serilog.Log.Error` directly in any ViewModel |
+| RULE-200 | ALL hard-delete operations in Application Services MUST catch `DbUpdateException` and return `Result.Failure` with Arabic message — NEVER let FK exception crash the API |
+| RULE-201 | All catch blocks in ViewModels MUST use `LogSystemError(message, context, exception)` from ViewModelBase — NEVER `Serilog.Log.Error(ex, ...)` directly |
+
+### 2.47 Service Layer & Controller Purity (v4.6)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-202 | ALL Application Service methods MUST return `Result<T>` or `Result` — NEVER throw exceptions like `KeyNotFoundException` |
+| RULE-203 | Controllers MUST NOT inject `DbContext` or `IUnitOfWork` directly — delegate ALL data access to Application Services |
+| RULE-204 | PrintController MUST move `SalesDbContext` queries to a dedicated `IPrintDataService` in Application layer |
+| RULE-205 | LogsController MUST move logging logic to an `ILogService` in Application layer |
+
+### 2.48 Enum Integrity (v4.6)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-206 | ALL enum VALUES MUST match AGENTS.md Section 3 exactly — NEVER deviate from the canonical values |
+| RULE-207 | `CostingMethod` values: WeightedAverage=1, LastPurchasePrice=2, SupplierPrice=3 |
+| RULE-208 | `CashTransactionType` values: OpeningBalance=1, SalesIncome=2, Expense=3, TransferOut=4, TransferIn=5, RefundOut=6, SupplierPayment=7, CustomerPayment=8 |
+| RULE-209 | `InvoiceTypePrint` values: Sales=1, Purchase=2, SalesReturn=3, PurchaseReturn=4, Test=5 |
+
+### 2.49 Database CHECK Constraints (v4.6)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-210 | `WarehouseStocks.Quantity` MUST have a DB-level `CHECK (Quantity >= 0)` constraint in Fluent API configuration |
+| RULE-211 | ALL `decimal(18,4)` precision MUST be changed to `decimal(18,2)` for money fields or `decimal(18,3)` for quantity fields — NO other precision allowed |
+| RULE-212 | `Product.ReorderLevel` MUST use `HasPrecision(18, 3)` — it is a quantity field, not a money field |
+| RULE-213 | `ProductPriceHistory` MUST have a dedicated `IEntityTypeConfiguration<ProductPriceHistory>` with explicit `HasMaxLength` on string fields |
+
+### 2.50 FK Delete Behavior Enforcement (v4.6)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-214 | ALL foreign keys MUST use `DeleteBehavior.Restrict` — absolute ZERO exceptions for Cascade delete |
+| RULE-215 | `ProductUnitConfiguration`, `UnitBarcodeConfiguration`, `ProductBarcodeConfiguration` MUST change `OnDelete(DeleteBehavior.Cascade)` to `OnDelete(DeleteBehavior.Restrict)` |
+| RULE-216 | `UnitBarcodeConfiguration` MUST add `.HasQueryFilter(x => x.IsActive)` to match `ProductBarcodeConfiguration` pattern |
+
+### 2.51 Response DTO Integrity (v4.6)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-217 | `ProductResponse`, `CustomerResponse`, `SupplierResponse` DTOs MUST NOT have a `Code` field — use auto-increment `Id` as sole identifier |
+| RULE-218 | `DuplicateCode` error constant is REMOVED from `ErrorCodes` — all references replaced with `DuplicateBarcode` or context-specific error codes |
+| RULE-219 | WarehouseService, UnitService, CategoryService MUST NOT return `DuplicateCode` — use appropriate error constants |
+
+### 2.52 Newest-First Sorting (v4.6.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-220 | ALL list ViewModels MUST display newest records first — sort by `Id` descending for entities with auto-increment PK, or by date descending for entities with date fields |
+| RULE-221 | Use `.OrderByDescending(x => x.Id)` when populating `ObservableCollection` from API results — NEVER rely on API return order alone |
+| RULE-222 | Invoice lists MUST sort by `InvoiceDate` descending (newest invoice first) |
+| RULE-223 | Payment lists MUST sort by `Id` descending (newest payment first) |
+
+### 2.53 Dialog Window Owner Safety (v4.6.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-224 | ALL dialog `PositionOverOwner()` methods MUST check `mainWindow != this` before setting `Owner` property — prevents "Cannot set Owner property to itself" error |
+| RULE-225 | When `MainWindow` is null or equals `this`, fall back to `WindowStartupLocation.CenterScreen` — NEVER crash |
+| RULE-226 | NEVER call `System.Windows.Application.Current.MainWindow` before it has been explicitly set in `Application_Startup` — the first Window created by WPF auto-becomes MainWindow |
+
+### 2.54 WPF Validation ErrorTemplate & ValidateAllAsync (v4.6.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-227 | ALL editor ViewModels MUST call `SetDialogService()` in every constructor to enable `ValidateAllAsync()` from ViewModelBase |
+| RULE-228 | Use `INotifyDataErrorInfo` (`AddError`/`ClearErrors`) in property setters for real-time validation — NEVER use parallel `HasXxxError` boolean + computed string properties |
+| RULE-229 | Pre-save validation MUST call `ClearAllErrors()` then `AddError()` for each field, then `await ValidateAllAsync()` from ViewModelBase — this shows the styled validation warning dialog automatically |
+| RULE-230 | The `Validation.ErrorTemplate` in `Styles.xaml` MUST render a red border + ❗ icon badge with `ToolTip` bound to `[0].ErrorContent` — applies to TextBox, PasswordBox, and ComboBox |
+
+### 2.55 Sound Service (ISoundService) & Transaction Feedback (v4.6.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-231 | `ISoundService` handles system-wide audio feedback via native Windows sounds (`PlaySuccessSound()`, `PlayErrorSound()`, `PlayWarningSound()`) |
+| RULE-232 | Audio feedback MUST fire on: successful barcode scans, quantity adjustments, pre-save validation dialogs, and save/post success events |
+
+**ISoundService Interface:**
+```csharp
+public interface ISoundService
+{
+    void PlaySuccess();
+    void PlayError();
+    void PlayWarning();
+}
+```
+
+### 2.56 Barcode Scanning (Continuous Input) & Event-Driven Selection (v4.6.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-233 | Continuous scanning MUST allow scanning product barcodes consecutively without closing the editor window or manually focusing the search field |
+| RULE-234 | `BarcodeLookupService` identifies products by barcode and automatically raises selection events marshaled to the UI thread via `Application.Current.Dispatcher` |
+
+### 2.57 Auto-Update System & DPAPI Security Integration (v4.6.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-235 | `IUpdaterService` handles background update checking, utilizing `%AppData%\SalesSystem\settings.json` to store skipped versions |
+| RULE-236 | DPAPI encryption via `IConnectionStringProtector` must be used for database connection strings to secure them at rest, applying `"DPAPI:"` prefix to raw values |
+| RULE-237 | `FirstRunSetupService` performs atomic write of encrypted settings on application startup via `.tmp` -> `File.Replace()` pattern |
+
+### 2.58 WPF ViewModels Code Quality Standard (v4.6.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-238 | ViewModels MUST NOT declare `async void` for operations that can throw exceptions, unless they are standard event handlers or ICommand execute wraps. All other async operations must return `Task` and be executed within `ExecuteAsync` wrappers |
+| RULE-239 | Derived list ViewModels MUST NOT shadow base class helper properties (such as `DialogService`) to avoid compile warnings and null reference issues. Use `SetDialogService()` instead |
+
+### 2.59 Rate Limiting & Brute-Force Protection (v4.6.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-240 | ALL login endpoints MUST use `[EnableRateLimiting("LoginPolicy")]` — 5 attempts per 15 minutes per IP |
+| RULE-241 | Global rate limit of 100 requests per minute per IP for all unauthenticated requests |
+| RULE-242 | Rate limit exceeded responses MUST return HTTP 429 with Arabic message and `RATE_LIMIT_EXCEEDED` code |
+| RULE-243 | Rate limiter middleware MUST be placed BEFORE `UseAuthentication()` in the middleware pipeline |
+
+### 2.60 User Hard-Delete Protection (v4.6.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-244 | `UserService.PermanentDeleteAsync()` MUST return `Result.Failure` — never hard-delete users |
+| RULE-245 | Any attempt to hard-delete a user MUST be logged as a Serilog warning |
+| RULE-246 | Users can only be soft-deleted (deactivated) via `DeleteAsync()` which sets `IsActive = false` |
+
+### 2.61 Connection String Security (v4.6.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-247 | `appsettings.Development.json` MUST NOT contain plaintext connection strings — use `SALESSYSTEM_DB_CONNECTION` env var |
+| RULE-248 | All connection string values in config files MUST be empty strings with a `_comment` property explaining env var usage |
+
+### 2.62 Garbled Arabic Text Prevention (v4.6.4)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-249 | ALL Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text — NEVER paste Arabic text through non-UTF-8 terminals or editors that re-encode characters |
+| RULE-250 | Before committing any C# file containing Arabic strings, verify the file is saved with UTF-8 encoding (BOM recommended) — use `file --mime-encoding` or editor's "Save with Encoding" feature |
+| RULE-251 | If viewing a file shows garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file was saved with the wrong encoding — rewrite ALL string literals from scratch with correct Arabic characters |
+| RULE-252 | Editor ViewModels and any file with user-facing messages MUST be checked for Arabic encoding integrity at code review time |
+| RULE-253 | When reviewing PRs, spot-check 3-5 Arabic string literals by reading them aloud in the diff — if any look like `ط§ط®طھط¨ط§ط±` instead of `اختبار`, flag the entire file for encoding review |
 
 ---
 
@@ -899,6 +1280,53 @@ public enum InvoiceTypePrint : byte
 ❌ IsLoading property (use IsBusy from ViewModelBase instead)
 ❌ MediatR/CQRS pattern (use Service Layer — MediatR package removed)
 ❌ Legacy WinForms code (deleted — use DesktopPWF WPF only)
+❌ Starting Desktop without checking DB connection (use DatabaseHealthCheckService first)
+❌ Letting DB connection exceptions crash the API without returning DATABASE_CONNECTION_ERROR
+❌ Showing raw exception messages to end users (use DatabaseErrorDialog with Arabic messages)
+❌ Using `SecureDbContextFactory` without fallback to `SALESSYSTEM_DB_CONNECTION` env var
+❌ Opening editors with `ShowDialog()` (always use `ScreenWindowService.OpenScreen` — non-modal)
+❌ Creating Window instances directly for screens (use `ScreenWindow` + `OpenWindow` instead)
+❌ Using strong references for window tracking (use `WeakReference<Window>`)
+❌ Calling UI operations from `OnClosed` callback without `Dispatcher.InvokeAsync()`
+❌ Using `MessageBox.Show` in ViewModels (use `IDialogService`)
+❌ Showing `ex.Message` in user-facing dialogs (log via Serilog, show Arabic-friendly message)
+❌ Generic `"خطأ"` dialog titles (use screen-specific titles)
+❌ Sync `_dialogService.ShowError()` without Async suffix
+❌ Raw HTTP response bodies in error dialogs (log via Serilog instead)
+❌ `ShutdownMode="OnLastWindowClose"` (use `OnExplicitShutdown`)
+❌ `LoginWindow.CloseButton_Click` calling `Close()` instead of `Shutdown()`
+❌ Logging user validation errors at Error level (use Warning for user mistakes)
+❌ Calling ReadFromJsonAsync on non-JSON response bodies without content-type guard
+❌ Manual `new ...View { DataContext = vm }` + `window.ShowDialog()` in ViewModels (use _dialogService.ShowDialog)
+❌ Ignoring `_dialogService.ShowDialog()` return value in list ViewModels (must refresh on true)
+❌ Button or MenuItem without Arabic ToolTip
+❌ ToolTip that just repeats the button text (e.g., Button="منتج جديد" ToolTip="منتج جديد")
+❌ Code column on Product, Customer, Supplier, or Warehouse entities (use Id instead)
+❌ WarehouseResponse still containing Code field
+❌ ProductCode on invoice item DTOs (use ProductId only)
+❌ Code auto-generation for products, customers, or suppliers
+❌ Filtering/searching by Code string column
+❌ Serilog.Log.Error directly in ViewModels (use LogSystemError from ViewModelBase instead)
+❌ T-SQL without IsDatabaseConnectionException guard in ExceptionMiddleware
+❌ Cascade delete on ANY FK (ProductUnit, UnitBarcode, ProductBarcode)
+❌ Application service throwing exceptions instead of returning Result.Failure (ProductPriceService.GetPriceByUnitAsync)
+❌ Controller injecting DbContext or IUnitOfWork directly (PrintController, LogsController)
+❌ Enum values that don't match AGENTS.md Section 3 exactly
+❌ decimal(18,4) for money fields (use decimal(18,2))
+❌ Missing CHECK constraint on WarehouseStocks.Quantity
+❌ Missing FluentAPI configuration for ProductPriceHistory
+❌ Missing HasQueryFilter(IsActive) on UnitBarcodeConfiguration
+❌ Code field on Product/Customer/Supplier Response DTOs
+❌ DuplicateCode in ErrorCodes
+❌ Setting Window.Owner = this (self-ownership crash)
+❌ Relying on API return order for list display (always sort client-side)
+❌ HasXxxError / XxxError boolean + computed string pattern for validation (use INotifyDataErrorInfo AddError/ClearErrors instead)
+❌ Plaintext connection strings in any appsettings file (use env var `SALESSYSTEM_DB_CONNECTION`)
+❌ Hard-deleting Users (soft delete only — `PermanentDeleteAsync` MUST return `Result.Failure`)
+❌ Login endpoint without rate limiting (use `[EnableRateLimiting("LoginPolicy")]`)
+❌ Unhandled exception dialog without FallbackErrorDialog (use thread-safe dialog overlay)
+❌ Duplicating validation dialog logic in each Editor ViewModel (use ValidateAllAsync from ViewModelBase)
+❌ Committing C# files with garbled Arabic (mojibake) — always verify UTF-8 encoding
 ```
 
 ---
@@ -967,7 +1395,7 @@ Supplier Payments:SP-{YYYY}-{000001}
 | Topic | Read This File |
 |-------|---------------|
 | Financial formulas | `docs/CONSTITUTION.md` |
-| Full requirements | `docs/PRD-MVP-v3.0.md` |
+| Full requirements | `docs/PRD-MVP.md` |
 | Database schema | `docs/database-schema.md` |
 | UI/UX flows | `docs/ui-screens.md` |
 | Security details | `.opencode/agent/security-auditor.md` |
@@ -998,13 +1426,13 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] All FKs use `DeleteBehavior.Restrict`?
 - [ ] Users soft-deleted only (never hard delete)?
 - [ ] Domain Entities use `private set` for critical properties and methods for state changes?
-- [ ] Read and Write operations are separated (CQRS)?
+- [ ] Service Layer pattern used (NOT CQRS/MediatR)?
 - [ ] Delete operations use DeleteStrategy enum (not direct MessageBox)?
 - [ ] Guard Clauses exist for all entity creation?
 - [ ] DialogService used instead of MessageBox.Show?
 - [ ] Toast notifications for minor success messages?
 - [ ] INotifyDataErrorInfo implemented with red border styles?
-- [ ] Save buttons disabled when form has errors (CanExecute)?
+- [ ] Save buttons ALWAYS enabled (no CanExecute) — validate on click with warning dialog?
 - [ ] Pricing stored per ProductUnit (not on Product)?
 - [ ] Unit conversions computed in Domain (not UI or Service)?
 - [ ] Barcodes stored in UnitBarcode table (not embedded in Unit)?
@@ -1042,3 +1470,81 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] MediatR NOT used (Service Layer pattern only)?
 - [ ] Legacy WinForms code deleted (not referenced)?
 - [ ] MASTER-PLAN.md reflects actual architecture (not aspirational)?
+- [ ] API exposes `GET /api/v1/health/database` endpoint?
+- [ ] Desktop checks DB connectivity on startup before showing login?
+- [ ] `DatabaseErrorDialog` shown on connection failure with Retry/Exit?
+- [ ] `ExceptionMiddleware` detects DB exceptions and returns `DATABASE_CONNECTION_ERROR`?
+- [ ] `SecureDbContextFactory` falls back to `SALESSYSTEM_DB_CONNECTION` env var?
+- [ ] Editors open non-modally via `ScreenWindowService.OpenScreen()` — NOT `ShowDialog()`?
+- [ ] `WeakReference<Window>` used for window tracking (not strong references)?
+- [ ] `OnClosed` callbacks use `Dispatcher.InvokeAsync()` for UI thread safety?
+- [ ] Auto-titles set to Arabic names (e.g., "فاتورة بيع") — not English type names?
+- [ ] MainWindow has "فتح نافذة جديدة" menu items for list screens?
+- [ ] ViewModel lifecycle: `Cleanup()` called on window close, EventBus unsubscribed?
+- [ ] `Cascade positioning` applied: 30px offset × (count % 10) from MainWindow?
+- [ ] All catch blocks log via Serilog — NEVER show ex.Message to user?
+- [ ] Dialog titles are screen-specific (never generic "خطأ")?
+- [ ] `MessageBox.Show` is NOT used anywhere?
+- [ ] ALL dialog calls use Async suffix (ShowErrorAsync)?
+- [ ] `HandleFailure()` transforms errors to user-friendly Arabic?
+- [ ] `App.xaml` uses `ShutdownMode="OnExplicitShutdown"`?
+- [ ] LoginWindow close button calls `Application.Current.Shutdown()`?
+- [ ] MainWindow handles shutdown on close (except during logout)?
+- [ ] No raw HTTP response bodies in user-facing dialogs?
+- [ ] Log.Error used for system errors only (not user validation mistakes)?
+- [ ] HandleResponseAsync checks content type before parsing error JSON?
+- [ ] Log.Warning used for validation/user errors (not Log.Error)?
+- [ ] No manual window creation in ViewModels (use _dialogService.ShowDialog)?
+- [ ] AddCommand uses RelayCommand (not AsyncRelayCommand) and has NO CanExecute predicate?
+- [ ] List ViewModels check ShowDialog return value before refreshing?
+- [ ] Editor ViewModels have IDialogService dependency?
+- [ ] No MessageBox.Show anywhere in ViewModels?
+- [ ] ALL buttons have Arabic ToolTip explaining the action?
+- [ ] ToolTips describe user action/consequence (not just repeat button text)?
+- [ ] Navigation MenuItems have destination description ToolTips?
+- [ ] Empty-state buttons have ToolTips?
+- [ ] Error dismiss buttons have ToolTip?
+- [ ] Product/Customer/Supplier/Warehouse have NO Code column/property?
+- [ ] WarehouseResponse DTO excludes Code field?
+- [ ] All search/filter uses Id or Name, not Code?
+- [ ] Invoice item DTOs carry ProductId only (no ProductCode)?
+- [ ] Report DTOs exclude Code fields?
+- [ ] Editor ViewModels exclude Code property?
+- [ ] LogSystemError used instead of direct Serilog.Log.Error in ViewModels?
+- [ ] All hard delete services catch DbUpdateException?
+- [ ] Controllers have NO direct DbContext or IUnitOfWork injection?
+- [ ] All services return Result<T> (never throw exceptions)?
+- [ ] Enum values match AGENTS.md Section 3 exactly?
+- [ ] No Cascade delete on any FK?
+- [ ] WarehouseStocks has CHECK (Quantity >= 0)?
+- [ ] ALL money fields use decimal(18,2) (not 18,4)?
+- [ ] ProductPriceHistory has Fluent API config?
+- [ ] UnitBarcode has HasQueryFilter(IsActive)?
+- [ ] Product/Customer/Supplier Response DTOs have NO Code field?
+- [ ] ErrorCodes has NO DuplicateCode constant?
+- [ ] PrintDataService returns `Result<InvoicePrintDto>` (not nullable `InvoicePrintDto?`)?
+- [ ] Purchase Invoice DataGrid has PriceDifferenceIndicator with orange `#E65100` TextBlock?
+- [ ] SettingsView has CostingMethod RadioButton group (WeightedAverage/LastPurchasePrice/SupplierPrice)?
+- [ ] SettingsViewModel has CostingMethod, IsWeightedAverageSelected, IsLastPriceSelected, IsSupplierPriceSelected properties?
+- [ ] StoreSettingsDto and UpdateSettingsRequest include CostingMethod field?
+- [ ] SettingsController Get/Update support CostingMethod via ISystemSettingsRepository?
+- [ ] Lists sorted newest-first using OrderByDescending?
+- [ ] Dialog PositionOverOwner() guards against self-ownership?
+- [ ] WindowStartupLocation.CenterScreen fallback when no valid owner?
+- [ ] SetDialogService() called in every Editor ViewModel constructor?
+- [ ] All validation uses INotifyDataErrorInfo (no HasXxxError booleans)?
+- [ ] ErrorTemplate renders red border + icon for invalid fields?
+- [ ] ValidateAsync() calls ClearAllErrors() + AddError() + await ValidateAllAsync()?
+- [ ] Sound Service (`ISoundService`) integrated and audible cues triggered?
+- [ ] Continuous scanning active with event-driven Dispatcher marshaling?
+- [ ] Auto-update checking done asynchronously in background?
+- [ ] DPAPI encryption applied to connection string with "DPAPI:" prefix?
+- [ ] No `async void` used for operation methods (use `Task` + `ExecuteAsync`)?
+- [ ] No shadowing of base class properties (like `DialogService`)?
+- [ ] Rate limiting configured (Login: 5/15min, Global: 100/min)?
+- [ ] User hard-delete guarded (PermanentDeleteAsync returns Result.Failure)?
+- [ ] No plaintext connection strings in any config file?
+- [ ] FluentValidators enhanced for all invoice/payment/transfer requests?
+- [ ] FallbackErrorDialog exists for unhandled exceptions?
+- [ ] Login endpoint has `[EnableRateLimiting("LoginPolicy")]`?
+- [ ] Rate limiter middleware placed BEFORE `UseAuthentication()`?

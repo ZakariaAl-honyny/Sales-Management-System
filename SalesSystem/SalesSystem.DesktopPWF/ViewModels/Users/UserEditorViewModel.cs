@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
-using System.Windows;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -15,6 +15,7 @@ public class UserEditorViewModel : ViewModelBase
 {
     private readonly IUserApiService _userService;
     private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
 
     private int _id;
     private string _username = string.Empty;
@@ -28,7 +29,6 @@ public class UserEditorViewModel : ViewModelBase
         get => _isEditMode;
         set => SetProperty(ref _isEditMode, value);
     }
-    private bool _isLoading;
     private string? _errorMessage;
 
 
@@ -36,6 +36,8 @@ public class UserEditorViewModel : ViewModelBase
     {
         _userService = App.GetService<IUserApiService>();
         _eventBus = App.GetService<IEventBus>();
+        _dialogService = App.GetService<IDialogService>();
+        SetDialogService(_dialogService);
         _isEditMode = false;
         WindowTitle = "إضافة مستخدم جديد";
         InitializeCommands();
@@ -54,7 +56,7 @@ public class UserEditorViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave());
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ المستخدم...")));
         CancelCommand = new RelayCommand(() => RequestClose());
     }
 
@@ -67,7 +69,12 @@ public class UserEditorViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _username, value))
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Username), "اسم المستخدم مطلوب");
+                else
+                    ClearErrors(nameof(Username));
+            }
         }
     }
 
@@ -77,7 +84,12 @@ public class UserEditorViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _fullName, value))
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(FullName), "الاسم بالكامل مطلوب");
+                else
+                    ClearErrors(nameof(FullName));
+            }
         }
     }
 
@@ -87,7 +99,12 @@ public class UserEditorViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _password, value))
-                (SaveCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+            {
+                if (!IsEditMode && string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Password), "كلمة المرور مطلوبة للمستخدم الجديد");
+                else
+                    ClearErrors(nameof(Password));
+            }
         }
     }
 
@@ -101,12 +118,6 @@ public class UserEditorViewModel : ViewModelBase
     {
         get => _isActive;
         set => SetProperty(ref _isActive, value);
-    }
-
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
     }
 
     public string? ErrorMessage
@@ -129,53 +140,54 @@ public class UserEditorViewModel : ViewModelBase
     #endregion
 
     #region Methods
-    private bool CanSave()
+    private async Task<bool> ValidateAsync()
     {
-        if (string.IsNullOrWhiteSpace(Username)) return false;
-        if (string.IsNullOrWhiteSpace(FullName)) return false;
-        if (!IsEditMode && string.IsNullOrWhiteSpace(Password)) return false;
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(Username))
+            errors.Add("• اسم المستخدم مطلوب — تأكد من إدخال اسم فريد للدخول إلى النظام");
+        if (string.IsNullOrWhiteSpace(FullName))
+            errors.Add("• الاسم بالكامل مطلوب — سيظهر هذا الاسم في الفواتير والتقارير");
+        if (!IsEditMode && string.IsNullOrWhiteSpace(Password))
+            errors.Add("• كلمة المرور مطلوبة — يجب أن تكون كلمة مرور قوية لحماية الحساب");
+
+        if (errors.Any())
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
+            return false;
+        }
         return true;
     }
 
-    private async Task SaveAsync()
+    private async Task SaveOperationAsync()
     {
-        IsLoading = true;
+        if (!await ValidateAsync())
+            return;
+
         ErrorMessage = null;
 
-        try
-        {
-            Result<UserDto> result;
+        Result<UserDto> result;
 
-            if (IsEditMode)
-            {
-                var request = new UpdateUserRequest(FullName, (byte)Role, IsActive, string.IsNullOrWhiteSpace(Password) ? null : Password);
-                result = await _userService.UpdateAsync(_id, request);
-            }
-            else
-            {
-                var request = new CreateUserRequest(Username, Password, FullName, (byte)Role);
-                result = await _userService.CreateAsync(request);
-            }
+        if (IsEditMode)
+        {
+            var request = new UpdateUserRequest(FullName, (byte)Role, IsActive, string.IsNullOrWhiteSpace(Password) ? null : Password);
+            result = await _userService.UpdateAsync(_id, request);
+        }
+        else
+        {
+            var request = new CreateUserRequest(Username, Password, FullName, (byte)Role);
+            result = await _userService.CreateAsync(request);
+        }
 
-            if (result.IsSuccess && result.Value != null)
-            {
-                _eventBus.Publish(new UserChangedMessage(result.Value.Id));
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ بيانات المستخدم", "UserEditorViewModel.SaveAsync", "[UserEditorViewModel.SaveAsync] Failed to save user data.");
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ في الحفظ", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-        catch (Exception ex)
+        if (result.IsSuccess && result.Value != null)
         {
-            ErrorMessage = HandleException(ex, "UserEditorViewModel.SaveAsync", "[UserEditorViewModel.SaveAsync] Failed to save user data.");
-            System.Windows.MessageBox.Show(ErrorMessage, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            _eventBus.Publish(new UserChangedMessage(result.Value.Id));
+            RequestClose();
         }
-        finally
+        else
         {
-            IsLoading = false;
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ بيانات المستخدم", "UserEditorViewModel.SaveAsync", "[UserEditorViewModel.SaveAsync] Failed to save user data.");
+            await _dialogService.ShowErrorAsync("خطأ في حفظ المستخدم", ErrorMessage!);
         }
     }
     #endregion

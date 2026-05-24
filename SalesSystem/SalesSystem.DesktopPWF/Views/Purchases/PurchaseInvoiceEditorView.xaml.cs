@@ -1,4 +1,5 @@
-using System.Windows;
+﻿using System.Windows;
+using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.ViewModels.Purchases;
 
 namespace SalesSystem.DesktopPWF.Views.Purchases;
@@ -16,21 +17,18 @@ public partial class PurchaseInvoiceEditorView : Window
     public PurchaseInvoiceEditorView(PurchaseInvoiceEditorViewModel viewModel) : this()
     {
         DataContext = viewModel;
-        IsReadOnly = viewModel.IsReadOnly;
+
+        viewModel.CloseRequested += () => Dispatcher.InvokeAsync(() => Close());
+        viewModel.FocusFirstInvalidFieldRequested += () =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                (Helpers.ValidationFocusBehavior.FindFirstInvalid(this) ??
+                Helpers.ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
+            });
+        };
     }
 
-    public bool IsReadOnly
-    {
-        get => !IsEnabled;
-        set
-        {
-            if (value)
-            {
-                IsEnabled = false;
-                Title = "عرض فاتورة شراء";
-            }
-        }
-    }
     protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
     {
         // Skip system keys that shouldn't be part of a barcode
@@ -51,3 +49,4 @@ public partial class PurchaseInvoiceEditorView : Window
         base.OnPreviewKeyDown(e);
     }
 }
+

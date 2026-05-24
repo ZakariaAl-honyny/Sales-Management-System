@@ -1,85 +1,103 @@
 using System.IO;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Api.Controllers;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
-using SalesSystem.Infrastructure.Data;
 
 namespace SalesSystem.Api.Tests.Controllers;
 
 public class PrintControllerTests
 {
     private readonly Mock<IPrintService> _printServiceMock;
-    private readonly InvoicePrintDtoBuilder _builder;
-    private readonly SalesDbContext _db;
+    private readonly Mock<IPrintDataService> _printDataServiceMock;
     private readonly Mock<ILogger<PrintController>> _loggerMock;
     private readonly PrintController _controller;
 
     public PrintControllerTests()
     {
         _printServiceMock = new Mock<IPrintService>();
-
-        var builderLogger = new Mock<ILogger<InvoicePrintDtoBuilder>>();
-        _builder = new InvoicePrintDtoBuilder(builderLogger.Object);
-
-        var options = new DbContextOptionsBuilder<SalesDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        _db = new SalesDbContext(options);
-
+        _printDataServiceMock = new Mock<IPrintDataService>();
         _loggerMock = new Mock<ILogger<PrintController>>();
         _controller = new PrintController(
             _printServiceMock.Object,
-            _builder,
-            _db,
+            _printDataServiceMock.Object,
             _loggerMock.Object);
     }
 
-    private async Task<SalesInvoice> SeedSalesInvoiceAsync()
+    private InvoicePrintDto CreateSampleSalesDto()
     {
-        var customer = Customer.Create("زبون تجريبي", phone: "0555555555", address: "الرياض");
-        _db.Customers.Add(customer);
-        await _db.SaveChangesAsync();
-
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: customer.Id);
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 2, unitPrice: 50);
-        invoice.AddItem(item);
-        invoice.Post();
-        _db.SalesInvoices.Add(invoice);
-        await _db.SaveChangesAsync();
-        return invoice;
+        return new InvoicePrintDto
+        {
+            InvoiceId = 1,
+            InvoiceNumber = "INV-2026-000001",
+            StoreName = "متجري",
+            StorePhone = string.Empty,
+            StoreAddress = string.Empty,
+            StoreTaxNumber = string.Empty,
+            LogoBytes = null,
+            CustomerOrSupplierName = "زبون تجريبي",
+            Items = new List<InvoiceItemPrintDto>
+            {
+                new("منتج تجريبي", "", 2, 50, 0, 100)
+            },
+            SubTotal = 100,
+            DiscountAmount = 0,
+            TaxRate = 15,
+            TaxAmount = 0,
+            GrandTotal = 100,
+            AmountPaid = 100,
+            ChangeAmount = 0,
+            PaymentMethod = "نقدي",
+            Notes = null
+        };
     }
 
-    private async Task<PurchaseInvoice> SeedPurchaseInvoiceAsync()
+    private InvoicePrintDto CreateSamplePurchaseDto()
     {
-        var supplier = Supplier.Create("مورد تجريبي", phone: "0555555555", address: "جدة");
-        _db.Suppliers.Add(supplier);
-        await _db.SaveChangesAsync();
-
-        var invoice = PurchaseInvoice.Create("PUR-2026-000001", supplierId: supplier.Id, warehouseId: 1);
-        var item = PurchaseInvoiceItem.Create(productId: 1, quantity: 5, unitCost: 30);
-        invoice.AddItem(item);
-        invoice.Post();
-        _db.PurchaseInvoices.Add(invoice);
-        await _db.SaveChangesAsync();
-        return invoice;
+        return new InvoicePrintDto
+        {
+            InvoiceId = 1,
+            InvoiceNumber = "PUR-2026-000001",
+            StoreName = "متجري",
+            StorePhone = string.Empty,
+            StoreAddress = string.Empty,
+            StoreTaxNumber = string.Empty,
+            LogoBytes = null,
+            CustomerOrSupplierName = "مورد تجريبي",
+            Items = new List<InvoiceItemPrintDto>
+            {
+                new("منتج تجريبي", "", 5, 30, 0, 150)
+            },
+            SubTotal = 150,
+            DiscountAmount = 0,
+            TaxRate = 15,
+            TaxAmount = 0,
+            GrandTotal = 150,
+            AmountPaid = 150,
+            ChangeAmount = 0,
+            PaymentMethod = "نقدي",
+            Notes = null
+        };
     }
+
+    // ─── Sales Invoice Preview ────────────────────────────────────────
 
     [Fact]
     public async Task PreviewSalesInvoice_WhenInvoiceExists_ReturnsOkWithPrintResult()
     {
-        var invoice = await SeedSalesInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
 
-        var result = await _controller.PreviewSalesInvoice(invoice.Id, CancellationToken.None);
+        var result = await _controller.PreviewSalesInvoice(1, CancellationToken.None);
 
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
         var printResult = okResult.Value.Should().BeOfType<PrintResult>().Subject;
@@ -89,6 +107,10 @@ public class PrintControllerTests
     [Fact]
     public async Task PreviewSalesInvoice_WhenInvoiceDoesNotExist_Returns404()
     {
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة"));
+
         var result = await _controller.PreviewSalesInvoice(999, CancellationToken.None);
 
         var notFound = result.Should().BeOfType<NotFoundObjectResult>().Subject;
@@ -98,26 +120,32 @@ public class PrintControllerTests
     [Fact]
     public async Task PreviewSalesInvoice_WhenPrintServiceFails_Returns400()
     {
-        var invoice = await SeedSalesInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("الطابعة غير متصلة"));
 
-        var result = await _controller.PreviewSalesInvoice(invoice.Id, CancellationToken.None);
+        var result = await _controller.PreviewSalesInvoice(1, CancellationToken.None);
 
         var badRequest = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         badRequest.StatusCode.Should().Be(400);
     }
 
+    // ─── Sales Invoice A4 Print ───────────────────────────────────────
+
     [Fact]
     public async Task PrintSalesA4_WhenInvoiceExists_ReturnsOk()
     {
-        var invoice = await SeedSalesInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
 
-        var result = await _controller.PrintSalesA4(invoice.Id, CancellationToken.None);
+        var result = await _controller.PrintSalesA4(1, CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
     }
@@ -125,6 +153,10 @@ public class PrintControllerTests
     [Fact]
     public async Task PrintSalesA4_WhenInvoiceDoesNotExist_Returns404()
     {
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة"));
+
         var result = await _controller.PrintSalesA4(999, CancellationToken.None);
 
         var notFound = result.Should().BeOfType<NotFoundObjectResult>().Subject;
@@ -134,25 +166,31 @@ public class PrintControllerTests
     [Fact]
     public async Task PrintSalesA4_WhenPrintFails_Returns400()
     {
-        var invoice = await SeedSalesInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("فشلت الطباعة"));
 
-        var result = await _controller.PrintSalesA4(invoice.Id, CancellationToken.None);
+        var result = await _controller.PrintSalesA4(1, CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    // ─── Sales Invoice Thermal Print ──────────────────────────────────
+
     [Fact]
     public async Task PrintSalesThermal_WhenInvoiceExists_ReturnsOk()
     {
-        var invoice = await SeedSalesInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.PrintThermalAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
 
-        var result = await _controller.PrintSalesThermal(invoice.Id, CancellationToken.None);
+        var result = await _controller.PrintSalesThermal(1, CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
     }
@@ -160,6 +198,10 @@ public class PrintControllerTests
     [Fact]
     public async Task PrintSalesThermal_WhenInvoiceDoesNotExist_Returns404()
     {
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة"));
+
         var result = await _controller.PrintSalesThermal(999, CancellationToken.None);
 
         var notFound = result.Should().BeOfType<NotFoundObjectResult>().Subject;
@@ -169,25 +211,31 @@ public class PrintControllerTests
     [Fact]
     public async Task PrintSalesThermal_WhenPrintFails_Returns400()
     {
-        var invoice = await SeedSalesInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetSalesInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSampleSalesDto()));
         _printServiceMock
             .Setup(x => x.PrintThermalAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("فشلت الطباعة الحرارية"));
 
-        var result = await _controller.PrintSalesThermal(invoice.Id, CancellationToken.None);
+        var result = await _controller.PrintSalesThermal(1, CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    // ─── Purchase Invoice Preview ─────────────────────────────────────
+
     [Fact]
     public async Task PreviewPurchaseInvoice_WhenInvoiceExists_ReturnsOkWithPrintResult()
     {
-        var invoice = await SeedPurchaseInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetPurchaseInvoicePrintDataAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Success(CreateSamplePurchaseDto()));
         _printServiceMock
             .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
 
-        var result = await _controller.PreviewPurchaseInvoice(invoice.Id, CancellationToken.None);
+        var result = await _controller.PreviewPurchaseInvoice(1, CancellationToken.None);
 
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
         var printResult = okResult.Value.Should().BeOfType<PrintResult>().Subject;
@@ -197,15 +245,27 @@ public class PrintControllerTests
     [Fact]
     public async Task PreviewPurchaseInvoice_WhenInvoiceDoesNotExist_Returns404()
     {
+        _printDataServiceMock
+            .Setup(x => x.GetPurchaseInvoicePrintDataAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة"));
+
         var result = await _controller.PreviewPurchaseInvoice(999, CancellationToken.None);
 
         var notFound = result.Should().BeOfType<NotFoundObjectResult>().Subject;
         notFound.StatusCode.Should().Be(404);
     }
 
+    // ─── Test Page ────────────────────────────────────────────────────
+
     [Fact]
     public async Task PrintTestPage_WhenA4Succeeds_ReturnsOk()
     {
+        _printDataServiceMock
+            .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
+        _printDataServiceMock
+            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
@@ -218,6 +278,12 @@ public class PrintControllerTests
     [Fact]
     public async Task PrintTestPage_WhenA4FailsAndThermalSucceeds_ReturnsOk()
     {
+        _printDataServiceMock
+            .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
+        _printDataServiceMock
+            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("A4 error"));
@@ -233,6 +299,12 @@ public class PrintControllerTests
     [Fact]
     public async Task PrintTestPage_WhenBothFail_Returns400()
     {
+        _printDataServiceMock
+            .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
+        _printDataServiceMock
+            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("A4 error"));
@@ -245,21 +317,26 @@ public class PrintControllerTests
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    // ─── Store Info via Test Page ─────────────────────────────────────
+
     [Fact]
     public async Task LoadStoreInfoAsync_WhenStoreSettingsExist_UsesStoreSettings()
     {
         var settings = StoreSettings.Create("متجر الاختبار", phone: "0111111111", address: "الرياض");
-        _db.StoreSettings.Add(settings);
-        await _db.SaveChangesAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettings>.Success(settings));
+        _printDataServiceMock
+            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
 
-        var invoice = await SeedSalesInvoiceAsync();
         InvoicePrintDto? captured = null;
         _printServiceMock
-            .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
+            .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success())
             .Callback<InvoicePrintDto>(dto => captured = dto);
 
-        await _controller.PreviewSalesInvoice(invoice.Id, CancellationToken.None);
+        await _controller.PrintTestPage(CancellationToken.None);
 
         captured.Should().NotBeNull();
         captured!.StoreName.Should().Be("متجر الاختبار");
@@ -270,14 +347,20 @@ public class PrintControllerTests
     [Fact]
     public async Task LoadStoreInfoAsync_WhenNoStoreSettings_UsesDefaults()
     {
-        var invoice = await SeedSalesInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettings>.Failure("No settings"));
+        _printDataServiceMock
+            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
+
         InvoicePrintDto? captured = null;
         _printServiceMock
-            .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
+            .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success())
             .Callback<InvoicePrintDto>(dto => captured = dto);
 
-        await _controller.PreviewSalesInvoice(invoice.Id, CancellationToken.None);
+        await _controller.PrintTestPage(CancellationToken.None);
 
         captured.Should().NotBeNull();
         captured!.StoreName.Should().Be("متجري");
@@ -293,19 +376,26 @@ public class PrintControllerTests
         {
             await File.WriteAllBytesAsync(tempFile, [0x89, 0x50, 0x4E, 0x47]);
 
-            _db.StoreSettings.Add(StoreSettings.Create("متجري"));
-            _db.SystemSettings.Add(SystemSetting.Create("LogoPath", tempFile,
-                dataType: "string", category: "Print", displayName: "شعار المتجر"));
-            await _db.SaveChangesAsync();
+            var sysSettings = new List<SystemSetting>
+            {
+                SystemSetting.Create("LogoPath", tempFile,
+                    dataType: "string", category: "Print", displayName: "شعار المتجر")
+            };
 
-            var invoice = await SeedSalesInvoiceAsync();
+            _printDataServiceMock
+                .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
+            _printDataServiceMock
+                .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result<List<SystemSetting>>.Success(sysSettings));
+
             InvoicePrintDto? captured = null;
             _printServiceMock
-                .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
+                .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
                 .ReturnsAsync(PrintResult.Success())
                 .Callback<InvoicePrintDto>(dto => captured = dto);
 
-            await _controller.PreviewSalesInvoice(invoice.Id, CancellationToken.None);
+            await _controller.PrintTestPage(CancellationToken.None);
 
             captured.Should().NotBeNull();
             captured!.LogoBytes.Should().NotBeNull();
@@ -321,17 +411,20 @@ public class PrintControllerTests
     [Fact]
     public async Task LoadStoreInfoAsync_WhenTaxRateMissing_UsesDefault15()
     {
-        _db.StoreSettings.Add(StoreSettings.Create("متجري"));
-        await _db.SaveChangesAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
+        _printDataServiceMock
+            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
 
-        var invoice = await SeedSalesInvoiceAsync();
         InvoicePrintDto? captured = null;
         _printServiceMock
-            .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
+            .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success())
             .Callback<InvoicePrintDto>(dto => captured = dto);
 
-        await _controller.PreviewSalesInvoice(invoice.Id, CancellationToken.None);
+        await _controller.PrintTestPage(CancellationToken.None);
 
         captured.Should().NotBeNull();
         captured!.TaxRate.Should().Be(15m);
@@ -340,19 +433,26 @@ public class PrintControllerTests
     [Fact]
     public async Task LoadStoreInfoAsync_WhenCustomTaxRateSet_UsesCustomRate()
     {
-        _db.StoreSettings.Add(StoreSettings.Create("متجري"));
-        _db.SystemSettings.Add(SystemSetting.Create("TaxRate", "10",
-            dataType: "decimal", category: "Print", displayName: "نسبة الضريبة"));
-        await _db.SaveChangesAsync();
+        var sysSettings = new List<SystemSetting>
+        {
+            SystemSetting.Create("TaxRate", "10",
+                dataType: "decimal", category: "Print", displayName: "نسبة الضريبة")
+        };
 
-        var invoice = await SeedSalesInvoiceAsync();
+        _printDataServiceMock
+            .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
+        _printDataServiceMock
+            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<List<SystemSetting>>.Success(sysSettings));
+
         InvoicePrintDto? captured = null;
         _printServiceMock
-            .Setup(x => x.ShowPreviewAsync(It.IsAny<InvoicePrintDto>()))
+            .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success())
             .Callback<InvoicePrintDto>(dto => captured = dto);
 
-        await _controller.PreviewSalesInvoice(invoice.Id, CancellationToken.None);
+        await _controller.PrintTestPage(CancellationToken.None);
 
         captured.Should().NotBeNull();
         captured!.TaxRate.Should().Be(10m);

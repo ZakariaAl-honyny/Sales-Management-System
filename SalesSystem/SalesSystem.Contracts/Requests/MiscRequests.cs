@@ -1,5 +1,7 @@
 namespace SalesSystem.Contracts.Requests;
 
+public record RestoreBackupRequest(string FileName);
+
 public record ReportFilterRequest(
     DateTime? DateFrom, DateTime? DateTo,
     int? CustomerId, int? SupplierId,
@@ -11,7 +13,11 @@ public record UpdateSettingsRequest(
     string? LogoUrl, string Currency, decimal DefaultTaxRate,
     bool IsTaxEnabled, string? TaxNumber,
     bool EnableStockAlerts, bool AllowNegativeStock, bool AutoUpdatePrices,
-    string InvoicePrefix);
+    string InvoicePrefix,
+    int CostingMethod = 1);
+
+public record UpdateCostingMethodRequest(
+    int Method);
 
 public record UpdatePrintSettingsRequest(
     string ThermalPrinterName,

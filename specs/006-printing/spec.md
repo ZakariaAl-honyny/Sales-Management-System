@@ -3,7 +3,7 @@
 **Feature Branch**: `006-printing`  
 **Created**: 2026-05-09  
 **Status**: Draft  
-**Input**: User description: "Phase 6 — Printing" based on PRD-MVP-v3.0.md
+**Input**: User description: "Phase 6 — Printing" based on PRD-MVP.md
 
 ## User Scenarios & Testing *(mandatory)*
 

@@ -1,8 +1,7 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
@@ -28,7 +27,6 @@ public class SupplierListViewModel : ViewModelBase
     private ICollectionView? _suppliersView;
     private SupplierDto? _selectedSupplier;
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
@@ -40,16 +38,7 @@ public class SupplierListViewModel : ViewModelBase
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
 
-        // Initialize commands
-        RefreshCommand = new AsyncRelayCommand(LoadSuppliersAsync);
-        AddCommand = new RelayCommand(AddSupplier);
-        EditCommand = new RelayCommand(EditSupplier, () => SelectedSupplier != null);
-        DeleteCommand = new AsyncRelayCommand(DeleteSupplierAsync, () => SelectedSupplier != null && SelectedSupplier.IsActive);
-        RestoreCommand = new AsyncRelayCommand(RestoreSupplierAsync, () => SelectedSupplier != null && !SelectedSupplier.IsActive);
-        SearchCommand = new RelayCommand(Search);
-
-        // Subscribe to supplier changes
-        _eventBus.Subscribe<SupplierChangedMessage>(OnSupplierChanged);
+        InitializeCommands();
     }
 
     public SupplierListViewModel(
@@ -63,6 +52,11 @@ public class SupplierListViewModel : ViewModelBase
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
 
+        InitializeCommands();
+    }
+
+    private void InitializeCommands()
+    {
         RefreshCommand = new AsyncRelayCommand(LoadSuppliersAsync);
         AddCommand = new RelayCommand(AddSupplier);
         EditCommand = new RelayCommand(EditSupplier, () => SelectedSupplier != null);
@@ -114,11 +108,6 @@ public class SupplierListViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -148,18 +137,18 @@ public class SupplierListViewModel : ViewModelBase
     #endregion
 
     #region Commands
-    public ICommand RefreshCommand { get; }
-    public ICommand AddCommand { get; }
-    public ICommand EditCommand { get; }
-    public ICommand DeleteCommand { get; }
+    public ICommand RefreshCommand { get; private set; } = null!;
+    public ICommand AddCommand { get; private set; } = null!;
+    public ICommand EditCommand { get; private set; } = null!;
+    public ICommand DeleteCommand { get; private set; } = null!;
     public ICommand RestoreCommand { get; private set; } = null!;
-    public ICommand SearchCommand { get; }
+    public ICommand SearchCommand { get; private set; } = null!;
     #endregion
 
     #region Methods
     public async Task LoadSuppliersAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -170,17 +159,25 @@ public class SupplierListViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Suppliers.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Suppliers.Add(item);
                     }
-                    SetupCollectionView();
+                    try
+                    {
+                        SetupCollectionView();
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // WPF ListCollectionView requires a running Dispatcher â€” skip in non-WPF contexts
+                        SuppliersView = null;
+                    }
                     IsEmpty = !Suppliers.Any();
                 });
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل تحميل الموردين", "SupplierListViewModel.LoadSuppliersAsync");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ طھط­ظ…ظٹظ„ ط§ظ„ظ…ظˆط±ط¯ظٹظ†", "SupplierListViewModel.LoadSuppliersAsync");
             }
         }
         catch (Exception ex)
@@ -189,7 +186,7 @@ public class SupplierListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -207,8 +204,7 @@ public class SupplierListViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var searchLower = SearchText.Trim().ToLower();
-        return (supplier.Code?.ToLower().Contains(searchLower) ?? false) ||
-               supplier.Name.ToLower().Contains(searchLower) ||
+        return supplier.Name.ToLower().Contains(searchLower) ||
                (supplier.Phone?.ToLower().Contains(searchLower) ?? false) ||
                (supplier.Email?.ToLower().Contains(searchLower) ?? false) ||
                (supplier.Address?.ToLower().Contains(searchLower) ?? false);
@@ -216,14 +212,21 @@ public class SupplierListViewModel : ViewModelBase
 
     private void AddSupplier()
     {
-        _dialogService.ShowDialog(new SupplierEditorViewModel());
+        var editorVm = new SupplierEditorViewModel();
+        if (_dialogService.ShowDialog(editorVm))
+        {
+            _ = LoadSuppliersAsync();
+        }
     }
 
     private void EditSupplier()
     {
-        if (SelectedSupplier != null)
+        if (SelectedSupplier == null) return;
+
+        var editorVm = new SupplierEditorViewModel(SelectedSupplier);
+        if (_dialogService.ShowDialog(editorVm))
         {
-            _dialogService.ShowDialog(new SupplierEditorViewModel(SelectedSupplier));
+            _ = LoadSuppliersAsync();
         }
     }
 
@@ -231,11 +234,11 @@ public class SupplierListViewModel : ViewModelBase
     {
         if (SelectedSupplier == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"المورد: {SelectedSupplier.Name}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"ط§ظ„ظ…ظˆط±ط¯: {SelectedSupplier.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -247,11 +250,11 @@ public class SupplierListViewModel : ViewModelBase
                 {
                     _eventBus.Publish(new SupplierChangedMessage(SelectedSupplier.Id));
                     await LoadSuppliersAsync();
-                    _toastService.ShowSuccess("تم إلغاء تنشيط المورد بنجاح");
+                    _toastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظ…ظˆط±ط¯ ط¨ظ†ط¬ط§ط­");
                 }
                 else
                 {
-                    ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط المورد", "SupplierListViewModel.DeleteSupplierAsync");
+                    ErrorMessage = HandleFailure(deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظ…ظˆط±ط¯", "SupplierListViewModel.DeleteSupplierAsync");
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -261,11 +264,13 @@ public class SupplierListViewModel : ViewModelBase
                 {
                     _eventBus.Publish(new SupplierChangedMessage(SelectedSupplier.Id));
                     await LoadSuppliersAsync();
-                    _toastService.ShowSuccess("تم حذف المورد نهائياً");
+                    _toastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„ظ…ظˆط±ط¯ ظ†ظ‡ط§ط¦ظٹط§ظ‹");
                 }
                 else
                 {
-                    ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في حذف المورد", "SupplierListViewModel.DeleteSupplierAsync");
+                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ظ…ظˆط±ط¯";
+                    ErrorMessage = HandleFailure(error, "SupplierListViewModel.DeleteSupplierAsync");
+                    LogSystemError($"Hard delete failed for Supplier {SelectedSupplier.Id}: {error}", "SupplierListViewModel.DeleteSupplierAsync");
                 }
             }
         }
@@ -275,7 +280,7 @@ public class SupplierListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -283,14 +288,13 @@ public class SupplierListViewModel : ViewModelBase
     {
         if (SelectedSupplier == null) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
         {
             var request = new UpdateSupplierRequest(
                 Name: SelectedSupplier.Name,
-                Code: SelectedSupplier.Code,
                 Phone: SelectedSupplier.Phone,
                 Email: SelectedSupplier.Email,
                 Address: SelectedSupplier.Address,
@@ -305,12 +309,11 @@ public class SupplierListViewModel : ViewModelBase
             {
                 _eventBus.Publish(new SupplierChangedMessage(SelectedSupplier.Id));
                 await LoadSuppliersAsync();
-                System.Windows.MessageBox.Show("تم استعادة المورد بنجاح", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
+                await _dialogService.ShowSuccessAsync("ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظˆط±ط¯", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظˆط±ط¯ ط¨ظ†ط¬ط§ط­");
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في استعادة المورد";
-                System.Windows.MessageBox.Show(ErrorMessage, "خطأ في الاستعادة", MessageBoxButton.OK, MessageBoxImage.Error);
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظˆط±ط¯", "SupplierListViewModel.RestoreSupplierAsync", $"[SupplierListViewModel.RestoreSupplierAsync] Failed to restore supplier with ID {SelectedSupplier.Id}.");
             }
         }
         catch (Exception ex)
@@ -319,7 +322,7 @@ public class SupplierListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -348,3 +351,7 @@ public class SupplierListViewModel : ViewModelBase
     }
     #endregion
 }
+
+
+
+

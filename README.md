@@ -11,12 +11,12 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-In%20Development-FFA500?style=for-the-badge" alt="Status"/>
+  <img src="https://img.shields.io/badge/Status-v4.6.4%20Complete-2ECC71?style=for-the-badge" alt="Status"/>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.5%20Refactored-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6.4-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -354,7 +354,7 @@ The following features are **not included** in the current MVP but are planned f
 |----------|---------|
 | [`AGENTS.md`](AGENTS.md) | Master rules for AI-assisted development |
 | [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) | Non-negotiable architectural rules |
-| [`docs/PRD-MVP-v3.0.md`](docs/PRD-MVP-v3.0.md) | Full product requirements document |
+| [`docs/PRD-MVP.md`](docs/PRD-MVP.md) | Full product requirements document |
 | [`docs/database-schema.md`](docs/database-schema.md) | SQL Server schema (30+ tables) |
 | [`docs/ui-screens.md`](docs/ui-screens.md) | UI/UX flows and EventBus patterns |
 
@@ -414,6 +414,16 @@ dotnet run
 | **Phase 8** | Dynamic UOM + Costing + Cash Boxes | ✅ Completed |
 | **Phase 9** | **Production Readiness** — Auto-Update, DPAPI Security, Backup System, Windows Service, Admin Screens, Inno Setup Installer | ✅ **Completed** |
 | **Phase 10** | **Code Quality & Refactoring** — ExecuteAsync() wrapper, MediatR removal, Legacy deletion, Test updates, MASTER-PLAN.md rewrite | ✅ **Completed** |
+| **Phase 11** | **Multi-Window Screen Management** — Non-modal editors, ScreenWindowService, "فتح نافذة جديدة" menus | ✅ **Completed** |
+| **v4.5.1** | **Error Message & Shutdown Improvements** — Error message overhaul, Arabic-friendly errors, shutdown handling, MessageBox elimination, async dialog compliance | ✅ **Complete** |
+| **v4.5.1a** | **Logging Separation & API Error Fixes** — Logging policy (Error vs Warning), `HandleResponseAsync` content-type guard, print test log level fix | ✅ **Complete** |
+| **Phase 13** | **Interactive Validation** — Remove CanExecute blocking, on-click warning dialogs, field ToolTips, required `*` markers, unique field explanations | ✅ **Completed** |
+| **Phase 14** | **Audit & Polish** — LogSystemError centralized, Dialog overlay + hover, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes | ✅ **Completed** |
+| **Phase 16** | **Audit & Service Layer Purity** — Result pattern enforcement, decimal precision fix, FK Restrict, Controller purity, FluentValidators, CostingMethod UI, Price Sync Indicators | ✅ **Completed** |
+| **v4.6.1** | **UI Sorting & Dialog Safety** — Newest-first sorting across 14 ViewModels, DatabaseErrorDialog self-owner fix, comprehensive system audit | ✅ **Completed** |
+| **v4.6.2** | **WPF Validation ErrorTemplate** — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated | ✅ **Completed** |
+| **v4.6.3** | **Architecture Alignment & Code Quality Audit** — Settings ViewModels/Views relocation, DI registration, MessageBox removal, async void refactoring, shadowing resolved | ✅ **Completed** |
+| **v4.6.4** | **Security Hardening & Code Quality** — Rate limiting (5/15min), user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -429,6 +439,94 @@ dotnet run
 
 ---
 
+## 🆕 What's New in v4.5.3 — Identifier Strategy Complete (All Entities)
+
+| Feature | Description |
+|---------|-------------|
+| **Removed Code Columns** | `Code` column removed from Product, Customer, and Supplier entities — use auto-increment `Id` (int PK) as sole identifier |
+| **Faster Search** | Search/filter by integer `Id` or `Name` only — no string Code comparisons |
+| **Simpler Forms** | Code text fields removed from all editor screens (Product, Customer, Supplier) |
+| **Cleaner Invoice Items** | `ProductCode` removed from all invoice item DTOs — uses `ProductId` only |
+| **Removed Code Reports** | Report DTOs (StockReport, CustomerBalance, SupplierBalance, LowStock) no longer include Code fields |
+| **Code Auto-Generation Removed** | `DocumentSequenceService` calls for PRD/CUST/SUP prefixes removed — no manual/auto code needed |
+| **Smaller Database** | 3 columns and 3 unique indexes removed from Products, Customers, Suppliers tables |
+| **Warehouse Code Removed** | `Code` column removed from Warehouse entity — all layers (Domain, EF, DTOs, Validators, ViewModels, Tests) |
+
+---
+
+## 🆕 What's New in v4.6 — Interactive Validation (Self-Explaining System)
+
+| Feature | Description |
+|---------|-------------|
+| **Buttons Always Enabled** | Save/Post/Print buttons are NEVER disabled — users see all available actions at all times |
+| **On-Click Validation** | When clicking Save with incomplete data, a clear warning dialog lists EVERY missing/incorrect field |
+| **Required Field Markers (*)** | All required fields consistently marked with `*` across every editor screen |
+| **Field-Level ToolTips** | Every input field has an Arabic ToolTip explaining validation rules (format, uniqueness, constraints) |
+| **Unique Field Explanations** | Barcode and Username fields have explicit helper text explaining uniqueness requirements |
+| **CanExecute Removed From All Commands** | 13 editor ViewModels had CanExecute predicates removed — Save, Post, Cancel commands always enabled |
+| **Interactive Instead of Blocking** | System guides users through completing data rather than blocking them with disabled buttons |
+| **13 ViewModels + 7 XAML Files Updated** | Product, Customer, Supplier, Category, Unit, Warehouse, User, Sales/Purchase Invoice, Stock Transfer, Sale/Purchase Return editors |
+
+### Before (v4.5.3) — Blocking Validation
+- Save buttons disabled (greyed out) until all required fields filled
+- Users didn't know WHY the button was disabled
+- No field-level explanations for validation rules
+- Barcode/username uniqueness not explained
+- Not all required fields had `*` markers
+
+### After (v4.6) — Interactive Validation
+- All buttons always visible and clickable
+- Clicking Save with missing data shows: "يرجى إكمال البيانات الإلزامية التالية:" + bullet list of all issues
+- Every input field has ToolTip explaining its rule
+- Unique fields have helper text: "الباركود يجب أن يكون فريداً — لا يمكن تكرار نفس الرمز لمنتجين مختلفين"
+- Required fields consistently marked with `*`
+- Warning dialog titles are screen-specific (e.g., "بيانات غير مكتملة")
+
+---
+
+### 🆕 What's New in v4.6 — Audit Fixes & System-Wide Polish
+
+| Feature | Description |
+|---------|-------------|
+| **LogSystemError Centralized** | All `Serilog.Log.Error` calls moved to `ViewModelBase.LogSystemError()` — zero direct calls in any ViewModel |
+| **Hard Delete Safety** | All 7 Application services now catch `DbUpdateException` in `PermanentDeleteAsync()` — returns descriptive Arabic error with inner exception logged |
+| **Dialog Overlay + Hover Effects** | All 8 dialog windows updated with transparent overlay (`WindowStyle="None"`, `AllowsTransparency="True"`, `#80000000` dimming), deep shadow cards, and button hover effects (IsMouseOver/IsPressed) |
+| **ValidationErrorsDialog** | New dedicated dialog with `ItemsControl` for bulleted error list — `ShowValidationErrorsAsync(title, List<string>)` added to `IDialogService` |
+| **Auto-Focus on First Invalid Field** | `ValidationFocusBehavior` helper class + `FocusFirstInvalidFieldRequested` event — after validation dialog closes, focus jumps to first error field |
+| **Login Icon Background Fix** | Login window icon no longer shows black rectangle — transparent background with PrimaryBrush fill |
+| **Settings Layout Fixed** | Test Print button no longer overflows — 4th RowDefinition added, bottom margin corrected |
+| **6 Subagent Files Updated** | All agent files updated with v4.6 patterns for automatic enforcement by AI agents |
+
+---
+
+## 🆕 What's New in v4.5.1
+
+| Feature | Description |
+|---------|-------------|
+| **Error Message Best Practices** | All catch blocks now use `Serilog.Log.Error()` — raw `ex.Message` NEVER shown to users |
+| **Arabic-Friendly Error Handling** | `HandleFailure()` transforms timeout/network/not-found errors into clear Arabic messages |
+| **Screen-Specific Dialog Titles** | All error dialogs now have context titles like `"خطأ في حفظ الفاتورة"` instead of generic `"خطأ"` |
+| **MessageBox Eliminated** | All 16 remaining `MessageBox.Show` calls replaced with `IDialogService` across 6 editor ViewModels |
+| **Async Dialog Compliance** | All sync `ShowError`/`ShowInfo`/`ShowWarning` calls migrated to `ShowErrorAsync`/`ShowInfoAsync`/`ShowWarningAsync` |
+| **Application Shutdown** | `ShutdownMode="OnExplicitShutdown"` with proper exit handling (LoginWindow close → shutdown, MainWindow close → shutdown, Logout → reopen LoginWindow) |
+| **Safe Error Logging** | Raw HTTP response bodies no longer shown to users — logged via Serilog instead |
+| **Vague Success Messages Fixed** | `"تم التصدير بنجاح"` → `"تم تصدير التقرير إلى Excel بنجاح"` / `"إلى CSV"` |
+| **Logging Separation Policy** | `Log.Error` reserved for system errors only (DB down, API unreachable, parse crashes); `Log.Warning` for user mistakes (validation errors, business rules, "not found") |
+| **HandleResponseAsync JSON Fix** | Non-generic `HandleResponseAsync` now checks content type before parsing JSON — prevents crash on empty/HTML 404 responses |
+| **Print Test Log Level Fixed** | Print test failures downgraded from `Log.Error` to `Log.Warning` — printer config is a user/configuration issue |
+| **Manual Window Creation Eliminated** | `CustomerListViewModel` `AddCustomer()`/`EditCustomer()` replaced manual `new CustomerEditorView { DataContext = vm }` + `ShowDialog()` with `_dialogService.ShowDialog()` |
+| **Supplier List Refresh Fixed** | `SupplierListViewModel` `AddSupplier()`/`EditSupplier()` now check `ShowDialog()` return and refresh list — previously ignored return causing stale data |
+| **Supplier Code Deduplicated** | `SupplierListViewModel` extracted command initialization into `InitializeCommands()` — eliminated duplicate code in both constructors |
+| **Supplier Command Properties Fixed** | Command properties changed from `{ get; }` to `{ get; private set; } = null!;` to support standard InitializeCommands pattern |
+| **Product Editor Messages Fixed** | `ProductEditorViewModel` added `IDialogService` dependency; replaced all 4 `MessageBox.Show` calls with proper async dialog calls |
+| **Self-Explaining System — ToolTips** | 174 Arabic ToolTips added across ~40 XAML files covering every Button, MenuItem, and interactive control |
+| **ToolTip Mapping Standard** | ToolTips describe user actions (e.g., `"فتح شاشة إضافة منتج جديد"`) — never just repeat button text |
+| **Consequence-Aware ToolTips** | Action buttons explain consequences: `"ترحيل العملية نهائياً — سيتم تحديث المخزون والرصيد"` |
+| **Navigation Menu ToolTips** | All 31 MainWindow MenuItems now have destination descriptions: `"عرض وإدارة فواتير البيع"` |
+| **Empty-State ToolTips** | All 11 "add first item" buttons now have ToolTips guiding first-time users |
+
+---
+
 ## 🆕 What's New in v4.5
 
 | Feature | Description |
@@ -440,7 +538,17 @@ dotnet run
 | **MASTER-PLAN.md Rewritten** | Now reflects actual Clean Architecture (Layered) — NOT aspirational Vertical Slices |
 | **Test Files Updated** | Application.Tests, Api.Tests, DesktopPWF.Tests, E2ETests — all updated to match current API signatures |
 | **E2ETests Fixed** | CS0118 namespace conflict resolved (FlaUI.Core.Application vs System.Windows.Application) |
-| **AGENTS.md Updated** | v4.5 with RULE-141 to RULE-150 (ExecuteAsync, MediatR removal, Legacy deletion) |
+| **AGENTS.md Updated** | v4.5 with RULE-141 to RULE-170 (ExecuteAsync, MediatR removal, Legacy deletion, DB Health Check, Multi-Window) |
+| **DB Health Check** | `GET /api/v1/health/database` endpoint + Desktop startup check before login |
+| **DatabaseErrorDialog** | Styled dialog with Retry/Exit on DB connection failure (Arabic) |
+| **ExceptionMiddleware** | Detects DB failures → returns `DATABASE_CONNECTION_ERROR` with 503 |
+| **🆕 Multi-Window Screen Management** | Open multiple independent windows simultaneously (e.g., 3 sale invoices at once) |
+| **🆕 IScreenWindowService** | Service layer for non-modal window lifecycle tracking, cascade positioning, weak reference management |
+| **🆕 ScreenWindow** | Generic host window that accepts any View/ViewModel pair via naming convention |
+| **🆕 Non-Modal Editors** | All 7 editor types (Sales, Purchases, Returns, Payments, Transfers) now open non-modally |
+| **🆕 MainWindow Menu** | "فتح نافذة جديدة" items for Sales, Purchases, Warehouses, Products, Customers, Suppliers |
+| **🆕 Arabic Auto-Titles** | Windows auto-title with Arabic names (فاتورة بيع, فاتورة شراء, سداد عميل, etc.) |
+| **🆕 Cascade Positioning** | New windows offset 30px from MainWindow — no overlapping |
 
 ---
 
@@ -480,11 +588,138 @@ dotnet run
 
 ---
 
+## 🆕 What's New in v4.6 — Audit & Service Layer Purity
+
+| Feature | Description |
+|---------|-------------|
+| **UpdateProductPricingService Returns Result** | Changed from `Task` + throwing exceptions to `Task<Result>` — never throws, returns `Result.Failure` with Arabic messages |
+| **decimal(18,4) → decimal(18,2)** | All money fields in ProductUnit, CashBox, CashTransaction configurations changed from `HasPrecision(18,4)` to `HasPrecision(18,2)` |
+| **FK DeleteBehavior.Restrict Enforced** | Cascade delete removed from ProductUnit, UnitBarcode, ProductBarcode configurations — ALL FKs use `Restrict` |
+| **Controller Purity Enforced** | PrintController moved DbContext queries to PrintDataService; LogsController removed `[AllowAnonymous]`; SettingsController GET restricted to AdminOnly |
+| **PrintDataService Returns Result<T>** | Changed from returning `InvoicePrintDto?` (nullable) to `Result<InvoicePrintDto>` — never returns null |
+| **6 New FluentValidators** | Created for: UpdateSalesInvoice, UpdatePurchaseInvoice, UpdateStockTransfer, UpdateCustomerPayment, UpdateSupplierPayment, CreateLogRequest |
+| **Costing Method in Settings UI** | 3 RadioButtons (Weighted Average / Last Purchase Price / Supplier Price) with Arabic explanations in Settings screen — persisted via API to SystemSettings table |
+| **Price Sync Indicators in Purchase Invoice** | New `CostChangedFromDatabase` + `PriceDifferenceIndicator` properties in PurchaseInvoiceLineViewModel — orange warning shows when entered cost differs from DB current cost |
+| **API CostingMethod Support** | SettingsController Get/Update now read/write CostingMethod via ISystemSettingsRepository; StoreSettingsDto and UpdateSettingsRequest include CostingMethod field |
+| **42/42 Tests Passing** | 3 UpdateProductPricingService tests fixed — WeightedAverage rounding (13.71 not 13.7113), Result assertions instead of exception expectations |
+
+---
+
+## 🆕 What's New in v4.6.2 — Validation ErrorTemplate & INotifyDataErrorInfo
+
+| Feature | Description |
+|---------|-------------|
+| **Newest-First Sorting** | ALL 14 list ViewModels now sort records with newest first — products, customers, suppliers, warehouses, categories, units, users, returns, transfers, and payments sort by `Id` descending; invoices sort by `InvoiceDate` descending |
+| **Files Updated** | `ProductListViewModel`, `CustomerListViewModel`, `SupplierListViewModel`, `WarehouseListViewModel`, `CategoryListViewModel`, `UnitListViewModel`, `UserListViewModel`, `SalesReturnListViewModel`, `PurchaseReturnListViewModel`, `StockTransfersListViewModel`, `CustomerPaymentsListViewModel`, `SupplierPaymentsListViewModel`, `SalesInvoiceListViewModel`, `PurchaseInvoiceListViewModel` |
+| **DatabaseErrorDialog Bug Fix** | Fixed "Cannot set Owner property to itself" crash on startup — `PositionOverOwner()` now guards against `MainWindow == this` and falls back to `CenterScreen` |
+| **Full System Audit** | Code Reviewer, Database Engineer, and Security Auditor subagents performed comprehensive audits — 79/83 code review pass, 12/17 DB schema pass, 8/10 security pass |
+| **Audit Findings Documented** | Key issues found: 16 entity configs missing `HasQueryFilter`, `CashBox` missing `OpeningBalance`, `BaseConversionFactor` precision wrong, User hard delete endpoint exists, hardcoded connection strings |
+
+### Newest-First Sorting — Complete List
+
+| ViewModel | Sort Field | Reason |
+|-----------|-----------|--------|
+| ProductListViewModel | `Id` descending | Auto-increment PK = newest first |
+| CustomerListViewModel | `Id` descending | Auto-increment PK = newest first |
+| SupplierListViewModel | `Id` descending | Auto-increment PK = newest first |
+| WarehouseListViewModel | `Id` descending | Auto-increment PK = newest first |
+| CategoryListViewModel | `Id` descending | Auto-increment PK = newest first |
+| UnitListViewModel | `Id` descending | Auto-increment PK = newest first |
+| UserListViewModel | `Id` descending | Auto-increment PK = newest first |
+| SalesReturnListViewModel | `Id` descending | Auto-increment PK = newest first |
+| PurchaseReturnListViewModel | `Id` descending | Auto-increment PK = newest first |
+| StockTransfersListViewModel | `Id` descending | Auto-increment PK = newest first |
+| CustomerPaymentsListViewModel | `Id` descending | Auto-increment PK = newest first |
+| SupplierPaymentsListViewModel | `Id` descending | Auto-increment PK = newest first |
+| SalesInvoiceListViewModel | `InvoiceDate` descending | Most recent invoices first |
+| PurchaseInvoiceListViewModel | `InvoiceDate` descending | Most recent invoices first |
+
+---
+
+## 🆕 What's New in v4.6.2 — WPF Validation ErrorTemplate & INotifyDataErrorInfo
+
+| Feature | Description |
+|---------|-------------|
+| **Red Border + ❗ Icon on Invalid Fields** | New `Validation.ErrorTemplate` in `Styles.xaml` wraps invalid TextBox/PasswordBox/ComboBox fields in a red border with a red ❗ badge icon — hover shows the error message via ToolTip bound to `[0].ErrorContent` |
+| **INotifyDataErrorInfo Standardized** | All Editor ViewModels now use `AddError/ClearErrors` in property setters for real-time validation — replaces legacy `HasXxxError` boolean + computed string pattern |
+| **ValidateAllAsync() Base Method** | `ViewModelBase` now provides a reusable `ValidateAllAsync()` that checks `HasErrors`, shows the validation warning dialog, and calls `RequestFocusFirstInvalidField()` — no more duplicated dialog logic in each Editor VM |
+| **14 Editor VMs Updated** | All 14 Editor ViewModels now call `SetDialogService()` in constructors to enable the base validation infrastructure |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `Resources/Styles.xaml` | New `ErrorTemplate` with red border + ❗ icon + ToolTip; Validation.HasError triggers on TextBox, PasswordBox, ComboBox |
+| `ViewModels/ViewModelBase.cs` | Added `SetDialogService()`, `ValidateAllAsync()`, `ValidateField()` |
+| `ViewModels/Products/ProductEditorViewModel.cs` | Refactored: removed 7 `HasXxxError` booleans, uses pure INotifyDataErrorInfo |
+| `ViewModels/Customers/CustomerEditorViewModel.cs` | Refactored: removed 3 `HasXxxError` booleans, uses pure INotifyDataErrorInfo |
+| `ViewModels/Suppliers/SupplierEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Categories/CategoryEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Units/UnitEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/WarehouseEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Users/UserEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Payments/CustomerPaymentEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Payments/SupplierPaymentEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Transfers/StockTransferEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Returns/SalesReturnEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Returns/PurchaseReturnEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Sales/SalesInvoiceEditorViewModel.cs` | Added `SetDialogService()` |
+| `ViewModels/Purchases/PurchaseInvoiceEditorViewModel.cs` | Added `SetDialogService()` |
+
+---
+
+## 🛡️ What's New in v4.6.4 — Security Hardening & Code Quality
+
+| Feature | Description |
+|---------|-------------|
+| **Rate Limiting** | Login endpoint protected with `[EnableRateLimiting("LoginPolicy")]` — 5 attempts per 15 minutes per IP. Global rate limit of 100 req/min with Arabic 429 response (`RATE_LIMIT_EXCEEDED`) |
+| **User Hard-Delete Blocked** | `UserService.PermanentDeleteAsync()` now returns `Result.Failure` — users can only be soft-deactivated per RULE-038. Hard-delete attempt logged as warning |
+| **Connection String Security** | Removed plaintext connection string from `appsettings.Development.json`. Uses only `SALESSYSTEM_DB_CONNECTION` env var with `_comment` explaining the policy |
+| **FluentValidator Enhancements** | Enhanced all 7 invoice/payment/transfer/return validators with additional rules: `PaymentType.IsInEnum()`, `InvoiceDate` not future, `Notes.MaxLength(500)`, `DiscountAmount >= 0` |
+| **FallbackErrorDialog** | Added `FallbackErrorDialog.xaml` — thread-safe dialog overlay for unhandled exceptions, replacing raw `MessageBox.Show` |
+| **Build Warning Fixes** | Resolved 10 CS0109 warnings (unnecessary `new` keyword) and 4 CS1540 errors (protected member access) across 8 ViewModel files |
+| **Test Coverage** | 50 test files re-enabled and compiling. 5 new tests: SetDialogService constructor, ValidateAsync (empty/valid/multiple), Post_AlreadyPostedInvoice |
+| **Security-Plan.md** | Comprehensive 7-layer security architecture document with implementation status table tracking what's done vs planned |
+| 🔒 **Rate Limiting & Brute-Force Protection** | 5 attempts/15min per IP, 100 req/min global — with Arabic 429 response |
+| 🔒 **User Hard-Delete Protection** | Soft-delete only, `PermanentDeleteAsync` returns `Result.Failure` |
+| 🔒 **Connection String Security** | Environment variables only, no plaintext in config files |
+| 🌐 **Arabic Encoding Integrity** | UTF-8 enforcement, garbled text auto-detection and fixes across multiple ViewModels |
+
+---
+
+## 🆕 What's New in v4.6.3 — Architecture Alignment & Code Quality Audit
+
+| Feature | Description |
+|---------|-------------|
+| **Settings Relocation** | Relocated `CostingMethodSettingsViewModel` and `CostingMethodSettingsView` to their proper architectural namespaces under ViewModels/Settings and Views/Settings |
+| **API Purity for Settings** | Refactored `CostingMethodSettingsViewModel` to utilize `ISettingsApiService` via HTTP client instead of direct `ISystemSettingsRepository` (Domain/Infrastructure) reference |
+| **DI Registration** | Registered `CostingMethodSettingsViewModel` as a transient service in `App.ConfigureServices` to enable dynamic dependency injection resolution |
+| **MessageBox Removal** | Replaced raw unhandled exception `MessageBox.Show` call in `App.xaml.cs` with a secure fallback or proper DialogService overlay |
+| **Swallowed Exceptions Fixed** | Resolved empty `catch { }` blocks in `DialogService.cs` to ensure all runtime errors are correctly logged via Serilog |
+| **CS0108 Hiding Warnings Fixed** | Eliminated compiler warnings by removing shadowed `DialogService` properties in list ViewModels and using `SetDialogService()` base method |
+| **Arabic Encoding Restored** | Corrected garbled Arabic string literals in `StockTransfersListViewModel.cs` and `SupplierPaymentsListViewModel.cs` |
+| **Async Void Refactored** | Standardized asynchronous execution flows by wrapping critical `async void` operations in ViewModels with safe try-catch patterns |
+
+---
+
+## 📜 Version History
+
+### v4.6.4 — Security Hardening & Code Quality (Current)
+- **Rate Limiting**: Login limited to 5 attempts/15min per IP, global 100 req/min
+- **User Hard-Delete Protection**: PermanentDeleteAsync always returns Failure
+- **Connection String Security**: No plaintext connection strings in config files
+- **Arabic Encoding Fixes**: Detected and fixed garbled Arabic across multiple ViewModels
+- **Build Quality**: CS0109/CS1540 warnings eliminated, async void patterns removed
+- **FallbackErrorDialog**: Thread-safe dialog for unhandled exceptions
+- **FluentValidation Enhancement**: All invoice/payment/transfer requests validated
+
+---
+
 ## 🤝 Contributing
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 140+ non-negotiable rules (RULE-001 to RULE-140)
+1. Read [`AGENTS.md`](AGENTS.md) — all 248 non-negotiable rules (RULE-001 to RULE-248)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

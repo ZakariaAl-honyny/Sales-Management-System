@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Windows;
+using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.ViewModels.Sales;
 
 namespace SalesSystem.DesktopPWF.Views.Sales;
@@ -18,6 +19,16 @@ public partial class SalesInvoiceEditorView : Window
     {
         DataContext = viewModel;
         IsReadOnly = viewModel.IsReadOnly;
+
+        viewModel.CloseRequested += () => Dispatcher.InvokeAsync(() => Close());
+        viewModel.FocusFirstInvalidFieldRequested += () =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                (Helpers.ValidationFocusBehavior.FindFirstInvalid(this) ??
+                Helpers.ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
+            });
+        };
     }       
 
     public bool IsReadOnly
@@ -28,7 +39,7 @@ public partial class SalesInvoiceEditorView : Window
             if (value)
             {
                 IsEnabled = false;
-                Title = "عرض فاتورة بيع";
+                Title = "ط¹ط±ط¶ ظپط§طھظˆط±ط© ط¨ظٹط¹";
             }
         }
     }
@@ -64,3 +75,4 @@ public partial class SalesInvoiceEditorView : Window
         base.OnClosed(e);
     }
 }
+

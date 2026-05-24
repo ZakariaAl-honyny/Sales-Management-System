@@ -16,6 +16,6 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("كلمة المرور مطلوبة")
-            .MinimumLength(3).WithMessage("كلمة المرور يجب أن تكون 3 أحرف على الأقل");
+            .MinimumLength(6).WithMessage("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
     }
 }

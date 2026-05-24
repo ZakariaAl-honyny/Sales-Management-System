@@ -1,9 +1,8 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
-using Serilog;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
@@ -17,7 +16,7 @@ public class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsApiService _settingsService;
     private readonly IBackupApiService _backupService;
-    private readonly IDialogService _dialogService;
+    private readonly IPrintApiService _printService;
 
     private string _companyName = string.Empty;
     private string? _taxNumber;
@@ -32,6 +31,7 @@ public class SettingsViewModel : ViewModelBase
     private ObservableCollection<string> _backups = new();
     private string? _selectedBackup;
 
+    private int _costingMethod = 1; // Default WeightedAverage
     private string _thermalPrinterName = string.Empty;
     private string _a4PrinterName = string.Empty;
     private string _logoPath = string.Empty;
@@ -42,7 +42,8 @@ public class SettingsViewModel : ViewModelBase
     {
         _settingsService = App.GetService<ISettingsApiService>();
         _backupService = App.GetService<IBackupApiService>();
-        _dialogService = App.GetService<IDialogService>();
+        _printService = App.GetService<IPrintApiService>();
+        SetDialogService(App.GetService<IDialogService>());
 
         LoadCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadSettingsOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.LoadSettingsAsync", "[SettingsViewModel.LoadSettingsAsync] Failed to load system settings."))));
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveSettingsOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Unexpected error during save."))));
@@ -135,6 +136,32 @@ public class SettingsViewModel : ViewModelBase
     }
     #endregion
 
+    #region Costing Method Properties
+    public int CostingMethod
+    {
+        get => _costingMethod;
+        set => SetProperty(ref _costingMethod, value);
+    }
+
+    public bool IsWeightedAverageSelected
+    {
+        get => _costingMethod == 1;
+        set { if (value) CostingMethod = 1; }
+    }
+
+    public bool IsLastPriceSelected
+    {
+        get => _costingMethod == 2;
+        set { if (value) CostingMethod = 2; }
+    }
+
+    public bool IsSupplierPriceSelected
+    {
+        get => _costingMethod == 3;
+        set { if (value) CostingMethod = 3; }
+    }
+    #endregion
+
     #region Print Properties
     public string ThermalPrinterName
     {
@@ -188,7 +215,7 @@ public class SettingsViewModel : ViewModelBase
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "اختر شعار المتجر",
+            Title = "اختيار شعار المتجر",
             Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp",
             Multiselect = false
         };
@@ -204,17 +231,16 @@ public class SettingsViewModel : ViewModelBase
     {
         StatusMessage = string.Empty;
 
-        var httpClient = App.GetService<System.Net.Http.HttpClient>();
-        var response = await httpClient.PostAsync("api/v1/print/test", null);
-        if (response.IsSuccessStatusCode)
+        var result = await _printService.TestPrintAsync();
+        if (result.IsSuccess)
         {
             StatusMessage = "✅ تمت طباعة الاختبار بنجاح";
         }
         else
         {
-            var errorBody = await response.Content.ReadAsStringAsync();
-            StatusMessage = "❌ فشلت طباعة الاختبار";
-            await _dialogService.ShowErrorAsync("خطأ في الطباعة", errorBody);
+            LogSystemError($"Print test failed: {result.Error}", "SettingsViewModel.TestPrintOperationAsync");
+            StatusMessage = "فشلت طباعة الاختبار";
+            await DialogService.ShowErrorAsync("خطأ في الطباعة", "فشل اختبار الطباعة. يرجى التحقق من إعدادات الطابعة والمحاولة مرة أخرى.");
         }
     }
 
@@ -236,6 +262,7 @@ public class SettingsViewModel : ViewModelBase
             AllowNegativeStock = s.AllowNegativeStock;
             AutoUpdatePrices = s.AutoUpdatePrices;
             InvoicePrefix = s.InvoicePrefix;
+            CostingMethod = s.CostingMethod;
         }
 
         try
@@ -253,7 +280,7 @@ public class SettingsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Serilog.Log.Warning(ex, "Failed to load print settings");
+            LogSystemError("Failed to load print settings", "SettingsViewModel.LoadSettingsOperationAsync", ex);
         }
     }
 
@@ -267,14 +294,14 @@ public class SettingsViewModel : ViewModelBase
             };
             StatusMessage = "يرجى إدخال اسم المنشأة";
             string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            await _dialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
+            await DialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
             return;
         }
 
         if (DefaultTaxRate < 0 || DefaultTaxRate > 100)
         {
             StatusMessage = "نسبة الضريبة يجب أن تكون بين 0 و 100";
-            await _dialogService.ShowWarningAsync("خطأ في البيانات", StatusMessage);
+            await DialogService.ShowWarningAsync("خطأ في البيانات", StatusMessage);
             return;
         }
 
@@ -293,7 +320,8 @@ public class SettingsViewModel : ViewModelBase
             EnableStockAlerts,
             AllowNegativeStock,
             AutoUpdatePrices,
-            InvoicePrefix
+            InvoicePrefix,
+            CostingMethod
         );
 
         var result = await _settingsService.UpdateSettingsAsync(request);
@@ -315,7 +343,7 @@ public class SettingsViewModel : ViewModelBase
         else
         {
             StatusMessage = HandleFailure(result.Error ?? "فشل في حفظ الإعدادات", "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Failed to update system settings.");
-            await _dialogService.ShowErrorAsync("خطأ في الحفظ", StatusMessage);
+            await DialogService.ShowErrorAsync("خطأ في الحفظ", StatusMessage);
         }
     }
 
@@ -332,7 +360,7 @@ public class SettingsViewModel : ViewModelBase
         else
         {
             StatusMessage = result.Error ?? "فشل في إنشاء النسخة الاحتياطية";
-            await _dialogService.ShowErrorAsync("خطأ في النسخ الاحتياطي", StatusMessage);
+            await DialogService.ShowErrorAsync("خطأ في النسخ الاحتياطي", StatusMessage);
         }
     }
 
@@ -356,7 +384,7 @@ public class SettingsViewModel : ViewModelBase
     {
         if (string.IsNullOrEmpty(SelectedBackup)) return;
 
-        var confirm = await _dialogService.ShowConfirmationAsync("تأكيد استعادة النسخة الاحتياطية", $"⚠️ تنبيه: استعادة النسخة الاحتياطية '{SelectedBackup}' سيؤدي إلى استبدال قاعدة البيانات الحالية تماماً وإغلاق جميع الاتصالات النشطة.\n\nهل تريد الاستمرار؟");
+        var confirm = await DialogService.ShowConfirmationAsync("تأكيد استعادة النسخة الاحتياطية", $"⚠️ تنبيه: استعادة النسخة الاحتياطية '{SelectedBackup}' سيؤدي إلى استبدال قاعدة البيانات الحالية تماماً وإغلاق جميع الاتصالات النشطة.\n\nهل تريد الاستمرار؟");
 
         if (!confirm) return;
 
@@ -366,14 +394,14 @@ public class SettingsViewModel : ViewModelBase
         if (result.IsSuccess)
         {
             StatusMessage = "✅ تم استعادة قاعدة البيانات بنجاح. سيتم إغلاق النظام لإعادة التحميل.";
-            await _dialogService.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
+            await DialogService.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
 
             System.Windows.Application.Current.Shutdown();
         }
         else
         {
             StatusMessage = result.Error ?? "فشل في استعادة النسخة الاحتياطية";
-            await _dialogService.ShowErrorAsync("خطأ في الاستعادة", StatusMessage);
+            await DialogService.ShowErrorAsync("خطأ في الاستعادة", StatusMessage);
         }
     }
     #endregion

@@ -9,12 +9,12 @@ public class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
     {
         RuleFor(x => x.UserName)
             .NotEmpty().WithMessage("اسم المستخدم مطلوب")
-            .MaximumLength(50).WithMessage("اسم المستخدم يجب ألا يتجاوز 50 حرفاً")
+            .MaximumLength(100).WithMessage("اسم المستخدم يجب ألا يتجاوز 100 حرفاً")
             .Matches(@"^[a-zA-Z0-9_\.]+$").WithMessage("اسم المستخدم يمكن أن يحتوي فقط على أحرف، أرقام، شرطة سفلية ونقاط");
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("كلمة المرور مطلوبة")
-            .MinimumLength(6).WithMessage("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+            .MinimumLength(8).WithMessage("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
 
         RuleFor(x => x.FullName)
             .NotEmpty().WithMessage("الاسم الكامل مطلوب")
@@ -37,7 +37,7 @@ public class UpdateUserRequestValidator : AbstractValidator<UpdateUserRequest>
             .InclusiveBetween((byte)1, (byte)3).WithMessage("دور المستخدم غير صالح");
 
         RuleFor(x => x.Password)
-            .MinimumLength(6).WithMessage("كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+            .MinimumLength(8).WithMessage("كلمة المرور يجب أن تكون 8 أحرف على الأقل")
             .When(x => !string.IsNullOrEmpty(x.Password));
     }
 }

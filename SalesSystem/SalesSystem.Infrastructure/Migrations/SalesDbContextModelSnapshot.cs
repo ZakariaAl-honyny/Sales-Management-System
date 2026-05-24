@@ -55,8 +55,8 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasDefaultValue("SAR");
 
                     b.Property<decimal>("CurrentBalance")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -89,16 +89,16 @@ namespace SalesSystem.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Amount")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("BalanceAfter")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("BalanceBefore")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("CashBoxId")
                         .HasColumnType("int");
@@ -193,10 +193,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<string>("Code")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -242,10 +238,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[Code] IS NOT NULL");
 
                     b.ToTable("Customers", (string)null);
                 });
@@ -452,10 +444,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Code")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<decimal>("ConversionFactor")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(18, 3)
@@ -489,7 +477,8 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("ReorderLevel")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
 
                     b.Property<decimal>("RetailPrice")
                         .ValueGeneratedOnAdd()
@@ -529,10 +518,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasFilter("[Barcode] IS NOT NULL");
 
                     b.HasIndex("CategoryId");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[Code] IS NOT NULL");
 
                     b.HasIndex("RetailUnitId");
 
@@ -602,7 +587,8 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.Property<string>("ChangeType")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("ChangedAt")
                         .HasColumnType("datetime2");
@@ -611,7 +597,8 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("CostingMethod")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -626,9 +613,11 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("NewValue")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("OldValue")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("ProductUnitId")
@@ -642,7 +631,7 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ProductPriceHistory");
+                    b.ToTable("ProductPriceHistories", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.ProductUnit", b =>
@@ -672,19 +661,19 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("LastPurchasePrice")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
                     b.Property<decimal>("PurchaseCost")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("SalesPrice")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
@@ -692,8 +681,8 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasDefaultValue(1);
 
                     b.Property<decimal>("SupplierPrice")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("UnitName")
                         .IsRequired()
@@ -1467,10 +1456,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
-                    b.Property<string>("Code")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1516,10 +1501,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[Code] IS NOT NULL");
 
                     b.ToTable("Suppliers", (string)null);
                 });
@@ -1691,7 +1672,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<DateTime>("UpdatedAt")
+                    b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("UpdatedBy")
@@ -1852,10 +1833,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Code")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1884,10 +1861,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[Code] IS NOT NULL");
 
                     b.ToTable("Warehouses", (string)null);
                 });
@@ -1936,7 +1909,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("WarehouseId", "ProductId")
                         .IsUnique();
 
-                    b.ToTable("WarehouseStocks", (string)null);
+                    b.ToTable("WarehouseStocks", null, t =>
+                        {
+                            t.HasCheckConstraint("CHK_WarehouseStocks_Quantity_NonNegative", "[Quantity] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashTransaction", b =>
@@ -2028,7 +2004,7 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasOne("SalesSystem.Domain.Entities.Product", "Product")
                         .WithMany("Barcodes")
                         .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Product");
@@ -2039,7 +2015,7 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasOne("SalesSystem.Domain.Entities.Product", "Product")
                         .WithMany("Units")
                         .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Product");
@@ -2267,7 +2243,7 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasOne("SalesSystem.Domain.Entities.ProductUnit", "ProductUnit")
                         .WithMany("Barcodes")
                         .HasForeignKey("ProductUnitId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("ProductUnit");

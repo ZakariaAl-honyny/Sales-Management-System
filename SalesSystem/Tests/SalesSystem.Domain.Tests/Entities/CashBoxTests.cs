@@ -24,7 +24,7 @@ public class CashBoxTests
     public void Deposit_PositiveAmount_ShouldIncreaseBalance()
     {
         var box = CashBox.Create("صندوق", initialBalance: 500);
-        box.Deposit(200, CashTransactionType.ManualIn, createdBy: 1);
+        box.Deposit(200, CashTransactionType.CustomerPayment, createdBy: 1);
         Assert.Equal(700, box.CurrentBalance);
     }
 
@@ -33,16 +33,16 @@ public class CashBoxTests
     {
         var box = CashBox.Create("صندوق");
         Assert.Throws<DomainException>(() => 
-            box.Deposit(0, CashTransactionType.ManualIn));
+            box.Deposit(0, CashTransactionType.CustomerPayment));
         Assert.Throws<DomainException>(() => 
-            box.Deposit(-100, CashTransactionType.ManualIn));
+            box.Deposit(-100, CashTransactionType.CustomerPayment));
     }
 
     [Fact]
     public void Withdraw_SufficientBalance_ShouldDecreaseBalance()
     {
         var box = CashBox.Create("صندوق", initialBalance: 1000);
-        box.Withdraw(300, CashTransactionType.ManualOut, createdBy: 1);
+        box.Withdraw(300, CashTransactionType.Expense, createdBy: 1);
         Assert.Equal(700, box.CurrentBalance);
     }
 
@@ -51,26 +51,26 @@ public class CashBoxTests
     {
         var box = CashBox.Create("صندوق", initialBalance: 100);
         Assert.Throws<DomainException>(() => 
-            box.Withdraw(200, CashTransactionType.ManualOut));
+            box.Withdraw(200, CashTransactionType.Expense));
     }
 
     [Fact]
     public void Deposit_ShouldCreateTransactionWithCorrectSnapshots()
     {
         var box = CashBox.Create("صندوق", initialBalance: 500);
-        var tx = box.Deposit(200, CashTransactionType.ManualIn, createdBy: 1);
+        var tx = box.Deposit(200, CashTransactionType.CustomerPayment, createdBy: 1);
 
         Assert.Equal(500, tx.BalanceBefore);
         Assert.Equal(700, tx.BalanceAfter);
         Assert.Equal(200, tx.Amount);
-        Assert.Equal(CashTransactionType.ManualIn, tx.TransactionType);
+        Assert.Equal(CashTransactionType.CustomerPayment, tx.TransactionType);
     }
 
     [Fact]
     public void Withdraw_ShouldCreateTransactionWithCorrectSnapshots()
     {
         var box = CashBox.Create("صندوق", initialBalance: 500);
-        var tx = box.Withdraw(200, CashTransactionType.ManualOut, createdBy: 1);
+        var tx = box.Withdraw(200, CashTransactionType.Expense, createdBy: 1);
 
         Assert.Equal(500, tx.BalanceBefore);
         Assert.Equal(300, tx.BalanceAfter);

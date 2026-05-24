@@ -9,4 +9,4 @@ public record StockTransferResponse(
     InvoiceStatus Status, DateTime TransferDate, string? Notes,
     List<StockTransferItemResponse> Items
 );
-public record StockTransferItemResponse(int Id, int ProductId, string ProductName, string ProductCode, decimal Quantity);
+public record StockTransferItemResponse(int Id, int ProductId, string ProductName, decimal Quantity);

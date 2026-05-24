@@ -262,8 +262,7 @@ public class ReportRepositoryTests
             purchasePrice: 50m,
             retailUnitId: 1,
             wholesaleUnitId: 1,
-            conversionFactor: 1m,
-            code: "P001"
+            conversionFactor: 1m
         );
         context.Products.Add(product);
 
@@ -299,8 +298,7 @@ public class ReportRepositoryTests
             purchasePrice: 50m,
             retailUnitId: 1,
             wholesaleUnitId: 1,
-            conversionFactor: 1m,
-            code: "P001"
+            conversionFactor: 1m
         );
         context.Products.Add(product);
 

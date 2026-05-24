@@ -260,26 +260,27 @@ public class GitHubUpdaterService : IUpdaterService
         }
     }
 
+    private static string GetAppDataSettingsPath()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var dir = Path.Combine(appData, "SalesSystem");
+        Directory.CreateDirectory(dir);
+        return Path.Combine(dir, "settings.json");
+    }
+
     public Result SkipVersion(string version)
     {
         try
         {
-            var appSettingsPath = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            var path = GetAppDataSettingsPath();
+            var json = File.Exists(path) ? File.ReadAllText(path) : "{}";
+            var obj = JsonSerializer.Deserialize<Dictionary<string, object?>>(json)
+                      ?? new Dictionary<string, object?>();
+            obj["SkippedVersion"] = version;
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            File.WriteAllText(path, JsonSerializer.Serialize(obj, options));
 
-            if (File.Exists(appSettingsPath))
-            {
-                var json = File.ReadAllText(appSettingsPath);
-                var obj = JsonSerializer.Deserialize<Dictionary<string, object?>>(json);
-                if (obj != null)
-                {
-                    obj["SkippedVersion"] = version;
-                    var options = new JsonSerializerOptions { WriteIndented = true };
-                    File.WriteAllText(appSettingsPath, JsonSerializer.Serialize(obj, options));
-                }
-            }
-
-            _logger.LogInformation("Version {Version} marked as skipped", version);
+            _logger.LogInformation("Version {Version} marked as skipped in {Path}", version, path);
             return Result.Success();
         }
         catch (Exception ex)
@@ -293,11 +294,21 @@ public class GitHubUpdaterService : IUpdaterService
     {
         try
         {
-            return Result<string>.Success(_configuration["SkippedVersion"] ?? string.Empty);
+            var path = GetAppDataSettingsPath();
+            if (!File.Exists(path))
+                return Result<string>.Success(string.Empty);
+
+            var json = File.ReadAllText(path);
+            var obj = JsonSerializer.Deserialize<Dictionary<string, object?>>(json);
+            if (obj != null && obj.TryGetValue("SkippedVersion", out var v) && v is string version)
+                return Result<string>.Success(version);
+
+            return Result<string>.Success(string.Empty);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to read skipped version");
+            _logger.LogWarning(ex, "Failed to read skipped version from {Path}",
+                GetAppDataSettingsPath());
             return Result<string>.Failure("Failed to read skipped version");
         }
     }

@@ -1,8 +1,10 @@
+using SalesSystem.Contracts.Common;
+
 namespace SalesSystem.Application.Interfaces.Services;
 
 public interface IBarcodeLookupService
 {
-    Task<BarcodeSearchResult?> LookupAsync(string barcode, CancellationToken ct = default);
+    Task<Result<BarcodeSearchResult>> LookupByBarcodeAsync(string barcode, CancellationToken ct = default);
 }
 
 public record BarcodeSearchResult(

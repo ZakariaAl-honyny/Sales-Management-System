@@ -1,4 +1,5 @@
 using System.Windows;
+using SalesSystem.DesktopPWF.Helpers;
 
 namespace SalesSystem.DesktopPWF.Views.Products;
 
@@ -16,6 +17,14 @@ public partial class ProductEditorView : Window
     {
         DataContext = viewModel;
         viewModel.CloseRequested += () => Close();
+        viewModel.FocusFirstInvalidFieldRequested += () =>
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                (ValidationFocusBehavior.FindFirstInvalid(this) ??
+                ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
+            });
+        };
     }
 }
 

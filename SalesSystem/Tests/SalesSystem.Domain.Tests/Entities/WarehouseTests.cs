@@ -11,14 +11,12 @@ public class WarehouseTests
     {
         var warehouse = Warehouse.Create(
             name: "Main Warehouse",
-            code: "WH001",
             location: "Building A",
             isDefault: true,
             createdByUserId: 1
         );
 
         warehouse.Name.Should().Be("Main Warehouse");
-        warehouse.Code.Should().Be("WH001");
         warehouse.Location.Should().Be("Building A");
         warehouse.IsDefault.Should().BeTrue();
     }
@@ -40,7 +38,6 @@ public class WarehouseTests
     {
         var warehouse = Warehouse.Create(name: "Test Warehouse");
 
-        warehouse.Code.Should().BeNull();
         warehouse.Location.Should().BeNull();
         warehouse.IsDefault.Should().BeFalse();
     }
@@ -50,21 +47,18 @@ public class WarehouseTests
     {
         var warehouse = Warehouse.Create(
             name: "Original Name",
-            code: "W001",
             location: "Old Location",
             createdByUserId: 1
         );
 
         warehouse.Update(
             name: "Updated Name",
-            code: "W002",
             location: "New Location",
             isDefault: true,
             updatedByUserId: 1
         );
 
         warehouse.Name.Should().Be("Updated Name");
-        warehouse.Code.Should().Be("W002");
         warehouse.Location.Should().Be("New Location");
         warehouse.IsDefault.Should().BeTrue();
     }
@@ -94,14 +88,12 @@ public class WarehouseTests
     {
         var warehouse = Warehouse.Create(
             name: "Test",
-            code: "C001",
             location: "Loc",
             createdByUserId: 1
         );
 
-        warehouse.Update(name: "Test", code: null, location: null, isDefault: false, updatedByUserId: 1);
+        warehouse.Update(name: "Test", location: null, isDefault: false, updatedByUserId: 1);
 
-        warehouse.Code.Should().BeNull();
         warehouse.Location.Should().BeNull();
     }
 }

@@ -43,13 +43,14 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16">
             <StackPanel>
                 <!-- Name -->
-                <TextBlock Text="اسم المستودع" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" 
+                <TextBlock Text="اسم المستودع *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+<TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                          Style="{StaticResource ModernTextBox}"
                          Tag="أدخل اسم المستودع (مثلاً: المستودع الرئيسي)" 
                          TabIndex="1"
                          helpers:FocusHelper.AdvanceOnEnter="True"
-                         AutomationProperties.AutomationId="TxtWarehouseName"/>
+                         AutomationProperties.AutomationId="TxtWarehouseName"
+                              ToolTip="أدخل اسماً فريداً للمستودع — هذا الحقل مطلوب ولا يمكن أن يكون فارغاً"/>
                 <TextBlock Text="اسم مميز يساعدك في التعرف على المخزن" Style="{StaticResource HelperTextStyle}"/>
                 <TextBlock Text="{Binding NameError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="4,4,0,0" Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibility}}"/>
                 
@@ -57,7 +58,7 @@
 
                 <!-- Location -->
                 <TextBlock Text="الموقع / العنوان" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                <TextBox Text="{Binding Location, UpdateSourceTrigger=PropertyChanged}" 
+                <TextBox Text="{Binding Location, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                          Style="{StaticResource ModernTextBox}"
                          TextWrapping="Wrap" 
                          AcceptsReturn="True" 
@@ -87,13 +88,13 @@
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button Command="{Binding SaveCommand}"
-                            IsEnabled="{Binding CanSave}"
                             Style="{StaticResource PrimaryButton}"
                             Width="150"
                             IsDefault="True"
                             TabIndex="4"
                             Margin="0,0,12,0"
-                            AutomationProperties.AutomationId="BtnSaveWarehouse">
+                            AutomationProperties.AutomationId="BtnSaveWarehouse"
+                            ToolTip="حفظ البيانات المدخلة">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,10,0" Stretch="Uniform" VerticalAlignment="Center"/>
                             <TextBlock Text="حفظ البيانات" VerticalAlignment="Center"/>
@@ -103,7 +104,8 @@
                     <Button Content="إلغاء"
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
-                            TabIndex="5"/>
+                            TabIndex="5"
+                            ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" 

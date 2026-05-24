@@ -33,7 +33,13 @@ public class BackupApiService : ApiServiceBase, IBackupApiService
     public async Task<Result> RestoreBackupAsync(string fileName, CancellationToken ct = default)
     {
         return await ExecuteCommandAsync(
-            () => _httpClient.PostAsync($"{BasePath}/restore?fileName={Uri.EscapeDataString(fileName)}", null, ct),
+            () =>
+            {
+                var body = new { fileName };
+                var json = System.Text.Json.JsonSerializer.Serialize(body);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                return _httpClient.PostAsync($"{BasePath}/restore", content, ct);
+            },
             "BackupApiService.RestoreBackupAsync");
     }
 }

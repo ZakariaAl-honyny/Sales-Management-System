@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 
@@ -25,20 +25,22 @@ public class UpdateProductPricingService : IUpdateProductPricingService
         _logger = logger;
     }
 
-    public async Task UpdateFromPurchaseAsync(
+    public async Task<Result> UpdateFromPurchaseAsync(
         UpdatePricingRequest request,
         CancellationToken ct = default)
     {
-        var purchasedUnit = await _uow.ProductUnits.Query()
-            .Include(u => u.Product)
-                .ThenInclude(p => p.Units)
-            .FirstOrDefaultAsync(u => u.Id == request.ProductUnitId, ct)
-            ?? throw new InvalidOperationException($"ProductUnit {request.ProductUnitId} not found");
+        var purchasedUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
+            u => u.Id == request.ProductUnitId, ct, "Product.Units");
+        
+        if (purchasedUnit == null)
+            return Result.Failure("وحدة المنتج غير موجودة", "PRODUCT_UNIT_NOT_FOUND");
 
         var product = purchasedUnit.Product;
         var allUnits = product.Units.Where(u => u.IsActive).ToList();
-        var baseUnit = allUnits.FirstOrDefault(u => u.IsBaseUnit)
-            ?? throw new InvalidOperationException($"Product {product.Name} has no base unit");
+        var baseUnit = allUnits.FirstOrDefault(u => u.IsBaseUnit);
+        
+        if (baseUnit == null)
+            return Result.Failure($"المنتج '{product.Name}' لا يحتوي على وحدة أساسية", "NO_BASE_UNIT");
 
         var costingMethod = await _settings.GetCostingMethodAsync(ct);
 
@@ -90,6 +92,8 @@ public class UpdateProductPricingService : IUpdateProductPricingService
             await _uow.ProductPriceHistory.AddAsync(entry, ct);
         }
         await _uow.SaveChangesAsync(ct);
+        
+        return Result.Success();
     }
 
     private async Task<decimal> CalculateNewBaseUnitCostAsync(
@@ -127,10 +131,9 @@ public class UpdateProductPricingService : IUpdateProductPricingService
         decimal newQuantityInBaseUnits,
         CancellationToken ct)
     {
-        var currentStock = await _uow.WarehouseStocks.Query()
-            .Where(s => s.ProductId == baseUnit.ProductId)
-            .Select(s => s.Quantity)
-            .FirstOrDefaultAsync(ct);
+        var stockRecord = await _uow.WarehouseStocks.FirstOrDefaultAsync(
+            s => s.ProductId == baseUnit.ProductId, ct);
+        var currentStock = stockRecord?.Quantity ?? 0m;
 
         var oldCost = baseUnit.PurchaseCost;
 
@@ -140,6 +143,6 @@ public class UpdateProductPricingService : IUpdateProductPricingService
             ((currentStock * oldCost) + (newQuantityInBaseUnits * newBaseUnitCost))
             / (currentStock + newQuantityInBaseUnits);
 
-        return Math.Round(weightedAverage, 4);
+        return Math.Round(weightedAverage, 2);
     }
 }

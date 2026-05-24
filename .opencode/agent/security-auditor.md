@@ -8,6 +8,10 @@ mode: subagent
 
 # Security Auditor
 
+## Arabic Encoding Requirement
+
+All Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text. If you encounter garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file has encoding corruption. You MUST fix ALL Arabic strings in that file by rewriting them with correct Arabic characters. Always verify your output files are saved with UTF-8 encoding.
+
 ## Role
 Application security specialist for the Sales Management System.
 
@@ -148,6 +152,10 @@ var connectionString = Environment.GetEnvironmentVariable(
     "DefaultConnection": "USE_ENVIRONMENT_VARIABLE"
   }
 }
+
+### 6. DPAPI Connection Security (v4.6.3)
+- Verify that database connection strings stored in appsettings.json or configuration files are protected using DPAPI via `IConnectionStringProtector` and have the `"DPAPI:"` prefix.
+- Double-encryption MUST be guarded against by calling `IsEncrypted` before protecting.
 ```
 
 ## Audit Prompt
@@ -156,3 +164,35 @@ Check EVERY input for validation.
 Check EVERY response for data leakage.
 Verify passwords hashed with BCrypt cost 12+.
 Verify no sensitive data in logs.
+
+- Check that ALL controllers use `[Authorize]` (not `[AllowAnonymous]` bypasses on non-login endpoints)
+- Check that NO hardcoded connection strings exist in production code (design-time factory is acceptable)
+- Check that Settings GET endpoints are restricted to AdminOnly (not accessible by Cashier)
+- Check that LogsController has input size validation
+- Check that CORS is configured if running outside desktop-only mode
+
+### Resolved Security Gaps (v4.6.4)
+1. **🔴 → ✅ Hard Delete for Users**: `UserService.PermanentDeleteAsync()` now returns `Result.Failure` — hard-delete blocked per RULE-244.
+2. **🔴 → ✅ Plaintext connection strings**: Removed from `appsettings.Development.json`. Uses `SALESSYSTEM_DB_CONNECTION` env var exclusively with `_comment` property (RULE-247/248).
+3. **🔴 → ✅ Rate Limiting**: Added `AddRateLimiter` with `LoginPolicy` (5/15min) + global (100/min). Arabic 429 response. Middleware placed before `UseAuthentication()` (RULE-240-243).
+4. **🟡 SettingsController** still has class-level `[Authorize]` without policy — mitigated by explicit per-action policies.
+
+### Extra Audit Checks (v4.6.4)
+
+#### Rate Limiting
+- [ ] `AddRateLimiter` configured in Program.cs?
+- [ ] LoginPolicy limits to 5 attempts per 15 minutes per IP?
+- [ ] `[EnableRateLimiting("LoginPolicy")]` on login endpoint?
+- [ ] `UseRateLimiter()` placed BEFORE `UseAuthentication()`?
+- [ ] Arabic 429 response with `RATE_LIMIT_EXCEEDED` code?
+- [ ] Global fallback limiter (100 req/min per IP) configured?
+
+#### User Integrity
+- [ ] `PermanentDeleteAsync` returns `Result.Failure` (not hard-delete)?
+- [ ] Hard-delete attempt logged as Serilog warning?
+- [ ] Users only soft-deleted via `DeleteAsync()` → `IsActive = false`?
+
+#### Connection String Security
+- [ ] No plaintext connection strings in any `appsettings.*.json` file?
+- [ ] `_comment` property explaining env var usage present in config?
+- [ ] All connection strings loaded from `SALESSYSTEM_DB_CONNECTION` env var?

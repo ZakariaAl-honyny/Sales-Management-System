@@ -34,6 +34,8 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
         var result = await _userService.GetAllAsync(includeInactive, ct);
+        if (!result.IsSuccess)
+            return BadRequest(new { error = result.Error });
         return Ok(result.Value);
     }
 
@@ -108,8 +110,12 @@ public class UsersController : ControllerBase
     /// <param name="id">User ID to delete permanently.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns success message with deleted ID.</returns>
+    /// <remarks>
+    /// Deprecated — hard delete no longer allowed per RULE-038.
+    /// The endpoint still exists but will return a failure response.
+    /// Use DELETE api/v1/users/{id} (soft delete) instead.
+    /// </remarks>
     [HttpDelete("permanent/{id:int}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)

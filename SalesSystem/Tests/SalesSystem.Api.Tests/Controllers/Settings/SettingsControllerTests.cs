@@ -3,10 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Api.Controllers;
-using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Domain.Enums;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Tests.Controllers.Settings;
@@ -14,16 +15,14 @@ namespace SalesSystem.Api.Tests.Controllers.Settings;
 public class SettingsControllerTests
 {
     private readonly Mock<IStoreSettingsService> _settingsServiceMock;
-    private readonly Mock<ISystemSettingsRepository> _systemSettingsMock;
     private readonly Mock<ILogger<SettingsController>> _loggerMock;
     private readonly SettingsController _controller;
 
     public SettingsControllerTests()
     {
         _settingsServiceMock = new Mock<IStoreSettingsService>();
-        _systemSettingsMock = new Mock<ISystemSettingsRepository>();
         _loggerMock = new Mock<ILogger<SettingsController>>();
-        _controller = new SettingsController(_settingsServiceMock.Object, _systemSettingsMock.Object);
+        _controller = new SettingsController(_settingsServiceMock.Object);
 
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, "1") };
         var identity = new ClaimsIdentity(claims);
@@ -32,12 +31,20 @@ public class SettingsControllerTests
         {
             HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = principal }
         };
+
+        // Setup default costing method responses
+        _settingsServiceMock
+            .Setup(x => x.GetCostingMethodAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<CostingMethod?>.Success(CostingMethod.WeightedAverage));
+        _settingsServiceMock
+            .Setup(x => x.SetCostingMethodAsync(It.IsAny<CostingMethod>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success());
     }
 
     [Fact]
     public async Task Get_WhenSettingsExist_ReturnsOkWithSettings()
     {
-        var settings = new StoreSettingsDto("متجري", "0123456789", "الرياض", "الوصف", "شركة", "10%", 15);
+        var settings = new StoreSettingsDto(1, "متجري", "0123456789", "الرياض", null, null, "SAR", 15m, true, null, true, false, true, "INV-");
         _settingsServiceMock
             .Setup(x => x.GetSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<StoreSettingsDto>.Success(settings));
@@ -63,8 +70,8 @@ public class SettingsControllerTests
     [Fact]
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedSettings()
     {
-        var request = new UpdateSettingsRequest("متجري المحدث", "0123456789", "جدة", "وصف جديد", "شركة", "15%", 20);
-        var settings = new StoreSettingsDto(request.StoreName, request.Phone, request.Address, request.Description, request.BusinessType, request.TaxRate, request.CreditLimit);
+        var request = new UpdateSettingsRequest("متجري المحدث", "جدة", "0123456789", "info@store.com", null, "SAR", 15m, true, null, true, false, true, "INV-");
+        var settings = new StoreSettingsDto(1, request.StoreName, request.Phone, request.Address, null, request.Email, request.Currency, request.DefaultTaxRate, request.IsTaxEnabled, request.TaxNumber, request.EnableStockAlerts, request.AllowNegativeStock, request.AutoUpdatePrices, request.InvoicePrefix);
 
         _settingsServiceMock
             .Setup(x => x.UpdateSettingsAsync(It.IsAny<UpdateSettingsRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -79,7 +86,7 @@ public class SettingsControllerTests
     [Fact]
     public async Task Update_WhenServiceFails_ReturnsBadRequest()
     {
-        var request = new UpdateSettingsRequest("متجري", "0123456789", "الرياض", "الوصف", "شركة", "10%", 15);
+        var request = new UpdateSettingsRequest("متجري", "الرياض", "0123456789", null, null, "SAR", 15m, true, null, true, false, true, "INV-");
 
         _settingsServiceMock
             .Setup(x => x.UpdateSettingsAsync(It.IsAny<UpdateSettingsRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -98,7 +105,7 @@ public class SettingsControllerTests
             HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = new ClaimsPrincipal() }
         };
 
-        var request = new UpdateSettingsRequest("متجري", "0123456789", "الرياض", "الوصف", "شركة", "10%", 15);
+        var request = new UpdateSettingsRequest("متجري", "الرياض", "0123456789", null, null, "SAR", 15m, true, null, true, false, true, "INV-");
 
         var result = await _controller.Update(request, CancellationToken.None);
 

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Infrastructure.Data;
@@ -67,5 +68,126 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
     public IQueryable<T> Query()
     {
         return _context.Set<T>().AsQueryable();
+    }
+
+    // ─── Async query methods ─────────────────────────────────────────
+
+    public async Task<T?> FirstOrDefaultAsync(
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default,
+        params string[] includePaths)
+    {
+        IQueryable<T> query = _context.Set<T>();
+        foreach (var path in includePaths)
+            query = query.Include(path);
+        return await query.FirstOrDefaultAsync(predicate, ct);
+    }
+
+    public async Task<T?> FirstOrDefaultIgnoreFiltersAsync(
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default,
+        params string[] includePaths)
+    {
+        IQueryable<T> query = _context.Set<T>().IgnoreQueryFilters();
+        foreach (var path in includePaths)
+            query = query.Include(path);
+        return await query.FirstOrDefaultAsync(predicate, ct);
+    }
+
+    public async Task<List<T>> ToListAsync(
+        CancellationToken ct = default,
+        params string[] includePaths)
+    {
+        IQueryable<T> query = _context.Set<T>();
+        foreach (var path in includePaths)
+            query = query.Include(path);
+        return await query.ToListAsync(ct);
+    }
+
+    public async Task<List<T>> ToListAsync(
+        Expression<Func<T, bool>>? predicate,
+        Func<IQueryable<T>, IQueryable<T>>? queryConfig = null,
+        CancellationToken ct = default,
+        bool ignoreQueryFilters = false,
+        params string[] includePaths)
+    {
+        IQueryable<T> query = ignoreQueryFilters ? _context.Set<T>().IgnoreQueryFilters() : _context.Set<T>();
+        foreach (var path in includePaths)
+            query = query.Include(path);
+        if (predicate != null)
+            query = query.Where(predicate);
+        if (queryConfig != null)
+            query = queryConfig(query);
+        return await query.ToListAsync(ct);
+    }
+
+    public async Task<(List<T> Items, int TotalCount)> GetPagedAsync(
+        Expression<Func<T, bool>>? predicate,
+        Func<IQueryable<T>, IQueryable<T>>? orderConfig,
+        int page,
+        int pageSize,
+        CancellationToken ct = default,
+        bool ignoreQueryFilters = false,
+        params string[] includePaths)
+    {
+        IQueryable<T> query = ignoreQueryFilters ? _context.Set<T>().IgnoreQueryFilters() : _context.Set<T>();
+        foreach (var path in includePaths)
+            query = query.Include(path);
+        if (predicate != null)
+            query = query.Where(predicate);
+
+        var totalCount = await query.CountAsync(ct);
+
+        IQueryable<T> ordered = orderConfig != null ? orderConfig(query) : query;
+        var items = await ordered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return (items, totalCount);
+    }
+
+    public async Task<List<T>> ToListIgnoreFiltersAsync(
+        CancellationToken ct = default,
+        params string[] includePaths)
+    {
+        IQueryable<T> query = _context.Set<T>().IgnoreQueryFilters();
+        foreach (var path in includePaths)
+            query = query.Include(path);
+        return await query.ToListAsync(ct);
+    }
+
+    public async Task<int> CountAsync(
+        Expression<Func<T, bool>>? predicate = null,
+        CancellationToken ct = default)
+    {
+        IQueryable<T> query = _context.Set<T>();
+        if (predicate != null)
+            query = query.Where(predicate);
+        return await query.CountAsync(ct);
+    }
+
+    public async Task<bool> AnyAsync(
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default)
+    {
+        return await _context.Set<T>().AnyAsync(predicate, ct);
+    }
+
+    public async Task<bool> AnyIgnoreFiltersAsync(
+        Expression<Func<T, bool>> predicate,
+        CancellationToken ct = default)
+    {
+        return await _context.Set<T>().IgnoreQueryFilters().AnyAsync(predicate, ct);
+    }
+
+    public async Task<int> CountIgnoreFiltersAsync(
+        Expression<Func<T, bool>>? predicate = null,
+        CancellationToken ct = default)
+    {
+        IQueryable<T> query = _context.Set<T>().IgnoreQueryFilters();
+        if (predicate != null)
+            query = query.Where(predicate);
+        return await query.CountAsync(ct);
     }
 }

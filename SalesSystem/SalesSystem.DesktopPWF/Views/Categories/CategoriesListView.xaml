@@ -186,7 +186,8 @@
                         <TextBlock Text="📂" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
                         <TextBlock Text="لا توجد تصنيفات حالياً" Style="{StaticResource HeaderStyle}" FontSize="20" HorizontalAlignment="Center"/>
                         <TextBlock Text="ابدأ بإضافة تصنيف جديد من خلال الزر أعلاه" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة أول تصنيف" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,24,0,0" Width="180"/>
+                        <Button Content="➕ إضافة أول تصنيف" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,24,0,0" Width="180"
+                                ToolTip="إضافة عنصر جديد"/>
                     </StackPanel>
                 </Grid>
             </Grid>

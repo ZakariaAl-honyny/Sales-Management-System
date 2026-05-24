@@ -116,7 +116,7 @@
                                 <Button Grid.Column="1" Content="🔍" 
                                         Command="{Binding SearchInvoiceCommand}"
                                         Style="{StaticResource SecondaryButton}" 
-                                        Width="36" Margin="4,0,0,0"/>
+                                        Width="36" Margin="4,0,0,0" ToolTip="البحث عن فاتورة"/>
                             </Grid>
 
                             <TextBlock Text="رقم الفاتورة" Style="{StaticResource LabelStyle}"/>
@@ -207,13 +207,15 @@
                                 Command="{Binding PostCommand}"
                                 Style="{StaticResource SuccessButton}"
                                 Margin="0,0,12,0"
-                                Visibility="{Binding IsDraft, Converter={StaticResource BoolToVisibility}}"/>
+                                Visibility="{Binding IsDraft, Converter={StaticResource BoolToVisibility}}"
+                                ToolTip="ترحيل العملية نهائياً — سيتم تحديث المخزون والرصيد"/>
 
                         <Button Command="{Binding SaveCommand}"
                                 Style="{StaticResource PrimaryButton}"
                                 Width="140"
                                 Margin="0,0,8,0"
-                                Visibility="{Binding IsDraft, Converter={StaticResource BoolToVisibility}}">
+                                Visibility="{Binding IsDraft, Converter={StaticResource BoolToVisibility}}"
+                                ToolTip="حفظ كمسودة دون ترحيل">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="💾" Margin="0,0,8,0"/>
                                 <TextBlock Text="حفظ المرتجع"/>
@@ -223,7 +225,8 @@
                         <Button Command="{Binding PrintA4Command}"
                                 Style="{StaticResource SecondaryButton}"
                                 Margin="0,0,8,0"
-                                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}">
+                                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"
+                                ToolTip="طباعة فاتورة بصيغة A4">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🖨️" Margin="0,0,8,0"/>
                                 <TextBlock Text="طباعة A4"/>
@@ -233,7 +236,8 @@
                         <Button Command="{Binding PrintReceiptCommand}"
                                 Style="{StaticResource SecondaryButton}"
                                 Margin="0,0,12,0"
-                                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}">
+                                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"
+                                ToolTip="طباعة إيصال حراري">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🧾" Margin="0,0,8,0"/>
                                 <TextBlock Text="طباعة إيصال"/>
@@ -244,12 +248,14 @@
                                 Command="{Binding CancelReturnCommand}"
                                 Style="{StaticResource DangerButton}"
                                 Margin="0,0,12,0"
-                                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"/>
+                                Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"
+                                ToolTip="إلغاء العملية (للحالات غير المرحلة)"/>
                                 
                         <Button Content="إغلاق"
                                 Command="{Binding CancelCommand}"
                                 Style="{StaticResource SecondaryButton}"
-                                Width="100"/>
+                                Width="100"
+                                ToolTip="إغلاق النافذة دون حفظ"/>
                     </StackPanel>
                 </Grid>
 

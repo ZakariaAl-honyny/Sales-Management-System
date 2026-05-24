@@ -9,6 +9,5 @@ public static class ErrorCodes
     public const string InvalidOperation = "INVALID_OPERATION";
     public const string Unauthorized = "UNAUTHORIZED";
     public const string Forbidden = "FORBIDDEN";
-    public const string DuplicateCode = "DUPLICATE_CODE";
     public const string DuplicateBarcode = "DUPLICATE_BARCODE";
 }

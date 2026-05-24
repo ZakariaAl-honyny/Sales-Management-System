@@ -157,7 +157,8 @@
                         <TextBlock Text="💰" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
                         <TextBlock Text="لا توجد سندات قبض حالياً" Style="{StaticResource HeaderStyle}" FontSize="20" HorizontalAlignment="Center"/>
                         <TextBlock Text="ابدأ بتسجيل أول دفعة مستلمة من عميل لتحديث الرصيد" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة أول سند" Command="{Binding NewCommand}" Style="{StaticResource PrimaryButton}" Margin="0,24,0,0" Width="180"/>
+                        <Button Content="➕ إضافة أول سند" Command="{Binding NewCommand}" Style="{StaticResource PrimaryButton}" Margin="0,24,0,0" Width="180"
+                                ToolTip="إضافة عنصر جديد"/>
                     </StackPanel>
                 </Grid>
             </Grid>

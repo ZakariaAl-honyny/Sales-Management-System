@@ -12,7 +12,6 @@ public class CustomerTests
         var customer = Customer.Create(
             name: "Test Customer",
             openingBalance: 0,
-            code: "C001",
             phone: "1234567890",
             email: "test@example.com",
             address: "Test Address",
@@ -22,7 +21,6 @@ public class CustomerTests
         customer.Name.Should().Be("Test Customer");
         customer.OpeningBalance.Should().Be(0);
         customer.CurrentBalance.Should().Be(0);
-        customer.Code.Should().Be("C001");
         customer.Phone.Should().Be("1234567890");
         customer.Email.Should().Be("test@example.com");
         customer.Address.Should().Be("Test Address");
@@ -185,7 +183,6 @@ public class CustomerTests
     {
         var customer = Customer.Create(
             name: "Original Name",
-            code: "C001",
             phone: "1111111111",
             email: "old@example.com",
             address: "Old Address",
@@ -194,7 +191,6 @@ public class CustomerTests
 
         customer.Update(
             name: "Updated Name",
-            code: "C002",
             phone: "2222222222",
             email: "new@example.com",
             address: "New Address",
@@ -204,7 +200,6 @@ public class CustomerTests
         );
 
         customer.Name.Should().Be("Updated Name");
-        customer.Code.Should().Be("C002");
         customer.Phone.Should().Be("2222222222");
         customer.Email.Should().Be("new@example.com");
         customer.Address.Should().Be("New Address");
@@ -218,7 +213,6 @@ public class CustomerTests
             createdByUserId: 1
         );
 
-        customer.Code.Should().BeNull();
         customer.Phone.Should().BeNull();
         customer.Email.Should().BeNull();
         customer.Address.Should().BeNull();

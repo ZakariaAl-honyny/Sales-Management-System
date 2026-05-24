@@ -8,7 +8,7 @@
       "applicationUrl": "http://localhost:5221",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "SALESSYSTEM_DB_CONNECTION": "Server=.;Database=SalesSystemDb;Trusted_Connection=True;TrustServerCertificate=True;"
+        "SALESSYSTEM_DB_CONNECTION": "Server=.;Database=SalesSystemDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
       }
     },
     "https": {
@@ -18,7 +18,7 @@
       "applicationUrl": "https://localhost:7181;http://localhost:5221",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "SALESSYSTEM_DB_CONNECTION": "Server=.;Database=SalesSystemDb;Trusted_Connection=True;TrustServerCertificate=True;"
+        "SALESSYSTEM_DB_CONNECTION": "Server=.;Database=SalesSystemDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
       }
     }
   }

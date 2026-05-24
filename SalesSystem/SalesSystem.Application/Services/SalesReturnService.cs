@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -31,12 +30,8 @@ public class SalesReturnService : ISalesReturnService
 
     public async Task<Result<SalesReturnDto>> GetByIdAsync(int id, CancellationToken ct)
     {
-        var sr = await _uow.SalesReturns.Query()
-            .Include(r => r.Customer)
-            .Include(r => r.Warehouse)
-            .Include(r => r.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+        var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
+            r => r.Id == id, ct, "Customer", "Warehouse", "Items.Product");
 
         if (sr == null)
             return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود", ErrorCodes.NotFound);
@@ -46,28 +41,17 @@ public class SalesReturnService : ISalesReturnService
 
     public async Task<Result<PagedResult<SalesReturnDto>>> GetAllAsync(int? customerId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _uow.SalesReturns.Query()
-            .Include(r => r.Customer)
-            .Include(r => r.Warehouse)
-            .AsQueryable();
+        System.Linq.Expressions.Expression<System.Func<SalesReturn, bool>> predicate = r =>
+            (!customerId.HasValue || r.CustomerId == customerId.Value) &&
+            (includeInactive || r.Status != InvoiceStatus.Cancelled);
 
-        if (!includeInactive)
-        {
-            query = query.Where(r => r.Status != (InvoiceStatus)3); // 3 = Cancelled
-        }
+        var includes = new[] { "Customer", "Warehouse" };
 
-        if (customerId.HasValue) query = query.Where(r => r.CustomerId == customerId.Value);
-
-        var totalItems = await query.CountAsync(ct);
-        var items = await query
-            .OrderByDescending(r => r.ReturnDate)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        var (items, total) = await _uow.SalesReturns.GetPagedAsync(
+            predicate, q => q.OrderByDescending(r => r.ReturnDate), page, pageSize, ct, includeInactive, includes);
 
         var dtos = items.Select(MapToDto).ToList();
-
-        return Result<PagedResult<SalesReturnDto>>.Success(PagedResult<SalesReturnDto>.Create(dtos, totalItems, page, pageSize));
+        return Result<PagedResult<SalesReturnDto>>.Success(PagedResult<SalesReturnDto>.Create(dtos, total, page, pageSize));
     }
 
     public async Task<Result<SalesReturnDto>> CreateAsync(CreateSalesReturnRequest request, int userId, CancellationToken ct)
@@ -75,9 +59,8 @@ public class SalesReturnService : ISalesReturnService
         // 1. Validation
         if (request.SalesInvoiceId.HasValue)
         {
-            var invoice = await _uow.SalesInvoices.Query()
-                .Include(i => i.Items)
-                .FirstOrDefaultAsync(i => i.Id == request.SalesInvoiceId.Value, ct);
+            var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
+                i => i.Id == request.SalesInvoiceId.Value, ct, "Items");
 
             if (invoice == null) return Result<SalesReturnDto>.Failure("الفاتورة الأصلية غير موجودة");
 
@@ -141,10 +124,8 @@ public class SalesReturnService : ISalesReturnService
 
     public async Task<Result<SalesReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
-        var sr = await _uow.SalesReturns.Query()
-            .Include(r => r.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+        var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
+            r => r.Id == id, ct, "Items.Product");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status != InvoiceStatus.Draft) return Result<SalesReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
@@ -206,10 +187,8 @@ public class SalesReturnService : ISalesReturnService
 
     public async Task<Result<SalesReturnDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
-        var sr = await _uow.SalesReturns.Query()
-            .Include(r => r.Items)
-                .ThenInclude(it => it.Product)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+        var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
+            r => r.Id == id, ct, "Items.Product");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status == InvoiceStatus.Cancelled) return await GetByIdAsync(id, ct);
@@ -289,7 +268,6 @@ public class SalesReturnService : ISalesReturnService
             r.Items.Select(it => new SalesReturnItemDto(
                 it.Id,
                 it.ProductId,
-                it.Product?.Code,
                 it.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 it.UnitPrice,
@@ -300,5 +278,3 @@ public class SalesReturnService : ISalesReturnService
         );
     }
 }
-
-

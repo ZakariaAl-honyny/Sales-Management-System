@@ -29,7 +29,7 @@ public class ProductBarcodeConfiguration : IEntityTypeConfiguration<ProductBarco
         builder.HasOne(x => x.Product)
             .WithMany(x => x.Barcodes)
             .HasForeignKey(x => x.ProductId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasQueryFilter(x => x.IsActive);
     }

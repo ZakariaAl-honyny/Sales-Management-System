@@ -5,7 +5,7 @@
 
 ## Research Summary
 
-No NEEDS CLARIFICATION items exist in the Technical Context. All technology decisions are pre-determined by the project Constitution and PRD-MVP-v3.0. This document records the rationale for each key decision.
+No NEEDS CLARIFICATION items exist in the Technical Context. All technology decisions are pre-determined by the project Constitution and PRD-MVP. This document records the rationale for each key decision.
 
 ---
 

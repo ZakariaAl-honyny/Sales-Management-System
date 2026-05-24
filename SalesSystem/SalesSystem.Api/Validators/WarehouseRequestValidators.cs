@@ -11,9 +11,6 @@ public class CreateWarehouseRequestValidator : AbstractValidator<CreateWarehouse
             .NotEmpty().WithMessage("اسم المخزن مطلوب")
             .MaximumLength(100).WithMessage("اسم المخزن لا يمكن أن يتجاوز 100 حرف");
 
-        RuleFor(x => x.Code)
-            .MaximumLength(30).WithMessage("كود المخزن لا يمكن أن يتجاوز 30 حرف");
-
         RuleFor(x => x.Location)
             .MaximumLength(200).WithMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
     }
@@ -26,9 +23,6 @@ public class UpdateWarehouseRequestValidator : AbstractValidator<UpdateWarehouse
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("اسم المخزن مطلوب")
             .MaximumLength(100).WithMessage("اسم المخزن لا يمكن أن يتجاوز 100 حرف");
-
-        RuleFor(x => x.Code)
-            .MaximumLength(30).WithMessage("كود المخزن لا يمكن أن يتجاوز 30 حرف");
 
         RuleFor(x => x.Location)
             .MaximumLength(200).WithMessage("العنوان لا يمكن أن يتجاوز 200 حرف");

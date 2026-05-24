@@ -17,7 +17,6 @@ public class ProductTests
             wholesalePrice: 1200m,
             conversionFactor: 10,
             minStock: 10m,
-            code: "P001",
             barcode: "123456789",
             categoryId: 1,
             retailUnitId: 1,
@@ -32,7 +31,6 @@ public class ProductTests
         product.WholesalePrice.Should().Be(1200m);
         product.ConversionFactor.Should().Be(10);
         product.MinStock.Should().Be(10m);
-        product.Code.Should().Be("P001");
         product.Barcode.Should().Be("123456789");
         product.CategoryId.Should().Be(1);
         product.RetailUnitId.Should().Be(1);
@@ -104,7 +102,6 @@ public class ProductTests
             wholesalePrice: 2000m,
             conversionFactor: 12,
             minStock: 20m,
-            code: "P002",
             barcode: "987654321",
             categoryId: 2,
             retailUnitId: 2,
@@ -119,7 +116,6 @@ public class ProductTests
         product.WholesalePrice.Should().Be(2000m);
         product.ConversionFactor.Should().Be(12);
         product.MinStock.Should().Be(20m);
-        product.Code.Should().Be("P002");
         product.Barcode.Should().Be("987654321");
         product.CategoryId.Should().Be(2);
         product.RetailUnitId.Should().Be(2);

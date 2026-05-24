@@ -10,9 +10,9 @@ public class CashTransactionConfiguration : IEntityTypeConfiguration<CashTransac
     {
         builder.ToTable("CashTransactions");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.Amount).HasPrecision(18, 4);
-        builder.Property(x => x.BalanceBefore).HasPrecision(18, 4);
-        builder.Property(x => x.BalanceAfter).HasPrecision(18, 4);
+        builder.Property(x => x.Amount).HasPrecision(18, 2);
+        builder.Property(x => x.BalanceBefore).HasPrecision(18, 2);
+        builder.Property(x => x.BalanceAfter).HasPrecision(18, 2);
         builder.Property(x => x.ReferenceType).HasMaxLength(50);
         builder.Property(x => x.Notes).HasMaxLength(500);
         builder.HasIndex(x => x.CashBoxId);

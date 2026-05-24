@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -32,14 +31,16 @@ public class UserService : IUserService
 
     public async Task<Result<IReadOnlyList<UserDto>>> GetAllAsync(bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _uow.Users.Query();
-        
+        List<User> users;
         if (includeInactive)
         {
-            query = query.IgnoreQueryFilters();
+            users = await _uow.Users.ToListIgnoreFiltersAsync(ct);
+        }
+        else
+        {
+            users = await _uow.Users.ToListAsync(ct);
         }
 
-        var users = await query.ToListAsync(ct);
         var dtos = users.Select(MapToDto).ToList();
         return Result<IReadOnlyList<UserDto>>.Success(dtos);
     }
@@ -88,7 +89,7 @@ public class UserService : IUserService
     {
         try
         {
-            var user = await _uow.Users.Query().IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id, ct);
+            var user = await _uow.Users.FirstOrDefaultIgnoreFiltersAsync(u => u.Id == id, ct);
             if (user == null)
                 return Result<UserDto>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 
@@ -147,26 +148,8 @@ public class UserService : IUserService
 
     public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
     {
-        var user = await _uow.Users.Query().IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Id == id, ct);
-        if (user == null)
-            return Result.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
-
-        if (user.Role == UserRole.Admin)
-        {
-            var users = await _uow.Users.Query().IgnoreQueryFilters()
-                .Where(u => u.Role == UserRole.Admin && u.IsActive && u.Id != id)
-                .ToListAsync(ct);
-            if (users.Count == 0)
-            {
-                return Result.Failure("لا يمكن حذف آخر مدير في النظام", ErrorCodes.InvalidOperation);
-            }
-        }
-
-        await _uow.Users.HardDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        _logger.LogInformation("User permanently deleted: {UserName}", user.UserName);
-        return Result.Success();
+        _logger.LogWarning("Attempt to hard-delete user {UserId} blocked — soft delete only", id);
+        return Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي — استخدم خاصية تعطيل الحساب بدلاً من ذلك", ErrorCodes.InvalidOperation);
     }
 
     private static UserDto MapToDto(User user)

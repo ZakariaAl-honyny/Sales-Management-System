@@ -44,13 +44,14 @@
         <!-- Main Form Content -->
         <Border Grid.Row="1" Padding="16">
             <StackPanel>
-                <TextBlock Text="اسم التصنيف" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                <TextBlock Text="اسم التصنيف *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+<TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                          Style="{StaticResource ModernTextBox}"
                          Tag="أدخل اسم التصنيف (مثلاً: إلكترونيات، أغذية...)"
                          TabIndex="1"
                          helpers:FocusHelper.AdvanceOnEnter="True"
-                         AutomationProperties.AutomationId="TxtCategoryName"/>
+                         AutomationProperties.AutomationId="TxtCategoryName"
+                              ToolTip="أدخل اسماً فريداً للتصنيف — هذا الحقل مطلوب ولا يمكن أن يكون فارغاً"/>
                 <TextBlock Text="مثال: مشروبات، معلبات، منظفات" Style="{StaticResource HelperTextStyle}"/>
                 
                 <Border Margin="0,20,0,0" Padding="16" Background="#F8FAFC" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0">
@@ -77,13 +78,13 @@
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
 <Button Command="{Binding SaveCommand}"
-                            IsEnabled="{Binding CanSave}"
                             Style="{StaticResource PrimaryButton}"
                             Width="150"
                             IsDefault="True"
                             TabIndex="2"
                             Margin="0,0,12,0"
-                            AutomationProperties.AutomationId="BtnSaveCategory">
+                            AutomationProperties.AutomationId="BtnSaveCategory"
+                            ToolTip="حفظ البيانات المدخلة">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,10,0" Stretch="Uniform" VerticalAlignment="Center"/>
                             <TextBlock Text="حفظ البيانات" VerticalAlignment="Center"/>
@@ -94,7 +95,8 @@
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
-                            TabIndex="3"/>
+                            TabIndex="3"
+                            ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" 

@@ -45,7 +45,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private decimal _paidAmount;
     private string? _notes;
     private string _barcodeSearchText = string.Empty;
-    private bool _isLoading;
     private bool _isEditMode;
     private string? _errorMessage;
     private bool _allowNegativeStock;
@@ -82,6 +81,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _invoicePrinter = invoicePrinter;
         _receiptPrinter = receiptPrinter;
         _dialogService = dialogService;
+        SetDialogService(dialogService);
         _soundService = soundService;
         _inventoryService = inventoryService;
         _barcodeService = barcodeService;
@@ -89,13 +89,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync, () => CanSave());
-        PostCommand = new AsyncRelayCommand(PostAsync, CanPost);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        PostCommand = new AsyncRelayCommand(PostAsync);
         CancelCommand = new RelayCommand(Cancel);
         AddLineCommand = new RelayCommand(AddLine);
         RemoveLineCommand = new RelayCommand(RemoveLine, CanRemoveLine);
-        PrintA4Command = new AsyncRelayCommand(PrintA4Async, CanPrint);
-        PrintReceiptCommand = new AsyncRelayCommand(PrintReceiptAsync, CanPrint);
+        PrintA4Command = new AsyncRelayCommand(PrintA4Async);
+        PrintReceiptCommand = new AsyncRelayCommand(PrintReceiptAsync);
         SearchProductCommand = new RelayCommand(SearchProduct);
         SearchProductSingleCommand = new RelayCommand(SearchProductSingle);
         SearchCustomerCommand = new RelayCommand(SearchCustomer);
@@ -331,12 +331,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         set => SetProperty(ref _barcodeSearchText, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
-
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -416,9 +410,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     #region Methods
     private async Task LoadReferenceDataAsync()
     {
-        try
+        await ExecuteAsync(async () =>
         {
-            IsLoading = true;
+            ErrorMessage = null;
             var customersResult = await _customerService.GetAllAsync();
             if (customersResult.IsSuccess && customersResult.Value != null)
             {
@@ -438,7 +432,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 Warehouses = new ObservableCollection<WarehouseDto>(warehousesResult.Value);
                 if (Warehouses.Any() && SelectedWarehouseId == 0)
                 {
-                    // Select default warehouse or first one
                     var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
                     SelectedWarehouseId = defaultWarehouse.Id;
                 }
@@ -463,26 +456,16 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     TaxRate = settingsResult.Value.DefaultTaxRate;
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "SalesInvoiceEditorViewModel.LoadReferenceDataAsync", "[SalesInvoiceEditorViewModel.LoadReferenceDataAsync] Failed to load customers, products, or warehouses.");
-        }
-        finally
-        {
-            if (!_isEditMode) IsLoading = false;
-        }
+        });
     }
 
     private async Task LoadInvoiceAsync()
     {
         if (!_invoiceId.HasValue) return;
 
-        IsLoading = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var result = await _invoiceService.GetByIdAsync(_invoiceId.Value);
             if (result.IsSuccess && result.Value != null)
             {
@@ -497,13 +480,12 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 Notes = invoice.Notes;
                 Status = invoice.Status;
 
-                // If posted or cancelled, make it read-only automatically
                 if (invoice.Status != (byte)InvoiceStatus.Draft)
                 {
                     IsReadOnly = true;
                     OnPropertyChanged(nameof(IsReadOnly));
                 }
-                IsTaxInclusive = false; // Default
+                IsTaxInclusive = false;
                 OnPropertyChanged(nameof(InvoiceNo));
 
                 Items.Clear();
@@ -533,26 +515,16 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الفاتورة", "SalesInvoiceEditorViewModel.LoadInvoiceAsync", $"[SalesInvoiceEditorViewModel.LoadInvoiceAsync] Failed to load invoice data for ID: {_invoiceId}");
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "SalesInvoiceEditorViewModel.LoadInvoiceAsync", $"[SalesInvoiceEditorViewModel.LoadInvoiceAsync] Failed to load invoice data for ID: {_invoiceId}");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task SaveAsync()
     {
-        if (!ValidateInvoice()) return;
+        if (!await ValidateInvoice()) return;
 
-        IsLoading = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var request = BuildRequest();
 
             Result<SalesInvoiceDto> result;
@@ -577,24 +549,16 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsEditMode));
                 OnPropertyChanged(nameof(IsReadOnly));
                 
-                _dialogService.ShowSuccessAsync("نجاح", "✅ تم حفظ الفاتورة بنجاح. يمكنك الآن الترحيل النهائي إذا أردت.");
+                await _dialogService.ShowSuccessAsync("نجاح", "✅ تم حفظ الفاتورة بنجاح. يمكنك الآن الترحيل النهائي إذا أردت.");
                 _eventBus.Publish(new SaleInvoiceChangedMessage(_invoiceId.Value));
                 UpdateCommandStates();
             }
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ الفاتورة", "SalesInvoiceEditorViewModel.SaveAsync", "[SalesInvoiceEditorViewModel.SaveAsync] Failed to save sales invoice.");
-                _ = _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
+                await _dialogService.ShowErrorAsync("خطأ في حفظ الفاتورة", ErrorMessage!);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "SalesInvoiceEditorViewModel.SaveAsync", "[SalesInvoiceEditorViewModel.SaveAsync] Failed to save sales invoice.");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task PostAsync()
@@ -608,34 +572,23 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
         if (!await _dialogService.ShowConfirmationAsync("تأكيد الترحيل", "هل أنت متأكد من ترحيل هذه الفاتورة؟\nسيتم خصم الكميات من المخزون.")) return;
 
-        IsLoading = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var postResult = await _invoiceService.PostAsync(_invoiceId!.Value);
             if (postResult.IsSuccess)
             {
-                _ = _dialogService.ShowSuccessAsync("نجاح", "تم ترحيل الفاتورة بنجاح");
+                await _dialogService.ShowSuccessAsync("نجاح", "تم ترحيل الفاتورة بنجاح");
                 _eventBus.Publish(new SaleInvoiceChangedMessage(_invoiceId.Value));
                 RequestClose();
             }
             else
             {
                 ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "SalesInvoiceEditorViewModel.PostAsync", $"[SalesInvoiceEditorViewModel.PostAsync] Failed to post/confirm sales invoice ID {_invoiceId}.");
-                _ = _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
+                await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "SalesInvoiceEditorViewModel.PostAsync", $"[SalesInvoiceEditorViewModel.PostAsync] Failed to post/confirm sales invoice ID {_invoiceId}.");
-            _ = _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
-        }
-        finally
-        {
-            IsLoading = false;
-            UpdateCommandStates();
-        }
+        });
+        UpdateCommandStates();
     }
 
     private async Task DeleteAsync()
@@ -644,33 +597,22 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
         if (!await _dialogService.ShowConfirmationAsync("تأكيد الإلغاء", "هل أنت متأكد من إلغاء هذه الفاتورة؟\nلا يمكن التراجع عن هذه العملية.")) return;
 
-        IsLoading = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var cancelResult = await _invoiceService.CancelAsync(_invoiceId.Value);
             if (cancelResult.IsSuccess)
             {
-                _ = _dialogService.ShowSuccessAsync("نجاح", "تم إلغاء الفاتورة بنجاح");
+                await _dialogService.ShowSuccessAsync("نجاح", "تم إلغاء الفاتورة بنجاح");
                 _eventBus.Publish(new SaleInvoiceChangedMessage(_invoiceId.Value));
                 RequestClose();
             }
             else
             {
                 ErrorMessage = cancelResult.Error ?? "فشل في إلغاء الفاتورة";
-                _ = _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
+                await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage!);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "SalesInvoiceEditorViewModel.DeleteAsync", $"[SalesInvoiceEditorViewModel.DeleteAsync] Failed to cancel invoice ID {_invoiceId}.");
-            _ = _dialogService.ShowErrorAsync("خطأ", ErrorMessage!);
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private async Task PrintA4Async()
@@ -687,45 +629,31 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     {
         if (!_invoiceId.HasValue) return;
 
-        IsLoading = true;
-        try
+        await ExecuteAsync(async () =>
         {
-            // 1. Get Store Settings
             var settingsResult = await _settingsService.GetSettingsAsync();
             if (!settingsResult.IsSuccess || settingsResult.Value == null)
             {
                 var error = HandleFailure(settingsResult.Error ?? "فشل في تحميل إعدادات المتجر", "SalesInvoiceEditorViewModel.PrepareAndPrint", "[SalesInvoiceEditorViewModel.PrepareAndPrint] Failed to load store settings for printing.");
-                _dialogService.ShowError(error, "خطأ");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة", error);
                 return;
             }
             
-            // 2. Get Full Invoice Data
             var invoiceResult = await _invoiceService.GetByIdAsync(_invoiceId.Value);
             if (!invoiceResult.IsSuccess || invoiceResult.Value == null)
             {
                 var error = HandleFailure(invoiceResult.Error ?? "فشل في تحميل بيانات الفاتورة", "SalesInvoiceEditorViewModel.PrepareAndPrint", $"[SalesInvoiceEditorViewModel.PrepareAndPrint] Failed to load invoice data for printing ID {_invoiceId}.");
-                _dialogService.ShowError(error, "خطأ");
+                await _dialogService.ShowErrorAsync("خطأ في الطباعة", error);
                 return;
             }
 
-            // 3. Map to Print DTOs
             var storeInfo = settingsResult.Value.ToPrintDto();
             var invoice = invoiceResult.Value.ToPrintDto();
             var items = invoiceResult.Value.Items.ToPrintDtos();
             var totals = invoiceResult.Value.ToTotalsPrintDto();
 
-            // 4. Show Preview
             printer.PrintPreview(invoice, items, totals, storeInfo);
-        }
-        catch (Exception ex)
-        {
-            var error = HandleException(ex, "SalesInvoiceEditorViewModel.PrepareAndPrint", $"[SalesInvoiceEditorViewModel.PrepareAndPrint] Unexpected error during print preparation for invoice ID {_invoiceId}.");
-            _dialogService.ShowError(error, "خطأ");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+        });
     }
 
     private void Cancel()
@@ -777,22 +705,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         return Items.Count > 1;
     }
 
-    private bool CanSave()
-    {
-        return !HasErrors && Items.Any(i => i.SelectedProduct != null && i.Quantity > 0);
-    }
-
-    private bool CanPost()
-    {
-        return CanSave() && SelectedWarehouseId > 0 && Status == (byte)InvoiceStatus.Draft;
-    }
-
-    private bool CanPrint()
-    {
-        return _invoiceId.HasValue;
-    }
-
-    private bool ValidateInvoice()
+    private async Task<bool> ValidateInvoice()
     {
         var errors = new List<string>();
 
@@ -807,8 +720,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
         if (errors.Any())
         {
-            string errorMsg = "يرجى إكمال البيانات الإلزامية التالية:\n\n" + string.Join("\n", errors);
-            _ = _dialogService.ShowWarningAsync("بيانات غير مكتملة", errorMsg);
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
+            RequestFocusFirstInvalidField();
             return false;
         }
 
@@ -1275,7 +1188,6 @@ public class InvoiceLineViewModel : ViewModelBase
         }
     }
 
-    public bool CanSave => !HasErrors && SelectedProduct != null && Quantity > 0;
 }
 
 public class PaymentTypeItem

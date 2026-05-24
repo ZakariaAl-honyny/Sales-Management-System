@@ -106,9 +106,16 @@ public abstract class ApiServiceBase
 
         try
         {
-            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-            Serilog.Log.Warning("API Command failure: {StatusCode} - {Error} ({ErrorCode})", response.StatusCode, error?.Error, error?.ErrorCode);
-            return Result.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
+            if (response.Content.Headers.ContentType?.MediaType == "application/json")
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                Serilog.Log.Warning("API Command failure: {StatusCode} - {Error} ({ErrorCode})", response.StatusCode, error?.Error, error?.ErrorCode);
+                return Result.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            Serilog.Log.Warning("API Command failure (non-JSON): {StatusCode} - {Content}", response.StatusCode, content);
+            return Result.Failure($"خطأ في الخادم: {response.StatusCode}", response.StatusCode.ToString());
         }
         catch (Exception ex)
         {
@@ -287,6 +294,8 @@ public interface ISettingsApiService
     Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, CancellationToken ct = default);
     Task<Result<PrintSettingsDto>> GetPrintSettingsAsync(CancellationToken ct = default);
     Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default);
+    Task<Result<int>> GetCostingMethodAsync(CancellationToken ct = default);
+    Task<Result> SetCostingMethodAsync(UpdateCostingMethodRequest request, CancellationToken ct = default);
     void RefreshCache();
 }
 
@@ -381,6 +390,19 @@ public interface IPrintApiService
     Task<Result> PrintPurchaseA4Async(int invoiceId, CancellationToken ct = default);
     Task<Result> PrintPurchaseThermalAsync(int invoiceId, CancellationToken ct = default);
     Task<Result<PrintPreviewData>> GetPurchasePreviewDataAsync(int invoiceId, CancellationToken ct = default);
+    Task<Result> TestPrintAsync(CancellationToken ct = default);
+}
+
+public interface IDatabaseHealthCheckService
+{
+    Task<HealthCheckResult> CheckAsync(CancellationToken ct = default);
+}
+
+public record HealthCheckResult
+{
+    public bool IsDatabaseConnected { get; init; }
+    public string? ErrorMessage { get; init; }
+    public bool IsApiReachable { get; init; }
 }
 
 public record PrintPreviewData(string TempFilePath, string InvoiceNumber);

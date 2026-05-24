@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
@@ -16,16 +16,26 @@ namespace SalesSystem.DesktopPWF.ViewModels.Payments;
 /// </summary>
 public class SupplierPaymentsListViewModel : ViewModelBase
 {
-    private readonly ISupplierPaymentApiService _paymentService;
-    private readonly ISupplierApiService _supplierService;
-    private readonly IDialogService _dialogService;
-    private readonly IPaymentPrinter _paymentPrinter;
-    private readonly ISettingsApiService _settingsService;
+    private ISupplierPaymentApiService? _paymentService;
+    private ISupplierApiService? _supplierService;
+    private IPaymentPrinter? _paymentPrinter;
+    private ISettingsApiService? _settingsService;
+    private IScreenWindowService? _screenWindowService;
+
+    private ISupplierPaymentApiService PaymentService => _paymentService ??= App.GetService<ISupplierPaymentApiService>();
+    private ISupplierApiService SupplierService => _supplierService ??= App.GetService<ISupplierApiService>();
+    private IPaymentPrinter PaymentPrinter => _paymentPrinter ??= App.GetService<IPaymentPrinter>();
+    private ISettingsApiService SettingsService => _settingsService ??= App.GetService<ISettingsApiService>();
+    private IScreenWindowService ScreenWindowService => _screenWindowService ??= App.GetService<IScreenWindowService>();
+
+    // Uses 'new' to suppress CS0108 (inherited member hiding).
+    // Test uses SetField("_dialogService", mock) before property is accessed.
+    private new IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
+    private IDialogService? _dialogService;
 
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
     private DateTime? _dateTo;
-    private bool _isLoading;
     private string _errorMessage = string.Empty;
     private bool _isEmpty;
     private SupplierPaymentDto? _selectedPayment;
@@ -34,12 +44,6 @@ public class SupplierPaymentsListViewModel : ViewModelBase
 
     public SupplierPaymentsListViewModel()
     {
-        _paymentService = App.GetService<ISupplierPaymentApiService>();
-        _supplierService = App.GetService<ISupplierApiService>();
-        _dialogService = App.GetService<IDialogService>();
-        _paymentPrinter = App.GetService<IPaymentPrinter>();
-        _settingsService = App.GetService<ISettingsApiService>();
-
         NewCommand = new RelayCommand(OnNew);
         ViewCommand = new RelayCommand(OnView, () => SelectedPayment != null);
         EditCommand = new RelayCommand(OnEdit, () => SelectedPayment != null);
@@ -67,11 +71,6 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         set => SetProperty(ref _dateTo, value);
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string ErrorMessage
     {
@@ -121,17 +120,17 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     {
         try
         {
-            IsLoading = true;
+            IsBusy = true;
             ErrorMessage = string.Empty;
 
-            var result = await _paymentService.GetAllAsync(SearchText, DateFrom, DateTo);
+            var result = await PaymentService.GetAllAsync(SearchText, DateFrom, DateTo);
 
             if (result.IsSuccess && result.Value != null)
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                InvokeOnUIThread(() =>
                 {
                     Payments.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Payments.Add(item);
                     }
@@ -152,7 +151,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -164,42 +163,53 @@ public class SupplierPaymentsListViewModel : ViewModelBase
 
     private void OnNew()
     {
-        var vm = new SupplierPaymentEditorViewModel();
-        if (_dialogService.ShowDialog(vm))
+        var vm = App.GetService<SupplierPaymentEditorViewModel>();
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            _ = LoadPaymentsAsync();
-        }
+            Title = "سداد مورد جديد",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
+            }
+        });
     }
 
     private void OnView()
     {
         if (SelectedPayment == null) return;
         var vm = new SupplierPaymentEditorViewModel(SelectedPayment.Id, isReadOnly: true);
-        _dialogService.ShowDialog(vm);
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        {
+            Title = "عرض سداد مورد"
+        });
     }
 
     private void OnEdit()
     {
         if (SelectedPayment == null) return;
         var vm = new SupplierPaymentEditorViewModel(SelectedPayment.Id);
-        if (_dialogService.ShowDialog(vm))
+        ScreenWindowService.OpenScreen(vm, new ScreenWindowOptions
         {
-            _ = LoadPaymentsAsync();
-        }
+            Title = "تعديل سداد مورد",
+            OnClosed = (vm) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPaymentsAsync());
+            }
+        });
     }
 
     private async Task OnDelete()
     {
         if (SelectedPayment == null) return;
 
-        var result = await _dialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
+        var result = await DialogService.ShowConfirmationAsync("تأكيد الحذف", "هل أنت متأكد من حذف هذا السداد؟");
 
         if (!result) return;
 
         try
         {
-            IsLoading = true;
-            var deleteResult = await _paymentService.DeleteAsync(SelectedPayment.Id);
+            IsBusy = true;
+            var deleteResult = await PaymentService.DeleteAsync(SelectedPayment.Id);
 
             if (deleteResult.IsSuccess)
             {
@@ -208,16 +218,18 @@ public class SupplierPaymentsListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = deleteResult.Error ?? "فشل في حذف السداد";
-                await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
+                await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            LogSystemError($"Failed to delete supplier payment {SelectedPayment?.Id}", "SupplierPaymentsListViewModel.OnDelete", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
+            await DialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -225,21 +237,26 @@ public class SupplierPaymentsListViewModel : ViewModelBase
     {
         if (SelectedPayment == null) return;
 
-        IsLoading = true;
+        IsBusy = true;
         try
         {
-            var settingsResult = await _settingsService.GetSettingsAsync();
+            var settingsResult = await SettingsService.GetSettingsAsync();
             if (!settingsResult.IsSuccess || settingsResult.Value == null) return;
 
-            _paymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
+            PaymentPrinter.PrintPreview(SelectedPayment.ToPrintDto(), settingsResult.Value.ToPrintDto());
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"خطأ في الطباعة: {ex.Message}";
+            LogSystemError($"Failed to print supplier payment {SelectedPayment?.Id}", "SupplierPaymentsListViewModel.OnPrint", ex);
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الطباعة";
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 }
+
+
+
+

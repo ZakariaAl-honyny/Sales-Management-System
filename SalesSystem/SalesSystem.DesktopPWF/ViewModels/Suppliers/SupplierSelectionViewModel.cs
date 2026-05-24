@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -17,7 +17,6 @@ public class SupplierSelectionViewModel : ViewModelBase
     private ICollectionView? _suppliersView;
     private SupplierDto? _selectedSupplier;
     private string _searchText = string.Empty;
-    private bool _isLoading;
 
     public SupplierSelectionViewModel()
     {
@@ -66,11 +65,6 @@ public class SupplierSelectionViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public ICommand SelectCommand { get; }
     public ICommand CancelCommand { get; }
@@ -78,7 +72,7 @@ public class SupplierSelectionViewModel : ViewModelBase
 
     private async Task LoadSuppliersAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         try
         {
             var result = await _supplierService.GetAllAsync();
@@ -92,7 +86,6 @@ public class SupplierSelectionViewModel : ViewModelBase
                     if (string.IsNullOrWhiteSpace(SearchText)) return true;
                     var search = SearchText.ToLower();
                     return supplier.Name.ToLower().Contains(search) || 
-                           (supplier.Code?.ToLower().Contains(search) ?? false) ||
                            (supplier.Phone?.ToLower().Contains(search) ?? false);
                 };
             }
@@ -103,7 +96,7 @@ public class SupplierSelectionViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -130,3 +123,7 @@ public class SupplierSelectionViewModel : ViewModelBase
         RequestClose();
     }
 }
+
+
+
+

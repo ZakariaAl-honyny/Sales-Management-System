@@ -9,6 +9,7 @@ using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -21,6 +22,7 @@ public class StoreSettingsServiceTests : IDisposable
     private readonly ITestOutputHelper _output;
     private readonly TestDbContext _dbContext;
     private readonly Mock<IUnitOfWork> _mockUow;
+    private readonly Mock<ISystemSettingsRepository> _mockSystemSettingsRepo;
     private readonly Mock<ILogger<StoreSettingsService>> _mockLogger;
 
     private readonly StoreSettingsService _sut;
@@ -37,6 +39,7 @@ public class StoreSettingsServiceTests : IDisposable
         _dbContext = new TestDbContext(options);
 
         _mockUow = new Mock<IUnitOfWork>();
+        _mockSystemSettingsRepo = new Mock<ISystemSettingsRepository>();
         _mockLogger = new Mock<ILogger<StoreSettingsService>>();
 
         _mockUow.Setup(u => u.StoreSettings).Returns(new InMemoryEfCoreRepository<StoreSettings>(_dbContext));
@@ -48,7 +51,7 @@ public class StoreSettingsServiceTests : IDisposable
                 return 1;
             });
 
-        _sut = new StoreSettingsService(_mockUow.Object, _mockLogger.Object);
+        _sut = new StoreSettingsService(_mockUow.Object, _mockSystemSettingsRepo.Object, _mockLogger.Object);
     }
 
     public void Dispose()
@@ -84,7 +87,7 @@ public class StoreSettingsServiceTests : IDisposable
         _output.WriteLine("[TEST] GetSettingsAsync_ExistingSettings_ReturnsDto");
 
         var settings = StoreSettings.Create("My Store", "USD");
-        settings.Update("Updated Store", "123456789", "Store Address", null, "EUR", 0.15m, true);
+        settings.Update("Updated Store", "123456789", "Store Address", null, null, "EUR", 0.15m, true, null, true, false, false, "INV");
         _dbContext.StoreSettings.Add(settings);
         await _dbContext.SaveChangesAsync();
 
@@ -109,16 +112,8 @@ public class StoreSettingsServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateSettingsAsync_NoExistingSettings_CreatesNew");
 
-        var request = new SalesSystem.Contracts.Requests.UpdateSettingsRequest
-        {
-            StoreName = "New Store Name",
-            Phone = "1234567890",
-            Address = "New Address",
-            LogoUrl = null,
-            Currency = "USD",
-            DefaultTaxRate = 0.10m,
-            IsTaxEnabled = true
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateSettingsRequest(
+            "New Store Name", "New Address", "1234567890", null, null, "USD", 0.10m, true, null, true, false, false, "INV");
 
         var result = await _sut.UpdateSettingsAsync(request, userId: 1, CancellationToken.None);
 
@@ -143,16 +138,8 @@ public class StoreSettingsServiceTests : IDisposable
         _dbContext.StoreSettings.Add(existing);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateSettingsRequest
-        {
-            StoreName = "Updated Store",
-            Phone = "0987654321",
-            Address = "New Address",
-            LogoUrl = "/path/to/logo.png",
-            Currency = "EUR",
-            DefaultTaxRate = 0.15m,
-            IsTaxEnabled = true
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateSettingsRequest(
+            "Updated Store", "New Address", "0987654321", null, "/path/to/logo.png", "EUR", 0.15m, true, null, true, false, false, "INV");
 
         var result = await _sut.UpdateSettingsAsync(request, userId: 1, CancellationToken.None);
 
@@ -171,13 +158,8 @@ public class StoreSettingsServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateSettingsAsync_TaxEnabled_CreatesSettingsWithTax");
 
-        var request = new SalesSystem.Contracts.Requests.UpdateSettingsRequest
-        {
-            StoreName = "Store With Tax",
-            Currency = "SAR",
-            DefaultTaxRate = 0.15m,
-            IsTaxEnabled = true
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateSettingsRequest(
+            "Store With Tax", null, null, null, null, "SAR", 0.15m, true, null, true, false, false, "INV");
 
         var result = await _sut.UpdateSettingsAsync(request, userId: 1, CancellationToken.None);
 
@@ -193,13 +175,8 @@ public class StoreSettingsServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateSettingsAsync_TaxDisabled_CreatesSettingsWithoutTax");
 
-        var request = new SalesSystem.Contracts.Requests.UpdateSettingsRequest
-        {
-            StoreName = "Store Without Tax",
-            Currency = "SAR",
-            DefaultTaxRate = 0m,
-            IsTaxEnabled = false
-        };
+        var request = new SalesSystem.Contracts.Requests.UpdateSettingsRequest(
+            "Store Without Tax", null, null, null, null, "SAR", 0m, false, null, true, false, false, "INV");
 
         var result = await _sut.UpdateSettingsAsync(request, userId: 1, CancellationToken.None);
 
@@ -255,6 +232,50 @@ public class StoreSettingsServiceTests : IDisposable
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

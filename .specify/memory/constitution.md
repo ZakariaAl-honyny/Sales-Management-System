@@ -339,7 +339,7 @@ SalesSystem/
 - **Compliance review**: Every code submission MUST pass the Pre-Submission
   Checklist above. The `code-reviewer` agent enforces this at merge time.
 - **Cross-reference**: See `AGENTS.md` §2 (Constitution Rules),
-  `docs/database-schema.md` (SQL schema), `docs/PRD-MVP-v3.0.md`
+  `docs/database-schema.md` (SQL schema), `docs/PRD-MVP.md`
   (full requirements).
 
 **Version**: 1.1.0 | **Ratified**: 2026-05-06 | **Last Amended**: 2026-05-20

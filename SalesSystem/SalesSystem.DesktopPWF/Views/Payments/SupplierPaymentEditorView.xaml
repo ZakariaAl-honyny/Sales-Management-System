@@ -40,7 +40,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <ComboBox ItemsSource="{Binding Suppliers}"
-                                      SelectedValue="{Binding SelectedSupplierId}"
+                                      SelectedValue="{Binding SelectedSupplierId, ValidatesOnDataErrors=True}"
                                       SelectedValuePath="Id"
                                       DisplayMemberPath="Name"
                                       Style="{StaticResource ModernComboBox}"
@@ -53,7 +53,8 @@
                                     Style="{StaticResource SecondaryButton}" 
                                     Padding="4,0" Height="28" Width="30"
                                     Margin="4,0,0,0"
-                                    IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"/>
+                                    IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
+                                    ToolTip="البحث عن فاتورة"/>
                         </Grid>
                         <Border Height="20"/>
 
@@ -69,7 +70,7 @@
 
                         <!-- Amount -->
                         <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
+                        <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
                                  Style="{StaticResource ModernTextBox}"
                                  Tag="أدخل المبلغ المدفوع"
                                  IsReadOnly="{Binding IsReadOnly}"
@@ -85,7 +86,7 @@
                         <!-- Payment Type -->
                         <TextBlock Text="طريقة الدفع" Style="{StaticResource LabelStyle}"/>
                         <ComboBox ItemsSource="{Binding PaymentTypeOptions}"
-                                  SelectedValue="{Binding PaymentType}"
+                                  SelectedValue="{Binding PaymentType, ValidatesOnDataErrors=True}"
                                   SelectedValuePath="Value"
                                   DisplayMemberPath="Display"
                                   Style="{StaticResource ModernComboBox}"
@@ -97,7 +98,7 @@
 
                         <!-- Notes -->
                         <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
+                        <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                  Style="{StaticResource ModernTextBox}"
                                  Height="80"
                                  TextWrapping="Wrap"
@@ -129,20 +130,23 @@
                             Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}"
                             IsDefault="True"
                             TabIndex="6"
-                            AutomationProperties.AutomationId="BtnSavePayment"/>
+                            AutomationProperties.AutomationId="BtnSavePayment"
+                            ToolTip="حفظ سند الدفع"/>
                     <Button Content="🖨️ طباعة السند"
                             Command="{Binding PrintCommand}"
                             Style="{StaticResource SecondaryButton}"
                             Width="140"
                             Margin="0,0,12,0"
                             Visibility="{Binding IsEdit, Converter={StaticResource BoolToVisibility}}"
-                            AutomationProperties.AutomationId="BtnPrintPayment"/>
+                            AutomationProperties.AutomationId="BtnPrintPayment"
+                            ToolTip="طباعة سند الدفع"/>
                     <Button Content="🚫 إغلاق"
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
                             TabIndex="7"
-                            AutomationProperties.AutomationId="BtnCancelPayment"/>
+                            AutomationProperties.AutomationId="BtnCancelPayment"
+                            ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 

@@ -292,7 +292,6 @@ namespace SalesSystem.Desktop.Forms.Warehouses
 
         private readonly ErrorProvider _errorProvider = new();
 
-        private TextBox txtCode = null!;
         private TextBox txtName = null!;
         private TextBox txtLocation = null!;
         private CheckBox chkIsDefault = null!;
@@ -315,8 +314,8 @@ namespace SalesSystem.Desktop.Forms.Warehouses
         {
             Text = _warehouseId.HasValue ? "تعديل مخزن" : "إضافة مخزن";
             StartPosition = FormStartPosition.CenterParent;
-            Size = new Size(650, 380);
-            MinimumSize = new Size(600, 340);
+            Size = new Size(650, 310);
+            MinimumSize = new Size(600, 310);
             RightToLeft = RightToLeft.Yes;
             RightToLeftLayout = true;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -330,20 +329,13 @@ namespace SalesSystem.Desktop.Forms.Warehouses
                 Dock = DockStyle.Fill,
                 Padding = new Padding(12),
                 ColumnCount = 1,
-                RowCount = 5
+                RowCount = 4
             };
 
-            mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
-
-            txtCode = new TextBox
-            {
-                Dock = DockStyle.Fill,
-                PlaceholderText = "الكود"
-            };
 
             txtName = new TextBox
             {
@@ -396,8 +388,7 @@ namespace SalesSystem.Desktop.Forms.Warehouses
             buttonsPanel.Controls.Add(btnSave);
             buttonsPanel.Controls.Add(btnCancel);
 
-            mainPanel.Controls.Add(CreateLabeledPanel("الكود:", txtCode), 0, 0);
-            mainPanel.Controls.Add(CreateLabeledPanel("اسم المخزن:", txtName), 0, 1);
+            mainPanel.Controls.Add(CreateLabeledPanel("اسم المخزن:", txtName), 0, 0);
             mainPanel.Controls.Add(CreateLabeledPanel("الموقع:", txtLocation), 0, 2);
             mainPanel.Controls.Add(CreateOptionsPanel(), 0, 3);
             mainPanel.Controls.Add(buttonsPanel, 0, 4);
@@ -461,7 +452,6 @@ namespace SalesSystem.Desktop.Forms.Warehouses
                     return;
                 }
 
-                txtCode.Text = warehouse.Code ?? string.Empty;
                 txtName.Text = warehouse.Name;
                 txtLocation.Text = warehouse.Location ?? string.Empty;
                 chkIsDefault.Checked = warehouse.IsDefault;
@@ -532,7 +522,6 @@ namespace SalesSystem.Desktop.Forms.Warehouses
         {
             return new CreateWarehouseRequestDto
             {
-                Code = TrimToNull(txtCode.Text),
                 Name = txtName.Text.Trim(),
                 Location = TrimToNull(txtLocation.Text),
                 IsDefault = chkIsDefault.Checked,
@@ -544,7 +533,6 @@ namespace SalesSystem.Desktop.Forms.Warehouses
         {
             return new UpdateWarehouseRequestDto
             {
-                Code = TrimToNull(txtCode.Text),
                 Name = txtName.Text.Trim(),
                 Location = TrimToNull(txtLocation.Text),
                 IsDefault = chkIsDefault.Checked,

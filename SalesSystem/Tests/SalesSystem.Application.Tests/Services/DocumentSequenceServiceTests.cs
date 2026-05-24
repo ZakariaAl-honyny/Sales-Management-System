@@ -9,6 +9,7 @@ using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
+using System.Linq.Expressions;
 using Xunit.Abstractions;
 
 namespace SalesSystem.Application.Tests.Services;
@@ -114,7 +115,7 @@ public class DocumentSequenceServiceTests : IDisposable
 
         invResult.Value.Should().StartWith("INV-");
         purResult.Value.Should().StartWith("PUR-");
-        srResult.Should().StartWith("SR-");
+        srResult.Value.Should().StartWith("SR-");
 
         _output.WriteLine($"[DEBUG] INV: {invResult.Value}, PUR: {purResult.Value}, SR: {srResult}");
         _output.WriteLine("[PASS] Different prefixes have independent sequences");
@@ -249,6 +250,50 @@ public class DocumentSequenceServiceTests : IDisposable
 
         public void DeleteRange(IEnumerable<T> entities)
             => throw new NotImplementedException();
+
+        public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().FirstOrDefault(predicate));
+
+        public Task<T?> FirstOrDefaultIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().FirstOrDefault(predicate));
+
+        public Task<List<T>> ToListAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().ToList());
+
+        public Task<List<T>> ToListAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? queryConfig = null, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            if (queryConfig != null) query = queryConfig(query);
+            return Task.FromResult(query.ToList());
+        }
+
+        public Task<(List<T> Items, int TotalCount)> GetPagedAsync(Expression<Func<T, bool>>? predicate, Func<IQueryable<T>, IQueryable<T>>? orderConfig, int page, int pageSize, CancellationToken ct = default, bool ignoreQueryFilters = false, params string[] includePaths)
+        {
+            IQueryable<T> query = _context.Set<T>();
+            if (ignoreQueryFilters) query = query.IgnoreQueryFilters();
+            if (predicate != null) query = query.Where(predicate);
+            var totalCount = query.Count();
+            if (orderConfig != null) query = orderConfig(query);
+            var items = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            return Task.FromResult((items, totalCount));
+        }
+
+        public Task<List<T>> ToListIgnoreFiltersAsync(CancellationToken ct = default, params string[] includePaths)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().ToList());
+
+        public Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().Count() : _context.Set<T>().Count(predicate));
+
+        public Task<int> CountIgnoreFiltersAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken ct = default)
+            => Task.FromResult(predicate == null ? _context.Set<T>().IgnoreQueryFilters().Count() : _context.Set<T>().IgnoreQueryFilters().Count(predicate));
+
+        public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().Any(predicate));
+
+        public Task<bool> AnyIgnoreFiltersAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => Task.FromResult(_context.Set<T>().IgnoreQueryFilters().Any(predicate));
 
         public IQueryable<T> Query() => _context.Set<T>().AsQueryable();
     }

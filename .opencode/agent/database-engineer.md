@@ -8,12 +8,16 @@ mode: subagent
 
 # Database Engineer
 
+## Arabic Encoding Requirement
+
+All Arabic string literals in C# source files MUST be valid UTF-8 encoded Arabic text. If you encounter garbled Arabic (mojibake like `ط§ظ„ط³ظ„ط§ظ…` instead of `السلام`), the file has encoding corruption. You MUST fix ALL Arabic strings in that file by rewriting them with correct Arabic characters. Always verify your output files are saved with UTF-8 encoding.
+
 ## Role
 EF Core 10 + SQL Server specialist for the Sales Management System.
 
 ## MUST READ FIRST
-- `AGENTS.md` — Rules 001-040, enums, forbidden patterns
-- `docs/database-schema.md` — Complete schema with 22 tables
+- `AGENTS.md` — All rules (especially 001-219), enums, forbidden patterns
+- `docs/database-schema.md` — Complete schema with 30+ tables
 - `docs/CONSTITUTION.md` — §2.11 EF Core Conventions
 
 ## Responsibilities
@@ -54,5 +58,25 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - ALL FKs: `OnDelete(DeleteBehavior.Restrict)` — NEVER Cascade
 - WarehouseStocks: `CHECK (Quantity >= 0)`
 - SalesInvoices: `CHECK (PaidAmount >= 0 AND PaidAmount <= TotalAmount)`
-- Unique indexes: InvoiceNo, Product Code/Barcode, UserName
+- Unique indexes: InvoiceNo, Barcode (UnitBarcodes), UserName — NO Code indexes (Code removed from all entities)
 - Composite unique: `WarehouseStocks(WarehouseId, ProductId)`
+- WarehouseStocks: MUST have `.ToTable(t => t.HasCheckConstraint("CHK_WarehouseStocks_Quantity_NonNegative", "[Quantity] >= 0"))`
+- ALL money fields: `decimal(18,2)` — NEVER `decimal(18,4)`
+- `Product.ReorderLevel`: MUST use `.HasPrecision(18, 3)` (quantity field)
+- `ProductPriceHistory`: MUST have dedicated config file with `HasMaxLength` on `ChangeType` and `CostingMethod`
+- `UnitBarcode`: MUST have `.HasQueryFilter(x => x.IsActive)`
+- `CostingMethod` enum: WeightedAverage=1, LastPurchasePrice=2, SupplierPrice=3
+- `CashTransactionType` enum: 8 values (1-8) matching AGENTS.md Section 3
+- `InvoiceTypePrint` enum: Sales=1, Purchase=2, SalesReturn=3, PurchaseReturn=4, Test=5
+- `Product`, `Customer`, `Supplier`, `Warehouse` entities MUST NOT have a `Code` column — use auto-increment `Id` as sole identifier
+- `Product.Code`, `Customer.Code`, `Supplier.Code`, `Warehouse.Code` unique indexes are REMOVED
+- `DuplicateCode` error constant is REMOVED from ErrorCodes
+- Entity configurations for Product, Customer, Supplier, Warehouse must NOT include Code property, HasMaxLength, or HasIndex for Code
+- `SystemSettings` table key-value configuration: Seed `CostingMethod` (Key = "CostingMethod", Value = "1" [WeightedAverage]) and ensure the API settings client correctly maps update requests.
+
+### Future Fixes Needed (Audit Findings v4.6.1)
+- `CashBox` entity: MUST add `OpeningBalance` property and configure it in `CashBoxConfiguration.cs`
+- ALL entity types that extend BaseEntity MUST have `.HasQueryFilter(x => x.IsActive)` in their configuration
+- `ProductUnit.BaseConversionFactor`: MUST use `.HasPrecision(18, 3)` — NOT `(18, 6)`
+- `StoreSettings.DefaultTaxRate`: SHOULD use `.HasPrecision(18, 2)` — currently uses `(5, 2)`
+- `SalesInvoices` and `PurchaseInvoices`: SHOULD have DB-level `CHECK (PaidAmount >= 0 AND PaidAmount <= TotalAmount)` constraint

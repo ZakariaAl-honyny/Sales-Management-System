@@ -1,4 +1,4 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
+﻿using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -24,7 +24,6 @@ public class UnitListViewModel : ViewModelBase
     private ICollectionView? _unitsView;
     private UnitDto? _selectedUnit;
     private string _searchText = string.Empty;
-    private bool _isLoading;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
@@ -92,11 +91,6 @@ public class UnitListViewModel : ViewModelBase
         }
     }
 
-    public bool IsLoading
-    {
-        get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
-    }
 
     public string? ErrorMessage
     {
@@ -139,7 +133,7 @@ public class UnitListViewModel : ViewModelBase
 
     public async Task LoadUnitsAsync()
     {
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -151,7 +145,7 @@ public class UnitListViewModel : ViewModelBase
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Units.Clear();
-                    foreach (var item in result.Value)
+                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
                     {
                         Units.Add(item);
                     }
@@ -161,7 +155,7 @@ public class UnitListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الوحدات", "UnitListViewModel.LoadUnitsAsync", "[UnitListViewModel.LoadUnitsAsync] Failed to load units list.");
+                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„ظˆط­ط¯ط§طھ", "UnitListViewModel.LoadUnitsAsync", "[UnitListViewModel.LoadUnitsAsync] Failed to load units list.");
                 IsEmpty = Units.Count == 0;
             }
         }
@@ -171,7 +165,7 @@ public class UnitListViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -217,11 +211,11 @@ public async Task DeleteUnitAsync()
     {
         if (SelectedUnit == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"الوحدة: {SelectedUnit.Name}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"ط§ظ„ظˆط­ط¯ط©: {SelectedUnit.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -232,11 +226,11 @@ public async Task DeleteUnitAsync()
                 if (deleteResult.IsSuccess)
                 {
                     await LoadUnitsAsync();
-                    _toastService.ShowSuccess("تم إلغاء تنشيط الوحدة بنجاح");
+                    _toastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظˆط­ط¯ط© ط¨ظ†ط¬ط§ط­");
                 }
                 else
                 {
-                    ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط الوحدة";
+                    ErrorMessage = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظˆط­ط¯ط©";
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -245,22 +239,24 @@ public async Task DeleteUnitAsync()
                 if (deleteResult.IsSuccess)
                 {
                     await LoadUnitsAsync();
-                    _toastService.ShowSuccess("تم حذف الوحدة نهائياً");
+                    _toastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„ظˆط­ط¯ط© ظ†ظ‡ط§ط¦ظٹط§ظ‹");
                 }
                 else
                 {
-                    ErrorMessage = deleteResult.Error ?? "فشل في حذف الوحدة";
+                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ظˆط­ط¯ط©";
+                    ErrorMessage = error;
+                    LogSystemError($"Hard delete failed for Unit {SelectedUnit.Id}: {error}", "UnitListViewModel.DeleteUnitAsync");
                 }
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ظ„ط­ط°ظپ";
             HandleException(ex, "UnitListViewModel.DeleteUnitAsync", $"[UnitListViewModel.DeleteUnitAsync] Failed to delete unit with ID {SelectedUnit?.Id}.");
         }
         finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -268,7 +264,7 @@ public async Task DeleteUnitAsync()
     {
         if (SelectedUnit == null) return;
 
-        IsLoading = true;
+        IsBusy = true;
         ErrorMessage = null;
 
         try
@@ -284,22 +280,22 @@ public async Task DeleteUnitAsync()
             if (result.IsSuccess)
             {
                 await LoadUnitsAsync();
-                await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة الوحدة بنجاح");
+                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظˆط­ط¯ط© ط¨ظ†ط¬ط§ط­");
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في استعادة الوحدة";
-                await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
+                ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظˆط­ط¯ط©";
+                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط§ط³طھط¹ط§ط¯ط©", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"حدث خطأ: {ex.Message}";
+            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظˆط­ط¯ط©";
             HandleException(ex, "UnitListViewModel.RestoreUnitAsync", $"[UnitListViewModel.RestoreUnitAsync] Failed to restore unit with ID {SelectedUnit?.Id}.");
         }
 finally
         {
-            IsLoading = false;
+            IsBusy = false;
         }
     }
 
@@ -322,3 +318,7 @@ finally
     }
     #endregion
 }
+
+
+
+

@@ -6,7 +6,6 @@ namespace SalesSystem.Domain.Entities;
 
 public class Product : BaseEntity
 {
-    public string? Code { get; private set; }
     public string? Barcode { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int? CategoryId { get; private set; }
@@ -119,7 +118,6 @@ public class Product : BaseEntity
         decimal wholesalePrice = 0,
         decimal conversionFactor = 1,
         decimal minStock = 0,
-        string? code = null,
         string? barcode = null,
         int? categoryId = null,
         int? retailUnitId = null,
@@ -148,7 +146,6 @@ public class Product : BaseEntity
             WholesalePrice = wholesalePrice,
             ConversionFactor = conversionFactor,
             MinStock = minStock,
-            Code = code,
             Barcode = barcode,
             CategoryId = categoryId,
             RetailUnitId = retailUnitId,
@@ -169,7 +166,6 @@ public class Product : BaseEntity
         decimal wholesalePrice,
         decimal conversionFactor,
         decimal minStock,
-        string? code,
         string? barcode,
         int? categoryId,
         int? retailUnitId,
@@ -196,7 +192,6 @@ public class Product : BaseEntity
         WholesalePrice = wholesalePrice;
         ConversionFactor = conversionFactor;
         MinStock = minStock;
-        Code = code;
         Barcode = barcode;
         CategoryId = categoryId;
         RetailUnitId = retailUnitId;

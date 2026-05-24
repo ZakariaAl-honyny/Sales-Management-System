@@ -84,7 +84,6 @@ public class UpdateProductRequestValidatorTests
     #endregion
 
     private static UpdateProductRequest CreateValidRequest() => new(
-        Code: "PROD001",
         Barcode: "123456789",
         Name: "Valid Product",
         CategoryId: 1,

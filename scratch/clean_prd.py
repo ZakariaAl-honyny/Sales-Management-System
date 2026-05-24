@@ -1,7 +1,7 @@
 import sys
 import os
 
-prd_path = r'c:\Users\ALlahabi\Desktop\Sales Management System\docs\PRD-MVP-v3.0.md'
+prd_path = r'c:\Users\ALlahabi\Desktop\Sales Management System\docs\PRD-MVP.md'
 
 with open(prd_path, 'r', encoding='utf-8', errors='ignore') as f:
     lines = f.readlines()

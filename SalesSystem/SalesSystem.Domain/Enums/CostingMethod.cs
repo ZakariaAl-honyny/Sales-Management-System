@@ -9,17 +9,17 @@ public enum CostingMethod : byte
     /// متوسط التكلفة المرجح — Weighted Average Cost
     /// Formula: [(OldQty × OldCost) + (NewQty × NewCost)] / TotalQty
     /// </summary>
-    WeightedAverage = 0,
+    WeightedAverage = 1,
 
     /// <summary>
     /// آخر سعر توريد — Last Purchase Price
     /// Simply uses the price from the most recent purchase invoice.
     /// </summary>
-    LastPurchasePrice = 1,
+    LastPurchasePrice = 2,
 
     /// <summary>
     /// سعر المورد — Supplier Catalog Price
     /// Uses the supplier's catalog price (not the actual invoice price).
     /// </summary>
-    SupplierPrice = 2
+    SupplierPrice = 3
 }

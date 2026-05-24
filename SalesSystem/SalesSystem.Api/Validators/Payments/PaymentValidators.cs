@@ -15,6 +15,18 @@ public class CreateCustomerPaymentValidator : AbstractValidator<CreateCustomerPa
 
         RuleFor(x => x.PaymentMethod)
             .IsInEnum().WithMessage("طريقة الدفع غير صحيحة");
+
+        RuleFor(x => x.SalesInvoiceId)
+            .GreaterThan(0).When(x => x.SalesInvoiceId.HasValue)
+            .WithMessage("رقم فاتورة البيع غير صحيح");
+
+        RuleFor(x => x.PaymentDate)
+            .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.PaymentDate.HasValue)
+            .WithMessage("تاريخ الدفع لا يمكن أن يكون في المستقبل");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(500).When(x => x.Notes != null)
+            .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
     }
 }
 
@@ -30,5 +42,17 @@ public class CreateSupplierPaymentValidator : AbstractValidator<CreateSupplierPa
 
         RuleFor(x => x.PaymentMethod)
             .IsInEnum().WithMessage("طريقة الدفع غير صحيحة");
+
+        RuleFor(x => x.PurchaseInvoiceId)
+            .GreaterThan(0).When(x => x.PurchaseInvoiceId.HasValue)
+            .WithMessage("رقم فاتورة الشراء غير صحيح");
+
+        RuleFor(x => x.PaymentDate)
+            .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.PaymentDate.HasValue)
+            .WithMessage("تاريخ الدفع لا يمكن أن يكون في المستقبل");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(500).When(x => x.Notes != null)
+            .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
     }
 }

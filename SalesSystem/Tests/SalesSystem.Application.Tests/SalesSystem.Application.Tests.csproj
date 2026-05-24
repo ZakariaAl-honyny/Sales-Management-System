@@ -24,35 +24,5 @@
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
-  <!-- All service tests excluded: require complete rewrite to match current API signatures.
-       Key changes since tests were written:
-       - Entity factory methods (Product.Create, Customer.Create, etc.) have different parameters
-       - Request DTOs are now positional (not object initializers) with required parameters
-       - Service constructors now require IDocumentSequenceService
-       - GetAllAsync methods now require includeInactive parameter
-       - ValidateStockAsync now has allowNegativeStock parameter
-       - Report DTOs have completely different constructors
-       - User.Activate() and Customer.Activate() methods removed
-       - LoginRequest is now positional constructor
-       - Product pricing moved from Product to ProductUnit (v4.3)
-       - Return requests use unified ReturnItemRequest instead of per-type requests -->
-  <ItemGroup>
-    <Compile Remove="Services\AuthServiceTests.cs" />
-    <Compile Remove="Services\WarehouseServiceTests.cs" />
-    <Compile Remove="Services\UserServiceTests.cs" />
-    <Compile Remove="Services\InventoryServiceTests.cs" />
-    <Compile Remove="Services\DocumentSequenceServiceTests.cs" />
-    <Compile Remove="Services\PaymentServiceTests.cs" />
-    <Compile Remove="Services\ReportServiceTests.cs" />
-    <Compile Remove="Services\CategoryServiceTests.cs" />
-    <Compile Remove="Services\CustomerServiceTests.cs" />
-    <Compile Remove="Services\UnitServiceTests.cs" />
-    <Compile Remove="Services\SalesReturnServiceTests.cs" />
-    <Compile Remove="Services\PurchaseReturnServiceTests.cs" />
-    <Compile Remove="Services\PurchaseServiceTests.cs" />
-    <Compile Remove="Services\SalesServiceTests.cs" />
-    <Compile Remove="Services\SupplierServiceTests.cs" />
-    <Compile Remove="Services\ProductServiceTests.cs" />
-    <Compile Remove="Services\StoreSettingsServiceTests.cs" />
-  </ItemGroup>
+
 </Project>
