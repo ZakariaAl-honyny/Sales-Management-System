@@ -13,8 +13,8 @@ namespace SalesSystem.E2ETests;
 [Collection("E2E")]
 public class UserManagementTests : TestBase, IDisposable
 {
-    private Window _mainWindow;
-    private Window _userEditorWindow;
+    private Window? _mainWindow;
+    private Window? _userEditorWindow;
     private bool _disposed;
 
     public UserManagementTests()
@@ -45,7 +45,7 @@ public class UserManagementTests : TestBase, IDisposable
         var windows = GetApplicationWindows();
         _mainWindow = windows.FirstOrDefault(w =>
             w.Name.Contains("المبيعات") || w.Name.Contains("Sales") || w.Name.Contains("System"))
-            ?? windows.FirstOrDefault();
+            ?? windows.FirstOrDefault()!;
     }
 
     /// <summary>

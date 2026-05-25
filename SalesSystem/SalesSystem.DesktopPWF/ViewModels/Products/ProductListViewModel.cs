@@ -22,6 +22,7 @@ public class ProductListViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<ProductDto> _products = new();
     private ICollectionView? _productsView;
@@ -30,7 +31,7 @@ public class ProductListViewModel : ViewModelBase
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
-    private string _lastUpdateTime = "ظ„ظ… ظٹطھظ… ط§ظ„طھط­ط¯ظٹط« ط¨ط¹ط¯";
+    private string _lastUpdateTime = "لم يتم التحديث بعد";
 
     public ProductListViewModel()
     {
@@ -38,6 +39,7 @@ public class ProductListViewModel : ViewModelBase
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         InitializeCommands();
     }
@@ -49,11 +51,13 @@ public class ProductListViewModel : ViewModelBase
         IProductApiService productService,
         IEventBus eventBus,
         IDialogService dialogService,
+        IScreenWindowService screenWindowService,
         IToastNotificationService? toastService = null)
     {
         _productService = productService ?? throw new ArgumentNullException(nameof(productService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+        _screenWindowService = screenWindowService ?? throw new ArgumentNullException(nameof(screenWindowService));
         _toastService = toastService ?? App.GetService<IToastNotificationService>();
 
         InitializeCommands();
@@ -180,7 +184,7 @@ public class ProductListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„ظ…ظ†طھط¬ط§طھ", "ProductListViewModel.LoadProductsAsync", "[ProductListViewModel.LoadProductsAsync] Failed to load products from API.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المنتجات", "ProductListViewModel.LoadProductsAsync", "[ProductListViewModel.LoadProductsAsync] Failed to load products from API.");
                 IsEmpty = Products.Count == 0;
             }
         }
@@ -214,12 +218,17 @@ public class ProductListViewModel : ViewModelBase
 
     private void AddProduct()
     {
-        var editorVm = new ProductEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        var editorVm = App.GetService<ProductEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            // Product was saved successfully - refresh list
-            _ = LoadProductsAsync();
-        }
+            Title = "منتج جديد",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadProductsAsync());
+            }
+        });
     }
 
     private void EditProduct()
@@ -227,10 +236,16 @@ public class ProductListViewModel : ViewModelBase
         if (SelectedProduct == null) return;
 
         var editorVm = new ProductEditorViewModel(SelectedProduct);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadProductsAsync();
-        }
+            Title = "تعديل منتج",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadProductsAsync());
+            }
+        });
     }
 
     public void EditProductFromDoubleClick()
@@ -245,7 +260,7 @@ public async Task DeleteProductAsync()
     {
         if (SelectedProduct == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"ط§ظ„ظ…ظ†طھط¬: {SelectedProduct.Name}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"المنتج: {SelectedProduct.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
@@ -261,11 +276,11 @@ public async Task DeleteProductAsync()
                 {
                     _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
                     await LoadProductsAsync();
-                    _toastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظ…ظ†طھط¬ ط¨ظ†ط¬ط§ط­");
+                    _toastService.ShowSuccess("تم إلغاء تنشيط المنتج بنجاح");
                 }
                 else
                 {
-                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬";
+                    var error = deleteResult.Error ?? "فشل في حذف المنتج";
                     ErrorMessage = error;
                     _toastService.ShowError(error);
                 }
@@ -277,11 +292,11 @@ public async Task DeleteProductAsync()
                 {
                     _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
                     await LoadProductsAsync();
-                    _toastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬ ظ†ظ‡ط§ط¦ظٹط§ظ‹");
+                    _toastService.ShowSuccess("تم حذف المنتج نهائياً");
                 }
                 else
                 {
-                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬";
+                    var error = deleteResult.Error ?? "فشل في حذف المنتج";
                     ErrorMessage = error;
                     _toastService.ShowError(error);
                     LogSystemError($"Hard delete failed for Product {SelectedProduct.Id}: {error}", "ProductListViewModel.DeleteProductAsync");
@@ -330,11 +345,11 @@ public async Task DeleteProductAsync()
             {
                 _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
                 await LoadProductsAsync();
-                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظ†طھط¬ ط¨ظ†ط¬ط§ط­");
+                await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة المنتج بنجاح");
             }
             else
             {
-                ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظ†طھط¬";
+                ErrorMessage = result.Error ?? "فشل في استعادة المنتج";
             }
         }
         catch (Exception ex)

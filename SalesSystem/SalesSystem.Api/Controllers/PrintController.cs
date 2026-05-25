@@ -150,7 +150,7 @@ public class PrintController : ControllerBase
         if (!pdfResult.IsSuccess)
             return BadRequest(new { error = pdfResult.Error });
 
-        return File(pdfResult.Value, "application/pdf", $"Invoice_{id}.pdf");
+        return File(pdfResult.Value!, "application/pdf", $"Invoice_{id}.pdf");
     }
 
     [HttpGet("generate-a4/purchase/{id:int}")]
@@ -165,7 +165,7 @@ public class PrintController : ControllerBase
         if (!pdfResult.IsSuccess)
             return BadRequest(new { error = pdfResult.Error });
 
-        return File(pdfResult.Value, "application/pdf", $"PurchaseInvoice_{id}.pdf");
+        return File(pdfResult.Value!, "application/pdf", $"PurchaseInvoice_{id}.pdf");
     }
 
     /// <summary>
@@ -234,7 +234,7 @@ public class PrintController : ControllerBase
         var sysSettingsResult = await _printDataService.GetPrintSystemSettingsAsync(ct);
 
         var settings = settingsResult.IsSuccess ? settingsResult.Value : null;
-        var sysSettings = sysSettingsResult.IsSuccess ? sysSettingsResult.Value : new List<SystemSetting>();
+        var sysSettings = sysSettingsResult.IsSuccess && sysSettingsResult.Value != null ? sysSettingsResult.Value : new List<SystemSetting>();
 
         var storeName = settings?.StoreName ?? "متجري";
         var storePhone = settings?.Phone ?? string.Empty;

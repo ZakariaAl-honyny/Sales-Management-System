@@ -2,6 +2,85 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.5 — Multi-Window & UI Polish (2026-05-25)
+
+### ✨ New Features
+- **Multi-Window Non-Modal Editors**: Editors now open in separate non-modal windows (Product, Customer, Supplier, Category, Unit, User, Sales Invoice, Purchase Invoice, etc.)
+- **ScreenWindowService**: Generic window host with cascade positioning (30px offset, modulo 10 reset)
+- **WeakReference Window Tracking**: Closed windows are fully garbage collected — no memory leaks
+- **Arabic Auto-Titles**: Editor windows display descriptive Arabic titles (e.g., "فاتورة بيع جديدة")
+
+### 🐛 Bug Fixes
+- **Dialog Ownership**: Dialogs now correctly center over the active window — no more self-ownership crashes
+- **EventBus Memory Leaks**: DashboardViewModel now uses standard `Cleanup()` override for unsubscription
+- **DialogService Active Window Resolution**: Owner correctly resolved to the active window instead of always MainWindow
+
+### 🛠️ Improvements
+- **Newest-First Sorting**: All list screens (Products, Customers, Suppliers, Invoices, etc.) default to newest-first
+- **Arabic ToolTips**: All primary interactive controls now have descriptive Arabic ToolTips
+- **MessageBox Elimination**: Zero remaining `MessageBox.Show` calls — 100% IDialogService
+
+## v4.4 — Production Hardening (2026-05-25)
+
+### الميزات الجديدة
+- **DPAPI Connection String Encryption**: تشفير سلسلة الاتصال بقاعدة البيانات باستخدام `ProtectedData` على أول تشغيل
+  - `ConnectionStringProtector` مع بادئة `"DPAPI:"` وفحص عدم التشفير المزدوج
+  - `SecureDbContextFactory` مع fallback إلى متغير البيئة `SALESSYSTEM_DB_CONNECTION`
+  - كتابة ذرية للملفات: `.tmp` ← `File.Replace()` ← `.bak`
+  - `FirstRunSetupService` لتشفير الإعدادات تلقائياً عند أول تشغيل
+  - `SecurityAudit.cs` — فحص أمني في وضع DEBUG فقط
+- **Windows Service Hosting**: تشغيل API كخدمة ويندوز مع سياسة استرداد تلقائي
+  - `UseWindowsService()` مع اسم الخدمة `SalesSystemService`
+  - 3 محاولات إعادة تشغيل عند الفشل (1د، 5د، 15د)
+  - Serilog EventLog sink لتسجيل الخدمة
+  - إعادة محاولة SQL عند بدء التشغيل: 3 محاولات × 5 ثوانٍ
+  - ترحيل قاعدة البيانات تلقائياً عند بدء الخدمة
+- **Automated Daily Backups**: نسخ احتياطي تلقائي يومي مع تنظيف قديم
+  - `ScheduledBackupWorker` — `BackgroundService` يومياً عند 2:00 صباحاً
+  - SQL خام `BACKUP DATABASE` بدون SMO
+  - استعادة باستخدام `SINGLE_USER WITH ROLLBACK AFTER 30` (مهلة 30 ثانية للمعاملات النشطة)
+  - `TrySetMultiUserAsync` للاسترداد عند فشل الاستعادة — لا تُترك DB في SINGLE_USER أبداً
+  - `DeleteOldBackupsAsync` — حذف النسخ القديمة تلقائياً (الاحتفاظ الافتراضي 30 يوماً)
+  - `int.TryParse` لكل قيم الإعدادات — لا `FormatException`
+- **Desktop Health Check**: فحص اتصال قاعدة البيانات قبل عرض شاشة الدخول
+  - `IDatabaseHealthCheckService` — يفحص `/api/v1/health/database` قبل تسجيل الدخول
+  - `DatabaseErrorDialog` مع زر إعادة المحاولة والخروج ورسائل خطأ بالعربية
+  - `ExceptionMiddleware` يكتشف استثناءات الاتصال ويعيد `503 Service Unavailable` مع رمز `DATABASE_CONNECTION_ERROR`
+  - نقطة نهاية `GET /api/v1/health/database` تستخدم `DbContext.Database.CanConnectAsync()`
+- **Silent Auto-Update**: تحديث تلقائي في الخلفية مع تحقق من SHA256
+  - `IUpdaterService` و `UpdaterService` — فحص تحديثات مع timeout 8 ثوانٍ وفشل صامت
+  - `GitHubUpdaterService` — بديل يستخدم GitHub API
+  - `UpdateDialogViewModel` مع `IDisposable` وإبلاغ التقدم و 4 أوامر
+  - `UpdateDialog.xaml` — نافذة RTL بدون حدود مع مقارنة الإصدار وسجل التغييرات وشريط التقدم
+  - تحقق SHA256 قبل تشغيل المثبت
+  - `LaunchInstallerAndExitAsync` يعيد `Result<bool>` — المتصل يدير الإغلاق
+  - الإصدار المُتخطّى محفوظ في `%AppData%\SalesSystem\settings.json`
+  - مقارنة الإصدارات باستخدام `System.Version` — لا مقارنة نصوص
+- **Settings UI**: حقول إعدادات النسخ الاحتياطي والتحديث في صفحة الإعدادات
+  - مسار النسخ الاحتياطي، وقت الجدولة، أيام الاحتفاظ
+  - عنوان خادم التحديث (Update Server URL)
+  - `AdminOnlyViewModel` — فرض صلاحية Admin عبر `ISessionService` المُحقونة في المُنشئ
+  - `UserListViewModel` — إدارة المستخدمين مع Toggle Status (حذف ناعم) وإعادة تعيين كلمة المرور
+
+### تحسينات
+- إضافة `ShowInfoAsync` إلى `IDialogService` — ثيمة زرقاء وأيقونة معلومات
+- استبدال جميع استدعاءات `MessageBox.Show` في `MainWindow.xaml.cs` بـ `IDialogService`
+- `AdminOnlyViewModel` يستخدم حقن التبعية في المُنشئ بدلاً من service locator
+- مشاركة معالج قوائم التقارير باستخدام `Tag` بدلاً من معالجات مكررة
+- `HashGen.cs` — حُذف (يحتوي على `Console.WriteLine` مخالف لـ RULE-035)
+- `UpdateDialogViewModel` — تنفيذ `IDisposable` للتخلص من `_downloadCts`
+- استخدام atomic write في `FirstRunSetupService` (`.tmp` → `File.Replace()`)
+- `ROLLBACK IMMEDIATE` ← `ROLLBACK AFTER 30` في `BackupService`
+
+### الميزات الجديدة (طباعة)
+- إعدادات طباعة A4 وحرارية مع اختيار الطابعة وتكوين الرأس والتذييل
+- **Inno Setup Installer**: `Installer/SalesSystem.iss` مع فحص .NET 10 runtime
+  - تثبيت يتطلب صلاحيات المدير (Admin install)
+  - تشغيل Windows Service تلقائياً أثناء التثبيت
+  - إنشاء مجلد النسخ الاحتياطي وتعيين الصلاحيات
+  - واجهة عربية كاملة للمثبت
+- **Post-Quantum Readiness**: بنية أمنية قابلة للترقية (DPAPI + env vars + salt)
+
 ## v4.3 — نظام الخزينة النقدية (2026-05-24)
 
 ### الميزات الجديدة

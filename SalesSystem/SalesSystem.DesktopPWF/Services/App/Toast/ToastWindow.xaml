@@ -52,7 +52,8 @@
                     Cursor="Hand"
                     VerticalAlignment="Top"
                     Margin="8,0,0,0"
-                    Click="CloseButton_Click"/>
+                    Click="CloseButton_Click"
+                    ToolTip="إخفاء رسالة التنبيه"/>
         </Grid>
     </Border>
 </Window>

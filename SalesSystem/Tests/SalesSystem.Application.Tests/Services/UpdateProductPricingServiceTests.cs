@@ -58,7 +58,7 @@ public class UpdateProductPricingServiceTests
         var mockHistoryRepo = new Mock<IGenericRepository<ProductPriceHistory>>();
         mockHistoryRepo.Setup(r => r.AddAsync(It.IsAny<ProductPriceHistory>(), It.IsAny<CancellationToken>()))
             .Callback<ProductPriceHistory, CancellationToken>((h, _) => priceHistory.Add(h))
-            .ReturnsAsync(default(ProductPriceHistory));
+            .ReturnsAsync((ProductPriceHistory)null!);
 
         _mockUow.Setup(u => u.ProductUnits).Returns(mockProductUnitsRepo.Object);
         _mockUow.Setup(u => u.WarehouseStocks).Returns(mockStockRepo.Object);
@@ -101,7 +101,7 @@ public class UpdateProductPricingServiceTests
         var mockStockRepo = CreateMockRepo<WarehouseStock>(new List<WarehouseStock>());
         var mockHistoryRepo = new Mock<IGenericRepository<ProductPriceHistory>>();
         mockHistoryRepo.Setup(r => r.AddAsync(It.IsAny<ProductPriceHistory>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(default(ProductPriceHistory));
+            .ReturnsAsync((ProductPriceHistory)null!);
 
         _mockUow.Setup(u => u.ProductUnits).Returns(mockProductUnitsRepo.Object);
         _mockUow.Setup(u => u.WarehouseStocks).Returns(mockStockRepo.Object);
@@ -139,7 +139,7 @@ public class UpdateProductPricingServiceTests
         var mockStockRepo = CreateMockRepo<WarehouseStock>(new List<WarehouseStock>());
         var mockHistoryRepo = new Mock<IGenericRepository<ProductPriceHistory>>();
         mockHistoryRepo.Setup(r => r.AddAsync(It.IsAny<ProductPriceHistory>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(default(ProductPriceHistory));
+            .ReturnsAsync((ProductPriceHistory)null!);
 
         _mockUow.Setup(u => u.ProductUnits).Returns(mockProductUnitsRepo.Object);
         _mockUow.Setup(u => u.WarehouseStocks).Returns(mockStockRepo.Object);
@@ -179,7 +179,7 @@ public class UpdateProductPricingServiceTests
         var mockStockRepo = CreateMockRepo<WarehouseStock>(new List<WarehouseStock>());
         var mockHistoryRepo = new Mock<IGenericRepository<ProductPriceHistory>>();
         mockHistoryRepo.Setup(r => r.AddAsync(It.IsAny<ProductPriceHistory>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(default(ProductPriceHistory));
+            .ReturnsAsync((ProductPriceHistory)null!);
 
         _mockUow.Setup(u => u.ProductUnits).Returns(mockProductUnitsRepo.Object);
         _mockUow.Setup(u => u.WarehouseStocks).Returns(mockStockRepo.Object);
@@ -217,7 +217,7 @@ public class UpdateProductPricingServiceTests
         var mockStockRepo = CreateMockRepo<WarehouseStock>(new List<WarehouseStock>());
         var mockHistoryRepo = new Mock<IGenericRepository<ProductPriceHistory>>();
         mockHistoryRepo.Setup(r => r.AddAsync(It.IsAny<ProductPriceHistory>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(default(ProductPriceHistory));
+            .ReturnsAsync((ProductPriceHistory)null!);
 
         _mockUow.Setup(u => u.ProductUnits).Returns(mockProductUnitsRepo.Object);
         _mockUow.Setup(u => u.WarehouseStocks).Returns(mockStockRepo.Object);
@@ -260,7 +260,7 @@ public class UpdateProductPricingServiceTests
         var historyEntries = new List<ProductPriceHistory>();
         mockHistoryRepo.Setup(r => r.AddAsync(It.IsAny<ProductPriceHistory>(), It.IsAny<CancellationToken>()))
             .Callback<ProductPriceHistory, CancellationToken>((h, _) => historyEntries.Add(h))
-            .ReturnsAsync(default(ProductPriceHistory));
+            .ReturnsAsync((ProductPriceHistory)null!);
 
         _mockUow.Setup(u => u.ProductUnits).Returns(mockProductUnitsRepo.Object);
         _mockUow.Setup(u => u.WarehouseStocks).Returns(mockStockRepo.Object);

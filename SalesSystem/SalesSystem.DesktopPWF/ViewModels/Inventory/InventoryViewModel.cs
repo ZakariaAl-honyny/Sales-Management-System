@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Services.Api;
@@ -103,7 +104,7 @@ get;
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
                     Movements.Clear();
-                    foreach (var item in movementsResult.Value)
+                    foreach (var item in movementsResult.Value.OrderByDescending(x => x.Id))
                     {
                         Movements.Add(item);
                     }

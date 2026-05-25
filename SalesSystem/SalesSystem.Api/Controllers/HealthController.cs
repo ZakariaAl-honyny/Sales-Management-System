@@ -1,9 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
-using SalesSystem.Infrastructure.Data;
-using System.Threading.Tasks;
+using SalesSystem.Contracts.Responses;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -15,12 +14,12 @@ namespace SalesSystem.Api.Controllers;
 [AllowAnonymous]
 public class HealthController : ControllerBase
 {
-    private readonly SalesDbContext _dbContext;
+    private readonly HealthCheckService _healthChecker;
     private readonly ILogger<HealthController> _logger;
 
-    public HealthController(SalesDbContext dbContext, ILogger<HealthController> logger)
+    public HealthController(HealthCheckService healthChecker, ILogger<HealthController> logger)
     {
-        _dbContext = dbContext;
+        _healthChecker = healthChecker;
         _logger = logger;
     }
 
@@ -30,22 +29,23 @@ public class HealthController : ControllerBase
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> GetHealth()
+    public async Task<IActionResult> GetHealth(CancellationToken ct)
     {
         try
         {
-            var isConnected = await _dbContext.Database.CanConnectAsync();
-            if (isConnected)
+            var report = await _healthChecker.CheckHealthAsync(ct);
+            if (report.Status == HealthStatus.Healthy)
             {
-                return Ok(new { status = "healthy", database = "connected" });
+                return Ok(new HealthCheckDto("Healthy", "Connected", DateTime.UtcNow));
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Health check failed: database unreachable");
+            _logger.LogWarning(ex, "Health check failed");
         }
 
-        return StatusCode(StatusCodes.Status503ServiceUnavailable, new { status = "unhealthy", database = "disconnected" });
+        return StatusCode(StatusCodes.Status503ServiceUnavailable,
+            new HealthCheckDto("Unhealthy", "Disconnected", DateTime.UtcNow));
     }
 
     /// <summary>
@@ -54,21 +54,29 @@ public class HealthController : ControllerBase
     [HttpGet("database")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> GetDatabaseHealth()
+    public async Task<IActionResult> GetDatabaseHealth(CancellationToken ct)
     {
         try
         {
-            var isConnected = await _dbContext.Database.CanConnectAsync();
-            if (isConnected)
+            var report = await _healthChecker.CheckHealthAsync(ct);
+
+            if (report.Entries.TryGetValue("database", out var dbEntry) &&
+                dbEntry.Status == HealthStatus.Healthy)
+            {
+                return Ok(new { status = "connected" });
+            }
+
+            if (report.Status == HealthStatus.Healthy)
             {
                 return Ok(new { status = "connected" });
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Health check failed: database unreachable");
+            _logger.LogWarning(ex, "Database health check failed");
         }
 
-        return StatusCode(StatusCodes.Status503ServiceUnavailable, new { status = "disconnected" });
+        return StatusCode(StatusCodes.Status503ServiceUnavailable,
+            new { status = "disconnected" });
     }
 }

@@ -41,6 +41,7 @@
                     </TextBlock>
                 </StackPanel>
                 <Button Grid.Column="1"
+                        ToolTip="عرض تعليمات إضافة الوحدات"
                         Content="تفاصيل أكثر"
                         Command="{Binding ShowHelpCommand}"
                         Background="Transparent"
@@ -162,6 +163,7 @@
 
                                 <!-- Remove Button -->
                                 <Button Grid.Column="6"
+                                        ToolTip="حذف الوحدة المحددة"
                                         Content="✕"
                                         Command="{Binding DataContext.RemoveUnitCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                         CommandParameter="{Binding}"

@@ -21,6 +21,7 @@ public class CustomerListViewModelTests : IDisposable
     private readonly Mock<ICustomerApiService> _mockCustomerService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
+    private readonly Mock<IScreenWindowService> _mockScreenWindowService;
     private readonly Mock<IToastNotificationService> _mockToastService;
     private readonly CustomerListViewModel _viewModel;
 
@@ -29,12 +30,14 @@ public class CustomerListViewModelTests : IDisposable
         _mockCustomerService = new Mock<ICustomerApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
+        _mockScreenWindowService = new Mock<IScreenWindowService>();
         _mockToastService = new Mock<IToastNotificationService>();
 
         _viewModel = new CustomerListViewModel(
             _mockCustomerService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
+            _mockScreenWindowService.Object,
             _mockToastService.Object);
     }
 
@@ -394,6 +397,7 @@ public class CustomerListViewModelTests : IDisposable
             _mockCustomerService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
+            _mockScreenWindowService.Object,
             _mockToastService.Object);
 
         capturedHandler.Should().NotBeNull("Handler should be subscribed on construction");

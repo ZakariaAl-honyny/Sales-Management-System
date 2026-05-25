@@ -2,6 +2,7 @@
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
@@ -22,6 +23,7 @@ public class SupplierListViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<SupplierDto> _suppliers = new();
     private ICollectionView? _suppliersView;
@@ -37,6 +39,7 @@ public class SupplierListViewModel : ViewModelBase
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         InitializeCommands();
     }
@@ -45,11 +48,13 @@ public class SupplierListViewModel : ViewModelBase
         ISupplierApiService supplierService,
         IEventBus eventBus,
         IDialogService dialogService,
+        IScreenWindowService screenWindowService,
         IToastNotificationService toastService)
     {
         _supplierService = supplierService ?? throw new ArgumentNullException(nameof(supplierService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+        _screenWindowService = screenWindowService ?? throw new ArgumentNullException(nameof(screenWindowService));
         _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
 
         InitializeCommands();
@@ -177,7 +182,7 @@ public class SupplierListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ طھط­ظ…ظٹظ„ ط§ظ„ظ…ظˆط±ط¯ظٹظ†", "SupplierListViewModel.LoadSuppliersAsync");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل تحميل الموردين", "SupplierListViewModel.LoadSuppliersAsync");
             }
         }
         catch (Exception ex)
@@ -212,11 +217,17 @@ public class SupplierListViewModel : ViewModelBase
 
     private void AddSupplier()
     {
-        var editorVm = new SupplierEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        var editorVm = App.GetService<SupplierEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadSuppliersAsync();
-        }
+            Title = "مورد جديد",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadSuppliersAsync());
+            }
+        });
     }
 
     private void EditSupplier()
@@ -224,17 +235,23 @@ public class SupplierListViewModel : ViewModelBase
         if (SelectedSupplier == null) return;
 
         var editorVm = new SupplierEditorViewModel(SelectedSupplier);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadSuppliersAsync();
-        }
+            Title = "تعديل مورد",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadSuppliersAsync());
+            }
+        });
     }
 
     private async Task DeleteSupplierAsync()
     {
         if (SelectedSupplier == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"ط§ظ„ظ…ظˆط±ط¯: {SelectedSupplier.Name}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"المورد: {SelectedSupplier.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
@@ -250,11 +267,11 @@ public class SupplierListViewModel : ViewModelBase
                 {
                     _eventBus.Publish(new SupplierChangedMessage(SelectedSupplier.Id));
                     await LoadSuppliersAsync();
-                    _toastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظ…ظˆط±ط¯ ط¨ظ†ط¬ط§ط­");
+                    _toastService.ShowSuccess("تم إلغاء تنشيط المورد بنجاح");
                 }
                 else
                 {
-                    ErrorMessage = HandleFailure(deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظ…ظˆط±ط¯", "SupplierListViewModel.DeleteSupplierAsync");
+                    ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط المورد", "SupplierListViewModel.DeleteSupplierAsync");
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -264,11 +281,11 @@ public class SupplierListViewModel : ViewModelBase
                 {
                     _eventBus.Publish(new SupplierChangedMessage(SelectedSupplier.Id));
                     await LoadSuppliersAsync();
-                    _toastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„ظ…ظˆط±ط¯ ظ†ظ‡ط§ط¦ظٹط§ظ‹");
+                    _toastService.ShowSuccess("تم حذف المورد نهائياً");
                 }
                 else
                 {
-                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ظ…ظˆط±ط¯";
+                    var error = deleteResult.Error ?? "فشل في حذف المورد";
                     ErrorMessage = HandleFailure(error, "SupplierListViewModel.DeleteSupplierAsync");
                     LogSystemError($"Hard delete failed for Supplier {SelectedSupplier.Id}: {error}", "SupplierListViewModel.DeleteSupplierAsync");
                 }
@@ -309,11 +326,11 @@ public class SupplierListViewModel : ViewModelBase
             {
                 _eventBus.Publish(new SupplierChangedMessage(SelectedSupplier.Id));
                 await LoadSuppliersAsync();
-                await _dialogService.ShowSuccessAsync("ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظˆط±ط¯", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظˆط±ط¯ ط¨ظ†ط¬ط§ط­");
+                await _dialogService.ShowSuccessAsync("استعادة المورد", "تم استعادة المورد بنجاح");
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ظˆط±ط¯", "SupplierListViewModel.RestoreSupplierAsync", $"[SupplierListViewModel.RestoreSupplierAsync] Failed to restore supplier with ID {SelectedSupplier.Id}.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة المورد", "SupplierListViewModel.RestoreSupplierAsync", $"[SupplierListViewModel.RestoreSupplierAsync] Failed to restore supplier with ID {SelectedSupplier.Id}.");
             }
         }
         catch (Exception ex)

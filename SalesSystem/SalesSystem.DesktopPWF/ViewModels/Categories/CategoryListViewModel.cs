@@ -19,6 +19,7 @@ public class CategoryListViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<CategoryDto> _categories = new();
     private ICollectionView? _categoriesView;
@@ -34,6 +35,7 @@ public class CategoryListViewModel : ViewModelBase
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         InitializeCommands();
     }
@@ -155,7 +157,7 @@ public class CategoryListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„طھطµظ†ظٹظپط§طھ", "CategoryListViewModel.LoadCategoriesAsync", "[CategoryListViewModel.LoadCategoriesAsync] Failed to load categories list.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل التصنيفات", "CategoryListViewModel.LoadCategoriesAsync", "[CategoryListViewModel.LoadCategoriesAsync] Failed to load categories list.");
                 IsEmpty = Categories.Count == 0;
             }
         }
@@ -187,31 +189,43 @@ public class CategoryListViewModel : ViewModelBase
 
     private void AddCategory()
     {
-        var editorVm = new CategoryEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        var editorVm = App.GetService<CategoryEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadCategoriesAsync();
-        }
+            Title = "تصنيف جديد",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadCategoriesAsync());
+            }
+        });
     }
 
     private void EditCategory()
     {
         if (SelectedCategory == null) return;
 
-        var editorVm = new CategoryEditorViewModel();
+        var editorVm = App.GetService<CategoryEditorViewModel>();
         editorVm.LoadCategory(SelectedCategory);
 
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadCategoriesAsync();
-        }
+            Title = "تعديل تصنيف",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadCategoriesAsync());
+            }
+        });
     }
 
 public async Task DeleteCategoryAsync()
     {
         if (SelectedCategory == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"ط§ظ„طھطµظ†ظٹظپ: {SelectedCategory.Name}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"التصنيف: {SelectedCategory.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
@@ -226,11 +240,11 @@ public async Task DeleteCategoryAsync()
                 if (deleteResult.IsSuccess)
                 {
                     await LoadCategoriesAsync();
-                    _toastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„طھطµظ†ظٹظپ ط¨ظ†ط¬ط§ط­");
+                    _toastService.ShowSuccess("تم إلغاء تنشيط التصنيف بنجاح");
                 }
                 else
                 {
-                    ErrorMessage = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„طھطµظ†ظٹظپ";
+                    ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط التصنيف";
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -239,11 +253,11 @@ public async Task DeleteCategoryAsync()
                 if (deleteResult.IsSuccess)
                 {
                     await LoadCategoriesAsync();
-                    _toastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„طھطµظ†ظٹظپ ظ†ظ‡ط§ط¦ظٹط§ظ‹");
+                    _toastService.ShowSuccess("تم حذف التصنيف نهائياً");
                 }
                 else
                 {
-                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„طھطµظ†ظٹظپ";
+                    var error = deleteResult.Error ?? "فشل في حذف التصنيف";
                     ErrorMessage = error;
                     LogSystemError($"Hard delete failed for Category {SelectedCategory.Id}: {error}", "CategoryListViewModel.DeleteCategoryAsync");
                 }
@@ -251,7 +265,7 @@ public async Task DeleteCategoryAsync()
         }
         catch (Exception ex)
         {
-            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ظ„ط­ط°ظپ";
+            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
             HandleException(ex, "CategoryListViewModel.DeleteCategoryAsync", $"[CategoryListViewModel.DeleteCategoryAsync] Failed to delete category with ID {SelectedCategory?.Id}.");
         }
         finally
@@ -280,17 +294,17 @@ public async Task DeleteCategoryAsync()
             if (result.IsSuccess)
             {
                 await LoadCategoriesAsync();
-                await _dialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„طھطµظ†ظٹظپ ط¨ظ†ط¬ط§ط­");
+                await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة التصنيف بنجاح");
             }
             else
             {
-                ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„طھطµظ†ظٹظپ";
-                await _dialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط§ط³طھط¹ط§ط¯ط©", ErrorMessage);
+                ErrorMessage = result.Error ?? "فشل في استعادة التصنيف";
+                await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط§ط³طھط¹ط§ط¯ط© ط§ظ„طھطµظ†ظٹظپ";
+            ErrorMessage = "حدث خطأ غير متوقع أثناء استعادة التصنيف";
             HandleException(ex, "CategoryListViewModel.RestoreCategoryAsync", $"[CategoryListViewModel.RestoreCategoryAsync] Failed to restore category with ID {SelectedCategory?.Id}.");
         }
 finally

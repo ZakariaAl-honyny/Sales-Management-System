@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
 using SalesSystem.Contracts.Common;
@@ -10,11 +11,13 @@ namespace SalesSystem.DesktopPWF.Services.App;
 public class UpdaterService : IUpdaterService
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<UpdaterService> _logger;
     private readonly string _versionFileUrl;
 
-    public UpdaterService(HttpClient httpClient)
+    public UpdaterService(HttpClient httpClient, ILogger<UpdaterService> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
         _versionFileUrl = LoadVersionFileUrl();
     }
 
@@ -44,7 +47,7 @@ public class UpdaterService : IUpdaterService
     {
         try
         {
-            Serilog.Log.Information("Checking for updates at {Url}", _versionFileUrl);
+            _logger.LogInformation("Checking for updates at {Url}", _versionFileUrl);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(8));
@@ -53,7 +56,7 @@ public class UpdaterService : IUpdaterService
 
             if (!response.IsSuccessStatusCode)
             {
-                Serilog.Log.Warning("Update server returned {Status}", response.StatusCode);
+                _logger.LogWarning("Update server returned {Status}", response.StatusCode);
                 return Result<UpdateCheckResult>.Failure("تعذر التحقق من التحديثات — الخادم غير متاح");
             }
 
@@ -71,33 +74,33 @@ public class UpdaterService : IUpdaterService
             if (!updateInfo.IsForceUpdate(currentVersion) &&
                 updateInfo.LatestVersion == skippedVersion)
             {
-                Serilog.Log.Information("Version {Version} was skipped by user", skippedVersion);
+                _logger.LogInformation("Version {Version} was skipped by user", skippedVersion);
                 return Result<UpdateCheckResult>.Success(UpdateCheckResult.NoUpdate());
             }
 
             if (updateInfo.IsUpdateAvailable(currentVersion))
             {
-                Serilog.Log.Information("Update available: {Current} → {Latest}",
+                _logger.LogInformation("Update available: {Current} → {Latest}",
                     currentVersion, updateInfo.LatestVersion);
                 return Result<UpdateCheckResult>.Success(UpdateCheckResult.Available(updateInfo));
             }
 
-            Serilog.Log.Information("App is up to date ({Version})", currentVersion);
+            _logger.LogInformation("App is up to date ({Version})", currentVersion);
             return Result<UpdateCheckResult>.Success(UpdateCheckResult.NoUpdate());
         }
         catch (OperationCanceledException)
         {
-            Serilog.Log.Warning("Update check timed out");
+            _logger.LogWarning("Update check timed out");
             return Result<UpdateCheckResult>.Failure("انتهت مهلة الاتصال — تحقق من اتصال الإنترنت");
         }
         catch (HttpRequestException ex)
         {
-            Serilog.Log.Warning(ex, "No internet connection for update check");
+            _logger.LogWarning(ex, "No internet connection for update check");
             return Result<UpdateCheckResult>.Failure("لا يوجد اتصال بالإنترنت");
         }
         catch (Exception ex)
         {
-            Serilog.Log.Error(ex, "Unexpected error during update check");
+            _logger.LogError(ex, "Unexpected error during update check");
             return Result<UpdateCheckResult>.Failure("حدث خطأ غير متوقع أثناء التحقق من التحديثات");
         }
     }
@@ -115,7 +118,7 @@ public class UpdaterService : IUpdaterService
 
             Directory.CreateDirectory(Path.GetDirectoryName(tempPath)!);
 
-            Serilog.Log.Information("Downloading update from {Url} to {Path}", downloadUrl, tempPath);
+            _logger.LogInformation("Downloading update from {Url} to {Path}", downloadUrl, tempPath);
 
             using var response = await _httpClient.GetAsync(
                 downloadUrl,
@@ -160,22 +163,22 @@ public class UpdaterService : IUpdaterService
                 if (!isValid)
                 {
                     File.Delete(tempPath);
-                    Serilog.Log.Error("Checksum verification failed for {File}", tempPath);
+                    _logger.LogError("Checksum verification failed for {File}", tempPath);
                     return Result<string>.Failure("Checksum verification failed");
                 }
             }
 
-            Serilog.Log.Information("Download complete: {Path}", tempPath);
+            _logger.LogInformation("Download complete: {Path}", tempPath);
             return Result<string>.Success(tempPath);
         }
         catch (OperationCanceledException)
         {
-            Serilog.Log.Information("Download cancelled by user");
+            _logger.LogInformation("Download cancelled by user");
             return Result<string>.Failure("Download cancelled");
         }
         catch (Exception ex)
         {
-            Serilog.Log.Error(ex, "Download failed");
+            _logger.LogError(ex, "Download failed");
             return Result<string>.Failure("فشل تحميل التحديث — تحقق من الاتصال وحاول مجدداً");
         }
     }
@@ -184,11 +187,11 @@ public class UpdaterService : IUpdaterService
     {
         if (!File.Exists(installerPath))
         {
-            Serilog.Log.Error("Installer not found at {Path}", installerPath);
+            _logger.LogError("Installer not found at {Path}", installerPath);
             return Task.FromResult(Result<bool>.Failure("Installer file not found"));
         }
 
-        Serilog.Log.Information("Launching installer: {Path}", installerPath);
+        _logger.LogInformation("Launching installer: {Path}", installerPath);
 
         var startInfo = new System.Diagnostics.ProcessStartInfo
         {
@@ -220,7 +223,7 @@ public class UpdaterService : IUpdaterService
         }
         catch (Exception ex)
         {
-            Serilog.Log.Warning(ex, "Failed to read assembly version");
+            _logger.LogWarning(ex, "Failed to read assembly version");
             return Result<string>.Failure("Unable to determine version");
         }
     }
@@ -232,12 +235,12 @@ public class UpdaterService : IUpdaterService
             var settings = LoadLocalSettings();
             settings["SkippedVersion"] = version;
             SaveLocalSettings(settings);
-            Serilog.Log.Information("Version {Version} marked as skipped", version);
+            _logger.LogInformation("Version {Version} marked as skipped", version);
             return Result.Success();
         }
         catch (Exception ex)
         {
-            Serilog.Log.Warning(ex, "Failed to persist skipped version");
+            _logger.LogWarning(ex, "Failed to persist skipped version");
             return Result.Failure("Failed to save skipped version");
         }
     }
@@ -253,7 +256,7 @@ public class UpdaterService : IUpdaterService
         }
         catch (Exception ex)
         {
-            Serilog.Log.Warning(ex, "Failed to read skipped version");
+            _logger.LogWarning(ex, "Failed to read skipped version");
             return Result<string>.Failure("Failed to read skipped version");
         }
     }

@@ -185,7 +185,7 @@ public class ProductsControllerTests : ControllerTestBase
         IsActive: true);
 
     private static CreateProductRequest CreateValidRequest() => new(
-        Barcode: null,
+        Barcode: null!,
         Name: "منتج جديد",
         CategoryId: 1,
         UnitId: 1,
@@ -200,7 +200,7 @@ public class ProductsControllerTests : ControllerTestBase
         Description: null);
 
     private static UpdateProductRequest UpdateValidRequest() => new(
-        Barcode: null,
+        Barcode: null!,
         Name: "منتج محدث",
         CategoryId: 1,
         UnitId: 1,

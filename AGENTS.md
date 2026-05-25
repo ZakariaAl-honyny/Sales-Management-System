@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/010-print-engine/plan.md](specs/010-print-engine/plan.md)
+**Active Feature Plan**: [specs/012-multi-window-ui/plan.md](specs/012-multi-window-ui/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview

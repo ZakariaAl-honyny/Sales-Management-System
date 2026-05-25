@@ -143,7 +143,7 @@ public class ProductServiceTests : IDisposable
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null, "Updated Product", null, null, null, null, 1m, 20m, 200m, 200m, 0m, 10m, null, true);
+        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null!, "Updated Product", null, null, null, null, 1m, 20m, 200m, 200m, 0m, 10m, null, true);
 
         var result = await _sut.UpdateAsync(product.Id, request, CancellationToken.None);
 
@@ -160,7 +160,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_NonExistentProduct_ReturnsNotFound");
 
-        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null, "Updated", null, null, null, null, 1m, 0m, 0m, 0m, 0m, 0m, null, true);
+        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null!, "Updated", null, null, null, null, 1m, 0m, 0m, 0m, 0m, 0m, null, true);
 
         var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
 

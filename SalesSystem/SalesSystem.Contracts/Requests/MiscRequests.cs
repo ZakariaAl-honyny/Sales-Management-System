@@ -14,7 +14,11 @@ public record UpdateSettingsRequest(
     bool IsTaxEnabled, string? TaxNumber,
     bool EnableStockAlerts, bool AllowNegativeStock, bool AutoUpdatePrices,
     string InvoicePrefix,
-    int CostingMethod = 1);
+    int CostingMethod = 1,
+    string? BackupPath = null,
+    string? BackupScheduleTime = null,
+    int BackupRetentionDays = 30,
+    string? UpdateServerUrl = null);
 
 public record UpdateCostingMethodRequest(
     int Method);

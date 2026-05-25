@@ -19,6 +19,7 @@ public class SupplierListViewModelTests : IDisposable
     private readonly Mock<ISupplierApiService> _mockSupplierService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
+    private readonly Mock<IScreenWindowService> _mockScreenWindowService;
     private readonly Mock<IToastNotificationService> _mockToastService;
     private readonly SupplierListViewModel _viewModel;
 
@@ -27,12 +28,14 @@ public class SupplierListViewModelTests : IDisposable
         _mockSupplierService = new Mock<ISupplierApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
+        _mockScreenWindowService = new Mock<IScreenWindowService>();
         _mockToastService = new Mock<IToastNotificationService>();
 
         _viewModel = new SupplierListViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
+            _mockScreenWindowService.Object,
             _mockToastService.Object);
     }
 

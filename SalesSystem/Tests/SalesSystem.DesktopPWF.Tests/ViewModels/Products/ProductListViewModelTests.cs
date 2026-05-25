@@ -21,6 +21,7 @@ public class ProductListViewModelTests : IDisposable
     private readonly Mock<IProductApiService> _mockProductService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
+    private readonly Mock<IScreenWindowService> _mockScreenWindowService;
     private readonly Mock<IToastNotificationService> _mockToastService;
     private readonly ProductListViewModel _viewModel;
 
@@ -29,12 +30,14 @@ public class ProductListViewModelTests : IDisposable
         _mockProductService = new Mock<IProductApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
+        _mockScreenWindowService = new Mock<IScreenWindowService>();
         _mockToastService = new Mock<IToastNotificationService>();
 
         _viewModel = new ProductListViewModel(
             _mockProductService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
+            _mockScreenWindowService.Object,
             _mockToastService.Object);
     }
 

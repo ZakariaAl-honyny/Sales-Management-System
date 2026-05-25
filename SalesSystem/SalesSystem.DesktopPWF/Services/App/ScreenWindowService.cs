@@ -73,6 +73,19 @@ public class ScreenWindowService : IScreenWindowService
         });
     }
 
+    public void OpenNonModal(ViewModelBase viewModel, string title, double width = 800, double height = 600)
+    {
+        var options = new ScreenWindowOptions
+        {
+            Title = title,
+            Width = width,
+            Height = height,
+            IsModal = false,
+            CanResize = true
+        };
+        OpenScreen(viewModel, options);
+    }
+
     public void OpenScreen<TViewModel>(ScreenWindowOptions? options = null)
         where TViewModel : class
     {

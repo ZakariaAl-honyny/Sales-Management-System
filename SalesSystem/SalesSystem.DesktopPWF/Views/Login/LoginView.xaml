@@ -108,7 +108,7 @@
                     </Border>
 
                     <!-- Submit Button -->
-                    <Button Grid.Row="5"
+                    <Button ToolTip="تسجيل الدخول إلى النظام" Grid.Row="5"
                             Content="تسجيل الدخول"
                             Command="{Binding LoginCommand}"
                             Style="{StaticResource PrimaryButton}"

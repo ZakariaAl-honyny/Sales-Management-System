@@ -2,6 +2,7 @@
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
@@ -21,6 +22,7 @@ public class CustomerListViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private ObservableCollection<CustomerDto> _customers = new();
     private ICollectionView? _customersView;
@@ -36,6 +38,7 @@ public class CustomerListViewModel : ViewModelBase
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
 
         InitializeCommands();
     }
@@ -47,11 +50,13 @@ public class CustomerListViewModel : ViewModelBase
         ICustomerApiService customerService,
         IEventBus eventBus,
         IDialogService dialogService,
+        IScreenWindowService screenWindowService,
         IToastNotificationService toastService)
     {
         _customerService = customerService ?? throw new ArgumentNullException(nameof(customerService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+        _screenWindowService = screenWindowService ?? throw new ArgumentNullException(nameof(screenWindowService));
         _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
 
         InitializeCommands();
@@ -174,7 +179,7 @@ public class CustomerListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„ط¹ظ…ظ„ط§ط،", "CustomerListViewModel.LoadCustomersAsync", "[CustomerListViewModel.LoadCustomersAsync] Failed to load customers list.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملاء", "CustomerListViewModel.LoadCustomersAsync", "[CustomerListViewModel.LoadCustomersAsync] Failed to load customers list.");
                 IsEmpty = Customers.Count == 0;
             }
         }
@@ -209,11 +214,17 @@ public class CustomerListViewModel : ViewModelBase
 
     private void AddCustomer()
     {
-        var editorVm = new CustomerEditorViewModel();
-        if (_dialogService.ShowDialog(editorVm))
+        var editorVm = App.GetService<CustomerEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadCustomersAsync();
-        }
+            Title = "عميل جديد",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadCustomersAsync());
+            }
+        });
     }
 
     private void EditCustomer()
@@ -221,10 +232,16 @@ public class CustomerListViewModel : ViewModelBase
         if (SelectedCustomer == null) return;
 
         var editorVm = new CustomerEditorViewModel(SelectedCustomer);
-        if (_dialogService.ShowDialog(editorVm))
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            _ = LoadCustomersAsync();
-        }
+            Title = "تعديل عميل",
+            Width = 900,
+            Height = 650,
+            OnClosed = (_) =>
+            {
+                System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadCustomersAsync());
+            }
+        });
     }
 
     public void EditCustomerFromDoubleClick()
@@ -239,7 +256,7 @@ public class CustomerListViewModel : ViewModelBase
     {
         if (SelectedCustomer == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"ط§ظ„ط¹ظ…ظٹظ„: {SelectedCustomer.Name}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"العميل: {SelectedCustomer.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
@@ -255,11 +272,11 @@ public class CustomerListViewModel : ViewModelBase
                 {
                     _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
                     await LoadCustomersAsync();
-                    _toastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ط¹ظ…ظٹظ„ ط¨ظ†ط¬ط§ط­");
+                    _toastService.ShowSuccess("تم إلغاء تنشيط العميل بنجاح");
                 }
                 else
                 {
-                    ErrorMessage = HandleFailure(deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ط¹ظ…ظٹظ„", "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
+                    ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط العميل", "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -269,11 +286,11 @@ public class CustomerListViewModel : ViewModelBase
                 {
                     _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
                     await LoadCustomersAsync();
-                    _toastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„ط¹ظ…ظٹظ„ ظ†ظ‡ط§ط¦ظٹط§ظ‹");
+                    _toastService.ShowSuccess("تم حذف العميل نهائياً");
                 }
                 else
                 {
-                    var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ط¹ظ…ظٹظ„";
+                    var error = deleteResult.Error ?? "فشل في حذف العميل";
                     ErrorMessage = HandleFailure(error, "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
                     LogSystemError($"Hard delete failed for Customer {SelectedCustomer.Id}: {error}", "CustomerListViewModel.DeleteCustomerAsync");
                 }
@@ -314,11 +331,11 @@ public class CustomerListViewModel : ViewModelBase
             {
                 _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
                 await LoadCustomersAsync();
-                await _dialogService.ShowSuccessAsync("ط§ط³طھط¹ط§ط¯ط© ط§ظ„ط¹ظ…ظٹظ„", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„ط¹ظ…ظٹظ„ ط¨ظ†ط¬ط§ط­");
+                await _dialogService.ShowSuccessAsync("استعادة العميل", "تم استعادة العميل بنجاح");
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ط¹ظ…ظٹظ„", "CustomerListViewModel.RestoreCustomerAsync", $"[CustomerListViewModel.RestoreCustomerAsync] Failed to restore customer with ID {SelectedCustomer.Id}.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة العميل", "CustomerListViewModel.RestoreCustomerAsync", $"[CustomerListViewModel.RestoreCustomerAsync] Failed to restore customer with ID {SelectedCustomer.Id}.");
             }
         }
         catch (Exception ex)
