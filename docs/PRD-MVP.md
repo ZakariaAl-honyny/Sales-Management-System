@@ -807,6 +807,53 @@ text
 
 ---
 
+### Phase 14 — Product Lifecycle & Media Management
+
+**Tasks:**
+
+1. **Database Schema Update (EF Core / SQL Server):**
+* Add a nullable `ExpirationDate` (`DateTime?`) to the `Products` table to support products without an expiry.
+* Add an optional `ImagePath` (`string?`) or `ImageSubPath` field to store the local reference of the product image.
+* Create a `StockWriteOff` (جدول الإتلاف/المستبعد) table to log quantities removed due to expiration or damage, linked to the `JournalEntries` for automatic accounting impact.
+
+2. **UI Enhancements (Product Management Screen - WPF):**
+* Implement a CheckBox labeled "له تاريخ انتهاء" (Has Expiration Date).
+* Dynamically enable/disable the `DatePicker` control based on the CheckBox state using MVVM binding.
+* Add an optional Image Upload component (Image control, "اختيار صورة" button, and "حذف الصورة" button).
+* Ensure image loading utilizes **Lazy Loading** or async drawing to prevent the main product list Grid from lagging during scroll.
+
+3. **Backend Logic & Guard Clauses:**
+* Enforce validation: If "Has Expiration Date" is checked, the `ExpirationDate` must be provided and cannot be a past date during the initial stock entry.
+* Implement image validation restricting files to standard formats (JPG, PNG) and limiting file size (e.g., max 2MB) before saving.
+
+4. **Expired & Damaged Products Report:**
+* Build a dedicated reporting view with advanced data filtering:
+* *Expired Items:* Products whose expiration date is less than or equal to the current system date.
+* *Near-Expiry Items:* Products expiring within an adjustable threshold (e.g., next 30, 60, or 90 days) for proactive inventory control.
+
+* Add a "ترحيل كحذف/إتلاف" button inside the report to clear expired quantities from the active inventory and trigger a background accounting entry (قيد آلية: من حـ/ خسائر بضاعة تالفة إلى حـ/ المخزون).
+
+**Definition of Done:**
+
+* Products can be created and updated smoothly with or without an expiration date.
+* Optional images render correctly in the UI without impacting application memory or rendering speed.
+* The Expired Products Report displays accurate real-time data based on the system clock.
+* Writing off expired stock decreases the available warehouse inventory immediately and reflects in the backend financial logs.
+
+---
+
+### 💡 توجيهات معمارية هامة لك قبل البدء في تطبيق هذه المرحلة:
+
+بما أنك تبني نظاماً تجارياً احترافياً ومستقراً، يرجى مراعاة النمذجة التالية أثناء توجيه المبرمجين أو الوكلاء لتنفيذ هذه المهام:
+
+1. **معالجة الصور (Image Storage Strategy):**
+* **احذر** من حفظ الصور كـ `byte[]` (BLOB) مباشرة داخل قاعدة بيانات SQL Server، لأن هذا سيجعل حجم ملف الـ `.bak` ضخماً جداً ويتسبب في بطء شديد أثناء النسخ الاحتياطي (Backup) والاسترجاع في المرحلة 7.
+* **الأفضل برمجياً:** حفظ الصورة في مجلد محلي داخل مسار النظام (مثلاً `%AppData%\SalesSystem\Images`) وحفظ **مسار الملف (String Path)** فقط في قاعدة البيانات.
+
+2. **محرك التنبيهات التلقائي (Proactive UX):**
+* بما أنك تركز على جعل النظام "يشرح نفسه للمستخدم بكل مرونة وسلاسة"، اجعل النظام يقوم بفحص التواريخ تلقائياً عند فتح شاشة النظام الرئيسية (Dashboard) في بداية اليوم.
+* إذا وجد النظام منتجات منتهية أو تشرف على الانتهاء، يعرض تنبيهاً علوياً خفيفاً (Badge/Notification) دون إزعاج المستخدم، لكي يتحرك التاجر ويتخذ إجراءً سريعاً قبل تكبد خسائر مالية.
+
 ## 8. Critical Business Rules Reference
 SALES FLOW:
 
