@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/017-sidebar-navigation/plan.md](specs/017-sidebar-navigation/plan.md)
+**Active Feature Plan**: [specs/018-accounting-foundation/plan.md](specs/018-accounting-foundation/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
