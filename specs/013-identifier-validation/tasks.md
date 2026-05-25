@@ -13,7 +13,7 @@ description: "Task list for Identifier Strategy & Validation (v4.5.3–v4.6.2)"
 
 ## Phase 1: Setup
 
-- [ ] T001 Verify solution builds with 0 errors: `dotnet build SalesSystem/SalesSystem.slnx` — FILE: `SalesSystem/SalesSystem.slnx`
+- [X] T001 Verify solution builds with 0 errors: `dotnet build SalesSystem/SalesSystem.slnx` — FILE: `SalesSystem/SalesSystem.slnx`
 
 ---
 
@@ -23,15 +23,15 @@ description: "Task list for Identifier Strategy & Validation (v4.5.3–v4.6.2)"
 
 **Independent Test**: API requests to create/update Products, Customers, etc. no longer contain `Code`. The database tables no longer have `Code` columns.
 
-- [ ] T002 [P] [US1] Remove `string Code` property and related constructor parameters from Domain Entities: `Product`, `Customer`, `Supplier`, `Warehouse`, `Category`, `Unit`, `User`. — FILE: `SalesSystem/SalesSystem.Domain/Entities/Products/Product.cs` + 6 others
+- [X] T002 [P] [US1] Remove `string Code` property and related constructor parameters from Domain Entities: `Product`, `Customer`, `Supplier`, `Warehouse`, `Category`, `Unit`, `User`. — FILE: `SalesSystem/SalesSystem.Domain/Entities/Products/Product.cs` + 6 others
 
-- [ ] T003 [P] [US1] Remove `string Code` property from all related DTOs (Data Transfer Objects) and Request classes in the Contracts project. Remove `ErrorCodes.DuplicateCode`. — FILE: `SalesSystem/SalesSystem.Contracts/Requests/Products/CreateProductRequest.cs` + multiple others
+- [X] T003 [P] [US1] Remove `string Code` property from all related DTOs (Data Transfer Objects) and Request classes in the Contracts project. Remove `ErrorCodes.DuplicateCode`. — FILE: `SalesSystem/SalesSystem.Contracts/Requests/Products/CreateProductRequest.cs` + multiple others
 
-- [ ] T004 [US1] Remove database index configurations referencing `Code` from EF Core entity configurations. — FILE: `SalesSystem/SalesSystem.Infrastructure/Persistence/Configurations/ProductConfiguration.cs` + 6 others
+- [X] T004 [US1] Remove database index configurations referencing `Code` from EF Core entity configurations. — FILE: `SalesSystem/SalesSystem.Infrastructure/Persistence/Configurations/ProductConfiguration.cs` + 6 others
 
-- [ ] T005 [US1] Remove any code-generation or duplicate-code-checking logic from Application Layer Services (e.g., `ProductService`, `CustomerService`). — FILE: `SalesSystem/SalesSystem.Application/Services/Products/ProductService.cs` + multiple others
+- [X] T005 [US1] Remove any code-generation or duplicate-code-checking logic from Application Layer Services (e.g., `ProductService`, `CustomerService`). — FILE: `SalesSystem/SalesSystem.Application/Services/Products/ProductService.cs` + multiple others
 
-- [ ] T006 [US1] Generate and apply EF Core Migration to drop the `Code` columns. Command: `dotnet ef migrations add DropLegacyEntityCodes --project SalesSystem/SalesSystem.Infrastructure --startup-project SalesSystem/SalesSystem.Api`. — FILE: `SalesSystem/SalesSystem.Infrastructure/Persistence/SalesDbContextModelSnapshot.cs`
+- [X] T006 [US1] Generate and apply EF Core Migration to drop the `Code` columns. (N/A — Code was never in database) Command: `dotnet ef migrations add DropLegacyEntityCodes --project SalesSystem/SalesSystem.Infrastructure --startup-project SalesSystem/SalesSystem.Api`. — FILE: `SalesSystem/SalesSystem.Infrastructure/Persistence/SalesDbContextModelSnapshot.cs`
 
 **Checkpoint**: Solution compiles. Migration drops `Code` columns successfully.
 
@@ -43,9 +43,9 @@ description: "Task list for Identifier Strategy & Validation (v4.5.3–v4.6.2)"
 
 **Independent Test**: Forcing a validation error displays a red border and a `❗` icon on the specific text box.
 
-- [ ] T007 [P] [US2] Implement `INotifyDataErrorInfo` interface in `ViewModelBase`. Add `Dictionary<string, List<string>> _errors`, `HasErrors`, `GetErrors()`, `AddError()`, and `ClearErrors()` methods. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Base/ViewModelBase.cs`
+- [X] T007 [P] [US2] Implement `INotifyDataErrorInfo` interface in `ViewModelBase`. Add `Dictionary<string, List<string>> _errors`, `HasErrors`, `GetErrors()`, `AddError()`, and `ClearErrors()` methods. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Base/ViewModelBase.cs`
 
-- [ ] T008 [P] [US2] Define standard `Validation.ErrorTemplate` in global XAML resources. Create a style targeting `TextBox` and `ComboBox` that draws a red border and displays the `❗` icon with a tooltip bound to the error message. — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Resources/Styles.xaml` (or `App.xaml`)
+- [X] T008 [P] [US2] Define standard `Validation.ErrorTemplate` in global XAML resources. Create a style targeting `TextBox` and `ComboBox` that draws a red border and displays the `❗` icon with a tooltip bound to the error message. — FILE: `SalesSystem/SalesSystem.DesktopPWF/Views/Resources/Styles.xaml` (or `App.xaml`)
 
 **Checkpoint**: `ViewModelBase` supports standard error reporting.
 
@@ -57,13 +57,13 @@ description: "Task list for Identifier Strategy & Validation (v4.5.3–v4.6.2)"
 
 **Independent Test**: Clicking "Save" on an empty form opens a DialogService warning listing exactly which fields are missing.
 
-- [ ] T009 [P] [US3] Refactor Product, Category, and Unit Editor ViewModels. Remove legacy manual boolean error flags (e.g., `HasNameError`). Implement `ValidateAll()` using `AddError` and `ClearErrors`. Remove `CanExecute` predicate from `SaveCommand`. Intercept save to show `_dialogService.ShowWarningAsync()` if invalid. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Products/ProductEditorViewModel.cs` + 2 others
+- [X] T009 [P] [US3] Refactor Product, Category, and Unit Editor ViewModels. Remove legacy manual boolean error flags (e.g., `HasNameError`). Implement `ValidateAll()` using `AddError` and `ClearErrors`. Remove `CanExecute` predicate from `SaveCommand`. Intercept save to show `_dialogService.ShowWarningAsync()` if invalid. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Products/ProductEditorViewModel.cs` + 2 others
 
-- [ ] T010 [P] [US3] Refactor Customer and Supplier Editor ViewModels. Apply the same `ValidateAll()` and `SaveCommand` pattern. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Customers/CustomerEditorViewModel.cs` + 1 other
+- [X] T010 [P] [US3] Refactor Customer and Supplier Editor ViewModels. Apply the same `ValidateAll()` and `SaveCommand` pattern. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Customers/CustomerEditorViewModel.cs` + 1 other
 
-- [ ] T011 [P] [US3] Refactor Warehouse and User Editor ViewModels. Apply the same `ValidateAll()` and `SaveCommand` pattern. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Inventory/WarehouseEditorViewModel.cs` + 1 other
+- [X] T011 [P] [US3] Refactor Warehouse and User Editor ViewModels. Apply the same `ValidateAll()` and `SaveCommand` pattern. — FILE: `SalesSystem/SalesSystem.DesktopPWF/ViewModels/Inventory/WarehouseEditorViewModel.cs` + 1 other
 
-- [ ] T012 [P] [US3] Clean up XAML files for all updated editors. Remove any manually coded `<TextBlock Foreground="Red" />` error messages that were previously bound to `HasXError` booleans. Ensure input bindings use `UpdateSourceTrigger=PropertyChanged` and `ValidatesOnNotifyDataErrors=True`. — FILE: *Multiple XAML files in `SalesSystem.DesktopPWF/Views/`*
+- [X] T012 [P] [US3] Clean up XAML files for all updated editors. Remove any manually coded `<TextBlock Foreground="Red" />` error messages that were previously bound to `HasXError` booleans. Ensure input bindings use `UpdateSourceTrigger=PropertyChanged` and `ValidatesOnNotifyDataErrors=True`. — FILE: *Multiple XAML files in `SalesSystem.DesktopPWF/Views/`*
 
 **Checkpoint**: All master data editors validate correctly, display red borders, and show an aggregated error dialogue on failed saves.
 
@@ -71,7 +71,7 @@ description: "Task list for Identifier Strategy & Validation (v4.5.3–v4.6.2)"
 
 ## Phase 5: Polish
 
-- [ ] T013 Update `docs/CHANGELOG.md` with v4.6 entry: Identifier Strategy & Validation (Removed legacy Code fields, migrated to auto-increment IDs, implemented standard INotifyDataErrorInfo WPF validation with dialog summaries). — FILE: `docs/CHANGELOG.md`
+- [X] T013 Update `docs/CHANGELOG.md` with v4.6 entry: Identifier Strategy & Validation (Removed legacy Code fields, migrated to auto-increment IDs, implemented standard INotifyDataErrorInfo WPF validation with dialog summaries). — FILE: `docs/CHANGELOG.md`
 
 ---
 

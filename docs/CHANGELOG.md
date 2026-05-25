@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.6 — Identifier Strategy & Validation (2026-05-25)
+
+### Breaking Changes
+- **Entity Code Removal**: Removed legacy `Code` property from master data entities (Product, Customer, Supplier, Warehouse, Category, Unit, User) across Domain, Contracts, Application, and Infrastructure layers. Entities now rely solely on auto-increment `Id` for identification.
+- **DuplicateCode Error Removed**: `ErrorCodes.DuplicateCode` constant deleted. Only `DuplicateBarcode` remains for barcode uniqueness.
+
+### Added
+- `INotifyDataErrorInfo` validation framework in `ViewModelBase` with `AddError()`, `ClearErrors()`, `ClearAllErrors()`, `ValidateAllAsync()`, and `ValidateField()` methods.
+- Global `Validation.ErrorTemplate` in `Styles.xaml` — red border + ❗ icon badge with error ToolTip for `TextBox`, `PasswordBox`, and `ComboBox`.
+- `SetDialogService()` method on `ViewModelBase` for enabling `ValidateAllAsync()` dialog support.
+
+### Changed
+- **SupplierEditorViewModel**: Refactored from legacy `HasNameError`/`HasOpeningBalanceError` boolean pattern to `INotifyDataErrorInfo` with `AddError/ClearErrors/ValidateAllAsync`.
+- **WarehouseEditorViewModel**: Refactored from legacy `HasNameError` boolean pattern to `INotifyDataErrorInfo` with `AddError/ClearErrors/ValidateAllAsync`.
+- **ProductEditorView.xaml**: Removed 7 manual `HasXxxError`/`XxxError` TextBlock bindings — validation feedback now handled by `ErrorTemplate`.
+- **CustomerEditorView.xaml, WarehouseEditorView.xaml, SupplierEditorView.xaml**: Removed manual `NameError`/`HasNameError` TextBlock bindings.
+
+### Fixed
+- Validation feedback now properly red-bordered with ❗ icon and ToolTip for all text-based inputs.
+
+### Removed
+- Legacy `HasNameError`, `HasOpeningBalanceError`, `NameError`, `OpeningBalanceError` boolean properties from `SupplierEditorViewModel`.
+- Legacy `HasNameError`, `NameError` boolean properties from `WarehouseEditorViewModel`.
+
 ## v4.5 — Multi-Window & UI Polish (2026-05-25)
 
 ### ✨ New Features
