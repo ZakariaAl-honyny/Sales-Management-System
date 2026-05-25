@@ -1018,6 +1018,14 @@ PAYMENT FLOW: (decrease balance, no stock change)
 
 هذا التصميم يضمن لك مرونة تشغيلية لا نهائية؛ فمهما أضفت من موديولات أو شاشات مستقبلاً، كل ما عليك فعله هو إضافة سطر جديد داخل الـ `Expander` المناسب، وسيتكفل النظام بالباقي دون أي تداخل في الكود.
 
+---
+
+### Phase 18 — Accounting Foundation Implementation Plan
+
+يرجى مراجعة ملف المواصفات وخطة التنفيذ المخصص لهذه المرحلة (بناء الهيكل المحاسبي المركزي):
+[Phase 18 — Accounting Foundation Implementation Plan](./Phase%2018%20%E2%80%94%20Accounting%20Foundation%20Implementation%20Plan.md)
+
+
 Sales Management System — PRD v4.6.2 (النسخة النهائية الشاملة)
 1. معلومات المشروع
 text

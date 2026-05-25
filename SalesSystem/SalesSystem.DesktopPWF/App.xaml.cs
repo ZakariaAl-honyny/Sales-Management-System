@@ -1,4 +1,3 @@
-using System.Configuration;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
@@ -204,9 +203,11 @@ public partial class App : System.Windows.Application
 
         // ViewModels
         services.AddTransient<LoginWindowViewModel>();
+        services.AddTransient<MainViewModel>();
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<SalesInvoiceListViewModel>();
         services.AddTransient<SalesInvoiceEditorViewModel>();
+        services.AddTransient<TouchPosViewModel>();
         services.AddTransient<PurchaseInvoiceListViewModel>();
         services.AddTransient<PurchaseInvoiceEditorViewModel>();
         services.AddTransient<ProductListViewModel>();

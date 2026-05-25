@@ -901,4 +901,118 @@
         <Setter Property="LineHeight" Value="22"/>
     </Style>
 
+    <!-- ============================================ -->
+    <!-- Sidebar Navigation Styles (Phase 17) -->
+    <!-- ============================================ -->
+
+    <!-- Toggle button template for sidebar expander headers -->
+    <ControlTemplate x:Key="SidebarExpanderToggleButtonTemplate" TargetType="ToggleButton">
+        <Border Background="{TemplateBinding Background}" 
+                Padding="{TemplateBinding Padding}"
+                BorderThickness="0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <!-- Arrow indicator (RTL: arrow on left side) -->
+                <TextBlock Grid.Column="0" 
+                           Text="&#x25C0;" 
+                           FontSize="10" 
+                           Foreground="#94A3B8"
+                           Margin="0,0,12,0"
+                           VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                                    <Setter Property="Text" Value="&#x25BC;" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <!-- Header content -->
+                <ContentPresenter Grid.Column="1" 
+                                  HorizontalAlignment="Right" 
+                                  VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </ControlTemplate>
+
+    <!-- Expander style for sidebar accordion groups -->
+    <Style x:Key="SidebarExpanderStyle" TargetType="Expander">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Border Background="{TemplateBinding Background}" BorderThickness="0">
+                        <StackPanel>
+                            <!-- Toggle Button (Header) -->
+                            <ToggleButton x:Name="HeaderSite" 
+                                          MinHeight="40"
+                                          Padding="16,0"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Foreground="White"
+                                          FontSize="14"
+                                          FontWeight="SemiBold"
+                                          HorizontalContentAlignment="Right"
+                                          IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Cursor="Hand"
+                                          Template="{StaticResource SidebarExpanderToggleButtonTemplate}">
+                                <ContentPresenter ContentSource="Header" 
+                                                  RecognizesAccessKey="True" 
+                                                  HorizontalAlignment="Right"/>
+                            </ToggleButton>
+                            <!-- Content -->
+                            <ContentPresenter x:Name="ExpandSite" 
+                                              Visibility="Collapsed"
+                                              Focusable="False"
+                                              HorizontalAlignment="Stretch"
+                                              Margin="0,0,0,4"/>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Sub-menu button style for sidebar Expander items -->
+    <Style x:Key="SidebarSubMenuButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="#E2E8F0" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="25,8,10,8" />
+        <Setter Property="HorizontalContentAlignment" Value="Right" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}" 
+                            Padding="{TemplateBinding Padding}"
+                            BorderThickness="0">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="#475569" />
+                            <Setter Property="Foreground" Value="White" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

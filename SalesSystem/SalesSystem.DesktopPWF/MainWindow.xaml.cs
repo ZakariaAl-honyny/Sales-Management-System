@@ -9,6 +9,17 @@ using SalesSystem.Contracts.Enums;
 using SalesSystem.DesktopPWF.ViewModels.Inventory;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
 using SalesSystem.DesktopPWF.Views.Updates;
+using SalesSystem.DesktopPWF.ViewModels.Products;
+using SalesSystem.DesktopPWF.ViewModels.Customers;
+using SalesSystem.DesktopPWF.ViewModels.Suppliers;
+using SalesSystem.DesktopPWF.ViewModels.Purchases;
+using SalesSystem.DesktopPWF.ViewModels.Returns;
+using SalesSystem.DesktopPWF.ViewModels.Payments;
+using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
+using SalesSystem.DesktopPWF.ViewModels.Reports;
+using SalesSystem.DesktopPWF.ViewModels.Transfers;
+using SalesSystem.DesktopPWF.ViewModels.Sales;
+using SalesSystem.DesktopPWF.ViewModels.Users;
 
 namespace SalesSystem.DesktopPWF;
 
@@ -16,6 +27,7 @@ public partial class MainWindow : Window
 {
     private readonly ISessionService _session;
     private readonly IDialogService _dialogService;
+    private readonly MainViewModel _mainViewModel;
     private bool _isLoggingOut;
 
     public MainWindow()
@@ -23,10 +35,15 @@ public partial class MainWindow : Window
         InitializeComponent();
         _session = App.GetService<ISessionService>();
         _dialogService = App.GetService<IDialogService>();
+        _mainViewModel = App.GetService<MainViewModel>();
+
+        // Set DataContext to MainViewModel for command bindings and ContentControl binding
+        DataContext = _mainViewModel;
 
         UpdateUserInfo();
-        ApplyPermissions();
-        NavigateTo("Dashboard");
+
+        // Navigate to dashboard on startup
+        _mainViewModel.NavigateTo<DashboardViewModel>();
 
         Closed += (s, e) =>
         {
@@ -52,114 +69,23 @@ public partial class MainWindow : Window
         };
     }
 
-    /// <summary>
-    /// يُطبّق الرؤية على عناصر القائمة الجانبية بناءً على صلاحيات المستخدم الحالي.
-    /// يُستدعى مرة واحدة عند فتح النافذة بعد تسجيل الدخول.
-    /// </summary>
-    private void ApplyPermissions()
-    {
-        Visibility Show(Enums.Permission p)
-            => _session.CanAccess(p) ? Visibility.Visible : Visibility.Collapsed;
+    // ═══════════════════════════════════════════════════════════════
+    // Menu navigation helpers — route through MainViewModel
+    // ═══════════════════════════════════════════════════════════════
 
-        // ─── AllStaff (Cashier+) ─────────────────────────────────────
-        NavSalesItem.Visibility            = Show(Enums.Permission.SalesInvoice);
-        NavSalesReturnsItem.Visibility     = Show(Enums.Permission.SalesReturn);
-        NavCustomersItem.Visibility        = Show(Enums.Permission.CustomerView);
-        NavCustomerPaymentsItem.Visibility = Show(Enums.Permission.CustomerPayment);
-
-        // ─── ManagerAndAbove ─────────────────────────────────────────
-        NavPurchasesItem.Visibility        = Show(Enums.Permission.PurchaseInvoice);
-        NavPurchaseReturnsItem.Visibility  = Show(Enums.Permission.PurchaseReturn);
-        NavProductsItem.Visibility         = Show(Enums.Permission.ProductManagement);
-        NavSuppliersItem.Visibility        = Show(Enums.Permission.SupplierManagement);
-        NavSupplierPaymentsItem.Visibility = Show(Enums.Permission.SupplierManagement);
-        NavStockTransfersItem.Visibility   = Show(Enums.Permission.StockTransfer);
-        NavReportsItem.Visibility          = Show(Enums.Permission.Reports);
-        NavLowStockItem.Visibility         = Show(Enums.Permission.Reports);
-        NavExpiredProductsItem.Visibility  = Show(Enums.Permission.Reports);
-        NavCategoriesItem.Visibility       = Show(Enums.Permission.ProductManagement);
-        NavUnitsItem.Visibility            = Show(Enums.Permission.ProductManagement);
-
-        // ─── AdminOnly ───────────────────────────────────────────────
-        NavWarehousesItem.Visibility       = Show(Enums.Permission.WarehouseManagement);
-        NavUsersItem.Visibility            = Show(Enums.Permission.UserManagement);
-        NavSettingsItem.Visibility         = Show(Enums.Permission.Settings);
-    }
-
-    /// <summary>
-    /// حماية ثانوية: يتحقق من الصلاحية قبل أي تنقل برمجي.
-    /// يمنع الوصول حتى لو تجاوز المستخدم الواجهة.
-    /// </summary>
-    private bool CanNavigateTo(string tag)
-    {
-        return tag switch
-        {
-            "Purchases"        => _session.CanAccess(Enums.Permission.PurchaseInvoice),
-            "PurchaseReturns"  => _session.CanAccess(Enums.Permission.PurchaseReturn),
-            "Products"         => _session.CanAccess(Enums.Permission.ProductManagement),
-            "Suppliers"        => _session.CanAccess(Enums.Permission.SupplierManagement),
-            "SupplierPayments" => _session.CanAccess(Enums.Permission.SupplierManagement),
-            "StockTransfers"   => _session.CanAccess(Enums.Permission.StockTransfer),
-            "Reports"          => _session.CanAccess(Enums.Permission.Reports),
-            "ExpiredProducts"  => _session.CanAccess(Enums.Permission.Reports),
-            "LowStock"         => _session.CanAccess(Enums.Permission.Reports),
-            "Warehouses"       => _session.CanAccess(Enums.Permission.WarehouseManagement),
-            "Users"            => _session.CanAccess(Enums.Permission.UserManagement),
-            "Settings"         => _session.CanAccess(Enums.Permission.Settings),
-            "Categories"       => _session.CanAccess(Enums.Permission.ProductManagement),
-            "Units"            => _session.CanAccess(Enums.Permission.ProductManagement),
-            _ => true // Dashboard, Sales, SalesReturns, Customers, CustomerPayments
-        };
-    }
-
-    private void NavigationList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (NavigationList.SelectedItem is ListBoxItem item && item.Tag is string tag)
-        {
-            NavigateTo(tag);
-        }
-    }
-
-    private void NavigateTo(string tag)
-    {
-        // الحماية الثانوية — منع التنقل البرمجي بدون صلاحية
-        if (!CanNavigateTo(tag))
-        {
-            _ = _dialogService.ShowWarningAsync("تنبيه", "ليس لديك صلاحية للوصول إلى هذه الشاشة.");
-            NavigationList.SelectedItem = null;
-            return;
-        }
-
-        Page? page = tag switch
-        {
-            "Dashboard" => new Views.DashboardView { DataContext = App.GetService<DashboardViewModel>() },
-            "Sales" => new Views.Sales.SalesInvoicesListView(),
-            "Purchases" => new Views.Purchases.PurchaseInvoicesListView(),
-            "Products" => new Views.Products.ProductsListView(),
-            "Customers" => new Views.Customers.CustomersListView(),
-            "Suppliers" => new Views.Suppliers.SuppliersListView(),
-            "Warehouses" => new Views.WarehousesView(),
-            "CustomerPayments" => new Views.Payments.CustomerPaymentsListView(),
-            "SupplierPayments" => new Views.Payments.SupplierPaymentsListView(),
-            "StockTransfers" => new Views.Transfers.StockTransfersListView(),
-            "Reports" => new Views.Reports.ReportsView { DataContext = App.GetService<ReportsViewModel>() },
-            "SalesReturns" => new Views.Returns.SalesReturnsListView(),
-            "PurchaseReturns" => new Views.Returns.PurchaseReturnsListView(),
-            "Categories" => new Views.Categories.CategoriesListView(),
-            "Units" => new Views.Units.UnitsListView(),
-            "Users" => new Views.Users.UsersListView(),
-            "Inventory" => new Views.Inventory.InventoryView(),
-            "LowStock" => new Views.Inventory.LowStockView { DataContext = App.GetService<LowStockViewModel>() },
-            "ExpiredProducts" => new Views.Reports.ExpiredProductsReportView(),
-            "Settings" => new Views.Settings.SettingsView(),
-            _ => null
-        };
-
-        if (page != null)
-        {
-            ContentFrame.Navigate(page);
-        }
-    }
+    private void ProductsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<ProductListViewModel>();
+    private void CustomersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<CustomerListViewModel>();
+    private void SuppliersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SupplierListViewModel>();
+    private void UsersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<UserListViewModel>();
+    private void SalesInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesInvoiceListViewModel>();
+    private void PurchaseInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseInvoiceListViewModel>();
+    private void SalesReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesReturnListViewModel>();
+    private void PurchaseReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseReturnListViewModel>();
+    private void WarehousesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<WarehouseListViewModel>();
+    private void StockTransfersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<StockTransfersListViewModel>();
+    private void CustomerPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<CustomerPaymentsListViewModel>();
+    private void SupplierPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SupplierPaymentsListViewModel>();
+    private void InventoryStatusMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<InventoryViewModel>();
 
     private async void CheckForUpdatesMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -187,6 +113,11 @@ public partial class MainWindow : Window
             var dialog = new UpdateDialog(vm) { Owner = this };
             dialog.ShowDialog();
         }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "فشل فحص التحديثات التلقائية (CheckForUpdates)");
+            _ = _dialogService.ShowErrorAsync("خطأ في فحص التحديثات", "حدث خطأ غير متوقع أثناء فحص التحديثات. يرجى المحاولة لاحقاً.");
+        }
         finally
         {
             IsEnabled = true;
@@ -200,14 +131,22 @@ public partial class MainWindow : Window
 
     private async void BtnLogout_Click(object sender, RoutedEventArgs e)
     {
-        var confirmed = await _dialogService.ShowConfirmationAsync("تسجيل الخروج", "هل أنت متأكد من تسجيل الخروج؟");
-        if (confirmed)
+        try
         {
-            _isLoggingOut = true;
-            _session.ClearSession();
-            var loginWindow = new LoginWindow();
-            loginWindow.Show();
-            this.Close();
+            var confirmed = await _dialogService.ShowConfirmationAsync("تسجيل الخروج", "هل أنت متأكد من تسجيل الخروج؟");
+            if (confirmed)
+            {
+                _isLoggingOut = true;
+                _session.ClearSession();
+                var loginWindow = new LoginWindow();
+                loginWindow.Show();
+                this.Close();
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "خطأ أثناء تسجيل الخروج");
+            _ = _dialogService.ShowErrorAsync("خطأ في تسجيل الخروج", "حدث خطأ غير متوقع أثناء تسجيل الخروج");
         }
     }
 
@@ -215,23 +154,20 @@ public partial class MainWindow : Window
     {
         if (sender is FrameworkElement element && element.Tag is string tag)
         {
-            NavigateTo(tag);
+            switch (tag)
+            {
+                case "Inventory":
+                    _mainViewModel.NavigateTo<InventoryViewModel>();
+                    break;
+                case "ExpiredProducts":
+                    _mainViewModel.NavigateTo<ExpiredProductsReportViewModel>();
+                    break;
+                default:
+                    _mainViewModel.NavigateTo<ReportsViewModel>();
+                    break;
+            }
         }
     }
-
-    private void ProductsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Products");
-    private void CustomersMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Customers");
-    private void SuppliersMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Suppliers");
-    private void UsersMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Users");
-    private void SalesInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Sales");
-    private void PurchaseInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Purchases");
-    private void SalesReturnsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("SalesReturns");
-    private void PurchaseReturnsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("PurchaseReturns");
-    private void WarehousesMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Warehouses");
-    private void StockTransfersMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("StockTransfers");
-    private void CustomerPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("CustomerPayments");
-    private void SupplierPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("SupplierPayments");
-    private void InventoryStatusMenuItem_Click(object sender, RoutedEventArgs e) => NavigateTo("Inventory");
 
     private void OpenPageInNewWindow(string title, string tag)
     {
