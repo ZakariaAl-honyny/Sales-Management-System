@@ -239,7 +239,6 @@ private async Task LoadPaymentAsync()
                 Amount: Amount,
                 PaymentMethod: PaymentType,
                 PaymentDate: PaymentDate,
-                PurchaseInvoiceId: null,
                 Notes: Notes);
             result = await _paymentService.UpdateAsync(_paymentId.Value, request);
         }

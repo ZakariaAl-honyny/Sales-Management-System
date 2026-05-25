@@ -132,6 +132,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception creating purchase return: {Message}", ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -206,6 +207,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception posting purchase return {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -223,7 +225,8 @@ public class PurchaseReturnService : IPurchaseReturnService
             r => r.Id == id, ct, "Items.Product");
 
         if (pr == null) return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
-        if (pr.Status == InvoiceStatus.Cancelled) return await GetByIdAsync(id, ct);
+        if (pr.Status == InvoiceStatus.Cancelled)
+            return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات ملغى بالفعل", ErrorCodes.InvalidOperation);
 
         return await _uow.ExecuteAsync(async () =>
         {
@@ -269,6 +272,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception cancelling purchase return {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)

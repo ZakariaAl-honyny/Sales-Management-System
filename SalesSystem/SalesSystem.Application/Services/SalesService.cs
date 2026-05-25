@@ -155,6 +155,7 @@ public class SalesService : ISalesService
         catch (DomainException ex)
         {
             await transaction.RollbackAsync(ct);
+            _logger.LogWarning(ex, "Validation error creating sales invoice draft");
             return Result<SalesInvoiceDto>.Failure(ex.Message);
         }
         catch (Exception ex)
@@ -272,6 +273,7 @@ public class SalesService : ISalesService
                     if (!stockResult.IsSuccess)
                     {
                         await transaction.RollbackAsync(ct);
+                        _logger.LogWarning("Stock decrease failed for sales invoice post: {Error}", stockResult.Error);
                         return Result<SalesInvoiceDto>.Failure(stockResult.Error!);
                     }
                 }
@@ -290,6 +292,7 @@ public class SalesService : ISalesService
                     if (customer == null)
                     {
                         await transaction.RollbackAsync(ct);
+                        _logger.LogWarning("Customer {CustomerId} not found for credit sales invoice {InvoiceNo} post", invoice.CustomerId, invoice.InvoiceNo);
                         return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
                     }
                     customer.IncreaseBalance(invoice.DueAmount);
@@ -355,6 +358,7 @@ public class SalesService : ISalesService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception posting sales invoice {Id}: {Message}", id, ex.Message);
                 return Result<SalesInvoiceDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -375,7 +379,7 @@ public class SalesService : ISalesService
             return Result<SalesInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
 
         if (invoice.Status == InvoiceStatus.Cancelled)
-            return await GetByIdAsync(id, ct);
+            return Result<SalesInvoiceDto>.Failure("الفاتورة ملغاة بالفعل", ErrorCodes.InvalidOperation);
 
         return await _uow.ExecuteAsync(async () =>
         {
@@ -401,6 +405,7 @@ public class SalesService : ISalesService
                         if (!stockResult.IsSuccess)
                         {
                             await transaction.RollbackAsync(ct);
+                            _logger.LogWarning("Stock increase reversal failed for sales invoice cancel: {Error}", stockResult.Error);
                             return Result<SalesInvoiceDto>.Failure(stockResult.Error!);
                         }
                     }
@@ -435,6 +440,10 @@ public class SalesService : ISalesService
                     }
                 }
 
+                // Zero out PaidAmount before Cancel() — financial entries have already been reversed
+                if (invoice.PaidAmount > 0)
+                    invoice.SetPaidAmount(0);
+
                 invoice.Cancel();
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -446,6 +455,7 @@ public class SalesService : ISalesService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception cancelling sales invoice {Id}: {Message}", id, ex.Message);
                 return Result<SalesInvoiceDto>.Failure(ex.Message);
             }
             catch (Exception ex)

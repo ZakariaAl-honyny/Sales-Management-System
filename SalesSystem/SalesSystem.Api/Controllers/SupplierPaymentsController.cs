@@ -82,8 +82,13 @@ public class SupplierPaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateSupplierPaymentRequest request, CancellationToken ct)
     {
-        var result = await _paymentService.UpdateSupplierPaymentAsync(id, request, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _paymentService.UpdateSupplierPaymentAsync(id, request, userId, ct);
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     /// <summary>
@@ -95,7 +100,12 @@ public class SupplierPaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
-        var result = await _paymentService.DeleteSupplierPaymentAsync(id, ct);
-        return result.IsSuccess ? NoContent() : BadRequest(new { error = result.Error });
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _paymentService.DeleteSupplierPaymentAsync(id, userId, ct);
+        if (result.IsSuccess) return NoContent();
+        if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 }

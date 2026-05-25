@@ -116,7 +116,7 @@ public class InventoryWriteOffService : IInventoryWriteOffService
             if (!decResult.IsSuccess)
             {
                 await transaction.RollbackAsync(ct);
-                _logger.LogError("Write-off failed during stock decrease: {Error}", decResult.Error);
+                _logger.LogWarning("Write-off failed during stock decrease: {Error}", decResult.Error);
                 return Result<StockWriteOffDto>.Failure(decResult.Error ?? "فشل في تحديث المخزون");
             }
 

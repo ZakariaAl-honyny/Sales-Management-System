@@ -15,5 +15,13 @@ public class UpdateSupplierPaymentValidator : AbstractValidator<UpdateSupplierPa
 
         RuleFor(x => x.PaymentMethod)
             .IsInEnum().WithMessage("طريقة الدفع غير صحيحة");
+
+        RuleFor(x => x.PaymentDate)
+            .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.PaymentDate.HasValue)
+            .WithMessage("تاريخ الدفع لا يمكن أن يكون في المستقبل");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(500).When(x => x.Notes != null)
+            .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
     }
 }

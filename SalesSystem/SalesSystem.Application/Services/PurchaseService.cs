@@ -152,6 +152,7 @@ public class PurchaseService : IPurchaseService
         catch (DomainException ex)
         {
             await transaction.RollbackAsync(ct);
+            _logger.LogWarning(ex, "Domain exception creating purchase invoice: {Message}", ex.Message);
             return Result<PurchaseInvoiceDto>.Failure(ex.Message);
         }
         catch (Exception ex)
@@ -205,6 +206,7 @@ public class PurchaseService : IPurchaseService
         }
         catch (DomainException ex)
         {
+            _logger.LogWarning(ex, "Domain exception updating purchase invoice {Id}: {Message}", id, ex.Message);
             return Result<PurchaseInvoiceDto>.Failure(ex.Message);
         }
         catch (Exception ex)
@@ -272,6 +274,7 @@ public class PurchaseService : IPurchaseService
                     if (!stockResult.IsSuccess)
                     {
                         await transaction.RollbackAsync(ct);
+                        _logger.LogWarning("Stock increase failed for purchase invoice post: {Error}", stockResult.Error);
                         return Result<PurchaseInvoiceDto>.Failure(stockResult.Error!);
                     }
                 }
@@ -319,6 +322,7 @@ public class PurchaseService : IPurchaseService
                     if (supplier == null)
                     {
                         await transaction.RollbackAsync(ct);
+                        _logger.LogWarning("Supplier {SupplierId} not found during purchase invoice {InvoiceNo} post", invoice.SupplierId, invoice.InvoiceNo);
                         return Result<PurchaseInvoiceDto>.Failure("المورد غير موجود");
                     }
                     supplier.IncreaseBalance(invoice.DueAmount);
@@ -353,6 +357,7 @@ public class PurchaseService : IPurchaseService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception posting purchase invoice {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseInvoiceDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -373,7 +378,7 @@ public class PurchaseService : IPurchaseService
             return Result<PurchaseInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
 
         if (invoice.Status == InvoiceStatus.Cancelled)
-            return await GetByIdAsync(id, ct);
+            return Result<PurchaseInvoiceDto>.Failure("الفاتورة ملغاة بالفعل", ErrorCodes.InvalidOperation);
 
         return await _uow.ExecuteAsync(async () =>
         {
@@ -400,6 +405,7 @@ public class PurchaseService : IPurchaseService
                         if (!stockResult.IsSuccess)
                         {
                             await transaction.RollbackAsync(ct);
+                            _logger.LogWarning("Stock reversal failed for purchase invoice cancel: {Error}", stockResult.Error);
                             return Result<PurchaseInvoiceDto>.Failure(stockResult.Error!);
                         }
                     }
@@ -420,7 +426,7 @@ public class PurchaseService : IPurchaseService
                         var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
                             invoice.CashBoxId.Value,
                             invoice.PaidAmount,
-                            CashTransactionType.CustomerPayment,
+                            CashTransactionType.SupplierPayment,
                             "PurchaseInvoiceCancel",
                             invoice.Id,
                             userId,
@@ -429,10 +435,15 @@ public class PurchaseService : IPurchaseService
                         if (!cashResult.IsSuccess)
                         {
                             await transaction.RollbackAsync(ct);
+                            _logger.LogWarning("Cash transaction reversal failed for purchase invoice cancel: {Error}", cashResult.Error);
                             return Result<PurchaseInvoiceDto>.Failure(cashResult.Error ?? "فشل في تسجيل الحركة النقدية العكسية");
                         }
                     }
                 }
+
+                // Zero out PaidAmount before Cancel() — financial entries have already been reversed
+                if (invoice.PaidAmount > 0)
+                    invoice.SetPaidAmount(0);
 
                 invoice.Cancel();
                 await _uow.SaveChangesAsync(ct);
@@ -445,6 +456,7 @@ public class PurchaseService : IPurchaseService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception cancelling purchase invoice {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseInvoiceDto>.Failure(ex.Message);
             }
             catch (Exception ex)

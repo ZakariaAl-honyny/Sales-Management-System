@@ -185,6 +185,7 @@ public class CashBoxService : ICashBoxService
             if (sourceBox == null)
             {
                 await dbTransaction.RollbackAsync(ct);
+                _logger.LogWarning("Source cash box {SourceCashBoxId} not found for transfer", request.SourceCashBoxId);
                 return Result.Failure("الصندوق المصدر غير موجود", ErrorCodes.NotFound);
             }
 
@@ -192,6 +193,7 @@ public class CashBoxService : ICashBoxService
             if (destBox == null)
             {
                 await dbTransaction.RollbackAsync(ct);
+                _logger.LogWarning("Destination cash box {DestCashBoxId} not found for transfer", request.DestinationCashBoxId);
                 return Result.Failure("الصندوق الوجهة غير موجود", ErrorCodes.NotFound);
             }
 

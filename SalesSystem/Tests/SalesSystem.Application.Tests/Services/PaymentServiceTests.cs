@@ -12,6 +12,7 @@ using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
 using Xunit.Abstractions;
+// ReSharper disable EntityFramework.ModelValidation.UnlimitedStringLength
 
 namespace SalesSystem.Application.Tests.Services;
 
@@ -47,6 +48,7 @@ public class PaymentServiceTests : IDisposable
         _mockUow.Setup(u => u.Suppliers).Returns(new InMemoryEfCoreRepository<Supplier>(_dbContext));
         _mockUow.Setup(u => u.CustomerPayments).Returns(new InMemoryEfCoreRepository<CustomerPayment>(_dbContext));
         _mockUow.Setup(u => u.SupplierPayments).Returns(new InMemoryEfCoreRepository<SupplierPayment>(_dbContext));
+        _mockUow.Setup(u => u.WarehouseStocks).Returns(new InMemoryEfCoreRepository<WarehouseStock>(_dbContext));
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
@@ -220,6 +222,54 @@ public class PaymentServiceTests : IDisposable
 
     #endregion
 
+    #region WarehouseStock Not Affected (T012)
+
+    [Fact]
+    public async Task CreateCustomerPaymentAsync_DoesNotAffectWarehouseStock()
+    {
+        _output.WriteLine("[TEST] CreateCustomerPaymentAsync_DoesNotAffectWarehouseStock");
+
+        var customer = Customer.Create("Test Customer", openingBalance: 1000m);
+        _dbContext.Customers.Add(customer);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment received");
+
+        var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        customer.CurrentBalance.Should().Be(500m);
+
+        var stockRecords = await _dbContext.WarehouseStocks.ToListAsync();
+        stockRecords.Should().BeEmpty("Customer payments should never create or modify warehouse stock records");
+
+        _output.WriteLine("[PASS] Customer payment does not affect warehouse stock");
+    }
+
+    [Fact]
+    public async Task CreateSupplierPaymentAsync_DoesNotAffectWarehouseStock()
+    {
+        _output.WriteLine("[TEST] CreateSupplierPaymentAsync_DoesNotAffectWarehouseStock");
+
+        var supplier = Supplier.Create("Test Supplier", openingBalance: 5000m);
+        _dbContext.Suppliers.Add(supplier);
+        await _dbContext.SaveChangesAsync();
+
+        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment made");
+
+        var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        supplier.CurrentBalance.Should().Be(4000m);
+
+        var stockRecords = await _dbContext.WarehouseStocks.ToListAsync();
+        stockRecords.Should().BeEmpty("Supplier payments should never create or modify warehouse stock records");
+
+        _output.WriteLine("[PASS] Supplier payment does not affect warehouse stock");
+    }
+
+    #endregion
+
     #region GetCustomerPaymentsAsync Tests
 
     [Fact]
@@ -280,6 +330,168 @@ public class PaymentServiceTests : IDisposable
 
     #endregion
 
+    #region Update and Delete Payment Tests (T012)
+
+    [Fact]
+    public async Task UpdateCustomerPaymentAsync_ReversesOldAndAppliesNewBalance()
+    {
+        _output.WriteLine("[TEST] UpdateCustomerPaymentAsync_ReversesOldAndAppliesNewBalance");
+
+        var customer = Customer.Create("Test Customer", openingBalance: 1000m);
+        _dbContext.Customers.Add(customer);
+        await _dbContext.SaveChangesAsync();
+
+        // Create initial payment of 500
+        var createRequest = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Initial payment");
+        var createResult = await _sut.CreateCustomerPaymentAsync(createRequest, userId: 1, CancellationToken.None);
+
+        createResult.IsSuccess.Should().BeTrue();
+        customer.CurrentBalance.Should().Be(500m, "After payment of 500, balance should decrease from 1000 to 500");
+
+        // Update payment amount from 500 to 200
+        var updateRequest = new SalesSystem.Contracts.Requests.UpdateCustomerPaymentRequest(1, 200m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, "Updated payment");
+        var updateResult = await _sut.UpdateCustomerPaymentAsync(createResult.Value!.Id, updateRequest, userId: 1, CancellationToken.None);
+
+        updateResult.IsSuccess.Should().BeTrue();
+        // Old amount (500) reversed: balance 500 -> 1000, then new amount (200) applied: 1000 -> 800
+        customer.CurrentBalance.Should().Be(800m, "Old 500 reversed then new 200 deducted => 1000 - 200 = 800");
+
+        _output.WriteLine("[PASS] Update customer payment reverses old and applies new balance");
+    }
+
+    [Fact]
+    public async Task UpdateSupplierPaymentAsync_ReversesOldAndAppliesNewBalance()
+    {
+        _output.WriteLine("[TEST] UpdateSupplierPaymentAsync_ReversesOldAndAppliesNewBalance");
+
+        var supplier = Supplier.Create("Test Supplier", openingBalance: 5000m);
+        _dbContext.Suppliers.Add(supplier);
+        await _dbContext.SaveChangesAsync();
+
+        // Create initial payment of 1000
+        var createRequest = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Initial payment");
+        var createResult = await _sut.CreateSupplierPaymentAsync(createRequest, userId: 1, CancellationToken.None);
+
+        createResult.IsSuccess.Should().BeTrue();
+        supplier.CurrentBalance.Should().Be(4000m, "After payment of 1000, balance should decrease from 5000 to 4000");
+
+        // Update payment amount from 1000 to 500
+        var updateRequest = new SalesSystem.Contracts.Requests.UpdateSupplierPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, "Updated payment");
+        var updateResult = await _sut.UpdateSupplierPaymentAsync(createResult.Value!.Id, updateRequest, userId: 1, CancellationToken.None);
+
+        updateResult.IsSuccess.Should().BeTrue();
+        // Old amount (1000) reversed: balance 4000 -> 5000, then new amount (500) applied: 5000 -> 4500
+        supplier.CurrentBalance.Should().Be(4500m, "Old 1000 reversed then new 500 deducted => 5000 - 500 = 4500");
+
+        _output.WriteLine("[PASS] Update supplier payment reverses old and applies new balance");
+    }
+
+    [Fact]
+    public async Task DeleteCustomerPaymentAsync_ReversesBalance()
+    {
+        _output.WriteLine("[TEST] DeleteCustomerPaymentAsync_ReversesBalance");
+
+        var customer = Customer.Create("Test Customer", openingBalance: 1000m);
+        _dbContext.Customers.Add(customer);
+        await _dbContext.SaveChangesAsync();
+
+        // Create payment of 500
+        var createRequest = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment to delete");
+        var createResult = await _sut.CreateCustomerPaymentAsync(createRequest, userId: 1, CancellationToken.None);
+
+        createResult.IsSuccess.Should().BeTrue();
+        customer.CurrentBalance.Should().Be(500m, "After payment, balance should be 500");
+
+        // Delete the payment — balance should be restored
+        var deleteResult = await _sut.DeleteCustomerPaymentAsync(createResult.Value!.Id, userId: 1, CancellationToken.None);
+
+        deleteResult.IsSuccess.Should().BeTrue();
+        customer.CurrentBalance.Should().Be(1000m, "After deletion, balance should be restored to original 1000");
+
+        _output.WriteLine("[PASS] Delete customer payment reverses balance");
+    }
+
+    [Fact]
+    public async Task DeleteSupplierPaymentAsync_ReversesBalance()
+    {
+        _output.WriteLine("[TEST] DeleteSupplierPaymentAsync_ReversesBalance");
+
+        var supplier = Supplier.Create("Test Supplier", openingBalance: 5000m);
+        _dbContext.Suppliers.Add(supplier);
+        await _dbContext.SaveChangesAsync();
+
+        // Create payment of 1000
+        var createRequest = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment to delete");
+        var createResult = await _sut.CreateSupplierPaymentAsync(createRequest, userId: 1, CancellationToken.None);
+
+        createResult.IsSuccess.Should().BeTrue();
+        supplier.CurrentBalance.Should().Be(4000m, "After payment, balance (what we owe) should be 4000");
+
+        // Delete the payment — balance should be restored
+        var deleteResult = await _sut.DeleteSupplierPaymentAsync(createResult.Value!.Id, userId: 1, CancellationToken.None);
+
+        deleteResult.IsSuccess.Should().BeTrue();
+        supplier.CurrentBalance.Should().Be(5000m, "After deletion, balance should be restored to original 5000");
+
+        _output.WriteLine("[PASS] Delete supplier payment reverses balance");
+    }
+
+    [Fact]
+    public async Task UpdateCustomerPaymentAsync_NonExistent_ReturnsNotFound()
+    {
+        _output.WriteLine("[TEST] UpdateCustomerPaymentAsync_NonExistent_ReturnsNotFound");
+
+        var updateRequest = new SalesSystem.Contracts.Requests.UpdateCustomerPaymentRequest(1, 200m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, "Updated");
+        var result = await _sut.UpdateCustomerPaymentAsync(999, updateRequest, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("غير موجودة");
+
+        _output.WriteLine("[PASS] Non-existent customer payment update returns NotFound");
+    }
+
+    [Fact]
+    public async Task DeleteCustomerPaymentAsync_NonExistent_ReturnsNotFound()
+    {
+        _output.WriteLine("[TEST] DeleteCustomerPaymentAsync_NonExistent_ReturnsNotFound");
+
+        var result = await _sut.DeleteCustomerPaymentAsync(999, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("غير موجودة");
+
+        _output.WriteLine("[PASS] Non-existent customer payment delete returns NotFound");
+    }
+
+    [Fact]
+    public async Task UpdateSupplierPaymentAsync_NonExistent_ReturnsNotFound()
+    {
+        _output.WriteLine("[TEST] UpdateSupplierPaymentAsync_NonExistent_ReturnsNotFound");
+
+        var updateRequest = new SalesSystem.Contracts.Requests.UpdateSupplierPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, "Updated");
+        var result = await _sut.UpdateSupplierPaymentAsync(999, updateRequest, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("غير موجودة");
+
+        _output.WriteLine("[PASS] Non-existent supplier payment update returns NotFound");
+    }
+
+    [Fact]
+    public async Task DeleteSupplierPaymentAsync_NonExistent_ReturnsNotFound()
+    {
+        _output.WriteLine("[TEST] DeleteSupplierPaymentAsync_NonExistent_ReturnsNotFound");
+
+        var result = await _sut.DeleteSupplierPaymentAsync(999, userId: 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("غير موجودة");
+
+        _output.WriteLine("[PASS] Non-existent supplier payment delete returns NotFound");
+    }
+
+    #endregion
+
     #region Helper Classes
 
     private class MockDbContextTransaction : IDbContextTransaction
@@ -298,6 +510,7 @@ public class PaymentServiceTests : IDisposable
         public DbSet<Supplier> Suppliers => Set<Supplier>();
         public DbSet<CustomerPayment> CustomerPayments => Set<CustomerPayment>();
         public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
+        public DbSet<WarehouseStock> WarehouseStocks => Set<WarehouseStock>();
     }
 
     private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity
