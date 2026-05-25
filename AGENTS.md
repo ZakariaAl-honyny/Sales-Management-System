@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/012-multi-window-ui/plan.md](specs/012-multi-window-ui/plan.md)
+**Active Feature Plan**: [specs/013-identifier-validation/plan.md](specs/013-identifier-validation/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
