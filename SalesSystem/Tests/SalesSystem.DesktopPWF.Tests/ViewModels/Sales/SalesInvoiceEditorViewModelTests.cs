@@ -32,6 +32,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<ICashBoxApiService> _cashBoxApiServiceMock;
     private readonly Mock<IPrintApiService> _printApiServiceMock;
     private readonly Mock<IToastNotificationService> _mockToastService;
+    private readonly Mock<ICategoryApiService> _mockCategoryService;
 
     public SalesInvoiceEditorViewModelTests()
     {
@@ -48,6 +49,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         _cashBoxApiServiceMock = new Mock<ICashBoxApiService>();
         _printApiServiceMock = new Mock<IPrintApiService>();
         _mockToastService = new Mock<IToastNotificationService>();
+        _mockCategoryService = new Mock<ICategoryApiService>();
     }
 
     public void Dispose()
@@ -593,6 +595,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _cashBoxApiServiceMock.Object,
             _printApiServiceMock.Object,
             _mockToastService.Object,
+            _mockCategoryService.Object,
             invoiceId);
     }
 

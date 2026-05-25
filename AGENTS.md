@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/014-product-lifecycle/plan.md](specs/014-product-lifecycle/plan.md)
+**Active Feature Plan**: [specs/015-touch-pos-interface/plan.md](specs/015-touch-pos-interface/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
