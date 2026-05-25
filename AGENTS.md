@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/013-identifier-validation/plan.md](specs/013-identifier-validation/plan.md)
+**Active Feature Plan**: [specs/014-product-lifecycle/plan.md](specs/014-product-lifecycle/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
