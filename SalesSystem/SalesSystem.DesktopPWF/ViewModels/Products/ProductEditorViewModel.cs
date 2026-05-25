@@ -319,7 +319,9 @@ public class ProductEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _expirationDate, value))
             {
-                if (value.HasValue && value.Value < DateTime.Today)
+                if (HasExpirationDate && !value.HasValue)
+                    AddError(nameof(ExpirationDate), "يرجى اختيار تاريخ انتهاء الصلاحية");
+                else if (value.HasValue && value.Value < DateTime.Today)
                     AddError(nameof(ExpirationDate), "تاريخ الانتهاء لا يمكن أن يكون في الماضي");
                 else
                     ClearErrors(nameof(ExpirationDate));
@@ -475,6 +477,8 @@ public class ProductEditorViewModel : ViewModelBase
             AddError(nameof(RetailUnitId), "يجب اختيار وحدة التجزئة");
         if (!WholesaleUnitId.HasValue || WholesaleUnitId.Value <= 0)
             AddError(nameof(WholesaleUnitId), "يجب اختيار وحدة الجملة");
+        if (HasExpirationDate && (!ExpirationDate.HasValue))
+            AddError(nameof(ExpirationDate), "يرجى اختيار تاريخ انتهاء الصلاحية");
 
         return await ValidateAllAsync();
     }

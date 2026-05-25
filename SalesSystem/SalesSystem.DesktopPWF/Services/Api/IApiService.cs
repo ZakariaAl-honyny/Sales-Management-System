@@ -288,6 +288,7 @@ public interface IReportApiService
     Task<Result<List<SupplierBalanceReportDto>>> GetSupplierBalancesReportAsync(int? supplierId = null, CancellationToken ct = default);
     Task<Result<List<ProductMovementReportDto>>> GetProductMovementsReportAsync(int productId, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
     Task<Result<List<LowStockReportDto>>> GetLowStockReportAsync(int? warehouseId = null, CancellationToken ct = default);
+    Task<Result<List<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays = 0, CancellationToken ct = default);
 }
 
 public interface ISettingsApiService
@@ -401,6 +402,11 @@ public interface IPrintApiService
     /// Returns the temp file path on success.
     /// </summary>
     Task<Result<string>> GetPurchaseA4PdfAsync(int invoiceId, CancellationToken ct = default);
+}
+
+public interface IInventoryWriteOffApiService
+{
+    Task<Result<StockWriteOffDto>> WriteOffAsync(CreateStockWriteOffRequest request, CancellationToken ct = default);
 }
 
 public interface IDatabaseHealthCheckService

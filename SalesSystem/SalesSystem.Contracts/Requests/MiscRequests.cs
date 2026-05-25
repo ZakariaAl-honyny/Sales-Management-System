@@ -23,6 +23,13 @@ public record UpdateSettingsRequest(
 public record UpdateCostingMethodRequest(
     int Method);
 
+public record CreateStockWriteOffRequest(
+    int ProductId,
+    int WarehouseId,
+    decimal Quantity,
+    string Reason,
+    int? UnitId = null);
+
 public record UpdatePrintSettingsRequest(
     string ThermalPrinterName,
     string A4PrinterName,

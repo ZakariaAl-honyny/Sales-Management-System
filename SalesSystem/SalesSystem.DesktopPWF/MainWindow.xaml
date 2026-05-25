@@ -56,6 +56,8 @@
                 <MenuItem Header="تقرير المشتريات" ToolTip="عرض تقارير المشتريات" Tag="Reports" Click="ReportMenuItem_Click"/>
                 <MenuItem Header="تقرير المخزون" ToolTip="عرض تقارير المخزون" Tag="Inventory" Click="ReportMenuItem_Click"/>
                 <MenuItem Header="تقرير الأرباح والخسائر" ToolTip="عرض تقارير الأرباح والخسائر" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="المنتجات المنتهية" ToolTip="إدارة وترحيل المنتجات المنتهية الصلاحية" Tag="ExpiredProducts" Click="ReportMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="الإعدادات" ToolTip="قائمة الإعدادات" x:Name="SettingsMenuItem">
                 <MenuItem Header="إدارة المنتجات" ToolTip="إدارة قائمة المنتجات والأسعار" Click="ProductsMenuItem_Click"/>
@@ -178,6 +180,12 @@
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="📊" FontSize="18" Margin="0,0,12,0"/>
                                     <TextBlock Text="التقارير" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </ListBoxItem>
+                            <ListBoxItem x:Name="NavExpiredProductsItem" Tag="ExpiredProducts" AutomationProperties.AutomationId="NavExpiredProducts" ToolTip="عرض المنتجات المنتهية الصلاحية وترحيلها كإتلاف.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="⚠️" FontSize="18" Margin="0,0,12,0"/>
+                                    <TextBlock Text="المنتجات المنتهية" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </ListBoxItem>
                             <ListBoxItem x:Name="NavSalesReturnsItem" Tag="SalesReturns" AutomationProperties.AutomationId="NavSalesReturns" ToolTip="إدارة بضائع المبيعات المرتجعة وإعادة المبالغ للعملاء.">

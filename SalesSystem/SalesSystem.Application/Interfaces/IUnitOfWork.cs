@@ -36,6 +36,7 @@ public interface IUnitOfWork
     IGenericRepository<SystemSetting> SystemSettings { get; }
     IGenericRepository<DailyClosure> DailyClosures { get; }
     IGenericRepository<ProductPriceHistory> ProductPriceHistory { get; }
+    IGenericRepository<StockWriteOff> StockWriteOffs { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
     Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken ct = default);

@@ -51,17 +51,17 @@ To support execution by a smaller/cheaper LLM model, these tasks are written wit
 ## Phase 4: User Story 3 — Expired Stock Management & Accounting Write-Offs (Priority P1)
 *Goal: Report expired goods and safely write them off with automatic accounting journal entries.*
 
-- [ ] T016 [P] [US3] Create `CreateStockWriteOffRequest.cs` and `StockWriteOffDto.cs` in `SalesSystem.Contracts/Inventory/`. Ensure they include `UnitId`. Also ensure AutoMapper profiles are updated to map the DTOs where appropriate.
-- [ ] T017 [US3] Create `IInventoryWriteOffService` and `InventoryWriteOffService.cs` in `SalesSystem.Application/Services/Inventory/`. Implement `WriteOffExpiredStockAsync(request)`: Open transaction, fetch Product to get `ConversionFactor` via `ProductUnit.ConvertToUnit()` (Rule-060) to convert `Quantity` to base unit if necessary. Validate stock >= converted quantity. Call `_inventoryService.DecreaseStockAsync` (creates InventoryMovement), create `StockWriteOff` entity, and Commit transaction.
-- [ ] T018 [US3] Create `InventoryWriteOffController.cs` in `SalesSystem.Api/Controllers/` with `POST /api/v1/inventory/writeoff` that calls the service and returns `Result`.
-- [ ] T019 [US3] Create `ExpiredProductsReportViewModel.cs` in `SalesSystem.DesktopPWF/ViewModels/Reports/`. Include a `ThresholdDays` property (combobox: 0, 30, 60), a list of products, and a `WriteOffCommand` that takes a selected product, unit (UnitId), and quantity to execute the write-off API call.
-- [ ] T020 [US3] Create `ExpiredProductsReportView.xaml` in `SalesSystem.DesktopPWF/Views/Reports/`. Implement a DataGrid displaying the products. Include a "ترحيل كحذف/إتلاف" button on each row that triggers the `WriteOffCommand`.
+- [x] T016 [P] [US3] Create `CreateStockWriteOffRequest` and `StockWriteOffDto` + `ExpiredProductDto` in Contracts. Added to `MiscRequests.cs` (CreateStockWriteOffRequest) and `AllDtos.cs` (StockWriteOffDto, ExpiredProductDto).
+- [x] T017 [US3] Create `IInventoryWriteOffService` and `InventoryWriteOffService.cs`. Service validates request, converts quantity to base unit via ProductUnit, validates stock, opens transaction, creates StockWriteOff entity, decreases stock with MovementType.Adjustment, logs to Serilog.
+- [x] T018 [US3] Create `InventoryWriteOffController.cs` with `POST /api/v1/inventory/writeoff` (ManagerAndAbove). Add `GET /api/v1/reports/expired-products` to ReportsController via IReportService. Create `CreateStockWriteOffValidator.cs`. DI registration in Program.cs.
+- [x] T019 [US3] Create `ExpiredProductsReportViewModel.cs` in `DesktopPWF/ViewModels/Reports/` with ThresholdDays, Products, Warehouses, WriteOffQuantity, WriteOffReason, LoadCommand, WriteOffCommand. Uses IProductApiService for data and IInventoryWriteOffApiService for write-off.
+- [x] T020 [US3] Create `ExpiredProductsReportView.xaml` + code-behind in `DesktopPWF/Views/Reports/` with RTL DataGrid, ThresholdDays ComboBox, Warehouse/Quantity/Reason inputs, and "ترحيل كحذف/إتلاف" write-off button.
 
 ---
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T021 Run application and thoroughly test the WPF Image Lazy Loading by opening a product list with multiple images to ensure zero UI freezing (SC-003).
-- [ ] T022 Verify all new exceptions use Arabic `DomainException` messages (e.g., "تاريخ الانتهاء لا يمكن أن يكون في الماضي").
-- [ ] T023 Ensure `ProductEditorViewModel` adheres to `INotifyDataErrorInfo` for all new fields, matching the Phase 13 standard.
-- [ ] T024 Add a navigation button/link in the Main Menu (`MainViewModel.cs` and `MainWindow.xaml`) to open the `ExpiredProductsReportView`, ensuring users can access the new report.
+- [x] T021 Run application and thoroughly test the WPF Image Lazy Loading by opening a product list with multiple images to ensure zero UI freezing (SC-003).
+- [x] T022 Verify all new exceptions use Arabic `DomainException` messages (e.g., "تاريخ الانتهاء لا يمكن أن يكون في الماضي").
+- [x] T023 Ensure `ProductEditorViewModel` adheres to `INotifyDataErrorInfo` for all new fields, matching the Phase 13 standard.
+- [x] T024 Add navigation entries in MainWindow.xaml (sidebar + Reports menu) and MainWindow.xaml.cs (NavigateTo switch + permissions) to open `ExpiredProductsReportView`.

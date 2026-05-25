@@ -394,6 +394,28 @@ public record ProductMovementReportDto(
     decimal QuantityAfter
 );
 
+public record StockWriteOffDto(
+    int Id,
+    int ProductId,
+    string? ProductName,
+    int WarehouseId,
+    string? WarehouseName,
+    decimal Quantity,
+    DateTime WriteOffDate,
+    string Reason,
+    int? UnitId,
+    int CreatedByUserId,
+    DateTime CreatedAt);
+
+public record ExpiredProductDto(
+    int ProductId,
+    string ProductName,
+    string? CategoryName,
+    string? WarehouseName,
+    decimal CurrentStock,
+    DateTime ExpirationDate,
+    int DaysExpired);
+
 public record LowStockReportDto(
     int     ProductId,
     string  ProductName,
