@@ -854,6 +854,60 @@ text
 * بما أنك تركز على جعل النظام "يشرح نفسه للمستخدم بكل مرونة وسلاسة"، اجعل النظام يقوم بفحص التواريخ تلقائياً عند فتح شاشة النظام الرئيسية (Dashboard) في بداية اليوم.
 * إذا وجد النظام منتجات منتهية أو تشرف على الانتهاء، يعرض تنبيهاً علوياً خفيفاً (Badge/Notification) دون إزعاج المستخدم، لكي يتحرك التاجر ويتخذ إجراءً سريعاً قبل تكبد خسائر مالية.
 
+---
+
+### Phase 15 — Touch-Optimized Quick POS Interface (Restaurant-Style Layout)
+
+**Tasks:**
+
+1. **UI/UX Architecture (Dual-Mode Sales Interface):**
+* Implement a switchable view mechanism within `SalesView.xaml` allowing the user to toggle between "المظهر القياسي (Retail Grid)" و "البيع السريع (Touch POS Layout)".
+* Apply a fully responsive **RTL Layout** customized for rapid screen interactions:
+* **الجانب الأيمن (Right Panel):** يحتوي على شجرة الفئات والأصناف مصفوفة كأزرار كبيرة (Tiles).
+* **الجانب الأيسر (Left Panel):** يحتوي على سلة البيع الحالية (Active Cart Grid) مع مجاميع الفاتورة وأزرار الدفع السريع في الأسفل.
+
+2. **Dynamic Categories & Items Component (WPF Layout):**
+* **Category Selector:** Use an `ItemsControl` bound to a `WrapPanel` or `UniformGrid` to display Product Categories as large, touch-friendly styled buttons. Clicking a category smoothly loads its corresponding products.
+* **Product Grid:** Displays products belonging to the selected category. Each product button must support:
+* Displaying the Product Name and Price clearly.
+* Rendering the optional product image (from Phase 8) as a background or icon with lazy loading.
+* Clicking/Touching the product button instantly executes an `AddToCartCommand` adding the item to the invoice lines (or incrementing its quantity if already present) without closing any menus.
+
+3. **In-Line Fast Cart Management:**
+* Redesign the active cart lines list using a lightweight DataGrid or customized ListView template.
+* Every invoice item line must feature immediate action buttons directly on the row:
+* `+` and `-` buttons to modify quantity instantly.
+* A quick delete/remove icon.
+* All total calculations (Total, Tax/VAT, Grand Total) must update in real-time instantly in the ViewModel via `RaisePropertyChanged` upon any quantity or item change.
+
+4. **Quick Checkout & On-Screen Numeric Keypad:**
+* Integrate an optional on-screen numeric keypad for touch-screen monitors to allow fast entry of paid amounts.
+* Add dedicated, one-click action buttons at the bottom of the invoice:
+* **[ كاش / Cash ]:** ترحيل فوري وطباعة الفاتورة مباشرة.
+* **[ شبكة / Card ]:** ترحيل الفاتورة كدفع إلكتروني.
+* **[ حفظ كمسودة / Draft ]:** تعليق الفاتورة لخدمة العملاء المترددين والعودة لها لاحقاً.
+
+5. **Backend & Shared ViewModel Integration:**
+* Ensure this new Touch UI reuses the EXACT same core Business Logic, Entities, and Application commands (`CreateInvoiceCommand`, `DraftInvoiceCommand`) used by the standard screen to enforce Clean Architecture principles and avoid duplication of validation rules.
+
+**Definition of Done:**
+
+* The user can toggle between the Retail Grid view and the Touch POS view seamlessly without losing current cart data.
+* Clicking a product button adds it to the active invoice in less than 50 milliseconds (No UI lag).
+* The layout adapts correctly to standard touch-screen monitors without any element overlapping or overflowing.
+* Executing a quick checkout validates the invoice locally (using Client-Side Validation) and saves/posts the data correctly to the database.
+
+---
+
+### 💡 توجيهات معمارية لإصدار الـ MVP:
+
+عندما يبدأ الوكلاء الذكيون (Agents) في كتابة كود هذه الشاشة، وجههم للالتزام بالآتي لضمان أعلى أداء (Performance):
+
+1. **الابتعاد عن الأبعاد الثابتة (No Hardcoded Sizes):**
+يجب أن تُبنى أزرار المنتجات والفئات داخل `UniformGrid` أو `WrapPanel` مع ضبط الـ `Width` والـ `Height` لتكون ديناميكية أو تعتمد على نسبة مئوية، لكي يتكيف حجم الأزرار تلقائياً سواء كان العميل يعرض النظام على شاشة كاشير صغيرة (15 بوصة) أو شاشة حاسوب ضخمة.
+2. **استغلال الـ Virtualization:**
+إذا كان لدى العميل فئة تحتوي على مئات الأصناف، فإن رندرة (Rendering) مئات الأزرار دفعة واحدة سيسبب بطء في الواجهة. يجب تفعيل خاصية `VirtualizingStackPanel.IsVirtualizing="True"` لضمان سرعة استجابة الشاشة وثبات الذاكرة (Memory) أثناء التنقل الفوري بين الفئات.
+
 ## 8. Critical Business Rules Reference
 SALES FLOW:
 
