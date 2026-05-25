@@ -34,6 +34,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly ICashBoxApiService _cashBoxService;
     private readonly IPrintApiService _printApiService;
     private readonly IToastNotificationService _toastService;
+    private readonly ICategoryApiService _categoryService;
 
     private int? _invoiceId;
     private string? _invoiceNo;
@@ -61,6 +62,22 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private ObservableCollection<CashBoxDto> _cashBoxes = new();
     private CashBoxDto? _selectedCashBox;
 
+    public TouchPosViewModel? TouchPosVM { get; private set; }
+    public TouchPosCartViewModel? TouchPosCartVM { get; private set; }
+
+    public enum SalesViewMode
+    {
+        Standard,
+        Touch
+    }
+
+    private SalesViewMode _currentViewMode;
+    public SalesViewMode CurrentViewMode
+    {
+        get => _currentViewMode;
+        set => SetProperty(ref _currentViewMode, value);
+    }
+
     public SalesInvoiceEditorViewModel(
         ISalesInvoiceApiService invoiceService,
         IEventBus eventBus,
@@ -75,6 +92,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         ICashBoxApiService cashBoxService,
         IPrintApiService printApiService,
         IToastNotificationService toastService,
+        ICategoryApiService categoryService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -92,6 +110,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _cashBoxService = cashBoxService;
         _printApiService = printApiService;
         _toastService = toastService;
+        _categoryService = categoryService;
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
@@ -116,6 +135,63 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             }
         });
         DeleteCommand = new AsyncRelayCommand(DeleteAsync, () => IsEditMode && !IsReadOnly);
+        ToggleViewModeCommand = new RelayCommand(ToggleViewMode);
+
+        // --- Touch POS ViewModels ---
+        TouchPosVM = new TouchPosViewModel(_categoryService, _productService);
+        TouchPosCartVM = new TouchPosCartViewModel(Items, RecalculateTotals);
+
+        // Wire: when a product is selected in Touch POS, add it to the cart
+        TouchPosVM.OnProductSelected = async product =>
+        {
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var line = new InvoiceLineViewModel(Products, _soundService)
+                {
+                    SelectedProduct = product,
+                    Quantity = 1m,
+                    Mode = (byte)SaleMode.Retail
+                };
+                line.PropertyChanged += (s, e) =>
+                {
+                    if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
+                        RecalculateTotals();
+                };
+                Items.Add(line);
+                OnPropertyChanged(nameof(Items));
+                RecalculateTotals();
+            });
+        };
+
+        // Wire: checkout delegates (call the existing SaveAsDraft/Post methods)
+        TouchPosCartVM.OnCashCheckout = async paidAmount =>
+        {
+            if (decimal.TryParse(paidAmount, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var amount))
+            {
+                _paidAmount = amount;
+                OnPropertyChanged(nameof(PaidAmount));
+                _paymentType = (byte)PaymentType.Cash;
+                OnPropertyChanged(nameof(PaymentType));
+                await PostAsync();
+            }
+        };
+
+        TouchPosCartVM.OnCardCheckout = async paidAmount =>
+        {
+            if (decimal.TryParse(paidAmount, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var amount))
+            {
+                _paidAmount = amount;
+                OnPropertyChanged(nameof(PaidAmount));
+                _paymentType = (byte)PaymentType.Credit;
+                OnPropertyChanged(nameof(PaymentType));
+                await PostAsync();
+            }
+        };
+
+        TouchPosCartVM.OnDraftSave = async () =>
+        {
+            await SaveAsync();
+        };
 
         SaleModeOptions = new List<EnumDisplayItem>
         {
@@ -160,9 +236,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 _allowNegativeStock = settingsResult.Value.AllowNegativeStock;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently ignore — settings are non-critical for basic functionality
+            LogSystemError("فشل تحميل الإعدادات — استخدام القيم الافتراضية", "LoadSettingsAsync", ex);
         }
     }
 
@@ -201,6 +277,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             App.GetService<ICashBoxApiService>(),
             App.GetService<IPrintApiService>(),
             App.GetService<IToastNotificationService>(),
+            App.GetService<ICategoryApiService>(),
             invoiceId,
             isReadOnly)
     {
@@ -443,6 +520,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     public ICommand SearchCustomerCommand { get; }
     public ICommand ProcessBarcodeCommand { get; }
     public ICommand DeleteCommand { get; }
+    public ICommand ToggleViewModeCommand { get; }
     #endregion
 
     #region Events
@@ -1119,6 +1197,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private void UpdateCommandStates()
     {
         // No-op: buttons remain enabled per interactive validation pattern (RULE-059)
+    }
+
+    private void ToggleViewMode()
+    {
+        CurrentViewMode = CurrentViewMode == SalesViewMode.Standard
+            ? SalesViewMode.Touch
+            : SalesViewMode.Standard;
     }
     #endregion
 }

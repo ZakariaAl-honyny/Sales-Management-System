@@ -1,0 +1,379 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Sales.TouchPosCartView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewmodels="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Sales"
+             xmlns:converters="clr-namespace:SalesSystem.DesktopPWF"
+             xmlns:controls="clr-namespace:SalesSystem.DesktopPWF.Views.Controls"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=viewmodels:TouchPosCartViewModel}"
+             FlowDirection="RightToLeft"
+             MinWidth="320"
+             Background="{StaticResource SurfaceBrush}">
+
+    <UserControl.Resources>
+        <!-- Style for cart item container -->
+        <Style x:Key="CartItemContainerStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="0,0,0,1"/>
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#F8FAFC"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style for cart quantity adjustment buttons (touch-friendly) -->
+        <Style x:Key="TouchQtyButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="False"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#E2E8F0"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#CBD5E1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style for remove item button -->
+        <Style x:Key="TouchRemoveButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="False"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#FEE2E2"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#FECACA"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style for checkout action buttons (Cash/Card/Draft) -->
+        <Style x:Key="CheckoutButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                BorderThickness="0">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="False"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Border" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ============================================================ -->
+        <!-- TOP ROW: Cart Items List                                     -->
+        <!-- ============================================================ -->
+        <Grid Grid.Row="0">
+            <!-- Cart items list when cart has items -->
+            <ListBox ItemsSource="{Binding CartItems}"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling"
+                     ItemContainerStyle="{StaticResource CartItemContainerStyle}"
+                     Visibility="{Binding CartItems.Count, Converter={StaticResource CountToVisibility}}">
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <!-- Product Image -->
+                                <ColumnDefinition Width="Auto"/>
+                                <!-- Name + Price info -->
+                                <ColumnDefinition Width="*"/>
+                                <!-- Qty controls + Remove -->
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Product Image (50x50, hidden when no image) -->
+                            <Image Grid.Column="0"
+                                   Source="{Binding SelectedProduct.ImagePath, IsAsync=True}"
+                                   Width="50"
+                                   Height="50"
+                                   Margin="0,0,10,0"
+                                   Stretch="UniformToFill"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding SelectedProduct.ImagePath, Converter={StaticResource NullToVisibility}}"/>
+
+                            <!-- Product Name and Price info -->
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,8,0">
+                                <!-- Product Name -->
+                                <TextBlock Text="{Binding ProductName}"
+                                           FontSize="14"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="0,0,0,2"/>
+                                <!-- Price info -->
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding UnitPrice, StringFormat=N2}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text=" × "
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding Quantity, StringFormat=N2}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text=" = "
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding LineTotal, StringFormat=N2}"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource SuccessBrush}"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Quantity Adjustment Controls -->
+                            <StackPanel Grid.Column="2"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <!-- Decrease Quantity Button -->
+                                <Button Content="−"
+                                        Style="{StaticResource TouchQtyButtonStyle}"
+                                        Background="#F1F5F9"
+                                        BorderBrush="{StaticResource BorderBrush}"
+                                        Command="{Binding DataContext.DecreaseQtyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="إنقاص الكمية بمقدار واحد"/>
+
+                                <!-- Quantity Display -->
+                                <Border Background="#F8FAFC"
+                                        BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Width="48"
+                                        Height="36"
+                                        Margin="2"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding Quantity, StringFormat=N0}"
+                                               FontSize="15"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+
+                                <!-- Increase Quantity Button -->
+                                <Button Content="+"
+                                        Style="{StaticResource TouchQtyButtonStyle}"
+                                        Background="#F1F5F9"
+                                        BorderBrush="{StaticResource BorderBrush}"
+                                        Command="{Binding DataContext.IncreaseQtyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="زيادة الكمية بمقدار واحد"/>
+
+                                <!-- Remove Item Button -->
+                                <Button Content="🗑"
+                                        Style="{StaticResource TouchRemoveButtonStyle}"
+                                        Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="حذف المنتج من السلة"/>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Empty cart state -->
+            <Border Background="Transparent"
+                    Visibility="{Binding CartItems.Count, Converter={StaticResource CountToVisibility}, ConverterParameter=Inverse}">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Margin="24">
+                    <TextBlock Text="🛒"
+                               FontSize="56"
+                               HorizontalAlignment="Center"
+                               Opacity="0.3"
+                               Margin="0,0,0,16"/>
+                    <TextBlock Text="السلة فارغة — أضف منتجات من القائمة"
+                               FontSize="16"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"/>
+                    <TextBlock Text="اختر تصنيفاً ثم اضغط على منتج لإضافته"
+                               FontSize="13"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               Margin="0,8,0,0"
+                               Opacity="0.7"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ============================================================ -->
+        <!-- BOTTOM ROW: Totals, Paid Amount, Numeric Keypad & Actions    -->
+        <!-- ============================================================ -->
+        <Border Grid.Row="1"
+                Background="{StaticResource PrimaryBrush}"
+                Padding="16,14"
+                CornerRadius="0"
+                Effect="{StaticResource DeepShadow}">
+            <StackPanel>
+                <!-- Part 1: Totals Display -->
+                <Grid Margin="0,0,0,8">
+                    <!-- Subtotal line -->
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="المجموع الفرعي" FontSize="13" Foreground="#CBD5E1"/>
+                        <TextBlock Grid.Column="1" Text="{Binding SubTotal, StringFormat=N2}" FontSize="14" FontWeight="SemiBold" Foreground="#CBD5E1"/>
+                    </Grid>
+                    <!-- Total line -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="الإجمالي" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat=N2}" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                    </Grid>
+                </Grid>
+
+                <!-- Part 2: Paid Amount with NumericKeypadControl -->
+                <Border Background="#1E293B" CornerRadius="8" Padding="12" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="المبلغ المدفوع" FontSize="13" Foreground="#94A3B8" Margin="0,0,0,6"/>
+                        <TextBlock Text="{Binding PaidAmountString, FallbackValue='0'}" 
+                                   FontSize="32" FontWeight="Bold" Foreground="White"
+                                   HorizontalAlignment="Center"/>
+                        <controls:NumericKeypadControl InputValue="{Binding PaidAmountString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                       Margin="0,8,0,0"
+                                                       MinHeight="180"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Part 3: Action Buttons (T015) -->
+                <UniformGrid Columns="3" Margin="0,0,0,0" Height="56">
+                    <Button Content="كاش" 
+                            Command="{Binding CashCheckoutCommand}"
+                            Style="{StaticResource CheckoutButtonStyle}"
+                            Background="#16A34A"
+                            ToolTip="إتمام البيع نقداً — سيتم ترحيل الفاتورة"/>
+                    <Button Content="شبكة" 
+                            Command="{Binding CardCheckoutCommand}"
+                            Style="{StaticResource CheckoutButtonStyle}"
+                            Background="#2563EB"
+                            ToolTip="إتمام البيع عبر بطاقة الشبكة"/>
+                    <Button Content="مسودة" 
+                            Command="{Binding DraftCommand}"
+                            Style="{StaticResource CheckoutButtonStyle}"
+                            Background="#F59E0B"
+                            ToolTip="حفظ كمسودة دون ترحيل"/>
+                </UniformGrid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

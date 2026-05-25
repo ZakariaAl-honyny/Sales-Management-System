@@ -49,6 +49,7 @@
             <converters:SaleModeToBrushConverter x:Key="SaleModeToBrushConverter"/>
             <converters:SaleModeToStringConverter x:Key="SaleModeToStringConverter"/>
             <converters:StringListJoinConverter x:Key="StringListJoinConverter"/>
+            <converters:SalesViewModeToVisibilityConverter x:Key="SalesViewModeToVisibilityConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

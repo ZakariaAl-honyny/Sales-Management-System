@@ -908,7 +908,7 @@ text
 2. **استغلال الـ Virtualization:**
 إذا كان لدى العميل فئة تحتوي على مئات الأصناف، فإن رندرة (Rendering) مئات الأزرار دفعة واحدة سيسبب بطء في الواجهة. يجب تفعيل خاصية `VirtualizingStackPanel.IsVirtualizing="True"` لضمان سرعة استجابة الشاشة وثبات الذاكرة (Memory) أثناء التنقل الفوري بين الفئات.
 
-## 8. Critical Business Rules Reference
+### Phase 16 — Critical Business Rules Reference
 SALES FLOW:
 
 Validate all items have sufficient stock in warehouse
