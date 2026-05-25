@@ -102,18 +102,6 @@ public class WarehouseEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
-    private bool _hasNameError;
-    public bool HasNameError
-    {
-        get => _hasNameError;
-        set
-        {
-            if (SetProperty(ref _hasNameError, value))
-                OnPropertyChanged(nameof(NameError));
-        }
-    }
-
-    public string? NameError => HasNameError ? "الاسم مطلوب" : null;
     #endregion
 
     #region Commands
@@ -122,10 +110,14 @@ public class WarehouseEditorViewModel : ViewModelBase
     #endregion
 
     #region Methods
-    private bool Validate()
+    private async Task<bool> ValidateAsync()
     {
-        HasNameError = string.IsNullOrWhiteSpace(Name);
-        return !HasNameError;
+        ClearAllErrors();
+
+        if (string.IsNullOrWhiteSpace(Name))
+            AddError(nameof(Name), "اسم المستودع مطلوب");
+
+        return await ValidateAllAsync();
     }
 
     private void ShowSaveError(Exception ex)
@@ -136,13 +128,8 @@ public class WarehouseEditorViewModel : ViewModelBase
 
     private async Task SaveOperationAsync()
     {
-        if (!Validate())
+        if (!await ValidateAsync())
         {
-            var errors = new List<string>();
-            if (HasNameError) errors.Add("• " + NameError);
-
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-            RequestFocusFirstInvalidField();
             return;
         }
 

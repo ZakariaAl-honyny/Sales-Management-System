@@ -147,7 +147,7 @@
                     Margin="4,0"
                     VerticalAlignment="Center"
                     ToolTip="{Binding ElementName=Placeholder, Path=AdornedElement.(Validation.Errors).[0].ErrorContent}">
-                <TextBlock Text="!"
+                <TextBlock Text="❗"
                            Foreground="White"
                            FontWeight="Bold"
                            FontSize="14"

@@ -154,32 +154,6 @@ public class SupplierEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
-    // Validation
-    private bool _hasNameError;
-    public bool HasNameError
-    {
-        get => _hasNameError;
-        set
-        {
-            if (SetProperty(ref _hasNameError, value))
-                OnPropertyChanged(nameof(NameError));
-        }
-    }
-
-    public string? NameError => HasNameError ? "الاسم مطلوب" : null;
-
-    private bool _hasOpeningBalanceError;
-    public bool HasOpeningBalanceError
-    {
-        get => _hasOpeningBalanceError;
-        set
-        {
-            if (SetProperty(ref _hasOpeningBalanceError, value))
-                OnPropertyChanged(nameof(OpeningBalanceError));
-        }
-    }
-
-    public string? OpeningBalanceError => HasOpeningBalanceError ? "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر" : null;
     #endregion
 
     #region Commands
@@ -188,23 +162,22 @@ public class SupplierEditorViewModel : ViewModelBase
     #endregion
 
     #region Methods
-    private bool Validate()
+    private async Task<bool> ValidateAsync()
     {
-        HasNameError = string.IsNullOrWhiteSpace(Name);
-        HasOpeningBalanceError = OpeningBalance < 0;
-        return !HasNameError && !HasOpeningBalanceError;
+        ClearAllErrors();
+
+        if (string.IsNullOrWhiteSpace(Name))
+            AddError(nameof(Name), "اسم المورد مطلوب");
+        if (OpeningBalance < 0)
+            AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
+
+        return await ValidateAllAsync();
     }
 
     private async Task SaveOperationAsync()
     {
-        if (!Validate())
+        if (!await ValidateAsync())
         {
-            var errors = new List<string>();
-            if (HasNameError) errors.Add("• " + NameError);
-            if (HasOpeningBalanceError) errors.Add("• " + OpeningBalanceError);
-            
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-            RequestFocusFirstInvalidField();
             return;
         }
 

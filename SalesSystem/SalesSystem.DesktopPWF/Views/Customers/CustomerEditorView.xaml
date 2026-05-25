@@ -42,8 +42,7 @@
                                  TabIndex="2"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
                                  AutomationProperties.AutomationId="TxtCustomerName"
-                              ToolTip="الاسم الكامل للعميل — هذا الحقل إلزامي ولا يمكن أن يكون فارغاً"/>
-                        <TextBlock Text="{Binding NameError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibility}}"/>
+                               ToolTip="الاسم الكامل للعميل — هذا الحقل إلزامي ولا يمكن أن يكون فارغاً"/>
                         <Border Height="12"/>
 
                         <!-- Phone -->

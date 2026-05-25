@@ -45,7 +45,6 @@
                                  helpers:FocusHelper.AdvanceOnEnter="True"
                                  AutomationProperties.AutomationId="TxtProductName"
                                  ToolTip="اسم المنتج كما يظهر في الفواتير — هذا الحقل إلزامي"/>
-                        <TextBlock Text="{Binding NameError}" Foreground="{StaticResource ErrorBrush}" Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibility}}"/>
                         <Border Height="8"/>
 
                         <TextBlock Text="الفئة *" Style="{StaticResource LabelStyle}"/>
@@ -56,8 +55,7 @@
                                   Style="{StaticResource ModernComboBox}"
                                   TabIndex="3"
                                   helpers:FocusHelper.AdvanceOnEnter="True"/>
-                        <TextBlock Text="{Binding CategoryError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasCategoryError, Converter={StaticResource BoolToVisibility}}"/>
-                        <Border Height="8"/>
+                                <Border Height="8"/>
 
                         <TextBlock Text="الوصف" Style="{StaticResource LabelStyle}"/>
                         <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
@@ -87,7 +85,6 @@
                                           DisplayMemberPath="Name"
                                           Style="{StaticResource ModernComboBox}"
                                           TabIndex="5"/>
-                                <TextBlock Text="{Binding UnitError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasUnitError, Converter={StaticResource BoolToVisibility}}"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Margin="8,0,8,0">
@@ -98,7 +95,6 @@
                                           DisplayMemberPath="Name"
                                           Style="{StaticResource ModernComboBox}"
                                           TabIndex="6"/>
-                                <TextBlock Text="{Binding WholesaleUnitError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasWholesaleUnitError, Converter={StaticResource BoolToVisibility}}"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="2" Margin="8,0,0,0">
@@ -107,7 +103,6 @@
                                          Style="{StaticResource ModernTextBox}" 
                                          TabIndex="7"
                                          ToolTip="عدد وحدات التجزئة في وحدة الجملة (مثلاً 12 قطعة في الكرتون) — هذا الحقل إلزامي"/>
-                                <TextBlock Text="{Binding ConversionFactorError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasConversionFactorError, Converter={StaticResource BoolToVisibility}}"/>
                             </StackPanel>
                         </Grid>
                         <TextBlock Text="ملاحظة: وحدة التجزئة هي الوحدة الأساسية للمخزون" Style="{StaticResource HelperTextStyle}" Margin="0,4,0,0"/>
@@ -130,7 +125,6 @@
                                          FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"
                                          TabIndex="8"
                                          ToolTip="سعر البيع للعميل العادي (تجزئة) — هذا الحقل إلزامي ويجب أن يكون أكبر من صفر"/>
-                                <TextBlock Text="{Binding RetailPriceError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasRetailPriceError, Converter={StaticResource BoolToVisibility}}"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Margin="8,0,8,0">
@@ -140,7 +134,6 @@
                                          FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"
                                          TabIndex="9"
                                          ToolTip="سعر البيع لتجار الجملة — هذا الحقل إلزامي ويجب أن يكون أكبر من صفر"/>
-                                <TextBlock Text="{Binding WholesalePriceError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0" Visibility="{Binding HasWholesalePriceError, Converter={StaticResource BoolToVisibility}}"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="2" Margin="8,0,0,0">

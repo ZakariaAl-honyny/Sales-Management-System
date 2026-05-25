@@ -52,7 +52,6 @@
                          AutomationProperties.AutomationId="TxtWarehouseName"
                               ToolTip="أدخل اسماً فريداً للمستودع — هذا الحقل مطلوب ولا يمكن أن يكون فارغاً"/>
                 <TextBlock Text="اسم مميز يساعدك في التعرف على المخزن" Style="{StaticResource HelperTextStyle}"/>
-                <TextBlock Text="{Binding NameError}" Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="4,4,0,0" Visibility="{Binding HasNameError, Converter={StaticResource BoolToVisibility}}"/>
                 
                 <Border Height="24"/>
 
