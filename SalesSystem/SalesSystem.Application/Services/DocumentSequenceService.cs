@@ -20,7 +20,15 @@ public class DocumentSequenceService : IDocumentSequenceService
 
     public async Task<Result<string>> GetNextNumberAsync(string prefix, CancellationToken ct)
     {
-        await _lock.WaitAsync(ct);
+        try
+        {
+            await _lock.WaitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return Result<string>.Failure("تم إلغاء العملية");
+        }
+
         try
         {
             var year = DateTime.Now.Year;
@@ -73,9 +81,6 @@ public class DocumentSequenceService : IDocumentSequenceService
             "TRF" => "تحويل مخزني",
             "CP" => "سند قبض عميل",
             "SP" => "سند صرف مورد",
-            "PRD" => "منتج",
-            "CUST" => "عميل",
-            "SUP" => "مورد",
             _ => "أخرى"
         };
     }

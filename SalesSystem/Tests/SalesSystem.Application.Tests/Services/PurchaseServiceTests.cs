@@ -337,9 +337,9 @@ public class PurchaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CancelAsync_AlreadyCancelledInvoice_ReturnsSuccess()
+    public async Task CancelAsync_AlreadyCancelledInvoice_ReturnsFailure()
     {
-        _output.WriteLine("[TEST] CancelAsync_AlreadyCancelledInvoice_ReturnsSuccess");
+        _output.WriteLine("[TEST] CancelAsync_AlreadyCancelledInvoice_ReturnsFailure");
 
         var supplier = Supplier.Create("Test Supplier", 0m);
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
@@ -364,10 +364,10 @@ public class PurchaseServiceTests : IDisposable
 
         var result = await _sut.CancelAsync(invoice.Id, userId: 1, CancellationToken.None);
 
-        result.IsSuccess.Should().BeTrue();
-        invoice.Status.Should().Be(InvoiceStatus.Cancelled);
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be("الفاتورة ملغاة بالفعل");
 
-        _output.WriteLine("[PASS] Already cancelled invoice returns success");
+        _output.WriteLine("[PASS] Already cancelled invoice returns failure with Arabic message");
     }
 
     #endregion

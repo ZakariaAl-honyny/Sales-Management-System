@@ -235,7 +235,6 @@ public class CustomerPaymentEditorViewModel : ViewModelBase
                 Amount: Amount,
                 PaymentMethod: PaymentType,
                 PaymentDate: PaymentDate,
-                SalesInvoiceId: null,
                 Notes: Notes);
             result = await _paymentService.UpdateAsync(_paymentId.Value, request);
         }

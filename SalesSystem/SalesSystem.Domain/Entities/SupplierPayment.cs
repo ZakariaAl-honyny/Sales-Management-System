@@ -52,14 +52,17 @@ public class SupplierPayment : BaseEntity
         return payment;
     }
 
-    public void Update(decimal amount, byte paymentMethod, DateTime? paymentDate, string? notes)
+    public void Update(decimal amount, byte paymentMethod, DateTime? paymentDate, string? notes, int? updatedByUserId = null)
     {
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
-
+        
         Amount = amount;
         PaymentMethod = paymentMethod;
-        if (paymentDate.HasValue) PaymentDate = paymentDate.Value;
-        Notes = notes;
+        if (paymentDate.HasValue)
+            PaymentDate = paymentDate.Value.Kind == DateTimeKind.Utc ? paymentDate.Value : paymentDate.Value.ToUniversalTime();
+        if (notes != null) Notes = notes;
+        SetUpdatedBy(updatedByUserId);
+        UpdateTimestamp();
     }
 }

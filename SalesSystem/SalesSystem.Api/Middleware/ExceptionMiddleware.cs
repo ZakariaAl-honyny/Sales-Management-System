@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using SalesSystem.Domain.Exceptions;
 using System;
 using System.Linq;
 using System.Text.Json;
@@ -9,6 +10,9 @@ namespace SalesSystem.Api.Middleware;
 
 /// <summary>
 /// Global exception handler middleware that catches unhandled exceptions and returns a consistent JSON error response.
+/// Handles DomainException as HTTP 400, ValidationException as HTTP 400 with field details,
+/// UnauthorizedAccessException as HTTP 403, database connection errors as HTTP 503,
+/// and all other exceptions as HTTP 500.
 /// </summary>
 public class ExceptionMiddleware
 {
@@ -40,8 +44,21 @@ public class ExceptionMiddleware
 
         object errorResponse;
 
-        if (exception is FluentValidation.ValidationException validationException)
+        if (exception is DomainException domainException)
         {
+            // Domain business rule violations — always return 400 Bad Request with Arabic message
+            _logger.LogWarning("Domain rule violation: {Message}", domainException.Message);
+            response.StatusCode = StatusCodes.Status400BadRequest;
+            errorResponse = new
+            {
+                error = domainException.Message,
+                errorCode = "DOMAIN_VALIDATION_ERROR",
+                details = domainException.Message
+            };
+        }
+        else if (exception is FluentValidation.ValidationException validationException)
+        {
+            _logger.LogWarning("Validation failure: {Message}", validationException.Message);
             response.StatusCode = StatusCodes.Status400BadRequest;
             errorResponse = new
             {
@@ -56,6 +73,7 @@ public class ExceptionMiddleware
         }
         else if (exception is System.UnauthorizedAccessException)
         {
+            _logger.LogWarning("Unauthorized access attempt");
             response.StatusCode = 403; // Forbidden
             errorResponse = new
             {
@@ -77,7 +95,7 @@ public class ExceptionMiddleware
         }
         else
         {
-            _logger.LogError(exception, "Unhandled exception");
+            _logger.LogError(exception, "Unhandled exception: {Message}", exception.Message);
             response.StatusCode = StatusCodes.Status500InternalServerError;
             errorResponse = new
             {
@@ -109,8 +127,4 @@ public class ExceptionMiddleware
                typeName.Contains("EntityException", StringComparison.Ordinal);
     }
 
-    private static string GetInnerMessage(Exception ex)
-    {
-        return ex.InnerException?.Message ?? ex.Message;
-    }
 }

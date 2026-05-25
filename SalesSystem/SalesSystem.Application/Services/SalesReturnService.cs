@@ -111,6 +111,7 @@ public class SalesReturnService : ISalesReturnService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception creating sales return: {Message}", ex.Message);
                 return Result<SalesReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -174,6 +175,7 @@ public class SalesReturnService : ISalesReturnService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception posting sales return {Id}: {Message}", id, ex.Message);
                 return Result<SalesReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -191,7 +193,8 @@ public class SalesReturnService : ISalesReturnService
             r => r.Id == id, ct, "Items.Product");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
-        if (sr.Status == InvoiceStatus.Cancelled) return await GetByIdAsync(id, ct);
+        if (sr.Status == InvoiceStatus.Cancelled)
+            return Result<SalesReturnDto>.Failure("مرتجع المبيعات ملغى بالفعل", ErrorCodes.InvalidOperation);
 
         return await _uow.ExecuteAsync(async () =>
         {
@@ -237,6 +240,7 @@ public class SalesReturnService : ISalesReturnService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception cancelling sales return {Id}: {Message}", id, ex.Message);
                 return Result<SalesReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)

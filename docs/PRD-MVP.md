@@ -929,6 +929,95 @@ RETURN FLOW: (reverse of original operation)
 TRANSFER FLOW: (decrease source, increase destination — same transaction)
 PAYMENT FLOW: (decrease balance, no stock change)
 
+---
+
+### Phase 17 — Collapsible Tree Sidebar Navigation
+
+تحويل القائمة الجانبية (Sidebar) إلى قائمة شجرية منسدلة أو ممتدة (Collapsible/Accordion Menu) هو الحل المعياري والمثالي للأنظمة الكبيرة. هذا التصميم يمنح النظام مظهراً رسمياً ومحترفاً يشبه مواقع الويب الحديثة، ويحل مشكلة تكدس الأزرار مع نمو النظام وإضافة ميزات جديدة.
+
+في واجهات المستخدم الاحترافية، نقوم بهيكلة هذه القائمة إلى مستويين (Two Levels) لضمان عدم تشتيت المستخدم:
+
+1. **المستوى الأول (Main Modules):** المجموعات الرئيسية وتكون مصحوبة بأيقونة معبرة وسهم يشير لحالة القائمة (مفتوحة/مغلقة).
+2. **المستوى الثاني (Sub-Items / Screens):** الشاشات التفصيلية التي تظهر فقط عندما يضغط المستخدم على المجموعة الرئيسية.
+
+إليك التصميم الهيكلي للقائمة الجانبية متوافقاً مع اتجاه القراءة العربي (RTL - من اليمين إلى اليسار):
+
+#### 1. الهيكل البصري للقائمة (RTL Sidebar Structure)
+
+```text
+[شعار النظام أو اسم المؤسسة]
+-----------------------------------------
+🔻 [أيقونة] المبيعات والتوزيع
+      ▪️ شاشة البيع السريع (POS)
+      ▪️ الفواتير المعلقة (المسودات)
+      ▪️ إدارة المرتجعات
+🔻 [أيقونة] المشتريات والموردين
+      ▪️ فاتورة مشتريات جديدة
+      ▪️ إدارة الموردين
+🔻 [أيقونة] الحسابات والمالية
+      ▪️ القيود اليومية
+      ▪️ شجرة الحسابات
+🔻 [أيقونة] التقارير والتحليلات
+      ▪️ التقارير التشغيلية
+      ▪️ الأرباح والخسائر
+      ▪️ تقارير العملاء التفصيلية
+🔻 [أيقونة] الإعدادات والتهيئة
+      ▪️ إعدادات النظام
+      ▪️ صلاحيات المستخدمين
+```
+
+#### 2. التنفيذ البرمجي النظيف (WPF XAML Example)
+
+إذا كنت تبني الواجهات باستخدام **WPF**، فإن أفضل وأسهل أداة برمجية تحقق مظهر الويب المرن دون تعقيد هي أداة **`Expander`** المضمنة داخل `StackPanel` أو `ScrollViewer`. تتيح لك هذه الأداة فتح وإغلاق المجموعات تلقائياً وحفظ المساحة.
+
+إليك كود XAML نظيف ورسمي يدعم الـ RTL:
+
+```xml
+<Grid FlowDirection="RightToLeft" Background="#F8F9FA">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Width="260" HorizontalAlignment="Right">
+        <StackPanel Background="#1E293B"> <Border Padding="20" Background="#0F172A">
+                <TextBlock Text="نظام إدارة المبيعات" Foreground="White" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+            </Border>
+
+            <Expander Header="المبيعات والتوزيع" Foreground="White" FontSize="14" Margin="5" IsExpanded="True">
+                <StackPanel Background="#334155" Margin="0,5,0,0">
+                    <Button Content="شاشة البيع السريع" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
+                    <Button Content="الفواتير المعلقة (Drafts)" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
+                    <Button Content="إدارة المرتجعات" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
+                </StackPanel>
+            </Expander>
+
+            <Expander Header="الحسابات والمالية" Foreground="White" FontSize="14" Margin="5">
+                <StackPanel Background="#334155" Margin="0,5,0,0">
+                    <Button Content="القيود اليومية" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
+                    <Button Content="شجرة الحسابات" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
+                </StackPanel>
+            </Expander>
+
+            <Expander Header="التقارير والتحليلات" Foreground="White" FontSize="14" Margin="5">
+                <StackPanel Background="#334155" Margin="0,5,0,0">
+                    <Button Content="التقرير المالي العام" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
+                    <Button Content="ربحية العملاء" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
+                </StackPanel>
+            </Expander>
+
+        </StackPanel>
+    </ScrollViewer>
+</Grid>
+```
+
+*(ملاحظة: الستايل `SidebarSubMenuButtonStyle` نقوم فيه بإلغاء الحواف وجعل الخلفية شفافة لتبدو الأزرار الفرعية كنصوص أنيقة يتم النقر عليها، مع إزاحة خفيفة جهة اليمين Padding لإعطاء انطباع التبعية للمجموعة الرئيسية).*
+
+#### 3. ربط القائمة مع هندسة النظام (Navigation Pattern)
+
+لكي تظل معمارية الكود نظيفة (Clean Architecture) ومتوافقة مع نمط MVVM، لا تقم بكتابة كود فتح الشاشات داخل أحداث النقر المباشر (Click Events) في الواجهة. بدلاً من ذلك، استخدم **`NavigationService`** أو **`MainViewModel`** لإدارة تبديل الشاشات:
+
+1. كل زر فرعي يتم ربطه بأمر `Command` يمرر نوع الشاشة المستهدفة كمعامل (Parameter).
+2. الشاشة الرئيسية تحتوي على منطقة مخصصة لعرض المحتوى النشط `ContentControl`.
+3. عند الضغط على زر فرعي، يتغير الـ `CurrentViewModel` داخل الـ `ContentControl` ليتم رسم الشاشة الجديدة فوراً في المساحة البيضاء المتبقية من التطبيق دون إعادة تحميل القائمة الجانبية.
+
+هذا التصميم يضمن لك مرونة تشغيلية لا نهائية؛ فمهما أضفت من موديولات أو شاشات مستقبلاً، كل ما عليك فعله هو إضافة سطر جديد داخل الـ `Expander` المناسب، وسيتكفل النظام بالباقي دون أي تداخل في الكود.
+
 Sales Management System — PRD v4.6.2 (النسخة النهائية الشاملة)
 1. معلومات المشروع
 text

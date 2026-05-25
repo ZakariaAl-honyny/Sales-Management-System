@@ -7,7 +7,6 @@ public record UpdateCustomerPaymentRequest(
     decimal Amount,
     PaymentType PaymentMethod,
     DateTime? PaymentDate,
-    int? SalesInvoiceId = null,
     string? Notes = null
 );
 
@@ -16,7 +15,6 @@ public record UpdateSupplierPaymentRequest(
     decimal Amount,
     PaymentType PaymentMethod,
     DateTime? PaymentDate,
-    int? PurchaseInvoiceId = null,
     string? Notes = null
 );
 

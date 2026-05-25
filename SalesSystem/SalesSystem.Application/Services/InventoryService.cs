@@ -209,6 +209,7 @@ public class InventoryService : IInventoryService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain rule violation while creating stock transfer");
                 return Result<StockTransferDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -341,6 +342,7 @@ public class InventoryService : IInventoryService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain rule violation while updating stock transfer {Id}", id);
                 return Result<StockTransferDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -397,6 +399,7 @@ public class InventoryService : IInventoryService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain rule violation while posting stock transfer {Id}", id);
                 return Result<StockTransferDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -447,6 +450,7 @@ public class InventoryService : IInventoryService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain rule violation while cancelling stock transfer {Id}", id);
                 return Result<StockTransferDto>.Failure(ex.Message);
             }
             catch (Exception ex)

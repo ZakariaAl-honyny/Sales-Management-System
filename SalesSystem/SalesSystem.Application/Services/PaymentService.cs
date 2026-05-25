@@ -70,6 +70,7 @@ public class PaymentService : IPaymentService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception creating customer payment: {Message}", ex.Message);
                 return Result<CustomerPaymentDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -129,6 +130,7 @@ public class PaymentService : IPaymentService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception creating supplier payment: {Message}", ex.Message);
                 return Result<SupplierPaymentDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -168,7 +170,7 @@ public class PaymentService : IPaymentService
         return Result<CustomerPaymentDto>.Success(MapToDto(payment));
     }
 
-    public async Task<Result<CustomerPaymentDto>> UpdateCustomerPaymentAsync(int id, UpdateCustomerPaymentRequest request, CancellationToken ct)
+    public async Task<Result<CustomerPaymentDto>> UpdateCustomerPaymentAsync(int id, UpdateCustomerPaymentRequest request, int userId, CancellationToken ct)
     {
         var payment = await _uow.CustomerPayments.GetByIdAsync(id, ct);
         if (payment == null) return Result<CustomerPaymentDto>.Failure("عملية الدفع غير موجودة", ErrorCodes.NotFound);
@@ -189,7 +191,8 @@ public class PaymentService : IPaymentService
                     request.Amount,
                     (byte)request.PaymentMethod,
                     request.PaymentDate,
-                    request.Notes
+                    request.Notes,
+                    userId
                 );
 
                 // Apply new amount
@@ -207,6 +210,7 @@ public class PaymentService : IPaymentService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception updating customer payment {Id}: {Message}", id, ex.Message);
                 return Result<CustomerPaymentDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -218,7 +222,7 @@ public class PaymentService : IPaymentService
         }, ct);
     }
 
-    public async Task<Result> DeleteCustomerPaymentAsync(int id, CancellationToken ct)
+    public async Task<Result> DeleteCustomerPaymentAsync(int id, int userId, CancellationToken ct)
     {
         var payment = await _uow.CustomerPayments.GetByIdAsync(id, ct);
         if (payment == null) return Result.Failure("عملية الدفع غير موجودة", ErrorCodes.NotFound);
@@ -226,7 +230,8 @@ public class PaymentService : IPaymentService
         var customer = await _uow.Customers.GetByIdAsync(payment.CustomerId, ct);
         if (customer == null) return Result.Failure("العميل غير موجود", ErrorCodes.NotFound);
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteAsync(async ()
+        =>
         {
             await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
@@ -234,6 +239,8 @@ public class PaymentService : IPaymentService
                 // Reverse the balance impact
                 customer.IncreaseBalance(payment.Amount);
 
+                payment.SetUpdatedBy(userId);
+                payment.UpdateTimestamp();
                 await _uow.CustomerPayments.SoftDeleteAsync(payment.Id, ct);
                 await _uow.Customers.UpdateAsync(customer, ct);
 
@@ -246,6 +253,7 @@ public class PaymentService : IPaymentService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception deleting customer payment {Id}: {Message}", id, ex.Message);
                 return Result.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -285,7 +293,7 @@ public class PaymentService : IPaymentService
         return Result<SupplierPaymentDto>.Success(MapToDto(payment));
     }
 
-    public async Task<Result<SupplierPaymentDto>> UpdateSupplierPaymentAsync(int id, UpdateSupplierPaymentRequest request, CancellationToken ct)
+    public async Task<Result<SupplierPaymentDto>> UpdateSupplierPaymentAsync(int id, UpdateSupplierPaymentRequest request, int userId, CancellationToken ct)
     {
         var payment = await _uow.SupplierPayments.GetByIdAsync(id, ct);
         if (payment == null) return Result<SupplierPaymentDto>.Failure("عملية الدفع غير موجودة", ErrorCodes.NotFound);
@@ -306,7 +314,8 @@ public class PaymentService : IPaymentService
                     request.Amount,
                     (byte)request.PaymentMethod,
                     request.PaymentDate,
-                    request.Notes
+                    request.Notes,
+                    userId
                 );
 
                 // Apply new amount
@@ -324,6 +333,7 @@ public class PaymentService : IPaymentService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception updating supplier payment {Id}: {Message}", id, ex.Message);
                 return Result<SupplierPaymentDto>.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -335,7 +345,7 @@ public class PaymentService : IPaymentService
         }, ct);
     }
 
-    public async Task<Result> DeleteSupplierPaymentAsync(int id, CancellationToken ct)
+    public async Task<Result> DeleteSupplierPaymentAsync(int id, int userId, CancellationToken ct)
     {
         var payment = await _uow.SupplierPayments.GetByIdAsync(id, ct);
         if (payment == null) return Result.Failure("عملية الدفع غير موجودة", ErrorCodes.NotFound);
@@ -343,7 +353,8 @@ public class PaymentService : IPaymentService
         var supplier = await _uow.Suppliers.GetByIdAsync(payment.SupplierId, ct);
         if (supplier == null) return Result.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteAsync(async ()
+        =>
         {
             await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
@@ -351,6 +362,8 @@ public class PaymentService : IPaymentService
                 // Reverse the balance impact
                 supplier.IncreaseBalance(payment.Amount); // What we owe them increases back
 
+                payment.SetUpdatedBy(userId);
+                payment.UpdateTimestamp();
                 await _uow.SupplierPayments.SoftDeleteAsync(payment.Id, ct);
                 await _uow.Suppliers.UpdateAsync(supplier, ct);
 
@@ -363,6 +376,7 @@ public class PaymentService : IPaymentService
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Domain exception deleting supplier payment {Id}: {Message}", id, ex.Message);
                 return Result.Failure(ex.Message);
             }
             catch (Exception ex)
@@ -380,7 +394,7 @@ public class PaymentService : IPaymentService
             p.Id,
             p.PaymentNo,
             p.CustomerId,
-            p.Customer?.Name ?? "Unknown",
+            p.Customer?.Name ?? "غير معروف",
             p.Amount,
             p.PaymentMethod,
             p.PaymentDate,
@@ -395,7 +409,7 @@ public class PaymentService : IPaymentService
             p.Id,
             p.PaymentNo,
             p.SupplierId,
-            p.Supplier?.Name ?? "Unknown",
+            p.Supplier?.Name ?? "غير معروف",
             p.Amount,
             p.PaymentMethod,
             p.PaymentDate,
