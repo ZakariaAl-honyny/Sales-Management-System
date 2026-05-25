@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/015-touch-pos-interface/plan.md](specs/015-touch-pos-interface/plan.md)
+**Active Feature Plan**: [specs/016-critical-business-rules/plan.md](specs/016-critical-business-rules/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
