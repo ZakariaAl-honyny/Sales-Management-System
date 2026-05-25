@@ -336,6 +336,8 @@ public async Task DeleteProductAsync()
                 WholesalePrice: SelectedProduct.WholesalePrice,
                 MinStock: SelectedProduct.MinStock,
                 Description: SelectedProduct.Description,
+                ExpirationDate: SelectedProduct.ExpirationDate,
+                ImagePath: SelectedProduct.ImagePath,
                 IsActive: true
             );
 

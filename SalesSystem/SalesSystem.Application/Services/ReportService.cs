@@ -151,4 +151,59 @@ public class ReportService : IReportService
             return Result<DashboardSummaryDto>.Failure("حدث خطأ أثناء إنشاء ملخص لوحة التحكم");
         }
     }
+
+    public async Task<Result<IEnumerable<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays, CancellationToken ct)
+    {
+        try
+        {
+            if (thresholdDays < 0)
+            {
+                _logger.LogWarning("Expired products report called with negative threshold: {ThresholdDays}", thresholdDays);
+                return Result<IEnumerable<ExpiredProductDto>>.Failure("عدد الأيام يجب أن يكون صفراً أو أكثر");
+            }
+
+            var cutoffDate = DateTime.Today.AddDays(thresholdDays);
+
+            _logger.LogInformation("Generating expired products report with threshold {ThresholdDays} days (cutoff: {CutoffDate})",
+                thresholdDays, cutoffDate);
+
+            var products = await _uow.Products.ToListAsync(
+                p => p.ExpirationDate.HasValue && p.ExpirationDate.Value <= cutoffDate,
+                q => q.OrderBy(p => p.ExpirationDate),
+                ct,
+                includePaths: new[] { "Category" });
+
+            // Fetch real stock quantities for expired products
+            var productIds = products.Select(p => p.Id).ToList();
+            var stocks = await _uow.WarehouseStocks.ToListAsync(
+                ws => productIds.Contains(ws.ProductId),
+                null, ct, false, "Warehouse");
+            var stockByProduct = stocks
+                .GroupBy(ws => ws.ProductId)
+                .ToDictionary(g => g.Key, g => g.Sum(ws => ws.Quantity));
+
+            var dtos = products.Select(p =>
+            {
+                stockByProduct.TryGetValue(p.Id, out var totalStock);
+                return new ExpiredProductDto(
+                    p.Id,
+                    p.Name,
+                    p.Category?.Name,
+                    null,
+                    totalStock,
+                    p.ExpirationDate!.Value,
+                    (DateTime.Today - p.ExpirationDate!.Value).Days
+                );
+            }).ToList();
+
+            _logger.LogInformation("Found {Count} expired/expiring products within {ThresholdDays} days", dtos.Count, thresholdDays);
+
+            return Result<IEnumerable<ExpiredProductDto>>.Success(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating expired products report");
+            return Result<IEnumerable<ExpiredProductDto>>.Failure("حدث خطأ أثناء إنشاء تقرير المنتجات المنتهية");
+        }
+    }
 }

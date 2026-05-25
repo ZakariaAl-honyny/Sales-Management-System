@@ -87,4 +87,11 @@ public class ReportApiService : ApiServiceBase, IReportApiService
             () => _httpClient.GetAsync(url, ct),
             "ReportApiService.GetLowStockReportAsync");
     }
+
+    public async Task<Result<List<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays = 0, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<List<ExpiredProductDto>>(
+            () => _httpClient.GetAsync($"{BasePath}/expired-products?thresholdDays={thresholdDays}", ct),
+            "ReportApiService.GetExpiredProductsReportAsync");
+    }
 }

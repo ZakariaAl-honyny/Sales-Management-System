@@ -130,7 +130,9 @@ public class ApiIntegrationTests : IAsyncLifetime
             RetailPrice: 150,
             WholesalePrice: 1300,
             MinStock: 10,
-            Description: "Test Description"
+            Description: "Test Description",
+            ExpirationDate: null,
+            ImagePath: null
         );
         var response = await _httpClient.PostAsJsonAsync("/api/v1/products", request);
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);

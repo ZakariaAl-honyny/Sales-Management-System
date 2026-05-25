@@ -108,4 +108,18 @@ public class ReportsController : ControllerBase
         var result = await _reportService.GetLowStockReportAsync(warehouseId, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
+
+    /// <summary>
+    /// Gets list of expired or expiring products within the given threshold days.
+    /// thresholdDays = 0 returns only already-expired products.
+    /// </summary>
+    [HttpGet("expired-products")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(typeof(IEnumerable<Contracts.DTOs.ExpiredProductDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetExpiredProducts(CancellationToken ct, [FromQuery] int thresholdDays = 0)
+    {
+        var result = await _reportService.GetExpiredProductsReportAsync(thresholdDays, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
 }

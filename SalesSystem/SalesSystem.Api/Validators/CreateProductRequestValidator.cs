@@ -40,5 +40,10 @@ public class CreateProductRequestValidator : AbstractValidator<CreateProductRequ
 
         RuleFor(x => x.WholesaleUnitId)
             .GreaterThan(0).When(x => x.WholesaleUnitId.HasValue).WithMessage("يجب اختيار وحدة الجملة");
+
+        RuleFor(x => x.ExpirationDate)
+            .GreaterThan(DateTime.Today.AddDays(-1))
+            .When(x => x.ExpirationDate.HasValue)
+            .WithMessage("تاريخ الانتهاء لا يمكن أن يكون في الماضي");
     }
 }

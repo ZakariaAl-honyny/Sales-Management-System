@@ -1,0 +1,245 @@
+<Page x:Class="SalesSystem.DesktopPWF.Views.Reports.ExpiredProductsReportView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
+      mc:Ignorable="d"
+      d:DesignHeight="700" d:DesignWidth="1000"
+      Title="تقرير المنتجات المنتهية"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Style="{StaticResource PageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="تقرير المنتجات المنتهية"
+                   Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="ExpiredProductsPageTitle"/>
+
+        <!-- Filters Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="عرض المنتجات المنتهية قبل" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox Width="160"
+                              ItemsSource="{Binding ThresholdDaysOptions}"
+                              SelectedItem="{Binding ThresholdDays}"
+                              Height="36"
+                              TabIndex="1"
+                              ToolTip="اختر عدد الأيام — 0 يعني المنتهية فقط، 30 يعني المنتهية أو التي ستنتهي خلال 30 يوماً"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding LoadCommand}" Style="{StaticResource PrimaryButton}" Height="36" Padding="20,0" TabIndex="2"
+                            ToolTip="تحديث القائمة بناءً على عدد الأيام المحدد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تحديث" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Content Area -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <!-- Error Message -->
+                <Border Background="{StaticResource ErrorLightBrush}"
+                        Padding="16,12"
+                        Margin="0,0,0,0"
+                        VerticalAlignment="Top"
+                        Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="⚠️" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <Button Grid.Column="2" Command="{Binding LoadCommand}" Style="{StaticResource SecondaryButton}" Height="28" Padding="12,0" FontSize="11"
+                                ToolTip="إعادة المحاولة">
+                            <TextBlock Text="إعادة المحاولة"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- 1. DataGrid — Expired Products -->
+                <DataGrid ItemsSource="{Binding Products}"
+                          SelectedItem="{Binding SelectedProduct}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          BorderThickness="0"
+                          Margin="0,0,0,0">
+                    <DataGrid.Style>
+                        <Style TargetType="DataGrid" BasedOn="{StaticResource ModernDataGrid}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Style>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="اسم المنتج" Binding="{Binding ProductName}" Width="2*"
+                                            ToolTipService.ToolTip="اسم المنتج المنتهي أو على وشك الانتهاء"/>
+                        <DataGridTextColumn Header="التصنيف" Binding="{Binding CategoryName}" Width="1*"
+                                            ToolTipService.ToolTip="التصنيف الذي ينتمي إليه المنتج"/>
+                        <DataGridTextColumn Header="تاريخ الانتهاء" Binding="{Binding ExpirationDate, StringFormat={}{0:yyyy/MM/dd}}" Width="1*"
+                                            ToolTipService.ToolTip="تاريخ انتهاء صلاحية المنتج"/>
+                        <DataGridTextColumn Header="أيام منتهي" Binding="{Binding DaysExpired}" Width="0.7*"
+                                            ToolTipService.ToolTip="عدد الأيام منذ انتهاء الصلاحية (الأرقام الموجبة تعني منتهي)">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                    <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="Text" Value="0">
+                                            <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding DaysExpired}" Value="-1">
+                                            <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding DaysExpired}" Value="-2">
+                                            <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding DaysExpired}" Value="-3">
+                                            <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="المخزون" Binding="{Binding CurrentStock, StringFormat={}{0:N0}}" Width="0.7*"
+                                            ToolTipService.ToolTip="الكمية المتوفرة حالياً في المخزون"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- 2. Empty State -->
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,0">
+                        <TextBlock Text="📦" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
+                        <TextBlock Text="لا توجد منتجات منتهية" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="جميع المنتجات ضمن فترة الصلاحية — لا توجد منتجات تحتاج إلى إتلاف" 
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Loading Overlay -->
+                <Border Background="#CCFFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="240" Height="6" Background="#E2E8F0" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="جاري تحميل البيانات..." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Write-Off Action Panel -->
+        <Border Grid.Row="3" Style="{StaticResource FooterBarStyle}" Padding="20,16"
+                Visibility="{Binding HasProducts, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="180"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="250"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Warehouse Selection -->
+                <TextBlock Grid.Column="0" Text="المستودع:" Style="{StaticResource FooterBarTextStyle}" Margin="0,0,12,0"/>
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding Warehouses}"
+                          SelectedItem="{Binding SelectedWarehouse}"
+                          DisplayMemberPath="Name"
+                          Height="34"
+                          FontSize="13"
+                          Background="White"
+                          ToolTip="اختر المستودع الذي سيتم إتلاف المخزون منه"/>
+
+                <!-- Write-Off Quantity -->
+                <TextBlock Grid.Column="2" Text="كمية الإتلاف:" Style="{StaticResource FooterBarTextStyle}" Margin="20,0,12,0"/>
+                <TextBox Grid.Column="3"
+                         Text="{Binding WriteOffQuantity, UpdateSourceTrigger=PropertyChanged}"
+                         Height="34"
+                         FontSize="13"
+                         Background="White"
+                         Padding="8,0"
+                         ToolTip="أدخل الكمية المراد إتلافها — يجب أن تكون أكبر من صفر"/>
+
+                <!-- Reason -->
+                <TextBlock Grid.Column="4" Text="السبب:" Style="{StaticResource FooterBarTextStyle}" Margin="20,0,12,0"/>
+                <TextBox Grid.Column="5"
+                         Text="{Binding WriteOffReason, UpdateSourceTrigger=PropertyChanged}"
+                         Height="34"
+                         FontSize="13"
+                         Background="White"
+                         Padding="8,0"
+                         ToolTip="سبب الإتلاف — افتراضياً: منتهي الصلاحية"/>
+
+                <!-- Write-Off Button -->
+                <Button Grid.Column="6"
+                        Command="{Binding WriteOffCommand}"
+                        Background="{StaticResource ErrorBrush}"
+                        Foreground="White"
+                        Height="34"
+                        Padding="20,0"
+                        FontWeight="Bold"
+                        FontSize="13"
+                        Margin="20,0,0,0"
+                        Cursor="Hand"
+                        ToolTip="ترحيل الكمية المحددة كإتلاف — سيتم خصم المخزون بشكل دائم">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🗑️" Margin="0,0,8,0"/>
+                        <TextBlock Text="ترحيل كحذف/إتلاف"/>
+                    </StackPanel>
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Border"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="#C0392B"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="#A93226"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="Border" Property="Background" Value="#E3E8EE"/>
+                                    <Setter Property="Foreground" Value="#A3ACB9"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

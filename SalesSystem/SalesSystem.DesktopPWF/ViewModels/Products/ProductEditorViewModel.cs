@@ -1,6 +1,9 @@
+using Microsoft.Win32;
 using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -38,6 +41,10 @@ public class ProductEditorViewModel : ViewModelBase
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
+    private DateTime? _expirationDate;
+    private string? _imagePath;
+    private bool _hasExpirationDate;
+    private byte[]? _pendingImageBytes;
 
     private CategoryDto? _selectedCategory;
     private UnitDto? _selectedUnit;
@@ -57,6 +64,7 @@ public class ProductEditorViewModel : ViewModelBase
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ المنتج...")));
         CancelCommand = new RelayCommand(Cancel);
         LoadLookupDataCommand = new AsyncRelayCommand(LoadLookupDataAsync);
+        UploadImageCommand = new AsyncRelayCommand(UploadImageAsync);
 
         _ = LoadLookupDataAsync();
     }
@@ -78,6 +86,7 @@ public class ProductEditorViewModel : ViewModelBase
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ المنتج...")));
         CancelCommand = new RelayCommand(Cancel);
         LoadLookupDataCommand = new AsyncRelayCommand(LoadLookupDataAsync);
+        UploadImageCommand = new AsyncRelayCommand(UploadImageAsync);
 
         _ = LoadLookupDataAsync();
     }
@@ -105,6 +114,9 @@ public class ProductEditorViewModel : ViewModelBase
         _minStock = product.MinStock;
         _description = product.Description ?? string.Empty;
         _isActive = product.IsActive;
+        _expirationDate = product.ExpirationDate;
+        _imagePath = product.ImagePath;
+        _hasExpirationDate = product.ExpirationDate.HasValue;
         _isEditMode = true;
     }
 
@@ -132,6 +144,9 @@ public class ProductEditorViewModel : ViewModelBase
         _minStock = product.MinStock;
         _description = product.Description ?? string.Empty;
         _isActive = product.IsActive;
+        _expirationDate = product.ExpirationDate;
+        _imagePath = product.ImagePath;
+        _hasExpirationDate = product.ExpirationDate.HasValue;
         _isEditMode = true;
     }
 
@@ -291,6 +306,35 @@ public class ProductEditorViewModel : ViewModelBase
         set => SetProperty(ref _isActive, value);
     }
 
+    public bool HasExpirationDate
+    {
+        get => _hasExpirationDate;
+        set => SetProperty(ref _hasExpirationDate, value);
+    }
+
+    public DateTime? ExpirationDate
+    {
+        get => _expirationDate;
+        set
+        {
+            if (SetProperty(ref _expirationDate, value))
+            {
+                if (HasExpirationDate && !value.HasValue)
+                    AddError(nameof(ExpirationDate), "يرجى اختيار تاريخ انتهاء الصلاحية");
+                else if (value.HasValue && value.Value < DateTime.Today)
+                    AddError(nameof(ExpirationDate), "تاريخ الانتهاء لا يمكن أن يكون في الماضي");
+                else
+                    ClearErrors(nameof(ExpirationDate));
+            }
+        }
+    }
+
+    public string? ImagePath
+    {
+        get => _imagePath;
+        set => SetProperty(ref _imagePath, value);
+    }
+
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -354,6 +398,7 @@ public class ProductEditorViewModel : ViewModelBase
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand LoadLookupDataCommand { get; }
+    public ICommand UploadImageCommand { get; private set; }
     #endregion
 
     #region Methods
@@ -432,8 +477,56 @@ public class ProductEditorViewModel : ViewModelBase
             AddError(nameof(RetailUnitId), "يجب اختيار وحدة التجزئة");
         if (!WholesaleUnitId.HasValue || WholesaleUnitId.Value <= 0)
             AddError(nameof(WholesaleUnitId), "يجب اختيار وحدة الجملة");
+        if (HasExpirationDate && (!ExpirationDate.HasValue))
+            AddError(nameof(ExpirationDate), "يرجى اختيار تاريخ انتهاء الصلاحية");
 
         return await ValidateAllAsync();
+    }
+
+    private async Task UploadImageAsync()
+    {
+        var openFileDialog = new OpenFileDialog
+        {
+            Title = "اختيار صورة للمنتج",
+            Filter = "ملفات الصور|*.jpg;*.jpeg;*.png|جميع الملفات|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+
+        if (openFileDialog.ShowDialog() == true)
+        {
+            try
+            {
+                var fileBytes = await File.ReadAllBytesAsync(openFileDialog.FileName);
+                var fileName = Path.GetFileName(openFileDialog.FileName);
+
+                // Validate file extension
+                var ext = Path.GetExtension(fileName);
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
+                if (!allowedExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                {
+                    await _dialogService.ShowWarningAsync("صورة غير صالحة", "يُسمح فقط بملفات JPG و PNG");
+                    return;
+                }
+
+                if (fileBytes.Length > 2 * 1024 * 1024)
+                {
+                    await _dialogService.ShowWarningAsync("حجم كبير", "حجم الصورة يتجاوز 2 ميجابايت");
+                    return;
+                }
+
+                // Store bytes for upload during save and use absolute path for preview
+                _pendingImageBytes = fileBytes;
+                ImagePath = openFileDialog.FileName;  // Full local path for WPF Image preview
+
+                await _dialogService.ShowInfoAsync("اختيار صورة", "تم اختيار الصورة. سيتم رفعها عند حفظ المنتج.");
+            }
+            catch (Exception ex)
+            {
+                LogSystemError("فشل في قراءة الصورة", "ProductEditorViewModel.UploadImageAsync", ex);
+                await _dialogService.ShowErrorAsync("خطأ في قراءة الصورة", "فشل في قراءة الملف");
+            }
+        }
     }
 
     private async Task SaveOperationAsync()
@@ -457,6 +550,8 @@ public class ProductEditorViewModel : ViewModelBase
                 PurchasePrice, SalePrice,
                 RetailPrice, WholesalePrice,
                 MinStock, string.IsNullOrWhiteSpace(Description) ? null : Description,
+                HasExpirationDate ? ExpirationDate : null,
+                ImagePath,
                 IsActive);
 
             result = await _productService.UpdateAsync(_productId, updateRequest);
@@ -470,13 +565,29 @@ public class ProductEditorViewModel : ViewModelBase
                 ConversionFactor,
                 PurchasePrice, SalePrice,
                 RetailPrice, WholesalePrice,
-                MinStock, string.IsNullOrWhiteSpace(Description) ? null : Description);
+                MinStock, string.IsNullOrWhiteSpace(Description) ? null : Description,
+                HasExpirationDate ? ExpirationDate : null,
+                ImagePath);
 
             result = await _productService.CreateAsync(createRequest);
         }
 
         if (result.IsSuccess && result.Value != null)
         {
+            // Upload pending image if one was selected
+            if (_pendingImageBytes != null && result.Value.Id > 0)
+            {
+                try
+                {
+                    await _productService.UploadImageAsync(result.Value.Id, _pendingImageBytes, ImagePath ?? "image.jpg");
+                    _pendingImageBytes = null;
+                }
+                catch (Exception ex)
+                {
+                    LogSystemError("فشل في رفع الصورة", "ProductEditorViewModel.SaveOperationAsync", ex);
+                }
+            }
+
             // Publish event to notify other modules
             _eventBus.Publish(new ProductChangedMessage(result.Value.Id));
 

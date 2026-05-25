@@ -1,12 +1,27 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Updates;
+using SalesSystem.Infrastructure.Services;
 using SalesSystem.Infrastructure.Updates;
 
 namespace SalesSystem.Infrastructure;
 
 public static class DependencyInjection
 {
+    /// <summary>
+    /// Registers all Infrastructure-layer services including image storage,
+    /// updater, and future cross-cutting services.
+    /// </summary>
+    public static IServiceCollection AddInfrastructureServices(
+        this IServiceCollection services)
+    {
+        // LocalImageStorageService holds no scoped state (_basePath is static, ILogger is singleton)
+        services.AddSingleton<ILocalImageStorageService, LocalImageStorageService>();
+
+        return services;
+    }
+
     public static IServiceCollection AddUpdateServices(
         this IServiceCollection services,
         IConfiguration configuration)

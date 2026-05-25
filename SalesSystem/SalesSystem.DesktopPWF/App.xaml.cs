@@ -25,6 +25,7 @@ using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
 using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
+using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 
@@ -84,8 +85,9 @@ public partial class App : System.Windows.Application
             mainWindow.Show();
             MainWindow = mainWindow;
 
-            // Background update check - never block startup
+            // Background checks - never block startup
             _ = ScheduleBackgroundUpdateCheckAsync();
+            _ = ScheduleExpirationNotificationCheckAsync();
         }
         else
         {
@@ -185,6 +187,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ISettingsApiService, SettingsApiService>();
         services.AddSingleton<IBackupApiService, BackupApiService>();
         services.AddSingleton<IInventoryApiService, InventoryApiService>();
+        services.AddSingleton<IInventoryWriteOffApiService, InventoryWriteOffApiService>();
         services.AddSingleton<ILogsApiService, LogsApiService>();
         services.AddSingleton<IProductUnitApiService, ProductUnitApiService>();
         services.AddSingleton<ICashBoxApiService, CashBoxApiService>();
@@ -245,6 +248,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<CashBoxTransactionsViewModel>();
         services.AddTransient<CashTransferViewModel>();
         services.AddTransient<DailyClosureViewModel>();
+        services.AddTransient<ExpiredProductsReportViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()
@@ -333,6 +337,46 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Warning(ex, "Background update check failed silently");
+        }
+    }
+
+    /// <summary>
+    /// Checks for expiring products and shows a non-intrusive notification on startup.
+    /// Runs after a delay to avoid blocking the UI thread during initial load.
+    /// </summary>
+    private async Task ScheduleExpirationNotificationCheckAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5));
+
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    var productApi = _serviceProvider!.GetRequiredService<IProductApiService>();
+                    var dialogService = _serviceProvider!.GetRequiredService<IDialogService>();
+
+                    var result = await productApi.GetExpiringProductsAsync(thresholdDays: 30);
+
+                    if (result.IsSuccess && result.Value != null && result.Value.Count > 0)
+                    {
+                        var count = result.Value.Count;
+                        await dialogService.ShowWarningAsync(
+                            "منتجات على وشك الانتهاء",
+                            $"⚠️ يوجد {count} منتج على وشك انتهاء الصلاحية خلال 30 يوماً.\n\n" +
+                            "يرجى مراجعة قائمة المنتجات لاتخاذ الإجراء المناسب.");
+                    }
+                }
+                catch (Exception innerEx)
+                {
+                    Log.Warning(innerEx, "Expiration notifications check failed silently");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to schedule expiration notification check");
         }
     }
 

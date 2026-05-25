@@ -13,4 +13,6 @@ public interface IProductService
     Task<Result> DeleteAsync(int id, CancellationToken ct);
     Task<Result> PermanentDeleteAsync(int id, CancellationToken ct);
     Task<Result<ProductDto>> GetByBarcodeAsync(string barcode, CancellationToken ct);
+    Task<Result<ProductDto>> UploadImageAsync(int id, byte[] imageBytes, string fileName, CancellationToken ct);
+    Task<Result<List<ProductDto>>> GetExpiringProductsAsync(int thresholdDays, CancellationToken ct);
 }

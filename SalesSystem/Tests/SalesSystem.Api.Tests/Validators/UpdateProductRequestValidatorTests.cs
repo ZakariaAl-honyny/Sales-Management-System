@@ -97,6 +97,8 @@ public class UpdateProductRequestValidatorTests
         WholesalePrice: 1300.00m,
         MinStock: 10,
         Description: "Test description",
+        ExpirationDate: null,
+        ImagePath: null,
         IsActive: true
     );
 }

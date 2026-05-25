@@ -637,6 +637,8 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 WholesalePrice: 900,
                 MinStock: 10,
                 Description: null,
+                ExpirationDate: null,
+                ImagePath: null,
                 IsActive: true),
             new ProductDto(
                 Id: 2,
@@ -657,6 +659,8 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 WholesalePrice: 500,
                 MinStock: 5,
                 Description: null,
+                ExpirationDate: null,
+                ImagePath: null,
                 IsActive: true)
         };
     }

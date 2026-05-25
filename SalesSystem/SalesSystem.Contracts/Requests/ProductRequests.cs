@@ -7,7 +7,9 @@ public record CreateProductRequest(
     decimal ConversionFactor,
     decimal PurchasePrice, decimal SalePrice, // Legacy
     decimal RetailPrice, decimal WholesalePrice,
-    decimal MinStock, string? Description
+    decimal MinStock, string? Description,
+    DateTime? ExpirationDate,
+    string? ImagePath  // مسار الصورة المحلي (اختياري)
 );
 
 public record UpdateProductRequest(
@@ -18,5 +20,7 @@ public record UpdateProductRequest(
     decimal PurchasePrice, decimal SalePrice, // Legacy
     decimal RetailPrice, decimal WholesalePrice,
     decimal MinStock, string? Description,
+    DateTime? ExpirationDate,
+    string? ImagePath,  // مسار الصورة المحلي (اختياري)
     bool IsActive
 );

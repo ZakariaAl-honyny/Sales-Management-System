@@ -182,6 +182,8 @@ public class ProductsControllerTests : ControllerTestBase
         RetailPrice: 100.00m,
         MinStock: 10.00m,
         Description: null,
+        ExpirationDate: null,
+        ImagePath: null,
         IsActive: true);
 
     private static CreateProductRequest CreateValidRequest() => new(
@@ -197,7 +199,9 @@ public class ProductsControllerTests : ControllerTestBase
         RetailPrice: 100.00m,
         WholesalePrice: 80.00m,
         MinStock: 10.00m,
-        Description: null);
+        Description: null,
+        ExpirationDate: null,
+        ImagePath: null);
 
     private static UpdateProductRequest UpdateValidRequest() => new(
         Barcode: null!,
@@ -213,5 +217,7 @@ public class ProductsControllerTests : ControllerTestBase
         WholesalePrice: 90.00m,
         MinStock: 15.00m,
         Description: "وصف محدث",
+        ExpirationDate: null,
+        ImagePath: null,
         IsActive: true);
 }

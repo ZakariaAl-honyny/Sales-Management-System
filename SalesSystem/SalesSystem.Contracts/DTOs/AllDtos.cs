@@ -25,6 +25,8 @@ public record ProductDto(
     decimal RetailPrice,
     decimal MinStock,
     string? Description,
+    DateTime? ExpirationDate,
+    string? ImagePath,  // مسار الصورة المحلي (اختياري)
     bool IsActive);
 
 public record WarehouseDto(int Id, string Name, string? Location, bool IsDefault, bool IsActive);
@@ -391,6 +393,28 @@ public record ProductMovementReportDto(
     decimal QuantityChange,
     decimal QuantityAfter
 );
+
+public record StockWriteOffDto(
+    int Id,
+    int ProductId,
+    string? ProductName,
+    int WarehouseId,
+    string? WarehouseName,
+    decimal Quantity,
+    DateTime WriteOffDate,
+    string Reason,
+    int? UnitId,
+    int CreatedByUserId,
+    DateTime CreatedAt);
+
+public record ExpiredProductDto(
+    int ProductId,
+    string ProductName,
+    string? CategoryName,
+    string? WarehouseName,
+    decimal CurrentStock,
+    DateTime ExpirationDate,
+    int DaysExpired);
 
 public record LowStockReportDto(
     int     ProductId,

@@ -118,6 +118,7 @@ builder.Services.AddUpdateServices(builder.Configuration);
 // ============================================
 // 4. DI Registrations
 // ============================================
+builder.Services.AddInfrastructureServices(); // Registers ILocalImageStorageService, etc.
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
@@ -136,6 +137,7 @@ builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<ISalesReturnService, SalesReturnService>();
 builder.Services.AddScoped<IPurchaseReturnService, PurchaseReturnService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IInventoryWriteOffService, InventoryWriteOffService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IStoreSettingsService, StoreSettingsService>();

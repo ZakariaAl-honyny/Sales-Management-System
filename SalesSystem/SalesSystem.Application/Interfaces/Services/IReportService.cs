@@ -24,4 +24,9 @@ public interface IReportService
     Task<Result<IEnumerable<LowStockReportDto>>> GetLowStockReportAsync(int? warehouseId, CancellationToken ct);
     /// Get dashboard summary statistics
     Task<Result<DashboardSummaryDto>> GetDashboardSummaryAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Get expired products report with optional threshold (0 = already expired)
+    /// </summary>
+    Task<Result<IEnumerable<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays, CancellationToken ct);
 }

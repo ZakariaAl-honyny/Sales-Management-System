@@ -76,6 +76,7 @@ public partial class MainWindow : Window
         NavStockTransfersItem.Visibility   = Show(Enums.Permission.StockTransfer);
         NavReportsItem.Visibility          = Show(Enums.Permission.Reports);
         NavLowStockItem.Visibility         = Show(Enums.Permission.Reports);
+        NavExpiredProductsItem.Visibility  = Show(Enums.Permission.Reports);
         NavCategoriesItem.Visibility       = Show(Enums.Permission.ProductManagement);
         NavUnitsItem.Visibility            = Show(Enums.Permission.ProductManagement);
 
@@ -100,6 +101,7 @@ public partial class MainWindow : Window
             "SupplierPayments" => _session.CanAccess(Enums.Permission.SupplierManagement),
             "StockTransfers"   => _session.CanAccess(Enums.Permission.StockTransfer),
             "Reports"          => _session.CanAccess(Enums.Permission.Reports),
+            "ExpiredProducts"  => _session.CanAccess(Enums.Permission.Reports),
             "LowStock"         => _session.CanAccess(Enums.Permission.Reports),
             "Warehouses"       => _session.CanAccess(Enums.Permission.WarehouseManagement),
             "Users"            => _session.CanAccess(Enums.Permission.UserManagement),
@@ -148,6 +150,7 @@ public partial class MainWindow : Window
             "Users" => new Views.Users.UsersListView(),
             "Inventory" => new Views.Inventory.InventoryView(),
             "LowStock" => new Views.Inventory.LowStockView { DataContext = App.GetService<LowStockViewModel>() },
+            "ExpiredProducts" => new Views.Reports.ExpiredProductsReportView(),
             "Settings" => new Views.Settings.SettingsView(),
             _ => null
         };

@@ -43,5 +43,10 @@ public class UpdateProductRequestValidator : AbstractValidator<UpdateProductRequ
 
         RuleFor(x => x.IsActive)
             .NotNull().WithMessage("حالة النشاط مطلوبة");
+
+        RuleFor(x => x.ExpirationDate)
+            .GreaterThan(DateTime.Today.AddDays(-1))
+            .When(x => x.ExpirationDate.HasValue)
+            .WithMessage("تاريخ الانتهاء لا يمكن أن يكون في الماضي");
     }
 }
