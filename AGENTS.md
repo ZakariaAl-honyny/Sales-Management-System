@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/016-critical-business-rules/plan.md](specs/016-critical-business-rules/plan.md)
+**Active Feature Plan**: [specs/017-sidebar-navigation/plan.md](specs/017-sidebar-navigation/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
