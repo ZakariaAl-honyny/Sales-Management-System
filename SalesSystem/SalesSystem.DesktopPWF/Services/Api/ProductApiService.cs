@@ -71,4 +71,28 @@ public class ProductApiService : ApiServiceBase, IProductApiService
             () => _httpClient.GetAsync($"api/v1/products/barcode/{barcode}"),
             "ProductApiService.GetByBarcodeAsync");
     }
+
+    public async Task<Result<List<ProductDto>>> GetExpiringProductsAsync(int thresholdDays = 30)
+    {
+        return await ExecuteAsync<List<ProductDto>>(
+            () => _httpClient.GetAsync($"api/v1/products/expiring?thresholdDays={thresholdDays}"),
+            "ProductApiService.GetExpiringProductsAsync");
+    }
+
+    public async Task<Result<ProductDto>> UploadImageAsync(int productId, byte[] imageBytes, string fileName)
+    {
+        try
+        {
+            AddAuthHeader();
+            using var content = new MultipartFormDataContent();
+            content.Add(new ByteArrayContent(imageBytes), "image", fileName);
+
+            var response = await _httpClient.PostAsync($"api/v1/products/{productId}/image", content);
+            return await HandleResponseAsync<ProductDto>(response);
+        }
+        catch (Exception ex)
+        {
+            return HandleConnectionError<ProductDto>(ex, "ProductApiService.UploadImageAsync");
+        }
+    }
 }

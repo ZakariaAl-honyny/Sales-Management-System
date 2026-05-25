@@ -207,6 +207,8 @@ public interface IProductApiService
     Task<Result> DeletePermanentlyAsync(int id);
     Task<Result<List<ProductDto>>> SearchAsync(string searchTerm);
     Task<Result<ProductDto>> GetByBarcodeAsync(string barcode);
+    Task<Result<ProductDto>> UploadImageAsync(int productId, byte[] imageBytes, string fileName);
+    Task<Result<List<ProductDto>>> GetExpiringProductsAsync(int thresholdDays = 30);
 }
 
 public interface ICategoryApiService

@@ -12,11 +12,13 @@ public class ProductService : IProductService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<ProductService> _logger;
+    private readonly ILocalImageStorageService _imageStorage;
 
-    public ProductService(IUnitOfWork uow, ILogger<ProductService> logger)
+    public ProductService(IUnitOfWork uow, ILogger<ProductService> logger, ILocalImageStorageService imageStorage)
     {
         _uow = uow;
         _logger = logger;
+        _imageStorage = imageStorage;
     }
 
     public async Task<Result<ProductDto>> GetByIdAsync(int id, CancellationToken ct)
@@ -65,6 +67,21 @@ public class ProductService : IProductService
                 }
             }
 
+            // Validate ExpirationDate is not in the past
+            if (request.ExpirationDate.HasValue && request.ExpirationDate.Value < DateTime.Today)
+            {
+                _logger.LogWarning("Product creation failed: ExpirationDate {Date} is in the past", request.ExpirationDate.Value);
+                return Result<ProductDto>.Failure("تاريخ الانتهاء لا يمكن أن يكون في الماضي");
+            }
+
+            // Sanitize ImagePath: reject path traversal sequences only
+            // (Forward/backward slashes are valid in relative DB paths like "product_42/abc.jpg")
+            if (request.ImagePath != null && request.ImagePath.Contains("..", StringComparison.Ordinal))
+            {
+                _logger.LogWarning("Product creation failed: ImagePath contains path traversal '..'");
+                return Result<ProductDto>.Failure("مسار الصورة غير صالح");
+            }
+
             var product = Product.Create(
                 request.Name,
                 request.PurchasePrice,
@@ -77,7 +94,8 @@ public class ProductService : IProductService
                 request.RetailUnitId,
                 request.WholesaleUnitId,
                 request.Description,
-                null
+                request.ExpirationDate,
+                request.ImagePath
             );
 
             await _uow.Products.AddAsync(product, ct);
@@ -122,6 +140,21 @@ public class ProductService : IProductService
                     return Result<ProductDto>.Failure("باركود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateBarcode);
             }
 
+            // Validate ExpirationDate is not in the past
+            if (request.ExpirationDate.HasValue && request.ExpirationDate.Value < DateTime.Today)
+            {
+                _logger.LogWarning("Product update failed: ExpirationDate {Date} is in the past", request.ExpirationDate.Value);
+                return Result<ProductDto>.Failure("تاريخ الانتهاء لا يمكن أن يكون في الماضي");
+            }
+
+            // Sanitize ImagePath: reject path traversal sequences only
+            // (Forward/backward slashes are valid in relative DB paths like "product_42/abc.jpg")
+            if (request.ImagePath != null && request.ImagePath.Contains("..", StringComparison.Ordinal))
+            {
+                _logger.LogWarning("Product update failed: ImagePath contains path traversal '..'");
+                return Result<ProductDto>.Failure("مسار الصورة غير صالح");
+            }
+
             product.Update(
                 request.Name,
                 request.PurchasePrice,
@@ -134,7 +167,9 @@ public class ProductService : IProductService
                 request.RetailUnitId,
                 request.WholesaleUnitId,
                 request.Description,
-                null
+                null,               // updatedByUserId (stays null for now)
+                request.ExpirationDate,
+                request.ImagePath
             );
 
             if (request.IsActive != product.IsActive)
@@ -223,6 +258,94 @@ public class ProductService : IProductService
         return Result<ProductDto>.Success(MapToDto(product));
     }
 
+    public async Task<Result<ProductDto>> UploadImageAsync(int id, byte[] imageBytes, string fileName, CancellationToken ct)
+    {
+        try
+        {
+            // Step 1: Verify product exists
+            var product = await _uow.Products.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (product == null)
+                return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
+
+            // Step 2: Save image via infrastructure service (handles validation + path traversal guard)
+            var saveResult = await _imageStorage.SaveImageAsync(imageBytes, fileName, id);
+            if (!saveResult.IsSuccess)
+                return Result<ProductDto>.Failure(saveResult.Error!);
+
+            // Step 3: Update product's ImagePath
+            var imagePath = saveResult.Value!;
+            product.Update(
+                product.Name,
+                product.PurchasePrice,
+                product.RetailPrice,
+                product.WholesalePrice,
+                product.ConversionFactor,
+                product.MinStock,
+                product.Barcode,
+                product.CategoryId,
+                product.RetailUnitId,
+                product.WholesaleUnitId,
+                product.Description,
+                null,               // updatedByUserId
+                product.ExpirationDate,
+                imagePath
+            );
+
+            await _uow.Products.UpdateAsync(product, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Image uploaded for product {ProductId}: {ImagePath}", id, imagePath);
+            return await GetByIdAsync(id, ct);
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation while uploading image for product {Id}", id);
+            return Result<ProductDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while uploading image for product {Id}", id);
+            return Result<ProductDto>.Failure("حدث خطأ غير متوقع أثناء رفع الصورة.");
+        }
+    }
+
+    public async Task<Result<List<ProductDto>>> GetExpiringProductsAsync(int thresholdDays, CancellationToken ct)
+    {
+        if (thresholdDays < 0)
+        {
+            _logger.LogWarning("GetExpiringProductsAsync called with negative threshold: {ThresholdDays}", thresholdDays);
+            return Result<List<ProductDto>>.Failure("عدد الأيام يجب أن يكون صفراً أو أكثر");
+        }
+        if (thresholdDays > 365)
+        {
+            _logger.LogWarning("GetExpiringProductsAsync called with excessive threshold: {ThresholdDays}", thresholdDays);
+            return Result<List<ProductDto>>.Failure("عدد الأيام لا يمكن أن يتجاوز 365 يوماً");
+        }
+
+        try
+        {
+            var cutoffDate = DateTime.Today.AddDays(thresholdDays);
+
+            var products = await _uow.Products.ToListAsync(
+                p => p.ExpirationDate.HasValue && p.ExpirationDate.Value <= cutoffDate,
+                q => q.OrderBy(p => p.ExpirationDate),
+                ct,
+                includePaths: new[] { "Category", "RetailUnit", "WholesaleUnit" });
+
+            var dtos = products.Select(MapToDto).ToList();
+
+            _logger.LogInformation("Found {Count} products expiring within {ThresholdDays} days (cutoff: {CutoffDate})",
+                dtos.Count, thresholdDays, cutoffDate);
+
+            return Result<List<ProductDto>>.Success(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching expiring products with threshold {ThresholdDays}", thresholdDays);
+            return Result<List<ProductDto>>.Failure("حدث خطأ أثناء البحث عن المنتجات المنتهية صلاحيتها.");
+        }
+    }
+
     private static ProductDto MapToDto(Product p)
     {
         return new ProductDto(
@@ -244,6 +367,8 @@ public class ProductService : IProductService
             p.RetailPrice,
             p.MinStock,
             p.Description,
+            p.ExpirationDate,
+            p.ImagePath,
             p.IsActive
         );
     }

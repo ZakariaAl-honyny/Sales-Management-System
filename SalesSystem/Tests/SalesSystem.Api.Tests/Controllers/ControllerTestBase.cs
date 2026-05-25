@@ -29,6 +29,7 @@ public abstract class ControllerTestBase
     protected Mock<IBackupService> BackupServiceMock { get; }
     protected Mock<IUserService> UserServiceMock { get; }
     protected Mock<IAuthService> AuthServiceMock { get; }
+    protected Mock<ILocalImageStorageService> ImageStorageServiceMock { get; }
 
     #endregion
 
@@ -51,6 +52,7 @@ public abstract class ControllerTestBase
         BackupServiceMock = new Mock<IBackupService>();
         UserServiceMock = new Mock<IUserService>();
         AuthServiceMock = new Mock<IAuthService>();
+        ImageStorageServiceMock = new Mock<ILocalImageStorageService>();
     }
 
     #region Helper Methods

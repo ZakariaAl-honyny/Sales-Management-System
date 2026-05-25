@@ -93,6 +93,8 @@ public class ProductEditorViewModelTests : IDisposable
             WholesalePrice: 1800,
             MinStock: 10,
             Description: null,
+            ExpirationDate: null,
+            ImagePath: null,
             IsActive: true);
 
         // Act - Use the constructor that accepts ProductDto and services
@@ -169,6 +171,8 @@ public class ProductEditorViewModelTests : IDisposable
             WholesalePrice: 1800,
             MinStock: 10,
             Description: null,
+            ExpirationDate: null,
+            ImagePath: null,
             IsActive: true);
 
         var viewModel = new ProductEditorViewModel(
@@ -452,6 +456,8 @@ public class ProductEditorViewModelTests : IDisposable
             WholesalePrice: 900,
             MinStock: 10,
             Description: null,
+            ExpirationDate: null,
+            ImagePath: null,
             IsActive: true);
     }
 

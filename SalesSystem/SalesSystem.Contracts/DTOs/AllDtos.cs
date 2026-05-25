@@ -25,6 +25,8 @@ public record ProductDto(
     decimal RetailPrice,
     decimal MinStock,
     string? Description,
+    DateTime? ExpirationDate,
+    string? ImagePath,  // مسار الصورة المحلي (اختياري)
     bool IsActive);
 
 public record WarehouseDto(int Id, string Name, string? Location, bool IsDefault, bool IsActive);

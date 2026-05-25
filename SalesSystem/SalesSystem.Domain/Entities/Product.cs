@@ -20,6 +20,8 @@ public class Product : BaseEntity
     public decimal MinStock { get; private set; }
     public decimal ReorderLevel { get; private set; }
     public string? Description { get; private set; }
+    public DateTime? ExpirationDate { get; private set; }
+    public string? ImagePath { get; private set; }
 
     // Navigation properties
     public virtual ICollection<ProductBarcode> Barcodes { get; private set; } = new List<ProductBarcode>();
@@ -142,6 +144,8 @@ public class Product : BaseEntity
         int? retailUnitId = null,
         int? wholesaleUnitId = null,
         string? description = null,
+        DateTime? expirationDate = null,
+        string? imagePath = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -170,6 +174,8 @@ public class Product : BaseEntity
             RetailUnitId = retailUnitId,
             WholesaleUnitId = wholesaleUnitId,
             Description = description,
+            ExpirationDate = expirationDate,
+            ImagePath = imagePath,
             // Sync legacy fields
             SalePrice = retailPrice,
             UnitId = retailUnitId
@@ -190,7 +196,9 @@ public class Product : BaseEntity
         int? retailUnitId,
         int? wholesaleUnitId,
         string? description,
-        int? updatedByUserId)
+        int? updatedByUserId,
+        DateTime? expirationDate = null,
+        string? imagePath = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
@@ -216,6 +224,8 @@ public class Product : BaseEntity
         RetailUnitId = retailUnitId;
         WholesaleUnitId = wholesaleUnitId;
         Description = description;
+        ExpirationDate = expirationDate;
+        ImagePath = imagePath;
         SalePrice = retailPrice;
         UnitId = retailUnitId;
         

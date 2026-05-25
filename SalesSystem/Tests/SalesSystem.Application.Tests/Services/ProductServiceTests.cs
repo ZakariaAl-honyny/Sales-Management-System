@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
+using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
@@ -22,6 +23,7 @@ public class ProductServiceTests : IDisposable
     private readonly TestDbContext _dbContext;
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<ILogger<ProductService>> _mockLogger;
+    private readonly Mock<ILocalImageStorageService> _mockImageStorage;
 
     private readonly ProductService _sut;
 
@@ -38,6 +40,7 @@ public class ProductServiceTests : IDisposable
 
         _mockUow = new Mock<IUnitOfWork>();
         _mockLogger = new Mock<ILogger<ProductService>>();
+        _mockImageStorage = new Mock<ILocalImageStorageService>();
 
         _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
         _mockUow.Setup(u => u.Categories).Returns(new InMemoryEfCoreRepository<Category>(_dbContext));
@@ -49,7 +52,7 @@ public class ProductServiceTests : IDisposable
                 return 1;
             });
 
-        _sut = new ProductService(_mockUow.Object, _mockLogger.Object);
+        _sut = new ProductService(_mockUow.Object, _mockLogger.Object, _mockImageStorage.Object);
     }
 
     public void Dispose()
@@ -99,7 +102,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesProduct");
 
-        var request = new SalesSystem.Contracts.Requests.CreateProductRequest("1234567890123", "New Product", null, null, null, null, 1m, 50m, 100m, 100m, 0m, 10m, null);
+        var request = new SalesSystem.Contracts.Requests.CreateProductRequest("1234567890123", "New Product", null, null, null, null, 1m, 50m, 100m, 100m, 0m, 10m, null, null, null);
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -120,7 +123,7 @@ public class ProductServiceTests : IDisposable
         _dbContext.Products.Add(existing);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateProductRequest("1234567890", "New Product", null, null, null, null, 1m, 50m, 100m, 100m, 0m, 0m, null); // Duplicate
+        var request = new SalesSystem.Contracts.Requests.CreateProductRequest("1234567890", "New Product", null, null, null, null, 1m, 50m, 100m, 100m, 0m, 0m, null, null, null); // Duplicate
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -143,7 +146,7 @@ public class ProductServiceTests : IDisposable
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null!, "Updated Product", null, null, null, null, 1m, 20m, 200m, 200m, 0m, 10m, null, true);
+        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null!, "Updated Product", null, null, null, null, 1m, 20m, 200m, 200m, 0m, 10m, null, null, null, true);
 
         var result = await _sut.UpdateAsync(product.Id, request, CancellationToken.None);
 
@@ -160,7 +163,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_NonExistentProduct_ReturnsNotFound");
 
-        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null!, "Updated", null, null, null, null, 1m, 0m, 0m, 0m, 0m, 0m, null, true);
+        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null!, "Updated", null, null, null, null, 1m, 0m, 0m, 0m, 0m, 0m, null, null, null, true);
 
         var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
 

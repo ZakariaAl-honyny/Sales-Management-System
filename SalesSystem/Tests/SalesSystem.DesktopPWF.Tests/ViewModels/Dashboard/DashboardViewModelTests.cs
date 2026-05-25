@@ -449,6 +449,8 @@ public class DashboardViewModelTests : IDisposable
             WholesalePrice: 1500m,
             MinStock: minStock,
             Description: null,
+            ExpirationDate: null,
+            ImagePath: null,
             IsActive: isActive);
     }
 

@@ -21,6 +21,8 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.ReorderLevel).HasPrecision(18, 3);
         builder.Property(p => p.ConversionFactor).IsRequired().HasPrecision(18, 3).HasDefaultValue(1m);
         builder.Property(p => p.Description).HasMaxLength(500);
+        builder.Property(p => p.ImagePath).HasMaxLength(500);
+        builder.Property(p => p.ExpirationDate);
 
         builder.HasOne(p => p.Category)
             .WithMany()

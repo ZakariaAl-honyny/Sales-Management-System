@@ -38,6 +38,7 @@ public class SalesDbContext : DbContext
     public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
+    public DbSet<StockWriteOff> StockWriteOffs => Set<StockWriteOff>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 

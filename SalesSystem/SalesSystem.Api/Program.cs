@@ -118,6 +118,7 @@ builder.Services.AddUpdateServices(builder.Configuration);
 // ============================================
 // 4. DI Registrations
 // ============================================
+builder.Services.AddInfrastructureServices(); // Registers ILocalImageStorageService, etc.
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();

@@ -84,8 +84,9 @@ public partial class App : System.Windows.Application
             mainWindow.Show();
             MainWindow = mainWindow;
 
-            // Background update check - never block startup
+            // Background checks - never block startup
             _ = ScheduleBackgroundUpdateCheckAsync();
+            _ = ScheduleExpirationNotificationCheckAsync();
         }
         else
         {
@@ -333,6 +334,46 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Warning(ex, "Background update check failed silently");
+        }
+    }
+
+    /// <summary>
+    /// Checks for expiring products and shows a non-intrusive notification on startup.
+    /// Runs after a delay to avoid blocking the UI thread during initial load.
+    /// </summary>
+    private async Task ScheduleExpirationNotificationCheckAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5));
+
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    var productApi = _serviceProvider!.GetRequiredService<IProductApiService>();
+                    var dialogService = _serviceProvider!.GetRequiredService<IDialogService>();
+
+                    var result = await productApi.GetExpiringProductsAsync(thresholdDays: 30);
+
+                    if (result.IsSuccess && result.Value != null && result.Value.Count > 0)
+                    {
+                        var count = result.Value.Count;
+                        await dialogService.ShowWarningAsync(
+                            "منتجات على وشك الانتهاء",
+                            $"⚠️ يوجد {count} منتج على وشك انتهاء الصلاحية خلال 30 يوماً.\n\n" +
+                            "يرجى مراجعة قائمة المنتجات لاتخاذ الإجراء المناسب.");
+                    }
+                }
+                catch (Exception innerEx)
+                {
+                    Log.Warning(innerEx, "Expiration notifications check failed silently");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to schedule expiration notification check");
         }
     }
 
