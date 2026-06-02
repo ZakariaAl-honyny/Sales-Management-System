@@ -378,6 +378,7 @@ public class DashboardViewModelTests : IDisposable
     {
         return new SalesInvoiceDto(
             Id: id,
+            InvoiceNo: 1,
             CustomerId: 1,
             CustomerName: "Test Customer",
             WarehouseId: 1,

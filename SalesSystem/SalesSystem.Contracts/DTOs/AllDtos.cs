@@ -58,6 +58,7 @@ public record CustomerDto(int Id, string Name, string? Phone, string? Email, str
 
 public record SalesInvoiceDto(
     int Id,
+    int InvoiceNo,
     int? CustomerId,
     string? CustomerName,
     int WarehouseId,
@@ -101,6 +102,7 @@ public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName,
 
 public record PurchaseInvoiceDto(
     int Id,
+    int InvoiceNo,
     int SupplierId,
     string SupplierName,
     int WarehouseId,

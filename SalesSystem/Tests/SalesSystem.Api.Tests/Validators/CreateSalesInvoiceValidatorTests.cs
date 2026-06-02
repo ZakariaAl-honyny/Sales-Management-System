@@ -607,6 +607,7 @@ public class CreateSalesInvoiceValidatorTests
 
     private static CreateSalesInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
+        InvoiceNo: null,
         CustomerId: null,
         CashBoxId: 1,
         InvoiceDate: DateTime.UtcNow.AddDays(-1),

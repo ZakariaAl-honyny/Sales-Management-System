@@ -92,11 +92,24 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, int userId, CancellationToken ct)
     {
+        // Compute default InvoiceNo if not provided: last Id + 1
+        var invoiceNo = request.InvoiceNo ?? 0;
+        if (invoiceNo <= 0)
+        {
+            var lastInvoices = await _uow.SalesInvoices.ToListAsync(
+                predicate: null,
+                queryConfig: q => q.OrderByDescending(i => i.Id).Take(1),
+                ct: ct);
+            var lastId = lastInvoices.FirstOrDefault()?.Id ?? 0;
+            invoiceNo = lastId + 1;
+        }
+
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
             var invoice = SalesInvoice.Create(
                 request.WarehouseId,
+                invoiceNo,
                 request.CustomerId,
                 request.InvoiceDate,
                 request.DueDate,
@@ -452,6 +465,7 @@ public class SalesService : ISalesService
     {
         return new SalesInvoiceDto(
             i.Id,
+            i.InvoiceNo,
             i.CustomerId,
             i.Customer?.Name ?? "عميل نقدي",
             i.WarehouseId,

@@ -207,13 +207,13 @@ catch (Exception ex)
 - Use auto-increment Id (int PK) as sole identifier for display and search
 - WarehouseResponse bindings must NOT include a Code field — it was removed from the record
 
-### Invoice Number Strategy — No InvoiceNo (v4.6.5)
-- SalesInvoice and PurchaseInvoice editor screens MUST NOT have an InvoiceNo text field
-- Invoice list ViewModels MUST NOT filter/search by InvoiceNo (string) — use `int.TryParse` + `Id` comparison
-- Invoice display uses formatted `Id` (`#ID` or just the integer value)
-- `SupplierInvoiceNo` display is kept for purchase invoices (supplier's reference) but MUST NOT be labeled as "رقم الفاتورة" (invoice number) — use "رقم فاتورة المورد" (supplier invoice number) instead
-- Report ViewModels MUST NOT reference or display `InvoiceNo` — use `Id` instead
-- Print preview ViewModels MUST use `Id` for invoice identification on printed documents
+### Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+- SalesInvoice and PurchaseInvoice editor screens MUST have an InvoiceNo (int) text field — user-facing invoice number
+- Editor ViewModel: `int InvoiceNo` property, `InvoiceNo = 0` for new invoices (service computes default as `lastId + 1`)
+- Invoice list ViewModels display `InvoiceNo` column and filter by `InvoiceNo == parsedInt || Id == parsedInt`
+- `SupplierInvoiceNo` display is kept for purchase invoices (supplier's reference) and labeled as "رقم فاتورة المورد" (supplier invoice number) — distinct from system "رقم الفاتورة"
+- Report ViewModels MUST include `int InvoiceNo` in DTOs
+- Print preview ViewModels: `InvoiceNumber` (string) set from `InvoiceNo.ToString()` via builder
 
 ### Interactive Validation (v4.6) — Buttons Always Enabled, Validate on Click
 

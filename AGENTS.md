@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.6.4 — Security Hardening & Code Quality)
+# AGENTS.md — Sales Management System (v4.6.7 — InvoiceNo Int Re-addition & Code Polish)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -1204,18 +1204,20 @@ public interface ISoundService
 | RULE-252 | Editor ViewModels and any file with user-facing messages MUST be checked for Arabic encoding integrity at code review time |
 | RULE-253 | When reviewing PRs, spot-check 3-5 Arabic string literals by reading them aloud in the diff — if any look like `ط§ط®طھط¨ط§ط±` instead of `اختبار`, flag the entire file for encoding review |
 
-### 2.63 Invoice Number Strategy — InvoiceNo → Id (v4.6.5)
+### 2.63 Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+
+SalesInvoice and PurchaseInvoice have an `InvoiceNo` (int) property — a user-facing invoice number. This is separate from the auto-increment `Id` PK. The InvoiceNo is NOT unique (duplicates allowed).
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-254 | `SalesInvoice` and `PurchaseInvoice` MUST NOT have an `InvoiceNo` (string) property — use auto-increment `Id` (int PK) as the sole invoice identifier |
-| RULE-255 | `GetByNumberAsync()` / `GetByNumber()` methods MUST NOT exist in services, controllers, or API clients — search by `Id` (int) instead |
-| RULE-256 | `InvoiceNo` parameter MUST be removed from `SalesInvoice.Create()` and `PurchaseInvoice.Create()` factory methods — they no longer require a string identifier |
-| RULE-257 | Search by invoice number MUST use `int.TryParse()` on the search text and compare against `Id` — NEVER filter by a string `InvoiceNo` column |
-| RULE-258 | `SupplierInvoiceNo` (string?) is a SUPPLIER's invoice reference number — NOT a system identifier. It is kept on `PurchaseInvoice` for supplier reference only and MUST NOT be used as the system invoice number |
-| RULE-259 | `SalesReportDto` and `PurchaseReportDto` MUST use `int Id` for the invoice identifier — NOT `string InvoiceNo` |
-| RULE-260 | `InvoicePrintDto` (print/PDF generation) MUST use `int Id` for the invoice identifier — NOT `string InvoiceNo` |
-| RULE-261 | `DocumentSequenceService` for invoice numbering (INV-{YYYY}-{000001}) is REMOVED — invoice display uses the auto-increment `Id` formatted as `#ID` |
+| RULE-254 | `SalesInvoice` and `PurchaseInvoice` MUST have `int InvoiceNo` (NOT string) — required property with guard `invoiceNo <= 0` |
+| RULE-255 | Default InvoiceNo when creating new invoice: service computes `lastId + 1` — user can override with any int |
+| RULE-256 | Request DTOs use `int? InvoiceNo` — null or ≤ 0 means "auto-generate" (service computes `lastId + 1`) |
+| RULE-257 | Search by invoice number: Desktop shows `InvoiceNo` column, search by int comparison |
+| RULE-258 | `SupplierInvoiceNo` (string?) is a SUPPLIER's invoice reference number — NOT the system InvoiceNo. Kept on `PurchaseInvoice` for supplier reference only |
+| RULE-259 | `SalesReportDto` and `PurchaseReportDto` use `int InvoiceNo` |
+| RULE-260 | `InvoicePrintDto` (print/PDF generation) uses `string InvoiceNumber` formatted from `InvoiceNo.ToString()` |
+| RULE-261 | No unique index on `InvoiceNo` — duplicates are explicitly allowed |
 
 ### 2.64 UI Compacting — Mobile-Ready Density (v4.6.6)
 
@@ -1278,7 +1280,7 @@ public enum InvoiceTypePrint : byte
 ❌ Data payloads in EventBus messages
 ❌ DataAnnotations on Domain Entities (use Fluent API)
 ❌ Cascade delete on any FK
-❌ InvoiceNo column on SalesInvoice or PurchaseInvoice (use Id int PK)
+❌ InvoiceNo as string (use int) — NOT nullable, NOT unique
 ❌ Hard-deleting Users (soft delete only — invoices reference them)
 ❌ Duplicating business logic outside of the Domain layer
 ❌ Direct property modification on Entities from outside the class (use Domain methods instead)
@@ -1332,11 +1334,12 @@ public enum InvoiceTypePrint : byte
 ❌ Button or MenuItem without Arabic ToolTip
 ❌ ToolTip that just repeats the button text (e.g., Button="منتج جديد" ToolTip="منتج جديد")
 ❌ Code column on Product, Customer, Supplier, or Warehouse entities (use Id instead)
-❌ InvoiceNo (string) on SalesInvoice or PurchaseInvoice entities (use auto-increment Id int PK instead)
-❌ GetByNumberAsync/GetByNumber methods in services or controllers (search by Id instead)
-❌ DocumentSequenceService for invoice numbering (INV/PUR prefixes removed — use Id)
-❌ Searching invoices by string InvoiceNo (use int.TryParse + Id comparison instead)
-❌ SupplierInvoiceNo used as system invoice number (it's supplier's reference only — use Id for system ID)
+❌ InvoiceNo as string on SalesInvoice or PurchaseInvoice entities (use int instead)
+❌ GetByNumberAsync/GetByNumber methods in services or controllers (search by Id)
+❌ InvoiceNo as string (use int, nullable in requests, NOT unique)
+❌ DocumentSequenceService for invoice numbering (INV/PUR prefixes — use InvoiceNo int)
+❌ SupplierInvoiceNo used as system InvoiceNo (it's supplier's reference only)
+❌ Unique index on InvoiceNo (duplicates allowed — user can set any int)
 ❌ WarehouseResponse still containing Code field
 ❌ ProductCode on invoice item DTOs (use ProductId only)
 ❌ Code auto-generation for products, customers, or suppliers
@@ -1548,13 +1551,15 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Error dismiss buttons have ToolTip?
 - [ ] Product/Customer/Supplier/Warehouse have NO Code column/property?
 - [ ] WarehouseResponse DTO excludes Code field?
-- [ ] SalesInvoice and PurchaseInvoice have NO `InvoiceNo` property (use `Id` int PK)?
-- [ ] `GetByNumberAsync` / `GetByNumber` removed from services and controllers?
-- [ ] `InvoiceNo` parameter removed from `SalesInvoice.Create()` and `PurchaseInvoice.Create()`?
-- [ ] Search by invoice uses `int.TryParse` + `Id` (not `InvoiceNo` string)?
-- [ ] Report DTOs (`SalesReportDto`, `PurchaseReportDto`) use `int Id` (not `string InvoiceNo`)?
-- [ ] `InvoicePrintDto` uses `int Id` (not `string InvoiceNo`)?
-- [ ] `SupplierInvoiceNo` kept only as supplier's reference (not system identifier)?
+- [ ] SalesInvoice and PurchaseInvoice have `int InvoiceNo` (NOT string)?
+- [ ] `SalesInvoice.Create()` requires `int invoiceNo` (second param)?
+- [ ] `PurchaseInvoice.Create()` requires `int invoiceNo` (third param)?
+- [ ] Request DTOs use `int? InvoiceNo` (null = auto-generate)?
+- [ ] Service computes `lastId + 1` as default when `InvoiceNo` is null/≤0?
+- [ ] Report DTOs (`SalesReportDto`, `PurchaseReportDto`, `InvoicePrintDto`) use `int InvoiceNo`?
+- [ ] `InvoicePrintDto.InvoiceNumber` (string) formatted via `.ToString()` on int?
+- [ ] `SupplierInvoiceNo` kept only as supplier's reference (not system InvoiceNo)?
+- [ ] No unique index on InvoiceNo (duplicates allowed)?
 - [ ] All search/filter uses Id or Name, not Code?
 - [ ] Invoice item DTOs carry ProductId only (no ProductCode)?
 - [ ] Report DTOs exclude Code fields?

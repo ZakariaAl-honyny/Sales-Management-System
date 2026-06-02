@@ -122,6 +122,7 @@ public class PurchaseServiceTests : IDisposable
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
@@ -180,6 +181,7 @@ public class PurchaseServiceTests : IDisposable
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
@@ -217,6 +219,7 @@ public class PurchaseServiceTests : IDisposable
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             paymentType: DomainPaymentType.Credit,
@@ -255,6 +258,7 @@ public class PurchaseServiceTests : IDisposable
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
@@ -291,6 +295,7 @@ public class PurchaseServiceTests : IDisposable
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             paymentType: DomainPaymentType.Credit,
@@ -339,6 +344,7 @@ public class PurchaseServiceTests : IDisposable
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
@@ -370,6 +376,7 @@ public class PurchaseServiceTests : IDisposable
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,

@@ -204,6 +204,11 @@
                             <StackPanel>
                                 <TextBlock Text="ℹ️ تفاصيل الفاتورة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
 
+                                <TextBlock Text="رقم الفاتورة *" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding InvoiceNo, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="رقم الفاتورة — يمكنك إدخال أي رقم تريده"
+                                         Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
+
                                 <TextBlock Text="العميل" Style="{StaticResource LabelStyle}"/>
                                 <Grid Margin="0,0,0,4">
                                     <Grid.ColumnDefinitions>

@@ -32,6 +32,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private readonly IToastNotificationService _toastService;
 
     private int? _invoiceId;
+    private int _invoiceNo;
     private int _selectedWarehouseId;
     private int? _selectedSupplierId;
     private int? _defaultSupplierId; // Auto-selected for Cash purchases
@@ -88,6 +89,11 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
+
+        if (!invoiceId.HasValue)
+        {
+            InvoiceNo = 0; // Service will compute lastId + 1
+        }
 
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         PostCommand = new AsyncRelayCommand(PostAsync);
@@ -179,6 +185,13 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     #region Properties
     public int? InvoiceId => _invoiceId;
+
+    public int InvoiceNo
+    {
+        get => _invoiceNo;
+        set => SetProperty(ref _invoiceNo, value);
+    }
+
     public bool IsEditMode => _isEditMode;
 
     public ObservableCollection<SupplierDto> Suppliers
@@ -478,6 +491,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 var invoice = result.Value;
+                InvoiceNo = invoice.InvoiceNo;
                 SelectedWarehouseId = invoice.WarehouseId;
                 SelectedSupplierId = invoice.SupplierId;
                 InvoiceDate = invoice.InvoiceDate;
@@ -738,6 +752,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         return new CreatePurchaseInvoiceRequest(
             SelectedWarehouseId,
             SelectedSupplierId ?? 0,
+            InvoiceNo > 0 ? InvoiceNo : null,
             InvoiceDate,
             null, // DueDate
             (PaymentType)SelectedPaymentType,

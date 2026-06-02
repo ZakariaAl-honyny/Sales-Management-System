@@ -2,16 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
-## v4.6.7 — Garbled Arabic Fix & Dialog UI Polish (2026-06-02)
+## v4.6.7 — InvoiceNo Int Re-addition & Code Polish (2026-06-02)
 
 ### Added
+- **InvoiceNo (int) Added Back**: `SalesInvoice` and `PurchaseInvoice` now have `int InvoiceNo` — a user-facing invoice number, separate from the auto-increment `Id` PK. NOT unique (duplicates allowed).
+  - Domain: `string InvoiceNo` → `int InvoiceNo` with guard `if (invoiceNo <= 0) throw ...`
+  - Requests: `int? InvoiceNo` in create DTOs (null = auto-generate `lastId + 1`)
+  - DTOs: `int InvoiceNo` in all response/report/print DTOs
+  - Services: Default `lastId + 1` computed when `InvoiceNo` is null/≤ 0
+  - Validators: `GreaterThan(0)` rule (only when provided)
+  - Desktop: `int InvoiceNo` property in editor VMs, displays in list columns
+- **Migration `AddInvoiceNoColumn`**: Adds `InvoiceNo int NOT NULL` to `SalesInvoices` and `PurchaseInvoices` tables (default 0).
 - **Screen Title Emoji Icons**: 41 main screen page title headers now have emoji icons (📦 Products, 🛒 Sales, 📥 Purchases, 👤 Customers, etc.) — improves visual scanability.
-- **FirstValidationErrorConverter**: Moved from `App.xaml` to `Resources/Styles.xaml` to fix `XamlParseException` (StaticResource inside ControlTemplate couldn't traverse merged dictionary scope).
+- **FirstValidationErrorConverter**: Moved from `App.xaml` to `Resources/Styles.xaml` to fix `XamlParseException`.
 
 ### Fixed
-- **Garbled Arabic Text — Full Solution Sweep**: 48 garbled Arabic strings fixed in `InvoicePrintDtoBuilderTests.cs` (mojibake like `ظ…طھط¬ط±ظٹ` → `متجري`, `ط§ظ„ط±ظٹط§ط¶` → `الرياض`). 5 garbled comment box-drawing separators fixed in `ProductSelectionViewModel.cs`, `PurchaseInvoiceListViewModel.cs`, `SalesInvoiceListViewModel.cs`.
-- **InvoicePrintDtoBuilderTests.cs Build Errors**: Removed leftover `"INV-001"` string argument from 13 `SalesInvoice.Create()` calls and 4 `PurchaseInvoice.Create()` calls (InvoiceNo parameter was removed in v4.6.5). Updated `InvoiceNumber` assertions to match builder's new `invoice.Id.ToString()` implementation.
-- **All 9 Dialog Buttons Standardized**: FontSize="11", Padding="10,4", CornerRadius="6" applied consistently across ErrorDialog, SuccessDialog, WarningDialog, InfoDialog, ConfirmationDialog, DeleteConfirmationDialog, ValidationErrorsDialog, DatabaseErrorDialog, and FallbackErrorDialog.
+- **Garbled Arabic Text — Full Solution Sweep**: 48 garbled Arabic strings fixed in `InvoicePrintDtoBuilderTests.cs`. 5 garbled comment box-drawing separators fixed in `ProductSelectionViewModel.cs`, `PurchaseInvoiceListViewModel.cs`, `SalesInvoiceListViewModel.cs`.
+- **All 9 Dialog Buttons Standardized**: FontSize="11", Padding="10,4", CornerRadius="6" applied consistently across all dialogs.
 - **DeleteConfirmationDialog Header**: Icon container 48×48→44×44, icon FontSize 26→20, title FontSize 18→16.
 - **ValidationErrorsDialog List**: Bullet points 14→12, error text 14→13, LineHeight 22→20.
 - **Screen Title Icon FontSizes**: 18→16 across 9 error bars, 5 report views, and StockTransferEditor header.
@@ -20,6 +27,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - All remaining non-standard button sizes standardized to Styles.xaml global compact tokens.
+- AGENTS.md Section 2.63 updated: `InvoiceNo` removal → `InvoiceNo` re-addition as `int`.
 
 ---
 

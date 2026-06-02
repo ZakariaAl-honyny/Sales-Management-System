@@ -18,6 +18,7 @@ public class PurchaseInvoice : BaseEntity
     public decimal TotalAmount { get; private set; }
     public decimal PaidAmount { get; private set; }
     public decimal DueAmount { get; private set; }
+    public int InvoiceNo { get; private set; }
     public string? SupplierInvoiceNo { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
@@ -32,6 +33,7 @@ public class PurchaseInvoice : BaseEntity
     public static PurchaseInvoice Create(
         int supplierId,
         int warehouseId,
+        int invoiceNo,
         DateTime? invoiceDate = null,
         DateOnly? dueDate = null,
         PaymentType paymentType = PaymentType.Cash,
@@ -45,6 +47,8 @@ public class PurchaseInvoice : BaseEntity
             throw new DomainException("المورد مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
+        if (invoiceNo <= 0)
+            throw new DomainException("رقم الفاتورة غير صحيح.");
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
         if (dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow.Date))
@@ -54,6 +58,7 @@ public class PurchaseInvoice : BaseEntity
         {
             SupplierId = supplierId,
             WarehouseId = warehouseId,
+            InvoiceNo = invoiceNo,
             CashBoxId = cashBoxId,
             InvoiceDate = invoiceDate ?? DateTime.UtcNow,
             DueDate = dueDate,

@@ -1,5 +1,7 @@
 # Database Schema Design
-# Sales Management System — v4.6.2 (WPF Validation ErrorTemplate & INotifyDataErrorInfo)
+# Sales Management System — v4.6.7 (InvoiceNo Int Re-addition)
+# Platform: SQL Server 2019+
+# 30+ Tables | decimal-only financials | nvarchar text | Soft delete
 # Platform: SQL Server 2019+
 # 30+ Tables | decimal-only financials | nvarchar text | Soft delete
 
@@ -206,7 +208,8 @@ Default schema: **`dbo`**
 ## I) PurchaseInvoices
 ### Columns
 - `Id` int PK
-- `InvoiceNo` nvarchar(30) not null unique
+- `Id` int PK
+- `InvoiceNo` int not null (user-facing invoice number, NOT unique — duplicates allowed)
 - `SupplierId` int not null FK
 - `WarehouseId` int not null FK
 - `InvoiceDate` datetime2 not null
@@ -251,7 +254,7 @@ Default schema: **`dbo`**
 ## K) SalesInvoices
 ### Columns
 - `Id` int PK
-- `InvoiceNo` nvarchar(30) not null unique
+- `InvoiceNo` int not null (user-facing invoice number, NOT unique — duplicates allowed)
 - `CustomerId` int null FK
 - `WarehouseId` int not null FK
 - `InvoiceDate` datetime2 not null
@@ -734,7 +737,7 @@ CREATE TABLE dbo.Customers
 CREATE TABLE dbo.PurchaseInvoices
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoices PRIMARY KEY,
-    InvoiceNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    InvoiceNo       INT           NOT NULL DEFAULT 0,
     SupplierId      INT           NOT NULL REFERENCES dbo.Suppliers(Id),
     WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
     InvoiceDate     DATETIME2     NOT NULL,
@@ -777,7 +780,7 @@ CREATE TABLE dbo.PurchaseInvoiceItems
 CREATE TABLE dbo.SalesInvoices
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoices PRIMARY KEY,
-    InvoiceNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    InvoiceNo       INT           NOT NULL DEFAULT 0,
     CustomerId      INT           NULL REFERENCES dbo.Customers(Id),
     WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
     InvoiceDate     DATETIME2     NOT NULL,

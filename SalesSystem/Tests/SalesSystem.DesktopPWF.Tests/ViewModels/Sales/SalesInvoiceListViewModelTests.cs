@@ -459,6 +459,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     {
         return new SalesInvoiceDto(
             Id: id,
+            InvoiceNo: 1,
             CustomerId: 1,
             CustomerName: customerName,
             WarehouseId: 1,

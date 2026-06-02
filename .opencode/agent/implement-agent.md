@@ -474,64 +474,76 @@ public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName, ...
 9. Remove from tests
 10. Remove auto-generation logic from services
 
-### Invoice Number Strategy — No InvoiceNo (v4.6.5)
+### Invoice Number Strategy — InvoiceNo as int (v4.6.7)
 
-SalesInvoice and PurchaseInvoice MUST NOT have an InvoiceNo (string) column. Use auto-increment Id (int PK) as the sole invoice identifier.
+SalesInvoice and PurchaseInvoice have `int InvoiceNo` — a user-facing invoice number, separate from the auto-increment `Id` PK. NOT unique (duplicates allowed). Default = `lastId + 1` when not provided.
 
 ```csharp
-// CORRECT — no InvoiceNo property
+// CORRECT — int InvoiceNo property (NOT string)
 public class SalesInvoice : BaseEntity
 {
-    public int Id { get; private set; }  // Auto-increment PK = invoice identifier
+    public int Id { get; private set; }       // Auto-increment PK
+    public int InvoiceNo { get; private set; } // User-facing invoice number
     public int WarehouseId { get; private set; }
-    // NO InvoiceNo property
 }
 
-// CORRECT — SalesInvoice.Create without invoiceNo parameter
+// CORRECT — SalesInvoice.Create with int invoiceNo parameter
 public static SalesInvoice Create(
+    int invoiceNo,                       // Required int invoice number
     int warehouseId,
     int? customerId = null,
     DateTime? invoiceDate = null,
-    // ... other params ...
     int? createdByUserId = null)
 {
-    // No invoiceNo parameter
+    if (invoiceNo <= 0)
+        throw new DomainException("رقم الفاتورة يجب أن يكون أكبر من الصفر");
+    // ...
 }
 
-// CORRECT — searching by Id
-var searchText = SearchText?.Trim();
-if (!string.IsNullOrWhiteSpace(searchText) && int.TryParse(searchText, out var id))
+// CORRECT — service computes default when request has null/0 InvoiceNo
+var invoiceNo = request.InvoiceNo ?? 0;
+if (invoiceNo <= 0)
 {
-    Invoices = Invoices.Where(i => i.Id == id).ToList();
+    var lastInvoice = await _uow.SalesInvoices.GetAll()
+        .OrderByDescending(i => i.Id).FirstOrDefaultAsync(ct);
+    invoiceNo = (lastInvoice?.Id ?? 0) + 1;
 }
-// NOT: i.InvoiceNo.Contains(searchText)
 
-// CORRECT — report DTO without InvoiceNo
+// CORRECT — searching by InvoiceNo (int comparison)
+var searchText = SearchText?.Trim();
+if (!string.IsNullOrWhiteSpace(searchText) && int.TryParse(searchText, out var num))
+{
+    Invoices = Invoices.Where(i => i.InvoiceNo == num).ToList();
+}
+
+// CORRECT — report DTO with int InvoiceNo
 public record SalesReportDto(
     DateTime InvoiceDate,
-    int Id,                          // Was: string InvoiceNo
+    int Id,
+    int InvoiceNo,                       // int, not string
     string CustomerName,
     decimal SubTotal, ...);
 
-// CORRECT — print DTO without InvoiceNo
+// CORRECT — print DTO formats int as string
 public record InvoicePrintDto(
-    int Id,                          // Was: string InvoiceNo
+    string InvoiceNumber,                // Formatted from InvoiceNo.ToString()
     string CustomerName, ...);
+
+// Builder: .InvoiceNumber = invoice.InvoiceNo.ToString()
 ```
 
-**When removing InvoiceNo from an entity:**
-1. Remove property from Domain entity
-2. Remove parameter from factory methods (Create)
-3. Remove from EF Core configuration (HasMaxLength + HasIndex)
-4. Remove from DTOs and Responses
-5. Remove GetByNumberAsync from service interfaces and implementations
-6. Remove GetByNumber endpoint from controllers
-7. Remove GetByNumberAsync from API client services
-8. Remove from ViewModel search/filter logic
-9. Remove from XAML bindings (if any)
-10. Remove from tests
+**When adding/supporting InvoiceNo as int:**
+1. Add `int InvoiceNo` property to Domain entity with guard `invoiceNo <= 0`
+2. Add `int invoiceNo` parameter to factory methods (Create)
+3. Remove old string `InvoiceNo` config, keep plain int (no HasMaxLength)
+4. Add `int InvoiceNo` to DTOs and Responses
+5. Service checks `if (invoiceNo <= 0)` to compute `lastId + 1`
+6. Validators: `GreaterThan(0)` rule only when InvoiceNo is provided
+7. Desktop VM: int property, `InvoiceNo = 0` for new (service computes)
+8. Search/filter by `InvoiceNo == parsedInt || Id == parsedInt`
+9. No unique index on InvoiceNo (duplicates allowed)
 
-**Note:** `SupplierInvoiceNo` (string?) on `PurchaseInvoice` is the SUPPLIER's invoice reference number — this is NOT a system identifier and is kept for supplier reference only. Do not confuse it with the removed `InvoiceNo`.
+**Note:** `SupplierInvoiceNo` (string?) on `PurchaseInvoice` is the SUPPLIER's invoice reference number — this is NOT the system InvoiceNo and is kept for supplier reference only. Do not confuse it.
 
 ### Price Sync Indicators (v4.6) — Purchase Invoice
 

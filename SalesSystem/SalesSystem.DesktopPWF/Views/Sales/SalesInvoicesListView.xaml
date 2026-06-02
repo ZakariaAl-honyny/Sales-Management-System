@@ -199,6 +199,11 @@
                                             Width="80" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         
+                        <DataGridTextColumn Header="رقم الفاتورة" 
+                                            Binding="{Binding InvoiceNo}" 
+                                            Width="120" 
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
                         <DataGridTextColumn Header="التاريخ" 
                                             Binding="{Binding InvoiceDate, StringFormat=yyyy-MM-dd}" 
                                             Width="120" 

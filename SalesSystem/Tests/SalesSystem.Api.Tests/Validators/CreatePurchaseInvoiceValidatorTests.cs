@@ -619,6 +619,7 @@ public class CreatePurchaseInvoiceValidatorTests
     private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
         SupplierId: 1,
+        InvoiceNo: null,
         InvoiceDate: DateTime.UtcNow.AddDays(-1),
         DueDate: null,
         PaymentType: PaymentType.Cash,

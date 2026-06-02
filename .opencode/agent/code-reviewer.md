@@ -96,15 +96,16 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] No `code:` named parameter in any Warehouse.Create() call?
 - [ ] All Warehouse.Create() calls use the new 4-param signature (name, location, isDefault, createdByUserId)?
 
-### Invoice Number Strategy — No InvoiceNo Column (v4.6.5)
-- [ ] SalesInvoice and PurchaseInvoice have NO `InvoiceNo` property (string)?
-- [ ] `GetByNumberAsync` / `GetByNumber` removed from services and controllers?
-- [ ] `InvoiceNo` parameter removed from `SalesInvoice.Create()` and `PurchaseInvoice.Create()`?
-- [ ] Search by invoice uses `int.TryParse` + `Id` (not `InvoiceNo` string)?
-- [ ] Report DTOs (`SalesReportDto`, `PurchaseReportDto`) use `int Id` (not `string InvoiceNo`)?
-- [ ] `InvoicePrintDto` uses `int Id` (not `string InvoiceNo`)?
-- [ ] `SupplierInvoiceNo` kept only as supplier's reference (not system identifier)?
-- [ ] No `InvoiceNo` unique index in EF configuration?
+### Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+- [ ] SalesInvoice and PurchaseInvoice have `int InvoiceNo` (NOT string)?
+- [ ] `SalesInvoice.Create()` requires `int invoiceNo` (second param)?
+- [ ] `PurchaseInvoice.Create()` requires `int invoiceNo` (third param)?
+- [ ] Request DTOs use `int? InvoiceNo` (null = auto-generate)?
+- [ ] Service computes `lastId + 1` as default when `InvoiceNo` is null/≤0?
+- [ ] Report DTOs (`SalesReportDto`, `PurchaseReportDto`) use `int InvoiceNo`?
+- [ ] `InvoicePrintDto` uses `string InvoiceNumber` formatted from `InvoiceNo.ToString()`?
+- [ ] `SupplierInvoiceNo` kept only as supplier's reference (not system InvoiceNo)?
+- [ ] No unique index on InvoiceNo (duplicates allowed)?
 
 ### Interactive Validation (v4.6)
 - [ ] Save/Post/Print commands have NO CanExecute predicates (always enabled)?

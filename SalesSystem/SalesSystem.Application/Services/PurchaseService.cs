@@ -91,12 +91,25 @@ public class PurchaseService : IPurchaseService
 
     public async Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, int userId, CancellationToken ct)
     {
+        // Compute default InvoiceNo if not provided: last Id + 1
+        var invoiceNo = request.InvoiceNo ?? 0;
+        if (invoiceNo <= 0)
+        {
+            var lastInvoices = await _uow.PurchaseInvoices.ToListAsync(
+                predicate: null,
+                queryConfig: q => q.OrderByDescending(i => i.Id).Take(1),
+                ct: ct);
+            var lastId = lastInvoices.FirstOrDefault()?.Id ?? 0;
+            invoiceNo = lastId + 1;
+        }
+
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
             var invoice = PurchaseInvoice.Create(
                 request.SupplierId,
                 request.WarehouseId,
+                invoiceNo,
                 request.InvoiceDate,
                 request.DueDate,
                 (Domain.Enums.PaymentType)request.PaymentType,
@@ -456,6 +469,7 @@ public class PurchaseService : IPurchaseService
     {
         return new PurchaseInvoiceDto(
             i.Id,
+            i.InvoiceNo,
             i.SupplierId,
             i.Supplier?.Name ?? "غير معروف",
             i.WarehouseId,

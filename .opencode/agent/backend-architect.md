@@ -67,9 +67,10 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 35. **Desktop Client Separation**: WPF ViewModels and UI controllers MUST NOT reference `ISystemSettingsRepository` or DB context. Use API clients (e.g., `ISettingsApiService`) to interact with the backend services.
 36. **Thread-Safe Exception Handling**: Avoid raw `MessageBox.Show` in global unhandled exceptions. Use secure logging with structured fallback screens.
 37. **Safe Exception Swallowing**: Swallowing exceptions via empty catch blocks is forbidden. Always log the error or provide documented, safe fallback logic.
-38. **InvoiceNo Removal**: SalesInvoice and PurchaseInvoice MUST NOT have an InvoiceNo (string) property — use auto-increment Id (int PK). GetByNumberAsync methods MUST NOT exist in services or controllers. Search by invoice uses int.TryParse + Id comparison.
-39. **SupplierInvoiceNo is NOT a System Identifier**: `SupplierInvoiceNo` (string?) on PurchaseInvoice is the supplier's external invoice reference only — do NOT use it as the system invoice number.
-40. **DocumentSequenceService Invoice Numbering Removed**: INV-{YYYY}-{000001} and PUR-{YYYY}-{000001} auto-numbering is removed — invoices display as formatted Id (#ID).
+38. **InvoiceNo as int (NOT string)**: SalesInvoice and PurchaseInvoice have `int InvoiceNo` — user-facing invoice number, separate from auto-increment `Id` PK. NOT unique (duplicates allowed). Default = `lastId + 1` when null/0 in request.
+39. **SupplierInvoiceNo is NOT System InvoiceNo**: `SupplierInvoiceNo` (string?) on PurchaseInvoice is the supplier's external reference only — do NOT use it as the system InvoiceNo.
+40. **Service Computes Default InvoiceNo**: If `request.InvoiceNo` is null or ≤ 0, service computes `lastId + 1` from last invoice's PK Id. User may override with any int.
+41. **No Unique Index on InvoiceNo**: Duplicates explicitly allowed — user can set any integer value.
 
 ## Pattern to Follow
 ```csharp

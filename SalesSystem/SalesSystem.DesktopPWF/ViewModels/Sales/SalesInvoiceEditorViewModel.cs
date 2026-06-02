@@ -37,6 +37,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly ICategoryApiService _categoryService;
 
     private int? _invoiceId;
+    private int _invoiceNo;
     private int _selectedWarehouseId;
     private int? _selectedCustomerId;
     private int? _defaultCustomerId;  // auto-selected for Cash sales
@@ -112,6 +113,11 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _categoryService = categoryService;
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
+
+        if (!invoiceId.HasValue)
+        {
+            InvoiceNo = 0; // Service will compute lastId + 1
+        }
         IsReadOnly = isReadOnly;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync);
@@ -324,6 +330,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
     #region Properties
     public int? InvoiceId => _invoiceId;
+
+    public int InvoiceNo
+    {
+        get => _invoiceNo;
+        set => SetProperty(ref _invoiceNo, value);
+    }
+
     public bool IsEditMode => _isEditMode;
 
     public ObservableCollection<CustomerDto> Customers
@@ -625,6 +638,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 var invoice = result.Value;
+                InvoiceNo = invoice.InvoiceNo;
                 SelectedWarehouseId = invoice.WarehouseId;
                 SelectedCustomerId = invoice.CustomerId;
                 InvoiceDate = invoice.InvoiceDate;
@@ -962,6 +976,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
         return new CreateSalesInvoiceRequest(
             SelectedWarehouseId,
+            InvoiceNo > 0 ? InvoiceNo : null,
             SelectedCustomerId,
             SelectedCashBox?.Id,
             InvoiceDate,

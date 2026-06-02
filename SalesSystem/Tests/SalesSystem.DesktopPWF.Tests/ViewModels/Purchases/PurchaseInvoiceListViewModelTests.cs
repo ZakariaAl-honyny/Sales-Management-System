@@ -216,7 +216,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.ErrorMessage = "ط®ط·ط£ ظپظٹ ط§ظ„طھط­ظ…ظٹظ„";
+        _viewModel.ErrorMessage = "خطأ في التحميل";
 
         propertyChangedEvents.Should().Contain("ErrorMessage");
     }
@@ -412,10 +412,10 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     {
         _viewModel.StatusOptions.Should().HaveCount(4);
 
-        _viewModel.StatusOptions.Should().Contain(s => s.Display == "ط§ظ„ظƒظ„" && s.Value == null);
-        _viewModel.StatusOptions.Should().Contain(s => s.Display == "ظ…ط³ظˆط¯ط©" && s.Value == 1);
-        _viewModel.StatusOptions.Should().Contain(s => s.Display == "ظ…ط±ط­ظ„ط©" && s.Value == 2);
-        _viewModel.StatusOptions.Should().Contain(s => s.Display == "ظ…ظ„ط؛ط§ط©" && s.Value == 3);
+        _viewModel.StatusOptions.Should().Contain(s => s.Display == "الكل" && s.Value == null);
+        _viewModel.StatusOptions.Should().Contain(s => s.Display == "مسودة" && s.Value == 1);
+        _viewModel.StatusOptions.Should().Contain(s => s.Display == "مرحلة" && s.Value == 2);
+        _viewModel.StatusOptions.Should().Contain(s => s.Display == "ملغاة" && s.Value == 3);
     }
 
     #endregion
@@ -448,6 +448,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     {
         return new PurchaseInvoiceDto(
             Id: id,
+            InvoiceNo: 1,
             SupplierId: 1,
             SupplierName: supplierName,
             WarehouseId: 1,

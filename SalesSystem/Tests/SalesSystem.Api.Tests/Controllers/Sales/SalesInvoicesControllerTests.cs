@@ -203,6 +203,7 @@ public class SalesInvoicesControllerTests : ControllerTestBase
 
     private static SalesInvoiceDto CreateInvoiceDto(int id, byte status) => new(
         Id: id,
+        InvoiceNo: 1,
         CustomerId: 1,
         CustomerName: "عميل اختبار",
         WarehouseId: 1,
@@ -225,6 +226,7 @@ public class SalesInvoicesControllerTests : ControllerTestBase
 
     private static CreateSalesInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
+        InvoiceNo: null,
         CustomerId: 1,
         CashBoxId: null,
         InvoiceDate: null,

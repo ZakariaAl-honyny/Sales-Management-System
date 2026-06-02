@@ -187,6 +187,7 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
 
     private static PurchaseInvoiceDto CreateInvoiceDto(int id, byte status) => new(
         Id: id,
+        InvoiceNo: 1,
         SupplierId: 1,
         SupplierName: "مورد اختبار",
         WarehouseId: 1,
@@ -211,6 +212,7 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
     private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
         SupplierId: 1,
+        InvoiceNo: null,
         InvoiceDate: null,
         DueDate: null,
         PaymentType: PaymentType.Cash,

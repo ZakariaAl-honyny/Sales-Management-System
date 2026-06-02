@@ -8,6 +8,9 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
     public CreatePurchaseInvoiceValidator()
     {
         RuleFor(x => x.SupplierId).GreaterThan(0).WithMessage("يجب اختيار المورد");
+        RuleFor(x => x.InvoiceNo)
+            .GreaterThan(0).When(x => x.InvoiceNo.HasValue)
+            .WithMessage("رقم الفاتورة يجب أن يكون أكبر من صفر");
         RuleFor(x => x.WarehouseId).GreaterThan(0).WithMessage("يجب اختيار المستودع");
         RuleFor(x => x.PaidAmount).GreaterThanOrEqualTo(0).WithMessage("المبلغ المدفوع لا يمكن أن يكون سالباً");
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0).WithMessage("الخصم لا يمكن أن يكون سالباً");

@@ -45,6 +45,7 @@ public class ReportRepositoryTests
 
         var invoice = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
+            invoiceNo: 1,
             customerId: customer.Id,
             paymentType: PaymentType.Cash
         );
@@ -84,6 +85,7 @@ public class ReportRepositoryTests
         // Create a Draft invoice (not posted)
         var draftInvoice = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
+            invoiceNo: 1,
             customerId: customer.Id
         );
 
@@ -120,6 +122,7 @@ public class ReportRepositoryTests
         // Invoice within range
         var invoiceInRange = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
+            invoiceNo: 1,
             customerId: customer.Id
         );
         var item1 = SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m);
@@ -129,6 +132,7 @@ public class ReportRepositoryTests
         // Invoice outside range
         var invoiceOutOfRange = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
+            invoiceNo: 2,
             customerId: customer.Id,
             invoiceDate: DateTime.UtcNow.AddDays(30)
         );

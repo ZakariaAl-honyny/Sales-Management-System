@@ -11,12 +11,13 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.6.6%20Complete-2ECC71?style=for-the-badge" alt="Status"/>
+<img src="https://img.shields.io/badge/Status-v4.6.7%20Complete-2ECC71?style=for-the-badge" 
+alt="Status"/>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.6.6-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6.7-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -425,6 +426,7 @@ dotnet run
 | **v4.6.3** | **Architecture Alignment & Code Quality Audit** — Settings ViewModels/Views relocation, DI registration, MessageBox removal, async void refactoring, shadowing resolved | ✅ **Completed** |
 | **v4.6.4** | **Security Hardening & Code Quality** — Rate limiting (5/15min), user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes | ✅ **Completed** |
 | **v4.6.5** | **Invoice Number Removal & Touch POS Polish** — InvoiceNo removed from entities, services, controllers, ViewModels, DTOs. Touch POS product card layout fixed. Stock validation warning on product add. PlayWarning() added to ISoundService. Garbled Arabic fixes | ✅ **Completed** |
+| **v4.6.7** | **InvoiceNo Int Re-addition** — InvoiceNo re-added as `int` (not string) to SalesInvoice/PurchaseInvoice. NOT unique (duplicates allowed). Default `lastId + 1`. Build: 0 errors, 0 warnings. Migration added | ✅ **Completed** |
 | **v4.6.6** | **UI Compacting — Mobile-Ready Density** — Global UI resize (63 views) for more content per screen: Styles.xaml compact tokens (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted by ~25-30%, PurchaseInvoiceEditorView size reduction, MainWindow sidebar 220→200, touch control sizes preserved. Future mobile-ready foundation | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
@@ -706,6 +708,28 @@ dotnet run
 
 ---
 
+## 🆕 What's New in v4.6.7 — InvoiceNo Int Re-addition
+
+| Feature | Description |
+|---------|-------------|
+| **InvoiceNo Back as int** | `SalesInvoice` and `PurchaseInvoice` now have `int InvoiceNo` — user-facing invoice number, separate from auto-increment `Id` PK |
+| **NOT Unique** | Duplicate InvoiceNo values explicitly allowed — user can set any integer value |
+| **Auto-generate Default** | Service computes `lastId + 1` when `InvoiceNo` is null or ≤ 0 in create requests |
+| **Request DTO** | `int? InvoiceNo` in `CreateSalesInvoiceRequest` / `CreatePurchaseInvoiceRequest` — null = auto-generate |
+| **Desktop Display** | Editor ViewModels show/have `int InvoiceNo` field; list ViewModels display and filter by InvoiceNo |
+| **Migration Added** | `20260602050426_AddInvoiceNoColumn` — adds `InvoiceNo int NOT NULL DEFAULT 0` to both tables |
+| **Build Verification** | **0 errors, 0 warnings** — all 9 projects compile clean |
+| **Tests** | 411 passed, 28 failed (all 28 failures are pre-existing garbled Arabic assertion mismatches — not InvoiceNo related) |
+
+### Key Design Decisions
+- `InvoiceNo` is `int` (NOT string) — simpler, faster, no formatting overhead
+- NOT unique — duplicates allowed (user may enter any integer, e.g., to match paper invoices)
+- Default `lastId + 1` — computed service-side, not client-side
+- `SupplierInvoiceNo` (string?) stays on PurchaseInvoice as supplier's reference — NOT the system InvoiceNo
+- `InvoicePrintDto.InvoiceNumber` (string) still exists — formatted via `InvoiceNo.ToString()` in the builder
+
+---
+
 ## 🆕 What's New in v4.6.6 — UI Compacting (Mobile-Ready Density)
 
 | Feature | Description |
@@ -775,7 +799,17 @@ dotnet run
 
 ## 📜 Version History
 
-### v4.6.6 — UI Compacting — Mobile-Ready Density (Current)
+### v4.6.7 — InvoiceNo Int Re-addition (Current)
+- **InvoiceNo Back as int**: SalesInvoice and PurchaseInvoice now have `int InvoiceNo` — user-facing invoice number
+- **NOT Unique**: Duplicates explicitly allowed (unlike the old string InvoiceNo which was unique)
+- **Auto-generate**: Service defaults to `lastId + 1` when not provided
+- **Request DTOs**: `int? InvoiceNo` — null/0 means "auto-generate"
+- **Desktop**: Editor VMs have `int InvoiceNo` field, list views display and filter by InvoiceNo
+- **Migration**: `20260602050426_AddInvoiceNoColumn` adds column to both tables
+- **Build**: 0 errors, 0 warnings across 9 projects
+- **Tests**: 411 passed, 28 failed (pre-existing garbled Arabic, not InvoiceNo-related)
+
+### v4.6.6 — UI Compacting — Mobile-Ready Density
 - **Global UI Resize**: 63 views compacted by ~25-30% — more content per screen
 - **Styles.xaml Tokens**: Button 36→28, font 13→11, DataGrid row 34→24
 - **All List/Editor/Dialog Views**: Height=36 overrides removed, padding reduced, margins shrunk
@@ -785,7 +819,8 @@ dotnet run
 - **Build**: DesktopPWF 0 errors, 0 warnings
 
 ### v4.6.5 — Invoice Number Removal & Touch POS Polish
-- **InvoiceNo Removed**: SalesInvoice and PurchaseInvoice no longer have InvoiceNo (string) — use auto-increment Id as identifier
+- **InvoiceNo (string) Removed**: InvoiceNo string column removed from SalesInvoice and PurchaseInvoice — auto-increment Id used temporarily as display identifier
+- **NOTE**: InvoiceNo re-added as `int` in v4.6.7 (see above) — this was a temporary removal
 - **GetByNumber Endpoints Removed**: Services, controllers, and API clients cleaned up
 - **Touch POS Polish**: Product card layout fixed, stock validation warning, PlayWarning() sound
 - **Garbled Arabic**: UTF-8 encoding fixes across multiple files

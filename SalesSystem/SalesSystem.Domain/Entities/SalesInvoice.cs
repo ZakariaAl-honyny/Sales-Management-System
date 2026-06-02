@@ -18,6 +18,7 @@ public class SalesInvoice : BaseEntity
     public decimal TotalAmount { get; private set; }
     public decimal PaidAmount { get; private set; }
     public decimal DueAmount { get; private set; }
+    public int InvoiceNo { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
@@ -30,6 +31,7 @@ public class SalesInvoice : BaseEntity
 
     public static SalesInvoice Create(
         int warehouseId,
+        int invoiceNo,
         int? customerId = null,
         DateTime? invoiceDate = null,
         DateOnly? dueDate = null,
@@ -41,6 +43,8 @@ public class SalesInvoice : BaseEntity
     {
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
+        if (invoiceNo <= 0)
+            throw new DomainException("رقم الفاتورة غير صحيح.");
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
         if (dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow.Date))
@@ -49,6 +53,7 @@ public class SalesInvoice : BaseEntity
         var invoice = new SalesInvoice
         {
             WarehouseId = warehouseId,
+            InvoiceNo = invoiceNo,
             CashBoxId = cashBoxId,
             CustomerId = customerId,
             InvoiceDate = invoiceDate ?? DateTime.UtcNow,

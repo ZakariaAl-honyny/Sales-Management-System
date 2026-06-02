@@ -13,6 +13,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: new DateTime(2027, 1, 1),
             dueDate: new DateOnly(2027, 1, 31),
             paymentType: PaymentType.Cash,
@@ -33,7 +34,8 @@ public class PurchaseInvoiceTests
     {
         var action = () => PurchaseInvoice.Create(
             supplierId: 0,
-            warehouseId: 1
+            warehouseId: 1,
+            invoiceNo: 1
         );
 
         action.Should().Throw<DomainException>()
@@ -45,7 +47,8 @@ public class PurchaseInvoiceTests
     {
         var action = () => PurchaseInvoice.Create(
             supplierId: 1,
-            warehouseId: 0
+            warehouseId: 0,
+            invoiceNo: 1
         );
 
         action.Should().Throw<DomainException>()
@@ -58,6 +61,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -88,6 +92,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -108,6 +113,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -127,6 +133,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -146,6 +153,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             discountAmount: 50m,
             createdByUserId: 1
         );
@@ -171,6 +179,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -194,6 +203,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -213,6 +223,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -233,6 +244,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -248,6 +260,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -265,6 +278,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -280,6 +294,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -299,6 +314,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -317,6 +333,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -337,6 +354,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -357,6 +375,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
@@ -376,6 +395,7 @@ public class PurchaseInvoiceTests
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             discountAmount: 100m,
             createdByUserId: 1
         );
