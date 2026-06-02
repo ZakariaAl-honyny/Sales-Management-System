@@ -15,9 +15,9 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="طريقة احتساب التكلفة"
-                       FontSize="20"
+                       FontSize="14"
                        FontWeight="Bold"
                        Foreground="#333"/>
             <TextBlock Text="تحدد كيف يحتسب النظام تكلفة البضاعة في المخزن عند كل عملية شراء"

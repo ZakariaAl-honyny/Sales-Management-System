@@ -143,7 +143,7 @@ public class CustomerPaymentsListViewModel : ViewModelBase
                     }
                     catch (InvalidOperationException)
                     {
-                        // WPF CollectionView requires a running Dispatcher â€” skip in non-WPF contexts
+                        // WPF CollectionView requires a running Dispatcher — skip in non-WPF contexts
                         PaymentsView = null;
                     }
                     IsEmpty = Payments.Count == 0;

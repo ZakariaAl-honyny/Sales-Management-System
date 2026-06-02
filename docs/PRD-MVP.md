@@ -1207,7 +1207,6 @@ Default schema: **`dbo`**
 ## I) PurchaseInvoices
 ### Columns
 - `Id` int PK
-- `InvoiceNo` nvarchar(30) not null unique
 - `SupplierId` int not null FK
 - `WarehouseId` int not null FK
 - `InvoiceDate` datetime2 not null
@@ -1247,7 +1246,6 @@ Default schema: **`dbo`**
 ## K) SalesInvoices
 ### Columns
 - `Id` int PK
-- `InvoiceNo` nvarchar(30) not null unique
 - `CustomerId` int null FK
 - `WarehouseId` int not null FK
 - `InvoiceDate` datetime2 not null
@@ -1716,7 +1714,6 @@ CREATE TABLE dbo.Customers
 CREATE TABLE dbo.PurchaseInvoices
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoices PRIMARY KEY,
-    InvoiceNo       NVARCHAR(30)  NOT NULL UNIQUE,
     SupplierId      INT           NOT NULL REFERENCES dbo.Suppliers(Id),
     WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
     InvoiceDate     DATETIME2     NOT NULL,
@@ -1753,7 +1750,6 @@ CREATE TABLE dbo.PurchaseInvoiceItems
 CREATE TABLE dbo.SalesInvoices
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoices PRIMARY KEY,
-    InvoiceNo       NVARCHAR(30)  NOT NULL UNIQUE,
     CustomerId      INT           NULL REFERENCES dbo.Customers(Id),
     WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
     InvoiceDate     DATETIME2     NOT NULL,
@@ -2442,7 +2438,6 @@ namespace SalesSystem.Domain.Entities;
 
 public class SalesInvoice : BaseEntity
 {
-    public string InvoiceNo { get; private set; } = string.Empty;
     public int CustomerId { get; private set; }
     public int WarehouseId { get; private set; }
     public DateTime InvoiceDate { get; private set; }
@@ -2467,7 +2462,6 @@ public class SalesInvoice : BaseEntity
     protected SalesInvoice() { }
 
     public static SalesInvoice Create(
-        string invoiceNo,
         int customerId,
         int warehouseId,
         PaymentType paymentType,
@@ -2475,8 +2469,6 @@ public class SalesInvoice : BaseEntity
         string? notes,
         int? createdByUserId)
     {
-        if (string.IsNullOrWhiteSpace(invoiceNo))
-            throw new DomainException("رقم الفاتورة مطلوب");
         if (customerId <= 0)
             throw new DomainException("العميل مطلوب");
         if (warehouseId <= 0)
@@ -2486,7 +2478,6 @@ public class SalesInvoice : BaseEntity
 
         return new SalesInvoice
         {
-            InvoiceNo = invoiceNo,
             CustomerId = customerId,
             WarehouseId = warehouseId,
             InvoiceDate = DateTime.UtcNow,
@@ -3064,7 +3055,6 @@ public static class ErrorCodes
 {
     public const string NotFound                = "NOT_FOUND";
     public const string InsufficientStock       = "INSUFFICIENT_STOCK";
-    public const string DuplicateInvoiceNo      = "DUPLICATE_INVOICE_NO";
     public const string DuplicateBarcode        = "DUPLICATE_BARCODE";
     public const string InvalidAmount           = "INVALID_AMOUNT";
     public const string InvalidQuantity         = "INVALID_QUANTITY";
@@ -3112,7 +3102,6 @@ public record WarehouseStockDto(
 // SalesSystem.Contracts/DTOs/SalesInvoiceDto.cs
 public record SalesInvoiceDto(
     int SalesInvoiceId,
-    string InvoiceNo,
     int CustomerId,
     string CustomerName,
     int WarehouseId,
@@ -3218,17 +3207,6 @@ public class InsufficientStockException : DomainException
     }
 }
 
-// استثناء الفاتورة المكررة
-public class DuplicateInvoiceNoException : DomainException
-{
-    public string InvoiceNo { get; }
-
-    public DuplicateInvoiceNoException(string invoiceNo)
-        : base($"رقم الفاتورة '{invoiceNo}' موجود بالفعل")
-    {
-        InvoiceNo = invoiceNo;
-    }
-}
 10. Infrastructure — EF Core
 10.1 DbContext
 csharp
@@ -3330,19 +3308,6 @@ public class SalesService : ISalesService
             }
         }
 
-        // === Step 4: توليد رقم الفاتورة ===
-        string invoiceNo;
-        try
-        {
-            invoiceNo = await _sequenceService.GenerateAsync("INV", ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "فشل في توليد رقم الفاتورة");
-            return Result<SalesInvoiceDto>.Failure(
-                "فشل في توليد رقم الفاتورة");
-        }
-
         // === Step 5: Database Transaction ===
         // ⚠️ كل العمليات التالية داخل Transaction واحدة
         await using var transaction = await _uow.BeginTransactionAsync(ct);
@@ -3350,7 +3315,6 @@ public class SalesService : ISalesService
         {
             // 5a. إنشاء الفاتورة
             var invoice = SalesInvoice.Create(
-                invoiceNo,
                 request.CustomerId,
                 request.WarehouseId,
                 (PaymentType)request.PaymentType,
@@ -3407,10 +3371,6 @@ public class SalesService : ISalesService
 
             // 5h. Commit
             await transaction.CommitAsync(ct);
-
-            _logger.LogInformation(
-                "تم إنشاء فاتورة البيع {InvoiceNo} بإجمالي {Total}",
-                invoice.InvoiceNo, invoice.TotalAmount);
 
             var dto = MapToDto(invoice);
             return Result<SalesInvoiceDto>.Success(dto);
@@ -4188,11 +4148,6 @@ public class SalesInvoiceConfiguration
     {
         builder.ToTable("SalesInvoices");
         builder.HasKey(x => x.SalesInvoiceId);
-
-        builder.Property(x => x.InvoiceNo)
-            .HasMaxLength(30)
-            .IsRequired();
-        builder.HasIndex(x => x.InvoiceNo).IsUnique();
 
         // ⚠️ كل الأموال decimal(18,2)
         builder.Property(x => x.SubTotal)

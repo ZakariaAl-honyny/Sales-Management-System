@@ -10,7 +10,6 @@ public interface IPurchaseService
     Task<Result<PurchaseInvoiceDto>> PostAsync(int id, int userId, CancellationToken ct);
     Task<Result<PurchaseInvoiceDto>> CancelAsync(int id, int userId, CancellationToken ct);
     Task<Result<PurchaseInvoiceDto>> GetByIdAsync(int id, CancellationToken ct);
-    Task<Result<PurchaseInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request, int userId, CancellationToken ct);
     Task<Result<PagedResult<PurchaseInvoiceDto>>> GetAllAsync(
         int? supplierId, 

@@ -9,7 +9,7 @@ namespace SalesSystem.DesktopPWF.Views.Products;
 /// <summary>
 /// Interaction logic for ProductsListView.xaml
 /// </summary>
-public partial class ProductsListView : Page
+public partial class ProductsListView : UserControl
 {
     private readonly ProductListViewModel _viewModel;
 

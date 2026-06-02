@@ -49,6 +49,7 @@ Phase 17: UI Sorting & Dialog Safety → Newest-first sorting across 14 ViewMode
 Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2) → Replace legacy HasXxxError boolean pattern with proper INotifyDataErrorInfo real-time validation; professional red border + ❗ icon ErrorTemplate in Styles.xaml; SetDialogService() added to ViewModelBase; all 14 Editor ViewModels refactored; ValidateAllAsync() for pre-save validation dialog
 Phase 19: Architecture Alignment & Code Quality Remediation (v4.6.3) → Costing settings HTTP refactoring, VM DI registration, CS0108 member hiding resolutions, async void try-catch safety, RTL Arabic corrections
 Phase 20: Security Hardening & Code Quality (v4.6.4) → Rate limiting, user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes
+Phase 21: UI Compacting — Mobile-Ready Density (v4.6.6) → Global UI resize (63 views), Styles.xaml token compaction (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted ~25-30%, PurchaseInvoiceEditorView catch-up, MainWindow sidebar 220→200, touch views preserved, future mobile-ready foundation
 ```
 
 ### Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2)
@@ -114,6 +115,33 @@ Phase 20: Security Hardening & Code Quality (v4.6.4) → Rate limiting, user har
 - [ ] All 7 FluentValidators have date, enum, maxlength rules
 - [ ] No CS0109, CS1540, CS0108 warnings in build
 - [ ] Security-Plan.md reflects actual implementation status
+
+### Phase 21: UI Compacting — Mobile-Ready Density (v4.6.6)
+
+**Goal**: Reduce all XAML views to compact density for more content per screen and to enable future mobile adaptation.
+
+**Key Changes:**
+- Styles.xaml global tokens compacted (button 36→28, font 13→11, DataGrid 34→24)
+- Dashboard, 15 list views, 14 editor views, 15 reports/settings, 19 dialogs/shell compacted
+- PurchaseInvoiceEditorView caught-up (was completely missed in initial round)
+- Touch-optimized views preserved at touch-friendly sizes
+- All Height=36/Padding=16+ hardcoded overrides removed from all views
+- NumericKeypadControl touch keys reduced
+
+**Rules Added:**
+- RULE-262 to RULE-274: UI compacting guidelines (no hardcoded heights, compact padding, reduced fonts, etc.)
+
+**Verification:**
+- [ ] No `Height="36"` or `Height="40"` on any Button/TextBox/ComboBox
+- [ ] No `Padding="16+"` on any Button
+- [ ] Header/footer padding = 12,6 / 12,8 max
+- [ ] Dialog titles = 16px, section headers = 14px
+- [ ] Sidebar width = 200
+- [ ] ScreenWindow MinWidth 500, MinHeight 350
+- [ ] Dialog icons = 44×44 max
+- [ ] Empty-state buttons: Margin=0,12,0,0 Width=140
+- [ ] Build: 0 errors, 0 warnings
+- [ ] All 63 views compacted
 
 ## Before Accepting Any Code
 Run through AGENTS.md Section 9 checklist. If ANY item fails, reject the code.

@@ -12,7 +12,7 @@
 
         <Border VerticalAlignment="Center" HorizontalAlignment="Center"
                 Background="White" CornerRadius="16" 
-                Width="440" MinHeight="220" Padding="28"
+                Width="400" MinHeight="180" Padding="20"
                 Effect="{StaticResource DeepShadow}">
             <Grid>
                 <Grid.RowDefinitions>
@@ -21,13 +21,13 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                    <Border Background="#E3F2FD" CornerRadius="25" Width="50" Height="50">
-                        <TextBlock Text="?" FontSize="24" FontWeight="Bold" Foreground="#1976D2"
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                    <Border Background="#E3F2FD" CornerRadius="22" Width="44" Height="44">
+                        <TextBlock Text="?" FontSize="20" FontWeight="Bold" Foreground="#1976D2"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
-                    <TextBlock Text="تأكيد" FontSize="20" FontWeight="Bold" Foreground="#1976D2"
-                               VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    <TextBlock Text="تأكيد" FontSize="16" FontWeight="Bold" Foreground="#1976D2"
+                               VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
 
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -35,15 +35,15 @@
                                Foreground="#333" LineHeight="24"/>
                 </ScrollViewer>
 
-                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
                     <Button ToolTip="رفض العملية" x:Name="NoButton" Content="لا"
-                            Width="100" Height="36" Margin="0,0,12,0"
-                            Background="#9E9E9E" Foreground="White" FontWeight="SemiBold"
+                            MinWidth="80" Margin="0,0,6,0"
+                            Background="#9E9E9E" Foreground="White" FontWeight="SemiBold" FontSize="11"
                             BorderThickness="0" Cursor="Hand" Click="NoButton_Click">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="Border" Background="{TemplateBinding Background}" 
-                                        CornerRadius="8" Padding="14,8">
+                                        CornerRadius="6" Padding="10,4">
                                     <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
@@ -59,13 +59,13 @@
                     </Button>
 
                     <Button ToolTip="تأكيد العملية" x:Name="YesButton" Content="نعم"
-                            Width="100" Height="36"
-                            Background="#1976D2" Foreground="White" FontWeight="SemiBold"
+                            MinWidth="80"
+                            Background="#1976D2" Foreground="White" FontWeight="SemiBold" FontSize="11"
                             BorderThickness="0" Cursor="Hand" Click="YesButton_Click">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="Border" Background="{TemplateBinding Background}" 
-                                        CornerRadius="8" Padding="14,8">
+                                        CornerRadius="6" Padding="10,4">
                                     <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                                 <ControlTemplate.Triggers>

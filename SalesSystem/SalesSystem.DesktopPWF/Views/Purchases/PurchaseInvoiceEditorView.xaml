@@ -44,7 +44,7 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="16,8">
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -52,7 +52,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Grid.Column="0">
                     <Path Data="{StaticResource IconInvoice}" Fill="White" Width="20" Height="20" Margin="0,0,12,0" Stretch="Uniform"/>
-                    <TextBlock Text="تحرير فاتورة شراء" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Text="📥  تحرير فاتورة شراء" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
                 <Border Grid.Column="1" Background="{StaticResource PrimaryLightBrush}" CornerRadius="6" Padding="12,4">
                     <StackPanel Orientation="Horizontal">
@@ -64,21 +64,21 @@
         </Border>
 
         <!-- Content Area -->
-        <Grid Grid.Row="1" Margin="16">
+        <Grid Grid.Row="1" Margin="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>      <!-- Main: Items -->
-                <ColumnDefinition Width="340"/>    <!-- Side: Info, Totals, Notes -->
+                <ColumnDefinition Width="320"/>    <!-- Side: Info, Totals, Notes -->
             </Grid.ColumnDefinitions>
 
             <!-- Main Panel (Right side) -->
-            <Grid Grid.Column="0" Margin="0,0,16,0">
+            <Grid Grid.Column="0" Margin="0,0,10,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/> <!-- Barcode Search -->
                     <RowDefinition Height="*"/>    <!-- DataGrid -->
                 </Grid.RowDefinitions>
 
                 <!-- Barcode Search -->
-                <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,16" Background="#F1F5F9" Padding="12">
+                <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,8" Background="#F1F5F9" Padding="10">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -89,14 +89,14 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="🔍 البحث بالباركود" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                         <TextBox Grid.Column="1" Text="{Binding BarcodeSearchText, UpdateSourceTrigger=PropertyChanged}" 
-                                 Style="{StaticResource ModernTextBox}" Height="36">
+                                 Style="{StaticResource ModernTextBox}">
                             <TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
                             </TextBox.InputBindings>
                         </TextBox>
                         <!-- Green button: opens continuous product selection window -->
                         <Button Grid.Column="2" Content="إضافة" Command="{Binding SearchProductCommand}"
-                                Style="{StaticResource SuccessButton}" Margin="8,0,0,0" Width="80" Height="36" ToolTip="البحث عن منتج وإضافته للقائمة"/>
+                                Style="{StaticResource SuccessButton}" Margin="6,0,0,0" Width="80" ToolTip="البحث عن منتج وإضافته للقائمة"/>
                         <!-- Separator -->
                         <Separator Grid.Column="3" Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
                         <TextBlock Grid.Column="4" Text="مسح الباركود يضيف الصنف تلقائياً" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
@@ -106,16 +106,16 @@
                 <!-- Items Grid -->
                 <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0">
                     <DockPanel>
-                        <Border DockPanel.Dock="Top" Background="#F8FAFC" Padding="16,10" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
+                        <Border DockPanel.Dock="Top" Background="#F8FAFC" Padding="10,6" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
                             <Grid>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="📋 قائمة الأصناف" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                    <TextBlock Text="📋 قائمة الأصناف" FontSize="13" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
                                     <Border Background="{StaticResource PrimaryBrush}" CornerRadius="10" Padding="8,1" Margin="10,0,0,0" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Items.Count}" Foreground="White" FontSize="11" FontWeight="Bold"/>
                                     </Border>
                                 </StackPanel>
                                 <Button HorizontalAlignment="Right" Content="+ إضافة صنف" Command="{Binding AddLineCommand}"
-                                        Style="{StaticResource SecondaryButton}" Height="30" Padding="12,0" FontSize="12" ToolTip="إضافة سطر جديد للفاتورة"/>
+                                        Style="{StaticResource SecondaryButton}" Padding="8,0" FontSize="11" ToolTip="إضافة سطر جديد للفاتورة"/>
                             </Grid>
                         </Border>
 
@@ -196,12 +196,12 @@
             <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <!-- Info Card -->
-                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
                         <StackPanel>
-                            <TextBlock Text="ℹ️ تفاصيل الفاتورة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
+                            <TextBlock Text="ℹ️ تفاصيل الفاتورة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
 
                             <TextBlock Text="المورد" Style="{StaticResource LabelStyle}"/>
-                            <Grid Margin="0,0,0,12">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
@@ -209,39 +209,39 @@
                                 <ComboBox ItemsSource="{Binding Suppliers}" SelectedValue="{Binding SelectedSupplierId}" 
                                           SelectedValuePath="Id" DisplayMemberPath="Name"/>
                                 <Button Grid.Column="1" Content="🔍" Command="{Binding SearchSupplierCommand}"
-                                        Style="{StaticResource SecondaryButton}" Width="32" Height="32" Margin="4,0,0,0" ToolTip="البحث عن مورد"/>
+                                        Style="{StaticResource SecondaryButton}" Width="28" Margin="4,0,0,0" ToolTip="البحث عن مورد"/>
                             </Grid>
 
                             <TextBlock Text="رقم فاتورة المورد" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding SupplierInvoiceNo}" Style="{StaticResource ModernTextBox}" Margin="0,0,0,12"/>
+                            <TextBox Text="{Binding SupplierInvoiceNo}" Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
 
                             <TextBlock Text="المستودع" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding Warehouses}" SelectedValue="{Binding SelectedWarehouseId}" 
-                                      SelectedValuePath="Id" DisplayMemberPath="Name" Margin="0,0,0,12"/>
+                                      SelectedValuePath="Id" DisplayMemberPath="Name" Margin="0,0,0,6"/>
 
                             <TextBlock Text="طريقة الدفع" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding PaymentTypeOptions}" SelectedValue="{Binding SelectedPaymentType}" 
-                                      SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,12"/>
+                                      SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,6"/>
 
                             <TextBlock Text="الصندوق النقدي *" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding CashBoxes}"
                                       SelectedItem="{Binding SelectedCashBox}"
                                       DisplayMemberPath="BoxName"
                                       Style="{StaticResource ModernComboBox}"
-                                      Margin="0,0,0,12"
+                                      Margin="0,0,0,6"
                                       ToolTip="اختر الصندوق النقدي الذي سيتم إيداع المبلغ المدفوع فيه"/>
 
                             <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding Notes}" Height="60" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8,4"/>
+                            <TextBox Text="{Binding Notes}" Height="50" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8,4"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Financial Summary Card -->
                     <Border Style="{StaticResource CardStyle}" Background="#F8FAFC" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="0,0,4,0">
                         <StackPanel>
-                            <TextBlock Text="💰 الملخص المالي" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
+                            <TextBlock Text="💰 الملخص المالي" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                             
-                            <CheckBox Content="شامل الضريبة" IsChecked="{Binding IsTaxInclusive}" Margin="0,0,0,12"/>
+                            <CheckBox Content="شامل الضريبة" IsChecked="{Binding IsTaxInclusive}" Margin="0,0,0,8"/>
                             
                             <Grid Margin="0,0,0,8">
                                 <TextBlock Text="الضريبة (%)" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
@@ -275,7 +275,7 @@
                                 <TextBox Text="{Binding PaidAmount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="110" HorizontalAlignment="Right" FontWeight="Bold" Background="#F0F9FF" BorderBrush="#7DD3FC"/>
                             </Grid>
 
-                            <Border Background="#FEF2F2" Padding="10,8" CornerRadius="4">
+                            <Border Background="#FEF2F2" Padding="8,6" CornerRadius="4">
                                 <Grid>
                                     <TextBlock Text="المبلغ المتبقي" FontWeight="Bold" Foreground="#DC2626"/>
                                     <TextBlock Text="{Binding DueAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="Bold" FontSize="15" Foreground="#DC2626"/>
@@ -288,7 +288,7 @@
         </Grid>
 
         <!-- Footer Actions -->
-        <Border Grid.Row="2" Background="White" Padding="20,12" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="2" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -316,17 +316,15 @@
                     <Button Content="📄 A4" 
                             Command="{Binding PrintA4Command}" 
                             Style="{StaticResource SecondaryButton}" 
-                            Margin="0,0,12,0" 
+                            Margin="0,0,8,0" 
                             TabIndex="14" 
-                            Padding="16,0"
                             ToolTip="طباعة فاتورة بصيغة A4"/>
 
                     <Button Content="🧾 وصل" 
                             Command="{Binding PrintThermalCommand}" 
                             Style="{StaticResource SecondaryButton}" 
-                            Margin="0,0,8,0" 
+                            Margin="0,0,4,0" 
                             TabIndex="15" 
-                            Padding="16,0"
                             ToolTip="طباعة إيصال حراري"/>
 
                     <Separator Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>

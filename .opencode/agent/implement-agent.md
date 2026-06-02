@@ -474,6 +474,65 @@ public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName, ...
 9. Remove from tests
 10. Remove auto-generation logic from services
 
+### Invoice Number Strategy — No InvoiceNo (v4.6.5)
+
+SalesInvoice and PurchaseInvoice MUST NOT have an InvoiceNo (string) column. Use auto-increment Id (int PK) as the sole invoice identifier.
+
+```csharp
+// CORRECT — no InvoiceNo property
+public class SalesInvoice : BaseEntity
+{
+    public int Id { get; private set; }  // Auto-increment PK = invoice identifier
+    public int WarehouseId { get; private set; }
+    // NO InvoiceNo property
+}
+
+// CORRECT — SalesInvoice.Create without invoiceNo parameter
+public static SalesInvoice Create(
+    int warehouseId,
+    int? customerId = null,
+    DateTime? invoiceDate = null,
+    // ... other params ...
+    int? createdByUserId = null)
+{
+    // No invoiceNo parameter
+}
+
+// CORRECT — searching by Id
+var searchText = SearchText?.Trim();
+if (!string.IsNullOrWhiteSpace(searchText) && int.TryParse(searchText, out var id))
+{
+    Invoices = Invoices.Where(i => i.Id == id).ToList();
+}
+// NOT: i.InvoiceNo.Contains(searchText)
+
+// CORRECT — report DTO without InvoiceNo
+public record SalesReportDto(
+    DateTime InvoiceDate,
+    int Id,                          // Was: string InvoiceNo
+    string CustomerName,
+    decimal SubTotal, ...);
+
+// CORRECT — print DTO without InvoiceNo
+public record InvoicePrintDto(
+    int Id,                          // Was: string InvoiceNo
+    string CustomerName, ...);
+```
+
+**When removing InvoiceNo from an entity:**
+1. Remove property from Domain entity
+2. Remove parameter from factory methods (Create)
+3. Remove from EF Core configuration (HasMaxLength + HasIndex)
+4. Remove from DTOs and Responses
+5. Remove GetByNumberAsync from service interfaces and implementations
+6. Remove GetByNumber endpoint from controllers
+7. Remove GetByNumberAsync from API client services
+8. Remove from ViewModel search/filter logic
+9. Remove from XAML bindings (if any)
+10. Remove from tests
+
+**Note:** `SupplierInvoiceNo` (string?) on `PurchaseInvoice` is the SUPPLIER's invoice reference number — this is NOT a system identifier and is kept for supplier reference only. Do not confuse it with the removed `InvoiceNo`.
+
 ### Price Sync Indicators (v4.6) — Purchase Invoice
 
 When the user edits unit cost on a purchase invoice, show a sync warning if it differs from DB:
@@ -809,6 +868,75 @@ public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct = de
   }
 }
 ```
+
+### UI Compacting Pattern (v4.6.6) — Mobile-Ready Density
+
+When creating or modifying XAML views, use compact sizes. DO NOT hardcode sizes that duplicate style defaults.
+
+#### CORRECT XAML Patterns:
+```xml
+<!-- CORRECT — no hardcoded Height/Padding on buttons → style provides 28px height + 10,4 padding -->
+<Button Content="حفظ" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}"/>
+<Button Content="إلغاء" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}"/>
+
+<!-- CORRECT — header border with compact padding -->
+<Border Background="{StaticResource PrimaryBrush}" Padding="12,6">
+    <TextBlock Text="العنوان" FontSize="14" FontWeight="Bold" Foreground="White"/>
+</Border>
+
+<!-- CORRECT — footer border with compact padding -->
+<Border Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+        <Button Content="✅ ترحيل نهائي" Command="{Binding PostCommand}" Style="{StaticResource PrimaryButton}" ToolTip="..."/>
+        <Button Content="💾 حفظ" Command="{Binding SaveCommand}" Style="{StaticResource SecondaryButton}" ToolTip="..."/>
+    </StackPanel>
+</Border>
+
+<!-- CORRECT — compact form field spacing -->
+<StackPanel>
+    <TextBlock Text="الاسم *" Style="{StaticResource LabelStyle}"/>
+    <TextBox Text="{Binding Name}" Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
+    <TextBlock Text="السعر *" Style="{StaticResource LabelStyle}"/>
+    <TextBox Text="{Binding Price}" Style="{StaticResource ModernTextBox}" Margin="0,0,0,8"/>
+</StackPanel>
+
+<!-- CORRECT — compact empty-state -->
+<Button Content="➕ إضافة أول منتج" Command="{Binding AddCommand}"
+        Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
+        ToolTip="فتح شاشة إضافة منتج جديد"/>
+
+<!-- CORRECT — section header with compact font -->
+<TextBlock Text="ℹ️ تفاصيل الفاتورة" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+```
+
+#### WRONG Patterns (NEVER Do These):
+```xml
+<!-- WRONG — hardcoded height that duplicates style -->
+<Button Height="36" Padding="16,0" ... />  <!-- ❌ style already provides 28px and 10,4 -->
+
+<!-- WRONG — oversized header/footer padding -->
+<Border Padding="16,12" ... />  <!-- ❌ should be 12,6 or 12,8 -->
+
+<!-- WRONG — oversized field spacing -->
+<TextBox Margin="0,0,0,12" ... />  <!-- ❌ should be 6 or 8 -->
+
+<!-- WRONG — oversized dialog font -->
+<TextBlock FontSize="20" ... />  <!-- ❌ dialog titles max 16, headers max 14 -->
+
+<!-- WRONG — fixed button width (use MinWidth) -->
+<Button Width="120" ... />  <!-- ❌ use MinWidth="80" or MinWidth="100" -->
+```
+
+#### Style Token Reference (Styles.xaml):
+- Button default: Height=28, Padding=10,4
+- ModernTextBox/ModernComboBox: Height=28
+- PageMargin: 10 (for outer grid margin)
+- CardStyle padding: handled internally
+- Sidebar: Width=200
+- Dialog title: FontSize=16
+- Section header: FontSize=14
+- DataGrid row: Height=24 (CompactDataGrid)
+- Toolbar spacing: Margin between buttons 4-6px
 
 ### FallbackErrorDialog Pattern (v4.6.4)
 

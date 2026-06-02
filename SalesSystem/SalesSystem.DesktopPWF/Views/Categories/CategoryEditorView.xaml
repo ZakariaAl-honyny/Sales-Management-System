@@ -20,7 +20,7 @@
         </Grid.RowDefinitions>
 
         <!-- Premium Header with Gradient -->
-        <Border Grid.Row="0" Padding="16,12">
+        <Border Grid.Row="0" Padding="12,6">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#0F172A" Offset="0"/>
@@ -35,7 +35,10 @@
                     <Path Data="{StaticResource IconDashboard}" Fill="White" Stretch="Uniform"/>
                 </Viewbox>
                 <StackPanel>
-                    <TextBlock Text="{Binding WindowTitle}" Style="{StaticResource HeaderStyle}" Foreground="White"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📂 " FontSize="20" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding WindowTitle}" Style="{StaticResource HeaderStyle}" Foreground="White"/>
+                    </StackPanel>
                     <TextBlock Text="يرجى إدخال اسم التصنيف لتنظيم المنتجات" FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"/>
                 </StackPanel>
             </StackPanel>
@@ -69,7 +72,7 @@
         </Border>
 
         <!-- Premium Footer -->
-        <Border Grid.Row="2" Background="#F8FAFC" Padding="24,20" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="2" Background="#F8FAFC" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

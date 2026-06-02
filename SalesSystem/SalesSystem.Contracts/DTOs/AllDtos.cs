@@ -27,7 +27,13 @@ public record ProductDto(
     string? Description,
     DateTime? ExpirationDate,
     string? ImagePath,  // مسار الصورة المحلي (اختياري)
-    bool IsActive);
+    bool IsActive,
+    decimal CurrentStock = 0)
+{
+    public bool IsOutOfStock => CurrentStock <= 0;
+    public bool IsLowStock => CurrentStock > 0 && CurrentStock <= MinStock;
+    public string StockStatusLabel => IsOutOfStock ? "نفذ" : IsLowStock ? "محدود" : "";
+}
 
 public record WarehouseDto(int Id, string Name, string? Location, bool IsDefault, bool IsActive);
 
@@ -52,7 +58,6 @@ public record CustomerDto(int Id, string Name, string? Phone, string? Email, str
 
 public record SalesInvoiceDto(
     int Id,
-    string InvoiceNo,
     int? CustomerId,
     string? CustomerName,
     int WarehouseId,
@@ -96,7 +101,6 @@ public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName,
 
 public record PurchaseInvoiceDto(
     int Id,
-    string InvoiceNo,
     int SupplierId,
     string SupplierName,
     int WarehouseId,
@@ -329,7 +333,7 @@ public record DashboardSummaryDto(
 
 public record SalesReportDto(
     DateTime InvoiceDate,
-    string InvoiceNo,
+    int Id,
     string CustomerName,
     decimal SubTotal,
     decimal DiscountAmount,
@@ -341,7 +345,7 @@ public record SalesReportDto(
 
 public record PurchaseReportDto(
     DateTime InvoiceDate,
-    string InvoiceNo,
+    int Id,
     string SupplierName,
     decimal SubTotal,
     decimal DiscountAmount,
@@ -431,6 +435,38 @@ public record LowStockReportDto(
     decimal ConversionFactor
 );
 
+// Financial Reports DTOs
+public record IncomeStatementDto(
+    string Category,
+    string Description,
+    decimal Amount);
 
+public record CashFlowItemDto(
+    string Category,
+    decimal Amount);
 
+public record CashFlowReportDto(
+    decimal OpeningBalance,
+    decimal TotalIncome,
+    decimal TotalExpense,
+    decimal NetCashFlow,
+    decimal ClosingBalance,
+    List<CashFlowItemDto> IncomeItems,
+    List<CashFlowItemDto> ExpenseItems);
+
+public record VatReportDto(
+    string InvoiceNumber,
+    DateTime InvoiceDate,
+    string? PartyName,
+    decimal TaxableAmount,
+    decimal TaxRate,
+    decimal TaxAmount);
+
+public record AccountStatementDto(
+    DateTime Date,
+    string Description,
+    string ReferenceNumber,
+    decimal Debit,
+    decimal Credit,
+    decimal Balance);
 

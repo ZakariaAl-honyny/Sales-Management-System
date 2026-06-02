@@ -29,7 +29,7 @@ public class ReportRepository : IReportRepository
             .OrderBy(i => i.InvoiceDate)
             .Select(i => new SalesReportDto(
                 i.InvoiceDate,
-                i.InvoiceNo,
+                i.Id,
                 i.Customer != null ? i.Customer.Name : "عميل نقدي",
                 i.SubTotal,
                 i.DiscountAmount,
@@ -55,7 +55,7 @@ public class ReportRepository : IReportRepository
             .OrderBy(i => i.InvoiceDate)
             .Select(i => new PurchaseReportDto(
                 i.InvoiceDate,
-                i.InvoiceNo,
+                i.Id,
                 i.Supplier != null ? i.Supplier.Name : "Unknown",
                 i.SubTotal,
                 i.DiscountAmount,

@@ -190,6 +190,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ILogsApiService, LogsApiService>();
         services.AddSingleton<IProductUnitApiService, ProductUnitApiService>();
         services.AddSingleton<ICashBoxApiService, CashBoxApiService>();
+        services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
 
         // Printing
         services.AddSingleton<Services.App.IInvoicePrinter, Services.Printing.InvoicePrinter>();
@@ -200,6 +201,9 @@ public partial class App : System.Windows.Application
 
         // Health check
         services.AddSingleton<IDatabaseHealthCheckService, DatabaseHealthCheckService>();
+
+        // Financial Reports API
+        services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
 
         // ViewModels
         services.AddTransient<LoginWindowViewModel>();
@@ -250,6 +254,16 @@ public partial class App : System.Windows.Application
         services.AddTransient<CashTransferViewModel>();
         services.AddTransient<DailyClosureViewModel>();
         services.AddTransient<ExpiredProductsReportViewModel>();
+
+        // Financial Report ViewModels
+        services.AddTransient<ViewModels.Reports.IncomeStatementViewModel>();
+        services.AddTransient<ViewModels.Reports.CashFlowReportViewModel>();
+        services.AddTransient<ViewModels.Reports.VatReportViewModel>();
+        services.AddTransient<ViewModels.Reports.AccountStatementViewModel>();
+        services.AddTransient<IncomeStatementViewModel>();
+        services.AddTransient<CashFlowReportViewModel>();
+        services.AddTransient<VatReportViewModel>();
+        services.AddTransient<AccountStatementViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()

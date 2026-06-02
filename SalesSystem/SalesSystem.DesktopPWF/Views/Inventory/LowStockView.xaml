@@ -1,4 +1,4 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.Inventory.LowStockView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Inventory.LowStockView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -7,7 +7,7 @@
       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
       mc:Ignorable="d" 
       d:DesignHeight="700" d:DesignWidth="1100"
-      Title="تقرير النواقص والطلب المقترح"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -25,7 +25,7 @@
             </Grid.ColumnDefinitions>
             
             <StackPanel Grid.Column="0">
-                <TextBlock Text="📋 تقرير النواقص والطلب الذكي" 
+                <TextBlock Text="⚠️  تقرير النواقص والطلب الذكي" 
                            Style="{StaticResource HeaderStyle}"
                            FontSize="28"/>
                 <TextBlock Text="عرض المنتجات التي وصلت لحد إعادة الطلب مع مقترحات الكميات المطلوبة" 
@@ -36,7 +36,7 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
                 <Button Command="{Binding ExportCommand}" 
                         Style="{StaticResource SecondaryButton}" 
-                        Margin="0,0,12,0" Height="40" Padding="20,0"
+                        Margin="0,0,8,0"
                         ToolTip="تصدير البيانات إلى ملف Excel">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="📊" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -45,7 +45,6 @@
                 </Button>
                 <Button Command="{Binding RefreshCommand}" 
                         Style="{StaticResource PrimaryButton}" 
-                        Height="40" Padding="20,0"
                         ToolTip="تحديث البيانات">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -141,4 +140,4 @@
             </Grid>
         </Border>
     </Grid>
-</Page>
+</UserControl>

@@ -66,21 +66,6 @@ public class SalesInvoicesController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a sales invoice by number
-    /// </summary>
-    /// <param name="invoiceNo">Invoice number</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Invoice details</returns>
-    [HttpGet("number/{invoiceNo}")]
-    [ProducesResponseType(typeof(SalesInvoiceDto), 200)]
-    [ProducesResponseType(404)]
-    public async Task<IActionResult> GetByNumber(string invoiceNo, CancellationToken ct)
-    {
-        var result = await _salesService.GetByNumberAsync(invoiceNo, ct);
-        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
-    }
-
-    /// <summary>
     /// Creates a new sales invoice (draft)
     /// </summary>
     /// <param name="request">Sales invoice creation request</param>

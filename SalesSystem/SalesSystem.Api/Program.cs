@@ -143,6 +143,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IStoreSettingsService, StoreSettingsService>();
 builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IFinancialReportService, FinancialReportService>();
 builder.Services.AddScoped<ISystemSettingsRepository, SystemSettingsRepository>();
 builder.Services.AddScoped<IUpdateProductPricingService, UpdateProductPricingService>();
 builder.Services.AddScoped<IProductUnitService, ProductUnitService>();

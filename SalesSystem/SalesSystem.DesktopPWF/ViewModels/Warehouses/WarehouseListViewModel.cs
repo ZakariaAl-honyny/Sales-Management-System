@@ -180,7 +180,7 @@ public class WarehouseListViewModel : ViewModelBase
                 }
                 catch (InvalidOperationException)
                 {
-                    // WPF CollectionView requires a running Dispatcher â€” silently skip in non-WPF contexts (e.g., tests)
+                    // WPF CollectionView requires a running Dispatcher — silently skip in non-WPF contexts (e.g., tests)
                     WarehousesView = null;
                 }
                 IsEmpty = Warehouses.Count == 0;
@@ -189,7 +189,7 @@ public class WarehouseListViewModel : ViewModelBase
         }
         else
         {
-            ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ط§ظ„ظ…ط³طھظˆط¯ط¹ط§طھ", "WarehouseListViewModel.LoadWarehousesAsync", "[WarehouseListViewModel.LoadWarehousesAsync] Failed to load warehouses list.");
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستودعات", "WarehouseListViewModel.LoadWarehousesAsync", "[WarehouseListViewModel.LoadWarehousesAsync] Failed to load warehouses list.");
             IsEmpty = Warehouses.Count == 0;
         }
     }
@@ -243,7 +243,7 @@ public class WarehouseListViewModel : ViewModelBase
     {
         if (SelectedWarehouse == null) return;
 
-        var strategy = await DialogService.ShowDeleteConfirmationAsync($"ط§ظ„ظ…ط³طھظˆط¯ط¹: {SelectedWarehouse.Name}");
+        var strategy = await DialogService.ShowDeleteConfirmationAsync($"المستودع: {SelectedWarehouse.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
@@ -256,11 +256,11 @@ public class WarehouseListViewModel : ViewModelBase
             {
                 EventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
                 await LoadWarehousesOperationAsync();
-                ToastService.ShowSuccess("طھظ… ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظ…ط³طھظˆط¯ط¹ ط¨ظ†ط¬ط§ط­");
+                ToastService.ShowSuccess("تم إلغاء تنشيط المستودع بنجاح");
             }
             else
             {
-                ErrorMessage = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط¥ظ„ط؛ط§ط، طھظ†ط´ظٹط· ط§ظ„ظ…ط³طھظˆط¯ط¹";
+                ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط المستودع";
             }
         }
         else if (strategy == DeleteStrategy.Permanent)
@@ -270,11 +270,11 @@ public class WarehouseListViewModel : ViewModelBase
             {
                 EventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
                 await LoadWarehousesOperationAsync();
-                ToastService.ShowSuccess("طھظ… ط­ط°ظپ ط§ظ„ظ…ط³طھظˆط¯ط¹ ظ†ظ‡ط§ط¦ظٹط§ظ‹");
+                ToastService.ShowSuccess("تم حذف المستودع نهائياً");
             }
             else
             {
-                var error = deleteResult.Error ?? "ظپط´ظ„ ظپظٹ ط­ط°ظپ ط§ظ„ظ…ط³طھظˆط¯ط¹";
+                var error = deleteResult.Error ?? "فشل في حذف المستودع";
                 ErrorMessage = error;
                 LogSystemError($"Hard delete failed for Warehouse {SelectedWarehouse.Id}: {error}", "WarehouseListViewModel.DeleteWarehouseAsync");
             }
@@ -300,12 +300,12 @@ public class WarehouseListViewModel : ViewModelBase
         {
             EventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
             await LoadWarehousesOperationAsync();
-            await DialogService.ShowSuccessAsync("ظ†ط¬ط§ط­", "طھظ… ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ط³طھظˆط¯ط¹ ط¨ظ†ط¬ط§ط­");
+            await DialogService.ShowSuccessAsync("نجاح", "تم استعادة المستودع بنجاح");
         }
         else
         {
-            ErrorMessage = result.Error ?? "ظپط´ظ„ ظپظٹ ط§ط³طھط¹ط§ط¯ط© ط§ظ„ظ…ط³طھظˆط¯ط¹";
-            await DialogService.ShowErrorAsync("ط®ط·ط£ ظپظٹ ط§ظ„ط§ط³طھط¹ط§ط¯ط©", ErrorMessage);
+            ErrorMessage = result.Error ?? "فشل في استعادة المستودع";
+            await DialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
         }
     }
 

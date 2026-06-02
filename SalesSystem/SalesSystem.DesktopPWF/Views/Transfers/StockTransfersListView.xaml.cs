@@ -4,7 +4,7 @@ using SalesSystem.DesktopPWF.ViewModels.Transfers;
 
 namespace SalesSystem.DesktopPWF.Views.Transfers;
 
-public partial class StockTransfersListView : Page
+public partial class StockTransfersListView : UserControl
 {
     private StockTransfersListViewModel _viewModel = null!;
 

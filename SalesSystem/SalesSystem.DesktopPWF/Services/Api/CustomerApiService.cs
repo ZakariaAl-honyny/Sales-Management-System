@@ -54,7 +54,7 @@ public class CustomerApiService : ApiServiceBase, ICustomerApiService
     public async Task<Result> DeletePermanentlyAsync(int id)
     {
         return await ExecuteCommandAsync(
-            () => _httpClient.DeleteAsync($"api/v1/customers/{id}/permanent"),
+            () => _httpClient.DeleteAsync($"api/v1/customers/permanent/{id}"),
             "CustomerApiService.DeletePermanentlyAsync");
     }
 }

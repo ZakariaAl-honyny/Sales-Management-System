@@ -8,7 +8,7 @@ namespace SalesSystem.DesktopPWF.Views.Purchases;
 /// <summary>
 /// Interaction logic for PurchaseInvoicesListView.xaml
 /// </summary>
-public partial class PurchaseInvoicesListView : Page
+public partial class PurchaseInvoicesListView : UserControl
 {
     private PurchaseInvoiceListViewModel? _viewModel;
 

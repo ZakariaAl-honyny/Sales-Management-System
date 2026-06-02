@@ -4,5 +4,6 @@ public interface ISoundService
 {
     void PlaySuccess();
     void PlayError();
+    void PlayWarning();
     void PlayNotification();
 }

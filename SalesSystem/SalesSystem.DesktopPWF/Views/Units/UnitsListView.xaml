@@ -1,11 +1,11 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.Units.UnitsListView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Units.UnitsListView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
       mc:Ignorable="d"
-      Title="إدارة الوحدات"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -18,7 +18,7 @@
 
         <!-- Header -->
         <TextBlock Grid.Row="0"
-                   Text="إدارة الوحدات"
+                   Text="⚖️  إدارة الوحدات"
                    Style="{StaticResource HeaderStyle}"
                                  AutomationProperties.AutomationId="UnitsPageTitle"/>
 
@@ -41,7 +41,7 @@
                     </TextBox>
                     <Button Command="{Binding SearchCommand}" 
                             Style="{StaticResource PrimaryButton}"
-                            Margin="12,0,0,0" Height="36" Padding="16,0"
+                            Margin="8,0,0,0"
                             AutomationProperties.AutomationId="BtnSearchUnit"
                             ToolTip="البحث في البيانات">
                         <StackPanel Orientation="Horizontal">
@@ -62,21 +62,21 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0" AutomationProperties.AutomationId="BtnAddUnit"
+                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0" AutomationProperties.AutomationId="BtnAddUnit"
                             ToolTip="إضافة عنصر جديد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="إضافة وحدة" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             ToolTip="تعديل الوحدة المختارة">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="✏️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="تعديل" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,4,0"
                             AutomationProperties.AutomationId="BtnDeleteUnit"
                             Visibility="{Binding SelectedUnit.IsActive, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}"
                             ToolTip="إيقاف نشاط الوحدة المختارة">
@@ -85,7 +85,7 @@
                             <TextBlock Text="حذف" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding RestoreCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding RestoreCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             Visibility="{Binding SelectedUnit.IsActive, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}"
                             ToolTip="إعادة تنشيط الوحدة المختارة">
                         <StackPanel Orientation="Horizontal">
@@ -93,7 +93,7 @@
                             <TextBlock Text="استعادة" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0" AutomationProperties.AutomationId="BtnRefreshUnits"
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" AutomationProperties.AutomationId="BtnRefreshUnits"
                             ToolTip="تحديث قائمة البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
@@ -185,7 +185,7 @@
                         <TextBlock Text="📏" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
                         <TextBlock Text="لا توجد وحدات حالياً" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
                         <TextBlock Text="قم بإضافة وحدات القياس (مثل: كيلو، حبة، كرتون) للبدء" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة أول وحدة" Command="{Binding AddCommand}" Margin="0,24,0,0"
+                        <Button Content="➕ إضافة أول وحدة" Command="{Binding AddCommand}" Margin="0,12,0,0"
                                 ToolTip="إضافة عنصر جديد"/>
                     </StackPanel>
                 </Grid>
@@ -203,5 +203,5 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>
 

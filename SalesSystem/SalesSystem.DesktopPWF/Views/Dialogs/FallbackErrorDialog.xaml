@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="خطأ في النظام"
-        Width="500" Height="250"
+        Width="440" Height="210"
         WindowStartupLocation="CenterScreen"
         FlowDirection="RightToLeft"
         ResizeMode="NoResize"
@@ -13,10 +13,28 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Text="⚠️ حدث خطأ غير متوقع" FontSize="18" FontWeight="Bold" Foreground="#D32F2F" Margin="0,0,0,10"/>
+        <TextBlock Grid.Row="0" Text="⚠️ حدث خطأ غير متوقع" FontSize="16" FontWeight="Bold" Foreground="#D32F2F" Margin="0,0,0,8"/>
         <TextBlock Grid.Row="1" Text="{Binding}" TextWrapping="Wrap" FontSize="13" Foreground="#333"/>
-        <Button ToolTip="تأكيد العملية" Grid.Row="2" Content="موافق" Width="120" Height="35" HorizontalAlignment="Center"
-                Background="#1976D2" Foreground="White" FontSize="14"
-                Click="OkButton_Click" Margin="0,10,0,0"/>
+        <Button ToolTip="تأكيد العملية" Grid.Row="2" Content="موافق" MinWidth="80" HorizontalAlignment="Center"
+                Background="#1976D2" Foreground="White" FontSize="11" FontWeight="SemiBold"
+                BorderThickness="0" Cursor="Hand"
+                Click="OkButton_Click" Margin="0,8,0,0">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Border" Background="{TemplateBinding Background}" 
+                            CornerRadius="6" Padding="10,4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="#1565C0"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="#0D47A1"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
     </Grid>
 </Window>

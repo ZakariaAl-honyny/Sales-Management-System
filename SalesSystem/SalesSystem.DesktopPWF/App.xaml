@@ -50,6 +50,7 @@
             <converters:SaleModeToStringConverter x:Key="SaleModeToStringConverter"/>
             <converters:StringListJoinConverter x:Key="StringListJoinConverter"/>
             <converters:SalesViewModeToVisibilityConverter x:Key="SalesViewModeToVisibilityConverter"/>
+            <converters:ImagePathConverter x:Key="ImagePathConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

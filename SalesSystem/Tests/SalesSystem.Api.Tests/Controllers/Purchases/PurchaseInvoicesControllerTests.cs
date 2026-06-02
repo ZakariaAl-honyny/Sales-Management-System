@@ -187,7 +187,6 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
 
     private static PurchaseInvoiceDto CreateInvoiceDto(int id, byte status) => new(
         Id: id,
-        InvoiceNo: $"PUR-2026-{id:D6}",
         SupplierId: 1,
         SupplierName: "مورد اختبار",
         WarehouseId: 1,

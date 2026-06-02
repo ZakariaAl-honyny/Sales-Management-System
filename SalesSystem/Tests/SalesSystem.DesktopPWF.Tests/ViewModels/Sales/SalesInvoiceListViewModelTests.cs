@@ -62,8 +62,8 @@ public class SalesInvoiceListViewModelTests : IDisposable
     {
         var invoices = new List<SalesInvoiceDto>
         {
-            CreateSalesInvoiceDto(1, "INV-2026-001", 1000m, (byte)InvoiceStatus.Draft),
-            CreateSalesInvoiceDto(2, "INV-2026-002", 2000m, (byte)InvoiceStatus.Posted)
+            CreateSalesInvoiceDto(1, 1000m, (byte)InvoiceStatus.Draft),
+            CreateSalesInvoiceDto(2, 2000m, (byte)InvoiceStatus.Posted)
         };
 
         _mockInvoiceService
@@ -81,7 +81,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
         await _viewModel.LoadInvoicesAsync();
 
         _viewModel.Invoices.Should().HaveCount(2);
-        _viewModel.Invoices.First().InvoiceNo.Should().Be("INV-2026-001");
+        _viewModel.Invoices.First().Id.Should().BeGreaterThan(0);
         _viewModel.IsBusy.Should().BeFalse();
     }
 
@@ -125,7 +125,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(new List<SalesInvoiceDto>
             {
-                CreateSalesInvoiceDto(1, "INV-001", 1000m, 2)
+                CreateSalesInvoiceDto(1, 1000m, 2)
             }));
 
         await _viewModel.LoadInvoicesAsync();
@@ -142,9 +142,9 @@ public class SalesInvoiceListViewModelTests : IDisposable
     {
         var invoices = new List<SalesInvoiceDto>
         {
-            CreateSalesInvoiceDto(1, "INV-001", 1000m, 2, "أحمد"),
-            CreateSalesInvoiceDto(2, "INV-002", 2000m, 2, "خالد"),
-            CreateSalesInvoiceDto(3, "INV-003", 3000m, 2, "أحمد")
+            CreateSalesInvoiceDto(1, 1000m, 2, "أحمد"),
+            CreateSalesInvoiceDto(2, 2000m, 2, "خالد"),
+            CreateSalesInvoiceDto(3, 3000m, 2, "أحمد")
         };
 
         _mockInvoiceService
@@ -179,8 +179,8 @@ public class SalesInvoiceListViewModelTests : IDisposable
     {
         var invoices = new List<SalesInvoiceDto>
         {
-            CreateSalesInvoiceDto(1, "INV-001", 1000m, 2, "عميل 1"),
-            CreateSalesInvoiceDto(2, "INV-002", 2000m, 2, "عميل 2")
+            CreateSalesInvoiceDto(1, 1000m, 2, "عميل 1"),
+            CreateSalesInvoiceDto(2, 2000m, 2, "عميل 2")
         };
 
         _mockInvoiceService
@@ -237,7 +237,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var invoice = CreateSalesInvoiceDto(1, "INV-001", 1000m, 1);
+        var invoice = CreateSalesInvoiceDto(1, 1000m, 1);
         _viewModel.SelectedInvoice = invoice;
 
         propertyChangedEvents.Should().Contain("SelectedInvoice");
@@ -302,7 +302,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CannotExecute_WhenInvoiceNotDraft()
     {
-        var invoice = CreateSalesInvoiceDto(1, "INV-001", 1000m, (byte)InvoiceStatus.Posted);
+        var invoice = CreateSalesInvoiceDto(1, 1000m, (byte)InvoiceStatus.Posted);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.EditCommand.CanExecute(null).Should().BeFalse();
     }
@@ -310,7 +310,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CanExecute_WhenDraftInvoiceSelected()
     {
-        var invoice = CreateSalesInvoiceDto(1, "INV-001", 1000m, (byte)InvoiceStatus.Draft);
+        var invoice = CreateSalesInvoiceDto(1, 1000m, (byte)InvoiceStatus.Draft);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -325,7 +325,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     [Fact]
     public void PostCommand_CannotExecute_WhenInvoiceNotDraft()
     {
-        var invoice = CreateSalesInvoiceDto(1, "INV-001", 1000m, (byte)InvoiceStatus.Posted);
+        var invoice = CreateSalesInvoiceDto(1, 1000m, (byte)InvoiceStatus.Posted);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.PostCommand.CanExecute(null).Should().BeFalse();
     }
@@ -333,7 +333,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     [Fact]
     public void PostCommand_CanExecute_WhenDraftInvoiceSelected()
     {
-        var invoice = CreateSalesInvoiceDto(1, "INV-001", 1000m, (byte)InvoiceStatus.Draft);
+        var invoice = CreateSalesInvoiceDto(1, 1000m, (byte)InvoiceStatus.Draft);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.PostCommand.CanExecute(null).Should().BeTrue();
     }
@@ -348,7 +348,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     [Fact]
     public void CancelCommand_CannotExecute_WhenInvoiceNotPosted()
     {
-        var invoice = CreateSalesInvoiceDto(1, "INV-001", 1000m, (byte)InvoiceStatus.Draft);
+        var invoice = CreateSalesInvoiceDto(1, 1000m, (byte)InvoiceStatus.Draft);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.CancelCommand.CanExecute(null).Should().BeFalse();
     }
@@ -356,7 +356,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     [Fact]
     public void CancelCommand_CanExecute_WhenPostedInvoiceSelected()
     {
-        var invoice = CreateSalesInvoiceDto(1, "INV-001", 1000m, (byte)InvoiceStatus.Posted);
+        var invoice = CreateSalesInvoiceDto(1, 1000m, (byte)InvoiceStatus.Posted);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.CancelCommand.CanExecute(null).Should().BeTrue();
     }
@@ -371,7 +371,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
     [Fact]
     public void ViewCommand_CanExecute_WhenInvoiceSelected()
     {
-        var invoice = CreateSalesInvoiceDto(1, "INV-001", 1000m, (byte)InvoiceStatus.Cancelled);
+        var invoice = CreateSalesInvoiceDto(1, 1000m, (byte)InvoiceStatus.Cancelled);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.ViewCommand.CanExecute(null).Should().BeTrue();
     }
@@ -453,14 +453,12 @@ public class SalesInvoiceListViewModelTests : IDisposable
 
     private static SalesInvoiceDto CreateSalesInvoiceDto(
         int id,
-        string invoiceNo,
         decimal totalAmount,
         byte status,
         string customerName = "عميل تجريبي")
     {
         return new SalesInvoiceDto(
             Id: id,
-            InvoiceNo: invoiceNo,
             CustomerId: 1,
             CustomerName: customerName,
             WarehouseId: 1,

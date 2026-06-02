@@ -2,7 +2,7 @@ using System.Windows.Controls;
 
 namespace SalesSystem.DesktopPWF.Views.Reports;
 
-public partial class ReportsView : Page
+public partial class ReportsView : UserControl
 {
     public ReportsView()
     {

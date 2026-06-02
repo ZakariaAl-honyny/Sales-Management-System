@@ -32,7 +32,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private readonly IToastNotificationService _toastService;
 
     private int? _invoiceId;
-    private string? _invoiceNo;
     private int _selectedWarehouseId;
     private int? _selectedSupplierId;
     private int? _defaultSupplierId; // Auto-selected for Cash purchases
@@ -180,11 +179,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     #region Properties
     public int? InvoiceId => _invoiceId;
-    public string? InvoiceNo
-    {
-        get => _invoiceNo;
-        set => SetProperty(ref _invoiceNo, value);
-    }
     public bool IsEditMode => _isEditMode;
 
     public ObservableCollection<SupplierDto> Suppliers
@@ -484,7 +478,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 var invoice = result.Value;
-                _invoiceNo = invoice.InvoiceNo;
                 SelectedWarehouseId = invoice.WarehouseId;
                 SelectedSupplierId = invoice.SupplierId;
                 InvoiceDate = invoice.InvoiceDate;
@@ -500,8 +493,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                     IsReadOnly = true;
                     OnPropertyChanged(nameof(IsReadOnly));
                 }
-                OnPropertyChanged(nameof(InvoiceNo));
-
                 Items.Clear();
                 foreach (var item in invoice.Items)
                 {
@@ -554,11 +545,9 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 _invoiceId = result.Value.Id;
-                _invoiceNo = result.Value.InvoiceNo;
                 _status = result.Value.Status;
                 _isEditMode = true;
                 
-                OnPropertyChanged(nameof(InvoiceNo));
                 OnPropertyChanged(nameof(Status));
                 OnPropertyChanged(nameof(IsEditMode));
                 OnPropertyChanged(nameof(IsReadOnly));
@@ -627,7 +616,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             {
                 var previewWindow = new Views.Common.PdfPreviewWindow(
                     result.Value,
-                    _invoiceNo ?? $"#{_invoiceId}",
+                    $"#{_invoiceId}",
                     _invoiceId!.Value,
                     isPurchase: true);
                 previewWindow.ShowDialog();

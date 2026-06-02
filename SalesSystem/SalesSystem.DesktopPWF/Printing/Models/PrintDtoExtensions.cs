@@ -23,7 +23,7 @@ public static class PrintDtoExtensions
     public static InvoicePrintDto ToPrintDto(this SalesInvoiceDto invoice, string? taxNumber = null)
     {
         return new InvoicePrintDto(
-            invoice.InvoiceNo,
+            invoice.Id,
             "فاتورة مبيعات",
             invoice.InvoiceDate,
             invoice.CustomerName ?? "عميل نقدي",
@@ -54,7 +54,7 @@ public static class PrintDtoExtensions
     public static InvoicePrintDto ToPrintDto(this PurchaseInvoiceDto invoice, string? taxNumber = null)
     {
         return new InvoicePrintDto(
-            invoice.InvoiceNo,
+            invoice.Id,
             "فاتورة مشتريات",
             invoice.InvoiceDate,
             invoice.SupplierName,

@@ -67,6 +67,9 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 35. **Desktop Client Separation**: WPF ViewModels and UI controllers MUST NOT reference `ISystemSettingsRepository` or DB context. Use API clients (e.g., `ISettingsApiService`) to interact with the backend services.
 36. **Thread-Safe Exception Handling**: Avoid raw `MessageBox.Show` in global unhandled exceptions. Use secure logging with structured fallback screens.
 37. **Safe Exception Swallowing**: Swallowing exceptions via empty catch blocks is forbidden. Always log the error or provide documented, safe fallback logic.
+38. **InvoiceNo Removal**: SalesInvoice and PurchaseInvoice MUST NOT have an InvoiceNo (string) property — use auto-increment Id (int PK). GetByNumberAsync methods MUST NOT exist in services or controllers. Search by invoice uses int.TryParse + Id comparison.
+39. **SupplierInvoiceNo is NOT a System Identifier**: `SupplierInvoiceNo` (string?) on PurchaseInvoice is the supplier's external invoice reference only — do NOT use it as the system invoice number.
+40. **DocumentSequenceService Invoice Numbering Removed**: INV-{YYYY}-{000001} and PUR-{YYYY}-{000001} auto-numbering is removed — invoices display as formatted Id (#ID).
 
 ## Pattern to Follow
 ```csharp

@@ -3,7 +3,7 @@ using SalesSystem.DesktopPWF.ViewModels.Inventory;
 
 namespace SalesSystem.DesktopPWF.Views.Inventory;
 
-public partial class LowStockView : Page
+public partial class LowStockView : UserControl
 {
     public LowStockView()
     {

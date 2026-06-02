@@ -54,7 +54,7 @@ public class SupplierApiService : ApiServiceBase, ISupplierApiService
     public async Task<Result> DeletePermanentlyAsync(int id)
     {
         return await ExecuteCommandAsync(
-            () => _httpClient.DeleteAsync($"api/v1/suppliers/{id}/permanent"),
+            () => _httpClient.DeleteAsync($"api/v1/suppliers/permanent/{id}"),
             "SupplierApiService.DeletePermanentlyAsync");
     }
 }
@@ -107,7 +107,7 @@ public class WarehouseApiService : ApiServiceBase, IWarehouseApiService
     public async Task<Result> DeletePermanentlyAsync(int id)
     {
         return await ExecuteCommandAsync(
-            () => _httpClient.DeleteAsync($"api/v1/warehouses/{id}/permanent"),
+            () => _httpClient.DeleteAsync($"api/v1/warehouses/permanent/{id}"),
             "WarehouseApiService.DeletePermanentlyAsync");
     }
 }

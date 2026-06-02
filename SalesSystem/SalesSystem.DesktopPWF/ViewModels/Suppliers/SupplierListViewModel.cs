@@ -174,7 +174,7 @@ public class SupplierListViewModel : ViewModelBase
                     }
                     catch (InvalidOperationException)
                     {
-                        // WPF ListCollectionView requires a running Dispatcher â€” skip in non-WPF contexts
+                        // WPF ListCollectionView requires a running Dispatcher — skip in non-WPF contexts
                         SuppliersView = null;
                     }
                     IsEmpty = !Suppliers.Any();

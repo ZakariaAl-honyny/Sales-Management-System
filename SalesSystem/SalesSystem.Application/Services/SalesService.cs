@@ -16,7 +16,6 @@ public class SalesService : ISalesService
 {
     private readonly IUnitOfWork _uow;
     private readonly IInventoryService _inventoryService;
-    private readonly IDocumentSequenceService _sequenceService;
     private readonly ICashBoxService _cashBoxService;
     private readonly IPrintDataService _printDataService;
     private readonly IPrintService _printService;
@@ -25,7 +24,6 @@ public class SalesService : ISalesService
     public SalesService(
         IUnitOfWork uow,
         IInventoryService inventoryService,
-        IDocumentSequenceService sequenceService,
         ICashBoxService cashBoxService,
         IPrintDataService printDataService,
         IPrintService printService,
@@ -33,7 +31,6 @@ public class SalesService : ISalesService
     {
         _uow = uow;
         _inventoryService = inventoryService;
-        _sequenceService = sequenceService;
         _cashBoxService = cashBoxService;
         _printDataService = printDataService;
         _printService = printService;
@@ -44,17 +41,6 @@ public class SalesService : ISalesService
     {
         var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
             i => i.Id == id, ct, "Customer", "Warehouse", "Items.Product");
-
-        if (invoice == null)
-            return Result<SalesInvoiceDto>.Failure("فاتورة المبيعات غير موجودة", ErrorCodes.NotFound);
-
-        return Result<SalesInvoiceDto>.Success(MapToDto(invoice));
-    }
-
-    public async Task<Result<SalesInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default)
-    {
-        var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
-            i => i.InvoiceNo == invoiceNo, ct, "Customer", "Warehouse", "Items.Product");
 
         if (invoice == null)
             return Result<SalesInvoiceDto>.Failure("فاتورة المبيعات غير موجودة", ErrorCodes.NotFound);
@@ -76,6 +62,9 @@ public class SalesService : ISalesService
         // Build predicate dynamically for search conditions
         var searchLower = string.IsNullOrWhiteSpace(search) ? null : search.Trim().ToLower();
 
+        // Parse search text as Id outside the expression tree (EF Core can't translate int.TryParse)
+        int? searchId = int.TryParse(searchLower, out var parsedId) ? parsedId : null;
+
         System.Linq.Expressions.Expression<System.Func<SalesInvoice, bool>> predicate = i =>
             (includeInactive || i.Status != InvoiceStatus.Cancelled) &&
             (!customerId.HasValue || i.CustomerId == customerId.Value) &&
@@ -83,7 +72,7 @@ public class SalesService : ISalesService
             (!from.HasValue || i.InvoiceDate >= from.Value) &&
             (!to.HasValue || i.InvoiceDate <= to.Value) &&
             (searchLower == null ||
-             i.InvoiceNo.ToLower().Contains(searchLower) ||
+             (searchId.HasValue && i.Id == searchId.Value) ||
              (i.Customer != null && i.Customer.Name.ToLower().Contains(searchLower)) ||
              (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
              i.Items.Any(item =>
@@ -106,15 +95,7 @@ public class SalesService : ISalesService
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
-            var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
-            var invoicePrefix = settings?.InvoicePrefix ?? "INV";
-            
-            var invoiceNoResult = await _sequenceService.GetNextNumberAsync(invoicePrefix, ct);
-            if (!invoiceNoResult.IsSuccess)
-                return Result<SalesInvoiceDto>.Failure(invoiceNoResult.Error!);
-
             var invoice = SalesInvoice.Create(
-                invoiceNoResult.Value!,
                 request.WarehouseId,
                 request.CustomerId,
                 request.InvoiceDate,
@@ -148,7 +129,7 @@ public class SalesService : ISalesService
 
             await transaction.CommitAsync(ct);
 
-            _logger.LogInformation("Sales Invoice created as Draft: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
+            _logger.LogInformation("Sales Invoice created as Draft: ID {Id} by User {UserId}", invoice.Id, userId);
 
             return await GetByIdAsync(invoice.Id, ct);
         }
@@ -231,7 +212,7 @@ public class SalesService : ISalesService
 
         if (invoice.Status != InvoiceStatus.Draft)
         {
-            _logger.LogWarning("Cannot post invoice {InvoiceNo} because status is {Status}", invoice.InvoiceNo, invoice.Status);
+            _logger.LogWarning("Cannot post invoice {Id} because status is {Status}", invoice.Id, invoice.Status);
             return Result<SalesInvoiceDto>.Failure("يمكن فقط ترحيل الفواتير المسودة");
         }
 
@@ -284,7 +265,7 @@ public class SalesService : ISalesService
                     if (!invoice.CustomerId.HasValue)
                     {
                         await transaction.RollbackAsync(ct);
-                        _logger.LogWarning("Cannot post credit invoice {InvoiceNo} without a customer", invoice.InvoiceNo);
+                        _logger.LogWarning("Cannot post credit invoice {Id} without a customer", invoice.Id);
                         return Result<SalesInvoiceDto>.Failure("يجب تحديد عميل للفواتير الآجلة");
                     }
 
@@ -292,7 +273,7 @@ public class SalesService : ISalesService
                     if (customer == null)
                     {
                         await transaction.RollbackAsync(ct);
-                        _logger.LogWarning("Customer {CustomerId} not found for credit sales invoice {InvoiceNo} post", invoice.CustomerId, invoice.InvoiceNo);
+                        _logger.LogWarning("Customer {CustomerId} not found for credit sales invoice {Id} post", invoice.CustomerId, invoice.Id);
                         return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
                     }
                     customer.IncreaseBalance(invoice.DueAmount);
@@ -312,15 +293,15 @@ public class SalesService : ISalesService
 
                     if (!cashResult.IsSuccess)
                     {
-                        _logger.LogWarning("Cash transaction recording failed for invoice {InvoiceNo} (ID: {Id}): {Error}",
-                            invoice.InvoiceNo, invoice.Id, cashResult.Error);
+                        _logger.LogWarning("Cash transaction recording failed for invoice {Id}: {Error}",
+                            invoice.Id, cashResult.Error);
                     }
                 }
 
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                _logger.LogInformation("Sales Invoice posted: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
+                _logger.LogInformation("Sales Invoice posted: ID {Id} by User {UserId}", invoice.Id, userId);
 
                 var postedResult = await GetByIdAsync(invoice.Id, ct);
 
@@ -434,8 +415,8 @@ public class SalesService : ISalesService
 
                         if (!cashResult.IsSuccess)
                         {
-                            _logger.LogWarning("Cash transaction recording failed during cancellation of invoice {InvoiceNo} (ID: {Id}): {Error}",
-                                invoice.InvoiceNo, invoice.Id, cashResult.Error);
+                            _logger.LogWarning("Cash transaction recording failed during cancellation of invoice {Id}: {Error}",
+                                invoice.Id, cashResult.Error);
                         }
                     }
                 }
@@ -448,7 +429,7 @@ public class SalesService : ISalesService
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                _logger.LogInformation("Sales Invoice cancelled: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
+                _logger.LogInformation("Sales Invoice cancelled: ID {Id} by User {UserId}", invoice.Id, userId);
 
                 return await GetByIdAsync(invoice.Id, ct);
             }
@@ -471,7 +452,6 @@ public class SalesService : ISalesService
     {
         return new SalesInvoiceDto(
             i.Id,
-            i.InvoiceNo,
             i.CustomerId,
             i.Customer?.Name ?? "عميل نقدي",
             i.WarehouseId,

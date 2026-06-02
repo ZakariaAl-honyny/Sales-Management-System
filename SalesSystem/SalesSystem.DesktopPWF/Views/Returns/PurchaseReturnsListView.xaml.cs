@@ -8,7 +8,7 @@ namespace SalesSystem.DesktopPWF.Views.Returns;
 /// <summary>
 /// Interaction logic for PurchaseReturnsListView.xaml
 /// </summary>
-public partial class PurchaseReturnsListView : Page
+public partial class PurchaseReturnsListView : UserControl
 {
     private PurchaseReturnListViewModel? _viewModel;
 

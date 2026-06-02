@@ -31,7 +31,6 @@ public class SalesServiceTests : IDisposable
     private readonly TestDbContext _dbContext;
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IInventoryService> _mockInventoryService;
-    private readonly Mock<IDocumentSequenceService> _mockSequenceService;
     private readonly Mock<ICashBoxService> _cashBoxServiceMock;
     private readonly Mock<ILogger<SalesService>> _mockLogger;
     private readonly Mock<IPrintDataService> _mockPrintDataService = new();
@@ -53,7 +52,6 @@ public class SalesServiceTests : IDisposable
 
         _mockUow = new Mock<IUnitOfWork>();
         _mockInventoryService = new Mock<IInventoryService>();
-        _mockSequenceService = new Mock<IDocumentSequenceService>();
         _cashBoxServiceMock = new Mock<ICashBoxService>();
         _mockLogger = new Mock<ILogger<SalesService>>();
 
@@ -82,9 +80,6 @@ public class SalesServiceTests : IDisposable
         _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MockDbContextTransaction());
 
-        _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<string>.Success("INV-2026-000001"));
-
         _mockInventoryService.Setup(i => i.ValidateStockAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
@@ -108,7 +103,6 @@ public class SalesServiceTests : IDisposable
         _sut = new SalesService(
             _mockUow.Object,
             _mockInventoryService.Object,
-            _mockSequenceService.Object,
             _cashBoxServiceMock.Object,
             _mockPrintDataService.Object,
             _mockPrintService.Object,
@@ -135,7 +129,7 @@ public class SalesServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Create invoice
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 100m, unitPrice: 50m));
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(5000m);
@@ -180,7 +174,7 @@ public class SalesServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GivenAlreadyPostedInvoice_WhenPosting_ThenReturnsFailure");
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 10m));
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(50m);
@@ -213,7 +207,7 @@ public class SalesServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Draft invoice can be cancelled (no stock/balance was affected yet)
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: null, paymentType: DomainPaymentType.Cash);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: null, paymentType: DomainPaymentType.Cash);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m));
         invoice.RecalculateTotals();
         // Status = Draft
@@ -257,7 +251,7 @@ public class SalesServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Credit invoice with no payment can be cancelled and stock is reversed
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Credit);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Credit);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 2m, unitPrice: 50m));
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(0m); // Unpaid
@@ -298,7 +292,7 @@ public class SalesServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GivenInvoiceWithItems_WhenRecalculating_ThenTotalsCorrect");
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1, discountAmount: 50m);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1, discountAmount: 50m);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m, discountAmount: 10m)); // 990
         invoice.AddItem(SalesInvoiceItem.Create(productId: 2, quantity: 5m, unitPrice: 50m, discountAmount: 0m));   // 250
         invoice.RecalculateTotals();
@@ -317,7 +311,7 @@ public class SalesServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GivenPartialPayment_WhenSettingPaidAmount_ThenDueAmountCorrect");
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m));
         invoice.RecalculateTotals();
 
@@ -334,7 +328,7 @@ public class SalesServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GivenPaidAmountExceedsTotal_WhenSetting_ThenThrowsDomainException");
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m));
         invoice.RecalculateTotals();
         // TotalAmount = 1000
@@ -352,7 +346,7 @@ public class SalesServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GivenNegativeTaxAmount_WhenSetting_ThenThrowsDomainException");
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m));
 
         var action = () => invoice.SetTaxAmount(-10m);
@@ -385,7 +379,7 @@ public class SalesServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GivenMultipleItems_WhenAddingToInvoice_ThenSubTotalCorrect");
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1);
 
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 2m, unitPrice: 100m, discountAmount: 0m)); // 200
         invoice.AddItem(SalesInvoiceItem.Create(productId: 2, quantity: 3m, unitPrice: 50m, discountAmount: 10m));  // 140

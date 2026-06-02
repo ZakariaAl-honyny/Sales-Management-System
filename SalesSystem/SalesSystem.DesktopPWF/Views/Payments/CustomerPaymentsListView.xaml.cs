@@ -4,7 +4,7 @@ using SalesSystem.DesktopPWF.ViewModels.Payments;
 
 namespace SalesSystem.DesktopPWF.Views.Payments;
 
-public partial class CustomerPaymentsListView : Page
+public partial class CustomerPaymentsListView : UserControl
 {
     private CustomerPaymentsListViewModel _viewModel = null!;
 

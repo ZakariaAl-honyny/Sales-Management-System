@@ -207,6 +207,14 @@ catch (Exception ex)
 - Use auto-increment Id (int PK) as sole identifier for display and search
 - WarehouseResponse bindings must NOT include a Code field — it was removed from the record
 
+### Invoice Number Strategy — No InvoiceNo (v4.6.5)
+- SalesInvoice and PurchaseInvoice editor screens MUST NOT have an InvoiceNo text field
+- Invoice list ViewModels MUST NOT filter/search by InvoiceNo (string) — use `int.TryParse` + `Id` comparison
+- Invoice display uses formatted `Id` (`#ID` or just the integer value)
+- `SupplierInvoiceNo` display is kept for purchase invoices (supplier's reference) but MUST NOT be labeled as "رقم الفاتورة" (invoice number) — use "رقم فاتورة المورد" (supplier invoice number) instead
+- Report ViewModels MUST NOT reference or display `InvoiceNo` — use `Id` instead
+- Print preview ViewModels MUST use `Id` for invoice identification on printed documents
+
 ### Interactive Validation (v4.6) — Buttons Always Enabled, Validate on Click
 
 **CRITICAL CHANGE:** Save/Post buttons are NEVER disabled via CanExecute. Validation happens when the user clicks the button.
@@ -441,6 +449,95 @@ private async Task<bool> ValidateAsync()
     return await ValidateAllAsync();  // Handles dialog + focus
 }
 ```
+
+### UI Compacting — Mobile-Ready Density (v4.6.6)
+
+ALL XAML views MUST use compact sizes. The Styles.xaml now provides compact default tokens — do NOT override them with hardcoded sizes.
+
+#### Global Style Tokens (Styles.xaml — DO NOT OVERRIDE)
+| Token | Value | Notes |
+|-------|-------|-------|
+| Button height | 28px | Never set Height=36 or Height=40 |
+| Button padding | 10,4 | Never set Padding=16,0 or Padding=24,0 |
+| TextBox/ComboBox height | 28px | Never set Height=36 |
+| Font size (general) | 11px | Section headers at 14px max |
+| DataGrid row height | 24px | Compact rows |
+| Dialog title font | 16px | Never use 18/20/22 |
+| Section header font | 14px | Never use 16/18/20 |
+| Sidebar width | 200px | Never use 220/240 |
+| ScreenWindow MinWidth | 500px | Never use 600+ |
+| ScreenWindow MinHeight | 350px | Never use 400+ |
+| Dialog icon border | 44×44 | Never use 50×50+ |
+| Dialog icon font | 20px | Never use 24+ |
+
+#### CORRECT Header Pattern
+```xml
+<Border Background="{StaticResource PrimaryBrush}" Padding="12,6">
+    <StackPanel Orientation="Horizontal">
+        <TextBlock Text="تحرير فاتورة" FontSize="14" FontWeight="Bold" Foreground="White"/>
+    </StackPanel>
+</Border>
+```
+
+#### CORRECT Footer Pattern
+```xml
+<Border Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+        <Button Content="✅ ترحيل" Style="{StaticResource PrimaryButton}" ToolTip="..."/>
+        <Button Content="🚫 إلغاء" Style="{StaticResource SecondaryButton}" ToolTip="..." Margin="8,0,0,0"/>
+    </StackPanel>
+</Border>
+```
+
+#### CORRECT Form Field Spacing
+```xml
+<StackPanel>
+    <TextBlock Text="الاسم *" Style="{StaticResource LabelStyle}"/>
+    <TextBox Text="{Binding Name}" Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
+    <TextBlock Text="السعر *" Style="{StaticResource LabelStyle}"/>
+    <TextBox Text="{Binding Price}" Style="{StaticResource ModernTextBox}" Margin="0,0,0,8"/>
+</StackPanel>
+```
+
+#### CORRECT Empty-State Pattern
+```xml
+<Button Content="➕ إضافة أول منتج" Command="{Binding AddCommand}"
+        Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
+        ToolTip="فتح شاشة إضافة منتج جديد"/>
+```
+
+#### CORRECT Dialog Title Pattern
+```xml
+<TextBlock Text="تأكيد الحذف" FontSize="16" FontWeight="Bold" Foreground="{StaticResource DialogTitleColor}"/>
+```
+
+#### CORRECT Dialog Icon Pattern
+```xml
+<Border Width="44" Height="44" CornerRadius="22" Background="{StaticResource ErrorBrush}">
+    <TextBlock Text="✕" FontSize="20" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+</Border>
+```
+
+#### CORRECT Dialog Button Pattern
+```xml
+<Button Content="نعم" Command="{Binding ConfirmCommand}"
+        Style="{StaticResource PrimaryButton}" MinWidth="80" ToolTip="تأكيد الإجراء"/>
+<Button Content="إلغاء" Command="{Binding CancelCommand}"
+        Style="{StaticResource SecondaryButton}" MinWidth="80" ToolTip="إلغاء الإجراء" Margin="8,0,0,0"/>
+```
+
+#### VERIFICATION (checklist for each view):
+- [ ] No `Height="36"` or `Height="40"` on buttons/textboxes/combos
+- [ ] No `Padding="16,0"` or larger on buttons
+- [ ] Header padding = `12,6` max
+- [ ] Footer padding = `12,8` max
+- [ ] Form field margins = `0,0,0,6` or `0,0,0,8`
+- [ ] Dialog title FontSize = 16
+- [ ] Section header FontSize = 14
+- [ ] Empty-state buttons: Margin="0,12,0,0", Width="140"
+- [ ] No `Width="120"` on buttons (use `MinWidth`)
+- [ ] Sidebar width = 200
+- [ ] ScreenWindow MinWidth 500, MinHeight 350
 
 ### Settings Relocation & IsEnabled Bindings (v4.6.3)
 

@@ -404,7 +404,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
         }
     }
 
-    // â”€â”€â”€ Print Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Print Methods ──────────────────────────────────────────────────────
 
 
 
@@ -416,7 +416,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
             var result = await _printService.GetSalesA4PdfAsync(SelectedInvoice.Id);
             if (result.IsSuccess && result.Value != null)
             {
-                var preview = new Views.Common.PdfPreviewWindow(result.Value, SelectedInvoice.InvoiceNo, SelectedInvoice.Id);
+                var preview = new Views.Common.PdfPreviewWindow(result.Value, SelectedInvoice.Id.ToString(), SelectedInvoice.Id);
                 preview.ShowDialog();
             }
             else

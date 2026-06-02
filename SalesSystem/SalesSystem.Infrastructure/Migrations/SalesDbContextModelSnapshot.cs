@@ -852,11 +852,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<DateTime>("InvoiceDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("InvoiceNo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -905,9 +900,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("InvoiceNo")
-                        .IsUnique();
 
                     b.HasIndex("SupplierId");
 
@@ -1141,11 +1133,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<DateTime>("InvoiceDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("InvoiceNo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -1189,9 +1176,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("CashBoxId");
 
                     b.HasIndex("CustomerId");
-
-                    b.HasIndex("InvoiceNo")
-                        .IsUnique();
 
                     b.HasIndex("WarehouseId");
 

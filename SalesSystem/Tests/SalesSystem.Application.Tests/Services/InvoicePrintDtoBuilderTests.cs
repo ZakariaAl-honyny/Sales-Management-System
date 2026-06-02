@@ -50,7 +50,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldPassStoreInfo()
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1);
 
         var result = await _sut.BuildFromSalesAsync(
             invoice, StoreName, StorePhone, StoreAddress, StoreTaxNumber, LogoBytes, TaxRate);
@@ -66,7 +66,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromPurchaseAsync_ShouldPassStoreInfo()
     {
-        var invoice = PurchaseInvoice.Create("PUR-001", supplierId: 1, warehouseId: 1);
+        var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1);
 
         var result = await _sut.BuildFromPurchaseAsync(
             invoice, StoreName, StorePhone, StoreAddress, StoreTaxNumber, LogoBytes, TaxRate);
@@ -114,7 +114,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldAllowNullLogo()
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1);
 
         var result = await _sut.BuildFromSalesAsync(
             invoice, StoreName, StorePhone, StoreAddress, StoreTaxNumber, null, TaxRate);
@@ -127,14 +127,14 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldMapHeaderFields()
     {
-        var invoice = SalesInvoice.Create("INV-2025-0001", warehouseId: 1,
+        var invoice = SalesInvoice.Create(warehouseId: 1,
             paymentType: PaymentType.Cash, notes: "ملاحظات الفاتورة");
 
         var result = await _sut.BuildFromSalesAsync(
             invoice, StoreName, StorePhone, StoreAddress, StoreTaxNumber, LogoBytes, TaxRate);
 
         result.InvoiceId.Should().Be(invoice.Id);
-        result.InvoiceNumber.Should().Be("INV-2025-0001");
+        result.InvoiceNumber.Should().Be(invoice.Id.ToString());
         result.InvoiceDate.Should().Be(invoice.CreatedAt);
         result.InvoiceType.Should().Be(InvoiceTypePrint.Sales);
         result.Notes.Should().Be("ملاحظات الفاتورة");
@@ -147,7 +147,7 @@ public class InvoicePrintDtoBuilderTests
     {
         var customer = Customer.Create("أحمد محمد", phone: "0555123456",
             address: "جدة - البلد", taxNumber: "TAX-C-001");
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1, customerId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1);
         SetNavigation(invoice, nameof(SalesInvoice.Customer), customer);
 
         var result = await _sut.BuildFromSalesAsync(
@@ -161,7 +161,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldUseDefaultNameWhenCustomerNull()
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1, customerId: null);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: null);
 
         var result = await _sut.BuildFromSalesAsync(
             invoice, StoreName, StorePhone, StoreAddress, StoreTaxNumber, LogoBytes, TaxRate);
@@ -177,7 +177,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromSalesAsync_ShouldMapItems()
     {
         var product = CreateProduct("منتج تجريبي");
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1);
         var item = SalesInvoiceItem.Create(productId: 1, quantity: 3, unitPrice: 25.50m, discountAmount: 5);
         SetNavigation(item, nameof(SalesInvoiceItem.Product), product);
         invoice.AddItem(item);
@@ -198,7 +198,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldFallbackToProductIdWhenProductNavigationNull()
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1);
         var item = SalesInvoiceItem.Create(productId: 42, quantity: 1, unitPrice: 10);
         invoice.AddItem(item);
 
@@ -211,7 +211,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldHandleEmptyItems()
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1);
 
         var result = await _sut.BuildFromSalesAsync(
             invoice, StoreName, StorePhone, StoreAddress, StoreTaxNumber, LogoBytes, TaxRate);
@@ -226,7 +226,7 @@ public class InvoicePrintDtoBuilderTests
     {
         var product1 = CreateProduct("منتج أ");
         var product2 = CreateProduct("منتج ب");
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1);
+        var invoice = SalesInvoice.Create(warehouseId: 1);
 
         var item1 = SalesInvoiceItem.Create(productId: 1, quantity: 2, unitPrice: 10);
         SetNavigation(item1, nameof(SalesInvoiceItem.Product), product1);
@@ -250,7 +250,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldMapFinancialTotals()
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1, discountAmount: 10);
+        var invoice = SalesInvoice.Create(warehouseId: 1, discountAmount: 10);
         var item = SalesInvoiceItem.Create(productId: 1, quantity: 5, unitPrice: 20, discountAmount: 5);
         invoice.AddItem(item);
         invoice.SetTaxAmount(15);
@@ -271,7 +271,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldHaveZeroChangeWhenPaidEqualsTotal()
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1, discountAmount: 0);
+        var invoice = SalesInvoice.Create(warehouseId: 1, discountAmount: 0);
         var item = SalesInvoiceItem.Create(productId: 1, quantity: 1, unitPrice: 50);
         invoice.AddItem(item);
         invoice.SetPaidAmount(50);
@@ -292,7 +292,7 @@ public class InvoicePrintDtoBuilderTests
     [InlineData(PaymentType.Mixed, "نقدي + آجل")]
     public async Task BuildFromSalesAsync_ShouldMapPaymentMethod(PaymentType paymentType, string expected)
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1, paymentType: paymentType);
+        var invoice = SalesInvoice.Create(warehouseId: 1, paymentType: paymentType);
         var item = SalesInvoiceItem.Create(productId: 1, quantity: 1, unitPrice: 10);
         invoice.AddItem(item);
         invoice.SetPaidAmount(10);
@@ -306,7 +306,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromSalesAsync_ShouldMapNotes()
     {
-        var invoice = SalesInvoice.Create("INV-001", warehouseId: 1, notes: "اشترى مع زبون آخر");
+        var invoice = SalesInvoice.Create(warehouseId: 1, notes: "اشترى مع زبون آخر");
         var item = SalesInvoiceItem.Create(productId: 1, quantity: 1, unitPrice: 10);
         invoice.AddItem(item);
         invoice.SetPaidAmount(10);
@@ -323,7 +323,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromPurchaseAsync_ShouldMapHeaderFields()
     {
         var supplier = Supplier.Create("المورد الأول", phone: "0566000000", taxNumber: "TAX-S-001");
-        var invoice = PurchaseInvoice.Create("PUR-2025-0001", supplierId: 1, warehouseId: 1,
+        var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1,
             paymentType: PaymentType.Credit, notes: "فاتورة مورد");
         SetNavigation(invoice, nameof(PurchaseInvoice.Supplier), supplier);
 
@@ -331,7 +331,7 @@ public class InvoicePrintDtoBuilderTests
             invoice, StoreName, StorePhone, StoreAddress, StoreTaxNumber, LogoBytes, TaxRate);
 
         result.InvoiceId.Should().Be(invoice.Id);
-        result.InvoiceNumber.Should().Be("PUR-2025-0001");
+        result.InvoiceNumber.Should().Be(invoice.Id.ToString());
         result.InvoiceDate.Should().Be(invoice.CreatedAt);
         result.InvoiceType.Should().Be(InvoiceTypePrint.Purchase);
         result.CustomerOrSupplierName.Should().Be("المورد الأول");
@@ -342,7 +342,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromPurchaseAsync_ShouldUseDefaultSupplierNameWhenNull()
     {
-        var invoice = PurchaseInvoice.Create("PUR-001", supplierId: 1, warehouseId: 1);
+        var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1);
 
         var result = await _sut.BuildFromPurchaseAsync(
             invoice, StoreName, StorePhone, StoreAddress, StoreTaxNumber, LogoBytes, TaxRate);
@@ -356,7 +356,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromPurchaseAsync_ShouldMapItems()
     {
         var product = CreateProduct("مادة خام", purchasePrice: 8, retailPrice: 15);
-        var invoice = PurchaseInvoice.Create("PUR-001", supplierId: 1, warehouseId: 1);
+        var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1);
         var item = PurchaseInvoiceItem.Create(productId: 1, quantity: 10, unitCost: 8.50m, discountAmount: 2);
         SetNavigation(item, nameof(PurchaseInvoiceItem.Product), product);
         invoice.AddItem(item);
@@ -376,7 +376,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromPurchaseAsync_ShouldMapFinancialTotals()
     {
-        var invoice = PurchaseInvoice.Create("PUR-001", supplierId: 1, warehouseId: 1, discountAmount: 20);
+        var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, discountAmount: 20);
         var item = PurchaseInvoiceItem.Create(productId: 1, quantity: 100, unitCost: 5);
         invoice.AddItem(item);
         invoice.SetTaxAmount(30);

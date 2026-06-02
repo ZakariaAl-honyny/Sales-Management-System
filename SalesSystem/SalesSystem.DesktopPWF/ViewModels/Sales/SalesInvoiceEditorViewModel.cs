@@ -37,7 +37,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly ICategoryApiService _categoryService;
 
     private int? _invoiceId;
-    private string? _invoiceNo;
     private int _selectedWarehouseId;
     private int? _selectedCustomerId;
     private int? _defaultCustomerId;  // auto-selected for Cash sales
@@ -138,26 +137,66 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         ToggleViewModeCommand = new RelayCommand(ToggleViewMode);
 
         // --- Touch POS ViewModels ---
-        TouchPosVM = new TouchPosViewModel(_categoryService, _productService);
+        TouchPosVM = new TouchPosViewModel(_categoryService, _productService, _inventoryService);
         TouchPosCartVM = new TouchPosCartViewModel(Items, RecalculateTotals);
 
-        // Wire: when a product is selected in Touch POS, add it to the cart
+        // Wire: when a product is selected in Touch POS, validate stock then add to cart
         TouchPosVM.OnProductSelected = async product =>
         {
+            // 1. Validate Warehouse Selection
+            if (SelectedWarehouseId <= 0)
+            {
+                await _dialogService.ShowWarningAsync("تنبيه", "يجب اختيار المستودع أولاً");
+                return;
+            }
+
+            // 2. Check Stock in Selected Warehouse (reuse barcode pattern)
+            var stockResult = await _inventoryService.GetStockAsync(product.Id, SelectedWarehouseId);
+            decimal currentStock = stockResult.IsSuccess ? stockResult.Value : 0;
+
+            // Check if product is already in the cart
+            var existingLine = Items.FirstOrDefault(i => i.ProductId == product.Id);
+            decimal neededQuantity = (existingLine?.Quantity ?? 0) + 1m;
+
+            if (!_allowNegativeStock && currentStock < neededQuantity)
+            {
+                _soundService.PlayWarning();
+                if (currentStock <= 0)
+                {
+                    await _dialogService.ShowErrorAsync("المخزون نفذ",
+                        $"المنتج: {product.Name}\nهذا المنتج نفذ من المخزون في المستودع الحالي.");
+                }
+                else
+                {
+                    await _dialogService.ShowErrorAsync("المخزون غير كافٍ",
+                        $"المنتج: {product.Name}\nالمتوفر في المستودع: {currentStock:N0}\nالمطلوب: {neededQuantity:N0}");
+                }
+                return;
+            }
+
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                var line = new InvoiceLineViewModel(Products, _soundService)
+                if (existingLine != null)
                 {
-                    SelectedProduct = product,
-                    Quantity = 1m,
-                    Mode = (byte)SaleMode.Retail
-                };
-                line.PropertyChanged += (s, e) =>
+                    existingLine.Quantity += 1m;
+                    _soundService.PlaySuccess();
+                }
+                else
                 {
-                    if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
-                        RecalculateTotals();
-                };
-                Items.Add(line);
+                    var line = new InvoiceLineViewModel(Products, _soundService)
+                    {
+                        SelectedProduct = product,
+                        Quantity = 1m,
+                        Mode = (byte)SaleMode.Retail
+                    };
+                    line.PropertyChanged += (s, e) =>
+                    {
+                        if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
+                            RecalculateTotals();
+                    };
+                    Items.Add(line);
+                }
+
                 OnPropertyChanged(nameof(Items));
                 RecalculateTotals();
             });
@@ -285,11 +324,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
     #region Properties
     public int? InvoiceId => _invoiceId;
-    public string? InvoiceNo
-    {
-        get => _invoiceNo;
-        set => SetProperty(ref _invoiceNo, value);
-    }
     public bool IsEditMode => _isEditMode;
 
     public ObservableCollection<CustomerDto> Customers
@@ -335,6 +369,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedWarehouseId, value))
             {
+                if (TouchPosVM != null)
+                    TouchPosVM.WarehouseId = value;
                 UpdateCommandStates();
             }
         }
@@ -589,7 +625,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 var invoice = result.Value;
-                _invoiceNo = invoice.InvoiceNo;
                 SelectedWarehouseId = invoice.WarehouseId;
                 SelectedCustomerId = invoice.CustomerId;
                 InvoiceDate = invoice.InvoiceDate;
@@ -605,7 +640,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     OnPropertyChanged(nameof(IsReadOnly));
                 }
                 IsTaxInclusive = false;
-                OnPropertyChanged(nameof(InvoiceNo));
 
                 Items.Clear();
                 foreach (var item in invoice.Items)
@@ -642,6 +676,19 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     {
         if (!await ValidateInvoice()) return;
 
+        // --- Stock validation before saving (warning only) ---
+        if (!_allowNegativeStock && _selectedWarehouseId > 0 && Items.Count > 0)
+        {
+            var stockIssues = await ValidateStockBeforePostAsync();
+            if (stockIssues.Count > 0)
+            {
+                var message = "تنبيه: بعض المنتجات ليس لديها مخزون كافٍ:\n\n";
+                message += string.Join("\n", stockIssues.Select(s => s.Description));
+                message += "\n\nيمكنك حفظ الفاتورة كمسودة ولكن قد لا تتمكن من ترحيلها.";
+                await _dialogService.ShowWarningAsync("المخزون غير كافٍ", message);
+            }
+        }
+
         await ExecuteAsync(async () =>
         {
             ErrorMessage = null;
@@ -660,11 +707,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 _invoiceId = result.Value.Id;
-                _invoiceNo = result.Value.InvoiceNo;
                 _status = result.Value.Status;
                 _isEditMode = true;
                 
-                OnPropertyChanged(nameof(InvoiceNo));
                 OnPropertyChanged(nameof(Status));
                 OnPropertyChanged(nameof(IsEditMode));
                 OnPropertyChanged(nameof(IsReadOnly));
@@ -688,6 +733,30 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         {
             await SaveAsync();
             if (_invoiceId == null) return;
+        }
+
+        // --- Stock validation before posting ---
+        if (!_allowNegativeStock)
+        {
+            var stockIssues = await ValidateStockBeforePostAsync();
+            if (stockIssues.Count > 0)
+            {
+                var criticalCount = stockIssues.Count(s => s.IsOutOfStock);
+                var message = "تنبيه المخزون:\n\n";
+                message += string.Join("\n", stockIssues.Select(s => s.Description));
+                message += "\n\n";
+
+                if (criticalCount > 0)
+                {
+                    message += $"❌ {criticalCount} منتج/منتجات نفذ من المخزون. لا يمكن متابعة الترحيل.";
+                    await _dialogService.ShowErrorAsync("المخزون غير كافٍ", message);
+                    return;
+                }
+
+                message += $"⚠️ {stockIssues.Count} منتج/منتجات الكمية المتوفرة أقل من المطلوب.\nهل تريد متابعة الترحيل على أي حال؟";
+                var proceed = await _dialogService.ShowConfirmationAsync("المخزون غير كافٍ", message);
+                if (!proceed) return;
+            }
         }
 
         if (!await _dialogService.ShowConfirmationAsync("تأكيد الترحيل", "هل أنت متأكد من ترحيل هذه الفاتورة؟\nسيتم خصم الكميات من المخزون.")) return;
@@ -757,7 +826,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             {
                 var previewWindow = new Views.Common.PdfPreviewWindow(
                     result.Value,
-                    _invoiceNo ?? $"#{_invoiceId}",
+                    $"#{_invoiceId}",
                     _invoiceId!.Value);
                 previewWindow.ShowDialog();
             }
@@ -1205,6 +1274,50 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             ? SalesViewMode.Touch
             : SalesViewMode.Standard;
     }
+
+    /// <summary>
+    /// Validates stock for all invoice items before posting.
+    /// Returns list of stock issues (empty = all good).
+    /// </summary>
+    private async Task<List<StockIssue>> ValidateStockBeforePostAsync()
+    {
+        var issues = new List<StockIssue>();
+        if (_allowNegativeStock || _selectedWarehouseId <= 0 || Items.Count == 0)
+            return issues;
+
+        foreach (var line in Items)
+        {
+            if (line.SelectedProduct == null) continue;
+
+            var stockResult = await _inventoryService.GetStockAsync(line.SelectedProduct.Id, _selectedWarehouseId);
+            if (!stockResult.IsSuccess) continue;
+
+            var availableStock = stockResult.Value;
+            var requiredQty = line.Quantity;
+
+            if (availableStock <= 0)
+            {
+                issues.Add(new StockIssue(line.SelectedProduct.Name, requiredQty, availableStock, true));
+            }
+            else if (availableStock < requiredQty)
+            {
+                issues.Add(new StockIssue(line.SelectedProduct.Name, requiredQty, availableStock, false));
+            }
+        }
+
+        return issues;
+    }
+
+    /// <summary>
+    /// Represents a stock validation issue for a single product.
+    /// </summary>
+    private record StockIssue(string ProductName, decimal RequiredQty, decimal AvailableStock, bool IsOutOfStock)
+    {
+        public string Description => IsOutOfStock
+            ? $"• {ProductName}: نفذ من المخزون (المتوفر: {AvailableStock:N0})"
+            : $"• {ProductName}: الكمية المطلوبة {RequiredQty:N0} لكن المتوفر {AvailableStock:N0}";
+    }
+
     #endregion
 }
 

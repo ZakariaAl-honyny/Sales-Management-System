@@ -39,7 +39,25 @@ public class MainViewModel : ViewModelBase
         NavigateToDashboardCommand = new RelayCommand(() => NavigateTo<DashboardViewModel>());
 
         // Sales section
-        NavigateToPosCommand = new RelayCommand(() => NavigateTo<TouchPosViewModel>());
+        NavigateToPosCommand = new RelayCommand(() => 
+        {
+            var screenService = App.GetService<IScreenWindowService>();
+            var editorVm = App.GetService<SalesInvoiceEditorViewModel>();
+            editorVm.CurrentViewMode = SalesInvoiceEditorViewModel.SalesViewMode.Touch;
+            
+            screenService.OpenScreen(editorVm, new ScreenWindowOptions
+            {
+                Title = "نقطة البيع (الكاشير)",
+                OnClosed = (vm) =>
+                {
+                    if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+                    {
+                        var eventBus = App.GetService<IEventBus>();
+                        eventBus.Publish(new SalesSystem.DesktopPWF.Messaging.Messages.SaleInvoiceChangedMessage(editor.InvoiceId.Value));
+                    }
+                }
+            });
+        });
         NavigateToSalesInvoicesCommand = new RelayCommand(() => NavigateTo<SalesInvoiceListViewModel>());
         NavigateToSalesReturnsCommand = new RelayCommand(() => NavigateTo<SalesReturnListViewModel>());
 
@@ -56,6 +74,12 @@ public class MainViewModel : ViewModelBase
         NavigateToReportsCommand = new RelayCommand(() => NavigateTo<ReportsViewModel>());
         NavigateToLowStockCommand = new RelayCommand(() => NavigateTo<LowStockViewModel>());
         NavigateToExpiredProductsCommand = new RelayCommand(() => NavigateTo<ExpiredProductsReportViewModel>());
+
+        // Financial Reports
+        NavigateToIncomeStatementCommand = new RelayCommand(() => NavigateTo<Reports.IncomeStatementViewModel>());
+        NavigateToCashFlowReportCommand = new RelayCommand(() => NavigateTo<Reports.CashFlowReportViewModel>());
+        NavigateToVatReportCommand = new RelayCommand(() => NavigateTo<Reports.VatReportViewModel>());
+        NavigateToAccountStatementCommand = new RelayCommand(() => NavigateTo<Reports.AccountStatementViewModel>());
 
         // Settings section
         NavigateToProductsCommand = new RelayCommand(() => NavigateTo<ProductListViewModel>());
@@ -140,6 +164,22 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى تقرير المنتجات منتهية الصلاحية</summary>
     public ICommand NavigateToExpiredProductsCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Financial Reports Commands
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>نقل إلى قائمة الدخل — عرض الإيرادات والتكاليف وصافي الربح</summary>
+    public ICommand NavigateToIncomeStatementCommand { get; }
+
+    /// <summary>نقل إلى تقرير التدفق النقدي — عرض الإيرادات والمصروفات والرصيد</summary>
+    public ICommand NavigateToCashFlowReportCommand { get; }
+
+    /// <summary>نقل إلى تقرير ضريبة القيمة المضافة — عرض الفواتير الخاضعة للضريبة</summary>
+    public ICommand NavigateToVatReportCommand { get; }
+
+    /// <summary>نقل إلى كشف حساب — عرض الحركات المدينة والدائنة للعميل أو المورد</summary>
+    public ICommand NavigateToAccountStatementCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Settings Section Commands
@@ -293,6 +333,10 @@ public class MainViewModel : ViewModelBase
             nameof(ReportsViewModel)                => "Reports",
             nameof(LowStockViewModel)               => "LowStock",
             nameof(ExpiredProductsReportViewModel)  => "ExpiredProducts",
+            nameof(IncomeStatementViewModel)         => "Reports",
+            nameof(CashFlowReportViewModel)           => "Reports",
+            nameof(VatReportViewModel)                => "Reports",
+            nameof(AccountStatementViewModel)         => "Reports",
             nameof(ProductListViewModel)            => "Products",
             nameof(CustomerListViewModel)           => "Customers",
             nameof(SupplierListViewModel)           => "Suppliers",

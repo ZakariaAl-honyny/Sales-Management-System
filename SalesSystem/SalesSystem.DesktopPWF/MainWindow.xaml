@@ -86,6 +86,18 @@
             <DataTemplate DataType="{x:Type vmReports:ExpiredProductsReportViewModel}">
                 <viewsReports:ExpiredProductsReportView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:IncomeStatementViewModel}">
+                <viewsReports:IncomeStatementView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:CashFlowReportViewModel}">
+                <viewsReports:CashFlowReportView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:VatReportViewModel}">
+                <viewsReports:VatReportView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:AccountStatementViewModel}">
+                <viewsReports:AccountStatementView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmProducts:ProductListViewModel}">
                 <viewsProducts:ProductsListView />
             </DataTemplate>
@@ -127,7 +139,7 @@
         </Grid.RowDefinitions>
 
         <!-- شريط القوائم Menu Bar -->
-        <Menu Grid.Row="0" Background="White" Padding="5">
+        <Menu Grid.Row="0" Background="White" Padding="3">
             <MenuItem Header="ملف" ToolTip="قائمة الملف">
                 <MenuItem Header="الملف الشخصي" ToolTip="عرض معلومات المستخدم الحالي" Click="ProfileMenuItem_Click"/>
                 <Separator/>
@@ -165,6 +177,11 @@
                 <MenuItem Header="تقرير الأرباح والخسائر" ToolTip="عرض تقارير الأرباح والخسائر" Tag="Reports" Click="ReportMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="المنتجات المنتهية" ToolTip="إدارة وترحيل المنتجات المنتهية الصلاحية" Tag="ExpiredProducts" Click="ReportMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="قائمة الدخل" ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="التدفق النقدي" ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="ضريبة القيمة المضافة" ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="كشف حساب" ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة" Tag="Reports" Click="ReportMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="الإعدادات" ToolTip="قائمة الإعدادات" x:Name="SettingsMenuItem">
                 <MenuItem Header="إدارة المنتجات" ToolTip="إدارة قائمة المنتجات والأسعار" Click="ProductsMenuItem_Click"/>
@@ -187,7 +204,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- الجانب الأيمن - قائمة التنقل (Sidebar) -->
-            <Border Grid.Column="0" Background="{StaticResource PrimaryBrush}" Width="220" BorderThickness="0">
+            <Border Grid.Column="0" Background="{StaticResource PrimaryBrush}" Width="200" BorderThickness="0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/> <!-- App Brand/Logo Area -->
@@ -195,11 +212,11 @@
                     </Grid.RowDefinitions>
 
                     <!-- App Branding -->
-                    <Border Grid.Row="0" Padding="16,20">
+                    <Border Grid.Row="0" Padding="12,12">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🚀" FontSize="24" Margin="0,0,12,0"/>
+                            <TextBlock Text="🚀" FontSize="22" Margin="0,0,8,0"/>
                             <TextBlock Text="نظام المبيعات" 
-                                       FontSize="18" 
+                                       FontSize="16" 
                                        FontWeight="Bold" 
                                        Foreground="White"
                                        VerticalAlignment="Center"
@@ -280,6 +297,23 @@
                                             Command="{Binding NavigateToExpiredProductsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             ToolTip="عرض المنتجات منتهية الصلاحية وإدارة إتلافها"/>
+                                    <Separator Margin="16,4"/>
+                                    <Button Content="قائمة الدخل" 
+                                            Command="{Binding NavigateToIncomeStatementCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح"/>
+                                    <Button Content="التدفق النقدي" 
+                                            Command="{Binding NavigateToCashFlowReportCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة"/>
+                                    <Button Content="ضريبة القيمة المضافة" 
+                                            Command="{Binding NavigateToVatReportCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة"/>
+                                    <Button Content="كشف حساب" 
+                                            Command="{Binding NavigateToAccountStatementCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة"/>
                                 </StackPanel>
                             </Expander>
 
@@ -336,7 +370,7 @@
             </Border>
 
             <!-- المنطقة الرئيسية - عرض المحتوى -->
-            <ContentControl Content="{Binding CurrentViewModel}" Grid.Column="1" Margin="10" />
+            <ContentControl Content="{Binding CurrentViewModel}" Grid.Column="1" Margin="8" />
         </Grid>
 
         <!-- شريط الحالة Status Bar -->

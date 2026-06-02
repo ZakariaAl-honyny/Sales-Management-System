@@ -11,7 +11,6 @@ public class PurchaseInvoiceTests
     public void Create_GivenValidData_ShouldCreatePurchaseInvoice()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             invoiceDate: new DateTime(2027, 1, 1),
@@ -22,7 +21,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        invoice.InvoiceNo.Should().Be("PUR-2026-000001");
+        invoice.Id.Should().BeGreaterThan(0);
         invoice.SupplierId.Should().Be(1);
         invoice.WarehouseId.Should().Be(1);
         invoice.PaymentType.Should().Be(PaymentType.Cash);
@@ -30,23 +29,9 @@ public class PurchaseInvoiceTests
     }
 
     [Fact]
-    public void Create_GivenInvoiceNoIsEmpty_ShouldThrowArgumentException()
-    {
-        var action = () => PurchaseInvoice.Create(
-            invoiceNo: "",
-            supplierId: 1,
-            warehouseId: 1
-        );
-
-        action.Should().Throw<DomainException>()
-            .WithMessage("رقم الفاتورة مطلوب.");
-    }
-
-    [Fact]
     public void Create_GivenSupplierIdIsZero_ShouldThrowArgumentException()
     {
         var action = () => PurchaseInvoice.Create(
-            invoiceNo: "PUR-001",
             supplierId: 0,
             warehouseId: 1
         );
@@ -59,7 +44,6 @@ public class PurchaseInvoiceTests
     public void Create_GivenWarehouseIdIsZero_ShouldThrowArgumentException()
     {
         var action = () => PurchaseInvoice.Create(
-            invoiceNo: "PUR-001",
             supplierId: 1,
             warehouseId: 0
         );
@@ -72,7 +56,6 @@ public class PurchaseInvoiceTests
     public void AddItem_GivenValidItem_ShouldAddItemAndRecalculateSubTotal()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -103,7 +86,6 @@ public class PurchaseInvoiceTests
     public void RemoveItem_GivenValidItem_ShouldRemoveItemAndRecalculate()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -124,7 +106,6 @@ public class PurchaseInvoiceTests
     public void AddItem_GivenNonDraftInvoice_ShouldThrowDomainException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -144,7 +125,6 @@ public class PurchaseInvoiceTests
     public void RemoveItem_GivenNonDraftInvoice_ShouldThrowDomainException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -164,7 +144,6 @@ public class PurchaseInvoiceTests
     public void RecalculateTotals_WithTax_ShouldCalculateCorrectly()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             discountAmount: 50m,
@@ -190,7 +169,6 @@ public class PurchaseInvoiceTests
     public void SetPaidAmount_GivenAmountExceedingTotalAmount_ShouldThrowDomainException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -214,7 +192,6 @@ public class PurchaseInvoiceTests
     public void SetPaidAmount_GivenNegativeAmount_ShouldThrowArgumentException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -234,7 +211,6 @@ public class PurchaseInvoiceTests
     public void SetPaidAmount_GivenValidAmount_ShouldSetPaidAmountAndRecalculateDue()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -255,7 +231,6 @@ public class PurchaseInvoiceTests
     public void SetTaxAmount_GivenNegativeTaxAmount_ShouldThrowArgumentException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -271,7 +246,6 @@ public class PurchaseInvoiceTests
     public void Post_GivenDraftInvoice_ShouldTransitionToPosted()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -289,7 +263,6 @@ public class PurchaseInvoiceTests
     public void Post_GivenEmptyInvoice_ShouldThrowDomainException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -305,7 +278,6 @@ public class PurchaseInvoiceTests
     public void Post_GivenAlreadyPostedInvoice_ShouldThrowDomainException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -325,7 +297,6 @@ public class PurchaseInvoiceTests
     public void Cancel_GivenPostedInvoice_ShouldTransitionToCancelled()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -344,7 +315,6 @@ public class PurchaseInvoiceTests
     public void Cancel_GivenAlreadyCancelledInvoice_ShouldThrowDomainException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -365,7 +335,6 @@ public class PurchaseInvoiceTests
     public void Cancel_GivenPaidInvoice_ShouldThrowDomainException()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -386,7 +355,6 @@ public class PurchaseInvoiceTests
     public void UpdateTotals_GivenValidDiscountAndTax_ShouldUpdateAndRecalculate()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             createdByUserId: 1
@@ -406,7 +374,6 @@ public class PurchaseInvoiceTests
     public void TotalAmount_Formula_ShouldBeSubTotalMinusDiscountPlusTax()
     {
         var invoice = PurchaseInvoice.Create(
-            invoiceNo: "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
             discountAmount: 100m,

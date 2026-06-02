@@ -3,7 +3,7 @@ using SalesSystem.DesktopPWF.ViewModels.Products;
 
 namespace SalesSystem.DesktopPWF.Views.Products;
 
-public partial class ProductUnitsListView : Page
+public partial class ProductUnitsListView : UserControl
 {
     private readonly ProductUnitsListViewModel _viewModel;
 

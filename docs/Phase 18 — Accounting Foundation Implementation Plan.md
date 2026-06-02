@@ -1,27 +1,27 @@
-﻿Phase 18 â€” Accounting Foundation Implementation Plan
-ًں“‹ Rules for AI Agent
+﻿Phase 18 — Accounting Foundation Implementation Plan
+📋 Rules for AI Agent
 This phase builds the financial backbone. Every other financial feature depends on it. Zero shortcuts. Zero assumptions.
 
-ًں—؛ï¸ڈ What We Are Building
+🗺️ What We Are Building
 text
 
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”گ
-â”‚                  ACCOUNTING FOUNDATION                          â”‚
-â”‚                                                                 â”‚
-â”‚  Chart of Accounts (Accounts)                                   â”‚
-â”‚       â”‚                                                         â”‚
-â”‚       â–¼                                                         â”‚
-â”‚  Journal Entries (JournalEntries)                               â”‚
-â”‚       â”‚                                                         â”‚
-â”‚       â–¼                                                         â”‚
-â”‚  Journal Entry Lines (JournalEntryLines)                        â”‚
-â”‚       â”‚                                                         â”‚
-â”‚       â–¼                                                         â”‚
-â”‚  System Account Mappings (SystemAccountMappings)                â”‚
-â”‚  "Which account to hit for each operation"                      â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”ک
-ًں—‚ï¸ڈ Task 0 â€” Database Migration
-Task 0.1 â€” Create All Tables in Order
+┌─────────────────────────────────────────────────────────────────┐
+│                  ACCOUNTING FOUNDATION                          │
+│                                                                 │
+│  Chart of Accounts (Accounts)                                   │
+│       │                                                         │
+│       ▼                                                         │
+│  Journal Entries (JournalEntries)                               │
+│       │                                                         │
+│       ▼                                                         │
+│  Journal Entry Lines (JournalEntryLines)                        │
+│       │                                                         │
+│       ▼                                                         │
+│  System Account Mappings (SystemAccountMappings)                │
+│  "Which account to hit for each operation"                      │
+└─────────────────────────────────────────────────────────────────┘
+🗂️ Task 0 — Database Migration
+Task 0.1 — Create All Tables in Order
 SQL
 
 -- =============================================
@@ -37,11 +37,11 @@ CREATE TABLE AccountTypes (
 );
 
 INSERT INTO AccountTypes VALUES
-(1, N'ط£طµظˆظ„',           'Assets'),
-(2, N'ط®طµظˆظ…',           'Liabilities'),
-(3, N'ط­ظ‚ظˆظ‚ ط§ظ„ظ…ظ„ظƒظٹط©',   'Equity'),
-(4, N'ط¥ظٹط±ط§ط¯ط§طھ',        'Revenues'),
-(5, N'ظ…طµط±ظˆظپط§طھ',        'Expenses');
+(1, N'أصول',           'Assets'),
+(2, N'خصوم',           'Liabilities'),
+(3, N'حقوق الملكية',   'Equity'),
+(4, N'إيرادات',        'Revenues'),
+(5, N'مصروفات',        'Expenses');
 
 -- =============================================
 -- 2. Chart of Accounts
@@ -193,48 +193,48 @@ CREATE TABLE SystemAccountMappings (
 
 -- ASSETS (1xxx)
 INSERT INTO Accounts (AccountCode, NameAr, NameEn, AccountType, IsSystemAccount) VALUES
-('1000', N'ط§ظ„ط£طµظˆظ„',                        'Assets',               1, 1),
-('1100', N'ط§ظ„ط£طµظˆظ„ ط§ظ„ظ…طھط¯ط§ظˆظ„ط©',               'Current Assets',       1, 1),
-('1101', N'ط§ظ„طµظ†ط¯ظˆظ‚',                        'Cash Account',         1, 1),
-('1102', N'ط§ظ„ط¨ظ†ظƒ',                          'Bank Account',         1, 1),
-('1200', N'ط§ظ„ظ…ط®ط²ظˆظ†',                        'Inventory',            1, 1),
-('1201', N'ط£طµظ„ ط§ظ„ظ…ط®ط²ظˆظ†',                    'Inventory Asset',      1, 1),
-('1300', N'ط§ظ„ط°ظ…ظ… ط§ظ„ظ…ط¯ظٹظ†ط©',                  'Receivables',          1, 1),
-('1301', N'ط°ظ…ظ… ط§ظ„ط¹ظ…ظ„ط§ط،',                    'Accounts Receivable',  1, 1);
+('1000', N'الأصول',                        'Assets',               1, 1),
+('1100', N'الأصول المتداولة',               'Current Assets',       1, 1),
+('1101', N'الصندوق',                        'Cash Account',         1, 1),
+('1102', N'البنك',                          'Bank Account',         1, 1),
+('1200', N'المخزون',                        'Inventory',            1, 1),
+('1201', N'أصل المخزون',                    'Inventory Asset',      1, 1),
+('1300', N'الذمم المدينة',                  'Receivables',          1, 1),
+('1301', N'ذمم العملاء',                    'Accounts Receivable',  1, 1);
 
 -- LIABILITIES (2xxx)
 INSERT INTO Accounts (AccountCode, NameAr, NameEn, AccountType, IsSystemAccount) VALUES
-('2000', N'ط§ظ„ط®طµظˆظ…',                         'Liabilities',          2, 1),
-('2100', N'ط§ظ„ط®طµظˆظ… ط§ظ„ظ…طھط¯ط§ظˆظ„ط©',               'Current Liabilities',  2, 1),
-('2101', N'ط°ظ…ظ… ط§ظ„ظ…ظˆط±ط¯ظٹظ†',                   'Accounts Payable',     2, 1),
-('2200', N'ط§ظ„ط¶ط±ط§ط¦ط¨ ط§ظ„ظ…ط³طھط­ظ‚ط©',               'Tax Liabilities',      2, 1),
-('2201', N'ط¶ط±ظٹط¨ط© ط§ظ„ظ‚ظٹظ…ط© ط§ظ„ظ…ط¶ط§ظپط© - ظ…ط®ط±ط¬ط§طھ', 'VAT Output',           2, 1),
-('2202', N'ط¶ط±ظٹط¨ط© ط§ظ„ظ‚ظٹظ…ط© ط§ظ„ظ…ط¶ط§ظپط© - ظ…ط¯ط®ظ„ط§طھ', 'VAT Input',            2, 1);
+('2000', N'الخصوم',                         'Liabilities',          2, 1),
+('2100', N'الخصوم المتداولة',               'Current Liabilities',  2, 1),
+('2101', N'ذمم الموردين',                   'Accounts Payable',     2, 1),
+('2200', N'الضرائب المستحقة',               'Tax Liabilities',      2, 1),
+('2201', N'ضريبة القيمة المضافة - مخرجات', 'VAT Output',           2, 1),
+('2202', N'ضريبة القيمة المضافة - مدخلات', 'VAT Input',            2, 1);
 
 -- EQUITY (3xxx)
 INSERT INTO Accounts (AccountCode, NameAr, NameEn, AccountType, IsSystemAccount) VALUES
-('3000', N'ط­ظ‚ظˆظ‚ ط§ظ„ظ…ظ„ظƒظٹط©',                   'Equity',               3, 1),
-('3101', N'ط±ط£ط³ ط§ظ„ظ…ط§ظ„',                      'Capital',              3, 1),
-('3102', N'ط§ظ„ط£ط±ط¨ط§ط­ ط§ظ„ظ…ط­طھط¬ط²ط©',               'Retained Earnings',    3, 1);
+('3000', N'حقوق الملكية',                   'Equity',               3, 1),
+('3101', N'رأس المال',                      'Capital',              3, 1),
+('3102', N'الأرباح المحتجزة',               'Retained Earnings',    3, 1);
 
 -- REVENUES (4xxx)
 INSERT INTO Accounts (AccountCode, NameAr, NameEn, AccountType, IsSystemAccount) VALUES
-('4000', N'ط§ظ„ط¥ظٹط±ط§ط¯ط§طھ',                      'Revenues',             4, 1),
-('4101', N'ط¥ظٹط±ط§ط¯ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ',               'Sales Revenue',        4, 1),
-('4102', N'ظ…ط±طھط¬ط¹ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ',               'Sales Returns',        4, 1),
-('4201', N'ط¥ظٹط±ط§ط¯ط§طھ ط£ط®ط±ظ‰',                   'Other Revenues',       4, 1);
+('4000', N'الإيرادات',                      'Revenues',             4, 1),
+('4101', N'إيرادات المبيعات',               'Sales Revenue',        4, 1),
+('4102', N'مرتجعات المبيعات',               'Sales Returns',        4, 1),
+('4201', N'إيرادات أخرى',                   'Other Revenues',       4, 1);
 
 -- EXPENSES (5xxx)
 INSERT INTO Accounts (AccountCode, NameAr, NameEn, AccountType, IsSystemAccount) VALUES
-('5000', N'ط§ظ„ظ…طµط±ظˆظپط§طھ',                       'Expenses',             5, 1),
-('5101', N'طھظƒظ„ظپط© ط§ظ„ط¨ط¶ط§ط¹ط© ط§ظ„ظ…ط¨ط§ط¹ط©',           'Cost of Goods Sold',   5, 1),
-('5201', N'ط§ظ„ظ…طµط±ظˆظپط§طھ ط§ظ„طھط´ط؛ظٹظ„ظٹط©',             'Operating Expenses',   5, 1),
-('5202', N'ط§ظ„ط¥ظٹط¬ط§ط±',                         'Rent',                 5, 1),
-('5203', N'ط§ظ„ظƒظ‡ط±ط¨ط§ط، ظˆط§ظ„ظ…ظٹط§ظ‡',                'Utilities',            5, 1),
-('5204', N'ط±ظˆط§طھط¨ ط§ظ„ظ…ظˆط¸ظپظٹظ†',                  'Salaries',             5, 1),
-('5205', N'ظ…طµط±ظˆظپط§طھ ط§ظ„ظ†ظ‚ظ„ ظˆط§ظ„طھظˆطµظٹظ„',          'Delivery Expenses',    5, 1),
-('5301', N'ط®ط³ط§ط¦ط± ط§ظ„ط¨ط¶ط§ط¹ط© ط§ظ„طھط§ظ„ظپط©',           'Spoilage Loss',        5, 1),
-('5302', N'ط®ط³ط§ط¦ط± ط§ظ„ظ…ط®ط²ظˆظ†',                   'Inventory Loss',       5, 1);
+('5000', N'المصروفات',                       'Expenses',             5, 1),
+('5101', N'تكلفة البضاعة المباعة',           'Cost of Goods Sold',   5, 1),
+('5201', N'المصروفات التشغيلية',             'Operating Expenses',   5, 1),
+('5202', N'الإيجار',                         'Rent',                 5, 1),
+('5203', N'الكهرباء والمياه',                'Utilities',            5, 1),
+('5204', N'رواتب الموظفين',                  'Salaries',             5, 1),
+('5205', N'مصروفات النقل والتوصيل',          'Delivery Expenses',    5, 1),
+('5301', N'خسائر البضاعة التالفة',           'Spoilage Loss',        5, 1),
+('5302', N'خسائر المخزون',                   'Inventory Loss',       5, 1);
 
 -- =============================================
 -- 7. Seed System Account Mappings
@@ -270,15 +270,15 @@ SELECT
     (SELECT Id FROM Accounts WHERE AccountCode = '5101'),
     (SELECT Id FROM Accounts WHERE AccountCode = '5201'),
     (SELECT Id FROM Accounts WHERE AccountCode = '5301');
-âœ… Task 0 Checklist
+✅ Task 0 Checklist
  All 6 tables created without errors
  All foreign keys valid
  Default accounts seeded (20+ accounts)
  SystemAccountMappings has one global row
  CHK_DebitOrCredit constraint applied
  CHK_NoNegativeValues constraint applied
-ًںڈ—ï¸ڈ Task 1 â€” Domain Layer
-Task 1.1 â€” Enums
+🏗️ Task 1 — Domain Layer
+Task 1.1 — Enums
 csharp
 
 // File: Domain/Accounting/Enums/AccountType.cs
@@ -308,7 +308,7 @@ public enum JournalEntryType
     Manual          = 8,
     OpeningBalance  = 9
 }
-Task 1.2 â€” Account Entity
+Task 1.2 — Account Entity
 csharp
 
 // File: Domain/Accounting/Entities/Account.cs
@@ -316,7 +316,7 @@ namespace Domain.Accounting.Entities;
 
 public class Account : BaseEntity
 {
-    // â”€â”€â”€ Properties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Properties ───────────────────────────────
     public string AccountCode { get; private set; }
     public string NameAr { get; private set; }
     public string NameEn { get; private set; }
@@ -326,7 +326,7 @@ public class Account : BaseEntity
     public bool IsActive { get; private set; }
     public string? Notes { get; private set; }
 
-    // â”€â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Navigation ───────────────────────────────
     public Account? ParentAccount { get; private set; }
     public IReadOnlyCollection<Account> SubAccounts => _subAccounts.AsReadOnly();
     private readonly List<Account> _subAccounts = new();
@@ -336,7 +336,7 @@ public class Account : BaseEntity
 
     private Account() { } // EF Core
 
-    // â”€â”€â”€ Factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Factory ──────────────────────────────────
     public static Account Create(
         string accountCode,
         string nameAr,
@@ -347,10 +347,10 @@ public class Account : BaseEntity
         string? notes = null)
     {
         if (string.IsNullOrWhiteSpace(accountCode))
-            throw new DomainException("ظƒظˆط¯ ط§ظ„ط­ط³ط§ط¨ ظ…ط·ظ„ظˆط¨");
+            throw new DomainException("كود الحساب مطلوب");
 
         if (string.IsNullOrWhiteSpace(nameAr))
-            throw new DomainException("ط§ط³ظ… ط§ظ„ط­ط³ط§ط¨ ط¨ط§ظ„ط¹ط±ط¨ظٹ ظ…ط·ظ„ظˆط¨");
+            throw new DomainException("اسم الحساب بالعربي مطلوب");
 
         return new Account
         {
@@ -365,14 +365,14 @@ public class Account : BaseEntity
         };
     }
 
-    // â”€â”€â”€ Domain Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Domain Methods ───────────────────────────
 
     public void Update(string nameAr, string nameEn, string? notes)
     {
         if (IsSystemAccount)
             throw new DomainException(
-                $"ط§ظ„ط­ط³ط§ط¨ '{NameAr}' ظ‡ظˆ ط­ط³ط§ط¨ ظ†ط¸ط§ظ… ظˆظ„ط§ ظٹظ…ظƒظ† طھط¹ط¯ظٹظ„ظ‡. " +
-                $"طھظˆط§طµظ„ ظ…ط¹ ط§ظ„ظ…ط³ط¤ظˆظ„ ظ„ط¥ط¬ط±ط§ط، ط£ظٹ طھط؛ظٹظٹط±ط§طھ.");
+                $"الحساب '{NameAr}' هو حساب نظام ولا يمكن تعديله. " +
+                $"تواصل مع المسؤول لإجراء أي تغييرات.");
 
         NameAr = nameAr.Trim();
         NameEn = nameEn.Trim();
@@ -383,7 +383,7 @@ public class Account : BaseEntity
     {
         if (IsSystemAccount)
             throw new DomainException(
-                $"ظ„ط§ ظٹظ…ظƒظ† طھط¹ط·ظٹظ„ ط§ظ„ط­ط³ط§ط¨ '{NameAr}' ظ„ط£ظ†ظ‡ ط­ط³ط§ط¨ ظ†ط¸ط§ظ… ط£ط³ط§ط³ظٹ.");
+                $"لا يمكن تعطيل الحساب '{NameAr}' لأنه حساب نظام أساسي.");
 
         IsActive = false;
     }
@@ -402,7 +402,7 @@ public class Account : BaseEntity
     public string GetDisplayName()
         => $"{AccountCode} - {NameAr}";
 }
-Task 1.3 â€” JournalEntry Entity
+Task 1.3 — JournalEntry Entity
 csharp
 
 // File: Domain/Accounting/Entities/JournalEntry.cs
@@ -410,7 +410,7 @@ namespace Domain.Accounting.Entities;
 
 public class JournalEntry : BaseEntity
 {
-    // â”€â”€â”€ Properties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Properties ───────────────────────────────
     public string EntryNumber { get; private set; }
     public DateTime TransactionDate { get; private set; }
     public string Description { get; private set; }
@@ -430,13 +430,13 @@ public class JournalEntry : BaseEntity
     public int? PostedBy { get; private set; }
     public DateTime? PostedAt { get; private set; }
 
-    // â”€â”€â”€ Lines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Lines ────────────────────────────────────
     private readonly List<JournalEntryLine> _lines = new();
     public IReadOnlyCollection<JournalEntryLine> Lines => _lines.AsReadOnly();
 
     private JournalEntry() { } // EF Core
 
-    // â”€â”€â”€ Factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Factory ──────────────────────────────────
     public static JournalEntry Create(
         string entryNumber,
         DateTime transactionDate,
@@ -449,10 +449,10 @@ public class JournalEntry : BaseEntity
         int? branchId = null)
     {
         if (string.IsNullOrWhiteSpace(entryNumber))
-            throw new DomainException("ط±ظ‚ظ… ط§ظ„ظ‚ظٹط¯ ظ…ط·ظ„ظˆط¨");
+            throw new DomainException("رقم القيد مطلوب");
 
         if (string.IsNullOrWhiteSpace(description))
-            throw new DomainException("ط¨ظٹط§ظ† ط§ظ„ظ‚ظٹط¯ ظ…ط·ظ„ظˆط¨");
+            throw new DomainException("بيان القيد مطلوب");
 
         return new JournalEntry
         {
@@ -471,7 +471,7 @@ public class JournalEntry : BaseEntity
         };
     }
 
-    // â”€â”€â”€ Domain Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Domain Methods ───────────────────────────
 
     /// <summary>
     /// Adds a debit line to the entry.
@@ -484,7 +484,7 @@ public class JournalEntry : BaseEntity
         string? description = null)
     {
         ValidateCanModify();
-        ValidateAmount(amount, "ط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ظ…ط¯ظٹظ†");
+        ValidateAmount(amount, "المبلغ المدين");
 
         _lines.Add(JournalEntryLine.CreateDebit(
             accountId, accountCode, accountNameAr, amount, description));
@@ -501,7 +501,7 @@ public class JournalEntry : BaseEntity
         string? description = null)
     {
         ValidateCanModify();
-        ValidateAmount(amount, "ط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ط¯ط§ط¦ظ†");
+        ValidateAmount(amount, "المبلغ الدائن");
 
         _lines.Add(JournalEntryLine.CreateCredit(
             accountId, accountCode, accountNameAr, amount, description));
@@ -528,18 +528,18 @@ public class JournalEntry : BaseEntity
     {
         if (!_lines.Any())
             throw new DomainException(
-                "ظ„ط§ ظٹظ…ظƒظ† طھط±ط­ظٹظ„ ظ‚ظٹط¯ ط¨ط¯ظˆظ† ط£ط³ط·ط±. ط£ط¶ظپ ط³ط·ط± ظ…ط¯ظٹظ† ظˆط¯ط§ط¦ظ† ط¹ظ„ظ‰ ط§ظ„ط£ظ‚ظ„.");
+                "لا يمكن ترحيل قيد بدون أسطر. أضف سطر مدين ودائن على الأقل.");
 
         if (!IsBalanced())
         {
             var totalDebit  = _lines.Sum(l => l.Debit);
             var totalCredit = _lines.Sum(l => l.Credit);
             throw new DomainException(
-                $"ط§ظ„ظ‚ظٹط¯ ط؛ظٹط± ظ…طھظˆط§ط²ظ† ظˆظ„ط§ ظٹظ…ظƒظ† طھط±ط­ظٹظ„ظ‡.\n" +
-                $"ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ظ…ط¯ظٹظ†:  {totalDebit:N2}\n" +
-                $"ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ط¯ط§ط¦ظ†: {totalCredit:N2}\n" +
-                $"ط§ظ„ظپط±ظ‚: {Math.Abs(totalDebit - totalCredit):N2}\n" +
-                $"ظٹط¬ط¨ ط£ظ† ظٹطھط³ط§ظˆظ‰ ط§ظ„ظ…ط¯ظٹظ† ظˆط§ظ„ط¯ط§ط¦ظ†.");
+                $"القيد غير متوازن ولا يمكن ترحيله.\n" +
+                $"إجمالي المدين:  {totalDebit:N2}\n" +
+                $"إجمالي الدائن: {totalCredit:N2}\n" +
+                $"الفرق: {Math.Abs(totalDebit - totalCredit):N2}\n" +
+                $"يجب أن يتساوى المدين والدائن.");
         }
 
         IsPosted  = true;
@@ -550,30 +550,30 @@ public class JournalEntry : BaseEntity
     public decimal TotalDebit  => _lines.Sum(l => l.Debit);
     public decimal TotalCredit => _lines.Sum(l => l.Credit);
 
-    // â”€â”€â”€ Private Guards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Private Guards ───────────────────────────
 
     private void ValidateCanModify()
     {
         if (IsPosted)
             throw new DomainException(
-                $"ط§ظ„ظ‚ظٹط¯ ط±ظ‚ظ… {EntryNumber} ظ…ط±ط­ظ‘ظ„ ظˆظ„ط§ ظٹظ…ظƒظ† طھط¹ط¯ظٹظ„ظ‡.\n" +
-                $"ظ„ط¥طµظ„ط§ط­ ط£ظٹ ط®ط·ط£طŒ ط§ط³طھط®ط¯ظ… 'ظ‚ظٹط¯ ط¹ظƒط³ظٹ' ط£ظˆ طھظˆط§طµظ„ ظ…ط¹ ط§ظ„ظ…ط­ط§ط³ط¨.");
+                $"القيد رقم {EntryNumber} مرحّل ولا يمكن تعديله.\n" +
+                $"لإصلاح أي خطأ، استخدم 'قيد عكسي' أو تواصل مع المحاسب.");
 
         if (IsReversed)
             throw new DomainException(
-                $"ط§ظ„ظ‚ظٹط¯ ط±ظ‚ظ… {EntryNumber} طھظ… ط¹ظƒط³ظ‡ ظˆظ„ط§ ظٹظ…ظƒظ† طھط¹ط¯ظٹظ„ظ‡.");
+                $"القيد رقم {EntryNumber} تم عكسه ولا يمكن تعديله.");
     }
 
     private static void ValidateAmount(decimal amount, string fieldName)
     {
         if (amount < 0)
-            throw new DomainException($"{fieldName} ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† ط³ط§ظ„ط¨ط§ظ‹");
+            throw new DomainException($"{fieldName} لا يمكن أن يكون سالباً");
 
         if (amount == 0)
-            throw new DomainException($"{fieldName} ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† طµظپط±ط§ظ‹");
+            throw new DomainException($"{fieldName} لا يمكن أن يكون صفراً");
     }
 }
-Task 1.4 â€” JournalEntryLine Entity
+Task 1.4 — JournalEntryLine Entity
 csharp
 
 // File: Domain/Accounting/Entities/JournalEntryLine.cs
@@ -584,7 +584,7 @@ public class JournalEntryLine : BaseEntity
     public int JournalEntryId { get; private set; }
     public int AccountId { get; private set; }
 
-    // Snapshots â€” account data at time of entry
+    // Snapshots — account data at time of entry
     public string AccountCode { get; private set; }
     public string AccountNameAr { get; private set; }
 
@@ -599,7 +599,7 @@ public class JournalEntryLine : BaseEntity
 
     private JournalEntryLine() { } // EF Core
 
-    // â”€â”€â”€ Factories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Factories ────────────────────────────────
 
     internal static JournalEntryLine CreateDebit(
         int accountId,
@@ -641,7 +641,7 @@ public class JournalEntryLine : BaseEntity
     public bool IsCredit => Credit > 0;
     public decimal Amount => Debit > 0 ? Debit : Credit;
 }
-Task 1.5 â€” SystemAccountMappings Entity
+Task 1.5 — SystemAccountMappings Entity
 csharp
 
 // File: Domain/Accounting/Entities/SystemAccountMappings.cs
@@ -651,30 +651,30 @@ public class SystemAccountMappings : BaseEntity
 {
     public int? BranchId { get; private set; }
 
-    // â”€â”€â”€ Asset Accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Asset Accounts ───────────────────────────
     public int DefaultCashAccountId        { get; private set; }
     public int DefaultBankAccountId        { get; private set; }
     public int InventoryAssetAccountId     { get; private set; }
     public int AccountsReceivableAccountId { get; private set; }
 
-    // â”€â”€â”€ Liability Accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Liability Accounts ───────────────────────
     public int AccountsPayableAccountId { get; private set; }
     public int VatOutputAccountId       { get; private set; }
     public int VatInputAccountId        { get; private set; }
 
-    // â”€â”€â”€ Equity Accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Equity Accounts ──────────────────────────
     public int CapitalAccountId { get; private set; }
 
-    // â”€â”€â”€ Revenue Accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Revenue Accounts ─────────────────────────
     public int SalesRevenueAccountId { get; private set; }
     public int SalesReturnAccountId  { get; private set; }
 
-    // â”€â”€â”€ Expense Accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Expense Accounts ─────────────────────────
     public int CogsAccountId            { get; private set; }
     public int GeneralExpenseAccountId  { get; private set; }
     public int SpoilageLossAccountId    { get; private set; }
 
-    // â”€â”€â”€ Navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Navigation ───────────────────────────────
     public Account DefaultCashAccount        { get; private set; }
     public Account DefaultBankAccount        { get; private set; }
     public Account InventoryAssetAccount     { get; private set; }
@@ -698,20 +698,20 @@ public class SystemAccountMappings : BaseEntity
     {
         return paymentMethod?.ToLower() switch
         {
-            "bank" or "ط´ط¨ظƒط©" or "ط¨ط·ط§ظ‚ط©" => DefaultBankAccountId,
+            "bank" or "شبكة" or "بطاقة" => DefaultBankAccountId,
             _ => DefaultCashAccountId
         };
     }
 }
-âœ… Task 1 Checklist
+✅ Task 1 Checklist
  All 4 entities created in Domain/Accounting/Entities/
  JournalEntry.IsBalanced() implemented
  JournalEntry.ValidateAndPost() throws if unbalanced
  Arabic error messages in all DomainExceptions
  IsSystemAccount prevents deletion/modification
  CreateDebit and CreateCredit are internal (only JournalEntry can create lines)
-âڑ™ï¸ڈ Task 2 â€” Infrastructure (EF Core Configuration)
-Task 2.1 â€” Account Configuration
+⚙️ Task 2 — Infrastructure (EF Core Configuration)
+Task 2.1 — Account Configuration
 csharp
 
 // File: Infrastructure/Persistence/Configurations/AccountConfiguration.cs
@@ -755,7 +755,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
-Task 2.2 â€” JournalEntry Configuration
+Task 2.2 — JournalEntry Configuration
 csharp
 
 // File: Infrastructure/Persistence/Configurations/JournalEntryConfiguration.cs
@@ -812,7 +812,7 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
-Task 2.3 â€” JournalEntryLine Configuration
+Task 2.3 — JournalEntryLine Configuration
 csharp
 
 // File: Infrastructure/Persistence/Configurations/JournalEntryLineConfiguration.cs
@@ -826,11 +826,11 @@ public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEnt
 
         // Precision for financial values
         builder.Property(x => x.Debit)
-            .HasPrecision(18, 2)
+            .HasPrecision(18, 4)
             .IsRequired();
 
         builder.Property(x => x.Credit)
-            .HasPrecision(18, 2)
+            .HasPrecision(18, 4)
             .IsRequired();
 
         builder.Property(x => x.AccountCode)
@@ -858,14 +858,14 @@ public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEnt
             .HasDatabaseName("IX_JournalEntryLines_AccountId");
     }
 }
-âœ… Task 2 Checklist
+✅ Task 2 Checklist
  All 3 configurations registered in AppDbContext.OnModelCreating()
  Decimal precision is (18,2) for all financial columns
  Unique indexes on EntryNumber and AccountCode
  Cascade delete on JournalEntryLines when entry deleted
  Restrict delete on Account (cannot delete account that has transactions)
-âڑ™ï¸ڈ Task 3 â€” Application Layer (Services)
-Task 3.1 â€” EntryNumber Generator
+⚙️ Task 3 — Application Layer (Services)
+Task 3.1 — EntryNumber Generator
 csharp
 
 // File: Application/Accounting/Services/JournalEntryNumberGenerator.cs
@@ -898,7 +898,7 @@ public class JournalEntryNumberGenerator : IJournalEntryNumberGenerator
         // Result: "JE-20260520-0001"
     }
 }
-Task 3.2 â€” System Account Mappings Service
+Task 3.2 — System Account Mappings Service
 csharp
 
 // File: Application/Accounting/Services/ISystemAccountService.cs
@@ -949,8 +949,8 @@ public class SystemAccountService : ISystemAccountService
 
         if (mapping == null)
             throw new InvalidOperationException(
-                "ظ„ظ… ظٹطھظ… ط¥ط¹ط¯ط§ط¯ ط±ط¨ط· ط§ظ„ط­ط³ط§ط¨ط§طھ ط§ظ„ط§ظپطھط±ط§ط¶ظٹط©. " +
-                "ظٹط±ط¬ظ‰ ط§ظ„ط°ظ‡ط§ط¨ ط¥ظ„ظ‰ ط§ظ„ط¥ط¹ط¯ط§ط¯ط§طھ â†گ ط¥ط¹ط¯ط§ط¯ط§طھ ط§ظ„ظ…ط­ط§ط³ط¨ط© ظˆطھط­ط¯ظٹط¯ ط§ظ„ط­ط³ط§ط¨ط§طھ ط§ظ„ط§ظپطھط±ط§ط¶ظٹط©.");
+                "لم يتم إعداد ربط الحسابات الافتراضية. " +
+                "يرجى الذهاب إلى الإعدادات ← إعدادات المحاسبة وتحديد الحسابات الافتراضية.");
 
         return mapping;
     }
@@ -963,10 +963,10 @@ public class SystemAccountService : ISystemAccountService
             .FirstOrDefaultAsync(a =>
                 a.AccountCode == accountCode && a.IsActive, ct)
             ?? throw new DomainException(
-                $"ط§ظ„ط­ط³ط§ط¨ ط¨ط§ظ„ظƒظˆط¯ '{accountCode}' ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ط£ظˆ ط؛ظٹط± ظ†ط´ط·.");
+                $"الحساب بالكود '{accountCode}' غير موجود أو غير نشط.");
     }
 }
-Task 3.3 â€” Create Manual Journal Entry Command
+Task 3.3 — Create Manual Journal Entry Command
 csharp
 
 // File: Application/Accounting/Commands/CreateJournalEntry/CreateJournalEntryCommand.cs
@@ -1001,20 +1001,20 @@ public class CreateJournalEntryCommandValidator
     {
         RuleFor(x => x.Description)
             .NotEmpty()
-            .WithMessage("ط¨ظٹط§ظ† ط§ظ„ظ‚ظٹط¯ ظ…ط·ظ„ظˆط¨")
+            .WithMessage("بيان القيد مطلوب")
             .MaximumLength(500);
 
         RuleFor(x => x.TransactionDate)
             .NotEmpty()
-            .WithMessage("طھط§ط±ظٹط® ط§ظ„ظ‚ظٹط¯ ظ…ط·ظ„ظˆط¨")
+            .WithMessage("تاريخ القيد مطلوب")
             .LessThanOrEqualTo(DateTime.Today.AddDays(1))
-            .WithMessage("طھط§ط±ظٹط® ط§ظ„ظ‚ظٹط¯ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† ظپظٹ ط§ظ„ظ…ط³طھظ‚ط¨ظ„");
+            .WithMessage("تاريخ القيد لا يمكن أن يكون في المستقبل");
 
         RuleFor(x => x.Lines)
             .NotEmpty()
-            .WithMessage("ظٹط¬ط¨ ط¥ط¶ط§ظپط© ط£ط³ط·ط± ظ„ظ„ظ‚ظٹط¯")
+            .WithMessage("يجب إضافة أسطر للقيد")
             .Must(lines => lines.Count >= 2)
-            .WithMessage("ط§ظ„ظ‚ظٹط¯ ظٹط¬ط¨ ط£ظ† ظٹط­طھظˆظٹ ط¹ظ„ظ‰ ط³ط·ط±ظٹظ† ط¹ظ„ظ‰ ط§ظ„ط£ظ‚ظ„");
+            .WithMessage("القيد يجب أن يحتوي على سطرين على الأقل");
 
         RuleFor(x => x.Lines)
             .Must(lines =>
@@ -1027,20 +1027,20 @@ public class CreateJournalEntryCommandValidator
             {
                 var d = x.Lines.Sum(l => l.Debit);
                 var c = x.Lines.Sum(l => l.Credit);
-                return $"ط§ظ„ظ‚ظٹط¯ ط؛ظٹط± ظ…طھظˆط§ط²ظ†. ط§ظ„ظ…ط¯ظٹظ†: {d:N2} â€” ط§ظ„ط¯ط§ط¦ظ†: {c:N2}";
+                return $"القيد غير متوازن. المدين: {d:N2} — الدائن: {c:N2}";
             });
 
         RuleForEach(x => x.Lines).ChildRules(line =>
         {
             line.RuleFor(l => l.AccountId)
                 .GreaterThan(0)
-                .WithMessage("ط­ط³ط§ط¨ ط§ظ„ظ‚ظٹط¯ ط؛ظٹط± طµط§ظ„ط­");
+                .WithMessage("حساب القيد غير صالح");
 
             line.RuleFor(l => l)
                 .Must(l =>
                     (l.Debit > 0 && l.Credit == 0) ||
                     (l.Credit > 0 && l.Debit == 0))
-                .WithMessage("ظƒظ„ ط³ط·ط± ظٹط¬ط¨ ط£ظ† ظٹظƒظˆظ† ط¥ظ…ط§ ظ…ط¯ظٹظ†ط§ظ‹ ط£ظˆ ط¯ط§ط¦ظ†ط§ظ‹ ظˆظ„ظٹط³ ط§ظ„ط§ط«ظ†ظٹظ† ظ…ط¹ط§ظ‹");
+                .WithMessage("كل سطر يجب أن يكون إما مديناً أو دائناً وليس الاثنين معاً");
         });
     }
 }
@@ -1069,10 +1069,10 @@ public class CreateJournalEntryCommandHandler
         CreateJournalEntryCommand command,
         CancellationToken cancellationToken)
     {
-        // â”€â”€â”€ 1. Generate entry number â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── 1. Generate entry number ───────────────────
         var entryNumber = await _numberGenerator.GenerateAsync(cancellationToken);
 
-        // â”€â”€â”€ 2. Load accounts for all lines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── 2. Load accounts for all lines ────────────
         var accountIds = command.Lines.Select(l => l.AccountId).Distinct().ToList();
 
         var accounts = await _context.Accounts
@@ -1086,9 +1086,9 @@ public class CreateJournalEntryCommandHandler
 
         if (missingIds.Any())
             throw new DomainException(
-                $"ط§ظ„ط­ط³ط§ط¨ط§طھ ط§ظ„طھط§ظ„ظٹط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©: {string.Join(", ", missingIds)}");
+                $"الحسابات التالية غير موجودة: {string.Join(", ", missingIds)}");
 
-        // â”€â”€â”€ 3. Create journal entry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── 3. Create journal entry ────────────────────
         var entry = JournalEntry.Create(
             entryNumber,
             command.TransactionDate,
@@ -1100,7 +1100,7 @@ public class CreateJournalEntryCommandHandler
             command.ReferenceNumber,
             command.BranchId);
 
-        // â”€â”€â”€ 4. Add lines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── 4. Add lines ───────────────────────────────
         foreach (var lineRequest in command.Lines)
         {
             var account = accounts.First(a => a.Id == lineRequest.AccountId);
@@ -1121,10 +1121,10 @@ public class CreateJournalEntryCommandHandler
                     lineRequest.Description);
         }
 
-        // â”€â”€â”€ 5. Validate and post â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── 5. Validate and post ───────────────────────
         entry.ValidateAndPost(command.CreatedBy);
 
-        // â”€â”€â”€ 6. Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─── 6. Save ────────────────────────────────────
         _context.JournalEntries.Add(entry);
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -1135,14 +1135,14 @@ public class CreateJournalEntryCommandHandler
         return entry.Id;
     }
 }
-âœ… Task 3 Checklist
+✅ Task 3 Checklist
  JournalEntryNumberGenerator creates sequential daily numbers
  Validator rejects unbalanced entries BEFORE handler runs
  Handler validates all accounts exist before creating entry
  Entry is posted immediately upon creation (no draft journals)
  All services registered in DI container
-ًں“ٹ Task 4 â€” Basic Financial Queries
-Task 4.1 â€” Get Account Balance Query
+📊 Task 4 — Basic Financial Queries
+Task 4.1 — Get Account Balance Query
 csharp
 
 // File: Application/Accounting/Queries/GetAccountBalance/GetAccountBalanceQuery.cs
@@ -1221,7 +1221,7 @@ public class GetAccountBalanceHandler
             isDebitNormal);
     }
 }
-Task 4.2 â€” Get Account Statement Query
+Task 4.2 — Get Account Statement Query
 csharp
 
 // File: Application/Accounting/Queries/GetAccountStatement/GetAccountStatementQuery.cs
@@ -1334,13 +1334,13 @@ public class GetAccountStatementHandler
             runningBalance);
     }
 }
-âœ… Task 4 Checklist
+✅ Task 4 Checklist
  All queries use AsNoTracking()
  Opening balance calculated correctly (before period)
  Running balance direction based on IsDebitNormal()
  Only IsPosted = true entries included in statements
  Results ordered by date then entry number
-ًں§ھ Task 5 â€” Unit Tests
+🧪 Task 5 — Unit Tests
 csharp
 
 // File: Tests/Domain/JournalEntryTests.cs
@@ -1355,8 +1355,8 @@ public class JournalEntryTests
     public void IsBalanced_EqualDebitsAndCredits_ReturnsTrue()
     {
         var entry = CreateEntry();
-        entry.AddDebitLine(CashId,  "1101", "ط§ظ„طµظ†ط¯ظˆظ‚",           1000);
-        entry.AddCreditLine(SalesId,"4101", "ط¥ظٹط±ط§ط¯ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ",  1000);
+        entry.AddDebitLine(CashId,  "1101", "الصندوق",           1000);
+        entry.AddCreditLine(SalesId,"4101", "إيرادات المبيعات",  1000);
 
         Assert.True(entry.IsBalanced());
     }
@@ -1365,8 +1365,8 @@ public class JournalEntryTests
     public void IsBalanced_UnequalAmounts_ReturnsFalse()
     {
         var entry = CreateEntry();
-        entry.AddDebitLine(CashId,  "1101", "ط§ظ„طµظ†ط¯ظˆظ‚",          1000);
-        entry.AddCreditLine(SalesId,"4101", "ط¥ظٹط±ط§ط¯ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ",  900);
+        entry.AddDebitLine(CashId,  "1101", "الصندوق",          1000);
+        entry.AddCreditLine(SalesId,"4101", "إيرادات المبيعات",  900);
 
         Assert.False(entry.IsBalanced());
     }
@@ -1375,13 +1375,13 @@ public class JournalEntryTests
     public void ValidateAndPost_UnbalancedEntry_ThrowsDomainException()
     {
         var entry = CreateEntry();
-        entry.AddDebitLine(CashId,  "1101", "ط§ظ„طµظ†ط¯ظˆظ‚",          500);
-        entry.AddCreditLine(SalesId,"4101", "ط¥ظٹط±ط§ط¯ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ",  300);
+        entry.AddDebitLine(CashId,  "1101", "الصندوق",          500);
+        entry.AddCreditLine(SalesId,"4101", "إيرادات المبيعات",  300);
 
         var ex = Assert.Throws<DomainException>(
             () => entry.ValidateAndPost(postedBy: 1));
 
-        Assert.Contains("ط؛ظٹط± ظ…طھظˆط§ط²ظ†", ex.Message);
+        Assert.Contains("غير متوازن", ex.Message);
     }
 
     [Fact]
@@ -1392,15 +1392,15 @@ public class JournalEntryTests
         var ex = Assert.Throws<DomainException>(
             () => entry.ValidateAndPost(postedBy: 1));
 
-        Assert.Contains("ط¨ط¯ظˆظ† ط£ط³ط·ط±", ex.Message);
+        Assert.Contains("بدون أسطر", ex.Message);
     }
 
     [Fact]
     public void ValidateAndPost_BalancedEntry_SetsIsPostedTrue()
     {
         var entry = CreateEntry();
-        entry.AddDebitLine(CashId,  "1101", "ط§ظ„طµظ†ط¯ظˆظ‚",          1000);
-        entry.AddCreditLine(SalesId,"4101", "ط¥ظٹط±ط§ط¯ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ", 1000);
+        entry.AddDebitLine(CashId,  "1101", "الصندوق",          1000);
+        entry.AddCreditLine(SalesId,"4101", "إيرادات المبيعات", 1000);
 
         entry.ValidateAndPost(postedBy: 1);
 
@@ -1413,14 +1413,14 @@ public class JournalEntryTests
     public void AddDebitLine_AfterPosted_ThrowsDomainException()
     {
         var entry = CreateEntry();
-        entry.AddDebitLine(CashId,  "1101", "ط§ظ„طµظ†ط¯ظˆظ‚",          1000);
-        entry.AddCreditLine(SalesId,"4101", "ط¥ظٹط±ط§ط¯ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ", 1000);
+        entry.AddDebitLine(CashId,  "1101", "الصندوق",          1000);
+        entry.AddCreditLine(SalesId,"4101", "إيرادات المبيعات", 1000);
         entry.ValidateAndPost(postedBy: 1);
 
         var ex = Assert.Throws<DomainException>(
-            () => entry.AddDebitLine(CashId, "1101", "ط§ظ„طµظ†ط¯ظˆظ‚", 500));
+            () => entry.AddDebitLine(CashId, "1101", "الصندوق", 500));
 
-        Assert.Contains("ظ…ط±ط­ظ‘ظ„", ex.Message);
+        Assert.Contains("مرحّل", ex.Message);
     }
 
     [Fact]
@@ -1430,15 +1430,15 @@ public class JournalEntryTests
         var entry = CreateEntry();
 
         // Cash in
-        entry.AddDebitLine(1,  "1101", "ط§ظ„طµظ†ط¯ظˆظ‚",                1150);
+        entry.AddDebitLine(1,  "1101", "الصندوق",                1150);
 
         // Sales revenue + VAT
-        entry.AddCreditLine(2, "4101", "ط¥ظٹط±ط§ط¯ط§طھ ط§ظ„ظ…ط¨ظٹط¹ط§طھ",       1000);
-        entry.AddCreditLine(3, "2201", "ط¶ط±ظٹط¨ط© ط§ظ„ظ‚ظٹظ…ط© ط§ظ„ظ…ط¶ط§ظپط©",    150);
+        entry.AddCreditLine(2, "4101", "إيرادات المبيعات",       1000);
+        entry.AddCreditLine(3, "2201", "ضريبة القيمة المضافة",    150);
 
         // COGS
-        entry.AddDebitLine(4,  "5101", "طھظƒظ„ظپط© ط§ظ„ط¨ط¶ط§ط¹ط© ط§ظ„ظ…ط¨ط§ط¹ط©",   700);
-        entry.AddCreditLine(5, "1201", "ط£طµظ„ ط§ظ„ظ…ط®ط²ظˆظ†",             700);
+        entry.AddDebitLine(4,  "5101", "تكلفة البضاعة المباعة",   700);
+        entry.AddCreditLine(5, "1201", "أصل المخزون",             700);
 
         Assert.True(entry.IsBalanced());
         Assert.Equal(1850, entry.TotalDebit);
@@ -1448,14 +1448,14 @@ public class JournalEntryTests
     [Fact]
     public void Account_IsDebitNormal_AssetReturnsTrue()
     {
-        var account = Account.Create("1101", "ط§ظ„طµظ†ط¯ظˆظ‚", "Cash", AccountType.Asset);
+        var account = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset);
         Assert.True(account.IsDebitNormal());
     }
 
     [Fact]
     public void Account_IsDebitNormal_RevenueReturnsFalse()
     {
-        var account = Account.Create("4101", "ظ…ط¨ظٹط¹ط§طھ", "Sales", AccountType.Revenue);
+        var account = Account.Create("4101", "مبيعات", "Sales", AccountType.Revenue);
         Assert.False(account.IsDebitNormal());
     }
 
@@ -1463,57 +1463,57 @@ public class JournalEntryTests
     public void Account_UpdateSystemAccount_ThrowsDomainException()
     {
         var account = Account.Create(
-            "1101", "ط§ظ„طµظ†ط¯ظˆظ‚", "Cash",
+            "1101", "الصندوق", "Cash",
             AccountType.Asset,
             isSystemAccount: true);
 
         var ex = Assert.Throws<DomainException>(
-            () => account.Update("ط§ط³ظ… ط¬ط¯ظٹط¯", "New Name", null));
+            () => account.Update("اسم جديد", "New Name", null));
 
-        Assert.Contains("ط­ط³ط§ط¨ ظ†ط¸ط§ظ…", ex.Message);
+        Assert.Contains("حساب نظام", ex.Message);
     }
 
     private static JournalEntry CreateEntry() =>
         JournalEntry.Create(
             "JE-20260520-0001",
             DateTime.Today,
-            "ظ‚ظٹط¯ ط§ط®طھط¨ط§ط±",
+            "قيد اختبار",
             JournalEntryType.Manual,
             createdBy: 1);
 }
-âœ… Task 5 Checklist
+✅ Task 5 Checklist
  9 unit tests all passing
  Multi-line complex entry test confirms 1850 = 1850
  IsDebitNormal() tested for Asset (true) and Revenue (false)
  System account modification throws correct Arabic message
-ًں“¦ Final Summary for Phase 17
+📦 Final Summary for Phase 17
 text
 
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”گ
-â”‚              PHASE 17 â€” ACCOUNTING FOUNDATION                      â”‚
-â”‚              Implementation Order                                  â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚ Task â”‚ Deliverable                                 â”‚ Must Pass    â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚  0   â”‚ SQL: 6 tables + seed data                   â”‚ Migration OK â”‚
-â”‚  1   â”‚ Domain: Account, JournalEntry, Lines,       â”‚ No DB refs   â”‚
-â”‚      â”‚         SystemAccountMappings               â”‚ in Domain    â”‚
-â”‚  2   â”‚ EF Core: 3 configurations                   â”‚ Precision    â”‚
-â”‚      â”‚                                             â”‚ (18,2)       â”‚
-â”‚  3   â”‚ Application: Generator, Service,            â”‚ Validator    â”‚
-â”‚      â”‚              Command + Validator + Handler  â”‚ runs first   â”‚
-â”‚  4   â”‚ Queries: Balance + Statement                â”‚ AsNoTracking â”‚
-â”‚  5   â”‚ Tests: 9 unit tests                         â”‚ All green    â”‚
-â””â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”ک
+┌────────────────────────────────────────────────────────────────────┐
+│              PHASE 17 — ACCOUNTING FOUNDATION                      │
+│              Implementation Order                                  │
+├──────┬─────────────────────────────────────────────┬──────────────┤
+│ Task │ Deliverable                                 │ Must Pass    │
+├──────┼─────────────────────────────────────────────┼──────────────┤
+│  0   │ SQL: 6 tables + seed data                   │ Migration OK │
+│  1   │ Domain: Account, JournalEntry, Lines,       │ No DB refs   │
+│      │         SystemAccountMappings               │ in Domain    │
+│  2   │ EF Core: 3 configurations                   │ Precision    │
+│      │                                             │ (18,2)       │
+│  3   │ Application: Generator, Service,            │ Validator    │
+│      │              Command + Validator + Handler  │ runs first   │
+│  4   │ Queries: Balance + Statement                │ AsNoTracking │
+│  5   │ Tests: 9 unit tests                         │ All green    │
+└──────┴─────────────────────────────────────────────┴──────────────┘
 
-RULES â€” ZERO TOLERANCE:
-â”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پ
-âœ… JournalEntry.ValidateAndPost() called BEFORE SaveChanges
-âœ… IsBalanced() must return true or SaveChanges never called
-âœ… Decimal precision is (18,2)
-âœ… IsSystemAccount = true accounts cannot be edited or deleted
-âœ… JournalEntryLine.CreateDebit/Credit are internal â€” only JournalEntry creates lines
-âœ… All financial queries use AsNoTracking
-âœ… Only IsPosted = true entries appear in financial reports
-âœ… Arabic error messages in ALL DomainExceptions
-âœ… Account snapshots (Code + Name) stored in JournalEntryLine
+RULES — ZERO TOLERANCE:
+━━━━━━━━━━━━━━━━━━━━━━
+✅ JournalEntry.ValidateAndPost() called BEFORE SaveChanges
+✅ IsBalanced() must return true or SaveChanges never called
+✅ Decimal precision is (18,2) — not (18,2)
+✅ IsSystemAccount = true accounts cannot be edited or deleted
+✅ JournalEntryLine.CreateDebit/Credit are internal — only JournalEntry creates lines
+✅ All financial queries use AsNoTracking
+✅ Only IsPosted = true entries appear in financial reports
+✅ Arabic error messages in ALL DomainExceptions
+✅ Account snapshots (Code + Name) stored in JournalEntryLine

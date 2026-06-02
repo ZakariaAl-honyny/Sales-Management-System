@@ -11,7 +11,6 @@ public class SalesInvoiceTests
     public void Create_GivenValidData_ShouldCreateInvoice()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             customerId: 1,
             invoiceDate: new DateTime(2027, 1, 1),
@@ -22,7 +21,7 @@ public class SalesInvoiceTests
             createdByUserId: 1
         );
 
-        invoice.InvoiceNo.Should().Be("INV-2026-000001");
+        invoice.Id.Should().BeGreaterThan(0);
         invoice.WarehouseId.Should().Be(1);
         invoice.CustomerId.Should().Be(1);
         invoice.InvoiceDate.Should().Be(new DateTime(2027, 1, 1));
@@ -37,7 +36,6 @@ public class SalesInvoiceTests
     public void AddItem_GivenValidItem_ShouldAddItemAndRecalculateSubTotal()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -67,7 +65,6 @@ public class SalesInvoiceTests
     public void AddItem_MultipleItems_ShouldSumLineTotalsCorrectly()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -90,7 +87,6 @@ public class SalesInvoiceTests
     public void SetPaidAmount_GivenNegativeAmount_ShouldThrowArgumentException(decimal invalidAmount)
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -112,7 +108,6 @@ public class SalesInvoiceTests
     public void SetPaidAmount_GivenAmountExceedingTotalAmount_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -135,7 +130,6 @@ public class SalesInvoiceTests
     public void SetPaidAmount_GivenValidAmount_ShouldSetPaidAmount()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -159,7 +153,6 @@ public class SalesInvoiceTests
     public void SetTaxAmount_GivenNegativeTaxAmount_ShouldThrowArgumentException(decimal negativeTax)
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -174,7 +167,6 @@ public class SalesInvoiceTests
     public void SetTaxAmount_GivenValidTaxAmount_ShouldSetTaxAmount()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -196,7 +188,6 @@ public class SalesInvoiceTests
     public void Post_GivenDraftInvoice_ShouldTransitionToPosted()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -217,7 +208,6 @@ public class SalesInvoiceTests
     public void Post_GivenInvoiceWithNoItems_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -233,7 +223,6 @@ public class SalesInvoiceTests
     {
         // Arrange
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -256,7 +245,6 @@ public class SalesInvoiceTests
     public void Cancel_GivenPostedInvoice_ShouldTransitionToCancelled()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -279,7 +267,6 @@ public class SalesInvoiceTests
     {
         // Draft invoices can be cancelled (no stock/balance to reverse)
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -302,7 +289,6 @@ public class SalesInvoiceTests
     {
         // Posted invoices with PaidAmount > 0 cannot be cancelled directly
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -325,7 +311,6 @@ public class SalesInvoiceTests
     public void Cancel_GivenAlreadyCancelledInvoice_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -349,7 +334,6 @@ public class SalesInvoiceTests
     public void Cancel_GivenPaidInvoice_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -373,7 +357,6 @@ public class SalesInvoiceTests
     public void RecalculateTotals_GivenItemsAndDiscountAndTax_ShouldCalculateCorrectly()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             discountAmount: 50m,
             createdByUserId: 1
@@ -399,7 +382,6 @@ public class SalesInvoiceTests
     public void RecalculateTotals_TotalAmountFormula_ShouldBeSubTotalMinusDiscountPlusTax()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             discountAmount: 100m,
             createdByUserId: 1
@@ -422,7 +404,6 @@ public class SalesInvoiceTests
     public void SetPaidAmount_ShouldRecalculateDueAmount()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -443,23 +424,9 @@ public class SalesInvoiceTests
     }
 
     [Fact]
-    public void Create_GivenInvoiceNoIsEmpty_ShouldThrowArgumentException()
-    {
-        var action = () => SalesInvoice.Create(
-            invoiceNo: "",
-            warehouseId: 1,
-            createdByUserId: 1
-        );
-
-        action.Should().Throw<DomainException>()
-            .WithMessage("رقم الفاتورة مطلوب.");
-    }
-
-    [Fact]
     public void Create_GivenWarehouseIdIsZero_ShouldThrowArgumentException()
     {
         var action = () => SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 0,
             createdByUserId: 1
         );
@@ -472,7 +439,6 @@ public class SalesInvoiceTests
     public void Create_GivenWarehouseIdIsNegative_ShouldThrowArgumentException()
     {
         var action = () => SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: -1,
             createdByUserId: 1
         );
@@ -485,7 +451,6 @@ public class SalesInvoiceTests
     public void AddItem_GivenNonDraftInvoice_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );
@@ -508,7 +473,6 @@ public class SalesInvoiceTests
     public void RemoveItem_GivenNonDraftInvoice_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
             createdByUserId: 1
         );

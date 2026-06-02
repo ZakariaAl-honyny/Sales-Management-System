@@ -292,8 +292,8 @@ public class ReportsViewModelTests
     {
         var salesReports = new List<SalesReportDto>
         {
-            new(DateTime.Today, "INV-001", "عميل", 1000m, 0m, 0m, 1000m, 1000m, 0m),
-            new(DateTime.Today, "INV-002", "عميل", 2000m, 0m, 0m, 2000m, 1500m, 500m)
+            new(DateTime.Today, 1, "عميل", 1000m, 0m, 0m, 1000m, 1000m, 0m),
+            new(DateTime.Today, 2, "عميل", 2000m, 0m, 0m, 2000m, 1500m, 500m)
         };
 
         _mockReportService
@@ -393,13 +393,13 @@ public class ReportsViewModelTests
     {
         var salesReports = new List<SalesReportDto>
         {
-            new(DateTime.Today, "INV-001", "عميل", 5000m, 0m, 0m, 5000m, 5000m, 0m),
-            new(DateTime.Today, "INV-002", "عميل", 3000m, 0m, 0m, 3000m, 3000m, 0m)
+            new(DateTime.Today, 1, "عميل", 5000m, 0m, 0m, 5000m, 5000m, 0m),
+            new(DateTime.Today, 2, "عميل", 3000m, 0m, 0m, 3000m, 3000m, 0m)
         };
 
         var purchaseReports = new List<PurchaseReportDto>
         {
-            new(DateTime.Today, "PUR-001", "مورد", 2000m, 0m, 0m, 2000m, 2000m, 0m)
+            new(DateTime.Today, 3, "مورد", 2000m, 0m, 0m, 2000m, 2000m, 0m)
         };
 
         _mockReportService

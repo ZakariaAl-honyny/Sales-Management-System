@@ -156,7 +156,7 @@ public class SalesReturnServiceTests : IDisposable
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m));
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(500m);
@@ -264,7 +264,7 @@ public class SalesReturnServiceTests : IDisposable
         _dbContext.Products.Add(product2);
         await _dbContext.SaveChangesAsync();
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: null, paymentType: DomainPaymentType.Cash);
+        var invoice = SalesInvoice.Create(warehouseId: 1, customerId: null, paymentType: DomainPaymentType.Cash);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m));
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(500m);

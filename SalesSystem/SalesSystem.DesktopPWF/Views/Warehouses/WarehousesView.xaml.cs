@@ -9,7 +9,7 @@ namespace SalesSystem.DesktopPWF.Views;
 /// <summary>
 /// Interaction logic for WarehousesView.xaml
 /// </summary>
-public partial class WarehousesView : Page
+public partial class WarehousesView : UserControl
 {
     private readonly WarehouseListViewModel _viewModel;
 

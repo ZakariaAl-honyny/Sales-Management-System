@@ -39,7 +39,7 @@ public partial class SalesInvoiceEditorView : Window
             if (value)
             {
                 IsEnabled = false;
-                Title = "ط¹ط±ط¶ ظپط§طھظˆط±ط© ط¨ظٹط¹";
+                Title = "عرض فاتورة بيع";
             }
         }
     }

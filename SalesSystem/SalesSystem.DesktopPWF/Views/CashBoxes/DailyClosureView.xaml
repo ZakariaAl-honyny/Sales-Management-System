@@ -1,4 +1,4 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.CashBoxes.DailyClosureView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.CashBoxes.DailyClosureView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,7 +6,7 @@
       xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CashBoxes"
       mc:Ignorable="d"
-      Title="الإغلاق اليومي"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -29,12 +29,12 @@
 
         <!-- Header -->
         <TextBlock Grid.Row="0"
-                   Text="{Binding CashBoxName, StringFormat='الإغلاق اليومي - {0}'}"
+                   Text="{Binding CashBoxName, StringFormat='📊  الإغلاق اليومي - {0}'}"
                    Style="{StaticResource HeaderStyle}"
                    AutomationProperties.AutomationId="DailyClosurePageTitle"/>
 
         <!-- Summary Cards -->
-        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="16,12" Margin="{StaticResource StandardSectionMargin}">
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="10,6" Margin="{StaticResource StandardSectionMargin}">
             <WrapPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
                 <!-- Opening Balance Card -->
                 <Border Style="{StaticResource CardStyle}" Width="180" Margin="0,0,12,0" Padding="12,10">
@@ -78,7 +78,7 @@
                     <!-- Perform Closure Button -->
                     <Button Command="{Binding PerformClosureCommand}"
                             Style="{StaticResource SuccessButton}"
-                            Margin="0,0,8,0" Height="36" Padding="16,0"
+                            Margin="0,0,8,0"
                             ToolTip="تنفيذ الإغلاق اليومي للصندوق — لا يمكن التراجع عن هذه العملية">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔒" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -87,7 +87,7 @@
                     </Button>
 
                     <!-- Refresh Button -->
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0"
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                             ToolTip="تحديث بيانات الإغلاق اليومي">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
@@ -184,7 +184,7 @@
                 <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="📊" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
-                        <TextBlock Text="لا توجد إغلاقات سابقة" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="لا توجد إغلاقات سابقة" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                     </StackPanel>
                 </Grid>
             </Grid>
@@ -201,4 +201,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>

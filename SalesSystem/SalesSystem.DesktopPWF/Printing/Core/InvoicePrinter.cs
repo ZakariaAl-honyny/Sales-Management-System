@@ -42,7 +42,7 @@ public class InvoicePrinter : IPrinterService
             Width = 1000,
             Height = 800,
             ShowIcon = false,
-            Text = $"معاينة الفاتورة - {invoice.InvoiceNo}"
+            Text = $"معاينة الفاتورة - #{invoice.Id}"
         };
         ppd.ShowDialog();
 
@@ -99,7 +99,7 @@ public class InvoicePrinter : IPrinterService
         float metaY = bounds.Top;
         g.DrawString(_invoice.Title, titleFont, Brushes.Black, new RectangleF(left, metaY, width / 2, 40), PrintHelper.LTRFormat);
         metaY += 35;
-        g.DrawString($"رقم الفاتورة: {_invoice.InvoiceNo}", subHeaderFont, Brushes.Black, new RectangleF(left, metaY, width / 2, 25), PrintHelper.LTRFormat);
+        g.DrawString($"رقم الفاتورة: {_invoice.Id}", subHeaderFont, Brushes.Black, new RectangleF(left, metaY, width / 2, 25), PrintHelper.LTRFormat);
         metaY += 25;
         g.DrawString($"التاريخ: {_invoice.Date:yyyy/MM/dd}", bodyFont, Brushes.Black, new RectangleF(left, metaY, width / 2, 20), PrintHelper.LTRFormat);
         

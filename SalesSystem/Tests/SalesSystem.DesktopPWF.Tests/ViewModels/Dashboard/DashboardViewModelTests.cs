@@ -373,13 +373,11 @@ public class DashboardViewModelTests : IDisposable
 
     private static SalesInvoiceDto CreateSalesInvoiceDto(
         int id,
-        string invoiceNo,
         decimal totalAmount,
         byte status)
     {
         return new SalesInvoiceDto(
             Id: id,
-            InvoiceNo: invoiceNo,
             CustomerId: 1,
             CustomerName: "Test Customer",
             WarehouseId: 1,

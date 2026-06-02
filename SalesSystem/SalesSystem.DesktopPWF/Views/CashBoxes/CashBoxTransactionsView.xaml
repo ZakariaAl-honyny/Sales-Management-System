@@ -1,4 +1,4 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.CashBoxes.CashBoxTransactionsView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.CashBoxes.CashBoxTransactionsView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,7 +6,7 @@
       xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CashBoxes"
       mc:Ignorable="d"
-      Title="حركات الصندوق"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -29,7 +29,7 @@
 
         <!-- Header -->
         <TextBlock Grid.Row="0"
-                   Text="{Binding CashBoxName, StringFormat='حركات الصندوق - {0}'}"
+                   Text="{Binding CashBoxName, StringFormat='💰  حركات الصندوق - {0}'}"
                    Style="{StaticResource HeaderStyle}"
                    AutomationProperties.AutomationId="CashBoxTransactionsPageTitle"/>
 
@@ -61,7 +61,7 @@
                     </Border>
 
                     <!-- Record Expense Button -->
-                    <Button Command="{Binding RecordExpenseCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding RecordExpenseCommand}" Style="{StaticResource DangerButton}" Margin="0,0,8,0"
                             ToolTip="تسجيل مصروف نقدي من الصندوق — سيتم خصم المبلغ من الرصيد الحالي">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="💰" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -69,7 +69,7 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0"
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                             ToolTip="تحديث قائمة حركات الصندوق">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
@@ -80,7 +80,7 @@
         </Border>
 
         <!-- Filter Bar -->
-        <Border Grid.Row="2" Style="{StaticResource ToolbarStyle}" BorderThickness="0,0,0,1" Padding="16,8">
+        <Border Grid.Row="2" Style="{StaticResource ToolbarStyle}" BorderThickness="0,0,0,1" Padding="10,4">
             <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
                     <TextBlock Text="من تاريخ:" VerticalAlignment="Center" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,6,0"/>
@@ -98,7 +98,7 @@
                                 ToolTip="تصفية الحركات إلى هذا التاريخ"/>
                 </StackPanel>
 
-                <Button Command="{Binding FilterCommand}" Style="{StaticResource PrimaryButton}" Height="32" Padding="12,0" Margin="0,0,8,0"
+                <Button Command="{Binding FilterCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
                         ToolTip="تطبيق التصفية حسب النطاق الزمني المحدد">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="🔍" Margin="0,0,6,0" VerticalAlignment="Center"/>
@@ -106,7 +106,7 @@
                     </StackPanel>
                 </Button>
 
-                <Button Command="{Binding ClearFilterCommand}" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0"
+                <Button Command="{Binding ClearFilterCommand}" Style="{StaticResource SecondaryButton}"
                         ToolTip="إزالة التصفية وعرض جميع الحركات">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="✕" Margin="0,0,6,0" VerticalAlignment="Center"/>
@@ -192,7 +192,7 @@
                 <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="💳" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
-                        <TextBlock Text="لا توجد حركات" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="لا توجد حركات" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                         <TextBlock Text="لم يتم تسجيل أي حركات نقدية لهذا الصندوق بعد" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Grid>
@@ -200,7 +200,7 @@
         </Border>
 
         <!-- Current Balance Summary -->
-        <Border Grid.Row="5" Background="White" Padding="16,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="5" Background="White" Padding="10,4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                 <TextBlock Text="الرصيد الحالي: " FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
                 <TextBlock Text="{Binding CurrentBalance, StringFormat=N2}" FontSize="16" FontWeight="Bold" 
@@ -209,7 +209,7 @@
         </Border>
 
         <!-- Footer -->
-        <Border Grid.Row="6" Background="White" Padding="16,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="6" Background="White" Padding="10,4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                 <TextBlock Text="عدد الحركات: " FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
                 <TextBlock Text="{Binding Transactions.Count, FallbackValue=0}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="4,0,0,0"/>
@@ -227,4 +227,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>

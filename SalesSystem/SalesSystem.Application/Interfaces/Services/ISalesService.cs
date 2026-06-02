@@ -10,7 +10,6 @@ public interface ISalesService
     Task<Result<SalesInvoiceDto>> PostAsync(int id, int userId, CancellationToken ct);
     Task<Result<SalesInvoiceDto>> CancelAsync(int id, int userId, CancellationToken ct);
     Task<Result<SalesInvoiceDto>> GetByIdAsync(int id, CancellationToken ct);
-    Task<Result<SalesInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> UpdateAsync(int id, UpdateSalesInvoiceRequest request, int userId, CancellationToken ct);
     Task<Result<PagedResult<SalesInvoiceDto>>> GetAllAsync(
         int? customerId, 

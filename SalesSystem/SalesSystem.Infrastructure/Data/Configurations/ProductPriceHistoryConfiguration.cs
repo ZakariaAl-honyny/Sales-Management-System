@@ -66,7 +66,7 @@ public class ProductPriceHistoryConfiguration : IEntityTypeConfiguration<Product
 
         // ─── Foreign keys ────────────────────────────────────────────────
 
-        builder.HasOne<ProductUnit>()
+        builder.HasOne(x => x.ProductUnit)
             .WithMany()
             .HasForeignKey(x => x.ProductUnitId)
             .OnDelete(DeleteBehavior.Restrict);

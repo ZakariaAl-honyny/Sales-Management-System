@@ -2,6 +2,99 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.6.7 — Garbled Arabic Fix & Dialog UI Polish (2026-06-02)
+
+### Added
+- **Screen Title Emoji Icons**: 41 main screen page title headers now have emoji icons (📦 Products, 🛒 Sales, 📥 Purchases, 👤 Customers, etc.) — improves visual scanability.
+- **FirstValidationErrorConverter**: Moved from `App.xaml` to `Resources/Styles.xaml` to fix `XamlParseException` (StaticResource inside ControlTemplate couldn't traverse merged dictionary scope).
+
+### Fixed
+- **Garbled Arabic Text — Full Solution Sweep**: 48 garbled Arabic strings fixed in `InvoicePrintDtoBuilderTests.cs` (mojibake like `ظ…طھط¬ط±ظٹ` → `متجري`, `ط§ظ„ط±ظٹط§ط¶` → `الرياض`). 5 garbled comment box-drawing separators fixed in `ProductSelectionViewModel.cs`, `PurchaseInvoiceListViewModel.cs`, `SalesInvoiceListViewModel.cs`.
+- **InvoicePrintDtoBuilderTests.cs Build Errors**: Removed leftover `"INV-001"` string argument from 13 `SalesInvoice.Create()` calls and 4 `PurchaseInvoice.Create()` calls (InvoiceNo parameter was removed in v4.6.5). Updated `InvoiceNumber` assertions to match builder's new `invoice.Id.ToString()` implementation.
+- **All 9 Dialog Buttons Standardized**: FontSize="11", Padding="10,4", CornerRadius="6" applied consistently across ErrorDialog, SuccessDialog, WarningDialog, InfoDialog, ConfirmationDialog, DeleteConfirmationDialog, ValidationErrorsDialog, DatabaseErrorDialog, and FallbackErrorDialog.
+- **DeleteConfirmationDialog Header**: Icon container 48×48→44×44, icon FontSize 26→20, title FontSize 18→16.
+- **ValidationErrorsDialog List**: Bullet points 14→12, error text 14→13, LineHeight 22→20.
+- **Screen Title Icon FontSizes**: 18→16 across 9 error bars, 5 report views, and StockTransferEditor header.
+- **Empty-State Titles**: FontSize 18→14 in CashBoxTransactionsView, DailyClosureView, ProductsListView.
+- **Page Titles**: BackupView 18→16, CostingMethodSettingsView 18→14.
+
+### Changed
+- All remaining non-standard button sizes standardized to Styles.xaml global compact tokens.
+
+---
+
+## v4.6.6 — UI Compacting — Mobile-Ready Density (2026-05-31)
+
+### Added
+- **Global UI Compacting**: All 63 XAML views compacted by ~25-30% for more content per screen and future mobile adaptation.
+- **Styles.xaml Global Token Reduction**: Button/TextBox/ComboBox default heights 36→28px, font sizes 13→11, DataGrid row height 34→24, header fonts 20→16.
+- **Dashboard Compacted**: KPI card spacing 32→12px, icon padding 12→6, description font size reduced.
+- **15 List Views Compacted**: Toolbar spacing reduced, search widths 220→160, all `Height="36"` overrides removed, empty-state margins 20→12px, widths 160→140px.
+- **14 Editor Views Compacted**: Header/footer padding reduced ~40%, section spacing 12→6/8px, title fonts 18→14.
+- **15 Reports/Settings/Inventory Views Compacted**: Filter bars, section margins, fonts, footer paddings all reduced.
+- **19 Dialogs/Shell Views Compacted**: Dialog titles 20→16, icon borders 50×50→44×44, button widths MinWidth 80-100, dialog containers shrunk ~15%.
+- **MainWindow Sidebar**: Width 220→200, menu padding 5→3, brand area 16,20→12,12.
+- **ScreenWindow**: MinWidth/MinHeight 600/400→500/350, default size 900×650→850×600.
+- **NumericKeypadControl**: Touch keys MinHeight 30→28, MinWidth 40→36, FontSize 16→14.
+- **Touch-optimized views preserved** at their touch-friendly sizes (CartView, Qty buttons).
+
+### Changed
+- **PurchaseInvoiceEditorView Fully Compacted**: Major miss caught — 18 edits: header 16,8→12,6, title font 18→14, outer margin 16→10, TextBox Height=36 removed, all field margins 12→6/8, footer padding 20,12→12,8.
+- **ProductsListView Empty State**: Button Margin 0,20→0,12, Width 160→140, Height=36 removed.
+- **ExpiredProductsReportView**: 4× Height=34 removed, button padding 20,0 removed.
+- **CashBoxTransactionsView**: 2× Height=32 removed from filter buttons.
+- **SalesInvoiceEditorView**: Line add button Height=30 removed, search button 32→28.
+- **Return Editors (Sales/Purchase)**: TextBox Height=36 removed, add button Height=36 removed, search button Height=32 removed.
+- **ProductUnitEditorView**: Button Height=32 removed, margin 8→6.
+- **StockTransferEditorView**: Border Height=30 removed, padding 16,4→10,4.
+- **Controls/NumericKeypadControl**: Keys MinHeight 30→28, MinWidth 40→36, FontSize 16→14.
+
+### Fixed
+- **5 Selection Views XML**: Fixed missing `>` on TextBox opening tags in ProductSelectionView, CustomerSelectionView, SalesInvoiceSelectionView, PurchaseInvoiceSelectionView, SupplierSelectionView — caused parsing errors after subagent edit glitch.
+
+### Removed
+- `Height="36"`, `Height="34"`, `Height="32"`, `Height="30"` hardcoded overrides from all Button/TextBox/ComboBox elements across all views (let Styles.xaml handle heights).
+- `Padding="16,0"`, `Padding="20,0"`, `Padding="24,0"` hardcoded overrides from buttons.
+- `Padding="16,12"`, `Padding="20,12"` from header/footer borders — replaced with `12,6` / `12,8`.
+- Large `Margin="0,0,0,12"` from form fields — replaced with `0,0,0,6` or `0,0,0,8`.
+
+---
+
+## v4.6.5 — Invoice Number Removal & Touch POS Polish (2026-05-31)
+
+### Breaking Changes
+- **InvoiceNo (string) Removed from SalesInvoice**: `InvoiceNo` property and parameter removed from `SalesInvoice` entity and `SalesInvoice.Create()` factory method. Use auto-increment `Id` (int PK) as the sole invoice identifier.
+- **InvoiceNo (string) Removed from PurchaseInvoice**: Same removal — `PurchaseInvoice.InvoiceNo` eliminated. Only `SupplierInvoiceNo` remains as supplier's external reference number (not a system identifier).
+- **GetByNumberAsync Removed from Services & Controllers**: `GetByNumberAsync()` / `GetByNumber()` methods removed from `ISalesService`, `SalesService`, `IPurchaseService`, `PurchaseService`, and both `SalesInvoicesController` and `PurchaseInvoicesController`.
+- **GetByNumber Endpoints Removed**: `GET /api/v1/sales/{number}` and `GET /api/v1/purchases/{number}` endpoints removed — search by `Id` only.
+- **GetByNumberAsync Removed from Desktop API Clients**: `GetByNumberAsync()` removed from `SalesInvoiceApiService` and `PurchaseInvoiceApiService`.
+
+### Added
+- **Stock Validation on Touch POS Product Add**: When adding a product with insufficient stock to a Touch POS cart, a warning dialog shows product name, requested quantity, and available stock (uses `_dialogService.ShowWarningAsync`).
+- **PlayWarning() on ISoundService**: New `PlayWarning()` method added to `ISoundService`/`SoundService` (uses `System.Media.SystemSounds.Asterisk.Play()`). Warning sound plays on stock validation failures.
+
+### Changed
+- **SalesReportDto**: `string InvoiceNo` replaced with `int Id` for invoice identifier across reports.
+- **PurchaseReportDto**: Same — `int Id` replaces `string InvoiceNo`.
+- **InvoicePrintDto (Printing)**: Uses `int Id` instead of `string InvoiceNo` for PDF/thermal printing.
+- **Invoice List Search**: `SalesInvoiceListViewModel` and `PurchaseInvoiceListViewModel` search now uses `int.TryParse()` + `Id` comparison — no string `InvoiceNo` filtering.
+- **EF Config**: `SalesInvoiceConfiguration` and `PurchaseInvoiceConfiguration` no longer configure `InvoiceNo` property (MaxLength, HasIndex removed).
+- **Stock Validation Warning**: Added `_dialogService.ShowWarningAsync` call in TouchPosViewModel when product stock is insufficient.
+
+### Fixed
+- **Touch POS Product Card Layout**: Removed `VirtualizingPanel.ScrollUnit="Pixel"` from `Styles.xaml` `ModernListBox` style. Increased `MinHeight` on `TouchPosCartView` from 150 to 200. Product cards now render with proper proportions.
+- **Garbled Arabic Encoding**: Fixed UTF-8 encoding issues across multiple files including `StockTransfersListViewModel.cs`, `SupplierPaymentsListViewModel.cs`.
+- **CategoryApiService GetById**: Endpoint corrected from `GetAllAsync` pattern to proper `GetById` call.
+
+### Removed
+- `SalesInvoice.InvoiceNo` property and EF configuration
+- `PurchaseInvoice.InvoiceNo` property and EF configuration
+- `InvoiceNo` parameter from `SalesInvoice.Create()` and `PurchaseInvoice.Create()`
+- `GetByNumberAsync` methods from 2 services, 2 controllers, 2 API clients
+- `InvoiceNo` unique index from `SalesInvoiceConfiguration` and `PurchaseInvoiceConfiguration`
+- `DocumentSequenceService` usage for invoice numbering (INV/PUR prefixes)
+- `InvoiceNo` from `SalesInvoiceListDto` and `PurchaseInvoiceListDto` records
+
 ## v4.6 — Identifier Strategy & Validation (2026-05-25)
 
 ### Breaking Changes

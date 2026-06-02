@@ -5,7 +5,7 @@ namespace SalesSystem.DesktopPWF.Views.Reports;
 /// <summary>
 /// Interaction logic for ExpiredProductsReportView.xaml
 /// </summary>
-public partial class ExpiredProductsReportView : Page
+public partial class ExpiredProductsReportView : UserControl
 {
     public ExpiredProductsReportView()
     {

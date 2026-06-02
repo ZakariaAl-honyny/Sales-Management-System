@@ -8,7 +8,7 @@
         WindowStartupLocation="CenterScreen"
         FlowDirection="RightToLeft"
         Background="{StaticResource BackgroundBrush}">
-    <Grid Margin="16">
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -16,7 +16,7 @@
         </Grid.RowDefinitions>
 
         <!-- Search Bar -->
-        <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,16" Padding="12">
+        <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,10" Padding="8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -24,8 +24,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
                          Style="{StaticResource ModernTextBox}"
-                         Tag="ابحث برقم الفاتورة أو اسم المورد..."
-                         Height="36">
+                         Tag="ابحث برقم الفاتورة أو اسم المورد...">
                     <TextBox.InputBindings>
                         <KeyBinding Key="Enter" Command="{Binding SearchCommand}"/>
                     </TextBox.InputBindings>
@@ -57,7 +56,7 @@
         </Border>
 
         <!-- Footer -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
             <Button Content="إلغاء" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" Width="100" Margin="0,0,12,0" ToolTip="إلغاء وإغلاق النافذة"/>
             <Button Content="✅ اختيار الفاتورة" Command="{Binding SelectCommand}" Style="{StaticResource PrimaryButton}" Width="150" IsDefault="True" ToolTip="تأكيد الاختيار"/>
         </StackPanel>

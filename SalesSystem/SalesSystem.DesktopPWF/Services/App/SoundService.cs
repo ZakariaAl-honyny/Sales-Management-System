@@ -15,6 +15,11 @@ public class SoundService : ISoundService
         SystemSounds.Hand.Play();
     }
 
+    public void PlayWarning()
+    {
+        SystemSounds.Exclamation.Play();
+    }
+
     public void PlayNotification()
     {
         SystemSounds.Beep.Play();

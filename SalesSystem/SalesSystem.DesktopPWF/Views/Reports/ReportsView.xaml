@@ -1,4 +1,4 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.Reports.ReportsView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Reports.ReportsView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -6,7 +6,7 @@
       xmlns:local="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
       mc:Ignorable="d"
       d:DesignHeight="700" d:DesignWidth="1000"
-      Title="التقارير"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -20,7 +20,7 @@
 
         <!-- Header -->
         <TextBlock Grid.Row="0"
-                   Text="التقارير والإحصائيات"
+                   Text="📊  التقارير والإحصائيات"
                    Style="{StaticResource HeaderStyle}"
                    AutomationProperties.AutomationId="ReportsPageTitle"/>
 
@@ -30,7 +30,7 @@
                 <!-- Report Type Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
                     <TextBlock Text="نوع التقرير" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <ComboBox Width="200" ItemsSource="{Binding ReportTypes}" SelectedValue="{Binding SelectedReportType}" SelectedValuePath="Type" DisplayMemberPath="DisplayName" Height="36" TabIndex="1"/>
+                    <ComboBox Width="200" ItemsSource="{Binding ReportTypes}" SelectedValue="{Binding SelectedReportType}" SelectedValuePath="Type" DisplayMemberPath="DisplayName" TabIndex="1"/>
                 </StackPanel>
 
                 <!-- Date Range Group -->
@@ -46,7 +46,7 @@
                 <StackPanel Orientation="Horizontal" Margin="0,5,20,5"
                             Visibility="{Binding WarehouseFilterVisible, Converter={StaticResource BoolToVisibility}}">
                     <TextBlock Text="المخزن" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <ComboBox Width="180" Height="36" TabIndex="4"
+                    <ComboBox Width="180" TabIndex="4"
                               ItemsSource="{Binding Warehouses}"
                               SelectedValue="{Binding SelectedWarehouseId}"
                               SelectedValuePath="Id"
@@ -55,14 +55,14 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding GenerateReportCommand}" Style="{StaticResource PrimaryButton}" Height="36" Padding="20,0" TabIndex="4" ToolTip="توليد التقرير حسب المعايير المحددة">
+                    <Button Command="{Binding GenerateReportCommand}" Style="{StaticResource PrimaryButton}" TabIndex="4" ToolTip="توليد التقرير حسب المعايير المحددة">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="⚙️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="توليد التقرير" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     <Menu Background="Transparent" Margin="12,0,0,0">
-                        <MenuItem Header="📁 تصدير" ToolTip="تصدير التقرير" Padding="12,4" Height="36" Background="#F1F5F9" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                        <MenuItem Header="📁 تصدير" ToolTip="تصدير التقرير" Padding="12,4" Background="#F1F5F9" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
                             <MenuItem.Icon>
                                 <TextBlock Text="📤" VerticalAlignment="Center"/>
                             </MenuItem.Icon>
@@ -147,4 +147,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>

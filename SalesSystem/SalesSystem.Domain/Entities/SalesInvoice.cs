@@ -6,7 +6,6 @@ namespace SalesSystem.Domain.Entities;
 
 public class SalesInvoice : BaseEntity
 {
-    public string InvoiceNo { get; private set; } = string.Empty;
     public int? CustomerId { get; private set; }
     public int WarehouseId { get; private set; }
     public int? CashBoxId { get; private set; }
@@ -30,7 +29,6 @@ public class SalesInvoice : BaseEntity
     private SalesInvoice() { }
 
     public static SalesInvoice Create(
-        string invoiceNo,
         int warehouseId,
         int? customerId = null,
         DateTime? invoiceDate = null,
@@ -41,8 +39,6 @@ public class SalesInvoice : BaseEntity
         int? cashBoxId = null,
         int? createdByUserId = null)
     {
-        if (string.IsNullOrWhiteSpace(invoiceNo))
-            throw new DomainException("رقم الفاتورة مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
         if (discountAmount < 0)
@@ -52,7 +48,6 @@ public class SalesInvoice : BaseEntity
 
         var invoice = new SalesInvoice
         {
-            InvoiceNo = invoiceNo,
             WarehouseId = warehouseId,
             CashBoxId = cashBoxId,
             CustomerId = customerId,

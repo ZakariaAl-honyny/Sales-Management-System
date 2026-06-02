@@ -8,7 +8,7 @@
         FlowDirection="RightToLeft"
         Icon="/Resources/print.ico">
 
-    <Grid Margin="16">
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -16,12 +16,12 @@
 
         <!-- PDF WebBrowser control (uses system PDF viewer) -->
         <WebBrowser Grid.Row="0" x:Name="PdfViewer"
-                    Margin="0,0,0,12"/>
+                    Margin="0,0,0,8"/>
 
         <!-- Bottom toolbar -->
         <Border Grid.Row="1"
                 Background="#F5F5F5"
-                Padding="12,8"
+                Padding="8,6"
                 CornerRadius="4">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -42,21 +42,21 @@
 
                 <Button Grid.Column="2"
                         Content="🖨️ طباعة A4"
-                        Padding="16,8"
+                        Padding="10,6"
                         Margin="4,0"
                         Click="PrintA4_Click"
                         ToolTip="إرسال الفاتورة إلى طابعة A4"/>
 
                 <Button Grid.Column="3"
                         Content="🧾 طباعة حراري"
-                        Padding="16,8"
+                        Padding="10,6"
                         Margin="4,0"
                         Click="PrintThermal_Click"
                         ToolTip="طباعة إيصال حراري 80mm"/>
 
                 <Button Grid.Column="4"
                         Content="❌ إغلاق"
-                        Padding="16,8"
+                        Padding="10,6"
                         Margin="4,0"
                         Click="Close_Click"
                         ToolTip="إغلاق المعاينة"/>

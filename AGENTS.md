@@ -1204,7 +1204,36 @@ public interface ISoundService
 | RULE-252 | Editor ViewModels and any file with user-facing messages MUST be checked for Arabic encoding integrity at code review time |
 | RULE-253 | When reviewing PRs, spot-check 3-5 Arabic string literals by reading them aloud in the diff — if any look like `ط§ط®طھط¨ط§ط±` instead of `اختبار`, flag the entire file for encoding review |
 
----
+### 2.63 Invoice Number Strategy — InvoiceNo → Id (v4.6.5)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-254 | `SalesInvoice` and `PurchaseInvoice` MUST NOT have an `InvoiceNo` (string) property — use auto-increment `Id` (int PK) as the sole invoice identifier |
+| RULE-255 | `GetByNumberAsync()` / `GetByNumber()` methods MUST NOT exist in services, controllers, or API clients — search by `Id` (int) instead |
+| RULE-256 | `InvoiceNo` parameter MUST be removed from `SalesInvoice.Create()` and `PurchaseInvoice.Create()` factory methods — they no longer require a string identifier |
+| RULE-257 | Search by invoice number MUST use `int.TryParse()` on the search text and compare against `Id` — NEVER filter by a string `InvoiceNo` column |
+| RULE-258 | `SupplierInvoiceNo` (string?) is a SUPPLIER's invoice reference number — NOT a system identifier. It is kept on `PurchaseInvoice` for supplier reference only and MUST NOT be used as the system invoice number |
+| RULE-259 | `SalesReportDto` and `PurchaseReportDto` MUST use `int Id` for the invoice identifier — NOT `string InvoiceNo` |
+| RULE-260 | `InvoicePrintDto` (print/PDF generation) MUST use `int Id` for the invoice identifier — NOT `string InvoiceNo` |
+| RULE-261 | `DocumentSequenceService` for invoice numbering (INV-{YYYY}-{000001}) is REMOVED — invoice display uses the auto-increment `Id` formatted as `#ID` |
+
+### 2.64 UI Compacting — Mobile-Ready Density (v4.6.6)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-262 | XAML MUST NOT have hardcoded `Height="36"` or `Height="40"` on Button/TextBox/ComboBox elements — style defaults now provide compact 28px height |
+| RULE-263 | XAML MUST NOT have hardcoded `Padding="16,0"` or `Padding="24,0"` or `Padding="20,0"` on buttons — style defaults now handle padding at 10,4 |
+| RULE-264 | XAML header/footer borders MUST use `Padding="12,6"` for headers and `Padding="12,8"` for footers — NEVER `Padding="16,12"` or `Padding="20,12"` or larger |
+| RULE-265 | XAML form section margins between fields MUST be `Margin="0,0,0,6"` or `Margin="0,0,0,8"` — NEVER `Margin="0,0,0,12"` or `Margin="0,0,0,16"` |
+| RULE-266 | XAML dialog title font sizes MUST be `FontSize="16"` — NEVER `FontSize="20"` or `FontSize="22"` |
+| RULE-267 | XAML section header font sizes MUST be `FontSize="14"` — NEVER `FontSize="18"` or `FontSize="20"` |
+| RULE-268 | XAML empty-state button margins MUST be `Margin="0,12,0,0"` with `Width="140"` — NEVER `Margin="0,20,0,0"` with `Width="160"` or larger |
+| RULE-269 | XAML MainWindow sidebar width MUST be `Width="200"` — NEVER `Width="220"` or `Width="240"` |
+| RULE-270 | XAML dialog icon border sizes MUST be `Width="44" Height="44"` with `FontSize="20"` — NEVER `50×50` with `FontSize="24"` |
+| RULE-271 | XAML ScreenWindow MUST use `MinWidth="500" MinHeight="350"` — NEVER `MinWidth="600" MinHeight="400"` |
+| RULE-272 | XAML dialog button widths MUST use `MinWidth` (80-100) — NEVER fixed `Width="120"` or `Width="130"` |
+| RULE-273 | ALL XAML views MUST remove hardcoded `Height` and `Padding` that duplicate style defaults — let Styles.xaml be the single source for button/input sizes |
+| RULE-274 | When adding new views, use the compact global styles from `Styles.xaml` — NEVER add custom oversized heights or padding |
 
 ## 3. Enums (Use These EXACT Values)
 
@@ -1249,6 +1278,7 @@ public enum InvoiceTypePrint : byte
 ❌ Data payloads in EventBus messages
 ❌ DataAnnotations on Domain Entities (use Fluent API)
 ❌ Cascade delete on any FK
+❌ InvoiceNo column on SalesInvoice or PurchaseInvoice (use Id int PK)
 ❌ Hard-deleting Users (soft delete only — invoices reference them)
 ❌ Duplicating business logic outside of the Domain layer
 ❌ Direct property modification on Entities from outside the class (use Domain methods instead)
@@ -1302,6 +1332,11 @@ public enum InvoiceTypePrint : byte
 ❌ Button or MenuItem without Arabic ToolTip
 ❌ ToolTip that just repeats the button text (e.g., Button="منتج جديد" ToolTip="منتج جديد")
 ❌ Code column on Product, Customer, Supplier, or Warehouse entities (use Id instead)
+❌ InvoiceNo (string) on SalesInvoice or PurchaseInvoice entities (use auto-increment Id int PK instead)
+❌ GetByNumberAsync/GetByNumber methods in services or controllers (search by Id instead)
+❌ DocumentSequenceService for invoice numbering (INV/PUR prefixes removed — use Id)
+❌ Searching invoices by string InvoiceNo (use int.TryParse + Id comparison instead)
+❌ SupplierInvoiceNo used as system invoice number (it's supplier's reference only — use Id for system ID)
 ❌ WarehouseResponse still containing Code field
 ❌ ProductCode on invoice item DTOs (use ProductId only)
 ❌ Code auto-generation for products, customers, or suppliers
@@ -1327,6 +1362,13 @@ public enum InvoiceTypePrint : byte
 ❌ Unhandled exception dialog without FallbackErrorDialog (use thread-safe dialog overlay)
 ❌ Duplicating validation dialog logic in each Editor ViewModel (use ValidateAllAsync from ViewModelBase)
 ❌ Committing C# files with garbled Arabic (mojibake) — always verify UTF-8 encoding
+❌ Hardcoded `Height="36"` or `Height="40"` on Button/TextBox/ComboBox (let style handle at 28px)
+❌ Hardcoded `Padding="16+"` on buttons (let style handle at 10,4)
+❌ Header/footer padding larger than `12,6` / `12,8` (use compact values)
+❌ Empty-state button margins `20px` or widths `160px` (use `12px` / `140px`)
+❌ Dialog title `FontSize` larger than 16 or section header larger than 14
+❌ MainWindow sidebar wider than `200` (use compact navigation width)
+❌ Dialog icon borders `50×50` or larger (use `44×44` max)
 ```
 
 ---
@@ -1506,6 +1548,13 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Error dismiss buttons have ToolTip?
 - [ ] Product/Customer/Supplier/Warehouse have NO Code column/property?
 - [ ] WarehouseResponse DTO excludes Code field?
+- [ ] SalesInvoice and PurchaseInvoice have NO `InvoiceNo` property (use `Id` int PK)?
+- [ ] `GetByNumberAsync` / `GetByNumber` removed from services and controllers?
+- [ ] `InvoiceNo` parameter removed from `SalesInvoice.Create()` and `PurchaseInvoice.Create()`?
+- [ ] Search by invoice uses `int.TryParse` + `Id` (not `InvoiceNo` string)?
+- [ ] Report DTOs (`SalesReportDto`, `PurchaseReportDto`) use `int Id` (not `string InvoiceNo`)?
+- [ ] `InvoicePrintDto` uses `int Id` (not `string InvoiceNo`)?
+- [ ] `SupplierInvoiceNo` kept only as supplier's reference (not system identifier)?
 - [ ] All search/filter uses Id or Name, not Code?
 - [ ] Invoice item DTOs carry ProductId only (no ProductCode)?
 - [ ] Report DTOs exclude Code fields?
@@ -1548,3 +1597,9 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] FallbackErrorDialog exists for unhandled exceptions?
 - [ ] Login endpoint has `[EnableRateLimiting("LoginPolicy")]`?
 - [ ] Rate limiter middleware placed BEFORE `UseAuthentication()`?
+- [ ] All views use compact sizes — no hardcoded `Height=36/40` on buttons/inputs?
+- [ ] Header/footer padding uses `12,6` / `12,8` or smaller?
+- [ ] Section margins between form fields use `8px` or less?
+- [ ] Dialog title fonts = 16 or less, section headers = 14 or less?
+- [ ] MainWindow sidebar width = 200 (not 220 / 240)?
+- [ ] Empty-state buttons use `Margin=0,12,0,0` Width=140 (not 20px/160)?

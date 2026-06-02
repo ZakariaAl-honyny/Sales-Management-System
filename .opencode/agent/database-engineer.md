@@ -58,7 +58,7 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - ALL FKs: `OnDelete(DeleteBehavior.Restrict)` — NEVER Cascade
 - WarehouseStocks: `CHECK (Quantity >= 0)`
 - SalesInvoices: `CHECK (PaidAmount >= 0 AND PaidAmount <= TotalAmount)`
-- Unique indexes: InvoiceNo, Barcode (UnitBarcodes), UserName — NO Code indexes (Code removed from all entities)
+- Unique indexes: Barcode (UnitBarcodes), UserName — NO Code indexes (Code removed from all entities), NO InvoiceNo indexes (InvoiceNo removed from SalesInvoice/PurchaseInvoice)
 - Composite unique: `WarehouseStocks(WarehouseId, ProductId)`
 - WarehouseStocks: MUST have `.ToTable(t => t.HasCheckConstraint("CHK_WarehouseStocks_Quantity_NonNegative", "[Quantity] >= 0"))`
 - ALL money fields: `decimal(18,2)` — NEVER `decimal(18,4)`
@@ -71,6 +71,10 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - `Product`, `Customer`, `Supplier`, `Warehouse` entities MUST NOT have a `Code` column — use auto-increment `Id` as sole identifier
 - `Product.Code`, `Customer.Code`, `Supplier.Code`, `Warehouse.Code` unique indexes are REMOVED
 - `DuplicateCode` error constant is REMOVED from ErrorCodes
+- `SalesInvoice.InvoiceNo` and `PurchaseInvoice.InvoiceNo` properties are REMOVED — use auto-increment `Id` as sole invoice identifier
+- `SalesInvoiceConfiguration` and `PurchaseInvoiceConfiguration` MUST NOT configure `InvoiceNo` (no HasMaxLength, no HasIndex)
+- `GetByNumberAsync` queries (by InvoiceNo string) MUST NOT exist in repositories or services
+- `SupplierInvoiceNo` on PurchaseInvoice is the supplier's external reference — distinct from the removed system InvoiceNo
 - Entity configurations for Product, Customer, Supplier, Warehouse must NOT include Code property, HasMaxLength, or HasIndex for Code
 - `SystemSettings` table key-value configuration: Seed `CostingMethod` (Key = "CostingMethod", Value = "1" [WeightedAverage]) and ensure the API settings client correctly maps update requests.
 

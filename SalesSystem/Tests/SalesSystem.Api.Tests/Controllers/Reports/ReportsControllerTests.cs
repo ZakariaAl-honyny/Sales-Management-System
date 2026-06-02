@@ -24,7 +24,7 @@ public class ReportsControllerTests
     {
         var from = DateTime.Now.AddDays(-30);
         var to = DateTime.Now;
-        var report = new SalesReportDto(from, "INV-001", "العميل", 10000m, 0m, 0m, 10000m, 5000m, 5000m);
+        var report = new SalesReportDto(from, 1, "العميل", 10000m, 0m, 0m, 10000m, 5000m, 5000m);
 
         _reportServiceMock
             .Setup(x => x.GetSalesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
@@ -67,7 +67,7 @@ public class ReportsControllerTests
     {
         var from = DateTime.Now.AddDays(-30);
         var to = DateTime.Now;
-        var report = new PurchaseReportDto(from, "PUR-001", "المورد", 8000m, 0m, 0m, 8000m, 4000m, 4000m);
+        var report = new PurchaseReportDto(from, 1, "المورد", 8000m, 0m, 0m, 8000m, 4000m, 4000m);
 
         _reportServiceMock
             .Setup(x => x.GetPurchasesReportAsync(It.IsAny<int?>(), It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))

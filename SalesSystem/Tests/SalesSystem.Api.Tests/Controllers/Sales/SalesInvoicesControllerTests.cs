@@ -203,7 +203,6 @@ public class SalesInvoicesControllerTests : ControllerTestBase
 
     private static SalesInvoiceDto CreateInvoiceDto(int id, byte status) => new(
         Id: id,
-        InvoiceNo: $"INV-2026-{id:D6}",
         CustomerId: 1,
         CustomerName: "عميل اختبار",
         WarehouseId: 1,

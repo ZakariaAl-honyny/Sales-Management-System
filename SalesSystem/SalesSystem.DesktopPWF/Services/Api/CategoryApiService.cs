@@ -44,7 +44,7 @@ public class CategoryApiService : ApiServiceBase, ICategoryApiService
     public async Task<Result> DeletePermanentlyAsync(int id)
     {
         return await ExecuteCommandAsync(
-            () => _httpClient.DeleteAsync($"api/v1/categories/{id}/permanent"),
+            () => _httpClient.DeleteAsync($"api/v1/categories/permanent/{id}"),
             "CategoryApiService.DeletePermanentlyAsync");
     }
 }

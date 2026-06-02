@@ -53,7 +53,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Grid.Column="0">
                     <Path Data="{StaticResource IconInvoice}" Fill="White" Width="20" Height="20" Margin="0,0,12,0" Stretch="Uniform"/>
-                    <TextBlock Text="تحرير فاتورة بيع" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Text="🛒  تحرير فاتورة بيع" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
                 <Button Grid.Column="1" Content="🔄 تبديل المظهر" Command="{Binding ToggleViewModeCommand}"
                         Style="{StaticResource SecondaryButton}" Margin="0,0,12,0"
@@ -69,8 +69,39 @@
 
         <!-- Content Area -->
         <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Barcode Search Shared -->
+                <RowDefinition Height="*"/>    <!-- Content Layouts -->
+            </Grid.RowDefinitions>
+
+            <!-- Shared Barcode Search -->
+            <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="16,16,16,0" Background="#F1F5F9" Padding="12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="🔍 البحث بالباركود" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBox Grid.Column="1" Text="{Binding BarcodeSearchText, UpdateSourceTrigger=PropertyChanged}" 
+                             Style="{StaticResource ModernTextBox}" Height="36">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <!-- Green button: opens continuous product selection window -->
+                    <Button Grid.Column="2" Content="إضافة" Command="{Binding SearchProductCommand}"
+                            Style="{StaticResource SuccessButton}" Margin="8,0,0,0" Width="80" Height="36" ToolTip="البحث عن منتج وإضافته للقائمة"/>
+                    <!-- Separator -->
+                    <Separator Grid.Column="3" Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
+                    <TextBlock Grid.Column="4" Text="مسح الباركود يضيف الصنف تلقائياً" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                </Grid>
+            </Border>
+
             <!-- Standard Retail Layout -->
-            <Grid Margin="16"
+            <Grid Grid.Row="1" Margin="16"
                   Visibility="{Binding CurrentViewMode, Converter={StaticResource SalesViewModeToVisibilityConverter}, ConverterParameter=Standard}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>      <!-- Main: Items -->
@@ -79,39 +110,10 @@
 
                 <!-- Main Panel (Right side) -->
                 <Grid Grid.Column="0" Margin="0,0,16,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- Barcode Search -->
-                        <RowDefinition Height="*"/>    <!-- DataGrid -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Barcode Search -->
-                    <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,16" Background="#F1F5F9" Padding="12">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="300"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="🔍 البحث بالباركود" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <TextBox Grid.Column="1" Text="{Binding BarcodeSearchText, UpdateSourceTrigger=PropertyChanged}" 
-                                     Style="{StaticResource ModernTextBox}" Height="36">
-                                <TextBox.InputBindings>
-                                    <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
-                                </TextBox.InputBindings>
-                            </TextBox>
-                            <!-- Green button: opens continuous product selection window -->
-                            <Button Grid.Column="2" Content="إضافة" Command="{Binding SearchProductCommand}"
-                                    Style="{StaticResource SuccessButton}" Margin="8,0,0,0" Width="80" Height="36" ToolTip="البحث عن منتج وإضافته للقائمة"/>
-                            <!-- Separator -->
-                            <Separator Grid.Column="3" Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
-                            <TextBlock Grid.Column="4" Text="مسح الباركود يضيف الصنف تلقائياً" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
-                        </Grid>
-                    </Border>
+                    <!-- Removed RowDefinitions since Barcode is now shared -->
 
                     <!-- Items Grid -->
-                    <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0">
+                    <Border Style="{StaticResource CardStyle}" Padding="0">
                         <DockPanel>
                             <Border DockPanel.Dock="Top" Background="#F8FAFC" Padding="16,10" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
                                 <Grid>
@@ -189,9 +191,15 @@
                 </Grid>
 
                 <!-- Side Panel (Left side) -->
-                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <!-- Info Card -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Info Card -->
                         <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
                             <StackPanel>
                                 <TextBlock Text="ℹ️ تفاصيل الفاتورة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
@@ -235,11 +243,13 @@
                                          ToolTip="أضف ملاحظات إضافية للفاتورة (اختياري)"/>
                             </StackPanel>
                         </Border>
+                    </StackPanel>
+                    </ScrollViewer>
 
                         <!-- Financial Summary Card -->
-                        <Border Style="{StaticResource CardStyle}" Background="#F8FAFC" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="0,0,4,0">
+                        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Background="#F8FAFC" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="0,0,4,0">
                             <StackPanel>
-                                <TextBlock Text="💰 الملخص المالي" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
+                                <TextBlock Text="💰 الملخص المالي" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                                 
                                 <CheckBox Content="شامل الضريبة" IsChecked="{Binding IsTaxInclusive}" Margin="0,0,0,12"/>
                                 
@@ -286,15 +296,14 @@
                                 </Border>
                             </StackPanel>
                         </Border>
-                    </StackPanel>
-                </ScrollViewer>
+                </Grid>
             </Grid>
 
             <!-- Touch POS Layout -->
-            <Grid Margin="16"
+            <Grid Grid.Row="1" Margin="16"
                   Visibility="{Binding CurrentViewMode, Converter={StaticResource SalesViewModeToVisibilityConverter}, ConverterParameter=Touch}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="360"/>   <!-- Cart panel -->
+                    <ColumnDefinition Width="420"/>   <!-- Cart panel -->
                     <ColumnDefinition Width="*"/>     <!-- Products panel -->
                 </Grid.ColumnDefinitions>
 
