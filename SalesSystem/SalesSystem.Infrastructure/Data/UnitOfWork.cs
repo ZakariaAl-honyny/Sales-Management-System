@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Infrastructure.Repositories;
 
@@ -47,6 +48,10 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<DailyClosure>? _dailyClosures;
     private IGenericRepository<StockWriteOff>? _stockWriteOffs;
     private IGenericRepository<ProductPriceHistory>? _productPriceHistory;
+    private IGenericRepository<Account>? _accounts;
+    private IGenericRepository<JournalEntry>? _journalEntries;
+    private IGenericRepository<JournalEntryLine>? _journalEntryLines;
+    private IGenericRepository<SystemAccountMappings>? _systemAccountMappings;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -84,6 +89,10 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<DailyClosure> DailyClosures => _dailyClosures ??= new GenericRepository<DailyClosure>(_context);
     public IGenericRepository<StockWriteOff> StockWriteOffs => _stockWriteOffs ??= new GenericRepository<StockWriteOff>(_context);
     public IGenericRepository<ProductPriceHistory> ProductPriceHistory => _productPriceHistory ??= new GenericRepository<ProductPriceHistory>(_context);
+    public IGenericRepository<Account> Accounts => _accounts ??= new GenericRepository<Account>(_context);
+    public IGenericRepository<JournalEntry> JournalEntries => _journalEntries ??= new GenericRepository<JournalEntry>(_context);
+    public IGenericRepository<JournalEntryLine> JournalEntryLines => _journalEntryLines ??= new GenericRepository<JournalEntryLine>(_context);
+    public IGenericRepository<SystemAccountMappings> SystemAccountMappings => _systemAccountMappings ??= new GenericRepository<SystemAccountMappings>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {

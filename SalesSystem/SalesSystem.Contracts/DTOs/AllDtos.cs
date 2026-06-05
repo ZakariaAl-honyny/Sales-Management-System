@@ -464,11 +464,44 @@ public record VatReportDto(
     decimal TaxRate,
     decimal TaxAmount);
 
+// ─── Accounting DTOs ─────────────────────────────────
+public record AccountBalanceDto(
+    int AccountId,
+    string AccountCode,
+    string AccountNameAr,
+    byte AccountType,
+    decimal TotalDebit,
+    decimal TotalCredit,
+    decimal Balance,
+    bool IsDebitNormal
+);
+
+public record AccountLedgerDto(
+    string AccountCode,
+    string AccountNameAr,
+    decimal OpeningBalance,
+    List<AccountLedgerLineDto> Lines,
+    decimal TotalDebit,
+    decimal TotalCredit,
+    decimal ClosingBalance
+);
+
+public record AccountLedgerLineDto(
+    DateTime Date,
+    string EntryNumber,
+    string Description,
+    string? ReferenceNumber,
+    decimal Debit,
+    decimal Credit,
+    decimal RunningBalance
+);
+
 public record AccountStatementDto(
     DateTime Date,
     string Description,
     string ReferenceNumber,
     decimal Debit,
     decimal Credit,
-    decimal Balance);
+    decimal Balance
+);
 

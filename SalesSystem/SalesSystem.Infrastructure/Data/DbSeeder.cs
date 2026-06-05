@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
+using SalesSystem.Infrastructure.Data.Seeders;
 using System.Linq;
 
 namespace SalesSystem.Infrastructure.Data;
@@ -104,6 +105,9 @@ public static class DbSeeder
 
         if (productsWithoutUnits.Any())
             logger?.LogInformation("Seeded base ProductUnits for {Count} products", productsWithoutUnits.Count);
+
+        // 9. Seed accounting foundation (chart of accounts + system mappings)
+        await AccountingSeeder.SeedAsync(db, logger);
 
         await db.SaveChangesAsync();
         logger?.LogInformation("Seed data completed successfully.");

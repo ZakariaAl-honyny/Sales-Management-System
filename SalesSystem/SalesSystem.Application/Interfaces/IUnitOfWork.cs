@@ -1,6 +1,7 @@
 using SalesSystem.Application.Interfaces.Repositories;
-using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Interfaces;
 
@@ -37,6 +38,10 @@ public interface IUnitOfWork
     IGenericRepository<DailyClosure> DailyClosures { get; }
     IGenericRepository<ProductPriceHistory> ProductPriceHistory { get; }
     IGenericRepository<StockWriteOff> StockWriteOffs { get; }
+    IGenericRepository<Account> Accounts { get; }
+    IGenericRepository<JournalEntry> JournalEntries { get; }
+    IGenericRepository<JournalEntryLine> JournalEntryLines { get; }
+    IGenericRepository<SystemAccountMappings> SystemAccountMappings { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
     Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken ct = default);

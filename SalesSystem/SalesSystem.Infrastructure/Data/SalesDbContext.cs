@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Infrastructure.Data;
@@ -39,6 +40,10 @@ public class SalesDbContext : DbContext
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
     public DbSet<StockWriteOff> StockWriteOffs => Set<StockWriteOff>();
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+    public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
+    public DbSet<SystemAccountMappings> SystemAccountMappings => Set<SystemAccountMappings>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 
