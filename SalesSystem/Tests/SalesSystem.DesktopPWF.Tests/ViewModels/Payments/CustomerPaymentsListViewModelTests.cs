@@ -51,7 +51,7 @@ public class CustomerPaymentsListViewModelTests
 
     private static CustomerPaymentDto CreatePayment(int id, string customerName, decimal amount)
     {
-        return new CustomerPaymentDto(id, $"CP-{id:000}", 1, customerName, amount, 1, DateTime.Today, null, null);
+        return new CustomerPaymentDto(id, $"CP-{id:000}", 1, customerName, amount, 1, null, null, DateTime.Today, null, null);
     }
 
     #region Property Tests

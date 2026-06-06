@@ -14,7 +14,13 @@ public class CashBox : BaseEntity
     public decimal OpeningBalance { get; private set; }
     public decimal CurrentBalance { get; private set; }
     public int? BranchId { get; private set; }
-    public string CurrencyCode { get; private set; } = "SAR";
+    /// <summary>
+    /// DEPRECATED: Legacy CurrencyCode field — kept for backwards compatibility.
+    /// Use <see cref="CurrencyId"/> and <see cref="Currency"/> navigation instead.
+    /// </summary>
+    public string CurrencyCode => Currency?.Code ?? string.Empty;
+    public int? CurrencyId { get; private set; }
+    public Currency? Currency { get; private set; }
     public int? AssignedUserId { get; private set; } // NULL = shared box
     public string? Notes { get; private set; }
 
@@ -31,7 +37,7 @@ public class CashBox : BaseEntity
         string boxName,
         int? branchId = null,
         int? assignedUserId = null,
-        string currencyCode = "SAR",
+        int? currencyId = null,
         decimal initialBalance = 0)
     {
         if (string.IsNullOrWhiteSpace(boxName))
@@ -42,7 +48,8 @@ public class CashBox : BaseEntity
             BoxName = boxName.Trim(),
             BranchId = branchId,
             AssignedUserId = assignedUserId,
-            CurrencyCode = currencyCode,
+            CurrencyId = currencyId,
+            OpeningBalance = initialBalance,
             CurrentBalance = initialBalance,
             IsActive = true
         };
@@ -69,7 +76,7 @@ public class CashBox : BaseEntity
 
         var transaction = CashTransaction.Create(
             Id, type, amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes);
+            referenceType, referenceId, createdBy, notes, CurrencyId);
 
         _transactions.Add(transaction);
         return transaction;
@@ -100,7 +107,7 @@ public class CashBox : BaseEntity
 
         var transaction = CashTransaction.Create(
             Id, type, -amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes);
+            referenceType, referenceId, createdBy, notes, CurrencyId);
 
         _transactions.Add(transaction);
         return transaction;

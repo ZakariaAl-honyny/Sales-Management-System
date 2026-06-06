@@ -23,6 +23,11 @@ public class CashTransactionConfiguration : IEntityTypeConfiguration<CashTransac
             .HasForeignKey(ct => ct.CashBoxId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(ct => ct.Currency)
+            .WithMany()
+            .HasForeignKey(ct => ct.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(x => x.IsActive).HasDefaultValue(true);
         builder.HasQueryFilter(x => x.IsActive);
     }

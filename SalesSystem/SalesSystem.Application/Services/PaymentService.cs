@@ -53,6 +53,8 @@ public class PaymentService : IPaymentService
                     request.SalesInvoiceId,
                     null, // ReferenceNo
                     request.Notes,
+                    null, // CurrencyId
+                    null, // ExchangeRate
                     userId,
                     request.PaymentDate
                 );
@@ -113,6 +115,8 @@ public class PaymentService : IPaymentService
                     request.PurchaseInvoiceId,
                     null, // ReferenceNo
                     request.Notes,
+                    null, // CurrencyId
+                    null, // ExchangeRate
                     userId,
                     request.PaymentDate
                 );
@@ -397,6 +401,8 @@ public class PaymentService : IPaymentService
             p.Customer?.Name ?? "غير معروف",
             p.Amount,
             p.PaymentMethod,
+            p.CurrencyId,
+            p.ExchangeRate,
             p.PaymentDate,
             p.SalesInvoiceId,
             p.Notes
@@ -412,9 +418,12 @@ public class PaymentService : IPaymentService
             p.Supplier?.Name ?? "غير معروف",
             p.Amount,
             p.PaymentMethod,
+            p.CurrencyId,
+            p.ExchangeRate,
             p.PaymentDate,
             p.PurchaseInvoiceId,
             p.Notes
         );
     }
+
 }

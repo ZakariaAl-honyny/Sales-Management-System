@@ -18,15 +18,22 @@ Break plans into granular executable tasks, ordered by PRD implementation phases
 ## MUST READ FIRST
 - `AGENTS.md` — Implementation phases (§9 of Orchestrator)
 
-## PRD Phase Alignment
+## PRD Phase Alignment (Current — Phases 18-31)
 ```text
-Milestone 1 → Phase 1: Foundation (Solution + Entities + DB)
-Milestone 2 → Phase 2: Backend Core (Repositories + Auth + Basic API)
-Milestone 3 → Phase 3: Business Logic (Sales/Purchase/Return/Transfer)
-Milestone 4 → Phase 4: Desktop Shell (MainForm + Navigation + EventBus)
-Milestone 5 → Phase 5: Desktop Modules (Products → Sales modules)
-Milestone 6 → Phase 6: Printing (A4 + 80mm thermal)
-Milestone 7 → Phase 7: Production (Backup + Installer + Windows Service)
+Phase 18: Accounting Foundation (JournalEntry, Account, FiscalYear)
+Phase 19: Settings Module (13 system settings, CostingMethod, Print/Tax settings)
+Phase 20: Currencies Module (multi-currency, exchange rates, FractionName)
+Phase 21: Users & Permissions (4 roles, 33 permission codes)
+Phase 22: Chart of Accounts (60 accounts, 5 types, SystemAccountMappings)
+Phase 23: Customers Module (Account auto-creation, CreditLimit)
+Phase 24: Suppliers Module (Account auto-creation, OpeningBalance JE)
+Phase 25: Products Module (ProductUnit, OpeningStock, TrackExpiry/TrackBatch)
+Phase 26: Warehouses Module (CRUD, Stock Transfer, AdjustmentType)
+Phase 27: Purchases Module (FIFO batches, Partial PO, AdditionalCharge)
+Phase 28: Sales Module (FIFO/FEFO, barcode auto-add, credit limit)
+Phase 29: Receipts & Payments (CashBox.AccountId, Cheque, immutability)
+Phase 30: Journal Entries (7 auto-providers, Annual Closing, Simple Mode UX)
+Phase 31: Reports Module (35+ DTOs, Hierarchical IS/BS, Excel export)
 ```
 
 ## Task Format
@@ -40,7 +47,8 @@ TASK-001: [Strong Verb] [Specific Noun]
 ```
 
 ## Critical Tasks (MUST be flagged)
-- DocumentSequenceService (thread-safe SemaphoreSlim)
+- DocumentSequenceService (thread-safe SemaphoreSlim — GetNextIntAsync for UNIQUE InvoiceNo)
+- InvoiceNo generation via DocumentSequenceService.GetNextIntAsync() (never lastId + 1)
 - SalesService (complete transaction flow)
 - PurchaseService (complete transaction flow)
 - InventoryService (stock movements + InventoryMovements)

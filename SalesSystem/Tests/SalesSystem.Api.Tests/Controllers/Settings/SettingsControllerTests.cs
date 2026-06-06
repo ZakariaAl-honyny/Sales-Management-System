@@ -101,6 +101,19 @@ public class SettingsControllerTests
     }
 
     [Fact]
+    public async Task Update_WhenNotFound_ReturnsNotFound()
+    {
+        _settingsServiceMock
+            .Setup(x => x.UpdateSettingsAsync(It.IsAny<UpdateSettingsRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<StoreSettingsDto>.Failure("المنشأة غير موجودة", "NOT_FOUND"));
+
+        var request = new UpdateSettingsRequest("متجري", "الرياض", "0123456789", null, null, "SAR", 15m, true, null, true, false, true, "INV-");
+        var result = await _controller.Update(request, CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
     public async Task Update_WithoutUserId_ReturnsUnauthorized()
     {
         _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext

@@ -10,14 +10,19 @@ public class StoreSettings : BaseEntity
     public string? Address { get; private set; }
     public string? LogoPath { get; private set; }
     public string? Email { get; private set; }
-    public string CurrencyCode { get; private set; } = "SAR";
-    public decimal DefaultTaxRate { get; private set; }
-    public bool IsTaxEnabled { get; private set; }
+    public string CurrencyCode { get; private set; } = "SAR"; // DEPRECATED: CurrencyCode — use Currencies table instead. Kept in DB for backwards compat. Remove in Phase 20.
+    public decimal DefaultTaxRate { get; private set; } // DEPRECATED: DefaultTaxRate — use Tax entity instead. Remove in Phase 20.
+    public bool IsTaxEnabled { get; private set; }      // DEPRECATED: IsTaxEnabled — use Tax entity instead. Remove in Phase 20.
     public string? TaxNumber { get; private set; }
     public bool EnableStockAlerts { get; private set; }
     public bool AllowNegativeStock { get; private set; }
     public bool AutoUpdatePrices { get; private set; }
-    public string InvoicePrefix { get; private set; } = "INV";
+    public string InvoicePrefix { get; private set; } = "INV"; // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead. Remove in Phase 20.
+
+    /// <summary>
+    /// File path to the company signature image printed on invoices.
+    /// </summary>
+    public string? SignaturePath { get; private set; }
 
     private StoreSettings() { }
 
@@ -34,12 +39,15 @@ public class StoreSettings : BaseEntity
         bool enableStockAlerts = true,
         bool allowNegativeStock = false,
         bool autoUpdatePrices = false,
-        string invoicePrefix = "INV")
+        string invoicePrefix = "INV",
+        string? signaturePath = null)
     {
         if (string.IsNullOrWhiteSpace(storeName))
             throw new DomainException("اسم المتجر مطلوب.");
         if (defaultTaxRate < 0)
             throw new DomainException("معدل الضريبة الافتراضي لا يمكن أن يكون سالباً.");
+        if (signaturePath != null && signaturePath.Length > 255)
+            throw new DomainException("مسار التوقيع طويل جداً");
 
         return new StoreSettings
         {
@@ -55,7 +63,8 @@ public class StoreSettings : BaseEntity
             EnableStockAlerts = enableStockAlerts,
             AllowNegativeStock = allowNegativeStock,
             AutoUpdatePrices = autoUpdatePrices,
-            InvoicePrefix = invoicePrefix
+            InvoicePrefix = invoicePrefix,
+            SignaturePath = signaturePath
         };
     }
 
@@ -72,12 +81,15 @@ public class StoreSettings : BaseEntity
         bool enableStockAlerts,
         bool allowNegativeStock,
         bool autoUpdatePrices,
-        string invoicePrefix)
+        string invoicePrefix,
+        string? signaturePath = null)
     {
         if (string.IsNullOrWhiteSpace(storeName))
             throw new DomainException("اسم المتجر مطلوب.");
         if (defaultTaxRate < 0)
             throw new DomainException("معدل الضريبة الافتراضي لا يمكن أن يكون سالباً.");
+        if (signaturePath != null && signaturePath.Length > 255)
+            throw new DomainException("مسار التوقيع طويل جداً");
         StoreName = storeName;
         Phone = phone;
         Address = address;
@@ -91,6 +103,7 @@ public class StoreSettings : BaseEntity
         AllowNegativeStock = allowNegativeStock;
         AutoUpdatePrices = autoUpdatePrices;
         InvoicePrefix = invoicePrefix;
+        SignaturePath = signaturePath;
         UpdateTimestamp();
     }
 }

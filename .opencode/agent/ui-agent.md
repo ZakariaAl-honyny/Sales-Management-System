@@ -207,9 +207,11 @@ catch (Exception ex)
 - Use auto-increment Id (int PK) as sole identifier for display and search
 - WarehouseResponse bindings must NOT include a Code field — it was removed from the record
 
-### Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+### Invoice Number Strategy — InvoiceNo as int, UNIQUE (v4.6.7)
 - SalesInvoice and PurchaseInvoice editor screens MUST have an InvoiceNo (int) text field — user-facing invoice number
-- Editor ViewModel: `int InvoiceNo` property, `InvoiceNo = 0` for new invoices (service computes default as `lastId + 1`)
+- Editor ViewModel: `int InvoiceNo` property, `InvoiceNo = 0` for new invoices (service computes via DocumentSequenceService — NOT lastId+1)
+- Editor shows suggested next InvoiceNo loaded from API; user can override (validated for uniqueness)
+- DocumentSequenceService used on Desktop via IApiService call to API endpoint (`GET /api/v1/sequences/next/{key}`)
 - Invoice list ViewModels display `InvoiceNo` column and filter by `InvoiceNo == parsedInt || Id == parsedInt`
 - `SupplierInvoiceNo` display is kept for purchase invoices (supplier's reference) and labeled as "رقم فاتورة المورد" (supplier invoice number) — distinct from system "رقم الفاتورة"
 - Report ViewModels MUST include `int InvoiceNo` in DTOs
@@ -548,4 +550,67 @@ ALL XAML views MUST use compact sizes. The Styles.xaml now provides compact defa
 2. **Buttons Always Enabled**:
    - Action buttons (Save, Post, Print) in View XAML MUST NOT bind their `IsEnabled` property to VM properties like `HasChanges` or `CanSave` (e.g., `IsEnabled="{Binding HasChanges}"` is FORBIDDEN).
    - Leave buttons enabled at all times. Clicking the button must trigger `Validate()` and display clear warning dialogs for missing or incorrect fields.
+
+## v4.6.8 — Phase 18 & Phase 20 Remediations
+
+### CurrencyEditorViewModel — Dual Constructor Pattern
+- MUST have parameterless constructor delegating to parameterized constructor:
+  ```csharp
+  public CurrencyEditorViewModel() : this(App.GetService<ICurrencyApiService>(),
+      App.GetService<IDialogService>(), App.GetService<IToastNotificationService>()) { }
+  public CurrencyEditorViewModel(ICurrencyApiService currencyApiService, IDialogService dialogService,
+      IToastNotificationService toastService) { ... }
+  ```
+
+### CurrenciesListViewModel — IDisposable
+- MUST implement `IDisposable` (not just override `Cleanup()`):
+  ```csharp
+  public class CurrenciesListViewModel : ViewModelBase, IDisposable
+  {
+      public void Dispose() => Cleanup();  // Ensures EventBus unsubscription
+  }
+  ```
+
+### ExchangeRate Display Format — N6 Not N2
+- Exchange rate bindings in `CurrencyEditorView.xaml` DataGrid MUST use `N6` format:
+  ```xml
+  <DataGridTextColumn Binding="{Binding OldRate, StringFormat='{}{0:N6}'}" Header="السعر القديم"/>
+  <DataGridTextColumn Binding="{Binding NewRate, StringFormat='{}{0:N6}'}" Header="السعر الجديد"/>
+  ```
+
+### Edit/Delete Commands — No CanExecute
+- `EditCommand` and `DeleteCommand` MUST NOT have CanExecute predicates (per RULE-059):
+  ```csharp
+  // CORRECT — always enabled
+  EditCommand = new RelayCommand(EditCurrency);      // NO predicate
+  DeleteCommand = new AsyncRelayCommand(DeleteCurrencyAsync);  // NO predicate
+  // WRONG — blocks buttons when nothing selected
+  EditCommand = new RelayCommand(EditCurrency, () => SelectedCurrency != null); // ❌
+  ```
+
+### Restore Success — Toast Not Dialog
+- Restore/deactivate success MUST use `IToastNotificationService` (not modal dialog):
+  ```csharp
+  // CORRECT — toast auto-dismisses
+  _toastService.ShowSuccess("تم استعادة العملة بنجاح");
+    // WRONG — modal dialog blocks user
+    await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة العملة بنجاح"); // ❌
+    ```
+
+## v4.6.9 — Phase 19 Settings Module Remediations
+
+### StoreSettings Service Locator Pattern
+- `SettingsViewModel` uses `App.GetService<>()` for DI access (parameterless constructor). This is an anti-pattern but follows existing codebase convention. When refactoring, prefer constructor injection.
+
+### SystemSettingsViewModel Pattern
+- Follows dictionary-based approach: `MapFromDictionary()` reads from API response, `BuildDictionary()` writes back.
+- Uses `ParseBool()`/`ParseInt()` safe-parse helpers with default values.
+- Uses `SetDialogService()` and `ExecuteAsync()` wrappers.
+- ENH-001/002 [FIXED]: SystemSettingsViewModel now has all 32 seeded settings as properties — including Print section (ThermalPrinterName, A4PrinterName, LogoPath, StoreTaxNumber, ShowLogo, FooterNote) and Notifications section (LowStockAlert, ExpiryAlert, ExpiryAlertDays, CreditLimitAlert).
+- ENH-003 [FIXED]: StoreSettingsService validates known system setting keys by type (boolean → TryParse, integer → TryParse with ranges) before saving batch updates.
+- ENH-004 [FIXED]: Tax entity has SetDefault() and ClearDefault() domain methods for cleaner service code.
+- ENH-005 [FIXED]: CashBox.Create() now sets `OpeningBalance = initialBalance` — was always 0.
+- ENH-007 [FIXED]: Currency entity has `SetAsBaseCurrency()` / `UnsetBaseCurrency()` domain methods.
+- ENH-012 [FIXED]: Removed unnecessary `async` from lambda in CurrencyEditorViewModel.
+
 ```

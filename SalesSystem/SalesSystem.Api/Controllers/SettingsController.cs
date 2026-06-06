@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Printing.Contracts;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
@@ -16,16 +16,13 @@ public class SettingsController : ControllerBase
 {
     private readonly IStoreSettingsService _settingsService;
     private readonly IPrintDataService _printSettingsService;
-    private readonly ISystemSettingsRepository _systemSettingsRepo;
 
     public SettingsController(
         IStoreSettingsService settingsService,
-        IPrintDataService printSettingsService,
-        ISystemSettingsRepository systemSettingsRepo)
+        IPrintDataService printSettingsService)
     {
         _settingsService = settingsService;
         _printSettingsService = printSettingsService;
-        _systemSettingsRepo = systemSettingsRepo;
     }
 
     [HttpGet]
@@ -40,7 +37,11 @@ public class SettingsController : ControllerBase
             var dto = result.Value with { CostingMethod = (int)costingMethod };
             return Ok(dto);
         }
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+            return Ok(result.Value);
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     [HttpPut]
@@ -52,7 +53,9 @@ public class SettingsController : ControllerBase
         var result = await _settingsService.UpdateSettingsAsync(request, userId, ct);
         if (result.IsSuccess)
             return Ok(result.Value);
-        return BadRequest(new { error = result.Error });
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     // ─── System Settings Bulk Endpoints ──────
@@ -65,8 +68,12 @@ public class SettingsController : ControllerBase
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> GetAllSystemSettings(CancellationToken ct)
     {
-        var settings = await _systemSettingsRepo.GetAllSystemSettingsAsync(ct);
-        return Ok(settings);
+        var result = await _settingsService.GetAllSystemSettingsAsync(ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     /// <summary>
@@ -79,8 +86,12 @@ public class SettingsController : ControllerBase
         if (settings == null || settings.Count == 0)
             return BadRequest(new { error = "لا توجد إعدادات للتحديث" });
 
-        await _systemSettingsRepo.SetBatchSystemSettingsAsync(settings, ct);
-        return Ok(new { message = "تم حفظ إعدادات النظام بنجاح" });
+        var result = await _settingsService.UpdateSystemSettingsAsync(settings, ct);
+        if (result.IsSuccess)
+            return Ok(new { message = "تم حفظ إعدادات النظام بنجاح" });
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     // ─── Costing Method Endpoints ────────────
@@ -95,7 +106,9 @@ public class SettingsController : ControllerBase
             var method = result.Value ?? CostingMethod.WeightedAverage;
             return Ok((int)method);
         }
-        return BadRequest(new { error = result.Error });
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     [HttpPut("costing-method")]
@@ -108,7 +121,9 @@ public class SettingsController : ControllerBase
         var result = await _settingsService.SetCostingMethodAsync((CostingMethod)request.Method, userId, ct);
         if (result.IsSuccess)
             return Ok(new { method = (int)request.Method });
-        return BadRequest(new { error = result.Error });
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     // ─── Print Settings Endpoints ────────────
@@ -120,7 +135,9 @@ public class SettingsController : ControllerBase
         var result = await _printSettingsService.GetPrintSettingsAsync(ct);
         if (result.IsSuccess && result.Value != null)
             return Ok(result.Value);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 
     [HttpPut("print")]
@@ -130,6 +147,8 @@ public class SettingsController : ControllerBase
         var result = await _printSettingsService.UpdatePrintSettingsAsync(request, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم حفظ إعدادات الطباعة بنجاح" });
-        return BadRequest(new { error = result.Error });
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
     }
 }

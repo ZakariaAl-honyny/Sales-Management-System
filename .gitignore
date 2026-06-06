@@ -69,3 +69,19 @@ publish/
 logs/
 **/logs/
 *.log
+
+# ============================================
+# Temp / Build artifacts
+# ============================================
+*wpftmp*
+build_temp/
+fix_encoding.cs
+fix_encoding.js
+FixEncoding/
+SalesSystem/FixEncoding/
+
+# ============================================
+# Misc analysis folders
+# ============================================
+all new Anylysis/
+docs/all new Anylysis/

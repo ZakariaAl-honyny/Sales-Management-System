@@ -19,12 +19,16 @@ Requirements ownership, user stories, and the source-of-truth for WHAT the syste
 - `docs/PRD-MVP.md` — All requirements
 
 ## Domain Knowledge (from AGENTS.md)
-- 3 roles: `Admin=1, Manager=2, Cashier=3`
+- 4 roles: `Admin=1, Manager=2, Cashier=3, Accountant=4`
 - Invoice statuses: `Draft=1, Posted=2, Cancelled=3`
 - Payment types: `Cash=1, Credit=2, Mixed=3`
 - 7 movement types: PurchaseIn, SaleOut, SaleReturnIn, PurchaseReturnOut, TransferOut, TransferIn, Adjustment
-- 22 database tables
-- 7 implementation phases
+- InvoiceNo = int, UNIQUE per document type, generated via DocumentSequenceService.GetNextIntAsync() (SemaphoreSlim lock)
+- Accounting: 60-account Chart of Accounts, JournalEntries, FiscalYears, 7 auto-journal entry providers
+- FIFO/FEFO: PurchaseLot batch tracking with expiry-based deduction
+- Multi-currency: Currency entity with exchange rates
+- 33 permission codes across 9 modules
+- 14 current implementation phases (18-31)
 
 ## Behaviors
 - Tag every requirement: `REQ-001` through `REQ-NNN`

@@ -169,4 +169,74 @@ public class DocumentSequenceTests
         number.Should().Be("INV-2026-001000");
         sequence.LastNumber.Should().Be(1000);
     }
+
+    [Fact]
+    public void GetNextInt_InitialSequence_ShouldReturnFirstNumber()
+    {
+        var sequence = DocumentSequence.Create(
+            documentType: "SalesInvoice",
+            prefix: "INV",
+            year: 2026
+        );
+
+        var number = sequence.GetNextInt();
+
+        number.Should().Be(1);
+        sequence.LastNumber.Should().Be(1);
+    }
+
+    [Fact]
+    public void GetNextInt_CalledMultipleTimes_ShouldIncrementCorrectly()
+    {
+        var sequence = DocumentSequence.Create(
+            documentType: "SalesInvoice",
+            prefix: "INV",
+            year: 2026
+        );
+
+        sequence.GetNextInt().Should().Be(1);
+        sequence.GetNextInt().Should().Be(2);
+        sequence.GetNextInt().Should().Be(3);
+        sequence.LastNumber.Should().Be(3);
+    }
+
+    [Fact]
+    public void GetNextInt_AfterIncrement_ShouldReturnCorrectValue()
+    {
+        var sequence = DocumentSequence.Create(
+            documentType: "SalesInvoice",
+            prefix: "INV",
+            year: 2026
+        );
+
+        sequence.Increment();
+        sequence.Increment();
+
+        var number = sequence.GetNextInt();
+
+        number.Should().Be(3);
+        sequence.LastNumber.Should().Be(3);
+    }
+
+    [Fact]
+    public void GetNextInt_InterleavedWithGetNextNumber_ShouldIncrementSequentially()
+    {
+        var sequence = DocumentSequence.Create(
+            documentType: "SalesInvoice",
+            prefix: "INV",
+            year: 2026
+        );
+
+        var strNum = sequence.GetNextNumber();
+        strNum.Should().Be("INV-2026-000001");
+        sequence.LastNumber.Should().Be(1);
+
+        var intNum = sequence.GetNextInt();
+        intNum.Should().Be(2);
+        sequence.LastNumber.Should().Be(2);
+
+        strNum = sequence.GetNextNumber();
+        strNum.Should().Be("INV-2026-000003");
+        sequence.LastNumber.Should().Be(3);
+    }
 }

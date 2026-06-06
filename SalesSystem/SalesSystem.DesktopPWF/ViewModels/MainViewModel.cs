@@ -18,6 +18,7 @@ using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
+using SalesSystem.DesktopPWF.ViewModels.Currencies;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -52,11 +53,14 @@ public class MainViewModel : ViewModelBase
                 Title = "نقطة البيع (الكاشير)",
                 OnClosed = (vm) =>
                 {
-                    if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+                    System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                     {
-                        var eventBus = App.GetService<IEventBus>();
-                        eventBus.Publish(new SalesSystem.DesktopPWF.Messaging.Messages.SaleInvoiceChangedMessage(editor.InvoiceId.Value));
-                    }
+                        if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+                        {
+                            var eventBus = App.GetService<IEventBus>();
+                            eventBus.Publish(new SalesSystem.DesktopPWF.Messaging.Messages.SaleInvoiceChangedMessage(editor.InvoiceId.Value));
+                        }
+                    });
                 }
             });
         });
@@ -97,6 +101,7 @@ public class MainViewModel : ViewModelBase
         NavigateToStockTransfersCommand = new RelayCommand(() => NavigateTo<StockTransfersListViewModel>());
         NavigateToInventoryCommand = new RelayCommand(() => NavigateTo<InventoryViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
+        NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -229,6 +234,9 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة الضرائب</summary>
     public ICommand NavigateToTaxesCommand { get; }
 
+    /// <summary>نقل إلى إدارة العملات — إضافة وتعديل العملات وأسعار الصرف</summary>
+    public ICommand NavigateToCurrenciesCommand { get; }
+
     // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
     // ═══════════════════════════════════════════════════════════════
@@ -313,6 +321,7 @@ public class MainViewModel : ViewModelBase
             "Categories"       => _sessionService.CanAccess(Permission.ProductManagement),
             "Units"            => _sessionService.CanAccess(Permission.ProductManagement),
             "Taxes"            => _sessionService.CanAccess(Permission.Settings),
+            "Currencies"       => _sessionService.CanAccess(Permission.Settings),
             _ => true // Dashboard, Sales, SalesReturns, Customers, CustomerPayments, POS, CashBoxes, Inventory
         };
     }
@@ -365,6 +374,7 @@ public class MainViewModel : ViewModelBase
             nameof(StockTransfersListViewModel)     => "StockTransfers",
             nameof(InventoryViewModel)              => "Inventory",
             nameof(TaxesListViewModel)              => "Taxes",
+            nameof(CurrenciesListViewModel)         => "Currencies",
             _                                        => viewModelType.Name
         };
     }

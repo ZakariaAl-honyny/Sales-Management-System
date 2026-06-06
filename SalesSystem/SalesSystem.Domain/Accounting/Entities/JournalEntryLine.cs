@@ -12,10 +12,12 @@ public class JournalEntryLine : BaseEntity
     public int JournalEntryId { get; private set; }
     public JournalEntry? JournalEntry { get; private set; }
     public int AccountId { get; private set; }
+    public Account? Account { get; private set; }
     public string AccountCode { get; private set; } = string.Empty;
     public string AccountNameAr { get; private set; } = string.Empty;
     public decimal Debit { get; private set; }
     public decimal Credit { get; private set; }
+    public int SortOrder { get; private set; }
     public string? Description { get; private set; }
 
     private JournalEntryLine() { } // EF Core

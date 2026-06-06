@@ -36,6 +36,12 @@ public class DocumentSequence : BaseEntity
         return $"{Prefix}-{Year:D4}-{LastNumber:D6}";
     }
 
+    public int GetNextInt()
+    {
+        LastNumber++;
+        return LastNumber;
+    }
+
     public void Increment()
     {
         LastNumber++;

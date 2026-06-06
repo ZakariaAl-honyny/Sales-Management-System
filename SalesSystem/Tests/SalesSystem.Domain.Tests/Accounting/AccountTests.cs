@@ -91,6 +91,37 @@ public class AccountTests
     }
 
     [Fact]
+    public void Create_NegativeParentAccountId_ThrowsDomainException()
+    {
+        // Act
+        var act = () => Account.Create(
+            accountCode: "PAR01",
+            nameAr: "حساب",
+            nameEn: "Account",
+            accountType: AccountType.Asset,
+            parentAccountId: -1);
+
+        // Assert
+        act.Should().Throw<DomainException>()
+            .Which.Message.Should().Be("رقم الحساب الأب غير صالح");
+    }
+
+    [Fact]
+    public void Create_AccountCodeTooLong_ThrowsDomainException()
+    {
+        // Act
+        var act = () => Account.Create(
+            accountCode: "ABCDEFGHIJKLMNOPQRSTU",
+            nameAr: "حساب",
+            nameEn: "Account",
+            accountType: AccountType.Asset);
+
+        // Assert
+        act.Should().Throw<DomainException>()
+            .Which.Message.Should().Be("رمز الحساب لا يمكن أن يتجاوز 20 حرف");
+    }
+
+    [Fact]
     public void Create_WithParentAccount_SetsParentId()
     {
         // Act
@@ -208,8 +239,7 @@ public class AccountTests
         // Act
         var act = () => account.Update(
             nameAr: "معدل",
-            nameEn: "Modified",
-            accountType: AccountType.Liability);
+            nameEn: "Modified");
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -230,13 +260,11 @@ public class AccountTests
         account.Update(
             nameAr: "جديد",
             nameEn: "New",
-            accountType: AccountType.Liability,
             notes: "ملاحظة محدثة");
 
         // Assert
         account.NameAr.Should().Be("جديد");
         account.NameEn.Should().Be("New");
-        account.AccountType.Should().Be(AccountType.Liability);
         account.Notes.Should().Be("ملاحظة محدثة");
     }
 
@@ -253,33 +281,11 @@ public class AccountTests
         // Act
         var act = () => account.Update(
             nameAr: "",
-            nameEn: "New Name",
-            accountType: AccountType.Liability);
+            nameEn: "New Name");
 
         // Assert
         act.Should().Throw<DomainException>()
             .Which.Message.Should().Contain("اسم الحساب بالعربية مطلوب");
-    }
-
-    [Fact]
-    public void Update_InvalidAccountType_ThrowsDomainException()
-    {
-        // Arrange
-        var account = Account.Create(
-            accountCode: "UPD03",
-            nameAr: "اسم",
-            nameEn: "Name",
-            accountType: AccountType.Asset);
-
-        // Act
-        var act = () => account.Update(
-            nameAr: "جديد",
-            nameEn: "New",
-            accountType: (AccountType)99);
-
-        // Assert
-        act.Should().Throw<DomainException>()
-            .Which.Message.Should().Contain("نوع الحساب غير صالح");
     }
 
     [Fact]
@@ -296,7 +302,6 @@ public class AccountTests
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
             parentAccountId: 15);
 
         // Assert
@@ -317,7 +322,6 @@ public class AccountTests
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
             notes: "ملاحظة جديدة");
 
         // Assert
@@ -338,7 +342,6 @@ public class AccountTests
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
             updatedByUserId: 7);
 
         // Assert
@@ -360,7 +363,6 @@ public class AccountTests
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
             parentAccountId: null);
 
         // Assert
@@ -381,8 +383,7 @@ public class AccountTests
         // Act
         account.Update(
             nameAr: "محدث",
-            nameEn: "Updated",
-            accountType: AccountType.Asset);
+            nameEn: "Updated");
 
         // Assert
         account.UpdatedAt.Should().NotBeNull();

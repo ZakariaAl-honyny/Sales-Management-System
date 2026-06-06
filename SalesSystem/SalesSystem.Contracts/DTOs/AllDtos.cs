@@ -1,3 +1,5 @@
+using SalesSystem.Domain.Accounting.Enums;
+
 namespace SalesSystem.Contracts.DTOs;
 
 public record UserDto(int Id, string UserName, string FullName, byte Role, bool IsActive);
@@ -77,6 +79,8 @@ public record SalesInvoiceDto(
     int? TaxId,
     string? TaxName,
     decimal? TaxRate,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     IReadOnlyList<SalesInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -125,6 +129,8 @@ public record PurchaseInvoiceDto(
     int? TaxId,
     string? TaxName,
     decimal? TaxRate,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     IReadOnlyList<PurchaseInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -164,6 +170,8 @@ public record SalesReturnDto(
     decimal TaxAmount,
     decimal DiscountAmount,
     decimal TotalAmount,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     string? Notes,
     byte Status, IReadOnlyList<SalesReturnItemDto> Items)
 {
@@ -196,6 +204,8 @@ public record PurchaseReturnDto(
     decimal TaxAmount,
     decimal DiscountAmount,
     decimal TotalAmount,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     string? Notes,
     byte Status, IReadOnlyList<PurchaseReturnItemDto> Items)
 {
@@ -244,6 +254,8 @@ public record CustomerPaymentDto(
     string CustomerName,
     decimal Amount,
     byte PaymentMethod,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     DateTime PaymentDate,
     int? SalesInvoiceId,
     string? Notes)
@@ -264,6 +276,8 @@ public record SupplierPaymentDto(
     string SupplierName,
     decimal Amount,
     byte PaymentMethod,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     DateTime PaymentDate,
     int? PurchaseInvoiceId,
     string? Notes)
@@ -479,12 +493,33 @@ public record VatReportDto(
 
 public record TaxDto(int Id, string Name, decimal Rate, bool IsDefault, bool IsActive);
 
+public record CurrencyDto(
+    int Id,
+    string Name,
+    string Code,
+    string Symbol,
+    decimal ExchangeRateToBase,
+    bool IsBaseCurrency,
+    string? FractionName,
+    bool IsSystem,
+    bool IsActive);
+
+public record ExchangeRateHistoryDto(
+    int Id,
+    int CurrencyId,
+    decimal OldRate,
+    decimal NewRate,
+    DateOnly EffectiveDate,
+    string? RateType,
+    string? Notes,
+    int? ChangedByUserId);
+
 // ─── Accounting DTOs ─────────────────────────────────
 public record AccountBalanceDto(
     int AccountId,
     string AccountCode,
     string AccountNameAr,
-    byte AccountType,
+    AccountType AccountType,
     decimal TotalDebit,
     decimal TotalCredit,
     decimal Balance,
@@ -518,5 +553,49 @@ public record AccountStatementDto(
     decimal Debit,
     decimal Credit,
     decimal Balance
+);
+
+public record SystemAccountMappingsDto(
+    int Id,
+    int DefaultCashAccountId,
+    string? DefaultCashAccountName,
+    string? DefaultCashAccountCode,
+    int DefaultBankAccountId,
+    string? DefaultBankAccountName,
+    string? DefaultBankAccountCode,
+    int InventoryAssetAccountId,
+    string? InventoryAssetAccountName,
+    string? InventoryAssetAccountCode,
+    int AccountsReceivableAccountId,
+    string? AccountsReceivableAccountName,
+    string? AccountsReceivableAccountCode,
+    int AccountsPayableAccountId,
+    string? AccountsPayableAccountName,
+    string? AccountsPayableAccountCode,
+    int VatOutputAccountId,
+    string? VatOutputAccountName,
+    string? VatOutputAccountCode,
+    int VatInputAccountId,
+    string? VatInputAccountName,
+    string? VatInputAccountCode,
+    int CapitalAccountId,
+    string? CapitalAccountName,
+    string? CapitalAccountCode,
+    int SalesRevenueAccountId,
+    string? SalesRevenueAccountName,
+    string? SalesRevenueAccountCode,
+    int SalesReturnAccountId,
+    string? SalesReturnAccountName,
+    string? SalesReturnAccountCode,
+    int CogsAccountId,
+    string? CogsAccountName,
+    string? CogsAccountCode,
+    int GeneralExpenseAccountId,
+    string? GeneralExpenseAccountName,
+    string? GeneralExpenseAccountCode,
+    int SpoilageLossAccountId,
+    string? SpoilageLossAccountName,
+    string? SpoilageLossAccountCode,
+    int? BranchId
 );
 

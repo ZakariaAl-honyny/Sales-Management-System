@@ -17,9 +17,17 @@ public record SupplierPaymentChangedMessage(int PaymentId);
 public record StockChangedMessage(int ProductId, int WarehouseId);
 public record CashBoxChangedMessage(int CashBoxId);
 public record TaxChangedMessage(int TaxId);
+public record CurrencyChangedMessage(int CurrencyId);
+public record CurrencyRateChangedMessage(int CurrencyId);
 
 /// <summary>
 /// Published when store settings are updated. Carries no data payload (RULE-034).
 /// </summary>
 public record StoreSettingsChangedMessage;
+
+/// <summary>
+/// Published when the application needs to shut down (e.g., after backup restore).
+/// The Shell/MainWindow should subscribe and call Application.Current.Shutdown().
+/// </summary>
+public record ApplicationShutdownMessage;
 

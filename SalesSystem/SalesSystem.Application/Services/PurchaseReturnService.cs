@@ -299,6 +299,8 @@ public class PurchaseReturnService : IPurchaseReturnService
             0, // TaxAmount
             0, // DiscountAmount
             r.TotalAmount,
+            null, // CurrencyId — system setting
+            null, // ExchangeRate — system setting
             r.Notes,
             (byte)r.Status,
             r.Items.Select(it => new PurchaseReturnItemDto(

@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.6.7 — InvoiceNo Int Re-addition & Code Polish)
+# AGENTS.md — Sales Management System (v4.6.9 — Settings Module Fixes, Phase 19 & Phase 20 Remediations)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/018-accounting-foundation/plan.md](specs/018-accounting-foundation/plan.md)
+**Active Feature Plan**: [specs/020-currencies-module/plan.md](specs/020-currencies-module/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
@@ -1237,6 +1237,76 @@ SalesInvoice and PurchaseInvoice have an `InvoiceNo` (int) property — a user-f
 | RULE-273 | ALL XAML views MUST remove hardcoded `Height` and `Padding` that duplicate style defaults — let Styles.xaml be the single source for button/input sizes |
 | RULE-274 | When adding new views, use the compact global styles from `Styles.xaml` — NEVER add custom oversized heights or padding |
 
+### 2.65 Transaction Strategy & EF Core Configuration (v4.6.8)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-275 | NEVER use `BeginTransactionAsync()` / `CommitAsync()` / `RollbackAsync()` when `SqlServerRetryingExecutionStrategy` is configured — the execution strategy does not support user-initiated transactions. Use `IUnitOfWork.ExecuteTransactionAsync()` (which wraps `CreateExecutionStrategy().ExecuteAsync()` with an explicit transaction) or a single `SaveChangesAsync()` call (EF Core wraps it in an implicit transaction) instead. |
+| RULE-276 | Use `IUnitOfWork.ExecuteTransactionAsync(Func<Task> operation, CancellationToken ct)` for atomic multi-save operations — this wraps `DbContext.Database.CreateExecutionStrategy().ExecuteAsync()` with an explicit transaction inside the delegate. NEVER use `BeginTransactionAsync()` directly when retrying execution strategy is configured. |
+| RULE-277 | `ExchangeRate` on `CustomerPayment` and `SupplierPayment` MUST use `.HasPrecision(18, 2)` — NEVER leave exchange rate precision unspecified (defaults to truncation risk). |
+| RULE-278 | `JournalEntry` to `JournalEntryLine` relationship MUST use `.WithOne(x => x.JournalEntry)` specifying the navigation property — NEVER bare `.WithOne()` (creates shadow FK `JournalEntryId1`). |
+| RULE-279 | Editor ViewModels MUST follow the `CashBoxEditorViewModel` pattern: parameterless constructor delegating to parameterized constructor, `ValidateAsync()` calling `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()`, and `IToastNotificationService` for success feedback. |
+| RULE-280 | `LogSystemError()` is reserved for SYSTEM errors only (DB failures, API unreachable, JSON parse crashes) — NEVER call it for API business validation errors (e.g., duplicate name/code). Use `HandleFailure()` alone, which logs at Warning level per RULE-183. |
+
+### 2.66 Phase 18 & Phase 20 Code Review Remediations (v4.6.8)
+
+All bugs from the Phase 18 accounting review (`docs/phase18_accounting_review.md`) and Phase 20 currencies review (`docs/currencies_module_review.md`) have been fixed in this session. The following rules codify the remediations enforced by those fixes:
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-281 | `IUnitOfWork` MUST have `ExecuteTransactionAsync(Func<Task> operation, CancellationToken ct)` method for atomic multi-save operations using `CreateExecutionStrategy().ExecuteAsync()` with an explicit `BeginTransactionAsync()` / `CommitAsync()` inside the delegate — NEVER perform two consecutive `SaveChangesAsync()` calls without a wrapping transaction. |
+| RULE-282 | `JournalEntryLineConfiguration` MUST have `CHK_DebitOrCredit` (exactly one of Debit/Credit is non-zero, or both zero) and `CHK_NoNegativeValues` (Debit >= 0 AND Credit >= 0) CHECK constraints via `builder.ToTable(t => t.HasCheckConstraint(...))`. |
+| RULE-283 | All enum properties in EF Core entity configurations MUST use `.HasConversion<int>()` explicitly — NEVER rely on EF Core convention alone (applies to `Account.AccountType`, `JournalEntry.EntryType`, and all other enum properties). |
+| RULE-284 | `SystemAccountMappings` navigation properties MUST be mapped with navigation lambda (e.g., `HasOne(x => x.DefaultCashAccount)`) — NEVER use bare `HasOne<Account>()` which leaves the nav property unmapped. |
+| RULE-285 | `JournalEntryLine.Account` navigation property MUST use `HasOne(x => x.Account)` with lambda — NEVER `HasOne<Account>()` without lambda (creates shadow FK or unmapped navigation). |
+| RULE-286 | `Currency.Create()` factory method MUST accept an `isSystem` parameter (default `false`) and assign it to `IsSystem` — NEVER hardcode `IsSystem = false` (breaks seed data protection for system currencies). |
+| RULE-287 | Filtered unique index on `Currency.IsBaseCurrency` MUST include `AND [IsActive] = 1` in the filter — a soft-deleted base currency must not prevent setting a new base currency. |
+| RULE-288 | Controller endpoints MUST return `404 NotFound` when the service returns `ErrorCodes.NotFound` (entity not found) and `400 BadRequest` for business validation errors — NEVER always return `BadRequest` for all failure types. |
+| RULE-289 | `CurrenciesListViewModel` (and all list ViewModels with EventBus subscriptions) MUST implement `IDisposable` and call `Cleanup()` (which disposes EventBus subscriptions) in `Dispose()` — use `IToastNotificationService.ShowSuccess()` for minor success messages, not modal dialogs. |
+| RULE-290 | `JournalEntryNumberGenerator` MUST query by today's date prefix (e.g., `EntryNumber.StartsWith("JE-20260606")`) for correct daily sequence reset — NEVER query the last entry globally by `Id` (breaks daily reset on quiet days). |
+
+### 2.67 Phase 19 — Settings Module: Code Review Remediations (v4.6.9)
+
+All bugs from the Phase 19 settings review (`docs/phase19_settings_review.md`) have been fixed in this session. The following rules codify the remediations:
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-291 | `SetBatchSystemSettingsAsync()` MUST NOT call `SaveChangesAsync()` directly — the repository only prepares entities, the caller (service layer) commits via `IUnitOfWork.SaveChangesAsync()`. This follows RULE-024 (repository NEVER owns transaction commit). |
+| RULE-292 | ALL Domain entity `Update()` methods MUST call `UpdateTimestamp()` at the end — NEVER leave `UpdatedAt` null after modifications (applies to `Tax.Update()`, `StoreSettings.Update()`, and all future entities). |
+| RULE-293 | `SystemSetting.Create()` MUST validate `Category` (not empty) and `DataType` (must be one of: string, int, bool, decimal) via guard clauses — NEVER allow invalid data types or empty categories to pass through. |
+| RULE-294 | Filtered unique indexes on soft-deletable entities MUST include `AND [IsActive] = 1` in the filter — a soft-deleted record must not prevent creating a new record with the same unique value (applies to `Tax.IsDefault`, `Currency.IsBaseCurrency`, and all future filtered indexes). |
+| RULE-295 | `SystemSettingsRepository.SetStringAsync()` MUST accept a `category` parameter (default `null` → `"General"`) for auto-created settings — NEVER hardcode `category: "Print"` which miscategorizes non-Print settings. |
+| RULE-296 | `DbSeeder` MUST seed ALL 25+ system settings from the plan specification — missing settings must be flagged and added during code review. Current seed count: 29 settings across Inventory (4), Sales (8), Purchases (3), Barcode (3), Accounting (1), Print (5), Notifications (4), General (3). |
+| RULE-297 | `StoreSettings` seed data MUST pass `defaultTaxRate: 0m` (deprecated — Tax entity is source of truth) — NEVER seed with `15m` which contradicts the deprecation strategy. |
+
+### 2.68 Phase 20 — Currencies Module: BUG-008 Fix (v4.6.9)
+
+This rule codifies the last remaining remediation from the Phase 20 currencies review (`docs/phase20_currencies_review.md`). Earlier Phase 20 remediations (RULE-281 through RULE-290) were applied in v4.6.8 and are documented in §2.66. This section documents the BUG-008 fix applied in v4.6.9.
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-298 | `Currency.Create()` MUST validate that `code.Trim().Length == 3` — ISO 4217 currency codes are always exactly 3 characters. NEVER use a generic max-length validation like `Length > 10`. |
+
+### 2.69 Phase 19 — Settings Module: Enhancement Remediations (v4.6.9)
+
+Following the Phase 19 code review, 8 enhancements were identified. The following rules codify the remediations (NOT bug fixes, which were already in §2.67):
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-299 | `Tax` entity MUST have `SetDefault()` and `ClearDefault()` domain methods that set `IsDefault` and call `UpdateTimestamp()` — NEVER set `IsDefault` directly from service code. |
+| RULE-300 | `SystemSettingsViewModel` MUST expose ALL seeded system settings as strongly-typed properties — fields added in v4.6.9: `HideTaxInSales`, `ShowExpiryInInvoices`, `HideTaxInPurchases`, `ShowLogo`, `FooterNote` (Print), `LowStockAlert`, `ExpiryAlert`, `ExpiryAlertDays`, `CreditLimitAlert` (Notifications), `ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber` (Print settings). |
+| RULE-301 | `StoreSettingsService.UpdateSystemSettingsAsync()` MUST validate known system setting keys by type before saving — boolean keys checked via `bool.TryParse`, integer keys via `int.TryParse` with range validation (CostingMethod 1-3, DecimalPlaces 0-6, StockAlertDays 1-365). |
+
+### 2.70 Phase 20 — Currencies Module: Enhancement Remediations (v4.6.9)
+
+Following the Phase 20 currencies review, 3 additional enhancements were applied in v4.6.9:
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-302 | `CashBox.Create()` MUST set `OpeningBalance = initialBalance` — not just `CurrentBalance`. NEVER leave `OpeningBalance` at default 0 when an initial balance is provided. |
+| RULE-303 | `Currency` entity MUST have `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods that set `IsBaseCurrency` and call `UpdateTimestamp()` — NEVER toggle `IsBaseCurrency` directly from service code. |
+| RULE-304 | `InvokeOnUIThreadAsync` callbacks MUST NOT use `async` keyword when the lambda contains no `await` — unnecessary `async` creates a fire-and-forget `Task` inside the dispatcher. |
+
 ## 3. Enums (Use These EXACT Values)
 
 ```csharp
@@ -1372,6 +1442,18 @@ public enum InvoiceTypePrint : byte
 ❌ Dialog title `FontSize` larger than 16 or section header larger than 14
 ❌ MainWindow sidebar wider than `200` (use compact navigation width)
 ❌ Dialog icon borders `50×50` or larger (use `44×44` max)
+❌ `BeginTransactionAsync` when `SqlServerRetryingExecutionStrategy` is configured
+❌ `ExchangeRate` on payments without `.HasPrecision(18, 2)` (causes silent truncation)
+❌ Bare `.WithOne()` on relationships — always specify the navigation property
+❌ `LogSystemError` for business validation errors from API (use `HandleFailure` only — Warning level)
+❌ `ValidateAsync()` with custom dialog instead of `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()`
+❌ `SetBatchSystemSettingsAsync` calling `SaveChangesAsync` directly (must use `_uow.SaveChangesAsync()`)
+❌ Tax.Update() without `UpdateTimestamp()` (audit trail broken)
+❌ SystemSetting.Create() without Category or DataType validation
+❌ Filtered unique index on soft-deletable entities missing `AND [IsActive]` guard
+❌ Hardcoded `category: "Print"` in `SetStringAsync()` auto-create
+❌ Seed data with `defaultTaxRate: 15m` (must be `0m`)
+❌ CurrencyCode validation using `Length > N` instead of `Length != 3` (ISO 4217 requires exactly 3 characters)
 ```
 
 ---
@@ -1608,3 +1690,10 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Dialog title fonts = 16 or less, section headers = 14 or less?
 - [ ] MainWindow sidebar width = 200 (not 220 / 240)?
 - [ ] Empty-state buttons use `Margin=0,12,0,0` Width=140 (not 20px/160)?
+- [ ] No `BeginTransactionAsync()` used when `SqlServerRetryingExecutionStrategy` is configured?
+- [ ] `ExchangeRate` on payment entities has `.HasPrecision(18, 2)` in Fluent API?
+- [ ] `JournalEntry` → `JournalEntryLine` uses `.WithOne(x => x.JournalEntry)` not bare `.WithOne()`?
+- [ ] Editor ViewModels call `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()` in `ValidateAsync()`?
+- [ ] `LogSystemError` NOT called for business validation errors — only for system errors?
+- [ ] Editor ViewModels have `IToastNotificationService` for success feedback?
+- [ ] `result.IsSuccess` used without `&& result.Value != null` guard (Result<T> invariant guarantees non-null)?

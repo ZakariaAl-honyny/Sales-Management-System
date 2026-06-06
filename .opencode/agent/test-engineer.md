@@ -114,7 +114,27 @@ Quality assurance and test automation specialist for the SalesSystem.
 | TC-20-009 | FallbackErrorDialog: Displays on unhandled WPF exception | Thread-safe fallback dialog shows exception message; `Log.Error` called; app does not crash silently |
 | TC-20-010 | Build: No CS0109 or CS1540 warnings across all projects | `dotnet build` produces 0 warnings; `new` keyword removed from derived `_dialogService` fields |
 
-### v4.6.7 — InvoiceNo Int Re-addition
+### v4.6.8 — Phase 18 & Phase 20 Remediations
+
+| Test Case | Description | Expected Result |
+|-----------|-------------|-----------------|
+| TC-22-001 | JournalEntryService: Closed fiscal year blocks new entries | Creating JE with TransactionDate in closed fiscal year returns `Result<int>.Failure("السنة المالية {year} مغلقة — لا يمكن إضافة قيود")` |
+| TC-22-002 | AnnualClosingService: Two saves wrapped in single transaction | Both JournalEntry and FiscalYearClosure saved atomically; if second save fails, first is rolled back |
+| TC-22-003 | JournalEntryNumberGenerator: Daily sequence resets | If last entry is `JE-20260605-0032`, today's first entry is `JE-20260606-0001`, not `JE-20260606-0033` |
+| TC-22-004 | JournalEntryLine: CHK_DebitOrCredit rejects dual debit+credit | Raw SQL insert with Debit=100 AND Credit=100 throws DB constraint violation |
+| TC-22-005 | JournalEntryLine: CHK_NoNegativeValues rejects negative values | Raw SQL insert with Debit=-10 throws DB constraint violation |
+| TC-22-006 | Account.Activate(): Reactivates a deactivated account | After `account.MarkAsDeleted()` then `account.Activate()`, `IsActive` returns `true` |
+| TC-22-007 | Currency.Create(): isSystem param sets IsSystem correctly | `Currency.Create(isSystem: true)` sets `IsSystem = true`; default `isSystem: false` |
+| TC-22-008 | Currency: isSystem records cannot be soft-deleted | `currency.MarkAsDeleted()` throws `DomainException("لا يمكن حذف عملة النظام")` when `IsSystem = true` |
+| TC-22-009 | Currency: Filtered unique index excludes soft-deleted records | After soft-deleting base currency, a new base currency can be set without unique constraint violation |
+| TC-22-010 | Currency Controller: NotFound returns 404 not 400 | `DELETE /currencies/99999` returns `404 NotFound` with Arabic error, not `400 BadRequest` |
+| TC-22-011 | Currency Controller: Business error returns 400 | `DELETE /currencies/{systemCurrencyId}` returns `400 BadRequest` with business error message |
+| TC-22-012 | SystemAccountMappings: Navigation properties load correctly | `mappings.DefaultCashAccount.Name` is non-null after `.Include(x => x.DefaultCashAccount)` query |
+| TC-22-013 | SystemAccountMappingsDto: Includes account name and code | DTO fields `DefaultCashAccountName` and `DefaultCashAccountCode` contain non-empty values |
+| TC-22-014 | ReversedByEntryId FK: Uses Restrict delete | Attempting to delete a JournalEntry that has a reversal referencing it throws FK constraint violation |
+| TC-22-015 | JournalEntryLineConfiguration: HasConversion<int> on enum | EF Core migration includes `AccountType int NOT NULL` and `EntryType int NOT NULL` |
+
+### v4.6.7 — InvoiceNo Int Re-addition & DocumentSequenceService
 
 | Test Case | Description | Expected Result |
 |-----------|-------------|-----------------|
@@ -123,7 +143,80 @@ Quality assurance and test automation specialist for the SalesSystem.
 | TC-21-003 | SalesInvoice List: Search by InvoiceNo int | Entering number in search filters by `InvoiceNo == parsedInt` |
 | TC-21-004 | SalesReportDto: Has int InvoiceNo field | DTO contains `int InvoiceNo` (not string) |
 | TC-21-005 | InvoicePrintDto.InvoiceNumber: Formatted from int | `string InvoiceNumber` set via `InvoiceNo.ToString()` in builder |
-| TC-21-006 | Service: Auto-generates InvoiceNo = lastId+1 | When request.InvoiceNo is null or ≤0, service computes `(last?.Id ?? 0) + 1` |
-| TC-21-007 | EF Config: No unique index on InvoiceNo | Duplicate InvoiceNo values do NOT throw unique constraint violation |
-| TC-21-006 | TouchPos: Stock validation warning shown | Adding product with insufficient stock shows `ShowWarningAsync` dialog with stock details |
-| TC-21-007 | ISoundService: PlayWarning exists | `PlayWarning()` method exists and plays system warning sound |
+| TC-21-006 | Service: Auto-generates InvoiceNo via DocumentSequenceService | When InvoiceNo is null/≤0, service calls `_sequenceService.GetNextIntAsync("SalesInvoice", ct)` |
+| TC-21-007 | DocumentSequenceService: Thread-safe SemaphoreSlim | static SemaphoreSlim(1,1) used; lock.Release() in finally block |
+| TC-21-008 | EF Config: UNIQUE index on InvoiceNo | Duplicate InvoiceNo throws DbUpdateException with unique constraint violation |
+| TC-21-009 | User override: Duplicate InvoiceNo handled | Service catches DbUpdateException, returns `Result.Failure("رقم الفاتورة مستخدم مسبقاً")` |
+| TC-21-010 | DocumentSequence.GetNextInt(): Returns incrementing int | First call → 1, second call → 2, independent per sequenceKey |
+
+## v4.6.9 — Phase 19 Settings Module Remediations
+
+### Testing ExecuteTransactionAsync
+When testing services that use `ExecuteTransactionAsync()`, mock it to invoke the delegate:
+```csharp
+_mockUow.Setup(u => u.ExecuteTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()))
+    .Returns<Func<Task>, CancellationToken>(async (operation, ct) =>
+    {
+        await operation();
+    });
+```
+
+### Testing Controller Error Handling
+When testing `NotFound` vs `BadRequest` response differentiation:
+```csharp
+// Test NotFound path
+_serviceMock.Setup(x => x.UpdateSettingsAsync(...))
+    .ReturnsAsync(Result<StoreSettingsDto>.Failure("message", "NOT_FOUND"));
+var result = await _controller.Update(request, ct);
+result.Should().BeOfType<NotFoundObjectResult>();
+
+// Test BadRequest path
+_serviceMock.Setup(x => x.UpdateSettingsAsync(...))
+    .ReturnsAsync(Result<StoreSettingsDto>.Failure("فشل في التحديث"));
+var result = await _controller.Update(request, ct);
+result.Should().BeOfType<BadRequestObjectResult>();
+```
+
+### Testing SystemSetting Validation
+```csharp
+[Fact]
+public void Create_EmptyCategory_ThrowsDomainException()
+{
+    Action action = () => SystemSetting.Create("Key", "Value", category: "");
+    action.Should().Throw<DomainException>().WithMessage("*تصنيف الإعداد مطلوب*");
+}
+
+[Fact]
+public void Create_InvalidDataType_ThrowsDomainException()
+{
+    Action action = () => SystemSetting.Create("Key", "Value", dataType: "invalid");
+    action.Should().Throw<DomainException>().WithMessage("*نوع البيانات غير صالح*");
+}
+```
+
+### Mocking ISystemSettingsRepository
+Since SettingsController no longer injects `ISystemSettingsRepository`, tests should not mock it for controller tests.
+
+## v4.6.9 — Phase 20 BUG-008 Test Pattern: CurrencyCode Length
+
+```csharp
+[Theory]
+[InlineData("")]
+[InlineData("US")]
+[InlineData("USDT")]
+public void Create_InvalidCodeLength_ThrowsDomainException(string invalidCode)
+{
+    Action action = () => Currency.Create("Test", invalidCode, "$", 1.0m);
+    action.Should().Throw<DomainException>().WithMessage("*3 أحرف*");
+}
+
+[Theory]
+[InlineData("USD")]
+[InlineData("EUR")]
+[InlineData("SAR")]
+public void Create_Valid3CharCode_Succeeds(string code)
+{
+    var currency = Currency.Create("Test", code, "$", 1.0m);
+    currency.Code.Should().Be(code);
+}
+```

@@ -21,7 +21,7 @@ public class SalesInvoiceTests
             createdByUserId: 1
         );
 
-        invoice.Id.Should().BeGreaterThan(0);
+        invoice.Id.Should().Be(0); // Id is assigned by DB, not entity constructor
         invoice.WarehouseId.Should().Be(1);
         invoice.CustomerId.Should().Be(1);
         invoice.InvoiceDate.Should().Be(new DateTime(2027, 1, 1));
@@ -123,7 +123,7 @@ public class SalesInvoiceTests
         var action = () => invoice.SetPaidAmount(150m);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ظ…ط¯ظپظˆط¹ ط£ظƒط¨ط± ظ…ظ† ط§ظ„ط¥ط¬ظ…ط§ظ„ظٹ.");
+            .WithMessage("المبلغ المدفوع أكبر من الإجمالي.");
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public class SalesInvoiceTests
         var action = () => invoice.SetTaxAmount(negativeTax);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ط§ظ„ط¶ط±ظٹط¨ط© ظ„ط§ ظٹظ…ظƒظ† ط£ظ† طھظƒظˆظ† ط³ط§ظ„ط¨ط©.");
+            .WithMessage("الضريبة لا يمكن أن تكون سالبة.");
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public class SalesInvoiceTests
         var action = () => invoice.Post();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ظ„ط§ ظٹظ…ظƒظ† طھط±ط­ظٹظ„ ظپط§طھظˆط±ط© ط¨ط¯ظˆظ† ط£طµظ†ط§ظپ.");
+            .WithMessage("لا يمكن ترحيل فاتورة بدون أصناف.");
     }
 
     [Fact]
@@ -238,7 +238,7 @@ public class SalesInvoiceTests
         // Act & Assert
         var action = () => invoice.Post();
         action.Should().Throw<DomainException>()
-            .WithMessage("ظپظ‚ط· ط§ظ„ظپظˆط§طھظٹط± ط§ظ„ظ…ط³ظˆط¯ط© ظٹظ…ظƒظ† طھط±ط­ظٹظ„ظ‡ط§.");
+            .WithMessage("فقط الفواتير المسودة يمكن ترحيلها.");
     }
 
     [Fact]
@@ -327,7 +327,7 @@ public class SalesInvoiceTests
         var action = () => invoice.Cancel();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ط§ظ„ظپط§طھظˆط±ط© ظ…ظ„ط؛ط§ط© ط¨ط§ظ„ظپط¹ظ„.");
+            .WithMessage("الفاتورة ملغاة بالفعل.");
     }
 
     [Fact]
@@ -350,7 +350,7 @@ public class SalesInvoiceTests
         var action = () => invoice.Cancel();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ظ„ط§ ظٹظ…ظƒظ† ط¥ظ„ط؛ط§ط، ظپط§طھظˆط±ط© ظ…ط¯ظپظˆط¹ط© ظ…ط¨ط§ط´ط±ط©.");
+            .WithMessage("لا يمكن إلغاء فاتورة مدفوعة مباشرة.");
     }
 
     [Fact]
@@ -432,7 +432,7 @@ public class SalesInvoiceTests
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ط§ظ„ظ…ط³طھظˆط¯ط¹ ظ…ط·ظ„ظˆط¨.");
+            .WithMessage("المستودع مطلوب.");
     }
 
     [Fact]
@@ -445,7 +445,7 @@ public class SalesInvoiceTests
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ط§ظ„ظ…ط³طھظˆط¯ط¹ ظ…ط·ظ„ظˆط¨.");
+            .WithMessage("المستودع مطلوب.");
     }
 
     [Fact]
@@ -467,7 +467,7 @@ public class SalesInvoiceTests
         var action = () => invoice.AddItem(item);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ظ„ط§ ظٹظ…ظƒظ† ط¥ط¶ط§ظپط© ط£طµظ†ط§ظپ ظ„ظپط§طھظˆط±ط© ط؛ظٹط± ظ…ط³ظˆط¯ط©.");
+            .WithMessage("لا يمكن إضافة أصناف لفاتورة غير مسودة.");
     }
 
     [Fact]
@@ -489,6 +489,6 @@ public class SalesInvoiceTests
         var action = () => invoice.RemoveItem(item);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("ظ„ط§ ظٹظ…ظƒظ† ط­ط°ظپ ط£طµظ†ط§ظپ ظ…ظ† ظپط§طھظˆط±ط© ط؛ظٹط± ظ…ط³ظˆط¯ط©.");
+            .WithMessage("لا يمكن حذف أصناف من فاتورة غير مسودة.");
     }
 }

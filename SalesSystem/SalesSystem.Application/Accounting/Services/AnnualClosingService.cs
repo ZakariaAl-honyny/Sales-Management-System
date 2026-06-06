@@ -147,9 +147,9 @@ public class AnnualClosingService : IAnnualClosingService
             var closingEntry = Domain.Accounting.Entities.JournalEntry.Create(
                 numberResult.Value!,
                 entryDate,
+                $"قفل السنة المالية {fiscalYear}",
                 JournalEntryType.Manual,
                 closedByUserId,
-                description: $"قفل السنة المالية {fiscalYear}",
                 referenceType: ClosingReferenceType,
                 referenceId: null,
                 referenceNumber: fiscalYear.ToString());
@@ -193,46 +193,43 @@ public class AnnualClosingService : IAnnualClosingService
             // ─── Step 10: Validate and Post ──────────────────────────────
             closingEntry.ValidateAndPost(closedByUserId);
 
-            // ─── Step 11: Save to database (transactional) ──────────────
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
-            try
+            // ─── Step 11: Save atomically via execution strategy ──────────────────────
+            // Uses ExecuteTransactionAsync which wraps the operation in an execution strategy
+            // (retry for transient failures) + explicit transaction (atomicity across both saves).
+            int closureId = 0;
+
+            await _uow.ExecuteTransactionAsync(async () =>
             {
                 await _uow.JournalEntries.AddAsync(closingEntry, ct);
                 await _uow.SaveChangesAsync(ct);
 
-                // Create FiscalYearClosure record
                 var closure = Domain.Accounting.Entities.FiscalYearClosure.Create(
                     fiscalYear,
                     closedByUserId,
                     netIncome,
                     closingEntry.Id,
-                    closedByUserId);
+                    createdByUserId: closedByUserId);
 
                 await _uow.FiscalYearClosures.AddAsync(closure, ct);
                 await _uow.SaveChangesAsync(ct);
 
-                await transaction.CommitAsync(ct);
+                closureId = closure.Id;
+            }, ct);
 
-                _logger.LogInformation(
-                    "Fiscal year {FiscalYear} closed. NetIncome={NetIncome:N2}, ClosingEntryId={EntryId}, ClosureId={ClosureId}",
-                    fiscalYear, netIncome, closingEntry.Id, closure.Id);
+            _logger.LogInformation(
+                "Fiscal year {FiscalYear} closed. NetIncome={NetIncome:N2}, ClosingEntryId={EntryId}, ClosureId={ClosureId}",
+                fiscalYear, netIncome, closingEntry.Id, closureId);
 
-                return Result<FiscalYearClosureDto>.Success(new FiscalYearClosureDto(
-                    Id: closure.Id,
-                    FiscalYear: fiscalYear,
-                    ClosedAt: closure.ClosedAt,
-                    ClosedByUserId: closedByUserId,
-                    NetIncome: netIncome,
-                    ClosingEntryId: closingEntry.Id,
-                    NetIncomeFormatted: netIncome >= 0
-                        ? $"{netIncome:N2} ربح"
-                        : $"{Math.Abs(netIncome):N2} خسارة"));
-            }
-            catch
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+            return Result<FiscalYearClosureDto>.Success(new FiscalYearClosureDto(
+                Id: closureId,
+                FiscalYear: fiscalYear,
+                ClosedAt: DateTime.UtcNow,
+                ClosedByUserId: closedByUserId,
+                NetIncome: netIncome,
+                ClosingEntryId: closingEntry.Id,
+                NetIncomeFormatted: netIncome >= 0
+                    ? $"{netIncome:N2} ربح"
+                    : $"{Math.Abs(netIncome):N2} خسارة"));
         }
         catch (DomainException ex)
         {

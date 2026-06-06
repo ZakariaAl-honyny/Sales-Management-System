@@ -40,7 +40,20 @@ public class Tax : BaseEntity
         Name = name.Trim();
         Rate = rate;
         IsDefault = isDefault;
+        UpdateTimestamp();
     }
 
-    public void MarkAsDeleted() => IsActive = false;
+    public void SetDefault()
+    {
+        IsDefault = true;
+        UpdateTimestamp();
+    }
+
+    public void ClearDefault()
+    {
+        IsDefault = false;
+        UpdateTimestamp();
+    }
+
+    public override void MarkAsDeleted() => IsActive = false;
 }

@@ -61,7 +61,7 @@ public class CashBoxService : ICashBoxService
                 request.BoxName,
                 request.BranchId,
                 request.AssignedUserId,
-                "SAR",
+                null,
                 0);
 
             box.SetCreatedBy(userId);
@@ -378,7 +378,9 @@ public class CashBoxService : ICashBoxService
         box.OpeningBalance,
         box.CurrentBalance,
         box.BranchId,
-        box.CurrencyCode,
+        box.CurrencyId,
+        box.Currency?.Name,
+        box.Currency?.Code,
         box.AssignedUserId,
         box.Notes,
         box.IsActive);
@@ -392,6 +394,7 @@ public class CashBoxService : ICashBoxService
         t.BalanceAfter,
         t.ReferenceType,
         t.ReferenceId,
+        t.CurrencyId,
         t.Notes,
         t.CreatedByUserId ?? 0,
         t.CreatedAt);

@@ -9,6 +9,7 @@ public record CashTransactionDto(
     decimal BalanceAfter,
     string? ReferenceType,
     int? ReferenceId,
+    int? CurrencyId,
     string? Notes,
     int CreatedBy,
     DateTime CreatedAt

@@ -121,3 +121,19 @@ When asked to fix code quickly, always check for and fix:
 3. Direct `HttpClient` → typed service class replacements
 4. Shadowed `_dialogService` fields → use base class `DialogService` property
 5. Hardcoded `Height="36"` or `Padding="16+"` on buttons (should use style defaults)
+
+## v4.6.9 — Phase 20 BUG-008 Quick Check
+- CurrencyCode validation uses `code.Trim().Length != 3` (not `> 10`).
+
+## v4.6.9 — Phase 19 Settings Module Remediations
+
+When fixing Settings Module issues, check for these common patterns:
+
+1. `SaveChangesAsync` in `SetBatchSystemSettingsAsync` — remove it, let service commit
+2. `Tax.Update()` missing `UpdateTimestamp()` — add it
+3. `SystemSetting.Create()` without Category/DataType guards — add them
+4. `TaxConfiguration` index missing `AND [IsActive]` — add it
+5. `SetStringAsync()` hardcoding `category: "Print"` — accept category parameter
+6. Missing system settings in `DbSeeder` — add them (target: 29)
+7. `defaultTaxRate: 15m` in seed — change to `0m`
+8. Controller returning `BadRequest` for NotFound — differentiate with `ErrorCodes.NotFound`

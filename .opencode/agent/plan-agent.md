@@ -26,7 +26,12 @@ Translate specs into exact technical blueprints matching the PRD's Clean Archite
 Desktop → (HttpClient) → API → Application → Infrastructure → SQL Server
 Desktop NEVER → SQL Server (RULE-007)
 Domain calculates LineTotal and DueAmount (supports Wholesale/Retail)
-CQRS: Separate Reads (Queries) from Writes (Commands)
+Service Layer pattern (NO CQRS/MediatR) — all business logic in Application Services
+- InvoiceNo = int, UNIQUE per document type, thread-safe via DocumentSequenceService.GetNextIntAsync() (SemaphoreSlim lock)
+- Accounting Foundation: 60-account Chart of Accounts, JournalEntries, FiscalYears, Annual Closing
+- FIFO/FEFO batch tracking via PurchaseLot entity
+- Multi-currency: Currency entity with exchange rates; CurrencyId FK on invoices/payments/journal entries
+- 4 user roles (Admin/Manager/Cashier/Accountant) with 33 permission codes
 ```
 
 ## Behaviors

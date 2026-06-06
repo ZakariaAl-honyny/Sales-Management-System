@@ -34,6 +34,21 @@ public class SystemAccountMappings : BaseEntity
     public int GeneralExpenseAccountId { get; private set; }
     public int SpoilageLossAccountId { get; private set; }
 
+    // ─── Navigation Properties ──────────────────────────
+    public Account? DefaultCashAccount { get; private set; }
+    public Account? DefaultBankAccount { get; private set; }
+    public Account? InventoryAssetAccount { get; private set; }
+    public Account? AccountsReceivableAccount { get; private set; }
+    public Account? AccountsPayableAccount { get; private set; }
+    public Account? VatOutputAccount { get; private set; }
+    public Account? VatInputAccount { get; private set; }
+    public Account? CapitalAccount { get; private set; }
+    public Account? SalesRevenueAccount { get; private set; }
+    public Account? SalesReturnAccount { get; private set; }
+    public Account? CogsAccount { get; private set; }
+    public Account? GeneralExpenseAccount { get; private set; }
+    public Account? SpoilageLossAccount { get; private set; }
+
     private SystemAccountMappings() { } // EF Core
 
     public static SystemAccountMappings Create(
@@ -68,6 +83,18 @@ public class SystemAccountMappings : BaseEntity
             throw new DomainException("رقم حساب إيرادات المبيعات مطلوب");
         if (cogsAccountId <= 0)
             throw new DomainException("رقم حساب تكلفة البضاعة المباعة مطلوب");
+        if (vatOutputAccountId <= 0)
+            throw new DomainException("رقم حساب ضريبة المخرجات مطلوب");
+        if (vatInputAccountId <= 0)
+            throw new DomainException("رقم حساب ضريبة المدخلات مطلوب");
+        if (capitalAccountId <= 0)
+            throw new DomainException("رقم حساب رأس المال مطلوب");
+        if (salesReturnAccountId <= 0)
+            throw new DomainException("رقم حساب مردودات المبيعات مطلوب");
+        if (generalExpenseAccountId <= 0)
+            throw new DomainException("رقم حساب المصروفات العمومية مطلوب");
+        if (spoilageLossAccountId <= 0)
+            throw new DomainException("رقم حساب التوالف مطلوب");
 
         var mappings = new SystemAccountMappings
         {
@@ -97,6 +124,10 @@ public class SystemAccountMappings : BaseEntity
     {
         if (string.Equals(paymentMethod, "Cash", StringComparison.OrdinalIgnoreCase))
             return DefaultCashAccountId;
+
+        if (string.Equals(paymentMethod, "Credit", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(paymentMethod, "Receivable", StringComparison.OrdinalIgnoreCase))
+            return AccountsReceivableAccountId;
 
         return DefaultBankAccountId;
     }

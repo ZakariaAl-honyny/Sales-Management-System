@@ -78,7 +78,7 @@ public class SystemSettingsRepository : ISystemSettingsRepository
         });
     }
 
-    public async Task SetStringAsync(string key, string value, int? userId = null, CancellationToken ct = default)
+    public async Task SetStringAsync(string key, string value, string? category = null, int? userId = null, CancellationToken ct = default)
     {
         var setting = await _context.SystemSettings
             .FirstOrDefaultAsync(s => s.SettingKey == key, ct);
@@ -89,7 +89,7 @@ public class SystemSettingsRepository : ISystemSettingsRepository
         }
         else
         {
-            var newSetting = SystemSetting.Create(key, value, category: "Print");
+            var newSetting = SystemSetting.Create(key, value, category: category ?? "General");
             _context.SystemSettings.Add(newSetting);
         }
 
@@ -166,11 +166,9 @@ public class SystemSettingsRepository : ISystemSettingsRepository
             }
         }
 
-        // Self-contained operation: this bulk update is always called standalone
-        // (never mixed with other entity types in a transaction), so SaveChanges is safe here.
-        await _context.SaveChangesAsync(ct);
+        // NO SaveChangesAsync here — caller is responsible via IUnitOfWork (RULE-024)
         InvalidateCacheSync();
-        _logger.LogInformation("Batch updated {Count} SystemSettings", settings.Count);
+        _logger.LogInformation("Batch prepared {Count} SystemSettings for save", settings.Count);
     }
 
     /// <summary>

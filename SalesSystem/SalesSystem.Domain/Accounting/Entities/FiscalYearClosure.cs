@@ -16,6 +16,7 @@ public class FiscalYearClosure : BaseEntity
     public int ClosedByUserId { get; private set; }
     public decimal NetIncome { get; private set; }
     public int ClosingEntryId { get; private set; }
+    public string? Notes { get; private set; }
 
     // ─── Navigation Properties ──────────────────────────
     public virtual User? ClosedByUser { get; private set; }
@@ -28,7 +29,8 @@ public class FiscalYearClosure : BaseEntity
         int closedByUserId,
         decimal netIncome,
         int closingEntryId,
-        int? createdByUserId = null)
+        int? createdByUserId = null,
+        string? notes = null)
     {
         if (fiscalYear <= 1900 || fiscalYear > DateTime.UtcNow.Year + 1)
             throw new DomainException(
@@ -47,6 +49,7 @@ public class FiscalYearClosure : BaseEntity
             ClosedByUserId = closedByUserId,
             NetIncome = netIncome,
             ClosingEntryId = closingEntryId,
+            Notes = notes?.Trim(),
             IsActive = true
         };
         closure.SetCreatedBy(createdByUserId);

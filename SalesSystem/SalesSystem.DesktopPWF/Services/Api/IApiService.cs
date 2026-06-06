@@ -431,6 +431,18 @@ public interface ITaxesApiService
     Task<Result> DeletePermanentlyAsync(int id);
 }
 
+public interface ICurrencyApiService
+{
+    Task<Result<List<CurrencyDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<CurrencyDto>> GetByIdAsync(int id);
+    Task<Result<CurrencyDto>> CreateAsync(CreateCurrencyRequest request);
+    Task<Result<CurrencyDto>> UpdateAsync(int id, UpdateCurrencyRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+    Task<Result> UpdateExchangeRateAsync(int id, decimal newRate);
+    Task<Result<List<ExchangeRateHistoryDto>>> GetRateHistoryAsync(int currencyId);
+}
+
 public interface IFinancialReportApiService
 {
     Task<Result<List<IncomeStatementDto>>> GetIncomeStatementAsync(DateTime from, DateTime to, CancellationToken ct = default);

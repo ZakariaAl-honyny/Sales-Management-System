@@ -21,6 +21,7 @@ using SalesSystem.DesktopPWF.ViewModels.Transfers;
 using SalesSystem.DesktopPWF.ViewModels.Sales;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
+using SalesSystem.DesktopPWF.Messaging.Messages;
 
 namespace SalesSystem.DesktopPWF;
 
@@ -51,6 +52,14 @@ public partial class MainWindow : Window
             if (!_isLoggingOut)
                 System.Windows.Application.Current.Shutdown();
         };
+
+        // Listen for shutdown requests (e.g., after backup restore)
+        var eventBus = App.GetService<IEventBus>();
+        eventBus.Subscribe<ApplicationShutdownMessage>(_ =>
+        {
+            System.Windows.Application.Current.Dispatcher.InvokeAsync(
+                () => System.Windows.Application.Current.Shutdown());
+        });
     }
 
     private void UpdateUserInfo()

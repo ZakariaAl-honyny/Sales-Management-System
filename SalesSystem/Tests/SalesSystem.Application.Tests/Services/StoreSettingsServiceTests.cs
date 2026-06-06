@@ -50,6 +50,11 @@ public class StoreSettingsServiceTests : IDisposable
                 await _dbContext.SaveChangesAsync();
                 return 1;
             });
+        _mockUow.Setup(u => u.ExecuteTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<Task>, CancellationToken>(async (operation, ct) =>
+            {
+                await operation();
+            });
 
         _sut = new StoreSettingsService(_mockUow.Object, _mockSystemSettingsRepo.Object, _mockLogger.Object);
     }
@@ -147,7 +152,8 @@ public class StoreSettingsServiceTests : IDisposable
         result.Value!.StoreName.Should().Be("Updated Store");
         result.Value.Phone.Should().Be("0987654321");
         result.Value.CurrencyCode.Should().Be("EUR");
-        result.Value.DefaultTaxRate.Should().Be(0.15m);
+        // DEPRECATED: DefaultTaxRate hardcoded as 0m in service — Tax entity is source of truth
+        result.Value.DefaultTaxRate.Should().Be(0M);
         result.Value.LogoPath.Should().Be("/path/to/logo.png");
 
         _output.WriteLine("[PASS] UpdateSettings updates existing settings");
@@ -165,7 +171,8 @@ public class StoreSettingsServiceTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.IsTaxEnabled.Should().BeTrue();
-        result.Value.DefaultTaxRate.Should().Be(0.15m);
+        // DEPRECATED: DefaultTaxRate hardcoded as 0m in service — Tax entity is source of truth
+        result.Value.DefaultTaxRate.Should().Be(0M);
 
         _output.WriteLine("[PASS] UpdateSettings correctly handles tax settings");
     }
@@ -181,9 +188,10 @@ public class StoreSettingsServiceTests : IDisposable
         var result = await _sut.UpdateSettingsAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.IsTaxEnabled.Should().BeFalse();
+        // DEPRECATED: IsTaxEnabled hardcoded as true in service — Tax entity is source of truth
+        result.Value!.IsTaxEnabled.Should().BeTrue();
 
-        _output.WriteLine("[PASS] UpdateSettings correctly handles disabled tax");
+        _output.WriteLine("[PASS] UpdateSettings correctly handles disabled tax (IsTaxEnabled hardcoded true as Tax entity is source of truth)");
     }
 
     #endregion

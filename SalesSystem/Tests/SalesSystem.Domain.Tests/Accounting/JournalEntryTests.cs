@@ -12,6 +12,7 @@ public class JournalEntryTests
         return JournalEntry.Create(
             "JE-2026-000001",
             new DateTime(2026, 6, 1),
+            "اختبار",
             JournalEntryType.Manual,
             createdBy: 1);
     }
@@ -33,6 +34,7 @@ public class JournalEntryTests
         var entry = JournalEntry.Create(
             "JE-2026-000001",
             new DateTime(2026, 6, 1),
+            "اختبار",
             JournalEntryType.Manual,
             createdBy: 1);
 
@@ -43,7 +45,7 @@ public class JournalEntryTests
         entry.IsPosted.Should().BeFalse();
         entry.IsReversed.Should().BeFalse();
         entry.Lines.Should().BeEmpty();
-        entry.Description.Should().BeNull();
+        entry.Description.Should().Be("اختبار");
         entry.ReferenceType.Should().BeNull();
         entry.ReferenceId.Should().BeNull();
         entry.ReferenceNumber.Should().BeNull();
@@ -58,6 +60,7 @@ public class JournalEntryTests
         var act = () => JournalEntry.Create(
             "",
             new DateTime(2026, 6, 1),
+            "اختبار",
             JournalEntryType.Manual,
             createdBy: 1);
 
@@ -73,6 +76,7 @@ public class JournalEntryTests
         var act = () => JournalEntry.Create(
             "JE-2026-000002",
             default,
+            "اختبار",
             JournalEntryType.Manual,
             createdBy: 1);
 
@@ -88,6 +92,7 @@ public class JournalEntryTests
         var act = () => JournalEntry.Create(
             "JE-2026-000003",
             new DateTime(2026, 6, 1),
+            "اختبار",
             (JournalEntryType)99,
             createdBy: 1);
 
@@ -103,6 +108,7 @@ public class JournalEntryTests
         var act = () => JournalEntry.Create(
             "JE-2026-000004",
             new DateTime(2026, 6, 1),
+            "اختبار",
             JournalEntryType.Manual,
             createdBy: -1);
 
@@ -118,6 +124,7 @@ public class JournalEntryTests
         var act = () => JournalEntry.Create(
             "JE-2026-000005",
             new DateTime(2026, 6, 1),
+            "اختبار",
             JournalEntryType.Manual,
             createdBy: 0);
 
@@ -133,9 +140,9 @@ public class JournalEntryTests
         var entry = JournalEntry.Create(
             "JE-2026-000006",
             new DateTime(2026, 6, 1),
+            "قيد يومية مبيعات",
             JournalEntryType.Sales,
-            createdBy: 1,
-            description: "قيد يومية مبيعات");
+            createdBy: 1);
 
         // Assert
         entry.Description.Should().Be("قيد يومية مبيعات");
@@ -148,6 +155,7 @@ public class JournalEntryTests
         var entry = JournalEntry.Create(
             "JE-2026-000007",
             new DateTime(2026, 6, 1),
+            "اختبار",
             JournalEntryType.Sales,
             createdBy: 1,
             referenceType: "SalesInvoice",
@@ -169,6 +177,7 @@ public class JournalEntryTests
             var entry = JournalEntry.Create(
                 $"JE-{(int)entryType}",
                 new DateTime(2026, 6, 1),
+                "اختبار",
                 entryType,
                 createdBy: 1);
 
@@ -183,6 +192,7 @@ public class JournalEntryTests
         var entry = JournalEntry.Create(
             "  JE-2026-000008  ",
             new DateTime(2026, 6, 1),
+            "اختبار",
             JournalEntryType.Manual,
             createdBy: 1);
 
@@ -197,9 +207,9 @@ public class JournalEntryTests
         var entry = JournalEntry.Create(
             "JE-2026-000009",
             new DateTime(2026, 6, 1),
+            "  وصف به مسافات  ",
             JournalEntryType.Manual,
-            createdBy: 1,
-            description: "  وصف به مسافات  ");
+            createdBy: 1);
 
         // Assert
         entry.Description.Should().Be("وصف به مسافات");
@@ -212,11 +222,44 @@ public class JournalEntryTests
         var entry = JournalEntry.Create(
             "JE-2026-000010",
             new DateTime(2026, 6, 1),
+            "اختبار",
             JournalEntryType.Manual,
             createdBy: 7);
 
         // Assert
         entry.CreatedByUserId.Should().Be(7);
+    }
+
+    [Fact]
+    public void Create_EmptyDescription_ThrowsDomainException()
+    {
+        // Act
+        var act = () => JournalEntry.Create(
+            "JE-2026-000011",
+            new DateTime(2026, 6, 1),
+            "",
+            JournalEntryType.Manual,
+            createdBy: 1);
+
+        // Assert
+        act.Should().Throw<DomainException>()
+            .Which.Message.Should().Contain("الوصف مطلوب");
+    }
+
+    [Fact]
+    public void Create_WhitespaceDescription_ThrowsDomainException()
+    {
+        // Act
+        var act = () => JournalEntry.Create(
+            "JE-2026-000012",
+            new DateTime(2026, 6, 1),
+            "   ",
+            JournalEntryType.Manual,
+            createdBy: 1);
+
+        // Assert
+        act.Should().Throw<DomainException>()
+            .Which.Message.Should().Contain("الوصف مطلوب");
     }
 
     // ─── Lines ─────────────────────────────────────────
@@ -502,9 +545,9 @@ public class JournalEntryTests
         var entry = JournalEntry.Create(
             "JE-SALES-001",
             new DateTime(2026, 6, 1),
+            "قيد مبيعات",
             JournalEntryType.Sales,
-            createdBy: 1,
-            description: "قيد مبيعات");
+            createdBy: 1);
         entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 1150m);
         entry.AddCreditLine(accountId: 9, "401", "إيرادات المبيعات", amount: 1000m);
         entry.AddCreditLine(accountId: 6, "601", "ضريبة المخرجات", amount: 150m);
@@ -525,9 +568,9 @@ public class JournalEntryTests
         var entry = JournalEntry.Create(
             "JE-PUR-001",
             new DateTime(2026, 6, 1),
+            "قيد مشتريات",
             JournalEntryType.Purchase,
-            createdBy: 1,
-            description: "قيد مشتريات");
+            createdBy: 1);
         entry.AddDebitLine(accountId: 3, "301", "المخزون", amount: 500m);
         entry.AddDebitLine(accountId: 7, "701", "ضريبة المدخلات", amount: 25m);
         entry.AddCreditLine(accountId: 1, "101", "نقدي", amount: 525m);

@@ -1,0 +1,190 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Currencies.CurrencyEditorView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+        mc:Ignorable="d"
+        Background="{StaticResource BackgroundBrush}"
+        FlowDirection="RightToLeft">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="12,6">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0F172A" Offset="0"/>
+                    <GradientStop Color="#1E293B" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.2"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="💰" FontSize="28" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding WindowTitle}" Style="{StaticResource HeaderStyle}" Foreground="White"/>
+                    </StackPanel>
+                    <TextBlock Text="إدارة العملات وأسعار الصرف في النظام" FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Form Content -->
+        <ScrollViewer Grid.Row="1">
+            <Border Padding="16">
+                <StackPanel>
+                    <!-- Name -->
+                    <TextBlock Text="اسم العملة *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                             Style="{StaticResource ModernTextBox}"
+                             Tag="أدخل اسم العملة (مثلاً: دولار أمريكي)"
+                             TabIndex="1"
+                             helpers:FocusHelper.AdvanceOnEnter="True"
+                             ToolTip="أدخل اسم العملة — هذا الحقل إلزامي"/>
+
+                    <!-- Code (ISO) -->
+                    <TextBlock Text="رمز العملة (ISO) *" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
+                    <TextBox Text="{Binding Code, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                             Style="{StaticResource ModernTextBox}"
+                             Width="150"
+                             TabIndex="2"
+                             ToolTip="أدخل رمز ISO ثلاثي الأحرف — مثال: USD للدولار الأمريكي، SAR للريال السعودي"/>
+                    <TextBlock Text="رمز ISO ثلاثي الأحرف — مثال: USD, SAR, EUR"
+                               Style="{StaticResource HelperTextStyle}"/>
+
+                    <!-- Symbol -->
+                    <TextBlock Text="الرمز *" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
+                    <TextBox Text="{Binding Symbol, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                             Style="{StaticResource ModernTextBox}"
+                             Width="120"
+                             TabIndex="3"
+                             ToolTip="أدخل رمز العملة — مثال: $, ﷼, €"/>
+                    <TextBlock Text="الرمز الذي يمثل العملة — مثال: $, ﷼, €"
+                               Style="{StaticResource HelperTextStyle}"/>
+
+                    <!-- Exchange Rate -->
+                    <TextBlock Text="سعر الصرف مقابل الأساسي *" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
+                    <TextBox Text="{Binding ExchangeRateToBase, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                             Style="{StaticResource ModernTextBox}"
+                             Width="150"
+                             TabIndex="4"
+                             ToolTip="أدخل سعر صرف العملة مقابل العملة الأساسية — مثال: 550 يعني أن الدولار = 550 ريال يمني"/>
+                    <TextBlock Text="أدخل سعر الصرف — مثال: 550 يعني أن 1 دولار = 550 ريال يمني (العملة الأساسية)"
+                               Style="{StaticResource HelperTextStyle}"/>
+
+                    <!-- IsBaseCurrency -->
+                    <CheckBox Content="عملة أساسية"
+                              IsChecked="{Binding IsBaseCurrency}"
+                              Margin="0,12,0,0"
+                              TabIndex="5"
+                              ToolTip="تعيين كعملة أساسية للنظام — عملة أساسية واحدة فقط يمكن أن تكون نشطة في نفس الوقت"/>
+
+                    <!-- Fraction Name -->
+                    <TextBlock Text="اسم الجزء" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
+                    <TextBox Text="{Binding FractionName, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBox}"
+                             Width="200"
+                             TabIndex="6"
+                             ToolTip="أدخل اسم الجزء من العملة — اختياري (مثال: فلس, سنت, قرش)"/>
+                    <TextBlock Text="اسم الجزء الصغير من العملة — اختياري (مثال: فلس, سنت)"
+                               Style="{StaticResource HelperTextStyle}"/>
+
+                    <Border Margin="0,16,0,0" Padding="16" Background="#F8FAFC" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💰" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="العملة الأساسية هي العملة الرئيسية المستخدمة في النظام. يتم تحويل جميع العملات الأخرى بناءً على سعر صرفها مقابل العملة الأساسية."
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       MaxWidth="400"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Rate History (if editing) -->
+                    <Border Margin="0,16,0,0" Padding="0" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0"
+                            Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <Border Padding="12,8" Background="#F8FAFC" CornerRadius="8,8,0,0" BorderThickness="0,0,0,1" BorderBrush="#E2E8F0">
+                                <TextBlock Text="سجل تغييرات سعر الصرف" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            </Border>
+                            <DataGrid ItemsSource="{Binding RateHistory}"
+                                      Style="{StaticResource ModernDataGrid}"
+                                      IsReadOnly="True"
+                                      MaxHeight="200"
+                                      Margin="8">
+                                <DataGrid.Columns>
+<DataGridTextColumn Header="السعر القديم" Binding="{Binding OldRate, StringFormat='{}{0:N6}'}" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+<DataGridTextColumn Header="السعر الجديد" Binding="{Binding NewRate, StringFormat='{}{0:N6}'}" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                                    <DataGridTextColumn Header="التاريخ" Binding="{Binding EffectiveDate, StringFormat='{}{0:yyyy-MM-dd}'}" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                                    <DataGridTextColumn Header="ملاحظات" Binding="{Binding Notes}" Width="*" CellStyle="{StaticResource DataGridCellStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="#F8FAFC" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Command="{Binding SaveCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            Width="150"
+                            IsDefault="True"
+                            TabIndex="7"
+                            Margin="0,0,12,0"
+                            ToolTip="حفظ بيانات العملة">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,10,0" Stretch="Uniform" VerticalAlignment="Center"/>
+                            <TextBlock Text="حفظ البيانات" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Content="إلغاء"
+                            Command="{Binding CancelCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="100"
+                            TabIndex="8"
+                            ToolTip="إلغاء والعودة"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="1"
+                           Text="{Binding ErrorMessage}"
+                           Foreground="{StaticResource ErrorBrush}"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"
+                           Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}"/>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#CCFFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+                CornerRadius="0">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="180" Height="4" Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Text="جاري المعالجة..." FontSize="14" FontWeight="SemiBold" Margin="0,16,0,0" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

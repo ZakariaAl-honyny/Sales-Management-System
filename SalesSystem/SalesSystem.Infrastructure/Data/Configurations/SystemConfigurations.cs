@@ -14,6 +14,7 @@ public class CustomerPaymentConfiguration : IEntityTypeConfiguration<CustomerPay
         builder.HasIndex(cp => cp.PaymentNo).IsUnique();
         builder.Property(cp => cp.Amount).IsRequired().HasPrecision(18, 2);
         builder.Property(cp => cp.PaymentMethod).IsRequired();
+        builder.Property(cp => cp.ExchangeRate).HasPrecision(18, 2);
         builder.Property(cp => cp.ReferenceNo).HasMaxLength(50);
         builder.Property(cp => cp.Notes).HasMaxLength(500);
 
@@ -36,6 +37,7 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
         builder.HasIndex(sp => sp.PaymentNo).IsUnique();
         builder.Property(sp => sp.Amount).IsRequired().HasPrecision(18, 2);
         builder.Property(sp => sp.PaymentMethod).IsRequired();
+        builder.Property(sp => sp.ExchangeRate).HasPrecision(18, 2);
         builder.Property(sp => sp.ReferenceNo).HasMaxLength(50);
         builder.Property(sp => sp.Notes).HasMaxLength(500);
 
@@ -94,6 +96,7 @@ public class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreSettings
         builder.Property(ss => ss.DefaultTaxRate).HasPrecision(18, 2);
         builder.Property(ss => ss.TaxNumber).HasMaxLength(50);
         builder.Property(ss => ss.InvoicePrefix).HasMaxLength(20).HasDefaultValue("INV");
+        builder.Property(ss => ss.SignaturePath).HasMaxLength(255);
 
         builder.HasQueryFilter(ss => ss.IsActive);
     }

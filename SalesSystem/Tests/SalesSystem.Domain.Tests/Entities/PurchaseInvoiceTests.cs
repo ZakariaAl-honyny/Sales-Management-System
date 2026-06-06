@@ -22,7 +22,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        invoice.Id.Should().BeGreaterThan(0);
+        invoice.Id.Should().Be(0); // Id is assigned by DB, not entity constructor
         invoice.SupplierId.Should().Be(1);
         invoice.WarehouseId.Should().Be(1);
         invoice.PaymentType.Should().Be(PaymentType.Cash);

@@ -179,7 +179,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("ط£ظƒط¨ط± ظ…ظ† ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ…ط¨ط§ط¹ط©");
+        result.Error.Should().Contain("أكبر من الكمية المباعة");
 
         _output.WriteLine("[PASS] Return quantity exceeding original invoice fails");
     }
@@ -246,7 +246,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("ط§ظ„ظپط§طھظˆط±ط© ط§ظ„ط£طµظ„ظٹط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©");
+        result.Error.Should().Contain("الفاتورة الأصلية غير موجودة");
 
         _output.WriteLine("[PASS] Non-existent original invoice returns failure");
     }
@@ -287,7 +287,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ظپظٹ ط§ظ„ظپط§طھظˆط±ط© ط§ظ„ط£طµظ„ظٹط©");
+        result.Error.Should().Contain("غير موجود في الفاتورة الأصلية");
 
         _output.WriteLine("[PASS] Product not in original invoice returns failure");
     }
@@ -339,7 +339,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.GetByIdAsync(999, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("ط؛ظٹط± ظ…ظˆط¬ظˆط¯");
+        result.Error.Should().Contain("غير موجود");
 
         _output.WriteLine("[PASS] Non-existent return returns NotFound");
     }

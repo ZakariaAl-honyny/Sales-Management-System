@@ -219,6 +219,11 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         DueAmount: 65.00m,
         Notes: null,
         Status: status,
+        TaxId: null,
+        TaxName: null,
+        TaxRate: null,
+        CurrencyId: null,
+        ExchangeRate: null,
         Items: new List<SalesInvoiceItemDto>
         {
             new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)

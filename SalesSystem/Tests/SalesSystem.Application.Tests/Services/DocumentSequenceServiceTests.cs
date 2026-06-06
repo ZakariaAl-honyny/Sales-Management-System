@@ -206,6 +206,82 @@ public class DocumentSequenceServiceTests : IDisposable
 
     #endregion
 
+    #region GetNextIntAsync Tests
+
+    [Fact]
+    public async Task GetNextIntAsync_NewKey_CreatesSequenceAndReturnsInt()
+    {
+        _output.WriteLine("[TEST] GetNextIntAsync_NewKey_CreatesSequenceAndReturnsInt");
+
+        var result = await _sut.GetNextIntAsync("SalesInvoice", CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Be(1);
+
+        _output.WriteLine($"[DEBUG] Generated int: {result.Value}");
+        _output.WriteLine("[PASS] New key creates sequence and returns 1");
+    }
+
+    [Fact]
+    public async Task GetNextIntAsync_ExistingKey_ReturnsNextInt()
+    {
+        _output.WriteLine("[TEST] GetNextIntAsync_ExistingKey_ReturnsNextInt");
+
+        // First call
+        var result1 = await _sut.GetNextIntAsync("SalesInvoice", CancellationToken.None);
+        result1.IsSuccess.Should().BeTrue();
+        result1.Value.Should().Be(1);
+
+        // Second call
+        var result2 = await _sut.GetNextIntAsync("SalesInvoice", CancellationToken.None);
+        result2.IsSuccess.Should().BeTrue();
+        result2.Value.Should().Be(2);
+
+        _output.WriteLine($"[DEBUG] Seq1: {result1.Value}, Seq2: {result2.Value}");
+        _output.WriteLine("[PASS] Existing key returns next int");
+    }
+
+    [Fact]
+    public async Task GetNextIntAsync_DifferentKeys_ReturnIndependentSequences()
+    {
+        _output.WriteLine("[TEST] GetNextIntAsync_DifferentKeys_ReturnIndependentSequences");
+
+        var salesResult = await _sut.GetNextIntAsync("SalesInvoice", CancellationToken.None);
+        var purchaseResult = await _sut.GetNextIntAsync("PurchaseInvoice", CancellationToken.None);
+
+        salesResult.IsSuccess.Should().BeTrue();
+        purchaseResult.IsSuccess.Should().BeTrue();
+
+        salesResult.Value.Should().Be(1);
+        purchaseResult.Value.Should().Be(1);
+
+        _output.WriteLine($"[DEBUG] Sales: {salesResult.Value}, Purchase: {purchaseResult.Value}");
+        _output.WriteLine("[PASS] Different keys have independent sequences");
+    }
+
+    [Fact]
+    public async Task GetNextIntAsync_YearChange_ResetsSequence()
+    {
+        _output.WriteLine("[TEST] GetNextIntAsync_YearChange_ResetsSequence");
+
+        // Create a sequence for a different year manually
+        var oldSequence = DocumentSequence.Create("SalesInvoice", "SalesInvoice", DateTime.Now.Year - 1);
+        oldSequence.GetNextInt(); // Increment to 1
+        _dbContext.DocumentSequences.Add(oldSequence);
+        await _dbContext.SaveChangesAsync();
+
+        // This should create a new sequence for the current year
+        var result = await _sut.GetNextIntAsync("SalesInvoice", CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Be(1);
+
+        _output.WriteLine($"[DEBUG] Year changed sequence int: {result.Value}");
+        _output.WriteLine("[PASS] Year change resets sequence");
+    }
+
+    #endregion
+
     #region Helper Classes
 
     private class TestDbContext : DbContext

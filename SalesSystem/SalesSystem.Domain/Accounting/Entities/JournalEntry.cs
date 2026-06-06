@@ -13,7 +13,7 @@ public class JournalEntry : BaseEntity
 {
     public string EntryNumber { get; private set; } = string.Empty;
     public DateTime TransactionDate { get; private set; }
-    public string? Description { get; private set; }
+    public string Description { get; private set; } = string.Empty;
     public JournalEntryType EntryType { get; private set; }
     public string? ReferenceType { get; private set; }
     public int? ReferenceId { get; private set; }
@@ -22,6 +22,9 @@ public class JournalEntry : BaseEntity
     public bool IsReversed { get; private set; }
     public int? PostedBy { get; private set; }
     public DateTime? PostedAt { get; private set; }
+    public int? BranchId { get; private set; }
+    public int? ReversedByEntryId { get; private set; }
+    public JournalEntry? ReversedByEntry { get; private set; }
 
     private readonly List<JournalEntryLine> _lines = new();
     public IReadOnlyList<JournalEntryLine> Lines => _lines.AsReadOnly();
@@ -36,9 +39,9 @@ public class JournalEntry : BaseEntity
     public static JournalEntry Create(
         string entryNumber,
         DateTime transactionDate,
+        string description,
         JournalEntryType entryType,
         int createdBy,
-        string? description = null,
         string? referenceType = null,
         int? referenceId = null,
         string? referenceNumber = null)
@@ -48,6 +51,9 @@ public class JournalEntry : BaseEntity
 
         if (transactionDate == default)
             throw new DomainException("تاريخ القيد المحاسبي مطلوب");
+
+        if (string.IsNullOrWhiteSpace(description))
+            throw new DomainException("الوصف مطلوب");
 
         if (!Enum.IsDefined(typeof(JournalEntryType), entryType))
             throw new DomainException("نوع القيد المحاسبي غير صالح");
@@ -59,7 +65,7 @@ public class JournalEntry : BaseEntity
         {
             EntryNumber = entryNumber.Trim(),
             TransactionDate = transactionDate,
-            Description = description?.Trim(),
+            Description = description.Trim(),
             EntryType = entryType,
             ReferenceType = referenceType?.Trim(),
             ReferenceId = referenceId,
@@ -80,12 +86,16 @@ public class JournalEntry : BaseEntity
         decimal amount,
         string? description = null)
     {
+        if (IsReversed)
+            throw new DomainException("لا يمكن تعديل قيد محاسبي تم عكسه");
+
         if (IsPosted)
             throw new DomainException("لا يمكن إضافة قيد إلى قيد تم ترحيله");
 
         var line = JournalEntryLine.CreateDebit(
             accountId, accountCode, accountNameAr, amount, description);
         _lines.Add(line);
+        UpdateTimestamp();
     }
 
     public void AddCreditLine(
@@ -95,12 +105,16 @@ public class JournalEntry : BaseEntity
         decimal amount,
         string? description = null)
     {
+        if (IsReversed)
+            throw new DomainException("لا يمكن تعديل قيد محاسبي تم عكسه");
+
         if (IsPosted)
             throw new DomainException("لا يمكن إضافة قيد إلى قيد تم ترحيله");
 
         var line = JournalEntryLine.CreateCredit(
             accountId, accountCode, accountNameAr, amount, description);
         _lines.Add(line);
+        UpdateTimestamp();
     }
 
     // ─── Balance & Posting ───────────────────────────
@@ -124,7 +138,7 @@ public class JournalEntry : BaseEntity
 
         if (!IsBalanced())
             throw new DomainException(
-                $"القيد المحاسبي غير متوازن — مجموع الخصوم ({TotalDebit:N2}) لا يساوي مجموع الإيداعات ({TotalCredit:N2})");
+                $"القيد المحاسبي غير متوازن — مجموع المدين ({TotalDebit:N2}) لا يساوي مجموع الدائن ({TotalCredit:N2})");
 
         IsPosted = true;
         PostedBy = postedBy;

@@ -50,6 +50,7 @@ Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2) → Repla
 Phase 19: Architecture Alignment & Code Quality Remediation (v4.6.3) → Costing settings HTTP refactoring, VM DI registration, CS0108 member hiding resolutions, async void try-catch safety, RTL Arabic corrections
 Phase 20: Security Hardening & Code Quality (v4.6.4) → Rate limiting, user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes
 Phase 21: UI Compacting — Mobile-Ready Density (v4.6.6) → Global UI resize (63 views), Styles.xaml token compaction (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted ~25-30%, PurchaseInvoiceEditorView catch-up, MainWindow sidebar 220→200, touch views preserved, future mobile-ready foundation
+Phase 22: v4.6.8 Code Review Remediations → Fix Phase 18 + Phase 20 critical bugs (atomic transactions via CreateExecutionStrategy, nav property mappings on SystemAccountMappings/JournalEntryLine, CHECK constraints CHK_DebitOrCredit/CHK_NoNegativeValues, ReversedByEntryId FK with Restrict, Controller HTTP 404 vs 400 differentiation, Currency.Create() isSystem param, filtered unique index IsActive guard, ListVM IDisposable, remove CanExecute predicates, toast for minor success, AllStaff policy on read endpoints)
 ```
 
 ### Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2)
@@ -142,6 +143,77 @@ Phase 21: UI Compacting — Mobile-Ready Density (v4.6.6) → Global UI resize (
 - [ ] Empty-state buttons: Margin=0,12,0,0 Width=140
 - [ ] Build: 0 errors, 0 warnings
 - [ ] All 63 views compacted
+
+### Phase 22: v4.6.8 Code Review Remediations
+
+**Goal**: Fix all CRITICAL and BUG items identified in the Phase 18 (Accounting) and Phase 20 (Currencies) code reviews.
+
+**Key Changes:**
+- `JournalEntryService` — Add closed fiscal year guard before creating entries
+- `AnnualClosingService` — Wrap two-phase save in `CreateExecutionStrategy().ExecuteAsync()` with explicit transaction
+- `JournalEntryNumberGenerator` — Fix daily sequence reset (query by today's prefix)
+- `JournalEntryLineConfiguration` — Add CHK_DebitOrCredit and CHK_NoNegativeValues constraints
+- `AccountConfiguration` / `JournalEntryConfiguration` — Add `.HasConversion<int>()` on enum properties
+- `JournalEntryConfiguration` — Add `ReversedByEntryId` self-referencing FK with Restrict
+- `JournalEntryLineConfiguration` — Fix `HasOne(x => x.Account)` navigation mapping
+- `SystemAccountMappingsConfiguration` — Fix ALL 13 navigation property mappings
+- `SystemAccountService` — Include account name/code in DTO via batch query
+- `Account` entity — Add `Activate()` method
+- `Currency.cs` — Add `isSystem` param to `Create()`, guard in `MarkAsDeleted()`
+- `CurrencyConfiguration` — Fix filtered unique index to include `[IsActive] = 1`
+- `ExchangeRateHistoryConfiguration` — Add composite index on `(CurrencyId, EffectiveDate)`
+- `CurrenciesController` — Fix 404 vs 400, add GetByCode/GetBaseCurrency endpoints, AllStaff on reads
+- `CurrencyApiService` — Pass `includeInactive` query parameter
+- `CurrenciesListViewModel` — Implement IDisposable, remove CanExecute predicates, toast for restore
+- `CurrencyEditorViewModel` — Dual constructor, N6 exchange rate format
+- `CurrencyValidators` — Add `UpdateExchangeRateRequestValidator`
+- `UpdateCurrencyRequest` — Remove unused `IsActive` field
+- `ExchangeRateHistory` — Fix OldRate validation (`< 0` → `<= 0`)
+- Desktop DI registration — Add `ICurrencyApiService`, `CurrenciesListViewModel`, `CurrencyEditorViewModel`
+
+**Bug Fixes Applied:**
+- BUG-001 (Currency): `Create()` now accepts `isSystem` param
+- BUG-003 (Currency): `includeInactive` parameter passthrough fixed
+- BUG-004 (Currency): OldRate validation `<= 0`
+- BUG-005 (Currency): Controller HTTP 404 vs 400 fixed
+- BUG-006 (Currency): Filtered unique index `IsActive` guard
+- BUG-007 (Currency): `UpdateExchangeRateRequestValidator` added
+- BUG-009 (Currency): `IsActive` removed from `UpdateCurrencyRequest`
+- BUG-010 (Currency): `IDisposable` on list VM
+- BUG-011 (Currency): CanExecute removed from Edit/Delete
+- BUG-012 (Currency): Toast instead of dialog for restore
+- BUG-013 (Currency): `LogSystemError` → `HandleFailure` for API errors
+- BUG-014 (Currency): Composite index added
+- ENH-001 (Currency): GetByCode + GetBaseCurrency endpoints added
+- ENH-006 (Currency): IsSystem guard in MarkAsDeleted()
+- ENH-008 (Currency): AllStaff policy on read endpoints
+- ENH-009 (Currency): ExchangeRate N2→N6 display format
+- BUG-001 (Accounting): Closed fiscal year guard in CreateJournalEntryAsync
+- BUG-002 (Accounting): Atomic annual closing via CreateExecutionStrategy
+- BUG-003 (Accounting): Daily sequence reset fix
+- BUG-005 (Accounting): CHK_DebitOrCredit + CHK_NoNegativeValues constraints
+- BUG-007 (Accounting): ReversedByEntryId FK with Restrict
+- BUG-008 (Accounting): JournalEntryLine.Account nav mapping fix
+- BUG-009 (Accounting): SystemAccountMappings nav mapping fix
+
+## v4.6.9 — Phase 19 Settings Module Remediations
+
+When reviewing Settings Module code, enforce these 7 rules:
+
+1. **RULE-291**: Repository NEVER owns SaveChanges — delegate commit to service layer via IUnitOfWork.
+2. **RULE-292**: Every entity Update() method must end with UpdateTimestamp().
+3. **RULE-293**: SystemSetting.Create() must validate Category (not empty) and DataType (whitelist: string/int/bool/decimal).
+4. **RULE-294**: Filtered unique indexes on soft-deletable entities must include AND [IsActive] = 1.
+5. **RULE-295**: SystemSettingsRepository.SetStringAsync() must accept a category parameter (default → "General"), never hardcode "Print".
+6. **RULE-296**: DbSeeder must seed ALL system settings from spec (target: 29+ across 8 categories).
+7. **RULE-297**: StoreSettings seed must use defaultTaxRate: 0m (Tax entity is source of truth).
+
+### 2.67 Phase 20 — Currencies Module: Code Review Remediations (v4.6.9)
+
+All bugs from the Phase 20 currencies review (`docs/currencies_module_review.md`) have been fixed. The last remaining fix (BUG-008: CurrencyCode validation) was applied in this session:
+
+- **BUG-008 [FIXED v4.6.9]**: `Currency.Create()` validation changed from `code.Length > 10` to `code.Trim().Length != 3` — ISO 4217 requires exactly 3 characters.
+- Domain entity, FluentValidation, and Desktop VM now all consistently enforce exactly 3 characters for CurrencyCode.
 
 ## Before Accepting Any Code
 Run through AGENTS.md Section 9 checklist. If ANY item fails, reject the code.

@@ -2,6 +2,77 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.6.9 — Settings Module Fixes & Phase 19 Remediations (2026-06-06)
+
+### Phase 19 Settings Module — Code Review Fixes
+
+- **BUG-001 [FIXED]**: Removed `SaveChangesAsync` from `SetBatchSystemSettingsAsync()` — repository no longer owns commit (RULE-291). Added `_uow.SaveChangesAsync()` to `StoreSettingsService.UpdateSystemSettingsAsync()`.
+- **BUG-002 [FIXED]**: Added `UpdateTimestamp()` call to `Tax.Update()` — audit trail was broken for tax modifications (RULE-292).
+- **BUG-003 [FIXED]**: Added 10 missing system settings to `DbSeeder` — `HideTaxInSales`, `ShowExpiryInInvoices`, `HideTaxInPurchases`, `ShowLogo`, `FooterNote`, `LowStockAlert`, `ExpiryAlert`, `ExpiryAlertDays`, `CreditLimitAlert` (RULE-296).
+- **BUG-004 [PRE-EXISTING]**: `SetTax()` domain method already existed on both `SalesInvoice` and `PurchaseInvoice` — no change needed.
+- **BUG-005 [FIXED]**: Changed `StoreSettings` seed `defaultTaxRate: 15m` → `0m` — Tax entity is source of truth (RULE-297).
+- **BUG-006 [FIXED]**: Added `AND [IsActive] = 1` to `TaxConfiguration` filtered unique index on `IsDefault` (RULE-294).
+- **BUG-007 [FIXED]**: Added `Category` guard clause and `DataType` validation to `SystemSetting.Create()` — validates against whitelist (RULE-293).
+- **BUG-008 [FIXED]**: `SetStringAsync()` now accepts `category` parameter (default → `"General"`) — no longer hardcodes `category: "Print"` (RULE-295).
+- **BUG-009 [FIXED]**: Removed dead-code redundant null check in `SettingsController.GetPrintSettings()`.
+
+### Phase 19 Enhancements
+- Total system settings seeded: 29 across 8 categories (Inventory, Sales, Purchases, Barcode, Accounting, Print, Notifications, General)
+- `SystemSettingsRepository` now uses `IMemoryCache` with `ConcurrentDictionary` key tracker for efficient cache invalidation
+- `StoreSettingsService` delegates system settings endpoints to `IStoreSettingsService` (no direct `ISystemSettingsRepository` injection in controller)
+- `SettingsController` now differentiates `NotFound` (404) vs `BadRequest` (400) responses based on `ErrorCodes.NotFound`
+- **ENH-001/002 [FIXED]**: Added missing properties to `SystemSettingsViewModel` — `HideTaxInSales`, `ShowExpiryInInvoices` (Sales), `HideTaxInPurchases` (Purchases), `ShowLogo`, `FooterNote`, `ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber` (Print), `LowStockAlert`, `ExpiryAlert`, `ExpiryAlertDays`, `CreditLimitAlert` (Notifications). All now map from/to the dictionary via `MapFromDictionary`/`BuildDictionary`.
+- **ENH-003 [FIXED]**: Added `ValidateSystemSettings()` in `StoreSettingsService` — validates 19 boolean keys via `bool.TryParse`, 6 integer keys via `int.TryParse` with range checks (CostingMethod 1-3, DecimalPlaces 0-6, StockAlertDays 1-365).
+- **ENH-004 [FIXED]**: Added `Tax.ClearDefault()` and `Tax.SetDefault()` domain methods — both call `UpdateTimestamp()` for audit trail (RULE-299).
+- **RULE-299 through RULE-301** added to AGENTS.md — Enhancement remediations for Phase 19.
+
+### Phase 20 Currencies Module — Remaining Fix
+- **BUG-008 [FIXED]**: `Currency.Create()` validation changed from `code.Length > 10` to `code.Trim().Length != 3` — ISO 4217 requires exactly 3 characters.
+- RULE-298 added to AGENTS.md — currency code length validation rule.
+
+### Phase 20 Currencies Module — Enhancement Fixes
+- **ENH-005 [FIXED]**: Added `OpeningBalance = initialBalance` to `CashBox.Create()` — OpeningBalance was always 0 regardless of initial balance.
+- **ENH-007 [FIXED]**: Added `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods on `Currency` entity — both call `UpdateTimestamp()` for audit trail (RULE-303).
+- **ENH-012 [FIXED]**: Removed unnecessary `async` keyword from lambda in `CurrencyEditorViewModel.LoadRateHistoryAsync()` — no `await` inside the lambda (RULE-304).
+- **RULE-302 through RULE-304** added to AGENTS.md — Enhancement remediations for Phase 20.
+
+### Documentation Updates
+- `docs/phase18_accounting_review.md` — All 12 bugs (5 critical, 7 standard) now marked as `[FIXED]`; executive summary updated; checklist and priority fix order refreshed; post-review fix status table added.
+
+### New Rules (AGENTS.md §2.67)
+- RULE-291 through RULE-298 — Settings Module (291-297) + CurrencyCode validation (298) code review remediations
+
+## v4.6.8 — Currency Module Stabilization & EF Core Transaction Strategy (2026-06-06)
+
+### What's New
+- Fixed ALL 14 Critical/Bug items from Phase 20 Currencies Module code review
+- Fixed ALL 12 Critical/Bug items from Phase 18 Accounting Foundation code review
+- Added `IUnitOfWork.ExecuteTransactionAsync()` for atomic multi-save operations using `CreateExecutionStrategy().ExecuteAsync()` with explicit `BeginTransactionAsync()`/`CommitAsync()` inside the delegate
+- Added DB CHECK constraints on `JournalEntryLine` (`CHK_DebitOrCredit`, `CHK_NoNegativeValues`)
+- Fixed `JournalEntryNumberGenerator` daily reset logic — now queries by today's date prefix (`JE-{yyyyMMdd}`) instead of global last entry by Id
+- Fixed `SystemAccountMappings` navigation property mappings — all 13 relationships now use lambda syntax `HasOne(x => x.DefaultCashAccount)` etc.
+- Added `Account.Activate()` method allowing reactivation of deactivated accounts
+- Added account names/codes to `SystemAccountMappingsDto` so UI can display meaningful account labels (not raw IDs)
+- Added `Account.Create()` — `createdByUserId` null guard fixed; `MarkAsDeleted()` now protected for system accounts via `IsSystem` guard
+- Fixed `Currency.Create()` to accept `isSystem` parameter (default `false`) — system currencies can no longer be deleted
+- Fixed all Controller endpoints to return `404 NotFound` for `ErrorCodes.NotFound`, `400 BadRequest` for business validation errors
+- `CurrenciesListViewModel` now implements `IDisposable`, uses toast for minor success messages
+- Removed `IsActive` field from `UpdateCurrencyRequest` (was unused and confusing)
+- Added `UpdateExchangeRateRequestValidator` FluentValidation rule
+- Added composite index on `ExchangeRateHistory(CurrencyId, EffectiveDate)` for fast lookups
+- Read endpoints now use `AllStaff` policy instead of restrictive `AdminOnly`
+- Exchange rate display precision changed from `N2` to `N6` in DataGrid bindings
+- All `ViewModels/Currencies/` files updated with RULE-229 validation pattern, no CanExecute, `IDisposable`, and `IToastNotificationService` for success feedback
+- AGENTS.md updated: RULE-275 to RULE-290 added covering transaction strategy, ExchangeRate precision, navigation property mapping, editor validation pattern, and LogSystemError discipline
+
+| Category | Count |
+|----------|-------|
+| 🔴 Critical bugs fixed | 11 |
+| 🟠 Bugs fixed | 15 |
+| 🟡 Enhancements | 14 |
+| **Total files modified** | ~45 files across 6 projects |
+| **All 9 projects build** | 0 errors, 0 warnings |
+
 ## v4.6.7 — InvoiceNo Int Re-addition & DocumentSequenceService Enhancement (2026-06-06)
 
 ### Added

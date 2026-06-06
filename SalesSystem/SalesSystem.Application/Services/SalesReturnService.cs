@@ -267,6 +267,8 @@ public class SalesReturnService : ISalesReturnService
             0, // TaxAmount (not in entity yet)
             0, // DiscountAmount (not in entity yet)
             r.TotalAmount,
+            null, // CurrencyId — system setting
+            null, // ExchangeRate — system setting
             r.Notes,
             (byte)r.Status,
             r.Items.Select(it => new SalesReturnItemDto(
