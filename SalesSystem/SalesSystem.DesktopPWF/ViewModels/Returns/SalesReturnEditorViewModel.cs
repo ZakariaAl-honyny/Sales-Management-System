@@ -118,7 +118,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedInvoice, value))
             {
-                if (value != null) SearchText = value.InvoiceNo;
+                if (value != null) SearchText = value.Id.ToString();
                 UpdateItemsFromInvoice();
             }
         }

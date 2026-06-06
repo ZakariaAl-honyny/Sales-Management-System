@@ -96,6 +96,17 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] No `code:` named parameter in any Warehouse.Create() call?
 - [ ] All Warehouse.Create() calls use the new 4-param signature (name, location, isDefault, createdByUserId)?
 
+### Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+- [ ] SalesInvoice and PurchaseInvoice have `int InvoiceNo` (NOT string)?
+- [ ] `SalesInvoice.Create()` requires `int invoiceNo` (second param)?
+- [ ] `PurchaseInvoice.Create()` requires `int invoiceNo` (third param)?
+- [ ] Request DTOs use `int? InvoiceNo` (null = auto-generate)?
+- [ ] Service computes `lastId + 1` as default when `InvoiceNo` is null/≤0?
+- [ ] Report DTOs (`SalesReportDto`, `PurchaseReportDto`) use `int InvoiceNo`?
+- [ ] `InvoicePrintDto` uses `string InvoiceNumber` formatted from `InvoiceNo.ToString()`?
+- [ ] `SupplierInvoiceNo` kept only as supplier's reference (not system InvoiceNo)?
+- [ ] No unique index on InvoiceNo (duplicates allowed)?
+
 ### Interactive Validation (v4.6)
 - [ ] Save/Post/Print commands have NO CanExecute predicates (always enabled)?
 - [ ] XAML buttons have NO `IsEnabled` binding (no `IsEnabled="{Binding CanSave}"`)?
@@ -182,6 +193,20 @@ Code quality and convention enforcement for the Sales Management System.
 ### Arabic Encoding
 - [ ] All Arabic string literals are valid UTF-8 (no mojibake like `ط§ظ„ط³ظ„ط§ظ…`)?
 - [ ] No Arabic strings appear garbled in the diff?
+
+### UI Compacting (v4.6.6) — Mobile-Ready Density
+- [ ] No hardcoded `Height="36"` or `Height="40"` on Button/TextBox/ComboBox elements?
+- [ ] No hardcoded `Padding="16,0"` or `Padding="24,0"` or `Padding="20,0"` on buttons?
+- [ ] Header padding = `12,6` or smaller?
+- [ ] Footer padding = `12,8` or smaller?
+- [ ] Form field margins between sections = `0,0,0,6` or `0,0,0,8` (not 12/16)?
+- [ ] Dialog title FontSize = 16 or less?
+- [ ] Section header FontSize = 14 or less?
+- [ ] Empty-state button Margin = `0,12,0,0` with Width = `140`?
+- [ ] MainWindow sidebar width = `200`?
+- [ ] Dialog icon border = `44×44` or smaller?
+- [ ] Dialog button widths use `MinWidth` (80-100) not fixed `Width` (120/130)?
+- [ ] ScreenWindow MinWidth = 500, MinHeight = 350?
 
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`

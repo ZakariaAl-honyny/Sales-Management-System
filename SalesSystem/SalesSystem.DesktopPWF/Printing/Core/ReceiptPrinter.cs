@@ -45,7 +45,7 @@ public class ReceiptPrinter : IPrinterService
             Width = 400,
             Height = 800,
             ShowIcon = false,
-            Text = $"معاينة الإيصال - {invoice.InvoiceNo}"
+            Text = $"معاينة الإيصال - #{invoice.Id}"
         };
         ppd.ShowDialog();
 
@@ -94,7 +94,7 @@ public class ReceiptPrinter : IPrinterService
         // 2. Invoice Meta
         g.DrawString(_invoice.Title, bodyBoldFont, Brushes.Black, new RectangleF(left, y, width, 20), PrintHelper.RTLCenterFormat);
         y += 20;
-        g.DrawString($"رقم: {_invoice.InvoiceNo}", bodyFont, Brushes.Black, new RectangleF(left, y, width, 20), PrintHelper.RTLFormatRight);
+        g.DrawString($"رقم: {_invoice.Id}", bodyFont, Brushes.Black, new RectangleF(left, y, width, 20), PrintHelper.RTLFormatRight);
         y += 15;
         g.DrawString($"التاريخ: {_invoice.Date:yyyy/MM/dd HH:mm}", bodyFont, Brushes.Black, new RectangleF(left, y, width, 20), PrintHelper.RTLFormatRight);
         y += 15;

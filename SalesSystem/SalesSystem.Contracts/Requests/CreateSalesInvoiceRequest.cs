@@ -4,6 +4,7 @@ namespace SalesSystem.Contracts.Requests;
 
 public record CreateSalesInvoiceRequest(
     int WarehouseId,
+    int? InvoiceNo,
     int? CustomerId,
     int? CashBoxId,
     DateTime? InvoiceDate,

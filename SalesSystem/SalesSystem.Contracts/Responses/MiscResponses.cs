@@ -15,7 +15,7 @@ public record TopProductResponse(string Name, decimal Quantity);
 
 public record SettingsResponse(
     string StoreName, string? Address, string? Phone,
-    string? LogoUrl, string Currency, decimal DefaultTaxRate
+    string? LogoUrl, string Currency, decimal DefaultTaxRate // DEPRECATED: DefaultTaxRate — use Tax entity instead (kept for backwards compat). Remove in Phase 20.
 );
 
 public record UserResponse(

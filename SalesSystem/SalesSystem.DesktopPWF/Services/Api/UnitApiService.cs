@@ -44,7 +44,7 @@ public class UnitApiService : ApiServiceBase, IUnitApiService
     public async Task<Result> DeletePermanentlyAsync(int id)
     {
         return await ExecuteCommandAsync(
-            () => _httpClient.DeleteAsync($"api/v1/units/{id}/permanent"),
+            () => _httpClient.DeleteAsync($"api/v1/units/permanent/{id}"),
             "UnitApiService.DeletePermanentlyAsync");
     }
 }

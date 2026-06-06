@@ -86,6 +86,20 @@ public class SettingsApiService : ApiServiceBase, ISettingsApiService
             "SettingsApiService.SetCostingMethodAsync");
     }
 
+    public async Task<Result<Dictionary<string, string>>> GetAllSystemSettingsAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync<Dictionary<string, string>>(
+            () => _httpClient.GetAsync("api/v1/settings/system", ct),
+            "SettingsApiService.GetAllSystemSettingsAsync");
+    }
+
+    public async Task<Result> UpdateSystemSettingsAsync(Dictionary<string, string> settings, CancellationToken ct = default)
+    {
+        return await ExecuteCommandAsync(
+            () => _httpClient.PutAsJsonAsync("api/v1/settings/system", settings, ct),
+            "SettingsApiService.UpdateSystemSettingsAsync");
+    }
+
     public void RefreshCache()
     {
         lock (_cacheLock)

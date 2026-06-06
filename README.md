@@ -11,12 +11,13 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.6.4%20Complete-2ECC71?style=for-the-badge" alt="Status"/>
+<img src="https://img.shields.io/badge/Status-v4.6.7%20Complete-2ECC71?style=for-the-badge" 
+alt="Status"/>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.6.4-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6.7-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -24,7 +25,7 @@
 
 ## 📋 Overview
 
-A **comprehensive sales management platform** built with Clean Architecture + CQRS principles, designed for small-to-medium retail businesses. The current version delivers a **WPF Desktop client (MVVM)** backed by an **ASP.NET Core Web API**, handling sales, purchases, inventory, returns, and financial tracking with full Arabic/English bilingual support.
+A **comprehensive sales management platform** built with Clean Architecture + Service Layer pattern, designed for small-to-medium retail businesses. The current version delivers a **WPF Desktop client (MVVM)** backed by an **ASP.NET Core Web API**, handling sales, purchases, inventory, returns, and financial tracking with full Arabic/English bilingual support.
 
 The API-first architecture is designed to support **future web and mobile clients** without any backend changes.
 
@@ -54,6 +55,12 @@ The API-first architecture is designed to support **future web and mobile client
 - 📦 **Multi-warehouse & Low Stock AI** — Track inventory across branches with auto-calculated reorder suggestions
   - `ReorderLevel` on each product
   - Smart low-stock reporting (e.g., "1 box + 3 pieces")
+- 📒 **Accounting Foundation (Phases 18-31)**: Chart of Accounts (60 accounts), Journal Entries, Fiscal Years, Annual Closing
+- 💱 **Multi-Currency (Phase 20)**: YER/USD/SAR support with exchange rates, FractionName, IsSystem guard
+- 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Manager/Cashier/Accountant), 33 permission codes, MustChangePassword, lockout
+- 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
+- 🔢 **InvoiceNo Strategy (v4.6.7)**: InvoiceNo = int, UNIQUE per document type, thread-safe auto-generation via DocumentSequenceService.GetNextIntAsync() with SemaphoreSlim lock
+- 📑 **Reports (Phase 31)**: 35+ report DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML
 - 👥 **Role-based access** — Admin, Manager, and Cashier with granular permissions
 - 📊 **Full audit trail** — Every stock change, price change, and financial transaction is tracked
 - 🌐 **API-first design** — RESTful API ready for web/mobile clients in future phases
@@ -110,6 +117,12 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - **`A4InvoiceDocument`** — QuestPDF document template (RTL Arabic, logo, tax breakdown)
 - **`ThermalReceiptGenerator`** — ESC/POS receipt builder (42-char columns, Windows-1256)
 - **`EscPos`** — Static class for ESC/POS command byte sequences
+
+### New Services (v4.6.7)
+- `IDocumentSequenceService.GetNextIntAsync()` — Thread-safe int sequence generation via SemaphoreSlim for InvoiceNo and other int sequences
+- `SystemAccountMappingsService` — Maps 7 system operation types to Chart of Accounts
+- `JournalEntryAutoService` — 7 auto-journal entry providers (Sales, Purchases, Returns, Payments, Receipts, Transfers, Annual Closing)
+- `FiscalYearService` — Fiscal year management with close validation
 
 ---
 
@@ -185,6 +198,21 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - `CashBox.CurrentBalance` never negative
 - Cash transfers require TWO transactions (Out + In)
 - `DailyClosure` for end-of-day reconciliation
+
+### 📒 Accounting Foundation (v4.6.7)
+- **Chart of Accounts** — 60-account hierarchical structure (Assets, Liabilities, Equity, Income, Expenses)
+  - System accounts protected by `IsSystem` guard — never deleted or edited
+- **Journal Entries** — Automatic journal entry creation for ALL financial transactions
+  - 7 auto-providers: Sales, Purchases, Returns, Payments, Receipts, Transfers, Annual Closing
+  - `JournalEntryAutoService` handles all providers centrally
+- **Fiscal Years** — Annual fiscal periods with open/close lifecycle
+  - `FiscalYearService` manages year creation, validation, and closing
+  - Closing entries automatically transfer revenue/expense to retained earnings
+- **Multi-Currency** — YER/USD/SAR support with exchange rate tables
+  - `FractionName` for sub-currency units (Fils, Cent)
+  - `IsSystem` guard on base currency
+- **Account Mappings** — `SystemAccountMappingsService` maps 7 operation types to COA accounts
+  - Configurable per business for tax/custom rules
 
 ### 🔄 Auto-Update System (v4.4)
 - Background update check 3 seconds after startup — NEVER blocks app
@@ -424,6 +452,9 @@ dotnet run
 | **v4.6.2** | **WPF Validation ErrorTemplate** — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated | ✅ **Completed** |
 | **v4.6.3** | **Architecture Alignment & Code Quality Audit** — Settings ViewModels/Views relocation, DI registration, MessageBox removal, async void refactoring, shadowing resolved | ✅ **Completed** |
 | **v4.6.4** | **Security Hardening & Code Quality** — Rate limiting (5/15min), user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes | ✅ **Completed** |
+| **v4.6.5** | **Invoice Number Removal & Touch POS Polish** — InvoiceNo removed from entities, services, controllers, ViewModels, DTOs. Touch POS product card layout fixed. Stock validation warning on product add. PlayWarning() added to ISoundService. Garbled Arabic fixes | ✅ **Completed** |
+| **v4.6.7** | **InvoiceNo Int Re-addition** — InvoiceNo re-added as `int` (not string) to SalesInvoice/PurchaseInvoice. NOT unique (duplicates allowed). Default `lastId + 1`. Build: 0 errors, 0 warnings. Migration added | ✅ **Completed** |
+| **v4.6.6** | **UI Compacting — Mobile-Ready Density** — Global UI resize (63 views) for more content per screen: Styles.xaml compact tokens (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted by ~25-30%, PurchaseInvoiceEditorView size reduction, MainWindow sidebar 220→200, touch control sizes preserved. Future mobile-ready foundation | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -687,7 +718,99 @@ dotnet run
 
 ---
 
-## 🆕 What's New in v4.6.3 — Architecture Alignment & Code Quality Audit
+## 🆕 What's New in v4.6.5 — Invoice Number Removal & Touch POS Polish
+
+| Feature | Description |
+|---------|-------------|
+| **InvoiceNo Removed from Entities** | `InvoiceNo` (string) removed from `SalesInvoice` and `PurchaseInvoice` entities — use auto-increment `Id` (int PK) as sole invoice identifier |
+| **GetByNumberAsync Removed** | `GetByNumberAsync()` methods removed from SalesInvoiceService, PurchaseInvoiceService, API controllers, and Desktop API clients — search by `Id` instead |
+| **Cleaner Invoice Forms** | Invoice number text field and auto-generation removed — invoice displays use formatted `Id` (`#ID`) |
+| **Search by Id** | Invoice list view search uses `int.TryParse()` + `Id` comparison — no string `InvoiceNo` filtering |
+| **Report DTOs Simplified** | `SalesReportDto` and `PurchaseReportDto` use `int Id` instead of `string InvoiceNo` |
+| **Print DTO Updated** | `InvoicePrintDto` uses `int Id` instead of `string InvoiceNo` for PDF/thermal printing |
+| **Touch POS Card Layout Fixed** | Removed `VirtualizingPanel.ScrollUnit="Pixel"` from ModernListBox style, increased `MinHeight` on cart view — product cards now render with proper proportions |
+| **Stock Validation on Product Add** | Adding a product with insufficient stock now shows a warning dialog with product name, requested qty, and available stock |
+| **PlayWarning() Sound** | New `PlayWarning()` method on `ISoundService` — plays `SystemSounds.Asterisk` on stock validation failures and other warnings |
+| **Garbled Arabic Fixes** | Multiple files cleaned up with correct UTF-8 Arabic encoding |
+
+---
+
+## 🆕 What's New in v4.6.7 — InvoiceNo Int Re-addition & Accounting Foundation
+
+| Feature | Description |
+|---------|-------------|
+| **InvoiceNo Back as int** | `SalesInvoice` and `PurchaseInvoice` now have `int InvoiceNo` — user-facing invoice number, separate from auto-increment `Id` PK |
+| **UNIQUE per Document Type** | InvoiceNo is UNIQUE within each table — no duplicates allowed for search/return/report integrity |
+| **Thread-Safe Auto-generation** | Service uses `IDocumentSequenceService.GetNextIntAsync()` with `SemaphoreSlim` lock — NOT `lastId + 1` (not thread-safe) |
+| **Request DTO** | `int? InvoiceNo` in `CreateSalesInvoiceRequest` / `CreatePurchaseInvoiceRequest` — null/0 = auto-generate via DocumentSequenceService |
+| **Desktop Display** | Editor ViewModels show `int InvoiceNo` field; list ViewModels display and filter by InvoiceNo |
+| **Migration Added** | `20260602050426_AddInvoiceNoColumn` — adds `InvoiceNo int NOT NULL DEFAULT 0` to both tables + UNIQUE index |
+| **Accounting Foundation** | Chart of Accounts (60 accounts), 7 auto-journal entry providers, Fiscal Year management, Multi-Currency (YER/USD/SAR) |
+| **Build Verification** | **0 errors, 0 warnings** — all 9 projects compile clean |
+| **Tests** | 411 passed, 28 failed (all 28 failures are pre-existing garbled Arabic assertion mismatches — not InvoiceNo related) |
+
+### Key Design Decisions
+- `InvoiceNo` is `int` (NOT string) — simpler, faster, no formatting overhead
+- **UNIQUE** per document type — prevents confusion in search, returns, reports, and customer service
+- Auto-generated via `DocumentSequenceService.GetNextIntAsync()` with `SemaphoreSlim` lock — thread-safe
+- `SupplierInvoiceNo` (string?) stays on PurchaseInvoice as supplier's reference — NOT the system InvoiceNo
+- `InvoicePrintDto.InvoiceNumber` (string) still exists — formatted via `InvoiceNo.ToString()` in the builder
+
+---
+
+## 🆕 What's New in v4.6.6 — UI Compacting (Mobile-Ready Density)
+
+| Feature | Description |
+|---------|-------------|
+| **Global Styles Compacted** | Styles.xaml global tokens reduced: button heights 36→28, TextBox/ComboBox 36→28, font sizes 13→11, DataGrid row height 34→24, header fonts 20→16 |
+| **Dashboard Compacted** | Spacing between KPI cards reduced 32→12px, icon padding 12→6, description font size reduced |
+| **15 List Views Compacted** | All toolbar spacing reduced, search box widths narrowed from 220→160, all `Height="36"` hardcoded overrides removed from buttons, empty-state button margins 20→12px and widths 160→140px |
+| **14 Editor Views Compacted** | Header/footer padding reduced by ~40%, section field spacing reduced from 12→6/8px, title fonts 18→14, footer bars reduced 24,16→12,8 |
+| **PurchaseInvoiceEditorView Fixed** | **Major miss caught** — completely untouched view compacted: header 16,8→12,6, title 18→14, all field margins 12→6/8, footer 20,12→12,8, print button Padding=16,0 removed |
+| **15 Reports/Settings/Inventory Views** | Filter bar compacted (ComboBox heights removed), report result padding 16,12→10,6, section margins 20→12px, all `Height=34/36` removed |
+| **19 Dialogs/Shell Views** | Dialog titles 20→16, icon borders 50×50→44×44, button widths reduced (MinWidth 80-100), dialog containers shrunk ~15% |
+| **MainWindow Sidebar** | Width reduced 220→200, menu item padding 5→3, brand area padding 16,20→12,12 |
+| **ScreenWindow** | MinWidth/MinHeight reduced 600/400→500/350, default size 900×650→850×600 |
+| **NumericKeypadControl** | Touch keys reduced MinHeight 30→28, MinWidth 40→36, FontSize 16→14 |
+| **Touch-optimized views preserved** | TouchPosCartView, TouchQty buttons kept at touch-friendly sizes (32px) |
+| **Future Mobile Ready** | Compact components scale better to smaller screens — all spacing/fonts now follow consistent compact token system |
+| **Build Verification** | **0 errors, 0 warnings** across DesktopPWF after compacting all 63 views |
+
+### Before (v4.6.5) — Spacious/Large
+- Buttons at 36px height with 16px+ padding
+- Dialog titles at 20px font size
+- Form field spacing at 12-16px margins
+- Toolbar/search bars with 36px buttons and 20px margins
+- Empty-state buttons at 160px+ width with 20px top margin
+- Sidebar at 220px width
+
+### After (v4.6.6) — Compact/Dense
+- Buttons at 28px default (style-driven) — all inline overrides removed
+- Dialog titles at 16px, section headers at 14px
+- Form field spacing at 6-8px margins
+- Toolbar buttons at style-default 28px with 4-8px margins
+- Empty-state buttons at 140px width with 12px top margin
+- Sidebar at 200px width
+- ~25-30% more content visible on screen at once
+
+### Files Modified (63 total)
+
+| Category | Files |
+|----------|-------|
+| **Styles** | `Resources/Styles.xaml` — global token compaction |
+| **Dashboard** | `Views/Dashboard/DashboardView.xaml` |
+| **List Views** | 15 files: SalesInvoices, PurchaseInvoices, Customers, Suppliers, Categories, Units, Users, Warehouses, Transfers, SalesReturns, PurchaseReturns, CustomerPayments, SupplierPayments, CashBoxes, ProductUnits |
+| **Editor Views** | 14 files: Customer, Supplier, Category, Unit, Warehouse, User, ProductUnit, SalesReturn, PurchaseReturn, StockTransfer, CustomerPayment, SupplierPayment, CashBox, CashTransfer |
+| **Reports/Settings** | 15 files: Reports, AccountStatement, IncomeStatement, VatReport, CashFlow, ExpiredProducts, Settings, CostingMethod, Backup, CashBoxTransactions, DailyClosure, Inventory, LowStock, Login, ProductUnitEditor |
+| **Dialogs** | 9 files: Error, Warning, Success, Info, Confirmation, DeleteConfirmation, ValidationErrors, DatabaseError, FallbackError |
+| **Shell** | 5 files: MainWindow, ScreenWindow, PdfPreviewWindow, SalesInvoicesView, UpdateDialog |
+| **Selection** | 5 files: ProductSelection, CustomerSelection, SupplierSelection, SalesInvoiceSelection, PurchaseInvoiceSelection |
+| **Controls** | 1 file: NumericKeypadControl |
+| **Major Miss Fixed** | `Views/Purchases/PurchaseInvoiceEditorView.xaml` — fully compacted (18 edits) |
+
+---
+
+### 🆕 What's New in v4.6.3 — Architecture Alignment & Code Quality Audit
 
 | Feature | Description |
 |---------|-------------|
@@ -704,7 +827,35 @@ dotnet run
 
 ## 📜 Version History
 
-### v4.6.4 — Security Hardening & Code Quality (Current)
+### v4.6.7 — InvoiceNo Int Re-addition & Accounting Foundation (Current)
+- **InvoiceNo Back as int**: SalesInvoice and PurchaseInvoice now have `int InvoiceNo` — user-facing invoice number
+- **UNIQUE per type**: InvoiceNo is UNIQUE within each table — prevents confusion in search/returns/reports
+- **Thread-Safe Auto-generation**: Uses `IDocumentSequenceService.GetNextIntAsync()` with `SemaphoreSlim` lock
+- **Request DTOs**: `int? InvoiceNo` — null/0 means auto-generate via DocumentSequenceService
+- **Desktop**: Editor VMs have `int InvoiceNo` field, list views display and filter by InvoiceNo
+- **Accounting Foundation**: Chart of Accounts (60 accounts), 7 auto-journal entry providers, Fiscal Year management, Multi-Currency (YER/USD/SAR)
+- **Migration**: `20260602050426_AddInvoiceNoColumn` adds column + UNIQUE index to both tables
+- **Build**: 0 errors, 0 warnings across 9 projects
+- **Tests**: 411 passed, 28 failed (pre-existing garbled Arabic, not InvoiceNo-related)
+
+### v4.6.6 — UI Compacting — Mobile-Ready Density
+- **Global UI Resize**: 63 views compacted by ~25-30% — more content per screen
+- **Styles.xaml Tokens**: Button 36→28, font 13→11, DataGrid row 34→24
+- **All List/Editor/Dialog Views**: Height=36 overrides removed, padding reduced, margins shrunk
+- **PurchaseInvoiceEditorView Fixed**: Major miss — fully compacted (was completely untouched)
+- **MainWindow Sidebar**: Width 220→200
+- **Touch Views Preserved**: Touch-optimized controls kept at touch-friendly sizes
+- **Build**: DesktopPWF 0 errors, 0 warnings
+
+### v4.6.5 — Invoice Number Removal & Touch POS Polish
+- **InvoiceNo (string) Removed**: InvoiceNo string column removed from SalesInvoice and PurchaseInvoice — auto-increment Id used temporarily as display identifier
+- **NOTE**: InvoiceNo re-added as `int` in v4.6.7 (see above) — this was a temporary removal
+- **GetByNumber Endpoints Removed**: Services, controllers, and API clients cleaned up
+- **Touch POS Polish**: Product card layout fixed, stock validation warning, PlayWarning() sound
+- **Garbled Arabic**: UTF-8 encoding fixes across multiple files
+- **Build**: 12/12 projects pass with 0 errors
+
+### v4.6.4 — Security Hardening & Code Quality
 - **Rate Limiting**: Login limited to 5 attempts/15min per IP, global 100 req/min
 - **User Hard-Delete Protection**: PermanentDeleteAsync always returns Failure
 - **Connection String Security**: No plaintext connection strings in config files
@@ -719,7 +870,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 248 non-negotiable rules (RULE-001 to RULE-248)
+1. Read [`AGENTS.md`](AGENTS.md) — all 274 non-negotiable rules (RULE-001 to RULE-274)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

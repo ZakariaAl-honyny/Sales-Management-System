@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Infrastructure.Repositories;
 
@@ -18,6 +19,7 @@ public class UnitOfWork : IUnitOfWork
     private readonly SalesDbContext _context;
     private IGenericRepository<User>? _users;
     private IGenericRepository<Unit>? _units;
+    private IGenericRepository<Tax>? _taxes;
     private IGenericRepository<Category>? _categories;
     private IGenericRepository<Product>? _products;
     private IGenericRepository<Warehouse>? _warehouses;
@@ -47,6 +49,11 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<DailyClosure>? _dailyClosures;
     private IGenericRepository<StockWriteOff>? _stockWriteOffs;
     private IGenericRepository<ProductPriceHistory>? _productPriceHistory;
+    private IGenericRepository<Account>? _accounts;
+    private IGenericRepository<JournalEntry>? _journalEntries;
+    private IGenericRepository<JournalEntryLine>? _journalEntryLines;
+    private IGenericRepository<SystemAccountMappings>? _systemAccountMappings;
+    private IGenericRepository<FiscalYearClosure>? _fiscalYearClosures;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -55,6 +62,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
 
     public IGenericRepository<User> Users => _users ??= new GenericRepository<User>(_context);
     public IGenericRepository<Unit> Units => _units ??= new GenericRepository<Unit>(_context);
+    public IGenericRepository<Tax> Taxes => _taxes ??= new GenericRepository<Tax>(_context);
     public IGenericRepository<Category> Categories => _categories ??= new GenericRepository<Category>(_context);
     public IGenericRepository<Product> Products => _products ??= new GenericRepository<Product>(_context);
     public IGenericRepository<Warehouse> Warehouses => _warehouses ??= new GenericRepository<Warehouse>(_context);
@@ -84,6 +92,11 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<DailyClosure> DailyClosures => _dailyClosures ??= new GenericRepository<DailyClosure>(_context);
     public IGenericRepository<StockWriteOff> StockWriteOffs => _stockWriteOffs ??= new GenericRepository<StockWriteOff>(_context);
     public IGenericRepository<ProductPriceHistory> ProductPriceHistory => _productPriceHistory ??= new GenericRepository<ProductPriceHistory>(_context);
+    public IGenericRepository<Account> Accounts => _accounts ??= new GenericRepository<Account>(_context);
+    public IGenericRepository<JournalEntry> JournalEntries => _journalEntries ??= new GenericRepository<JournalEntry>(_context);
+    public IGenericRepository<JournalEntryLine> JournalEntryLines => _journalEntryLines ??= new GenericRepository<JournalEntryLine>(_context);
+    public IGenericRepository<SystemAccountMappings> SystemAccountMappings => _systemAccountMappings ??= new GenericRepository<SystemAccountMappings>(_context);
+    public IGenericRepository<FiscalYearClosure> FiscalYearClosures => _fiscalYearClosures ??= new GenericRepository<FiscalYearClosure>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {

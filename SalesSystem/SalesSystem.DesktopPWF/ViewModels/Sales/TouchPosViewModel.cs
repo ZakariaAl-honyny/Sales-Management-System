@@ -14,6 +14,7 @@ public class TouchPosViewModel : ViewModelBase
 {
     private readonly ICategoryApiService _categoryService;
     private readonly IProductApiService _productService;
+    private readonly IInventoryApiService _inventoryService;
 
     private ObservableCollection<CategoryDto> _categories = new();
     private ObservableCollection<ProductDto> _products = new();
@@ -25,13 +26,16 @@ public class TouchPosViewModel : ViewModelBase
     /// </summary>
     /// <param name="categoryService">Service for category API operations.</param>
     /// <param name="productService">Service for product API operations.</param>
+    /// <param name="inventoryService">Service for inventory API operations (stock lookups).</param>
     /// <exception cref="ArgumentNullException">Thrown when a required dependency is null.</exception>
     public TouchPosViewModel(
         ICategoryApiService categoryService,
-        IProductApiService productService)
+        IProductApiService productService,
+        IInventoryApiService inventoryService)
     {
         _categoryService = categoryService ?? throw new ArgumentNullException(nameof(categoryService));
         _productService = productService ?? throw new ArgumentNullException(nameof(productService));
+        _inventoryService = inventoryService ?? throw new ArgumentNullException(nameof(inventoryService));
 
         SelectCategoryCommand = new RelayCommand(OnSelectCategory);
         AddToCartCommand = new RelayCommand((param) =>
@@ -83,8 +87,37 @@ public class TouchPosViewModel : ViewModelBase
     public CategoryDto? SelectedCategory
     {
         get => _selectedCategory;
-        set => SetProperty(ref _selectedCategory, value);
+        set
+        {
+            if (SetProperty(ref _selectedCategory, value) && value != null)
+            {
+                _ = ExecuteAsync(() => LoadProductsForCategoryOperationAsync(value.Id));
+            }
+            else if (value == null)
+            {
+                Products.Clear();
+            }
+        }
     }
+
+    private int _warehouseId;
+    /// <summary>
+    /// Gets or sets the warehouse ID for stock lookups.
+    /// Should be set by the parent ViewModel before loading products.
+    /// </summary>
+    public int WarehouseId
+    {
+        get => _warehouseId;
+        set => SetProperty(ref _warehouseId, value);
+    }
+
+    private Dictionary<int, decimal> _productStocks = new();
+
+    /// <summary>
+    /// Gets the product stock lookup dictionary (ProductId → Quantity).
+    /// Updated whenever products are loaded for the selected category.
+    /// </summary>
+    public Dictionary<int, decimal> ProductStocks => _productStocks;
 
     /// <summary>
     /// Gets or sets the error message displayed when an operation fails.
@@ -147,6 +180,8 @@ public class TouchPosViewModel : ViewModelBase
     /// <summary>
     /// Loads products for the specified category by filtering all active products client-side.
     /// Products are sorted newest-first by ID.
+    /// If <see cref="WarehouseId"/> is set, stock quantities are also loaded
+    /// and populated on each product's <see cref="ProductDto.CurrentStock"/> field.
     /// </summary>
     /// <param name="categoryId">The category ID to filter by.</param>
     private async Task LoadProductsForCategoryOperationAsync(int categoryId)
@@ -159,6 +194,33 @@ public class TouchPosViewModel : ViewModelBase
                 .Where(p => p.CategoryId == categoryId)
                 .OrderByDescending(p => p.Id)
                 .ToList();
+
+            // Load stock quantities for all products in current warehouse
+            if (_warehouseId > 0 && filtered.Count > 0)
+            {
+                try
+                {
+                    var stocksResult = await _inventoryService.GetWarehouseStocksAsync(_warehouseId);
+                    if (stocksResult.IsSuccess && stocksResult.Value != null)
+                    {
+                        _productStocks = stocksResult.Value
+                            .Where(s => s.ProductId > 0)
+                            .ToDictionary(s => s.ProductId, s => s.Quantity);
+
+                        // Apply stock to ProductDto (since it's a record, we create new instances)
+                        filtered = filtered.Select(p =>
+                        {
+                            var stock = _productStocks.GetValueOrDefault(p.Id, 0m);
+                            return p with { CurrentStock = stock };
+                        }).OrderByDescending(p => p.Id).ToList();
+                    }
+                }
+                catch
+                {
+                    // Stock loading failure shouldn't block product display
+                    _productStocks = new Dictionary<int, decimal>();
+                }
+            }
 
             Products = new ObservableCollection<ProductDto>(filtered);
         }

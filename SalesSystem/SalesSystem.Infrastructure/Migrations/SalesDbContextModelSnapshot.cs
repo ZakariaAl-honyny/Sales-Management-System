@@ -22,6 +22,313 @@ namespace SalesSystem.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.Account", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<byte>("AccountType")
+                        .HasColumnType("tinyint");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsSystemAccount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("ParentAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountCode")
+                        .IsUnique();
+
+                    b.HasIndex("ParentAccountId");
+
+                    b.ToTable("Accounts", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("EntryNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte>("EntryType")
+                        .HasColumnType("tinyint");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsPosted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsReversed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("PostedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PostedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ReferenceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("TransactionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntryNumber")
+                        .IsUnique();
+
+                    b.HasIndex("TransactionDate");
+
+                    b.ToTable("JournalEntries", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntryLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AccountNameAr")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Credit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Debit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("JournalEntryId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("JournalEntryId1")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("JournalEntryId");
+
+                    b.HasIndex("JournalEntryId1");
+
+                    b.ToTable("JournalEntryLines", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.SystemAccountMappings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountsPayableAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AccountsReceivableAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BranchId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CapitalAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CogsAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DefaultBankAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DefaultCashAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GeneralExpenseAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("InventoryAssetAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SalesReturnAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SalesRevenueAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SpoilageLossAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VatInputAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("VatOutputAccountId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountsPayableAccountId");
+
+                    b.HasIndex("AccountsReceivableAccountId");
+
+                    b.HasIndex("CapitalAccountId");
+
+                    b.HasIndex("CogsAccountId");
+
+                    b.HasIndex("DefaultBankAccountId");
+
+                    b.HasIndex("DefaultCashAccountId");
+
+                    b.HasIndex("GeneralExpenseAccountId");
+
+                    b.HasIndex("InventoryAssetAccountId");
+
+                    b.HasIndex("SalesReturnAccountId");
+
+                    b.HasIndex("SalesRevenueAccountId");
+
+                    b.HasIndex("SpoilageLossAccountId");
+
+                    b.HasIndex("VatInputAccountId");
+
+                    b.HasIndex("VatOutputAccountId");
+
+                    b.ToTable("SystemAccountMappings", (string)null);
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashBox", b =>
                 {
                     b.Property<int>("Id")
@@ -724,9 +1031,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int>("ProductUnitId")
                         .HasColumnType("int");
 
-                    b.Property<int>("ProductUnitId1")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -740,8 +1044,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("ChangedByUserId");
 
                     b.HasIndex("ProductUnitId");
-
-                    b.HasIndex("ProductUnitId1");
 
                     b.ToTable("ProductPriceHistories", (string)null);
                 });
@@ -852,10 +1154,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<DateTime>("InvoiceDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("InvoiceNo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                    b.Property<int>("InvoiceNo")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -905,9 +1205,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("InvoiceNo")
-                        .IsUnique();
 
                     b.HasIndex("SupplierId");
 
@@ -1141,10 +1438,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<DateTime>("InvoiceDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("InvoiceNo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                    b.Property<int>("InvoiceNo")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -1189,9 +1484,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("CashBoxId");
 
                     b.HasIndex("CustomerId");
-
-                    b.HasIndex("InvoiceNo")
-                        .IsUnique();
 
                     b.HasIndex("WarehouseId");
 
@@ -2102,6 +2394,116 @@ namespace SalesSystem.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.Account", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("ParentAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntryLine", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", "JournalEntry")
+                        .WithMany()
+                        .HasForeignKey("JournalEntryId1");
+
+                    b.Navigation("JournalEntry");
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.SystemAccountMappings", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountsPayableAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountsReceivableAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("CapitalAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("CogsAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("DefaultBankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("DefaultCashAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("GeneralExpenseAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("InventoryAssetAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("SalesReturnAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("SalesRevenueAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("SpoilageLossAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("VatInputAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("VatOutputAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashTransaction", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Entities.CashBox", "CashBox")
@@ -2222,16 +2624,10 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Entities.ProductUnit", null)
+                    b.HasOne("SalesSystem.Domain.Entities.ProductUnit", "ProductUnit")
                         .WithMany()
                         .HasForeignKey("ProductUnitId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SalesSystem.Domain.Entities.ProductUnit", "ProductUnit")
-                        .WithMany()
-                        .HasForeignKey("ProductUnitId1")
-                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("ProductUnit");
@@ -2532,6 +2928,11 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("Product");
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntry", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashBox", b =>

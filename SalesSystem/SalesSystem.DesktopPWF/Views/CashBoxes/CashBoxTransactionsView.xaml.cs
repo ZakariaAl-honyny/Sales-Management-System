@@ -3,7 +3,7 @@ using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 
 namespace SalesSystem.DesktopPWF.Views.CashBoxes;
 
-public partial class CashBoxTransactionsView : Page
+public partial class CashBoxTransactionsView : UserControl
 {
     private readonly CashBoxTransactionsViewModel _viewModel;
 

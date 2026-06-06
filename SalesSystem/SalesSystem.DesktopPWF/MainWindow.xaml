@@ -4,6 +4,40 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SalesSystem.DesktopPWF"
+        xmlns:viewmodels="clr-namespace:SalesSystem.DesktopPWF.ViewModels"
+        xmlns:views="clr-namespace:SalesSystem.DesktopPWF.Views"
+        xmlns:viewsSales="clr-namespace:SalesSystem.DesktopPWF.Views.Sales"
+        xmlns:viewsReturns="clr-namespace:SalesSystem.DesktopPWF.Views.Returns"
+        xmlns:viewsPurchases="clr-namespace:SalesSystem.DesktopPWF.Views.Purchases"
+        xmlns:viewsPayments="clr-namespace:SalesSystem.DesktopPWF.Views.Payments"
+        xmlns:viewsCashBoxes="clr-namespace:SalesSystem.DesktopPWF.Views.CashBoxes"
+        xmlns:viewsReports="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
+        xmlns:viewsInventory="clr-namespace:SalesSystem.DesktopPWF.Views.Inventory"
+        xmlns:viewsProducts="clr-namespace:SalesSystem.DesktopPWF.Views.Products"
+        xmlns:viewsCustomers="clr-namespace:SalesSystem.DesktopPWF.Views.Customers"
+        xmlns:viewsSuppliers="clr-namespace:SalesSystem.DesktopPWF.Views.Suppliers"
+        xmlns:viewsCategories="clr-namespace:SalesSystem.DesktopPWF.Views.Categories"
+        xmlns:viewsUnits="clr-namespace:SalesSystem.DesktopPWF.Views.Units"
+        xmlns:viewsUsers="clr-namespace:SalesSystem.DesktopPWF.Views.Users"
+        xmlns:viewsTransfers="clr-namespace:SalesSystem.DesktopPWF.Views.Transfers"
+             xmlns:viewsSettings="clr-namespace:SalesSystem.DesktopPWF.Views.Settings"
+             xmlns:vmSettings="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Settings"
+             xmlns:vmSales="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Sales"
+        xmlns:vmReturns="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Returns"
+        xmlns:vmPurchases="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Purchases"
+        xmlns:vmPayments="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Payments"
+        xmlns:vmCashBoxes="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CashBoxes"
+        xmlns:vmReports="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Reports"
+        xmlns:vmInventory="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Inventory"
+        xmlns:vmProducts="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Products"
+        xmlns:vmCustomers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Customers"
+        xmlns:vmSuppliers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Suppliers"
+        xmlns:vmCategories="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Categories"
+        xmlns:vmUnits="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Units"
+        xmlns:vmUsers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Users"
+        xmlns:vmTaxes="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Taxes"
+        xmlns:viewsTaxes="clr-namespace:SalesSystem.DesktopPWF.Views.Taxes"
+        xmlns:vmTransfers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Transfers"
         mc:Ignorable="d"
         Title="نظام إدارة المبيعات"
         Height="700" Width="1200"
@@ -11,6 +45,103 @@
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- DataTemplates for ViewModel → View mapping -->
+            <DataTemplate DataType="{x:Type viewmodels:DashboardViewModel}">
+                <views:DashboardView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmSales:TouchPosViewModel}">
+                <viewsSales:TouchPosView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmSales:SalesInvoiceListViewModel}">
+                <viewsSales:SalesInvoicesListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReturns:SalesReturnListViewModel}">
+                <viewsReturns:SalesReturnsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmPurchases:PurchaseInvoiceListViewModel}">
+                <viewsPurchases:PurchaseInvoicesListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReturns:PurchaseReturnListViewModel}">
+                <viewsReturns:PurchaseReturnsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmPayments:CustomerPaymentsListViewModel}">
+                <viewsPayments:CustomerPaymentsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmPayments:SupplierPaymentsListViewModel}">
+                <viewsPayments:SupplierPaymentsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmCashBoxes:CashBoxesListViewModel}">
+                <viewsCashBoxes:CashBoxesListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewmodels:ReportsViewModel}">
+                <viewsReports:ReportsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmInventory:LowStockViewModel}">
+                <viewsInventory:LowStockView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:ExpiredProductsReportViewModel}">
+                <viewsReports:ExpiredProductsReportView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:IncomeStatementViewModel}">
+                <viewsReports:IncomeStatementView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:CashFlowReportViewModel}">
+                <viewsReports:CashFlowReportView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:VatReportViewModel}">
+                <viewsReports:VatReportView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:AccountStatementViewModel}">
+                <viewsReports:AccountStatementView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmProducts:ProductListViewModel}">
+                <viewsProducts:ProductsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmCustomers:CustomerListViewModel}">
+                <viewsCustomers:CustomersListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmSuppliers:SupplierListViewModel}">
+                <viewsSuppliers:SuppliersListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewmodels:WarehouseListViewModel}">
+                <views:WarehousesView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmCategories:CategoryListViewModel}">
+                <viewsCategories:CategoriesListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmUnits:UnitListViewModel}">
+                <viewsUnits:UnitsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmUsers:UserListViewModel}">
+                <viewsUsers:UsersListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type viewmodels:SettingsViewModel}">
+                <viewsSettings:SettingsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmSettings:SystemSettingsViewModel}">
+                <viewsSettings:SystemSettingsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmSettings:BackupViewModel}">
+                <viewsSettings:BackupView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmTransfers:StockTransfersListViewModel}">
+                <viewsTransfers:StockTransfersListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmInventory:InventoryViewModel}">
+                <viewsInventory:InventoryView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmTaxes:TaxesListViewModel}">
+                <viewsTaxes:TaxesListView />
+            </DataTemplate>
+        </ResourceDictionary>
+    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -20,7 +151,7 @@
         </Grid.RowDefinitions>
 
         <!-- شريط القوائم Menu Bar -->
-        <Menu Grid.Row="0" Background="White" Padding="5">
+        <Menu Grid.Row="0" Background="White" Padding="3">
             <MenuItem Header="ملف" ToolTip="قائمة الملف">
                 <MenuItem Header="الملف الشخصي" ToolTip="عرض معلومات المستخدم الحالي" Click="ProfileMenuItem_Click"/>
                 <Separator/>
@@ -58,6 +189,11 @@
                 <MenuItem Header="تقرير الأرباح والخسائر" ToolTip="عرض تقارير الأرباح والخسائر" Tag="Reports" Click="ReportMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="المنتجات المنتهية" ToolTip="إدارة وترحيل المنتجات المنتهية الصلاحية" Tag="ExpiredProducts" Click="ReportMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="قائمة الدخل" ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="التدفق النقدي" ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="ضريبة القيمة المضافة" ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="كشف حساب" ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة" Tag="Reports" Click="ReportMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="الإعدادات" ToolTip="قائمة الإعدادات" x:Name="SettingsMenuItem">
                 <MenuItem Header="إدارة المنتجات" ToolTip="إدارة قائمة المنتجات والأسعار" Click="ProductsMenuItem_Click"/>
@@ -66,6 +202,10 @@
                 <Separator/>
                 <MenuItem Header="إدارة المستخدمين" ToolTip="إدارة حسابات المستخدمين والصلاحيات" Click="UsersMenuItem_Click"/>
                 <Separator/>
+                <MenuItem Header="الضرائب" ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة" Click="TaxesMenuItem_Click"/>
+                <MenuItem Header="النسخ الاحتياطي" 
+                          Command="{Binding NavigateToBackupCommand}"
+                          ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
                 <MenuItem Header="فتح نافذة منتجات جديدة" ToolTip="فتح نافذة منتجات مستقلة في نافذة منفصلة" Click="OpenNewProductsWindow_Click"/>
                 <MenuItem Header="فتح نافذة عملاء جديدة" ToolTip="فتح نافذة عملاء مستقلة في نافذة منفصلة" Click="OpenNewCustomersWindow_Click"/>
                 <MenuItem Header="فتح نافذة موردين جديدة" ToolTip="فتح نافذة موردين مستقلة في نافذة منفصلة" Click="OpenNewSuppliersWindow_Click"/>
@@ -75,25 +215,24 @@
         <!-- المحتوى الرئيسي -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- الجانب الأيمن - قائمة التنقل (Sidebar) -->
-            <Border Grid.Column="0" Background="{StaticResource PrimaryBrush}" BorderThickness="0">
+            <Border Grid.Column="0" Background="{StaticResource PrimaryBrush}" Width="200" BorderThickness="0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/> <!-- App Brand/Logo Area -->
                         <RowDefinition Height="*"/>    <!-- Navigation Items -->
-                        <RowDefinition Height="Auto"/> <!-- Footer Area -->
                     </Grid.RowDefinitions>
 
                     <!-- App Branding -->
-                    <Border Grid.Row="0" Padding="16,20">
+                    <Border Grid.Row="0" Padding="12,12">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🚀" FontSize="24" Margin="0,0,12,0"/>
+                            <TextBlock Text="🚀" FontSize="22" Margin="0,0,8,0"/>
                             <TextBlock Text="نظام المبيعات" 
-                                       FontSize="18" 
+                                       FontSize="16" 
                                        FontWeight="Bold" 
                                        Foreground="White"
                                        VerticalAlignment="Center"
@@ -101,139 +240,165 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Navigation Menu -->
+                    <!-- Navigation Menu with Expander Groups -->
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <ListBox x:Name="NavigationList" 
-                                 BorderThickness="0" 
-                                 Background="Transparent"
-                                 Margin="6,0"
-                                 SelectionChanged="NavigationList_SelectionChanged"
-                                 ItemContainerStyle="{StaticResource SidebarListBoxItem}"
-                                 AutomationProperties.AutomationId="MainNavigationList">
-                            <ListBoxItem Tag="Dashboard" AutomationProperties.AutomationId="NavDashboard" ToolTip="عرض ملخص سريع للمبيعات، الأرباح، وأداء المخزون الحالي.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🏠" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="لوحة التحكم" VerticalAlignment="Center"/>
+                        <StackPanel Background="#1E293B">
+
+                            <!-- Sales Expander -->
+                            <Expander Header="المبيعات" Style="{StaticResource SidebarExpanderStyle}"
+                                      AutomationProperties.AutomationId="SidebarExpanderSales">
+                                <StackPanel>
+                                    <Button Content="نقطة البيع" 
+                                            Command="{Binding NavigateToPosCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="شاشة البيع المباشر وإتمام عمليات البيع للعملاء"/>
+                                    <Button Content="فواتير البيع" 
+                                            Command="{Binding NavigateToSalesInvoicesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض وإدارة فواتير البيع بجميع حالاتها"/>
+                                    <Button Content="مرتجعات المبيعات" 
+                                            Command="{Binding NavigateToSalesReturnsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة مرتجعات المبيعات وإعادة الأصناف للمخزون"/>
                                 </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavSalesItem" Tag="Sales" AutomationProperties.AutomationId="NavSales" ToolTip="إدارة فواتير البيع، مرتجعات المبيعات، ومتابعة ديون العملاء.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🛒" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="المبيعات" VerticalAlignment="Center"/>
+                            </Expander>
+
+                            <!-- Purchases Expander -->
+                            <Expander Header="المشتريات" Style="{StaticResource SidebarExpanderStyle}"
+                                      AutomationProperties.AutomationId="SidebarExpanderPurchases">
+                                <StackPanel>
+                                    <Button Content="فواتير الشراء" 
+                                            Command="{Binding NavigateToPurchasesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض وإدارة فواتير الشراء من الموردين"/>
+                                    <Button Content="مرتجعات المشتريات" 
+                                            Command="{Binding NavigateToPurchaseReturnsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة مرتجعات المشتريات وإعادة البضائع للموردين"/>
                                 </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavPurchasesItem" Tag="Purchases" AutomationProperties.AutomationId="NavPurchases" ToolTip="إدارة فواتير المشتريات، الموردين، ومرتجعات الشراء.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="📦" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="المشتريات" VerticalAlignment="Center"/>
+                            </Expander>
+
+                            <!-- Finance Expander -->
+                            <Expander Header="المالية" Style="{StaticResource SidebarExpanderStyle}"
+                                      AutomationProperties.AutomationId="SidebarExpanderFinance">
+                                <StackPanel>
+                                    <Button Content="مدفوعات العملاء" 
+                                            Command="{Binding NavigateToCustomerPaymentsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="تسجيل المبالغ المستلمة من العملاء لتسوية المديونيات"/>
+                                    <Button Content="مدفوعات الموردين" 
+                                            Command="{Binding NavigateToSupplierPaymentsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="تسجيل المبالغ المدفوعة للموردين لتسوية الحسابات"/>
+                                    <Button Content="الخزينة" 
+                                            Command="{Binding NavigateToCashBoxesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة الصناديق النقدية ومتابعة الأرصدة والحركات"/>
                                 </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavProductsItem" Tag="Products" AutomationProperties.AutomationId="NavProducts" ToolTip="إدارة قائمة الأصناف، الأسعار، الباركود، والكميات.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="📋" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="المنتجات" VerticalAlignment="Center"/>
+                            </Expander>
+
+                            <!-- Reports Expander -->
+                            <Expander Header="التقارير" Style="{StaticResource SidebarExpanderStyle}"
+                                      AutomationProperties.AutomationId="SidebarExpanderReports">
+                                <StackPanel>
+                                    <Button Content="التقارير" 
+                                            Command="{Binding NavigateToReportsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="توليد وعرض التقارير المالية والمبيعات والمخزون"/>
+                                    <Button Content="نواقص المخزون" 
+                                            Command="{Binding NavigateToLowStockCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض الأصناف التي وصلت للحد الأدنى للمخزون مع مقترحات الطلب"/>
+                                    <Button Content="المنتجات المنتهية" 
+                                            Command="{Binding NavigateToExpiredProductsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض المنتجات منتهية الصلاحية وإدارة إتلافها"/>
+                                    <Separator Margin="16,4"/>
+                                    <Button Content="قائمة الدخل" 
+                                            Command="{Binding NavigateToIncomeStatementCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح"/>
+                                    <Button Content="التدفق النقدي" 
+                                            Command="{Binding NavigateToCashFlowReportCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة"/>
+                                    <Button Content="ضريبة القيمة المضافة" 
+                                            Command="{Binding NavigateToVatReportCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة"/>
+                                    <Button Content="كشف حساب" 
+                                            Command="{Binding NavigateToAccountStatementCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة"/>
                                 </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavCustomersItem" Tag="Customers" AutomationProperties.AutomationId="NavCustomers" ToolTip="إدارة بيانات العملاء، الحسابات، وتاريخ المعاملات.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="👥" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="العملاء" VerticalAlignment="Center"/>
+                            </Expander>
+
+                            <!-- Settings Expander -->
+                            <Expander Header="الإعدادات" Style="{StaticResource SidebarExpanderStyle}"
+                                      AutomationProperties.AutomationId="SidebarExpanderSettings">
+                                <StackPanel>
+                                    <Button Content="المنتجات" 
+                                            Command="{Binding NavigateToProductsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة قائمة المنتجات والأسعار والباركود"/>
+                                    <Button Content="العملاء" 
+                                            Command="{Binding NavigateToCustomersCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة بيانات العملاء والحسابات وتاريخ المعاملات"/>
+                                    <Button Content="الموردين" 
+                                            Command="{Binding NavigateToSuppliersCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة بيانات الموردين ومتابعة المستحقات المالية"/>
+                                    <Button Content="المستودعات" 
+                                            Command="{Binding NavigateToWarehousesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة الفروع والمستودعات ومواقع تخزين المنتجات"/>
+                                    <Button Content="التصنيفات" 
+                                            Command="{Binding NavigateToCategoriesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة التصنيفات الرئيسية والفرعية للأصناف والمنتجات"/>
+                                    <Button Content="الوحدات" 
+                                            Command="{Binding NavigateToUnitsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة وحدات القياس المستخدمة في المخزون والفواتير"/>
+                                    <Button Content="المستخدمين" 
+                                            Command="{Binding NavigateToUsersCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة حسابات الموظفين والصلاحيات وبيانات الدخول"/>
+                                    <Button Content="الإعدادات" 
+                                            Command="{Binding NavigateToSettingsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إعدادات النظام والعملات والضرائب وتهيئة الطابعات"/>
+                                    <Button Content="إعدادات النظام" 
+                                            Command="{Binding NavigateToSystemSettingsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة جميع إعدادات النظام المخزنة — المخزون والمبيعات والمشتريات والباركود"/>
+                                    <Button Content="النسخ الاحتياطي" 
+                                            Command="{Binding NavigateToBackupCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة النسخ الاحتياطي — إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
+                                    <Button Content="الضرائب" 
+                                            Command="{Binding NavigateToTaxesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة"/>
+                                    <Button Content="نقل المخزون" 
+                                            Command="{Binding NavigateToStockTransfersCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة عمليات نقل البضائع بين المستودعات"/>
+                                    <Button Content="المخزون" 
+                                            Command="{Binding NavigateToInventoryCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض حركة المخزون وإدارة الأصناف في المستودعات"/>
                                 </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavSuppliersItem" Tag="Suppliers" AutomationProperties.AutomationId="NavSuppliers" ToolTip="إدارة بيانات الموردين ومتابعة المستحقات المالية.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🚚" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="الموردين" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavWarehousesItem" Tag="Warehouses" AutomationProperties.AutomationId="NavWarehouses" ToolTip="إدارة الفروع والمستودعات ومواقع تخزين المنتجات.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🏭" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="المستودعات" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavLowStockItem" Tag="LowStock" AutomationProperties.AutomationId="NavLowStock" ToolTip="عرض الأصناف التي وصلت للحد الأدنى للمخزون مع مقترحات الطلب.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="📉" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="نواقص المخزون" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavCustomerPaymentsItem" Tag="CustomerPayments" AutomationProperties.AutomationId="NavCustomerPayments" ToolTip="تسجيل المبالغ المستلمة من العملاء لتسوية المديونيات.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="💰" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="سداد العملاء" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavSupplierPaymentsItem" Tag="SupplierPayments" AutomationProperties.AutomationId="NavSupplierPayments" ToolTip="تسجيل المبالغ المدفوعة للموردين لتسوية الحسابات.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="💵" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="سداد الموردين" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavStockTransfersItem" Tag="StockTransfers" AutomationProperties.AutomationId="NavTransfers" ToolTip="عمليات نقل البضائع بين المستودعات المختلفة.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="🔄" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="نقل المخزون" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavReportsItem" Tag="Reports" AutomationProperties.AutomationId="NavReports" ToolTip="توليد التقارير المالية، تقارير المبيعات، وحركة الأصناف.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="📊" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="التقارير" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavExpiredProductsItem" Tag="ExpiredProducts" AutomationProperties.AutomationId="NavExpiredProducts" ToolTip="عرض المنتجات المنتهية الصلاحية وترحيلها كإتلاف.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="⚠️" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="المنتجات المنتهية" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavSalesReturnsItem" Tag="SalesReturns" AutomationProperties.AutomationId="NavSalesReturns" ToolTip="إدارة بضائع المبيعات المرتجعة وإعادة المبالغ للعملاء.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="⏪" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="مرتجعات المبيعات" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavPurchaseReturnsItem" Tag="PurchaseReturns" AutomationProperties.AutomationId="NavPurchaseReturns" ToolTip="إدارة بضائع المشتريات المرتجعة واسترداد المبالغ من الموردين.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="⏩" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="مرتجعات المشتريات" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavCategoriesItem" Tag="Categories" AutomationProperties.AutomationId="NavCategories" ToolTip="إدارة التصنيفات الرئيسية والفرعية للأصناف والمنتجات.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="📁" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="التصنيفات" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavUnitsItem" Tag="Units" AutomationProperties.AutomationId="NavUnits" ToolTip="إدارة وحدات القياس المستخدمة في المخزون والفواتير.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="⚖️" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="الوحدات" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavUsersItem" Tag="Users" AutomationProperties.AutomationId="NavUsers" ToolTip="إدارة حسابات الموظفين، الصلاحيات، وبيانات الدخول.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="👤" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="المستخدمين" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                            <ListBoxItem x:Name="NavSettingsItem" Tag="Settings" AutomationProperties.AutomationId="NavSettings" ToolTip="إعدادات النظام، العملات، الضرائب، وتهيئة الطابعات.">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="⚙️" FontSize="18" Margin="0,0,12,0"/>
-                                    <TextBlock Text="الإعدادات" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </ListBoxItem>
-                        </ListBox>
+                            </Expander>
+
+                        </StackPanel>
                     </ScrollViewer>
                 </Grid>
             </Border>
 
-            <!-- المنطقة الرئيسية - إطار المحتوى -->
-            <Frame x:Name="ContentFrame" 
-                   Grid.Column="1" 
-                   NavigationUIVisibility="Hidden"
-                   Background="{StaticResource BackgroundBrush}"/>
+            <!-- المنطقة الرئيسية - عرض المحتوى -->
+            <ContentControl Content="{Binding CurrentViewModel}" Grid.Column="1" Margin="8" />
         </Grid>
 
         <!-- شريط الحالة Status Bar -->

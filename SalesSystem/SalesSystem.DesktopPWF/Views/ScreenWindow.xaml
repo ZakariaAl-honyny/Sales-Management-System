@@ -4,8 +4,8 @@
         FlowDirection="RightToLeft"
         WindowStartupLocation="Manual"
         ShowInTaskbar="True"
-        MinWidth="600" MinHeight="400"
-        Width="900" Height="650"
+        MinWidth="500" MinHeight="350"
+        Width="850" Height="600"
         Background="{StaticResource BackgroundBrush}">
     <ContentControl x:Name="ScreenContent" />
 </Window>

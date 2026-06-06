@@ -6,20 +6,13 @@
              mc:Ignorable="d"
              FlowDirection="RightToLeft"
              d:DesignHeight="500" d:DesignWidth="700">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+        <StackPanel>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="النسخ الاحتياطي واستعادة البيانات"
-                       FontSize="20"
+        <StackPanel Margin="0,0,0,10">
+            <TextBlock Text="💾  النسخ الاحتياطي واستعادة البيانات"
+                       FontSize="16"
                        FontWeight="Bold"
                        Foreground="#333"/>
             <TextBlock Text="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"
@@ -28,108 +21,149 @@
                        Margin="0,4,0,0"/>
         </StackPanel>
 
-        <!-- Create Backup Button -->
-        <StackPanel Grid.Row="1" Margin="0,0,0,8">
-            <Button Content="إنشاء نسخة احتياطية الآن"
-                    Command="{Binding CreateBackupCommand}"
-                    ToolTip="إنشاء نسخة احتياطية جديدة من قاعدة البيانات"
-                    Padding="20,10"
-                    Background="#1976D2"
-                    Foreground="White"
-                    FontWeight="SemiBold"
-                    HorizontalAlignment="Right"
-                    Width="220"/>
-        </StackPanel>
+        <!-- Backup Configuration Card -->
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock Text="⚙️  إعدادات النسخ الاحتياطي"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,12"/>
 
-        <!-- Backup Path Info -->
-        <Border Grid.Row="2"
-                Background="#F5F5F5"
-                BorderBrush="#E0E0E0"
-                BorderThickness="1"
-                CornerRadius="4"
-                Padding="12"
-                Margin="0,0,0,12">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="مسار النسخ: " FontWeight="SemiBold" Foreground="#555"/>
-                <TextBlock Text="{Binding BackupPath}" Foreground="#777"/>
+                <!-- Backup Path -->
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="مسار النسخ الاحتياطي *" Style="{StaticResource LabelStyle}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding BackupPathFromSettings}"
+                                 ToolTip="المسار الذي سيتم حفظ النسخ الاحتياطية فيه — يجب أن يكون مجلداً موجوداً أو سيتم إنشاؤه تلقائياً"/>
+                        <Button Grid.Column="1"
+                                Content="تصفح..."
+                                Command="{Binding BrowseBackupPathCommand}"
+                                Margin="6,0,0,0"
+                                ToolTip="اختيار مجلد لحفظ النسخ الاحتياطية"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Schedule Time -->
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="وقت الجدولة" Style="{StaticResource LabelStyle}"/>
+                    <TextBox Text="{Binding BackupScheduleTime}"
+                             ToolTip="الوقت المحدد لإنشاء النسخ الاحتياطية التلقائية — الصيغة: HH:mm (مثال: 02:00)"/>
+                </StackPanel>
+
+                <!-- Retention Days -->
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="عدد أيام الاحتفاظ" Style="{StaticResource LabelStyle}"/>
+                    <TextBox Text="{Binding BackupRetentionDays}"
+                             ToolTip="عدد الأيام التي سيتم الاحتفاظ فيها بالنسخ الاحتياطية قبل حذفها تلقائياً (الافتراضي: 30 يوماً)"/>
+                </StackPanel>
+
+                <!-- Update Server URL -->
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="رابط خادم التحديثات" Style="{StaticResource LabelStyle}"/>
+                    <TextBox Text="{Binding UpdateServerUrl}"
+                             ToolTip="رابط الخادم الذي سيتم التحقق من خلاله من وجود تحديثات جديدة للنظام"/>
+                </StackPanel>
+
+                <!-- Save Backup Settings -->
+                <Button Content="💾 حفظ إعدادات النسخ"
+                        Command="{Binding SaveBackupSettingsCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        HorizontalAlignment="Right"
+                        Margin="0,8,0,0"
+                        ToolTip="حفظ إعدادات النسخ الاحتياطي — مسار النسخ ووقت الجدولة وعدد أيام الاحتفاظ"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Create Backup Button -->
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock Text="🔄  إنشاء واستعادة"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,12"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <Button Content="إنشاء نسخة احتياطية الآن"
+                            Command="{Binding CreateBackupCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            ToolTip="إنشاء نسخة احتياطية جديدة من قاعدة البيانات — قد يستغرق ذلك بضع دقائق حسب حجم البيانات"/>
+                    <Button Content="استعادة من النسخة المحددة"
+                            Command="{Binding RestoreBackupCommand}"
+                            Style="{StaticResource DangerButton}"
+                            Margin="8,0,0,0"
+                            ToolTip="استعادة قاعدة البيانات من النسخة المحددة — سيتم إغلاق النظام بعد الاستعادة"/>
+                </StackPanel>
             </StackPanel>
         </Border>
 
         <!-- Backups List -->
-        <Grid Grid.Row="3">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="300"/>
+                </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0"
-                       Text="النسخ المتاحة:"
-                       FontSize="14"
-                       FontWeight="SemiBold"
-                       Margin="0,0,0,8"/>
+                <TextBlock Grid.Row="0"
+                           Text="النسخ المتاحة:"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,8"/>
 
-            <DataGrid Grid.Row="1"
-                      ItemsSource="{Binding BackupFiles}"
-                      SelectedItem="{Binding SelectedBackupFile}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      AlternatingRowBackground="#F9F9F9"
-                      RowHeaderWidth="0"
-                      GridLinesVisibility="Horizontal"
-                      BorderBrush="#E0E0E0"
-                      BorderThickness="1">
-                <DataGrid.Resources>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="FontWeight" Value="SemiBold"/>
-                        <Setter Property="Background" Value="#F0F0F0"/>
-                        <Setter Property="Padding" Value="8,6"/>
-                    </Style>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="Padding" Value="8,4"/>
-                        <Setter Property="VerticalAlignment" Value="Center"/>
-                    </Style>
-                </DataGrid.Resources>
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="اسم الملف"
-                                        Binding="{Binding FileName}"
-                                        Width="*"
-                                        MinWidth="200"/>
-                    <DataGridTextColumn Header="الحجم"
-                                        Binding="{Binding DisplaySize}"
-                                        Width="100"/>
-                    <DataGridTextColumn Header="التاريخ"
-                                        Binding="{Binding CreatedAt}"
-                                        Width="160"/>
-                </DataGrid.Columns>
-            </DataGrid>
-        </Grid>
-
-        <!-- Restore Button -->
-        <StackPanel Grid.Row="4" Margin="0,12,0,0">
-            <Button Content="استعادة من النسخة المحددة"
-                    Command="{Binding RestoreBackupCommand}"
-                    ToolTip="استعادة قاعدة البيانات من النسخة المحددة — سيتم إغلاق النظام"
-                    Padding="20,10"
-                    Background="#E65100"
-                    Foreground="White"
-                    FontWeight="SemiBold"
-                    HorizontalAlignment="Right"
-                    Width="240"/>
-        </StackPanel>
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding BackupFiles}"
+                          SelectedItem="{Binding SelectedBackupFile}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          AlternatingRowBackground="#F9F9F9"
+                          RowHeaderWidth="0"
+                          GridLinesVisibility="Horizontal"
+                          BorderBrush="#E0E0E0"
+                          BorderThickness="1">
+                    <DataGrid.Resources>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="Background" Value="#F0F0F0"/>
+                            <Setter Property="Padding" Value="8,6"/>
+                        </Style>
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="Padding" Value="8,4"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGrid.Resources>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="اسم الملف"
+                                            Binding="{Binding FileName}"
+                                            Width="*"
+                                            MinWidth="200"/>
+                        <DataGridTextColumn Header="الحجم"
+                                            Binding="{Binding DisplaySize}"
+                                            Width="100"/>
+                        <DataGridTextColumn Header="التاريخ"
+                                            Binding="{Binding CreatedAt}"
+                                            Width="160"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
 
         <!-- Status Bar -->
-        <Border Grid.Row="5"
-                Background="#FFF8E1"
+        <Border Background="#FFF8E1"
                 BorderBrush="#FFC107"
                 BorderThickness="1"
                 CornerRadius="4"
                 Padding="10,6"
-                Margin="0,12,0,0"
+                Margin="0,8,0,0"
                 Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibility}}">
             <TextBlock Text="{Binding StatusMessage}"
                        Foreground="#F57F17"
                        TextWrapping="Wrap"
                        FontSize="12"/>
-        </Border>
-    </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

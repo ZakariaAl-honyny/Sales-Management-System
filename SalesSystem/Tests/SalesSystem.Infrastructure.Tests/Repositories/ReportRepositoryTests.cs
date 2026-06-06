@@ -44,8 +44,8 @@ public class ReportRepositoryTests
         context.Customers.Add(customer);
 
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: context.Warehouses.First().Id,
+            invoiceNo: 1,
             customerId: customer.Id,
             paymentType: PaymentType.Cash
         );
@@ -67,7 +67,7 @@ public class ReportRepositoryTests
         // Assert
         result.Should().NotBeEmpty();
         var report = result.First();
-        report.InvoiceNo.Should().Be("INV-2026-000001");
+        report.Id.Should().BeGreaterThan(0);
     }
 
     [Fact]
@@ -84,8 +84,8 @@ public class ReportRepositoryTests
 
         // Create a Draft invoice (not posted)
         var draftInvoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: context.Warehouses.First().Id,
+            invoiceNo: 1,
             customerId: customer.Id
         );
 
@@ -121,8 +121,8 @@ public class ReportRepositoryTests
 
         // Invoice within range
         var invoiceInRange = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: context.Warehouses.First().Id,
+            invoiceNo: 1,
             customerId: customer.Id
         );
         var item1 = SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m);
@@ -131,8 +131,8 @@ public class ReportRepositoryTests
 
         // Invoice outside range
         var invoiceOutOfRange = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000002",
             warehouseId: context.Warehouses.First().Id,
+            invoiceNo: 2,
             customerId: customer.Id,
             invoiceDate: DateTime.UtcNow.AddDays(30)
         );

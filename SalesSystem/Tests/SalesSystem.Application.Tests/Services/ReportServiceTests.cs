@@ -48,8 +48,8 @@ public class ReportServiceTests
         var to = DateTime.Now;
         var reportItems = new List<SalesSystem.Contracts.DTOs.SalesReportDto>
         {
-            new(DateTime.Now.AddDays(-1), "INV-001", "Customer 1", 1000m, 0m, 0m, 1000m, 500m, 500m),
-            new(DateTime.Now, "INV-002", "Customer 2", 1200m, 0m, 0m, 1200m, 600m, 600m)
+            new(DateTime.Now.AddDays(-1), 1, "Customer 1", 1000m, 0m, 0m, 1000m, 500m, 500m),
+            new(DateTime.Now, 2, "Customer 2", 1200m, 0m, 0m, 1200m, 600m, 600m)
         };
 
         _mockReportRepository.Setup(r => r.GetSalesReportAsync(null, from, to, It.IsAny<CancellationToken>()))
@@ -92,8 +92,8 @@ public class ReportServiceTests
         var to = DateTime.Now;
         var reportItems = new List<SalesSystem.Contracts.DTOs.PurchaseReportDto>
         {
-            new(DateTime.Now.AddDays(-1), "PUR-001", "Supplier 1", 1000m, 0m, 0m, 1000m, 1000m, 0m),
-            new(DateTime.Now, "PUR-002", "Supplier 2", 1200m, 0m, 0m, 1200m, 1200m, 0m)
+            new(DateTime.Now.AddDays(-1), 1, "Supplier 1", 1000m, 0m, 0m, 1000m, 1000m, 0m),
+            new(DateTime.Now, 2, "Supplier 2", 1200m, 0m, 0m, 1200m, 1200m, 0m)
         };
 
         _mockReportRepository.Setup(r => r.GetPurchasesReportAsync(null, from, to, It.IsAny<CancellationToken>()))

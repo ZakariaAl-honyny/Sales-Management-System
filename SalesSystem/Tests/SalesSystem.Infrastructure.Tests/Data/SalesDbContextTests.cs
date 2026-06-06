@@ -209,8 +209,8 @@ public class SalesDbContextTests
         await context.SaveChangesAsync();
 
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
-            warehouseId: warehouse.Id,
+            warehouse.Id,
+            1,
             customerId: customer.Id
         );
 
@@ -245,7 +245,7 @@ public class SalesDbContextTests
         context.Warehouses.Add(warehouse);
         await context.SaveChangesAsync();
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: warehouse.Id);
+        var invoice = SalesInvoice.Create(warehouse.Id, 1);
         // Quantity uses precision (18,3) - should store up to 3 decimal places
         var item = SalesInvoiceItem.Create(productId: 1, quantity: 100.123m, unitPrice: 50.789m);
         invoice.AddItem(item);
@@ -296,7 +296,7 @@ public class SalesDbContextTests
         context.Warehouses.Add(warehouse);
         await context.SaveChangesAsync();
 
-        var invoice = SalesInvoice.Create("INV-2026-000002", warehouseId: warehouse.Id);
+        var invoice = SalesInvoice.Create(warehouse.Id, 1);
         var item1 = SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m);
         var item2 = SalesInvoiceItem.Create(productId: 2, quantity: 3m, unitPrice: 200m);
         invoice.AddItem(item1);

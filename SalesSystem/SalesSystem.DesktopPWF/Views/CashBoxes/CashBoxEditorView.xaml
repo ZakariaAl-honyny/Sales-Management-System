@@ -1,35 +1,36 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.CashBoxes.CashBoxEditorView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.CashBoxes.CashBoxEditorView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       mc:Ignorable="d"
-      Title="صندوق"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
     <Grid Style="{StaticResource PageRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="19*"/>
+            <RowDefinition Height="102*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0"
-                   Text="إضافة صندوق جديد"
+                   Text="💰  إضافة صندوق جديد"
                    Style="{StaticResource HeaderStyle}"
-                   Visibility="{Binding IsEditMode, Converter={StaticResource InverseBoolToVisibility}}"/>
+                   Visibility="{Binding IsEditMode, Converter={StaticResource InverseBoolToVisibility}}" Margin="0,0,0,12"/>
         <TextBlock Grid.Row="0"
-                   Text="تعديل صندوق"
+                   Text="💰  تعديل صندوق"
                    Style="{StaticResource HeaderStyle}"
-                   Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"/>
+                   Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,12"/>
 
-        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="16">
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="16,16,16,16" Grid.RowSpan="2">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="20">
 
                     <!-- Box Name -->
-                    <StackPanel Margin="0,0,0,16">
+                    <StackPanel Margin="0,0,0,8">
                         <TextBlock Text="اسم الصندوق *" Style="{StaticResource LabelStyle}"/>
                         <TextBox Text="{Binding BoxName, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ModernTextBox}"
@@ -37,7 +38,7 @@
                     </StackPanel>
 
                     <!-- Opening Balance -->
-                    <StackPanel Margin="0,0,0,16">
+                    <StackPanel Margin="0,0,0,8">
                         <TextBlock Text="الرصيد الافتتاحي *" Style="{StaticResource LabelStyle}"/>
                         <TextBox Text="{Binding OpeningBalance, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
                                  Style="{StaticResource ModernTextBox}"
@@ -49,14 +50,14 @@
         </Border>
 
         <!-- Error Message -->
-        <Border Grid.Row="1"
+        <Border Grid.Row="2"
                 Background="{StaticResource ErrorLightBrush}"
                 BorderBrush="{StaticResource ErrorBrush}"
                 BorderThickness="1"
                 Padding="12,8"
-                Margin="16"
+                Margin="16,149,16,0"
                 CornerRadius="6"
-                VerticalAlignment="Bottom"
+                VerticalAlignment="Top"
                 Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
@@ -70,11 +71,10 @@
         </Border>
 
         <!-- Footer Buttons -->
-        <Border Grid.Row="2" Background="White" Padding="16,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="2" Background="White" Padding="16,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}" Margin="0,204,0,0" Grid.RowSpan="2">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                 <Button Command="{Binding SaveCommand}"
                         Style="{StaticResource PrimaryButton}"
-                        Height="36" Padding="24,0"
                         ToolTip="حفظ بيانات الصندوق النقدي">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="💾" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -84,7 +84,7 @@
 
                 <Button Command="{Binding CancelCommand}"
                         Style="{StaticResource SecondaryButton}"
-                        Margin="8,0,0,0" Height="36" Padding="24,0"
+                        Margin="4,0,0,0"
                         ToolTip="إلغاء الأمر والعودة للقائمة">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="❌" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -95,7 +95,7 @@
         </Border>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="3"
+        <Border Grid.Row="0" Grid.RowSpan="4"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
@@ -105,4 +105,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>

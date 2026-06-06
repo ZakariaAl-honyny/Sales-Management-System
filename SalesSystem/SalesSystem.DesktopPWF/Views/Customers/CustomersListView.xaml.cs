@@ -9,7 +9,7 @@ namespace SalesSystem.DesktopPWF.Views.Customers;
 /// <summary>
 /// Interaction logic for CustomersListView.xaml
 /// </summary>
-public partial class CustomersListView : System.Windows.Controls.Page
+public partial class CustomersListView : System.Windows.Controls.UserControl
 {
     private readonly CustomerListViewModel _viewModel;
 

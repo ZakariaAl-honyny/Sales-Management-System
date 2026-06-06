@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
@@ -11,9 +11,8 @@ public class SalesInvoiceTests
     public void Create_GivenValidData_ShouldCreateInvoice()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            customerId: 1,
+            invoiceNo: 1, customerId: 1,
             invoiceDate: new DateTime(2027, 1, 1),
             dueDate: new DateOnly(2027, 1, 31),
             paymentType: PaymentType.Cash,
@@ -22,7 +21,7 @@ public class SalesInvoiceTests
             createdByUserId: 1
         );
 
-        invoice.InvoiceNo.Should().Be("INV-2026-000001");
+        invoice.Id.Should().BeGreaterThan(0);
         invoice.WarehouseId.Should().Be(1);
         invoice.CustomerId.Should().Be(1);
         invoice.InvoiceDate.Should().Be(new DateTime(2027, 1, 1));
@@ -37,9 +36,8 @@ public class SalesInvoiceTests
     public void AddItem_GivenValidItem_ShouldAddItemAndRecalculateSubTotal()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item1 = SalesInvoiceItem.Create(
@@ -67,9 +65,8 @@ public class SalesInvoiceTests
     public void AddItem_MultipleItems_ShouldSumLineTotalsCorrectly()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -90,9 +87,8 @@ public class SalesInvoiceTests
     public void SetPaidAmount_GivenNegativeAmount_ShouldThrowArgumentException(decimal invalidAmount)
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -112,9 +108,8 @@ public class SalesInvoiceTests
     public void SetPaidAmount_GivenAmountExceedingTotalAmount_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -128,16 +123,15 @@ public class SalesInvoiceTests
         var action = () => invoice.SetPaidAmount(150m);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("المبلغ المدفوع أكبر من الإجمالي.");
+            .WithMessage("ط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ظ…ط¯ظپظˆط¹ ط£ظƒط¨ط± ظ…ظ† ط§ظ„ط¥ط¬ظ…ط§ظ„ظٹ.");
     }
 
     [Fact]
     public void SetPaidAmount_GivenValidAmount_ShouldSetPaidAmount()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -159,24 +153,22 @@ public class SalesInvoiceTests
     public void SetTaxAmount_GivenNegativeTaxAmount_ShouldThrowArgumentException(decimal negativeTax)
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var action = () => invoice.SetTaxAmount(negativeTax);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("الضريبة لا يمكن أن تكون سالبة.");
+            .WithMessage("ط§ظ„ط¶ط±ظٹط¨ط© ظ„ط§ ظٹظ…ظƒظ† ط£ظ† طھظƒظˆظ† ط³ط§ظ„ط¨ط©.");
     }
 
     [Fact]
     public void SetTaxAmount_GivenValidTaxAmount_ShouldSetTaxAmount()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -196,9 +188,8 @@ public class SalesInvoiceTests
     public void Post_GivenDraftInvoice_ShouldTransitionToPosted()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -217,15 +208,14 @@ public class SalesInvoiceTests
     public void Post_GivenInvoiceWithNoItems_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var action = () => invoice.Post();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("لا يمكن ترحيل فاتورة بدون أصناف.");
+            .WithMessage("ظ„ط§ ظٹظ…ظƒظ† طھط±ط­ظٹظ„ ظپط§طھظˆط±ط© ط¨ط¯ظˆظ† ط£طµظ†ط§ظپ.");
     }
 
     [Fact]
@@ -233,9 +223,8 @@ public class SalesInvoiceTests
     {
         // Arrange
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -249,16 +238,15 @@ public class SalesInvoiceTests
         // Act & Assert
         var action = () => invoice.Post();
         action.Should().Throw<DomainException>()
-            .WithMessage("فقط الفواتير المسودة يمكن ترحيلها.");
+            .WithMessage("ظپظ‚ط· ط§ظ„ظپظˆط§طھظٹط± ط§ظ„ظ…ط³ظˆط¯ط© ظٹظ…ظƒظ† طھط±ط­ظٹظ„ظ‡ط§.");
     }
 
     [Fact]
     public void Cancel_GivenPostedInvoice_ShouldTransitionToCancelled()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -279,9 +267,8 @@ public class SalesInvoiceTests
     {
         // Draft invoices can be cancelled (no stock/balance to reverse)
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -302,9 +289,8 @@ public class SalesInvoiceTests
     {
         // Posted invoices with PaidAmount > 0 cannot be cancelled directly
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -325,9 +311,8 @@ public class SalesInvoiceTests
     public void Cancel_GivenAlreadyCancelledInvoice_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -342,16 +327,15 @@ public class SalesInvoiceTests
         var action = () => invoice.Cancel();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("الفاتورة ملغاة بالفعل.");
+            .WithMessage("ط§ظ„ظپط§طھظˆط±ط© ظ…ظ„ط؛ط§ط© ط¨ط§ظ„ظپط¹ظ„.");
     }
 
     [Fact]
     public void Cancel_GivenPaidInvoice_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -366,16 +350,15 @@ public class SalesInvoiceTests
         var action = () => invoice.Cancel();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("لا يمكن إلغاء فاتورة مدفوعة مباشرة.");
+            .WithMessage("ظ„ط§ ظٹظ…ظƒظ† ط¥ظ„ط؛ط§ط، ظپط§طھظˆط±ط© ظ…ط¯ظپظˆط¹ط© ظ…ط¨ط§ط´ط±ط©.");
     }
 
     [Fact]
     public void RecalculateTotals_GivenItemsAndDiscountAndTax_ShouldCalculateCorrectly()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            discountAmount: 50m,
+            invoiceNo: 1, discountAmount: 50m,
             createdByUserId: 1
         );
 
@@ -399,9 +382,8 @@ public class SalesInvoiceTests
     public void RecalculateTotals_TotalAmountFormula_ShouldBeSubTotalMinusDiscountPlusTax()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            discountAmount: 100m,
+            invoiceNo: 1, discountAmount: 100m,
             createdByUserId: 1
         );
 
@@ -422,9 +404,8 @@ public class SalesInvoiceTests
     public void SetPaidAmount_ShouldRecalculateDueAmount()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -443,51 +424,36 @@ public class SalesInvoiceTests
     }
 
     [Fact]
-    public void Create_GivenInvoiceNoIsEmpty_ShouldThrowArgumentException()
-    {
-        var action = () => SalesInvoice.Create(
-            invoiceNo: "",
-            warehouseId: 1,
-            createdByUserId: 1
-        );
-
-        action.Should().Throw<DomainException>()
-            .WithMessage("رقم الفاتورة مطلوب.");
-    }
-
-    [Fact]
     public void Create_GivenWarehouseIdIsZero_ShouldThrowArgumentException()
     {
         var action = () => SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 0,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("المستودع مطلوب.");
+            .WithMessage("ط§ظ„ظ…ط³طھظˆط¯ط¹ ظ…ط·ظ„ظˆط¨.");
     }
 
     [Fact]
     public void Create_GivenWarehouseIdIsNegative_ShouldThrowArgumentException()
     {
         var action = () => SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: -1,
+            invoiceNo: 1,
             createdByUserId: 1
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("المستودع مطلوب.");
+            .WithMessage("ط§ظ„ظ…ط³طھظˆط¯ط¹ ظ…ط·ظ„ظˆط¨.");
     }
 
     [Fact]
     public void AddItem_GivenNonDraftInvoice_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -501,16 +467,15 @@ public class SalesInvoiceTests
         var action = () => invoice.AddItem(item);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("لا يمكن إضافة أصناف لفاتورة غير مسودة.");
+            .WithMessage("ظ„ط§ ظٹظ…ظƒظ† ط¥ط¶ط§ظپط© ط£طµظ†ط§ظپ ظ„ظپط§طھظˆط±ط© ط؛ظٹط± ظ…ط³ظˆط¯ط©.");
     }
 
     [Fact]
     public void RemoveItem_GivenNonDraftInvoice_ShouldThrowDomainException()
     {
         var invoice = SalesInvoice.Create(
-            invoiceNo: "INV-2026-000001",
             warehouseId: 1,
-            createdByUserId: 1
+            invoiceNo: 1, createdByUserId: 1
         );
 
         var item = SalesInvoiceItem.Create(
@@ -524,6 +489,6 @@ public class SalesInvoiceTests
         var action = () => invoice.RemoveItem(item);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("لا يمكن حذف أصناف من فاتورة غير مسودة.");
+            .WithMessage("ظ„ط§ ظٹظ…ظƒظ† ط­ط°ظپ ط£طµظ†ط§ظپ ظ…ظ† ظپط§طھظˆط±ط© ط؛ظٹط± ظ…ط³ظˆط¯ط©.");
     }
 }

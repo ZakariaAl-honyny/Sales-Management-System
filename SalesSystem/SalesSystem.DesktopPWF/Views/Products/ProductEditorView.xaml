@@ -24,6 +24,7 @@
         <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="16,12">
             <StackPanel Orientation="Horizontal">
                 <Path Data="{StaticResource IconProduct}" Fill="White" Width="24" Height="24" Margin="0,0,16,0" Stretch="Uniform"/>
+                <TextBlock Text="📦 " FontSize="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding Title}" Style="{StaticResource HeaderStyle}" Foreground="White" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
@@ -34,7 +35,7 @@
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>
                         <!-- Basic Info Section -->
-                        <TextBlock Text="المعلومات الأساسية" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="المعلومات الأساسية" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                         
 
                         <TextBlock Text="اسم المنتج *" Style="{StaticResource LabelStyle}"/>
@@ -71,7 +72,7 @@
                         <Border Height="24"/>
 
                         <!-- Dual Units Section -->
-                        <TextBlock Text="إعدادات الوحدات (نظام ثنائي الوحدات)" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="إعدادات الوحدات (نظام ثنائي الوحدات)" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -113,7 +114,7 @@
                         <Border Height="24"/>
 
                         <!-- Pricing Section -->
-                        <TextBlock Text="الأسعار والتكلفة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="الأسعار والتكلفة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                         
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -183,7 +184,7 @@
                             <Border Height="16"/>
                             
                             <!-- Expiration Date Section -->
-                            <TextBlock Text="تاريخ انتهاء الصلاحية" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
+                            <TextBlock Text="تاريخ انتهاء الصلاحية" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                             
                             <StackPanel Orientation="Horizontal">
                                 <CheckBox Content="له تاريخ انتهاء" 
@@ -206,7 +207,7 @@
                             <Border Height="24"/>
                             
                             <!-- Image Upload Section -->
-                            <TextBlock Text="صورة المنتج" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
+                            <TextBlock Text="صورة المنتج" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                             
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                 <Button Command="{Binding UploadImageCommand}" 
@@ -236,7 +237,7 @@
                                     BorderBrush="{StaticResource BorderBrush}"
                                     BorderThickness="1"
                                     Visibility="{Binding ImagePath, Converter={StaticResource StringToVisibility}}">
-                                <Image Source="{Binding ImagePath, IsAsync=True}" 
+                                <Image Source="{Binding ImagePath, Converter={StaticResource ImagePathConverter}, IsAsync=True}" 
                                        Width="100" Height="100"
                                        Stretch="Uniform"
                                        VerticalAlignment="Center" 

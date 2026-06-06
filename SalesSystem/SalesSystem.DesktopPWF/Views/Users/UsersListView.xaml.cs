@@ -4,7 +4,7 @@ using SalesSystem.DesktopPWF.ViewModels.Users;
 
 namespace SalesSystem.DesktopPWF.Views.Users;
 
-public partial class UsersListView : Page
+public partial class UsersListView : UserControl
 {
     private UserListViewModel? ViewModel => DataContext as UserListViewModel;
 

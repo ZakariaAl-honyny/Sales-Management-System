@@ -113,7 +113,7 @@ public class DailyClosureViewModel : ViewModelBase
         set => SetProperty(ref _selectedClosure, value);
     }
 
-    public ObservableCollection<DailyClosureDto> DailyClosures { get; } = new();
+    public ObservableCollection<DailyClosureDto> PastClosures { get; } = new();
 
     #endregion
 
@@ -156,14 +156,14 @@ public class DailyClosureViewModel : ViewModelBase
 
         InvokeOnUIThread(() =>
         {
-            DailyClosures.Clear();
+            PastClosures.Clear();
             var sorted = closuresResult.Value.OrderByDescending(c => c.ClosureDate);
             foreach (var closure in sorted)
             {
-                DailyClosures.Add(closure);
+                PastClosures.Add(closure);
             }
 
-            IsEmpty = DailyClosures.Count == 0;
+            IsEmpty = PastClosures.Count == 0;
             IsClosedToday = closuresResult.Value.Any(c => c.ClosureDate == today);
 
             var lastClosure = closuresResult.Value

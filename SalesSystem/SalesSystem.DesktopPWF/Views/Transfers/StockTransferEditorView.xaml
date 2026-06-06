@@ -23,10 +23,10 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="16,8">
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="🔄" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                <TextBlock Text="تحرير تحويل مخزني" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                <TextBlock Text="🔄" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <TextBlock Text="تحرير تحويل مخزني" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
 
@@ -34,7 +34,7 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16,12">
             <StackPanel>
                 <!-- Metadata Card -->
-                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16" Padding="16">
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8" Padding="16">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -80,7 +80,7 @@
                                 <TextBlock Text="أصناف التحويل" FontSize="15" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                                 
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                    <Border Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Width="250" Height="30" Margin="0,0,12,0">
+                                    <Border Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Width="250" Margin="0,0,8,0">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -98,7 +98,7 @@
                                     </Border>
 
                                     <Button Style="{StaticResource SuccessButton}" 
-                                            Padding="16,4" Height="30"
+                                            Padding="10,4"
                                             Command="{Binding SearchProductCommand}"
                                             Visibility="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBoolToVisibility}}"
                                             ToolTip="إضافة سطر جديد للفاتورة">
@@ -200,7 +200,7 @@
                     </Grid>
                 </Border>
 
-                <Border Background="#F1F5F9" Padding="16" Margin="0,16,0,0" CornerRadius="4">
+                <Border Background="#F1F5F9" Padding="16" Margin="0,8,0,0" CornerRadius="4">
                     <StackPanel>
                         <TextBlock Text="ملاحظات التحويل" Style="{StaticResource LabelStyle}"/>
                         <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
@@ -216,7 +216,7 @@
         </ScrollViewer>
 
         <!-- Footer Actions -->
-        <Border Grid.Row="2" Background="White" Padding="20,12" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="2" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

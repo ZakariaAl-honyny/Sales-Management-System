@@ -1,4 +1,3 @@
-using System.Configuration;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
@@ -25,6 +24,7 @@ using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
 using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
+using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
@@ -191,6 +191,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ILogsApiService, LogsApiService>();
         services.AddSingleton<IProductUnitApiService, ProductUnitApiService>();
         services.AddSingleton<ICashBoxApiService, CashBoxApiService>();
+        services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
+        services.AddSingleton<ITaxesApiService, TaxesApiService>();
 
         // Printing
         services.AddSingleton<Services.App.IInvoicePrinter, Services.Printing.InvoicePrinter>();
@@ -202,11 +204,16 @@ public partial class App : System.Windows.Application
         // Health check
         services.AddSingleton<IDatabaseHealthCheckService, DatabaseHealthCheckService>();
 
+        // Financial Reports API
+        services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
+
         // ViewModels
         services.AddTransient<LoginWindowViewModel>();
+        services.AddTransient<MainViewModel>();
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<SalesInvoiceListViewModel>();
         services.AddTransient<SalesInvoiceEditorViewModel>();
+        services.AddTransient<TouchPosViewModel>();
         services.AddTransient<PurchaseInvoiceListViewModel>();
         services.AddTransient<PurchaseInvoiceEditorViewModel>();
         services.AddTransient<ProductListViewModel>();
@@ -238,9 +245,14 @@ public partial class App : System.Windows.Application
         services.AddTransient<ReportsViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<CostingMethodSettingsViewModel>();
+        services.AddTransient<SystemSettingsViewModel>();
         services.AddTransient<BackupViewModel>();
         services.AddTransient<ProductUnitEditorViewModel>();
         services.AddTransient<ProductUnitsListViewModel>();
+
+        // Tax ViewModels
+        services.AddTransient<TaxesListViewModel>();
+        services.AddTransient<TaxEditorViewModel>();
 
         // Cash Box ViewModels
         services.AddTransient<CashBoxEditorViewModel>();
@@ -249,6 +261,16 @@ public partial class App : System.Windows.Application
         services.AddTransient<CashTransferViewModel>();
         services.AddTransient<DailyClosureViewModel>();
         services.AddTransient<ExpiredProductsReportViewModel>();
+
+        // Financial Report ViewModels
+        services.AddTransient<ViewModels.Reports.IncomeStatementViewModel>();
+        services.AddTransient<ViewModels.Reports.CashFlowReportViewModel>();
+        services.AddTransient<ViewModels.Reports.VatReportViewModel>();
+        services.AddTransient<ViewModels.Reports.AccountStatementViewModel>();
+        services.AddTransient<IncomeStatementViewModel>();
+        services.AddTransient<CashFlowReportViewModel>();
+        services.AddTransient<VatReportViewModel>();
+        services.AddTransient<AccountStatementViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()

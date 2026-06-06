@@ -1,4 +1,4 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.Transfers.StockTransfersListView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Transfers.StockTransfersListView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,7 +6,7 @@
       xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
       mc:Ignorable="d"
-      Title="التحويلات المخزنية"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -26,7 +26,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0"
-                   Text="التحويلات المخزنية"
+                   Text="🔄  التحويلات المخزنية"
                    Style="{StaticResource HeaderStyle}"
                    AutomationProperties.AutomationId="StockTransfersPageTitle"/>
 
@@ -47,7 +47,7 @@
                             <KeyBinding Key="Return" Command="{Binding RefreshCommand}"/>
                         </TextBox.InputBindings>
                     </TextBox>
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Height="36" Padding="16,0" AutomationProperties.AutomationId="BtnSearchTransfer"
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource PrimaryButton}" Margin="4,0,0,0" AutomationProperties.AutomationId="BtnSearchTransfer"
                             ToolTip="البحث في البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -66,7 +66,7 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             AutomationProperties.AutomationId="BtnAddTransfer"
                             ToolTip="فتح شاشة إنشاء تحويل مخزون جديد">
                         <StackPanel Orientation="Horizontal">
@@ -74,28 +74,28 @@
                             <TextBlock Text="تحويل جديد" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             ToolTip="تعديل العنصر المحدد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="📝" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="تعديل" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding PostCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding PostCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0"
                             ToolTip="ترحيل العملية وتحديث المخزون">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="✅" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="ترحيل" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0" Margin="0,0,8,0"
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             AutomationProperties.AutomationId="BtnRefreshTransfers"
                             ToolTip="تحديث قائمة البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding PrintCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0"
+                    <Button Command="{Binding PrintCommand}" Style="{StaticResource SecondaryButton}"
                             AutomationProperties.AutomationId="BtnPrintTransfer"
                             ToolTip="طباعة المستند">
                         <StackPanel Orientation="Horizontal">
@@ -246,9 +246,9 @@
                 <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="🚛" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
-                        <TextBlock Text="لا توجد تحويلات مخزنية حالياً" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="لا توجد تحويلات مخزنية حالياً" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                         <TextBlock Text="يمكنك نقل الكميات بين المستودعات المختلفة وتسجيل الحركات هنا" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة تحويل جديد" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" Width="160" Height="36"
+                        <Button Content="➕ إضافة تحويل جديد" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
                                 ToolTip="فتح شاشة إنشاء تحويل مخزون جديد"/>
                     </StackPanel>
                 </Grid>
@@ -274,4 +274,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>

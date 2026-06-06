@@ -1,0 +1,209 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Reports.CashFlowReportView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
+      mc:Ignorable="d"
+      d:DesignHeight="700" d:DesignWidth="1000"
+     
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Style="{StaticResource PageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+Text="💰  تقرير التدفق النقدي"
+                   Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="CashFlowReportPageTitle"/>
+
+        <!-- Filters Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="من تاريخ" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <DatePicker SelectedDate="{Binding DateFrom}" Style="{StaticResource ModernDatePicker}" Width="150" TabIndex="1"
+                                ToolTip="اختر تاريخ بداية الفترة لتقرير التدفق النقدي"/>
+                    <TextBlock Text="إلى تاريخ" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="16,0,12,0"/>
+                    <DatePicker SelectedDate="{Binding DateTo}" Style="{StaticResource ModernDatePicker}" Width="150" TabIndex="2"
+                                ToolTip="اختر تاريخ نهاية الفترة لتقرير التدفق النقدي"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="الصندوق" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox Width="180" TabIndex="3"
+                              ItemsSource="{Binding CashBoxes}"
+                              SelectedValue="{Binding SelectedCashBoxId}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="BoxName"
+                              ToolTip="اختر صندوقاً محدداً أو اترك الكل لعرض جميع الصناديق"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding GenerateReportCommand}" Style="{StaticResource PrimaryButton}" TabIndex="4"
+                            ToolTip="توليد تقرير التدفق النقدي حسب الفترة والصندوق المحدد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💰" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="عرض التقرير" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Content Area -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <!-- Error Message -->
+                <Border Background="{StaticResource ErrorLightBrush}"
+                        Padding="10,6"
+                        Margin="0,0,0,0"
+                        VerticalAlignment="Top"
+                        Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <Button Grid.Column="2" Command="{Binding GenerateReportCommand}" Style="{StaticResource SecondaryButton}" Height="28" Padding="12,0" FontSize="11"
+                                ToolTip="إعادة المحاولة">
+                            <TextBlock Text="إعادة المحاولة"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Grid Visibility="{Binding HasData, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Income Items -->
+                    <Border Grid.Column="0" Margin="8" Style="{StaticResource CardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="📈 الإيرادات" FontSize="16" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" Margin="16,12"/>
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding IncomeItems}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      BorderThickness="0"
+                                      Margin="0,0,0,0">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="التصنيف" Binding="{Binding Category}" Width="*"
+                                                        ToolTipService.ToolTip="تصنيف الإيراد"/>
+                                    <DataGridTextColumn Header="المبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="Auto"
+                                                        ToolTipService.ToolTip="قيمة الإيراد بالريال"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Expense Items -->
+                    <Border Grid.Column="1" Margin="8" Style="{StaticResource CardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="📉 المصروفات" FontSize="16" FontWeight="Bold" Foreground="{StaticResource ErrorBrush}" Margin="16,12"/>
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding ExpenseItems}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      BorderThickness="0"
+                                      Margin="0,0,0,0">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="التصنيف" Binding="{Binding Category}" Width="*"
+                                                        ToolTipService.ToolTip="تصنيف المصروف"/>
+                                    <DataGridTextColumn Header="المبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="Auto"
+                                                        ToolTipService.ToolTip="قيمة المصروف بالريال"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Empty State -->
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,0">
+                        <TextBlock Text="💰" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
+                        <TextBlock Text="تقرير التدفق النقدي" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="اختر الفترة الزمنية والفرع (اختياري) ثم اضغط على 'عرض التقرير'" 
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Loading Overlay -->
+                <Border Background="#CCFFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="240" Height="6" Background="#E2E8F0" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="جاري تحميل تقرير التدفق النقدي..." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Summary Footer -->
+        <Border Grid.Row="3" Style="{StaticResource FooterBarStyle}"
+                Visibility="{Binding HasData, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
+                    <TextBlock Text="الرصيد الافتتاحي:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                    <TextBlock Text="{Binding FormattedOpeningBalance}" Style="{StaticResource FooterBarTextStyle}" FontSize="16" FontWeight="Bold" Margin="6,0,4,0"/>
+                    <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
+                    <TextBlock Text="الإيرادات:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                    <TextBlock Text="{Binding FormattedTotalIncome}" Style="{StaticResource FooterBarTextStyle}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" Margin="6,0,4,0"/>
+                    <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
+                    <TextBlock Text="المصروفات:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                    <TextBlock Text="{Binding FormattedTotalExpense}" Style="{StaticResource FooterBarTextStyle}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource ErrorBrush}" Margin="6,0,4,0"/>
+                    <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
+                    <TextBlock Text="صافي التدفق:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                    <TextBlock Text="{Binding FormattedNetCashFlow}" FontSize="18" FontWeight="Bold" Margin="6,0,4,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource FooterBarTextStyle}">
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPositiveCashFlow}" Value="False">
+                                        <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="الرصيد الختامي:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                    <TextBlock Text="{Binding FormattedClosingBalance}" Style="{StaticResource FooterBarTextStyle}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="6,0,4,0"/>
+                    <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

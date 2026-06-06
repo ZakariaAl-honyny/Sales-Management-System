@@ -58,13 +58,25 @@ public class ScreenWindowService : IScreenWindowService
                     return;
                 }
 
-                if (Activator.CreateInstance(viewType) is not Window window)
+                var viewInstance = Activator.CreateInstance(viewType);
+
+                // If the resolved view is a Window, show it directly (backward compatibility)
+                if (viewInstance is Window window)
                 {
-                    Log.Error("Failed to create window from type {ViewType}", viewType.FullName);
+                    ConfigureAndShowWindow(window, viewModel, options);
                     return;
                 }
 
-                ConfigureAndShowWindow(window, viewModel, options);
+                // Otherwise, wrap the UserControl/FrameworkElement in a ScreenWindow
+                if (viewInstance is not FrameworkElement element)
+                {
+                    Log.Error("View type {ViewType} is neither Window nor FrameworkElement", viewType.FullName);
+                    return;
+                }
+
+                var screenWindow = new Views.ScreenWindow();
+                screenWindow.SetContent(element, viewModel);
+                ConfigureAndShowWindow(screenWindow, viewModel, options);
             }
             catch (Exception ex)
             {

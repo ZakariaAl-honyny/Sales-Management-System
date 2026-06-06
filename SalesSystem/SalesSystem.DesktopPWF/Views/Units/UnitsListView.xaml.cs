@@ -4,7 +4,7 @@ using SalesSystem.DesktopPWF.ViewModels.Units;
 
 namespace SalesSystem.DesktopPWF.Views.Units;
 
-public partial class UnitsListView : Page
+public partial class UnitsListView : UserControl
 {
     public UnitsListView()
     {

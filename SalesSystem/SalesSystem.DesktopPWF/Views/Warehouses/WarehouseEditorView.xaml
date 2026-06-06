@@ -20,7 +20,7 @@
         </Grid.RowDefinitions>
 
         <!-- Premium Header with Gradient -->
-        <Border Grid.Row="0" Padding="16,12">
+        <Border Grid.Row="0" Padding="12,6">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#0F172A" Offset="0"/>
@@ -78,7 +78,7 @@
         </ScrollViewer>
 
         <!-- Premium Footer -->
-        <Border Grid.Row="2" Background="#F8FAFC" Padding="24,20" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="2" Background="#F8FAFC" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

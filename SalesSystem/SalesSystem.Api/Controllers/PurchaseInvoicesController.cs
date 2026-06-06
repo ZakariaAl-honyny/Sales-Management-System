@@ -66,21 +66,6 @@ public class PurchaseInvoicesController : ControllerBase
     }
 
     /// <summary>
-    /// Gets a purchase invoice by number
-    /// </summary>
-    /// <param name="invoiceNo">Invoice number</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Invoice details</returns>
-    [HttpGet("number/{invoiceNo}")]
-    [ProducesResponseType(typeof(PurchaseInvoiceDto), 200)]
-    [ProducesResponseType(404)]
-    public async Task<IActionResult> GetByNumber(string invoiceNo, CancellationToken ct)
-    {
-        var result = await _purchaseService.GetByNumberAsync(invoiceNo, ct);
-        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
-    }
-
-    /// <summary>
     /// Creates a new purchase invoice (draft)
     /// </summary>
     /// <param name="request">Purchase invoice creation request</param>

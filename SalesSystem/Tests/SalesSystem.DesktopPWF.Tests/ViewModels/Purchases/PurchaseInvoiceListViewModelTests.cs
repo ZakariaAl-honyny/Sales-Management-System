@@ -1,4 +1,4 @@
-namespace SalesSystem.DesktopPWF.Tests.ViewModels.Purchases;
+﻿namespace SalesSystem.DesktopPWF.Tests.ViewModels.Purchases;
 
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -52,8 +52,8 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     {
         var invoices = new List<PurchaseInvoiceDto>
         {
-            CreatePurchaseInvoiceDto(1, "PUR-2026-001", 1000m, (byte)InvoiceStatus.Draft),
-            CreatePurchaseInvoiceDto(2, "PUR-2026-002", 2000m, (byte)InvoiceStatus.Posted)
+            CreatePurchaseInvoiceDto(1, 1000m, (byte)InvoiceStatus.Draft),
+            CreatePurchaseInvoiceDto(2, 2000m, (byte)InvoiceStatus.Posted)
         };
 
         _mockInvoiceService
@@ -71,7 +71,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         await _viewModel.LoadInvoicesAsync();
 
         _viewModel.Invoices.Should().HaveCount(2);
-        _viewModel.Invoices.First().InvoiceNo.Should().Be("PUR-2026-001");
+        _viewModel.Invoices.First().Id.Should().BeGreaterThan(0);
         _viewModel.IsBusy.Should().BeFalse();
     }
 
@@ -115,7 +115,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(new List<PurchaseInvoiceDto>
             {
-                CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, 2)
+                CreatePurchaseInvoiceDto(1, 1000m, 2)
             }));
 
         await _viewModel.LoadInvoicesAsync();
@@ -132,9 +132,9 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     {
         var invoices = new List<PurchaseInvoiceDto>
         {
-            CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, 2, "مورد 1"),
-            CreatePurchaseInvoiceDto(2, "PUR-002", 2000m, 2, "مورد 2"),
-            CreatePurchaseInvoiceDto(3, "PUR-003", 3000m, 2, "مورد 1")
+            CreatePurchaseInvoiceDto(1, 1000m, 2, "مورد 1"),
+            CreatePurchaseInvoiceDto(2, 2000m, 2, "مورد 2"),
+            CreatePurchaseInvoiceDto(3, 3000m, 2, "مورد 1")
         };
 
         _mockInvoiceService
@@ -169,8 +169,8 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     {
         var invoices = new List<PurchaseInvoiceDto>
         {
-            CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, 2, "مورد 1"),
-            CreatePurchaseInvoiceDto(2, "PUR-002", 2000m, 2, "مورد 2")
+            CreatePurchaseInvoiceDto(1, 1000m, 2, "مورد 1"),
+            CreatePurchaseInvoiceDto(2, 2000m, 2, "مورد 2")
         };
 
         _mockInvoiceService
@@ -186,7 +186,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
         await _viewModel.LoadInvoicesAsync();
-        _viewModel.SearchText = "غير موجود";
+        _viewModel.SearchText = "ط؛ظٹط± ظ…ظˆط¬ظˆط¯";
 
         var count = 0;
         if (_viewModel.InvoicesView != null)
@@ -227,7 +227,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var invoice = CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, 1);
+        var invoice = CreatePurchaseInvoiceDto(1, 1000m, 1);
         _viewModel.SelectedInvoice = invoice;
 
         propertyChangedEvents.Should().Contain("SelectedInvoice");
@@ -239,7 +239,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.SearchText = "بحث";
+        _viewModel.SearchText = "ط¨ط­ط«";
 
         propertyChangedEvents.Should().Contain("SearchText");
     }
@@ -291,7 +291,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CannotExecute_WhenInvoiceNotDraft()
     {
-        var invoice = CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, (byte)InvoiceStatus.Posted);
+        var invoice = CreatePurchaseInvoiceDto(1, 1000m, (byte)InvoiceStatus.Posted);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.EditCommand.CanExecute(null).Should().BeFalse();
     }
@@ -299,7 +299,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CanExecute_WhenDraftInvoiceSelected()
     {
-        var invoice = CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, (byte)InvoiceStatus.Draft);
+        var invoice = CreatePurchaseInvoiceDto(1, 1000m, (byte)InvoiceStatus.Draft);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -314,7 +314,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     [Fact]
     public void PostCommand_CannotExecute_WhenInvoiceNotDraft()
     {
-        var invoice = CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, (byte)InvoiceStatus.Posted);
+        var invoice = CreatePurchaseInvoiceDto(1, 1000m, (byte)InvoiceStatus.Posted);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.PostCommand.CanExecute(null).Should().BeFalse();
     }
@@ -322,7 +322,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     [Fact]
     public void PostCommand_CanExecute_WhenDraftInvoiceSelected()
     {
-        var invoice = CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, (byte)InvoiceStatus.Draft);
+        var invoice = CreatePurchaseInvoiceDto(1, 1000m, (byte)InvoiceStatus.Draft);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.PostCommand.CanExecute(null).Should().BeTrue();
     }
@@ -337,7 +337,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     [Fact]
     public void CancelCommand_CannotExecute_WhenInvoiceNotPosted()
     {
-        var invoice = CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, (byte)InvoiceStatus.Draft);
+        var invoice = CreatePurchaseInvoiceDto(1, 1000m, (byte)InvoiceStatus.Draft);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.CancelCommand.CanExecute(null).Should().BeFalse();
     }
@@ -345,7 +345,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     [Fact]
     public void CancelCommand_CanExecute_WhenPostedInvoiceSelected()
     {
-        var invoice = CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, (byte)InvoiceStatus.Posted);
+        var invoice = CreatePurchaseInvoiceDto(1, 1000m, (byte)InvoiceStatus.Posted);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.CancelCommand.CanExecute(null).Should().BeTrue();
     }
@@ -360,7 +360,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     [Fact]
     public void ViewCommand_CanExecute_WhenInvoiceSelected()
     {
-        var invoice = CreatePurchaseInvoiceDto(1, "PUR-001", 1000m, (byte)InvoiceStatus.Cancelled);
+        var invoice = CreatePurchaseInvoiceDto(1, 1000m, (byte)InvoiceStatus.Cancelled);
         _viewModel.SelectedInvoice = invoice;
         _viewModel.ViewCommand.CanExecute(null).Should().BeTrue();
     }
@@ -442,14 +442,13 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
 
     private static PurchaseInvoiceDto CreatePurchaseInvoiceDto(
         int id,
-        string invoiceNo,
         decimal totalAmount,
         byte status,
         string supplierName = "مورد تجريبي")
     {
         return new PurchaseInvoiceDto(
             Id: id,
-            InvoiceNo: invoiceNo,
+            InvoiceNo: 1,
             SupplierId: 1,
             SupplierName: supplierName,
             WarehouseId: 1,

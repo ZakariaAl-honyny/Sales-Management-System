@@ -181,7 +181,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ ظ…ط±طھط¬ط¹ط§طھ ط§ظ„ظ…ط´طھط±ظٹط§طھ", "PurchaseReturnListViewModel.LoadReturnsAsync", "[PurchaseReturnListViewModel.LoadReturnsAsync] Failed to load purchase returns list.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل مرتجعات المشتريات", "PurchaseReturnListViewModel.LoadReturnsAsync", "[PurchaseReturnListViewModel.LoadReturnsAsync] Failed to load purchase returns list.");
                 IsEmpty = Returns.Count == 0;
             }
         }
@@ -225,7 +225,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
         var editorVm = App.GetService<PurchaseReturnEditorViewModel>();
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "ظ…ط±طھط¬ط¹ ظ…ط´طھط±ظٹط§طھ ط¬ط¯ظٹط¯",
+            Title = "مرتجع مشتريات جديد",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
@@ -258,7 +258,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
                     
                     _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
                     {
-                        Title = "ظ…ط±طھط¬ط¹ ظ…ط´طھط±ظٹط§طھ ظ…ظ† ظپط§طھظˆط±ط©",
+                        Title = "مرتجع مشتريات من فاتورة",
                         OnClosed = (vm) =>
                         {
                             System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());
@@ -269,7 +269,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
                 {
                     InvokeOnUIThread(() =>
                     {
-                        dialogService.ShowError(fullInvoiceResult.Error ?? "ظپط´ظ„ ظپظٹ طھط­ظ…ظٹظ„ طھظپط§طµظٹظ„ ط§ظ„ظپط§طھظˆط±ط©");
+                        dialogService.ShowError(fullInvoiceResult.Error ?? "فشل في تحميل تفاصيل الفاتورة");
                     });
                 }
             }
@@ -294,7 +294,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
         _ = editorVm.LoadReturnAsync(SelectedReturn.Id);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "ط¹ط±ط¶ ظ…ط±طھط¬ط¹ ظ…ط´طھط±ظٹط§طھ",
+            Title = "عرض مرتجع مشتريات",
             OnClosed = (vm) =>
             {
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadReturnsAsync());

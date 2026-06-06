@@ -7,7 +7,7 @@ namespace SalesSystem.DesktopPWF.Views;
 /// <summary>
 /// Dashboard View - displays system statistics and overview
 /// </summary>
-public partial class DashboardView : Page
+public partial class DashboardView : UserControl
 {
     private readonly DashboardViewModel _viewModel;
 

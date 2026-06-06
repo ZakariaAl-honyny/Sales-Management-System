@@ -6,92 +6,89 @@
              mc:Ignorable="d"
              FlowDirection="RightToLeft"
              d:DesignHeight="300" d:DesignWidth="500">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="طريقة احتساب التكلفة"
-                       FontSize="20"
-                       FontWeight="Bold"
-                       Foreground="#333"/>
-            <TextBlock Text="تحدد كيف يحتسب النظام تكلفة البضاعة في المخزن عند كل عملية شراء"
-                       FontSize="12"
-                       Foreground="#666"
-                       Margin="0,4,0,0"/>
-        </StackPanel>
-
-        <!-- Costing Method Options -->
-        <StackPanel Grid.Row="1">
-            <RadioButton x:Name="WeightedAverageRadio"
-                         GroupName="CostingMethod"
-                         IsChecked="{Binding IsWeightedAverageSelected}"
-                         Margin="0,0,0,8">
-                <StackPanel>
-                    <TextBlock Text="متوسط التكلفة المرجح" FontWeight="SemiBold" FontSize="14"/>
-                    <TextBlock Text="[(الرصيد القديم × التكلفة القديمة) + (الكمية الجديدة × التكلفة الجديدة)] ÷ إجمالي الكمية"
-                               FontSize="11" Foreground="#666" TextWrapping="Wrap" MaxWidth="400"/>
-                </StackPanel>
-            </RadioButton>
-
-            <RadioButton x:Name="LastPurchaseRadio"
-                         GroupName="CostingMethod"
-                         IsChecked="{Binding IsLastPurchasePriceSelected}"
-                         Margin="0,0,0,8">
-                <StackPanel>
-                    <TextBlock Text="آخر سعر توريد" FontWeight="SemiBold" FontSize="14"/>
-                    <TextBlock Text="يتم استخدام سعر آخر فاتورة شراء فقط"
-                               FontSize="11" Foreground="#666"/>
-                </StackPanel>
-            </RadioButton>
-
-            <RadioButton x:Name="SupplierPriceRadio"
-                         GroupName="CostingMethod"
-                         IsChecked="{Binding IsSupplierPriceSelected}">
-                <StackPanel>
-                    <TextBlock Text="سعر المورد" FontWeight="SemiBold" FontSize="14"/>
-                    <TextBlock Text="يتم استخدام سعر الكتالوج المسجل من المورد"
-                               FontSize="11" Foreground="#666"/>
-                </StackPanel>
-            </RadioButton>
-        </StackPanel>
-
-        <!-- Warning Box -->
-        <Border Grid.Row="2"
-                Background="#FFF8E1"
-                BorderBrush="#FFC107"
-                BorderThickness="1"
-                CornerRadius="4"
-                Padding="12"
-                Margin="0,16,0,0"
-                Visibility="{Binding ShowWarning, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="!" FontSize="16" Margin="0,0,8,0"/>
-                <TextBlock Text="تغيير طريقة الاحتساب سيؤثر على تكلفة المنتجات من تاريخ التغيير فصاعداً."
-                           TextWrapping="Wrap"
-                           Foreground="#F57F17"/>
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="طريقة احتساب التكلفة"
+                           FontSize="14"
+                           FontWeight="Bold"
+                           Foreground="#333"/>
+                <TextBlock Text="تحدد كيف يحتسب النظام تكلفة البضاعة في المخزن عند كل عملية شراء"
+                           FontSize="12"
+                           Foreground="#666"
+                           Margin="0,4,0,0"/>
             </StackPanel>
-        </Border>
 
-        <!-- Save Button -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,20,0,0">
-            <Button ToolTip="حفظ البيانات المدخلة" Content="حفظ التغييرات"
-                    Command="{Binding SaveCommand}"
-                    Padding="20,10"
-                    Background="#4CAF50"
-                    Foreground="White"
-                     FontWeight="SemiBold"/>
-            <Button ToolTip="إلغاء العملية الحالية" Content="إلغاء"
-                    Command="{Binding CancelCommand}"
-                    Padding="20,10"
-                    Margin="12,0,0,0"
-                    Background="#9E9E9E"
-                    Foreground="White"/>
-        </StackPanel>
-    </Grid>
+            <!-- Costing Method Options -->
+            <StackPanel Grid.Row="1">
+                <RadioButton x:Name="WeightedAverageRadio"
+                             GroupName="CostingMethod"
+                             IsChecked="{Binding IsWeightedAverageSelected}"
+                             Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="متوسط التكلفة المرجح" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="[(الرصيد القديم × التكلفة القديمة) + (الكمية الجديدة × التكلفة الجديدة)] ÷ إجمالي الكمية"
+                                   FontSize="11" Foreground="#666" TextWrapping="Wrap" MaxWidth="400"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="LastPurchaseRadio"
+                             GroupName="CostingMethod"
+                             IsChecked="{Binding IsLastPurchasePriceSelected}"
+                             Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="آخر سعر توريد" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="يتم استخدام سعر آخر فاتورة شراء فقط"
+                                   FontSize="11" Foreground="#666"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="SupplierPriceRadio"
+                             GroupName="CostingMethod"
+                             IsChecked="{Binding IsSupplierPriceSelected}">
+                    <StackPanel>
+                        <TextBlock Text="سعر المورد" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="يتم استخدام سعر الكتالوج المسجل من المورد"
+                                   FontSize="11" Foreground="#666"/>
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+
+            <!-- Warning Box -->
+            <Border Grid.Row="2"
+                    Background="#FFF8E1"
+                    BorderBrush="#FFC107"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="12"
+                    Margin="0,16,0,0"
+                    Visibility="{Binding ShowWarning, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="!" FontSize="16" Margin="0,0,8,0"/>
+                    <TextBlock Text="تغيير طريقة الاحتساب سيؤثر على تكلفة المنتجات من تاريخ التغيير فصاعداً."
+                               TextWrapping="Wrap"
+                               Foreground="#F57F17"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Save Button -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,20,0,0">
+                <Button ToolTip="حفظ البيانات المدخلة" Content="حفظ التغييرات"
+                        Command="{Binding SaveCommand}"
+                        Style="{StaticResource PrimaryButton}"/>
+                <Button ToolTip="إلغاء العملية الحالية" Content="إلغاء"
+                        Command="{Binding CancelCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Margin="12,0,0,0"/>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

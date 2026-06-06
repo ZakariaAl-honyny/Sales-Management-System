@@ -10,8 +10,6 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
     {
         builder.ToTable("PurchaseInvoices");
         builder.HasKey(pi => pi.Id);
-        builder.Property(pi => pi.InvoiceNo).IsRequired().HasMaxLength(30);
-        builder.HasIndex(pi => pi.InvoiceNo).IsUnique();
         builder.Property(pi => pi.SubTotal).HasPrecision(18, 2);
         builder.Property(pi => pi.DiscountAmount).HasPrecision(18, 2);
         builder.Property(pi => pi.TaxAmount).HasPrecision(18, 2);

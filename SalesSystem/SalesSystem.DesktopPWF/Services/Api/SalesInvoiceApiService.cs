@@ -57,13 +57,6 @@ public class SalesInvoiceApiService : ApiServiceBase, ISalesInvoiceApiService
             "SalesInvoiceApiService.GetByIdAsync");
     }
 
-    public async Task<Result<SalesInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default)
-    {
-        return await ExecuteAsync<SalesInvoiceDto>(
-            () => _httpClient.GetAsync($"{BasePath}/number/{invoiceNo}", ct),
-            "SalesInvoiceApiService.GetByNumberAsync");
-    }
-
     public async Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, CancellationToken ct = default)
     {
         return await ExecuteAsync<SalesInvoiceDto>(

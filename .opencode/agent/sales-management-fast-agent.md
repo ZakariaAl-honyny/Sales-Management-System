@@ -96,6 +96,23 @@ When fixing garbled Arabic:
 3. Verify the file is saved with UTF-8 encoding (BOM recommended)
 4. Check 3-5 Arabic strings in the diff to confirm they read correctly in Arabic
 
+### UI Compacting Fixes (v4.6.6)
+
+When fixing XAML views for compact density:
+
+1. **Remove hardcoded Height** — Find `Height="36"` or `Height="40"` on Button/TextBox/ComboBox and remove the attribute (style now provides Height=28)
+2. **Remove hardcoded Padding** — Find `Padding="16,0"` or `Padding="20,0"` or `Padding="24,0"` on buttons and remove (style now provides 10,4)
+3. **Reduce header padding** — Replace `Padding="16,12"` or `Padding="20,12"` on header borders with `Padding="12,6"`
+4. **Reduce footer padding** — Replace `Padding="16,8"` or `Padding="20,12"` on footer borders with `Padding="12,8"`
+5. **Reduce form margins** — Replace `Margin="0,0,0,12"` or `Margin="0,0,0,16"` with `Margin="0,0,0,6"` or `Margin="0,0,0,8"`
+6. **Reduce empty-state** — Replace `Margin="0,20,0,0" Width="160" Height="36"` with `Margin="0,12,0,0" Width="140"`
+7. **Reduce dialog fonts** — Replace `FontSize="20"` on titles → `FontSize="16"`, `FontSize="18"` on section headers → `FontSize="14"`
+8. **Reduce dialog icons** — Replace `Width="50" Height="50"` icons → `Width="44" Height="44"`, font size 24→20
+9. **Reduce button widths** — Replace `Width="120" Width="130"` on dialog buttons → `MinWidth="80"` or `MinWidth="100"`
+10. **Check return editors** — SalesReturnEditorView and PurchaseReturnEditorView often get missed — apply same pattern
+
+Always check: after change, the file must still parse as valid XML and build with 0 errors.
+
 ## Quick Fixes
 
 When asked to fix code quickly, always check for and fix:
@@ -103,3 +120,4 @@ When asked to fix code quickly, always check for and fix:
 2. `MessageBox.Show` → `IDialogService` replacements
 3. Direct `HttpClient` → typed service class replacements
 4. Shadowed `_dialogService` fields → use base class `DialogService` property
+5. Hardcoded `Height="36"` or `Padding="16+"` on buttons (should use style defaults)

@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -156,7 +156,7 @@ public class SalesReturnServiceTests : IDisposable
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
+        var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1, customerId: 1, paymentType: DomainPaymentType.Cash);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m));
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(500m);
@@ -179,7 +179,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("أكبر من الكمية المباعة");
+        result.Error.Should().Contain("ط£ظƒط¨ط± ظ…ظ† ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ…ط¨ط§ط¹ط©");
 
         _output.WriteLine("[PASS] Return quantity exceeding original invoice fails");
     }
@@ -246,7 +246,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("الفاتورة الأصلية غير موجودة");
+        result.Error.Should().Contain("ط§ظ„ظپط§طھظˆط±ط© ط§ظ„ط£طµظ„ظٹط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©");
 
         _output.WriteLine("[PASS] Non-existent original invoice returns failure");
     }
@@ -264,7 +264,7 @@ public class SalesReturnServiceTests : IDisposable
         _dbContext.Products.Add(product2);
         await _dbContext.SaveChangesAsync();
 
-        var invoice = SalesInvoice.Create("INV-2026-000001", warehouseId: 1, customerId: null, paymentType: DomainPaymentType.Cash);
+        var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1, customerId: null, paymentType: DomainPaymentType.Cash);
         invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m));
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(500m);
@@ -287,7 +287,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.CreateAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("غير موجود في الفاتورة الأصلية");
+        result.Error.Should().Contain("ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ظپظٹ ط§ظ„ظپط§طھظˆط±ط© ط§ظ„ط£طµظ„ظٹط©");
 
         _output.WriteLine("[PASS] Product not in original invoice returns failure");
     }
@@ -339,7 +339,7 @@ public class SalesReturnServiceTests : IDisposable
         var result = await _sut.GetByIdAsync(999, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("غير موجود");
+        result.Error.Should().Contain("ط؛ظٹط± ظ…ظˆط¬ظˆط¯");
 
         _output.WriteLine("[PASS] Non-existent return returns NotFound");
     }

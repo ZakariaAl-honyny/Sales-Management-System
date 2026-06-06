@@ -154,9 +154,20 @@ public class PrintDataService : IPrintDataService
             var receiptFooter = GetSettingValue(sysSettings, "ReceiptFooter", "");
             var escPosCodePageStr = GetSettingValue(sysSettings, "EscPosCodePage", "22");
 
+            var paperSize = GetSettingValue(sysSettings, "PaperSize", "A4");
+            var printCopiesStr = GetSettingValue(sysSettings, "PrintCopies", "1");
+            var showBalanceStr = GetSettingValue(sysSettings, "ShowBalanceOnPrint", "true");
+            var printSignatureStr = GetSettingValue(sysSettings, "PrintSignature", "false");
+            var showLogoStr = GetSettingValue(sysSettings, "ShowLogo", "true");
+            var footerNote = GetSettingValue(sysSettings, "FooterNote", "");
+
             decimal.TryParse(taxRateStr, out var taxRate);
             bool.TryParse(autoPrintStr, out var autoPrintOnPost);
             int.TryParse(escPosCodePageStr, out var escPosCodePage);
+            int.TryParse(printCopiesStr, out var printCopies);
+            bool.TryParse(showBalanceStr, out var showBalanceOnPrint);
+            bool.TryParse(printSignatureStr, out var printSignature);
+            bool.TryParse(showLogoStr, out var showLogo);
 
             var dto = new PrintSettingsDto(
                 thermalPrinterName,
@@ -167,7 +178,13 @@ public class PrintDataService : IPrintDataService
                 autoPrintOnPost,
                 receiptHeader,
                 receiptFooter,
-                escPosCodePage);
+                escPosCodePage,
+                paperSize,
+                printCopies,
+                showBalanceOnPrint,
+                printSignature,
+                showLogo,
+                footerNote);
 
             return Result<PrintSettingsDto>.Success(dto);
         }
@@ -191,7 +208,14 @@ public class PrintDataService : IPrintDataService
             await _systemSettingsRepo.SetStringAsync("ReceiptHeader", request.ReceiptHeader ?? "", ct: ct);
             await _systemSettingsRepo.SetStringAsync("ReceiptFooter", request.ReceiptFooter ?? "", ct: ct);
             await _systemSettingsRepo.SetStringAsync("EscPosCodePage", request.EscPosCodePage.ToString(), ct: ct);
+            await _systemSettingsRepo.SetStringAsync("PaperSize", request.PaperSize ?? "A4", ct: ct);
+            await _systemSettingsRepo.SetStringAsync("PrintCopies", request.PrintCopies.ToString(), ct: ct);
+            await _systemSettingsRepo.SetStringAsync("ShowBalanceOnPrint", request.ShowBalanceOnPrint.ToString().ToLower(), ct: ct);
+            await _systemSettingsRepo.SetStringAsync("PrintSignature", request.PrintSignature.ToString().ToLower(), ct: ct);
+            await _systemSettingsRepo.SetStringAsync("ShowLogo", request.ShowLogo.ToString().ToLower(), ct: ct);
+            await _systemSettingsRepo.SetStringAsync("FooterNote", request.FooterNote ?? "", ct: ct);
 
+            await _uow.SaveChangesAsync(ct);
             return Result.Success();
         }
         catch (Exception ex)

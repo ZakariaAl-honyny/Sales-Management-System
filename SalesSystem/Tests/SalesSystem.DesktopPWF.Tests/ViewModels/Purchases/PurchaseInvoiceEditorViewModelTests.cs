@@ -112,7 +112,26 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
     [Fact]
     public async Task LoadInvoiceAsync_WhenExists_PopulatesFields()
     {
-        var invoice = new PurchaseInvoiceDto(1, "PUR-2026-001", 1, "مورد تجريبي", 1, "المستودع الرئيسي", DateTime.Today, null, 1, 1000m, 0, 0, 1000m, 1000m, 0, null, null, 1, new List<PurchaseInvoiceItemDto>
+        var invoice = new PurchaseInvoiceDto(
+            Id: 1,
+            InvoiceNo: 1,
+            SupplierId: 1,
+            SupplierName: "مورد تجريبي",
+            WarehouseId: 1,
+            WarehouseName: "المستودع الرئيسي",
+            InvoiceDate: DateTime.Today,
+            DueDate: null,
+            PaymentType: 1,
+            SubTotal: 1000m,
+            DiscountAmount: 0,
+            TaxAmount: 0,
+            TotalAmount: 1000m,
+            PaidAmount: 1000m,
+            DueAmount: 0,
+            SupplierInvoiceNo: null,
+            Notes: null,
+            Status: 1,
+            Items: new List<PurchaseInvoiceItemDto>
         {
             new PurchaseInvoiceItemDto(1, 1, "منتج 1", 10, 100m, 0, 1000m, 1)
         });

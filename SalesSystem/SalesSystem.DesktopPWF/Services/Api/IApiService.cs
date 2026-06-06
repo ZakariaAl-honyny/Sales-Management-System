@@ -299,6 +299,8 @@ public interface ISettingsApiService
     Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default);
     Task<Result<int>> GetCostingMethodAsync(CancellationToken ct = default);
     Task<Result> SetCostingMethodAsync(UpdateCostingMethodRequest request, CancellationToken ct = default);
+    Task<Result<Dictionary<string, string>>> GetAllSystemSettingsAsync(CancellationToken ct = default);
+    Task<Result> UpdateSystemSettingsAsync(Dictionary<string, string> settings, CancellationToken ct = default);
     void RefreshCache();
 }
 
@@ -313,7 +315,6 @@ public interface ISalesInvoiceApiService
 {
     Task<Result<List<SalesInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<SalesInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> UpdateAsync(int id, CreateSalesInvoiceRequest request, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
@@ -324,7 +325,6 @@ public interface IPurchaseInvoiceApiService
 {
     Task<Result<List<PurchaseInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<PurchaseInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
@@ -419,6 +419,25 @@ public record HealthCheckResult
     public bool IsDatabaseConnected { get; init; }
     public string? ErrorMessage { get; init; }
     public bool IsApiReachable { get; init; }
+}
+
+public interface ITaxesApiService
+{
+    Task<Result<List<TaxDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<TaxDto>> GetByIdAsync(int id);
+    Task<Result<TaxDto>> CreateAsync(CreateTaxRequest request);
+    Task<Result<TaxDto>> UpdateAsync(int id, UpdateTaxRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
+}
+
+public interface IFinancialReportApiService
+{
+    Task<Result<List<IncomeStatementDto>>> GetIncomeStatementAsync(DateTime from, DateTime to, CancellationToken ct = default);
+    Task<Result<CashFlowReportDto>> GetCashFlowReportAsync(DateTime from, DateTime to, int? cashBoxId = null, CancellationToken ct = default);
+    Task<Result<List<VatReportDto>>> GetVatReportAsync(DateTime from, DateTime to, CancellationToken ct = default);
+    Task<Result<List<AccountStatementDto>>> GetCustomerAccountStatementAsync(int customerId, DateTime from, DateTime to, CancellationToken ct = default);
+    Task<Result<List<AccountStatementDto>>> GetSupplierAccountStatementAsync(int supplierId, DateTime from, DateTime to, CancellationToken ct = default);
 }
 
 

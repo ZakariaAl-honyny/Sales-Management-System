@@ -4,7 +4,7 @@ using SalesSystem.DesktopPWF.ViewModels.Categories;
 
 namespace SalesSystem.DesktopPWF.Views.Categories;
 
-public partial class CategoriesListView : Page
+public partial class CategoriesListView : UserControl
 {
     public CategoriesListView()
     {

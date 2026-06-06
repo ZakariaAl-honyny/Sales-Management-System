@@ -45,8 +45,8 @@
 
         <!-- Style for cart quantity adjustment buttons (touch-friendly) -->
         <Style x:Key="TouchQtyButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="36"/>
-            <Setter Property="Height" Value="36"/>
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="2"/>
@@ -85,8 +85,8 @@
 
         <!-- Style for remove item button -->
         <Style x:Key="TouchRemoveButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="36"/>
-            <Setter Property="Height" Value="36"/>
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Margin" Value="2"/>
             <Setter Property="Padding" Value="0"/>
@@ -126,7 +126,7 @@
         <!-- Style for checkout action buttons (Cash/Card/Draft) -->
         <Style x:Key="CheckoutButtonStyle" TargetType="Button">
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="2"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -180,15 +180,13 @@
                             <Grid.ColumnDefinitions>
                                 <!-- Product Image -->
                                 <ColumnDefinition Width="Auto"/>
-                                <!-- Name + Price info -->
+                                <!-- Name, Price info, Qty controls -->
                                 <ColumnDefinition Width="*"/>
-                                <!-- Qty controls + Remove -->
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
                             <!-- Product Image (50x50, hidden when no image) -->
                             <Image Grid.Column="0"
-                                   Source="{Binding SelectedProduct.ImagePath, IsAsync=True}"
+                                    Source="{Binding SelectedProduct.ImagePath, Converter={StaticResource ImagePathConverter}, IsAsync=True}"
                                    Width="50"
                                    Height="50"
                                    Margin="0,0,10,0"
@@ -196,10 +194,13 @@
                                    VerticalAlignment="Center"
                                    Visibility="{Binding SelectedProduct.ImagePath, Converter={StaticResource NullToVisibility}}"/>
 
-                            <!-- Product Name and Price info -->
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Margin="0,0,8,0">
+                            <!-- Details -->
+                            <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
                                 <!-- Product Name -->
                                 <TextBlock Text="{Binding ProductName}"
                                            FontSize="14"
@@ -207,76 +208,84 @@
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            TextWrapping="NoWrap"
                                            TextTrimming="CharacterEllipsis"
-                                           Margin="0,0,0,2"/>
-                                <!-- Price info -->
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding UnitPrice, StringFormat=N2}"
-                                               FontSize="12"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               FontWeight="SemiBold"/>
-                                    <TextBlock Text=" × "
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <TextBlock Text="{Binding Quantity, StringFormat=N2}"
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <TextBlock Text=" = "
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextSecondaryBrush}"/>
-                                    <TextBlock Text="{Binding LineTotal, StringFormat=N2}"
-                                               FontSize="13"
-                                               FontWeight="Bold"
-                                               Foreground="{StaticResource SuccessBrush}"/>
-                                </StackPanel>
-                            </StackPanel>
+                                           Margin="0,0,0,4"/>
+                                           
+                                <Grid Grid.Row="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                            <!-- Quantity Adjustment Controls -->
-                            <StackPanel Grid.Column="2"
-                                        Orientation="Horizontal"
-                                        VerticalAlignment="Center">
-                                <!-- Decrease Quantity Button -->
-                                <Button Content="−"
-                                        Style="{StaticResource TouchQtyButtonStyle}"
-                                        Background="#F1F5F9"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        Command="{Binding DataContext.DecreaseQtyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}"
-                                        ToolTip="إنقاص الكمية بمقدار واحد"/>
+                                    <!-- Price info -->
+                                    <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                                        <TextBlock Text="{Binding UnitPrice, StringFormat=N2}"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   FontWeight="SemiBold"/>
+                                        <TextBlock Text=" × "
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding Quantity, StringFormat=N2}"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        <TextBlock Text=" = "
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding LineTotal, StringFormat=N2}"
+                                                   FontSize="13"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource SuccessBrush}"/>
+                                    </WrapPanel>
 
-                                <!-- Quantity Display -->
-                                <Border Background="#F8FAFC"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Width="48"
-                                        Height="36"
-                                        Margin="2"
-                                        VerticalAlignment="Center"
-                                        HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding Quantity, StringFormat=N0}"
-                                               FontSize="15"
-                                               FontWeight="Bold"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"/>
-                                </Border>
+                                    <!-- Quantity Adjustment Controls -->
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <!-- Decrease Quantity Button -->
+                                        <Button Content="−"
+                                                Style="{StaticResource TouchQtyButtonStyle}"
+                                                Background="#F1F5F9"
+                                                BorderBrush="{StaticResource BorderBrush}"
+                                                Command="{Binding DataContext.DecreaseQtyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="إنقاص الكمية بمقدار واحد"/>
 
-                                <!-- Increase Quantity Button -->
-                                <Button Content="+"
-                                        Style="{StaticResource TouchQtyButtonStyle}"
-                                        Background="#F1F5F9"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        Command="{Binding DataContext.IncreaseQtyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}"
-                                        ToolTip="زيادة الكمية بمقدار واحد"/>
+                                        <!-- Quantity Display -->
+                                        <Border Background="#F8FAFC"
+                                                BorderBrush="{StaticResource BorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Width="40"
+                                                Height="32"
+                                                Margin="2"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding Quantity, StringFormat=N0}"
+                                                       FontSize="15"
+                                                       FontWeight="Bold"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
 
-                                <!-- Remove Item Button -->
-                                <Button Content="🗑"
-                                        Style="{StaticResource TouchRemoveButtonStyle}"
-                                        Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}"
-                                        ToolTip="حذف المنتج من السلة"/>
-                            </StackPanel>
+                                        <!-- Increase Quantity Button -->
+                                        <Button Content="+"
+                                                Style="{StaticResource TouchQtyButtonStyle}"
+                                                Background="#F1F5F9"
+                                                BorderBrush="{StaticResource BorderBrush}"
+                                                Command="{Binding DataContext.IncreaseQtyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="زيادة الكمية بمقدار واحد"/>
+
+                                        <!-- Remove Item Button -->
+                                        <Button Content="🗑"
+                                                Style="{StaticResource TouchRemoveButtonStyle}"
+                                                Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip="حذف المنتج من السلة"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
@@ -316,20 +325,20 @@
         <!-- ============================================================ -->
         <Border Grid.Row="1"
                 Background="{StaticResource PrimaryBrush}"
-                Padding="16,14"
+                Padding="12,10"
                 CornerRadius="0"
                 Effect="{StaticResource DeepShadow}">
             <StackPanel>
                 <!-- Part 1: Totals Display -->
-                <Grid Margin="0,0,0,8">
+                <StackPanel Margin="0,0,0,6">
                     <!-- Subtotal line -->
                     <Grid Margin="0,0,0,4">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="المجموع الفرعي" FontSize="13" Foreground="#CBD5E1"/>
-                        <TextBlock Grid.Column="1" Text="{Binding SubTotal, StringFormat=N2}" FontSize="14" FontWeight="SemiBold" Foreground="#CBD5E1"/>
+                        <TextBlock Text="المجموع الفرعي" FontSize="12" Foreground="#CBD5E1"/>
+                        <TextBlock Grid.Column="1" Text="{Binding SubTotal, StringFormat=N2}" FontSize="13" FontWeight="SemiBold" Foreground="#CBD5E1"/>
                     </Grid>
                     <!-- Total line -->
                     <Grid>
@@ -337,26 +346,26 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="الإجمالي" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat=N2}" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="الإجمالي" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat=N2}" FontSize="18" FontWeight="Bold" Foreground="White"/>
                     </Grid>
-                </Grid>
+                </StackPanel>
 
                 <!-- Part 2: Paid Amount with NumericKeypadControl -->
-                <Border Background="#1E293B" CornerRadius="8" Padding="12" Margin="0,0,0,8">
+                <Border Background="#1E293B" CornerRadius="8" Padding="10" Margin="0,0,0,6">
                     <StackPanel>
-                        <TextBlock Text="المبلغ المدفوع" FontSize="13" Foreground="#94A3B8" Margin="0,0,0,6"/>
+                        <TextBlock Text="المبلغ المدفوع" FontSize="12" Foreground="#94A3B8" Margin="0,0,0,4"/>
                         <TextBlock Text="{Binding PaidAmountString, FallbackValue='0'}" 
-                                   FontSize="32" FontWeight="Bold" Foreground="White"
+                                   FontSize="24" FontWeight="Bold" Foreground="White"
                                    HorizontalAlignment="Center"/>
                         <controls:NumericKeypadControl InputValue="{Binding PaidAmountString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                       Margin="0,8,0,0"
-                                                       MinHeight="180"/>
+                                                       Margin="0,4,0,0"
+                                                       MinHeight="120"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Part 3: Action Buttons (T015) -->
-                <UniformGrid Columns="3" Margin="0,0,0,0" Height="56">
+                <UniformGrid Columns="3" Margin="0,0,0,0" Height="40">
                     <Button Content="كاش" 
                             Command="{Binding CashCheckoutCommand}"
                             Style="{StaticResource CheckoutButtonStyle}"

@@ -28,7 +28,6 @@ public class PurchaseServiceTests : IDisposable
     private readonly TestDbContext _dbContext;
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IInventoryService> _mockInventoryService;
-    private readonly Mock<IDocumentSequenceService> _mockSequenceService;
     private readonly Mock<IStoreSettingsService> _mockStoreSettingsService;
     private readonly Mock<IUpdateProductPricingService> _mockPricingService;
     private readonly Mock<ICashBoxService> _cashBoxServiceMock;
@@ -49,7 +48,6 @@ public class PurchaseServiceTests : IDisposable
 
         _mockUow = new Mock<IUnitOfWork>();
         _mockInventoryService = new Mock<IInventoryService>();
-        _mockSequenceService = new Mock<IDocumentSequenceService>();
         _mockStoreSettingsService = new Mock<IStoreSettingsService>();
         _mockPricingService = new Mock<IUpdateProductPricingService>();
         _cashBoxServiceMock = new Mock<ICashBoxService>();
@@ -78,9 +76,6 @@ public class PurchaseServiceTests : IDisposable
         _mockStoreSettingsService.Setup(s => s.GetSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<StoreSettingsDto>.Success(new StoreSettingsDto(1, "متجري", null, null, null, null, "SAR", 15m, true, null, true, false, true, "PUR-", (int)SalesSystem.Domain.Enums.CostingMethod.WeightedAverage)));
 
-        _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<string>.Success("PUR-2026-000001"));
-
         _mockInventoryService.Setup(i => i.IncreaseStockAsync(
             It.IsAny<int>(), It.IsAny<int>(), It.IsAny<decimal>(),
             It.IsAny<MovementType>(), It.IsAny<string>(), It.IsAny<int>(),
@@ -96,7 +91,6 @@ public class PurchaseServiceTests : IDisposable
         _sut = new PurchaseService(
             _mockUow.Object,
             _mockInventoryService.Object,
-            _mockSequenceService.Object,
             _mockStoreSettingsService.Object,
             _mockPricingService.Object,
             _cashBoxServiceMock.Object,
@@ -126,9 +120,9 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
-            "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
@@ -185,9 +179,9 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
-            "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
@@ -223,9 +217,9 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
-            "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             paymentType: DomainPaymentType.Credit,
@@ -262,9 +256,9 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
-            "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
@@ -299,9 +293,9 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
-            "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             paymentType: DomainPaymentType.Credit,
@@ -348,9 +342,9 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
-            "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,
@@ -380,9 +374,9 @@ public class PurchaseServiceTests : IDisposable
         _output.WriteLine("[TEST] GivenPurchaseInvoiceWithItems_WhenRecalculating_ThenTotalsCorrect");
 
         var invoice = PurchaseInvoice.Create(
-            "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,

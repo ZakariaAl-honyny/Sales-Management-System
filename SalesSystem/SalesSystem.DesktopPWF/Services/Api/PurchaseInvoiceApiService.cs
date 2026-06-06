@@ -58,13 +58,6 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
             "PurchaseInvoiceApiService.GetByIdAsync");
     }
 
-    public async Task<Result<PurchaseInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default)
-    {
-        return await ExecuteAsync<PurchaseInvoiceDto>(
-            () => _httpClient.GetAsync($"{BasePath}/number/{invoiceNo}", ct),
-            "PurchaseInvoiceApiService.GetByNumberAsync");
-    }
-
     public async Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, CancellationToken ct = default)
     {
         return await ExecuteAsync<PurchaseInvoiceDto>(

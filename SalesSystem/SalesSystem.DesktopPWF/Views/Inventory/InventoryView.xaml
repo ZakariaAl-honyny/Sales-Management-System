@@ -1,4 +1,4 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.Inventory.InventoryView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Inventory.InventoryView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -7,7 +7,7 @@
       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
       mc:Ignorable="d" 
       d:DesignHeight="700" d:DesignWidth="1000"
-      Title="حركة المخزون"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -53,7 +53,7 @@
                                 </TextBox>
                                 <Button Command="{Binding RefreshCommand}" 
                                         Style="{StaticResource PrimaryButton}" 
-                                        Margin="12,0,0,0" Height="36" Padding="16,0"
+                                        Margin="8,0,0,0"
                                         ToolTip="البحث في سجل حركات المخزون">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -64,13 +64,13 @@
 
                             <!-- Actions Group -->
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                                <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="16,0"
+<Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                                         ToolTip="تحديث قائمة حركات المخزون">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="تحديث" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="تحديث" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                             </StackPanel>
                         </WrapPanel>
                     </Border>
@@ -216,7 +216,7 @@
                     <Border Grid.Row="0" Style="{StaticResource ToolbarStyle}">
                         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                                <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="16,0"
+                                <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                                         AutomationProperties.AutomationId="BtnRefreshStocks"
                                         ToolTip="تحديث مستويات المخزون الحالية">
                                     <StackPanel Orientation="Horizontal">
@@ -331,5 +331,5 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>
 

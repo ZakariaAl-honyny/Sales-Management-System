@@ -1,4 +1,4 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.Purchases.PurchaseInvoicesListView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Purchases.PurchaseInvoicesListView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -6,7 +6,7 @@
       xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
       mc:Ignorable="d"
-      Title="فواتير الشراء"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -26,7 +26,7 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <TextBlock Grid.Row="0" Text="فواتير الشراء" Style="{StaticResource HeaderStyle}" Margin="0,0,0,12"/>
+        <TextBlock Grid.Row="0" Text="📥  فواتير الشراء" Style="{StaticResource HeaderStyle}" Margin="0,0,0,12"/>
 
         <!-- Toolbar -->
         <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
@@ -45,7 +45,7 @@
                     </TextBox>
                     <Button Command="{Binding SearchCommand}" 
                             Style="{StaticResource PrimaryButton}"
-                            Margin="12,0,0,0" Height="36" Padding="16,0"
+                            Margin="8,0,0,0"
                             ToolTip="اضغط هنا للبحث عن الفواتير حسب البيانات التي أدخلتها">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -65,49 +65,49 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             ToolTip="فتح شاشة إنشاء فاتورة جديدة">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="فاتورة جديدة" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             ToolTip="تعديل الفاتورة المختارة (للمسودات فقط)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="📝" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="تعديل" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding PostCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding PostCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0"
                             ToolTip="ترحيل الفاتورة المختارة نهائياً للمخزون">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="✅" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="ترحيل" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding PrintPreviewCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding PrintPreviewCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             ToolTip="معاينة فاتورة الشراء قبل الطباعة (للمرحّلة فقط)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🖨️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="معاينة" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding PrintA4Command}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding PrintA4Command}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             ToolTip="طباعة A4 (للمرحّلة فقط)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🖨️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="طباعة A4" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding PrintThermalCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding PrintThermalCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             ToolTip="طباعة حرارية (للمرحّلة فقط)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🧾" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="طباعة حرارية" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0"
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                             ToolTip="تحديث قائمة الفواتير من الخادم">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
@@ -122,12 +122,12 @@
                 Background="{StaticResource ErrorLightBrush}" 
                 BorderBrush="{StaticResource ErrorBrush}"
                 BorderThickness="1"
-                Padding="16,12"
+                Padding="10,6"
                 Margin="0,0,0,16"
                 CornerRadius="8"
                 Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="⚠️" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="18"/>
+                <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
                 <TextBlock Text="{Binding ErrorMessage}" 
                            Foreground="{StaticResource ErrorTextBrush}" 
                            FontWeight="SemiBold"
@@ -200,6 +200,11 @@
                                             Width="80" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         
+                        <DataGridTextColumn Header="رقم الفاتورة" 
+                                            Binding="{Binding InvoiceNo}" 
+                                            Width="120" 
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
                         <DataGridTextColumn Header="التاريخ" 
                                             Binding="{Binding InvoiceDate, StringFormat=yyyy-MM-dd}" 
                                             Width="120" 
@@ -281,7 +286,7 @@
                         <TextBlock Text="📦" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
                         <TextBlock Text="لا توجد فواتير شراء حالياً" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
                         <TextBlock Text="سجل عمليات الشراء من الموردين لزيادة المخزون وإدارة فواتيرك هنا" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة فاتورة شراء" Command="{Binding NewCommand}" Margin="0,24,0,0"
+                        <Button Content="➕ إضافة فاتورة شراء" Command="{Binding NewCommand}" Margin="0,12,0,0"
                                 ToolTip="إنشاء فاتورة جديدة"/>
                     </StackPanel>
                 </Grid>
@@ -307,5 +312,5 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>
 

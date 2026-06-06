@@ -58,7 +58,7 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - ALL FKs: `OnDelete(DeleteBehavior.Restrict)` — NEVER Cascade
 - WarehouseStocks: `CHECK (Quantity >= 0)`
 - SalesInvoices: `CHECK (PaidAmount >= 0 AND PaidAmount <= TotalAmount)`
-- Unique indexes: InvoiceNo, Barcode (UnitBarcodes), UserName — NO Code indexes (Code removed from all entities)
+- Unique indexes: Barcode (UnitBarcodes), UserName — NO Code indexes (Code removed from all entities), InvoiceNo on SalesInvoice/PurchaseInvoice has NO unique index (duplicates allowed)
 - Composite unique: `WarehouseStocks(WarehouseId, ProductId)`
 - WarehouseStocks: MUST have `.ToTable(t => t.HasCheckConstraint("CHK_WarehouseStocks_Quantity_NonNegative", "[Quantity] >= 0"))`
 - ALL money fields: `decimal(18,2)` — NEVER `decimal(18,4)`
@@ -71,6 +71,12 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - `Product`, `Customer`, `Supplier`, `Warehouse` entities MUST NOT have a `Code` column — use auto-increment `Id` as sole identifier
 - `Product.Code`, `Customer.Code`, `Supplier.Code`, `Warehouse.Code` unique indexes are REMOVED
 - `DuplicateCode` error constant is REMOVED from ErrorCodes
+- `SalesInvoice.InvoiceNo` is `int` (NOT string, NOT nullable, NOT unique) — user-facing invoice number
+- `PurchaseInvoice.InvoiceNo` is `int` (NOT string, NOT nullable, NOT unique) — user-facing invoice number
+- `SalesInvoiceConfiguration` and `PurchaseInvoiceConfiguration`: InvoiceNo is a plain `int` column — no HasMaxLength, no HasIndex (no unique constraint), no IsRequired needed
+- Service computes default `lastId + 1` when request InvoiceNo is null/≤0
+- Migration adds `InvoiceNo int NOT NULL DEFAULT 0` to both tables
+- `SupplierInvoiceNo` on PurchaseInvoice is the supplier's external reference — distinct from system InvoiceNo
 - Entity configurations for Product, Customer, Supplier, Warehouse must NOT include Code property, HasMaxLength, or HasIndex for Code
 - `SystemSettings` table key-value configuration: Seed `CostingMethod` (Key = "CostingMethod", Value = "1" [WeightedAverage]) and ensure the API settings client correctly maps update requests.
 

@@ -9,7 +9,7 @@ namespace SalesSystem.DesktopPWF.Views.Suppliers;
 /// <summary>
 /// Interaction logic for SuppliersListView.xaml
 /// </summary>
-public partial class SuppliersListView : System.Windows.Controls.Page
+public partial class SuppliersListView : System.Windows.Controls.UserControl
 {
     private readonly SupplierListViewModel _viewModel;
 

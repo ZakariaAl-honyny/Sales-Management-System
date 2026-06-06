@@ -23,7 +23,7 @@ public static class PrintDtoExtensions
     {
         return new InvoicePrintDto
         {
-            InvoiceNumber = invoice.InvoiceNo,
+            InvoiceNumber = invoice.Id.ToString(),
             InvoiceDate = invoice.InvoiceDate,
             TypeName = "فاتورة مبيعات",
             CashierName = string.Empty,
@@ -64,7 +64,7 @@ public static class PrintDtoExtensions
     {
         return new InvoicePrintDto
         {
-            InvoiceNumber = invoice.InvoiceNo,
+            InvoiceNumber = invoice.Id.ToString(),
             InvoiceDate = invoice.InvoiceDate,
             TypeName = "فاتورة مشتريات",
             CashierName = string.Empty,

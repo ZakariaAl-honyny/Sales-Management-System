@@ -1,7 +1,7 @@
 namespace SalesSystem.DesktopPWF.Printing.Models;
 
 public record InvoicePrintDto(
-    string InvoiceNo,
+    int Id,
     string Title,
     DateTime Date,
     string CustomerName,

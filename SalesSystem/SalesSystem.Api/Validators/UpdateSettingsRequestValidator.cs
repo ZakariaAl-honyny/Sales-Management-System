@@ -28,16 +28,19 @@ public class UpdateSettingsRequestValidator : AbstractValidator<UpdateSettingsRe
             .NotEmpty().WithMessage("العملة مطلوبة")
             .MaximumLength(10).WithMessage("العملة يجب ألا تتجاوز 10 أحرف");
 
+        // DEPRECATED: DefaultTaxRate — use Tax entity instead. Remove in Phase 20.
         RuleFor(x => x.DefaultTaxRate)
-            .InclusiveBetween(0m, 100m).WithMessage("نسبة الضريبة يجب أن تكون بين 0 و 100");
+            .InclusiveBetween(0m, 100m).WithMessage("نسبة الضريبة يجب أن تكون بين 0 و 100")
+            .When(x => x.DefaultTaxRate > 0);
 
         RuleFor(x => x.TaxNumber)
             .MaximumLength(50).WithMessage("الرقم الضريبي يجب ألا يتجاوز 50 حرف")
             .When(x => !string.IsNullOrEmpty(x.TaxNumber));
 
+        // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead. Remove in Phase 20.
         RuleFor(x => x.InvoicePrefix)
-            .NotEmpty().WithMessage("بادئة الفاتورة مطلوبة")
-            .MaximumLength(10).WithMessage("بادئة الفاتورة يجب ألا تتجاوز 10 أحرف");
+            .MaximumLength(10).WithMessage("بادئة الفاتورة يجب ألا تتجاوز 10 أحرف")
+            .When(x => !string.IsNullOrEmpty(x.InvoicePrefix));
 
         RuleFor(x => x.CostingMethod)
             .InclusiveBetween(1, 3).WithMessage("طريقة التكلفة غير صالحة — يجب أن تكون 1 (متوسط مرجح)، 2 (آخر سعر شراء)، أو 3 (سعر المورد)");

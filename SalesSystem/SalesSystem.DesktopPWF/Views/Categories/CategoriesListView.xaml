@@ -1,11 +1,11 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.Categories.CategoriesListView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Categories.CategoriesListView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
       mc:Ignorable="d"
-      Title="إدارة التصنيفات"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -18,7 +18,7 @@
 
         <!-- Header -->
         <TextBlock Grid.Row="0"
-                   Text="إدارة التصنيفات"
+                   Text="📂  إدارة التصنيفات"
                    Style="{StaticResource HeaderStyle}"
                              AutomationProperties.AutomationId="CategoriesPageTitle"/>
 
@@ -39,7 +39,7 @@
                             <KeyBinding Key="Return" Command="{Binding SearchCommand}"/>
                         </TextBox.InputBindings>
                     </TextBox>
-                     <Button Command="{Binding SearchCommand}" Style="{StaticResource PrimaryButton}" Margin="12,0,0,0" Height="36" Padding="16,0"
+                     <Button Command="{Binding SearchCommand}" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
                              AutomationProperties.AutomationId="BtnSearchCategory"
                              ToolTip="البحث عن تصنيف بالاسم">
                         <StackPanel Orientation="Horizontal">
@@ -60,7 +60,7 @@
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             AutomationProperties.AutomationId="BtnAddCategory"
                             ToolTip="إضافة تصنيف منتجات جديد">
                         <StackPanel Orientation="Horizontal">
@@ -68,14 +68,14 @@
                             <TextBlock Text="إضافة تصنيف" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             ToolTip="تعديل التصنيف المختار">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="✏️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="تعديل" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,4,0"
                             AutomationProperties.AutomationId="BtnDeleteCategory"
                             Visibility="{Binding SelectedCategory.IsActive, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}"
                             ToolTip="إيقاف نشاط التصنيف المختار">
@@ -84,7 +84,7 @@
                             <TextBlock Text="حذف" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding RestoreCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,12,0" Height="36" Padding="16,0"
+                    <Button Command="{Binding RestoreCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             Visibility="{Binding SelectedCategory.IsActive, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}"
                             ToolTip="إعادة تنشيط التصنيف المختار">
                         <StackPanel Orientation="Horizontal">
@@ -92,7 +92,7 @@
                             <TextBlock Text="استعادة" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Height="36" Padding="12,0"
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                             AutomationProperties.AutomationId="BtnRefreshCategories"
                             ToolTip="تحديث قائمة التصنيفات">
                         <StackPanel Orientation="Horizontal">
@@ -184,9 +184,9 @@
                 <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="📂" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
-                        <TextBlock Text="لا توجد تصنيفات حالياً" Style="{StaticResource HeaderStyle}" FontSize="20" HorizontalAlignment="Center"/>
+                        <TextBlock Text="لا توجد تصنيفات حالياً" Style="{StaticResource HeaderStyle}" FontSize="14" HorizontalAlignment="Center"/>
                         <TextBlock Text="ابدأ بإضافة تصنيف جديد من خلال الزر أعلاه" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة أول تصنيف" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,24,0,0" Width="180"
+                        <Button Content="➕ إضافة أول تصنيف" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
                                 ToolTip="إضافة عنصر جديد"/>
                     </StackPanel>
                 </Grid>
@@ -204,5 +204,5 @@
             </StackPanel>
         </Border>
     </Grid>
-</Page>
+</UserControl>
 

@@ -22,8 +22,9 @@ public class DatabaseHealthCheck : IHealthCheck
     {
         try
         {
-            var connString = _configuration.GetConnectionString("DefaultConnection")
-                ?? Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION");
+            var connString = _configuration.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrEmpty(connString))
+                connString = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION");
 
             if (string.IsNullOrEmpty(connString))
                 return HealthCheckResult.Unhealthy("Unreachable");

@@ -3,6 +3,7 @@ namespace SalesSystem.Contracts.Responses;
 public record CashBoxDto(
     int Id,
     string BoxName,
+    decimal OpeningBalance,
     decimal CurrentBalance,
     int? BranchId,
     string CurrencyCode,

@@ -6,7 +6,6 @@ namespace SalesSystem.Domain.Entities;
 
 public class PurchaseInvoice : BaseEntity
 {
-    public string InvoiceNo { get; private set; } = string.Empty;
     public int SupplierId { get; private set; }
     public int WarehouseId { get; private set; }
     public int? CashBoxId { get; private set; }
@@ -19,6 +18,7 @@ public class PurchaseInvoice : BaseEntity
     public decimal TotalAmount { get; private set; }
     public decimal PaidAmount { get; private set; }
     public decimal DueAmount { get; private set; }
+    public int InvoiceNo { get; private set; }
     public string? SupplierInvoiceNo { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
@@ -31,9 +31,9 @@ public class PurchaseInvoice : BaseEntity
     private PurchaseInvoice() { }
 
     public static PurchaseInvoice Create(
-        string invoiceNo,
         int supplierId,
         int warehouseId,
+        int invoiceNo,
         DateTime? invoiceDate = null,
         DateOnly? dueDate = null,
         PaymentType paymentType = PaymentType.Cash,
@@ -43,12 +43,12 @@ public class PurchaseInvoice : BaseEntity
         int? cashBoxId = null,
         int? createdByUserId = null)
     {
-        if (string.IsNullOrWhiteSpace(invoiceNo))
-            throw new DomainException("رقم الفاتورة مطلوب.");
         if (supplierId <= 0)
             throw new DomainException("المورد مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
+        if (invoiceNo <= 0)
+            throw new DomainException("رقم الفاتورة غير صحيح.");
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
         if (dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow.Date))
@@ -56,9 +56,9 @@ public class PurchaseInvoice : BaseEntity
 
         var invoice = new PurchaseInvoice
         {
-            InvoiceNo = invoiceNo,
             SupplierId = supplierId,
             WarehouseId = warehouseId,
+            InvoiceNo = invoiceNo,
             CashBoxId = cashBoxId,
             InvoiceDate = invoiceDate ?? DateTime.UtcNow,
             DueDate = dueDate,

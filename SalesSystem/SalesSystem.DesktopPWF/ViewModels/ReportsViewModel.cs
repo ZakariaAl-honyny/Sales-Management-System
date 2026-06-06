@@ -315,7 +315,7 @@ public class ReportsViewModel : ViewModelBase
             {
                 var row = table.NewRow();
                 row["التاريخ"] = reportDto.InvoiceDate.ToString("yyyy/MM/dd");
-                row["رقم الفاتورة"] = reportDto.InvoiceNo;
+                row["رقم الفاتورة"] = reportDto.Id.ToString();
                 row["العميل"] = reportDto.CustomerName;
                 row["المجموع الفرعي"] = reportDto.SubTotal;
                 row["الخصم"] = reportDto.DiscountAmount;
@@ -358,7 +358,7 @@ public class ReportsViewModel : ViewModelBase
             {
                 var row = table.NewRow();
                 row["التاريخ"] = reportDto.InvoiceDate.ToString("yyyy/MM/dd");
-                row["رقم الفاتورة"] = reportDto.InvoiceNo;
+                row["رقم الفاتورة"] = reportDto.Id.ToString();
                 row["المورد"] = reportDto.SupplierName;
                 row["المجموع الفرعي"] = reportDto.SubTotal;
                 row["الخصم"] = reportDto.DiscountAmount;

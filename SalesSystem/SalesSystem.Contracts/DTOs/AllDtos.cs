@@ -27,7 +27,13 @@ public record ProductDto(
     string? Description,
     DateTime? ExpirationDate,
     string? ImagePath,  // مسار الصورة المحلي (اختياري)
-    bool IsActive);
+    bool IsActive,
+    decimal CurrentStock = 0)
+{
+    public bool IsOutOfStock => CurrentStock <= 0;
+    public bool IsLowStock => CurrentStock > 0 && CurrentStock <= MinStock;
+    public string StockStatusLabel => IsOutOfStock ? "نفذ" : IsLowStock ? "محدود" : "";
+}
 
 public record WarehouseDto(int Id, string Name, string? Location, bool IsDefault, bool IsActive);
 
@@ -52,7 +58,7 @@ public record CustomerDto(int Id, string Name, string? Phone, string? Email, str
 
 public record SalesInvoiceDto(
     int Id,
-    string InvoiceNo,
+    int InvoiceNo,
     int? CustomerId,
     string? CustomerName,
     int WarehouseId,
@@ -68,6 +74,9 @@ public record SalesInvoiceDto(
     decimal DueAmount,
     string? Notes,
     byte Status,
+    int? TaxId,
+    string? TaxName,
+    decimal? TaxRate,
     IReadOnlyList<SalesInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -96,7 +105,7 @@ public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName,
 
 public record PurchaseInvoiceDto(
     int Id,
-    string InvoiceNo,
+    int InvoiceNo,
     int SupplierId,
     string SupplierName,
     int WarehouseId,
@@ -113,6 +122,9 @@ public record PurchaseInvoiceDto(
     string? SupplierInvoiceNo,
     string? Notes,
     byte Status,
+    int? TaxId,
+    string? TaxName,
+    decimal? TaxRate,
     IReadOnlyList<PurchaseInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -289,7 +301,13 @@ public record PrintSettingsDto(
     bool AutoPrintOnPost,
     string ReceiptHeader,
     string ReceiptFooter,
-    int EscPosCodePage);
+    int EscPosCodePage,
+    string PaperSize,
+    int PrintCopies,
+    bool ShowBalanceOnPrint,
+    bool PrintSignature,
+    bool ShowLogo = true,
+    string FooterNote = "");
 
 public record StoreSettingsDto(
     int Id,
@@ -299,18 +317,19 @@ public record StoreSettingsDto(
     string? LogoPath,
     string? Email,
     string CurrencyCode,
-    decimal DefaultTaxRate,
-    bool IsTaxEnabled,
+    decimal DefaultTaxRate, // DEPRECATED: DefaultTaxRate — use Tax entity instead (kept for backwards compat). Remove in Phase 20.
+    bool IsTaxEnabled,      // DEPRECATED: IsTaxEnabled — use Tax entity instead (kept for backwards compat). Remove in Phase 20.
     string? TaxNumber,
     bool EnableStockAlerts,
     bool AllowNegativeStock,
     bool AutoUpdatePrices,
-    string InvoicePrefix,
+    string InvoicePrefix,    // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead (kept for backwards compat). Remove in Phase 20.
     int CostingMethod = 1,
     string? BackupPath = null,
     string? BackupScheduleTime = "02:00",
     int BackupRetentionDays = 30,
-    string? UpdateServerUrl = null);
+    string? UpdateServerUrl = null,
+    string? SignaturePath = null);
 
 public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
 
@@ -329,7 +348,7 @@ public record DashboardSummaryDto(
 
 public record SalesReportDto(
     DateTime InvoiceDate,
-    string InvoiceNo,
+    int Id,
     string CustomerName,
     decimal SubTotal,
     decimal DiscountAmount,
@@ -341,7 +360,7 @@ public record SalesReportDto(
 
 public record PurchaseReportDto(
     DateTime InvoiceDate,
-    string InvoiceNo,
+    int Id,
     string SupplierName,
     decimal SubTotal,
     decimal DiscountAmount,
@@ -431,6 +450,73 @@ public record LowStockReportDto(
     decimal ConversionFactor
 );
 
+// Financial Reports DTOs
+public record IncomeStatementDto(
+    string Category,
+    string Description,
+    decimal Amount);
 
+public record CashFlowItemDto(
+    string Category,
+    decimal Amount);
 
+public record CashFlowReportDto(
+    decimal OpeningBalance,
+    decimal TotalIncome,
+    decimal TotalExpense,
+    decimal NetCashFlow,
+    decimal ClosingBalance,
+    List<CashFlowItemDto> IncomeItems,
+    List<CashFlowItemDto> ExpenseItems);
+
+public record VatReportDto(
+    string InvoiceNumber,
+    DateTime InvoiceDate,
+    string? PartyName,
+    decimal TaxableAmount,
+    decimal TaxRate,
+    decimal TaxAmount);
+
+public record TaxDto(int Id, string Name, decimal Rate, bool IsDefault, bool IsActive);
+
+// ─── Accounting DTOs ─────────────────────────────────
+public record AccountBalanceDto(
+    int AccountId,
+    string AccountCode,
+    string AccountNameAr,
+    byte AccountType,
+    decimal TotalDebit,
+    decimal TotalCredit,
+    decimal Balance,
+    bool IsDebitNormal
+);
+
+public record AccountLedgerDto(
+    string AccountCode,
+    string AccountNameAr,
+    decimal OpeningBalance,
+    List<AccountLedgerLineDto> Lines,
+    decimal TotalDebit,
+    decimal TotalCredit,
+    decimal ClosingBalance
+);
+
+public record AccountLedgerLineDto(
+    DateTime Date,
+    string EntryNumber,
+    string Description,
+    string? ReferenceNumber,
+    decimal Debit,
+    decimal Credit,
+    decimal RunningBalance
+);
+
+public record AccountStatementDto(
+    DateTime Date,
+    string Description,
+    string ReferenceNumber,
+    decimal Debit,
+    decimal Credit,
+    decimal Balance
+);
 

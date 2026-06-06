@@ -13,11 +13,11 @@
     <UserControl.Resources>
         <!-- Style for category tile buttons -->
         <Style x:Key="TouchCategoryTileStyle" TargetType="ListBoxItem">
-            <Setter Property="MinHeight" Value="50"/>
-            <Setter Property="MinWidth" Value="90"/>
-            <Setter Property="Padding" Value="14,10"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="MinHeight" Value="40"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
@@ -61,11 +61,12 @@
             </Setter>
         </Style>
 
-        <!-- Style for product touch buttons -->
+        <!-- Style for product touch buttons (square shape + clear selection feedback) -->
         <Style x:Key="TouchProductButtonStyle" TargetType="Button">
-            <Setter Property="MinHeight" Value="100"/>
-            <Setter Property="Margin" Value="7"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Height" Value="90"/>
+            <Setter Property="Width" Value="95"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="Padding" Value="6"/>
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -79,15 +80,33 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="12"
+                                CornerRadius="10"
                                 Padding="{TemplateBinding Padding}"
                                 Margin="{TemplateBinding Margin}"
                                 MinHeight="{TemplateBinding MinHeight}"
                                 Effect="{StaticResource SubtleShadow}"
                                 SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="False"/>
+                            <Grid>
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  RecognizesAccessKey="False"/>
+                                <!-- Green overlay shown briefly on press -->
+                                <Border x:Name="PressedOverlay"
+                                        Background="#10B981"
+                                        CornerRadius="10"
+                                        Opacity="0"
+                                        IsHitTestVisible="False"/>
+                                <!-- Checkmark shown on press -->
+                                <TextBlock x:Name="CheckMark"
+                                           Text="✓"
+                                           FontSize="28"
+                                           FontWeight="Bold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Opacity="0"
+                                           IsHitTestVisible="False"/>
+                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -96,13 +115,27 @@
                                 <Setter TargetName="Border" Property="Effect" Value="{StaticResource DeepShadow}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#E2E8F0"/>
-                                <Setter TargetName="Border" Property="BorderBrush" Value="#1E40AF"/>
+                                <Setter TargetName="Border" Property="Background" Value="#D1FAE5"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#10B981"/>
+                                <Setter TargetName="Border" Property="BorderThickness" Value="2"/>
+                                <Setter TargetName="PressedOverlay" Property="Opacity" Value="0.3"/>
+                                <Setter TargetName="CheckMark" Property="Opacity" Value="1"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- Style for stock status badge on product card -->
+        <Style x:Key="StockBadgeStyle" TargetType="Border">
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="MinWidth" Value="40"/>
+            <Setter Property="Height" Value="18"/>
         </Style>
     </UserControl.Resources>
 
@@ -129,9 +162,9 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                    <TextBlock Text="📂" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="📂" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                     <TextBlock Text="التصنيفات"
-                               FontSize="16" FontWeight="Bold"
+                               FontSize="14" FontWeight="Bold"
                                Foreground="{StaticResource TextPrimaryBrush}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -163,7 +196,7 @@
                 <TextBlock Grid.Row="1"
                            Text="لا توجد تصنيفات متاحة"
                            Foreground="{StaticResource TextSecondaryBrush}"
-                           FontSize="15"
+                           FontSize="13"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            Margin="0,8"
@@ -185,9 +218,9 @@
 
                 <!-- Section header -->
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                    <TextBlock Text="📦" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="📦" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                     <TextBlock Text="المنتجات"
-                               FontSize="16" FontWeight="Bold"
+                               FontSize="14" FontWeight="Bold"
                                Foreground="{StaticResource TextPrimaryBrush}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -195,15 +228,11 @@
                 <!-- Product grid -->
                 <ScrollViewer Grid.Row="1"
                               VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled"
-                              VirtualizingStackPanel.IsVirtualizing="True"
-                              VirtualizingStackPanel.VirtualizationMode="Recycling">
-                    <ItemsControl ItemsSource="{Binding Products}"
-                                  VirtualizingStackPanel.IsVirtualizing="True"
-                                  VirtualizingStackPanel.VirtualizationMode="Recycling">
+                              HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Products}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <UniformGrid Columns="4"/>
+                                <WrapPanel Orientation="Horizontal" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
@@ -212,31 +241,63 @@
                                         CommandParameter="{Binding}"
                                         Style="{StaticResource TouchProductButtonStyle}">
                                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <!-- Product Image (lazy loaded, hidden when null) -->
-                                        <Image Source="{Binding ImagePath, IsAsync=True}"
-                                               MaxHeight="55"
-                                               MaxWidth="80"
-                                               Margin="0,0,0,6"
+                                        <!-- Product Image (smaller) -->
+                                        <Image Source="{Binding ImagePath, Converter={StaticResource ImagePathConverter}, IsAsync=True}"
+                                                MaxHeight="28"
+                                                MaxWidth="50"
+                                               Margin="0,0,0,4"
                                                Visibility="{Binding ImagePath, Converter={StaticResource NullToVisibility}}"/>
 
-                                        <!-- Product Name -->
+                                        <!-- Product Name (smaller font) -->
                                         <TextBlock Text="{Binding Name}"
-                                                   FontSize="14"
+                                                   FontSize="10"
                                                    FontWeight="Bold"
                                                    TextWrapping="Wrap"
                                                    TextAlignment="Center"
                                                    HorizontalAlignment="Center"
-                                                   LineHeight="18"
-                                                   MaxHeight="36"
-                                                   Margin="0,0,0,4"/>
+                                                   LineHeight="13"
+                                                   MaxHeight="26"
+                                                   Margin="0,0,0,2"/>
 
-                                        <!-- Price -->
-                                        <TextBlock Text="{Binding RetailPrice, StringFormat=N2}"
-                                                   FontSize="15"
-                                                   FontWeight="Bold"
-                                                   Foreground="{StaticResource SuccessBrush}"
-                                                   TextAlignment="Center"
-                                                   HorizontalAlignment="Center"/>
+                                        <!-- Price row -->
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding RetailPrice, StringFormat=N2}"
+                                                       FontSize="11"
+                                                       FontWeight="Bold"
+                                                       Foreground="{StaticResource SuccessBrush}"
+                                                       TextAlignment="Center"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <!-- Stock status badge -->
+                                        <Border Visibility="{Binding IsOutOfStock, Converter={StaticResource BoolToVisibility}}">
+                                            <Border.Style>
+                                                <Style TargetType="Border" BasedOn="{StaticResource StockBadgeStyle}">
+                                                    <Setter Property="Background" Value="#FEE2E2"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLowStock}" Value="True">
+                                                            <Setter Property="Background" Value="#FEF3C7"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding StockStatusLabel}"
+                                                       FontSize="10"
+                                                       FontWeight="Bold"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#991B1B"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsLowStock}" Value="True">
+                                                                <Setter Property="Foreground" Value="#92400E"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
                                     </StackPanel>
                                 </Button>
                             </DataTemplate>
@@ -249,16 +310,16 @@
                         Background="Transparent"
                         Visibility="{Binding Products.Count, Converter={StaticResource CountToVisibility}, ConverterParameter=Inverse}">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="📭" FontSize="48" HorizontalAlignment="Center" Opacity="0.4" Margin="0,0,0,10"/>
+                        <TextBlock Text="📭" FontSize="40" HorizontalAlignment="Center" Opacity="0.4" Margin="0,0,0,8"/>
                         <TextBlock Text="لا توجد منتجات في هذا التصنيف"
-                                   FontSize="16"
+                                   FontSize="14"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="اختر تصنيفاً آخر أو أضف منتجات جديدة"
-                                   FontSize="13"
+                        <TextBlock Text="اختر تصنيفاً آخر، أو تأكد من توفر رصيد كافٍ في المستودع"
+                                   FontSize="12"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"
-                                   Margin="0,6,0,0"
+                                   Margin="0,4,0,0"
                                    Opacity="0.7"/>
                     </StackPanel>
                 </Border>
@@ -294,9 +355,9 @@
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock Text="🏪" FontSize="72" HorizontalAlignment="Center" Opacity="0.3" Margin="0,0,0,16"/>
                 <TextBlock Text="نقطة البيع"
-                           FontSize="28" FontWeight="Bold"
-                           Foreground="{StaticResource TextPrimaryBrush}"
-                           HorizontalAlignment="Center"/>
+                            FontSize="26" FontWeight="Bold"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            HorizontalAlignment="Center"/>
                 <TextBlock Text="لا توجد تصنيفات متاحة حالياً"
                            FontSize="15"
                            Foreground="{StaticResource TextSecondaryBrush}"

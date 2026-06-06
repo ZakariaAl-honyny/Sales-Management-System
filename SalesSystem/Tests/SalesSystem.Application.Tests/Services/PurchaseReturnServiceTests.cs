@@ -204,9 +204,9 @@ public class PurchaseReturnServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(
-            "PUR-2026-000001",
             supplierId: 1,
             warehouseId: 1,
+            invoiceNo: 1,
             invoiceDate: DateTime.Now,
             dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             discountAmount: 0m,

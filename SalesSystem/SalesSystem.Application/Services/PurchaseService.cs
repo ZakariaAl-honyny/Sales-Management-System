@@ -14,7 +14,6 @@ public class PurchaseService : IPurchaseService
 {
     private readonly IUnitOfWork _uow;
     private readonly IInventoryService _inventoryService;
-    private readonly IDocumentSequenceService _sequenceService;
     private readonly IStoreSettingsService _settingsService;
     private readonly IUpdateProductPricingService _pricingService;
     private readonly ICashBoxService _cashBoxService;
@@ -23,7 +22,6 @@ public class PurchaseService : IPurchaseService
     public PurchaseService(
         IUnitOfWork uow,
         IInventoryService inventoryService,
-        IDocumentSequenceService sequenceService,
         IStoreSettingsService settingsService,
         IUpdateProductPricingService pricingService,
         ICashBoxService cashBoxService,
@@ -31,7 +29,6 @@ public class PurchaseService : IPurchaseService
     {
         _uow = uow;
         _inventoryService = inventoryService;
-        _sequenceService = sequenceService;
         _settingsService = settingsService;
         _pricingService = pricingService;
         _cashBoxService = cashBoxService;
@@ -42,17 +39,6 @@ public class PurchaseService : IPurchaseService
     {
         var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
             i => i.Id == id, ct, "Supplier", "Warehouse", "Items.Product");
-
-        if (invoice == null)
-            return Result<PurchaseInvoiceDto>.Failure("فاتورة المشتريات غير موجودة", ErrorCodes.NotFound);
-
-        return Result<PurchaseInvoiceDto>.Success(MapToDto(invoice));
-    }
-
-    public async Task<Result<PurchaseInvoiceDto>> GetByNumberAsync(string invoiceNo, CancellationToken ct = default)
-    {
-        var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
-            i => i.InvoiceNo == invoiceNo, ct, "Supplier", "Warehouse", "Items.Product");
 
         if (invoice == null)
             return Result<PurchaseInvoiceDto>.Failure("فاتورة المشتريات غير موجودة", ErrorCodes.NotFound);
@@ -74,6 +60,9 @@ public class PurchaseService : IPurchaseService
         // Build predicate dynamically
         var searchLower = string.IsNullOrWhiteSpace(search) ? null : search.Trim().ToLower();
 
+        // Parse search text as Id outside the expression tree (EF Core can't translate int.TryParse)
+        int? searchId = int.TryParse(searchLower, out var parsedId) ? parsedId : null;
+
         System.Linq.Expressions.Expression<System.Func<PurchaseInvoice, bool>> predicate = i =>
             (!supplierId.HasValue || i.SupplierId == supplierId.Value) &&
             (!status.HasValue || (int)i.Status == status.Value) &&
@@ -81,7 +70,7 @@ public class PurchaseService : IPurchaseService
             (!from.HasValue || i.InvoiceDate >= from.Value) &&
             (!to.HasValue || i.InvoiceDate <= to.Value) &&
             (searchLower == null ||
-             i.InvoiceNo.ToLower().Contains(searchLower) ||
+             (searchId.HasValue && i.Id == searchId.Value) ||
              (i.Supplier != null && i.Supplier.Name.ToLower().Contains(searchLower)) ||
              (i.SupplierInvoiceNo != null && i.SupplierInvoiceNo.ToLower().Contains(searchLower)) ||
              (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
@@ -102,17 +91,25 @@ public class PurchaseService : IPurchaseService
 
     public async Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, int userId, CancellationToken ct)
     {
+        // Compute default InvoiceNo if not provided: last Id + 1
+        var invoiceNo = request.InvoiceNo ?? 0;
+        if (invoiceNo <= 0)
+        {
+            var lastInvoices = await _uow.PurchaseInvoices.ToListAsync(
+                predicate: null,
+                queryConfig: q => q.OrderByDescending(i => i.Id).Take(1),
+                ct: ct);
+            var lastId = lastInvoices.FirstOrDefault()?.Id ?? 0;
+            invoiceNo = lastId + 1;
+        }
+
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
-            var invoiceNoResult = await _sequenceService.GetNextNumberAsync("PUR", ct);
-            if (!invoiceNoResult.IsSuccess)
-                return Result<PurchaseInvoiceDto>.Failure(invoiceNoResult.Error!);
-
             var invoice = PurchaseInvoice.Create(
-                invoiceNoResult.Value!,
                 request.SupplierId,
                 request.WarehouseId,
+                invoiceNo,
                 request.InvoiceDate,
                 request.DueDate,
                 (Domain.Enums.PaymentType)request.PaymentType,
@@ -145,7 +142,7 @@ public class PurchaseService : IPurchaseService
 
             await transaction.CommitAsync(ct);
 
-            _logger.LogInformation("Purchase Invoice created as Draft: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
+            _logger.LogInformation("Purchase Invoice created as Draft: ID {Id} by User {UserId}", invoice.Id, userId);
 
             return await GetByIdAsync(invoice.Id, ct);
         }
@@ -226,7 +223,7 @@ public class PurchaseService : IPurchaseService
 
         if (invoice.Status != InvoiceStatus.Draft)
         {
-            _logger.LogWarning("Cannot post purchase invoice {InvoiceNo} because status is {Status}", invoice.InvoiceNo, invoice.Status);
+            _logger.LogWarning("Cannot post purchase invoice {Id} because status is {Status}", invoice.Id, invoice.Status);
             return Result<PurchaseInvoiceDto>.Failure("يمكن فقط ترحيل الفواتير المسودة");
         }
 
@@ -253,7 +250,7 @@ public class PurchaseService : IPurchaseService
                         }
                     }
                     await _uow.SaveChangesAsync(ct);
-                    _logger.LogInformation("AutoUpdatePrices: Updated purchase prices for {Count} products from invoice {InvoiceNo}", invoice.Items.Count, invoice.InvoiceNo);
+                    _logger.LogInformation("AutoUpdatePrices: Updated purchase prices for {Count} products from invoice {Id}", invoice.Items.Count, invoice.Id);
                 }
 
                 // Update Stock
@@ -304,14 +301,14 @@ public class PurchaseService : IPurchaseService
 
                         if (!result.IsSuccess)
                         {
-                            _logger.LogWarning("Cost update for product {ProductId} from invoice {InvoiceNo} failed: {Error}",
-                                item.ProductId, invoice.InvoiceNo, result.Error);
+                            _logger.LogWarning("Cost update for product {ProductId} from invoice {Id} failed: {Error}",
+                                item.ProductId, invoice.Id, result.Error);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Cost update failed for product {ProductId} from invoice {InvoiceNo}",
-                            item.ProductId, invoice.InvoiceNo);
+                        _logger.LogWarning(ex, "Cost update failed for product {ProductId} from invoice {Id}",
+                            item.ProductId, invoice.Id);
                     }
                 }
 
@@ -322,7 +319,7 @@ public class PurchaseService : IPurchaseService
                     if (supplier == null)
                     {
                         await transaction.RollbackAsync(ct);
-                        _logger.LogWarning("Supplier {SupplierId} not found during purchase invoice {InvoiceNo} post", invoice.SupplierId, invoice.InvoiceNo);
+                        _logger.LogWarning("Supplier {SupplierId} not found during purchase invoice {Id} post", invoice.SupplierId, invoice.Id);
                         return Result<PurchaseInvoiceDto>.Failure("المورد غير موجود");
                     }
                     supplier.IncreaseBalance(invoice.DueAmount);
@@ -342,15 +339,15 @@ public class PurchaseService : IPurchaseService
 
                     if (!cashResult.IsSuccess)
                     {
-                        _logger.LogWarning("Cash transaction recording failed for purchase invoice {InvoiceNo} (ID: {Id}): {Error}",
-                            invoice.InvoiceNo, invoice.Id, cashResult.Error);
+                        _logger.LogWarning("Cash transaction recording failed for purchase invoice {Id}: {Error}",
+                            invoice.Id, cashResult.Error);
                     }
                 }
 
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                _logger.LogInformation("Purchase Invoice posted: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
+                _logger.LogInformation("Purchase Invoice posted: ID {Id} by User {UserId}", invoice.Id, userId);
 
                 return await GetByIdAsync(invoice.Id, ct);
             }
@@ -449,7 +446,7 @@ public class PurchaseService : IPurchaseService
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                _logger.LogInformation("Purchase Invoice cancelled: {InvoiceNo} (ID: {Id}) by User {UserId}", invoice.InvoiceNo, invoice.Id, userId);
+                _logger.LogInformation("Purchase Invoice cancelled: ID {Id} by User {UserId}", invoice.Id, userId);
 
                 return await GetByIdAsync(invoice.Id, ct);
             }

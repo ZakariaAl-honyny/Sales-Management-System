@@ -392,7 +392,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         }
     }
 
-    // â”€â”€â”€ Print Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Print Methods ──────────────────────────────────────────────────────
 
     private async Task PrintPreviewAsync()
     {
@@ -402,7 +402,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
             var result = await _printService.GetPurchaseA4PdfAsync(SelectedInvoice.Id);
             if (result.IsSuccess && result.Value != null)
             {
-                var preview = new Views.Common.PdfPreviewWindow(result.Value, SelectedInvoice.InvoiceNo, SelectedInvoice.Id, isPurchase: true);
+                var preview = new Views.Common.PdfPreviewWindow(result.Value, SelectedInvoice.Id.ToString(), SelectedInvoice.Id, isPurchase: true);
                 preview.ShowDialog();
             }
             else

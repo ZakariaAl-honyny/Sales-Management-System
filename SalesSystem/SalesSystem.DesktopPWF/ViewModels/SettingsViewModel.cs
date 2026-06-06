@@ -15,7 +15,6 @@ namespace SalesSystem.DesktopPWF.ViewModels;
 public class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsApiService _settingsService;
-    private readonly IBackupApiService _backupService;
     private readonly IPrintApiService _printService;
 
     private string _companyName = string.Empty;
@@ -28,9 +27,6 @@ public class SettingsViewModel : ViewModelBase
     private bool _enableStockAlerts = true;
     private bool _allowNegativeStock;
     private bool _autoUpdatePrices;
-    private ObservableCollection<string> _backups = new();
-    private string? _selectedBackup;
-
     private int _costingMethod = 1; // Default WeightedAverage
     private string _thermalPrinterName = string.Empty;
     private string _a4PrinterName = string.Empty;
@@ -41,28 +37,28 @@ public class SettingsViewModel : ViewModelBase
     private string _receiptFooter = string.Empty;
     private int _escPosCodePage = 22;
     private bool _autoPrintOnPost;
-    private string _backupPath = string.Empty;
-    private string _backupScheduleTime = "02:00";
-    private int _backupRetentionDays = 30;
-    private string _updateServerUrl = string.Empty;
+    private string _paperSize = "A4";
+    private int _printCopies = 1;
+    private bool _showBalanceOnPrint = true;
+    private bool _printSignature;
+    private bool _showLogo = true;
+    private string _footerNote = string.Empty;
+    private string _signaturePath = string.Empty;
 
     public SettingsViewModel()
     {
         _settingsService = App.GetService<ISettingsApiService>();
-        _backupService = App.GetService<IBackupApiService>();
         _printService = App.GetService<IPrintApiService>();
         SetDialogService(App.GetService<IDialogService>());
 
         LoadCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadSettingsOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.LoadSettingsAsync", "[SettingsViewModel.LoadSettingsAsync] Failed to load system settings."))));
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveSettingsOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.SaveSettingsAsync", "[SettingsViewModel.SaveSettingsAsync] Unexpected error during save."))));
-        CreateBackupCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(CreateBackupOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.CreateBackupAsync", "[SettingsViewModel.CreateBackupAsync] Unexpected error."))));
-        RestoreBackupCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(RestoreBackupOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.RestoreBackupAsync", "[SettingsViewModel.RestoreBackupAsync] Unexpected error."))), () => !string.IsNullOrEmpty(SelectedBackup));
         BrowseLogoCommand = new RelayCommand(_ => BrowseLogo());
         TestPrintCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(TestPrintOperationAsync, ex => StatusMessage = HandleException(ex, "SettingsViewModel.TestPrintAsync", "[SettingsViewModel.TestPrintAsync] Test print failed."))));
-        BrowseBackupPathCommand = new RelayCommand(_ => BrowseBackupPath());
+        BrowseSignatureCommand = new RelayCommand(_ => BrowseSignature());
+        ClearSignatureCommand = new RelayCommand(_ => SignaturePath = string.Empty);
 
         _ = ExecuteAsync(LoadSettingsOperationAsync);
-        _ = RefreshBackupListAsync();
     }
 
     #region Properties
@@ -96,16 +92,18 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _address, value);
     }
 
+    // DEPRECATED: DefaultTaxRate — use Tax entity instead. Remove in Phase 20.
     public decimal DefaultTaxRate
     {
-        get => _defaultTaxRate;
-        set => SetProperty(ref _defaultTaxRate, value);
+        get => 0m;
+        set { _defaultTaxRate = 0m; OnPropertyChanged(); }
     }
 
+    // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead. Remove in Phase 20.
     public string InvoicePrefix
     {
-        get => _invoicePrefix;
-        set => SetProperty(ref _invoicePrefix, value);
+        get => string.Empty;
+        set { _invoicePrefix = string.Empty; OnPropertyChanged(); }
     }
 
     public bool EnableStockAlerts
@@ -126,23 +124,6 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _autoUpdatePrices, value);
     }
 
-    public ObservableCollection<string> Backups
-    {
-        get => _backups;
-        set => SetProperty(ref _backups, value);
-    }
-
-    public string? SelectedBackup
-    {
-        get => _selectedBackup;
-        set
-        {
-            if (SetProperty(ref _selectedBackup, value))
-            {
-                RestoreBackupCommand.RaiseCanExecuteChanged();
-            }
-        }
-    }
     #endregion
 
     #region Costing Method Properties
@@ -244,6 +225,42 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _autoPrintOnPost, value);
     }
 
+    public string PaperSize
+    {
+        get => _paperSize;
+        set => SetProperty(ref _paperSize, value);
+    }
+
+    public int PrintCopies
+    {
+        get => _printCopies;
+        set => SetProperty(ref _printCopies, value);
+    }
+
+    public bool ShowBalanceOnPrint
+    {
+        get => _showBalanceOnPrint;
+        set => SetProperty(ref _showBalanceOnPrint, value);
+    }
+
+    public bool PrintSignature
+    {
+        get => _printSignature;
+        set => SetProperty(ref _printSignature, value);
+    }
+
+    public bool ShowLogo
+    {
+        get => _showLogo;
+        set => SetProperty(ref _showLogo, value);
+    }
+
+    public string FooterNote
+    {
+        get => _footerNote;
+        set => SetProperty(ref _footerNote, value);
+    }
+
     public List<string> InstalledPrinters { get; } =
         System.Drawing.Printing.PrinterSettings.InstalledPrinters
             .Cast<string>()
@@ -251,40 +268,19 @@ public class SettingsViewModel : ViewModelBase
             .ToList();
     #endregion
 
-    #region Backup & Update Properties
-    public string BackupPath
+    public string SignaturePath
     {
-        get => _backupPath;
-        set => SetProperty(ref _backupPath, value);
+        get => _signaturePath;
+        set => SetProperty(ref _signaturePath, value);
     }
-
-    public string BackupScheduleTime
-    {
-        get => _backupScheduleTime;
-        set => SetProperty(ref _backupScheduleTime, value);
-    }
-
-    public int BackupRetentionDays
-    {
-        get => _backupRetentionDays;
-        set => SetProperty(ref _backupRetentionDays, value);
-    }
-
-    public string UpdateServerUrl
-    {
-        get => _updateServerUrl;
-        set => SetProperty(ref _updateServerUrl, value);
-    }
-    #endregion
 
     #region Commands
     public AsyncRelayCommand LoadCommand { get; }
     public AsyncRelayCommand SaveCommand { get; }
-    public AsyncRelayCommand CreateBackupCommand { get; }
-    public AsyncRelayCommand RestoreBackupCommand { get; }
     public ICommand BrowseLogoCommand { get; }
     public ICommand TestPrintCommand { get; }
-    public ICommand BrowseBackupPathCommand { get; }
+    public ICommand BrowseSignatureCommand { get; }
+    public ICommand ClearSignatureCommand { get; }
     #endregion
 
     #region Logic
@@ -305,18 +301,19 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    private void BrowseBackupPath()
+    private void BrowseSignature()
     {
-        var dialog = new Microsoft.Win32.OpenFolderDialog
+        var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "اختيار مجلد النسخ الاحتياطي",
+            Title = "اختيار ملف التوقيع",
+            Filter = "Image Files|*.png;*.jpg;*.jpeg",
             Multiselect = false
         };
 
         if (dialog.ShowDialog() == true)
         {
-            BackupPath = dialog.FolderName;
-            StatusMessage = "✅ تم اختيار مجلد النسخ الاحتياطي";
+            SignaturePath = dialog.FileName;
+            StatusMessage = "✅ تم اختيار ملف التوقيع";
         }
     }
 
@@ -356,10 +353,7 @@ public class SettingsViewModel : ViewModelBase
             AutoUpdatePrices = s.AutoUpdatePrices;
             InvoicePrefix = s.InvoicePrefix;
             CostingMethod = s.CostingMethod;
-            BackupPath = s.BackupPath ?? string.Empty;
-            BackupScheduleTime = s.BackupScheduleTime ?? "02:00";
-            BackupRetentionDays = s.BackupRetentionDays;
-            UpdateServerUrl = s.UpdateServerUrl ?? string.Empty;
+            SignaturePath = s.SignaturePath ?? string.Empty;
         }
 
         try
@@ -377,6 +371,12 @@ public class SettingsViewModel : ViewModelBase
                 ReceiptFooter = p.ReceiptFooter ?? string.Empty;
                 EscPosCodePage = p.EscPosCodePage;
                 AutoPrintOnPost = p.AutoPrintOnPost;
+                PaperSize = p.PaperSize;
+                PrintCopies = p.PrintCopies;
+                ShowBalanceOnPrint = p.ShowBalanceOnPrint;
+                PrintSignature = p.PrintSignature;
+                ShowLogo = p.ShowLogo;
+                FooterNote = p.FooterNote ?? string.Empty;
             }
         }
         catch (Exception ex)
@@ -399,15 +399,9 @@ public class SettingsViewModel : ViewModelBase
             return;
         }
 
-        if (DefaultTaxRate < 0 || DefaultTaxRate > 100)
-        {
-            StatusMessage = "نسبة الضريبة يجب أن تكون بين 0 و 100";
-            await DialogService!.ShowWarningAsync("خطأ في البيانات", StatusMessage);
-            return;
-        }
-
         StatusMessage = string.Empty;
 
+        // DEPRECATED: DefaultTaxRate — use Tax entity instead; DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead. Remove in Phase 20.
         var request = new UpdateSettingsRequest(
             CompanyName,
             Address,
@@ -415,18 +409,19 @@ public class SettingsViewModel : ViewModelBase
             Email,
             null,
             "SAR",
-            DefaultTaxRate,
-            DefaultTaxRate > 0,
+            0m,            // DefaultTaxRate — deprecated, always send 0
+            true,          // IsTaxEnabled — deprecated, always send true
             TaxNumber,
             EnableStockAlerts,
             AllowNegativeStock,
             AutoUpdatePrices,
-            InvoicePrefix,
+            string.Empty,  // InvoicePrefix — deprecated, always send empty
             CostingMethod,
-            BackupPath,
-            BackupScheduleTime,
-            BackupRetentionDays,
-            UpdateServerUrl
+            BackupPath: null,
+            BackupScheduleTime: null,
+            BackupRetentionDays: 30,
+            UpdateServerUrl: null,
+            SignatureUrl: SignaturePath
         );
 
         var result = await _settingsService.UpdateSettingsAsync(request);
@@ -443,7 +438,13 @@ public class SettingsViewModel : ViewModelBase
                 AutoPrintOnPost,
                 ReceiptHeader,
                 ReceiptFooter,
-                EscPosCodePage);
+                EscPosCodePage,
+                PaperSize: PaperSize,
+                PrintCopies: PrintCopies,
+                ShowBalanceOnPrint: ShowBalanceOnPrint,
+                PrintSignature: PrintSignature,
+                ShowLogo: ShowLogo,
+                FooterNote: FooterNote);
             var printResult = await _settingsService.UpdatePrintSettingsAsync(printRequest);
             if (!printResult.IsSuccess)
             {
@@ -452,6 +453,9 @@ public class SettingsViewModel : ViewModelBase
                 await DialogService!.ShowErrorAsync("خطأ في حفظ إعدادات الطباعة", StatusMessage);
                 return;
             }
+
+            // Publish settings changed event so other ViewModels can react
+            App.GetService<IEventBus>().Publish(new StoreSettingsChangedMessage());
 
             StatusMessage = "✅ تم حفظ الإعدادات بنجاح";
             _ = Task.Delay(3000).ContinueWith(_ => StatusMessage = string.Empty);
@@ -463,62 +467,5 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
-    private async Task CreateBackupOperationAsync()
-    {
-        StatusMessage = "جاري إنشاء نسخة احتياطية...";
-
-        var result = await _backupService.CreateBackupAsync();
-        if (result.IsSuccess)
-        {
-            StatusMessage = "✅ تم إنشاء النسخة الاحتياطية بنجاح";
-            await RefreshBackupListAsync();
-        }
-        else
-        {
-            StatusMessage = result.Error ?? "فشل في إنشاء النسخة الاحتياطية";
-            await DialogService!.ShowErrorAsync("خطأ في النسخ الاحتياطي", StatusMessage);
-        }
-    }
-
-    private async Task RefreshBackupListAsync()
-    {
-        try
-        {
-            var result = await _backupService.GetBackupListAsync();
-            if (result.IsSuccess && result.Value != null)
-            {
-                Backups = new ObservableCollection<string>(result.Value);
-            }
-        }
-        catch (Exception ex)
-        {
-            HandleException(ex, "SettingsViewModel.RefreshBackupListAsync", "[SettingsViewModel.RefreshBackupListAsync] Failed to refresh backup list.");
-        }
-    }
-
-    private async Task RestoreBackupOperationAsync()
-    {
-        if (string.IsNullOrEmpty(SelectedBackup)) return;
-
-        var confirm = await DialogService!.ShowConfirmationAsync("تأكيد استعادة النسخة الاحتياطية", $"⚠️ تنبيه: استعادة النسخة الاحتياطية '{SelectedBackup}' سيؤدي إلى استبدال قاعدة البيانات الحالية تماماً وإغلاق جميع الاتصالات النشطة.\n\nهل تريد الاستمرار؟");
-
-        if (!confirm) return;
-
-        StatusMessage = "جاري استعادة النسخة الاحتياطية... قد يستغرق هذا وقتاً.";
-
-        var result = await _backupService.RestoreBackupAsync(SelectedBackup);
-        if (result.IsSuccess)
-        {
-            StatusMessage = "✅ تم استعادة قاعدة البيانات بنجاح. سيتم إغلاق النظام لإعادة التحميل.";
-            await DialogService!.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
-
-            System.Windows.Application.Current.Shutdown();
-        }
-        else
-        {
-            StatusMessage = result.Error ?? "فشل في استعادة النسخة الاحتياطية";
-            await DialogService!.ShowErrorAsync("خطأ في الاستعادة", StatusMessage);
-        }
-    }
     #endregion
 }

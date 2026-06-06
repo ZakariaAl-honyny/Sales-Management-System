@@ -20,11 +20,12 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="16,8">
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
             <Grid>
                 <StackPanel Orientation="Horizontal">
                     <Path Data="{StaticResource IconInvoice}" Fill="White" Width="20" Height="20" Margin="0,0,12,0" Stretch="Uniform"/>
-                    <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Text="↩️ " FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
                 
                 <Border HorizontalAlignment="Right" VerticalAlignment="Center" 
@@ -51,7 +52,7 @@
 
                 <Border Style="{StaticResource CardStyle}" Padding="0">
                     <DockPanel>
-                        <Border DockPanel.Dock="Top" Background="#F8FAFC" Padding="16,12" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
+                        <Border DockPanel.Dock="Top" Background="#F8FAFC" Padding="10,6" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="📦 المنتجات المرتجعة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" FontSize="15"/>
                                 <TextBlock Text="{Binding Items.Count, StringFormat=({0} أصناف)}" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
@@ -78,7 +79,7 @@
                                         <DataTemplate>
                                             <TextBox Text="{Binding ReturnQuantity, UpdateSourceTrigger=PropertyChanged}" 
                                                      Style="{StaticResource ModernTextBox}" 
-                                                     Height="32" Padding="8,4" 
+                                                     Padding="8,4" 
                                                      FontWeight="Bold"
                                                      HorizontalContentAlignment="Center"/>
                                         </DataTemplate>
@@ -96,9 +97,9 @@
             <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <!-- Info Card -->
-                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16">
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
                         <StackPanel>
-                            <TextBlock Text="ℹ️ معلومات الفاتورة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
+                            <TextBlock Text="ℹ️ معلومات الفاتورة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
                             
                             <TextBlock Text="بحث عن فاتورة" Style="{StaticResource LabelStyle}"/>
                             <Grid Margin="0,0,0,12">
@@ -106,9 +107,8 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
-                                         Style="{StaticResource ModernTextBox}" 
-                                         Height="36">
+                                 <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
+                                          Style="{StaticResource ModernTextBox}">
                                     <TextBox.InputBindings>
                                         <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
                                     </TextBox.InputBindings>
@@ -120,7 +120,7 @@
                             </Grid>
 
                             <TextBlock Text="رقم الفاتورة" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding SelectedInvoice.InvoiceNo}" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,0,12" Background="#F8FAFC"/>
+                            <TextBox Text="{Binding SelectedInvoice.Id}" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,0,12" Background="#F8FAFC"/>
 
                             <TextBlock Text="العميل" Style="{StaticResource LabelStyle}"/>
                             <TextBox Text="{Binding SelectedInvoice.CustomerName}" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,0,12" Background="#F8FAFC"/>
@@ -135,7 +135,7 @@
                     </Border>
 
                     <!-- Impact Analysis Card -->
-                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,16" Background="#EEF2FF" BorderBrush="#C7D2FE"
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8" Background="#EEF2FF" BorderBrush="#C7D2FE"
                             Visibility="{Binding Impact.HasImpact, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
                             <TextBlock Text="📊 تحليل الأثر" FontWeight="Bold" Foreground="#4338CA" Margin="0,0,0,12"/>
@@ -180,7 +180,7 @@
         </Grid>
 
         <!-- Footer -->
-        <Border Grid.Row="2" Background="White" Padding="20,12" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="2" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

@@ -1,5 +1,7 @@
 # Database Schema Design
-# Sales Management System — v4.6.2 (WPF Validation ErrorTemplate & INotifyDataErrorInfo)
+# Sales Management System — v4.6.7 (InvoiceNo Int Re-addition)
+# Platform: SQL Server 2019+
+# 30+ Tables | decimal-only financials | nvarchar text | Soft delete
 # Platform: SQL Server 2019+
 # 30+ Tables | decimal-only financials | nvarchar text | Soft delete
 
@@ -42,6 +44,10 @@ Default schema: **`dbo`**
 - `PasswordHash` nvarchar(256) not null
 - `FullName` nvarchar(150) not null
 - `Role` tinyint not null (1=Admin, 2=Manager, 3=Cashier)
+- `MustChangePassword` bit not null default 1
+- `Status` tinyint not null default 1 (1=Active, 2=Locked, 3=Suspended)
+- `LastLoginAt` datetime2 null
+- `FailedLoginAttempts` int not null default 0
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -86,6 +92,8 @@ Default schema: **`dbo`**
 - `AvgCost` decimal(18,2) not null default 0 (computed by UpdateProductPricingService)
 - `ReorderLevel` decimal(18,3) not null default 0
 - `MinStock` decimal(18,3) not null default 0
+- `TrackExpiry` bit not null default 0
+- `IsExpirable` bit not null default 0
 - `Description` nvarchar(500) null
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
@@ -172,6 +180,9 @@ Default schema: **`dbo`**
 - `Address` nvarchar(250) null
 - `OpeningBalance` decimal(18,2) not null default 0
 - `CurrentBalance` decimal(18,2) not null default 0
+- `AccountId` int null FK → Accounts(Id)
+- `CurrencyId` int null FK → Currencies(Id)
+- `CreditLimit` decimal(18,2) not null default 0
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -191,6 +202,10 @@ Default schema: **`dbo`**
 - `Address` nvarchar(250) null
 - `OpeningBalance` decimal(18,2) not null default 0
 - `CurrentBalance` decimal(18,2) not null default 0
+- `AccountId` int null FK → Accounts(Id)
+- `CurrencyId` int null FK → Currencies(Id)
+- `CreditLimit` decimal(18,2) not null default 0
+- `CustomerType` tinyint null (1=Retail, 2=Wholesale, 3=Corporate)
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -206,7 +221,7 @@ Default schema: **`dbo`**
 ## I) PurchaseInvoices
 ### Columns
 - `Id` int PK
-- `InvoiceNo` nvarchar(30) not null unique
+- `InvoiceNo` int not null (user-facing invoice number, UNIQUE per document type — generated via DocumentSequenceService.GetNextIntAsync)
 - `SupplierId` int not null FK
 - `WarehouseId` int not null FK
 - `InvoiceDate` datetime2 not null
@@ -228,30 +243,12 @@ Default schema: **`dbo`**
 
 ---
 
-## J) PurchaseInvoiceItems
-### Columns
-- `PurchaseInvoiceItemId` int PK
-- `PurchaseInvoiceId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null
-- `UnitCost` decimal(18,2) not null
-- `DiscountAmount` decimal(18,2) not null default 0
-- `LineTotal` decimal(18,2) not null
-- `Notes` nvarchar(250) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
 # 5) Sales
 
 ## K) SalesInvoices
 ### Columns
 - `Id` int PK
-- `InvoiceNo` nvarchar(30) not null unique
+- `InvoiceNo` int not null (user-facing invoice number, UNIQUE per document type — generated via DocumentSequenceService.GetNextIntAsync)
 - `CustomerId` int null FK
 - `WarehouseId` int not null FK
 - `InvoiceDate` datetime2 not null
@@ -270,6 +267,7 @@ Default schema: **`dbo`**
 - `IsActive` bit not null default 1
 - `CreatedAt` datetime2 not null
 - `UpdatedAt` datetime2 null
+- `CashBoxId` int null FK → CashBoxes(Id)
 
 ---
 
@@ -448,6 +446,8 @@ Default schema: **`dbo`**
 - `OpeningBalance` decimal(18,2) not null default 0
 - `CurrentBalance` decimal(18,2) not null default 0 (computed from CashTransaction sum)
 - `IsDefault` bit not null default 0
+- `AccountId` int null FK → Accounts(Id)
+- `CurrencyId` int null FK → Currencies(Id)
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -734,7 +734,7 @@ CREATE TABLE dbo.Customers
 CREATE TABLE dbo.PurchaseInvoices
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoices PRIMARY KEY,
-    InvoiceNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    InvoiceNo       INT           NOT NULL DEFAULT 0,
     SupplierId      INT           NOT NULL REFERENCES dbo.Suppliers(Id),
     WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
     InvoiceDate     DATETIME2     NOT NULL,
@@ -752,7 +752,9 @@ CREATE TABLE dbo.PurchaseInvoices
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2     NULL
+    UpdatedAt       DATETIME2     NULL,
+
+    CONSTRAINT UQ_PurchaseInvoices_InvoiceNo UNIQUE (InvoiceNo)
 );
 
 -- 10. PurchaseInvoiceItems
@@ -777,7 +779,7 @@ CREATE TABLE dbo.PurchaseInvoiceItems
 CREATE TABLE dbo.SalesInvoices
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoices PRIMARY KEY,
-    InvoiceNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    InvoiceNo       INT           NOT NULL DEFAULT 0,
     CustomerId      INT           NULL REFERENCES dbo.Customers(Id),
     WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
     InvoiceDate     DATETIME2     NOT NULL,
@@ -795,7 +797,9 @@ CREATE TABLE dbo.SalesInvoices
     UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
     IsActive        BIT           NOT NULL DEFAULT(1),
     CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2     NULL
+    UpdatedAt       DATETIME2     NULL,
+
+    CONSTRAINT UQ_SalesInvoices_InvoiceNo UNIQUE (InvoiceNo)
 );
 
 -- 12. SalesInvoiceItems
@@ -1089,7 +1093,155 @@ CREATE TABLE dbo.SystemLog
 );
 CREATE INDEX IX_SystemLog_Level ON dbo.SystemLog([Level], CreatedAt DESC);
 
+-- ============================================================================
+-- 29+ New Tables (v4.7+ — Accounting Foundation)
+-- ============================================================================
+
+-- 29. Currencies
+CREATE TABLE dbo.Currencies
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Currencies PRIMARY KEY,
+    Code            NVARCHAR(10)  NOT NULL,
+    Name            NVARCHAR(100) NOT NULL,
+    Symbol          NVARCHAR(10)  NULL,
+    ExchangeRate    DECIMAL(18,6) NOT NULL CONSTRAINT DF_Currencies_ExchangeRate DEFAULT(1),
+    IsDefault       BIT           NOT NULL CONSTRAINT DF_Currencies_IsDefault DEFAULT(0),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Currencies_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Currencies_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
+
+    CONSTRAINT UQ_Currencies_Code UNIQUE (Code)
+);
+
+-- 30. Accounts (Chart of Accounts)
+CREATE TABLE dbo.Accounts
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Accounts PRIMARY KEY,
+    AccountCode     NVARCHAR(20)  NOT NULL,
+    AccountName     NVARCHAR(150) NOT NULL,
+    AccountType     TINYINT       NOT NULL, -- 1=Asset, 2=Liability, 3=Equity, 4=Income, 5=Expense
+    ParentAccountId INT           NULL REFERENCES dbo.Accounts(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Accounts_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Accounts_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL,
+
+    CONSTRAINT UQ_Accounts_AccountCode UNIQUE (AccountCode)
+);
+
+-- 31. JournalEntries
+CREATE TABLE dbo.JournalEntries
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_JournalEntries PRIMARY KEY,
+    EntryDate       DATETIME2     NOT NULL,
+    ReferenceType   NVARCHAR(30)  NOT NULL, -- 'SalesInvoice', 'PurchaseInvoice', 'Payment', etc.
+    ReferenceId     INT           NOT NULL,
+    Description     NVARCHAR(500) NULL,
+    IsPosted        BIT           NOT NULL CONSTRAINT DF_JournalEntries_IsPosted DEFAULT(1),
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_JournalEntries_CreatedAt DEFAULT(SYSDATETIME()),
+    PostedAt        DATETIME2     NULL
+);
+CREATE INDEX IX_JournalEntries_Reference ON dbo.JournalEntries(ReferenceType, ReferenceId);
+CREATE INDEX IX_JournalEntries_EntryDate ON dbo.JournalEntries(EntryDate DESC);
+
+-- 32. JournalEntryLines
+CREATE TABLE dbo.JournalEntryLines
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_JournalEntryLines PRIMARY KEY,
+    JournalEntryId  INT           NOT NULL REFERENCES dbo.JournalEntries(Id),
+    AccountId       INT           NOT NULL REFERENCES dbo.Accounts(Id),
+    DebitAmount     DECIMAL(18,2) NOT NULL CONSTRAINT DF_JournalEntryLines_Debit DEFAULT(0),
+    CreditAmount    DECIMAL(18,2) NOT NULL CONSTRAINT DF_JournalEntryLines_Credit DEFAULT(0),
+    Description     NVARCHAR(250) NULL,
+
+    CONSTRAINT CK_JournalEntryLines_Amounts CHECK (DebitAmount >= 0 AND CreditAmount >= 0)
+);
+CREATE INDEX IX_JournalEntryLines_JournalEntryId ON dbo.JournalEntryLines(JournalEntryId);
+CREATE INDEX IX_JournalEntryLines_AccountId ON dbo.JournalEntryLines(AccountId);
+
+-- 33. PurchaseLots (FIFO/FEFO tracking)
+CREATE TABLE dbo.PurchaseLots
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseLots PRIMARY KEY,
+    ProductId       INT           NOT NULL REFERENCES dbo.Products(Id),
+    PurchaseInvoiceId INT         NOT NULL REFERENCES dbo.PurchaseInvoices(Id),
+    LotNo           NVARCHAR(50)  NULL,
+    ManufactureDate DATE          NULL,
+    ExpiryDate      DATE          NULL,
+    Quantity        DECIMAL(18,3) NOT NULL,
+    RemainingQty    DECIMAL(18,3) NOT NULL,
+    UnitCost        DECIMAL(18,2) NOT NULL,
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_PurchaseLots_CreatedAt DEFAULT(SYSDATETIME()),
+
+    CONSTRAINT CK_PurchaseLots_RemainingQty CHECK (RemainingQty >= 0)
+);
+CREATE INDEX IX_PurchaseLots_ProductId ON dbo.PurchaseLots(ProductId, ExpiryDate);
+CREATE INDEX IX_PurchaseLots_PurchaseInvoiceId ON dbo.PurchaseLots(PurchaseInvoiceId);
+
+-- 34. FiscalYears
+CREATE TABLE dbo.FiscalYears
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_FiscalYears PRIMARY KEY,
+    YearName        NVARCHAR(20)  NOT NULL, -- e.g., '2026', '2026-2027'
+    StartDate       DATE          NOT NULL,
+    EndDate         DATE          NOT NULL,
+    IsClosed        BIT           NOT NULL CONSTRAINT DF_FiscalYears_IsClosed DEFAULT(0),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_FiscalYears_CreatedAt DEFAULT(SYSDATETIME()),
+
+    CONSTRAINT CK_FiscalYears_EndAfterStart CHECK (EndDate > StartDate)
+);
+
+-- 35. Taxes
+CREATE TABLE dbo.Taxes
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Taxes PRIMARY KEY,
+    TaxName         NVARCHAR(100) NOT NULL,
+    TaxRate         DECIMAL(18,2) NOT NULL,
+    TaxType         TINYINT       NOT NULL, -- 1=Inclusive, 2=Exclusive, 3=Withholding
+    IsDefault       BIT           NOT NULL CONSTRAINT DF_Taxes_IsDefault DEFAULT(0),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Taxes_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Taxes_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL
+);
+
+-- ============================================================================
+-- ALTER TABLE Statements for New Columns (v4.7+)
+-- ============================================================================
+
+-- Customers: New columns
+ALTER TABLE dbo.Customers ADD
+    AccountId       INT NULL REFERENCES dbo.Accounts(Id),
+    CurrencyId      INT NULL REFERENCES dbo.Currencies(Id),
+    CreditLimit     DECIMAL(18,2) NOT NULL CONSTRAINT DF_Customers_CreditLimit DEFAULT(0),
+    CustomerType    TINYINT NULL; -- 1=Retail, 2=Wholesale, 3=Corporate
+
+-- Suppliers: New columns
+ALTER TABLE dbo.Suppliers ADD
+    AccountId       INT NULL REFERENCES dbo.Accounts(Id),
+    CurrencyId      INT NULL REFERENCES dbo.Currencies(Id),
+    CreditLimit     DECIMAL(18,2) NOT NULL CONSTRAINT DF_Suppliers_CreditLimit DEFAULT(0);
+
+-- Users: New columns
+ALTER TABLE dbo.Users ADD
+    MustChangePassword BIT NOT NULL CONSTRAINT DF_Users_MustChangePassword DEFAULT(1),
+    [Status]           TINYINT NOT NULL CONSTRAINT DF_Users_Status DEFAULT(1), -- 1=Active, 2=Locked, 3=Suspended
+    LastLoginAt        DATETIME2 NULL,
+    FailedLoginAttempts INT NOT NULL CONSTRAINT DF_Users_FailedLoginAttempts DEFAULT(0);
+
+-- Products: New columns
+ALTER TABLE dbo.Products ADD
+    AvgCost         DECIMAL(18,2) NOT NULL CONSTRAINT DF_Products_AvgCost DEFAULT(0),
+    TrackExpiry     BIT NOT NULL CONSTRAINT DF_Products_TrackExpiry DEFAULT(0),
+    IsExpirable     BIT NOT NULL CONSTRAINT DF_Products_IsExpirable DEFAULT(0);
+
+-- CashBoxes: New columns
+ALTER TABLE dbo.CashBoxes ADD
+    AccountId       INT NULL REFERENCES dbo.Accounts(Id),
+    CurrencyId      INT NULL REFERENCES dbo.Currencies(Id);
+
+-- ============================================================================
 -- Seed Data for SystemSettings
+-- ============================================================================
 INSERT INTO dbo.SystemSettings ([Key], [Value], [Description])
 VALUES
     (N'CostingMethod', N'1', N'1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice'),

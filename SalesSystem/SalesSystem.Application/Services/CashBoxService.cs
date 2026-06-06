@@ -375,6 +375,7 @@ public class CashBoxService : ICashBoxService
     private static CashBoxDto MapToDto(CashBox box) => new(
         box.Id,
         box.BoxName,
+        box.OpeningBalance,
         box.CurrentBalance,
         box.BranchId,
         box.CurrencyCode,

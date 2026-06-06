@@ -113,3 +113,17 @@ Quality assurance and test automation specialist for the SalesSystem.
 | TC-20-008 | Rate Limiter: Middleware pipeline order is correct | `UseRateLimiter()` is registered BEFORE `UseAuthentication()` in Program.cs |
 | TC-20-009 | FallbackErrorDialog: Displays on unhandled WPF exception | Thread-safe fallback dialog shows exception message; `Log.Error` called; app does not crash silently |
 | TC-20-010 | Build: No CS0109 or CS1540 warnings across all projects | `dotnet build` produces 0 warnings; `new` keyword removed from derived `_dialogService` fields |
+
+### v4.6.7 — InvoiceNo Int Re-addition
+
+| Test Case | Description | Expected Result |
+|-----------|-------------|-----------------|
+| TC-21-001 | SalesInvoice: Created with int InvoiceNo | `SalesInvoice.Create(5, ...)` creates invoice with InvoiceNo=5; guard throws if ≤ 0 |
+| TC-21-002 | PurchaseInvoice: Created with int InvoiceNo | `PurchaseInvoice.Create(100, ...)` creates invoice with InvoiceNo=100 |
+| TC-21-003 | SalesInvoice List: Search by InvoiceNo int | Entering number in search filters by `InvoiceNo == parsedInt` |
+| TC-21-004 | SalesReportDto: Has int InvoiceNo field | DTO contains `int InvoiceNo` (not string) |
+| TC-21-005 | InvoicePrintDto.InvoiceNumber: Formatted from int | `string InvoiceNumber` set via `InvoiceNo.ToString()` in builder |
+| TC-21-006 | Service: Auto-generates InvoiceNo = lastId+1 | When request.InvoiceNo is null or ≤0, service computes `(last?.Id ?? 0) + 1` |
+| TC-21-007 | EF Config: No unique index on InvoiceNo | Duplicate InvoiceNo values do NOT throw unique constraint violation |
+| TC-21-006 | TouchPos: Stock validation warning shown | Adding product with insufficient stock shows `ShowWarningAsync` dialog with stock details |
+| TC-21-007 | ISoundService: PlayWarning exists | `PlayWarning()` method exists and plays system warning sound |

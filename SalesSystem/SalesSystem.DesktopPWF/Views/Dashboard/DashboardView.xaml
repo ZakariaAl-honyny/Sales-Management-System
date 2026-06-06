@@ -1,4 +1,4 @@
-<Page x:Class="SalesSystem.DesktopPWF.Views.DashboardView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.DashboardView"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -6,7 +6,7 @@
       xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
       mc:Ignorable="d"
       d:DesignHeight="700" d:DesignWidth="1000"
-      Title="الرئيسية"
+     
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -41,8 +41,8 @@
                 Background="{StaticResource ErrorLightBrush}" 
                 BorderBrush="{StaticResource ErrorBrush}"
                 BorderThickness="1"
-                Padding="16,12"
-                Margin="32,24,32,0"
+                Padding="10,6"
+                Margin="12,8,12,0"
                 CornerRadius="8"
                 Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
             <StackPanel Orientation="Horizontal">
@@ -56,21 +56,22 @@
         </Border>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="24">
+            <StackPanel Margin="12">
                 <!-- Header Area -->
-                <Grid Margin="0,0,0,32">
+                <Grid Margin="0,0,0,16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="لوحة التحكم" 
+                        <TextBlock Text="📈  لوحة التحكم" 
                                    Style="{StaticResource HeaderStyle}" 
                                    AutomationProperties.AutomationId="DashboardHeaderTitle"/>
                         <TextBlock Text="نظرة عامة على أداء النظام والعمليات اليومية" 
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   Margin="0,4,0,0"/>
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    FontSize="12"
+                                    Margin="0,2,0,0"/>
                     </StackPanel>
 
                     <Button Grid.Column="1"
@@ -87,22 +88,22 @@
                 </Grid>
 
                 <!-- Primary KPI Cards -->
-                <UniformGrid Rows="1" Margin="0,0,0,32">
+                <UniformGrid Rows="1" Margin="0,0,0,12">
                     <!-- Today's Sales -->
                     <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="CardTodaySales">
                         <StackPanel>
-                            <Grid Margin="0,0,0,16">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Background="{StaticResource SuccessLightBrush}" CornerRadius="12" Padding="12">
+                                <Border Background="{StaticResource SuccessLightBrush}" CornerRadius="8" Padding="6">
                                     <TextBlock Text="💰"/>
                                 </Border>
                                 <TextBlock Grid.Column="1" 
-                                           Text="مبيعات اليوم" 
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
+Text="🛒  مبيعات اليوم" 
+                                            FontWeight="SemiBold"
+                                            Foreground="{StaticResource TextSecondaryBrush}"
                                            VerticalAlignment="Center" 
                                            Margin="16,0,0,0"/>
                             </Grid>
@@ -111,20 +112,20 @@
                                         AutomationProperties.AutomationId="ValueTodaySales"/>
                             <TextBlock Text="إجمالي المبالغ التي بعت بها اليوم"
                                        Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
-                                       Margin="0,4,0,0"/>
+                                        FontSize="10"
+                                        Margin="0,2,0,0"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Monthly Sales -->
                     <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="CardMonthSales">
                         <StackPanel>
-                            <Grid Margin="0,0,0,16">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Background="{StaticResource InfoLightBrush}" CornerRadius="12" Padding="12">
+                                <Border Background="{StaticResource InfoLightBrush}" CornerRadius="8" Padding="6">
                                     <TextBlock Text="📊"/>
                                 </Border>
                                 <TextBlock Grid.Column="1" 
@@ -139,20 +140,20 @@
                                         AutomationProperties.AutomationId="ValueMonthSales"/>
                             <TextBlock Text="إجمالي مبيعاتك خلال الـ 30 يوماً الماضية"
                                        Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
-                                       Margin="0,4,0,0"/>
+                                        FontSize="10"
+                                        Margin="0,2,0,0"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Monthly Purchases -->
                     <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="CardMonthPurchases">
                         <StackPanel>
-                            <Grid Margin="0,0,0,16">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Background="{StaticResource WarningLightBrush}" CornerRadius="12" Padding="12">
+                                <Border Background="{StaticResource WarningLightBrush}" CornerRadius="8" Padding="6">
                                     <TextBlock Text="📦"/>
                                 </Border>
                                 <TextBlock Grid.Column="1" 
@@ -167,20 +168,20 @@
                                         AutomationProperties.AutomationId="ValueMonthPurchases"/>
                             <TextBlock Text="المبالغ التي دفعتها للموردين لشراء بضاعة"
                                        Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
-                                       Margin="0,4,0,0"/>
+                                        FontSize="10"
+                                        Margin="0,2,0,0"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Net Profit -->
                     <Border Style="{StaticResource CardStyle}" AutomationProperties.AutomationId="CardNetProfit">
                         <StackPanel>
-                            <Grid Margin="0,0,0,16">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Background="{StaticResource AccentLightBrush}" CornerRadius="12" Padding="12">
+                                <Border Background="{StaticResource AccentLightBrush}" CornerRadius="8" Padding="6">
                                     <TextBlock Text="📈"/>
                                 </Border>
                                 <TextBlock Grid.Column="1" 
@@ -196,14 +197,14 @@
                                         AutomationProperties.AutomationId="ValueNetProfit"/>
                             <TextBlock Text="مكسبك الحقيقي (المبيعات - التكاليف)"
                                        Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="11"
-                                       Margin="0,4,0,0"/>
+                                        FontSize="10"
+                                        Margin="0,2,0,0"/>
                         </StackPanel>
                     </Border>
                 </UniformGrid>
 
                 <!-- Second Row: Entity Stats -->
-                <UniformGrid Rows="1" Margin="0,0,0,32">
+                <UniformGrid Rows="1" Margin="0,0,0,12">
                     <!-- Total Customers -->
                     <Border Style="{StaticResource CardStyle}" Margin="0,0,16,0" AutomationProperties.AutomationId="StatCustomers">
                         <StackPanel>
@@ -253,7 +254,7 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Text="آخر فواتير المبيعات" 
+                            <TextBlock Text="📋  آخر فواتير المبيعات" 
                                        Style="{StaticResource HeaderStyle}"
                                        Margin="0,0,0,16"/>
 
@@ -264,8 +265,8 @@
                                       AutomationProperties.AutomationId="ListRecentInvoices">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
-                                        <Setter Property="Padding" Value="16"/>
-                                        <Setter Property="Margin" Value="0,0,0,12"/>
+                                        <Setter Property="Padding" Value="10"/>
+                                        <Setter Property="Margin" Value="0,0,0,6"/>
                                         <Setter Property="Background" Value="{StaticResource MutedLightBrush}"/>
                                         <Setter Property="Template">
                                             <Setter.Value>
@@ -318,7 +319,7 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Text="تنبيهات المخزون المنخفض" 
+                            <TextBlock Text="⚠️  تنبيهات المخزون المنخفض" 
                                        Style="{StaticResource HeaderStyle}"
                                        Margin="0,0,0,16"/>
 
@@ -329,8 +330,8 @@
                                       AutomationProperties.AutomationId="ListLowStock">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
-                                        <Setter Property="Padding" Value="16"/>
-                                        <Setter Property="Margin" Value="0,0,0,12"/>
+                                        <Setter Property="Padding" Value="10"/>
+                                        <Setter Property="Margin" Value="0,0,0,6"/>
                                         <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
                                         <Setter Property="Template">
                                             <Setter.Value>
@@ -381,4 +382,4 @@
             </StackPanel>
         </ScrollViewer>
     </Grid>
-</Page>
+</UserControl>
