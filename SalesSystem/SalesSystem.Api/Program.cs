@@ -10,6 +10,7 @@ using SalesSystem.Api.Middleware;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Application.Accounting.Services;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Application.Services;
@@ -118,6 +119,7 @@ builder.Services.AddUpdateServices(builder.Configuration);
 // ============================================
 // 4. DI Registrations
 // ============================================
+builder.Services.AddMemoryCache(); // Required for SystemSettingsRepository caching
 builder.Services.AddInfrastructureServices(); // Registers ILocalImageStorageService, etc.
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
@@ -129,6 +131,7 @@ builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IDocumentSequenceService, DocumentSequenceService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<ITaxService, TaxService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<IBarcodeLookupService, BarcodeLookupService>();
 builder.Services.AddScoped<IProductPriceService, ProductPriceService>();
@@ -152,6 +155,13 @@ builder.Services.AddScoped<IProductUnitService, ProductUnitService>();
 builder.Services.AddScoped<IPrintDataService, PrintDataService>();
 builder.Services.AddScoped<InvoicePrintDtoBuilder>();
 builder.Services.AddScoped<ILogService, LogService>();
+
+// ─── Accounting Services ────────────────────────────────────
+builder.Services.AddScoped<IJournalEntryService, JournalEntryService>();
+builder.Services.AddScoped<ISystemAccountService, SystemAccountService>();
+builder.Services.AddScoped<IJournalEntryNumberGenerator, JournalEntryNumberGenerator>();
+builder.Services.AddScoped<IAnnualClosingService, AnnualClosingService>();
+
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================

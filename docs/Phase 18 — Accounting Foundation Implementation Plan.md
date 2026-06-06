@@ -119,8 +119,7 @@ CREATE TABLE JournalEntryLines (
     SortOrder       INT           NOT NULL DEFAULT 0,
 
     CONSTRAINT FK_JournalEntryLines_Entry
-        FOREIGN KEY (JournalEntryId) REFERENCES JournalEntries(Id)
-            ON DELETE CASCADE,
+        FOREIGN KEY (JournalEntryId) REFERENCES JournalEntries(Id),
 
     CONSTRAINT FK_JournalEntryLines_Account
         FOREIGN KEY (AccountId) REFERENCES Accounts(Id),
@@ -799,10 +798,14 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
             .HasDatabaseName("IX_JournalEntries_Reference");
 
         // Lines relationship
+        // Composition enforced at domain level: JournalEntry owns Lines via JournalEntryLine entity
+        // On delete: domain checks if entry is posted before allowing deletion
+        // Reversal pattern: use ReversedByEntryId FK (Restrict) to reverse a posted entry
+        // rather than deleting it — this preserves audit trail
         builder.HasMany(x => x.Lines)
             .WithOne(x => x.JournalEntry)
             .HasForeignKey(x => x.JournalEntryId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Self-reference for reversals
         builder.HasOne<JournalEntry>()
@@ -826,11 +829,11 @@ public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEnt
 
         // Precision for financial values
         builder.Property(x => x.Debit)
-            .HasPrecision(18, 4)
+            .HasPrecision(18, 2)
             .IsRequired();
 
         builder.Property(x => x.Credit)
-            .HasPrecision(18, 4)
+            .HasPrecision(18, 2)
             .IsRequired();
 
         builder.Property(x => x.AccountCode)
@@ -860,10 +863,11 @@ public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEnt
 }
 ✅ Task 2 Checklist
  All 3 configurations registered in AppDbContext.OnModelCreating()
- Decimal precision is (18,2) for all financial columns
- Unique indexes on EntryNumber and AccountCode
- Cascade delete on JournalEntryLines when entry deleted
- Restrict delete on Account (cannot delete account that has transactions)
+  Decimal precision is (18,2) for all financial columns
+  Unique indexes on EntryNumber and AccountCode
+  Restrict delete on ALL foreign keys (JournalEntry→Lines, Account→Account)
+  Domain-level composition: JournalEntry owns Lines but deletion is prevented if posted
+  Reversal via ReversedByEntryId FK (Restrict) preserves audit trail
 ⚙️ Task 3 — Application Layer (Services)
 Task 3.1 — EntryNumber Generator
 csharp
@@ -1502,18 +1506,1248 @@ text
 │      │                                             │ (18,2)       │
 │  3   │ Application: Generator, Service,            │ Validator    │
 │      │              Command + Validator + Handler  │ runs first   │
-│  4   │ Queries: Balance + Statement                │ AsNoTracking │
+│  4   │ Queries: Balance + Statement + Trial Balance  │ AsNoTracking │
 │  5   │ Tests: 9 unit tests                         │ All green    │
+│  6   │ Annual Closing: FiscalYearClosure + workflow │ Balanced     │
 └──────┴─────────────────────────────────────────────┴──────────────┘
 
 RULES — ZERO TOLERANCE:
 ━━━━━━━━━━━━━━━━━━━━━━
 ✅ JournalEntry.ValidateAndPost() called BEFORE SaveChanges
 ✅ IsBalanced() must return true or SaveChanges never called
-✅ Decimal precision is (18,2) — not (18,2)
+✅ Decimal precision is (18,2) — not (18,4)
 ✅ IsSystemAccount = true accounts cannot be edited or deleted
 ✅ JournalEntryLine.CreateDebit/Credit are internal — only JournalEntry creates lines
 ✅ All financial queries use AsNoTracking
 ✅ Only IsPosted = true entries appear in financial reports
 ✅ Arabic error messages in ALL DomainExceptions
 ✅ Account snapshots (Code + Name) stored in JournalEntryLine
+
+📊 Task 4.3 — Trial Balance Query Infrastructure
+The Accounting Foundation provides the query infrastructure needed for Trial Balance reporting.
+The full Trial Balance report UI + export will be developed in Phase 31 (Reporting Module).
+
+Query infrastructure responsibilities:
+- GetAccountBalanceQuery (Task 4.1) returns per-account debit/credit totals — reusable by Trial Balance
+- Trial Balance needs: all active accounts, grouped by AccountType, showing:
+  - Account Code, Name
+  - Total Debit, Total Credit
+  - Net Balance (Debit Normal: TotalDebit - TotalCredit, Credit Normal: TotalCredit - TotalDebit)
+  - Running Debit and Credit totals across all accounts (Debit total must equal Credit total)
+- Filtering by date range and AccountType
+- All queries use AsNoTracking and include only IsPosted = true entries
+
+The Trial Balance query reuses GetAccountBalanceQuery per account, aggregated across all active accounts.
+
+🔄 Task 6 — Annual Closing (إقفال سنوي)
+Task 6.1 — Fiscal Year Closing Workflow
+The Annual Closing process zeros out all Revenue (4xxx) and Expense (5xxx) accounts and
+transfers the net income/loss to Retained Earnings (3102). This is performed once per fiscal year.
+
+Steps:
+1. Verify ALL journal entries for the fiscal year are posted (IsPosted = true)
+   - If any entry in the year is not posted, abort closing with DomainException
+2. Calculate net income:
+   - Total Revenue (4xxx) - Total Expense (5xxx)
+   - If positive → Net Income (credit to Retained Earnings)
+   - If negative → Net Loss (debit to Retained Earnings)
+3. Create a closing JournalEntry:
+   a. For each Revenue account: Debit the balance to zero
+      Example — Sales Revenue (4101) with balance 500,000:
+        Debit  4101 (Sales Revenue)     500,000
+        Credit 3102 (Retained Earnings)  500,000
+   b. For each Expense account: Credit the balance to zero
+      Example — COGS (5101) with balance 300,000:
+        Debit  3102 (Retained Earnings)  300,000
+        Credit 5101 (COGS)               300,000
+   c. Net result: Retained Earnings reflects the difference
+4. Post the closing entry (ValidateAndPost)
+5. Mark fiscal year as closed in a dedicated FiscalYearClosure table
+6. Prevent further posting of entries with TransactionDate in a closed fiscal year
+
+Data model for FiscalYearClosure:
+```sql
+CREATE TABLE FiscalYearClosures (
+    Id              INT PRIMARY KEY IDENTITY(1,1),
+    FiscalYear      INT NOT NULL,           -- e.g., 2026
+    ClosedAt        DATETIME2 NOT NULL DEFAULT GETDATE(),
+    ClosedByUserId  INT NOT NULL,
+    NetIncome       DECIMAL(18,2) NOT NULL,
+    ClosingEntryId  INT NOT NULL,            -- FK to JournalEntries
+
+    CONSTRAINT FK_FiscalYearClosures_ClosedBy
+        FOREIGN KEY (ClosedByUserId) REFERENCES Users(Id),
+    CONSTRAINT FK_FiscalYearClosures_Entry
+        FOREIGN KEY (ClosingEntryId) REFERENCES JournalEntries(Id),
+    CONSTRAINT UQ_FiscalYearClosures_Year
+        UNIQUE (FiscalYear)
+);
+
+CREATE INDEX IX_FiscalYearClosures_Year ON FiscalYearClosures(FiscalYear);
+```
+
+Checklist:
+  All entries must be posted before closing the year
+  Revenue accounts zeroed out (debit to balance)
+  Expense accounts zeroed out (credit to balance)
+  Net income/loss transferred to Retained Earnings
+  Closed fiscal year blocks new entries
+  Closing entry is a regular JournalEntry (type = Manual) with full audit trail
+
+---
+
+## Task 7 — Comprehensive Unit Tests
+
+**Test Infrastructure:**
+- Use xUnit + Moq + FluentAssertions
+- `SalesSystem.Domain.Tests` for entity tests
+- `SalesSystem.Application.Tests` for service tests
+- `SalesSystem.Api.Tests` for API controller tests
+- `SalesSystem.Arch.Tests` for configuration tests
+
+**Files to create/modify:**
+
+| File | Change |
+|------|--------|
+| `Tests/Domain/AccountTests.cs` | **CREATE** |
+| `Tests/Domain/JournalEntryTests.cs` | **EXPAND** (existing 9 tests → 25+) |
+| `Tests/Domain/JournalEntryLineTests.cs` | **CREATE** |
+| `Tests/Domain/FiscalYearClosureTests.cs` | **CREATE** |
+| `Tests/Application/AccountServiceTests.cs` | **CREATE** |
+| `Tests/Application/JournalEntryServiceTests.cs` | **CREATE** |
+| `Tests/Application/SystemAccountMappingServiceTests.cs` | **CREATE** |
+| `Tests/Application/TrialBalanceServiceTests.cs` | **CREATE** |
+| `Tests/Api/AccountsControllerTests.cs` | **CREATE** |
+| `Tests/Api/JournalEntriesControllerTests.cs` | **CREATE** |
+| `Tests/Arch/AccountConfigurationTests.cs` | **CREATE** |
+| `Tests/Arch/JournalEntryConfigurationTests.cs` | **CREATE** |
+| `Tests/Arch/JournalEntryLineConfigurationTests.cs` | **CREATE** |
+
+**Estimate:** ~4 hours
+
+---
+
+## Task 8 — Self-Explanation ◉ Tooltips for Accounting Concepts
+
+**Goal**: Make every accounting term in the system self-explanatory via ◉ tooltips. Non-accountant users should understand each term without external help.
+
+**Pattern**: Every accounting term in the UI gets a ◉ icon next to it. On hover/click, a tooltip shows a plain-Arabic explanation.
+
+**Implementation**:
+- Use WPF ToolTip with a custom style (blue background, question-mark icon)
+- Create a reusable `InfoTooltip` UserControl: `<TextBlock Text="◉" ToolTip="{Binding}" Style="{StaticResource InfoTooltipStyle}"/>`
+- Create `AccountingTermAttribute` to tag terms with their explanation ID
+- Store explanations in a resource file or database table `AccountingTermExplanations`
+
+**Concepts to explain with ◉ tooltips**:
+
+| Term (Arabic) | Explanation (Arabic) | Location |
+|--------------|---------------------|----------|
+| قيد اليومية | "القيد اليومية هو تسجيل حركة مالية في دفتر المحاسبة. كل عملية بيع أو شراء أو دفع تنشئ قيداً يومياً." | Journal Entry creation screen |
+| الترحيل | "الترحيل يعني تأكيد القيد اليومية وجعله نهائياً. بعد الترحيل لا يمكن تعديل القيد." | Post button tooltip |
+| الإقفال السنوي | "الإقفال السنوي يعني إنهاء السنة المالية وتحويل أرصدة الإيرادات والمصروفات إلى الأرباح المحتجزة. يتم مرة واحدة في نهاية السنة." | Annual Closing wizard |
+| قيد الافتتاح | "قيد الافتتاح هو قيد يفتح السنة المالية الجديدة بأرصدة الحسابات التي تحمل رصيداً إلى السنة الجديدة." | Opening entry screen |
+| دليل الحسابات | "دليل الحسابات هو قائمة بجميع الحسابات التي تستخدمها الشركة. يشبه فهرس الدفتر." | Chart of Accounts screen |
+| شجرة الحسابات | "شجرة الحسابات هي تصنيف هرمي للحسابات. المستوى الأول: أصول - خصوم - حقوق ملكية - إيرادات - مصروفات." | Account tree view |
+| حساب رئيسي | "حساب رئيسي هو حساب تجميعي لا يمكن الترحيل إليه مباشرة. يستخدم لتنظيم وتجميع الحسابات التفصيلية تحته." | Account selection |
+| حساب تفصيلي | "حساب تفصيلي هو حساب يمكن الترحيل إليه. يمثل حساباً حقيقياً مثل: الصندوق، البنك، عميل معين." | Account selection |
+| رصيد دائن | "الرصيد الدائن يعني أن الحساب عليه التزام أو دين. في حساب المورد مثلاً، الرصيد الدائن يعني أن عليه فاتورة غير مدفوعة." | Trial balance / Reports |
+| رصيد مدين | "الرصيد المدين يعني أن الحساب له قيمة مستحقة. في حساب العميل مثلاً، الرصيد المدين يعني أن عليه مبلغاً للشركة." | Trial balance / Reports |
+| الأصول | "الأصول هي ممتلكات الشركة التي لها قيمة مالية. مثل: النقد في الصندوق، الأثاث، السيارة، المباني." | Balance sheet / Reports |
+| الخصوم | "الخصوم هي التزامات الشركة المالية تجاه الغير. مثل: فواتير الموردين غير المدفوعة، القروض." | Balance sheet / Reports |
+| حقوق الملكية | "حقوق الملكية هي حقوق أصحاب الشركة في أصولها. تحسب كالتالي: الأصول - الخصوم = حقوق الملكية." | Balance sheet / Reports |
+| الإيرادات | "الإيرادات هي الأموال التي تكسبها الشركة من بيع المنتجات أو تقديم الخدمات." | Income statement / Reports |
+| المصروفات | "المصروفات هي التكاليف التي تدفعها الشركة لتشغيل النشاط التجاري. مثل: الإيجار، الرواتب، الكهرباء." | Income statement / Reports |
+| صافي الربح | "صافي الربح = الإيرادات - المصروفات. إذا كانت الإيرادات أكبر من المصروفات فهناك ربح." | Income statement / Reports |
+| صافي الخسارة | "صافي الخسارة = المصروفات - الإيرادات. إذا كانت المصروفات أكبر من الإيرادات فهناك خسارة." | Income statement / Reports |
+| الأرباح المحتجزة | "الأرباح المحتجزة هي الأرباح التي تراكمت في الشركة منذ بدء النشاط ولم توزع على الملاك." | Balance sheet / Reports |
+| ميزان المراجعة | "ميزان المراجعة هو تقرير يظهر جميع الحسابات وأرصدتها المدينة والدائنة. يستخدم للتحقق من صحة القيود قبل إعداد القوائم المالية." | Trial Balance report |
+
+**UI Design**:
+```xml
+<!-- Reusable InfoTooltip control -->
+<Border CornerRadius="12" Background="#E3F2FD" BorderBrush="#90CAF9" BorderThickness="1"
+        ToolTipService.ShowDuration="60000" ToolTipService.InitialShowDelay="200">
+    <TextBlock Text="ⓘ" FontSize="14" Foreground="#1565C0"
+               ToolTip="{Binding Explanation}" Cursor="Help"
+               Style="{StaticResource InfoIconStyle}"/>
+</Border>
+```
+
+**Data structure for explanations**:
+```csharp
+public class AccountingTermExplanation
+{
+    public string TermKey { get; set; } = "";  // e.g., "journal_entry"
+    public string TermArabic { get; set; } = "";  // e.g., "قيد اليومية"
+    public string ExplanationArabic { get; set; } = "";  // plain Arabic explanation
+    public string ScreenLocation { get; set; } = "";  // where it appears
+}
+```
+
+**Implementation Tasks**:
+1. Create `AccountingTermExplanation` entity + DbSet
+2. Seed all 18 explanations above in migration
+3. Create `InfoTooltip` WPF UserControl with ◉ icon + styled ToolTip
+4. Apply to all accounting screens: Journal Entry, Chart of Accounts, Trial Balance, Reports
+5. Create API endpoint: `GET /api/v1/accounting/terms/{key}` for dynamic loading
+
+**Estimate**: ~3 hours
+**Files**: 6 (Entity + Migration + UserControl + ViewModel + Controller + API Service)
+
+---
+
+### 1. Domain Entity Tests
+
+#### Account Entity (`AccountTests.cs`)
+
+```csharp
+[Fact]
+public void Create_ValidInput_CreatesAccountCorrectly()
+{
+    var account = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset);
+    Assert.Equal("1101", account.Code);
+    Assert.Equal("الصندوق", account.NameAr);
+    Assert.Equal(AccountType.Asset, account.Type);
+    Assert.False(account.IsSystemAccount);
+    Assert.True(account.IsActive);
+}
+
+[Fact]
+public void Create_EmptyCode_ThrowsDomainException()
+{
+    var ex = Assert.Throws<DomainException>(() =>
+        Account.Create("", "الصندوق", "Cash", AccountType.Asset));
+    Assert.Contains("مطلوب", ex.Message);
+}
+
+[Fact]
+public void Create_NegativeParentId_ThrowsDomainException()
+{
+    var ex = Assert.Throws<DomainException>(() =>
+        Account.Create("1101", "الصندوق", "Cash", AccountType.Asset, parentId: -1));
+    Assert.Contains("سال", ex.Message);
+}
+
+[Fact]
+public void Update_SystemAccount_ThrowsDomainException()
+{
+    var account = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset, isSystemAccount: true);
+    var ex = Assert.Throws<DomainException>(() =>
+        account.Update("اسم جديد", "New Name", null));
+    Assert.Contains("حساب نظام", ex.Message);
+}
+
+[Fact]
+public void Update_NonSystemAccount_Succeeds()
+{
+    var account = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset);
+    account.Update("خزينة", "Treasury", null);
+    Assert.Equal("خزينة", account.NameAr);
+}
+
+[Fact]
+public void IsDebitNormal_Asset_ReturnsTrue()
+{
+    var account = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset);
+    Assert.True(account.IsDebitNormal());
+}
+
+[Fact]
+public void IsDebitNormal_Liability_ReturnsFalse()
+{
+    var account = Account.Create("2101", "موردون", "Payables", AccountType.Liability);
+    Assert.False(account.IsDebitNormal());
+}
+
+[Fact]
+public void IsDebitNormal_Equity_ReturnsFalse()
+{
+    var account = Account.Create("3101", "رأس المال", "Capital", AccountType.Equity);
+    Assert.False(account.IsDebitNormal());
+}
+
+[Fact]
+public void IsDebitNormal_Revenue_ReturnsFalse()
+{
+    var account = Account.Create("4101", "مبيعات", "Sales", AccountType.Revenue);
+    Assert.False(account.IsDebitNormal());
+}
+
+[Fact]
+public void IsDebitNormal_Expense_ReturnsTrue()
+{
+    var account = Account.Create("5101", "تكلفة", "COGS", AccountType.Expense);
+    Assert.True(account.IsDebitNormal());
+}
+
+[Fact]
+public void Level_CalculatedFromCodeLength()
+{
+    var account = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset);
+    Assert.Equal(2, account.Level); // 4 chars → 2 (1101 → Level 2)
+}
+
+[Fact]
+public void MarkAsDeleted_SetsIsActiveFalse()
+{
+    var account = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset);
+    account.MarkAsDeleted();
+    Assert.False(account.IsActive);
+}
+```
+
+#### JournalEntry Entity (`JournalEntryTests.cs` — Expand existing)
+
+```csharp
+// Keep all 9 existing tests. Add:
+
+[Fact]
+public void Create_ValidInput_CreatesEntryWithDraftStatus()
+{
+    var entry = JournalEntry.Create(
+        "JE-20260520-0001", DateTime.Today, "قيد اختبار",
+        JournalEntryType.Manual, createdBy: 1);
+    Assert.Equal(InvoiceStatus.Draft, entry.Status);
+    Assert.False(entry.IsPosted);
+    Assert.Equal(0, entry.TotalDebit);
+    Assert.Equal(0, entry.TotalCredit);
+}
+
+[Fact]
+public void Cancel_DraftEntry_SetsStatusCancelled()
+{
+    var entry = CreateEntry(); // draft by default
+    entry.Cancel(1);
+    Assert.Equal(InvoiceStatus.Cancelled, entry.Status);
+}
+
+[Fact]
+public void Cancel_PostedEntry_ThrowsDomainException()
+{
+    var entry = CreateEntry();
+    entry.AddDebitLine(1, "1101", "الصندوق", 1000);
+    entry.AddCreditLine(2, "4101", "إيرادات", 1000);
+    entry.ValidateAndPost(1);
+    var ex = Assert.Throws<DomainException>(() => entry.Cancel(1));
+    Assert.Contains("إلغاء", ex.Message);
+}
+
+[Fact]
+public void AddLine_AfterCancelled_ThrowsDomainException()
+{
+    var entry = CreateEntry();
+    entry.Cancel(1);
+    var ex = Assert.Throws<DomainException>(() =>
+        entry.AddDebitLine(1, "1101", "الصندوق", 500));
+    Assert.Contains("ملغي", ex.Message);
+}
+
+[Fact]
+public void Reversal_CreatesReversedEntry_WithCorrectReference()
+{
+    var original = CreateEntry();
+    original.AddDebitLine(1, "1101", "الصندوق", 1000);
+    original.AddCreditLine(2, "4101", "إيرادات", 1000);
+    original.ValidateAndPost(1);
+
+    var reversal = original.CreateReversal(DateTime.Today, 1);
+    Assert.NotNull(reversal);
+    Assert.Equal(original.Id, reversal.ReversedEntryId);
+    Assert.Equal(JournalEntryType.Reversal, reversal.Type);
+    Assert.True(reversal.IsBalanced());
+}
+
+[Fact]
+public void Reversal_DraftEntry_ThrowsDomainException()
+{
+    var entry = CreateEntry();
+    var ex = Assert.Throws<DomainException>(() =>
+        entry.CreateReversal(DateTime.Today, 1));
+    Assert.Contains("مرحّل", ex.Message);
+}
+
+// 3-state lifecycle test
+[Fact]
+public void Lifecycle_Draft_To_Posted_To_Cancelled_ValidTransitions()
+{
+    var entry = CreateEntry();
+    Assert.Equal(InvoiceStatus.Draft, entry.Status);
+    entry.AddDebitLine(1, "1101", "الصندوق", 1000);
+    entry.AddCreditLine(2, "4101", "إيرادات", 1000);
+    entry.ValidateAndPost(1);
+    Assert.Equal(InvoiceStatus.Posted, entry.Status);
+    entry.CancelWithReversal(DateTime.Today, 1);
+    Assert.Equal(InvoiceStatus.Cancelled, entry.Status);
+}
+
+[Fact]
+public void Lifecycle_Posted_To_Invalid_ThrowsDomainException()
+{
+    // Verify that a posted entry can NEVER go back to Draft
+    var entry = CreateEntry();
+    entry.AddDebitLine(1, "1101", "الصندوق", 1000);
+    entry.AddCreditLine(2, "4101", "إيرادات", 1000);
+    entry.ValidateAndPost(1);
+    // No Draft setter exists — validate via reflection or design
+    // This test confirms the design prevents the transition
+    Assert.True(entry.IsPosted);
+}
+
+[Fact]
+public void TotalDebit_MultipleLines_ReturnsSum()
+{
+    var entry = CreateEntry();
+    entry.AddDebitLine(1, "1101", "الصندوق", 500);
+    entry.AddDebitLine(3, "1201", "مخزون", 300);
+    entry.AddCreditLine(2, "4101", "إيرادات", 800);
+    Assert.Equal(800m, entry.TotalDebit);
+}
+
+[Fact]
+public void TotalCredit_MultipleLines_ReturnsSum()
+{
+    var entry = CreateEntry();
+    entry.AddDebitLine(1, "1101", "الصندوق", 800);
+    entry.AddCreditLine(2, "4101", "إيرادات", 500);
+    entry.AddCreditLine(4, "2201", "ضريبة", 300);
+    Assert.Equal(800m, entry.TotalCredit);
+}
+```
+
+#### JournalEntryLine Entity (`JournalEntryLineTests.cs`)
+
+```csharp
+[Fact]
+public void Create_ValidInput_CreatesLineCorrectly()
+{
+    var entry = CreateEntry();
+    entry.AddDebitLine(1, "1101", "الصندوق", 1000);
+    Assert.Single(entry.Lines);
+    Assert.Equal(1000m, entry.Lines.First().Debit);
+    Assert.Equal(0m, entry.Lines.First().Credit);
+}
+
+[Fact]
+public void AddDebitLine_NegativeAmount_ThrowsDomainException()
+{
+    var entry = CreateEntry();
+    var ex = Assert.Throws<DomainException>(() =>
+        entry.AddDebitLine(1, "1101", "الصندوق", -100));
+    Assert.Contains("أكبر من", ex.Message);
+}
+
+[Fact]
+public void AddCreditLine_ZeroAmount_ThrowsDomainException()
+{
+    var entry = CreateEntry();
+    var ex = Assert.Throws<DomainException>(() =>
+        entry.AddCreditLine(2, "4101", "إيرادات", 0));
+    Assert.Contains("أكبر من", ex.Message);
+}
+
+[Fact]
+public void AddLine_EmptyAccountName_ThrowsDomainException()
+{
+    var entry = CreateEntry();
+    var ex = Assert.Throws<DomainException>(() =>
+        entry.AddDebitLine(1, "1101", "", 100));
+    Assert.Contains("مطلوب", ex.Message);
+}
+
+[Fact]
+public void DebitCredit_NotNullConstraint()
+{
+    var entry = CreateEntry();
+    entry.AddDebitLine(1, "1101", "Cash", 500);
+    var line = entry.Lines.First();
+    Assert.NotNull(line.Debit);
+    Assert.NotNull(line.Credit);
+    Assert.True(line.Debit > 0 || line.Credit > 0);
+}
+```
+
+#### FiscalYearClosure Entity (`FiscalYearClosureTests.cs`)
+
+```csharp
+[Fact]
+public void CloseYear_ValidYear_CreatesClosure()
+{
+    var closure = new FiscalYearClosure(2026, closedBy: 1, netIncome: 50000m, closingEntryId: 100);
+    Assert.Equal(2026, closure.FiscalYear);
+    Assert.Equal(50000m, closure.NetIncome);
+    Assert.NotNull(closure.ClosedAt);
+}
+
+[Fact]
+public void CloseYear_FutureYear_ThrowsDomainException()
+{
+    var ex = Assert.Throws<DomainException>(() =>
+        new FiscalYearClosure(2099, closedBy: 1, netIncome: 0, closingEntryId: 100));
+    Assert.Contains("مستقبل", ex.Message);
+}
+
+[Fact]
+public void CloseYear_NegativeNetIncome_AllowsValue()
+{
+    // Net income can be negative (net loss)
+    var closure = new FiscalYearClosure(2026, closedBy: 1, netIncome: -10000m, closingEntryId: 100);
+    Assert.Equal(-10000m, closure.NetIncome);
+}
+```
+
+---
+
+### 2. Service Tests (using `Mock<IUnitOfWork>`)
+
+#### AccountServiceTests.cs
+
+```csharp
+public class AccountServiceTests
+{
+    private readonly Mock<IUnitOfWork> _uowMock;
+    private readonly Mock<IAccountRepository> _repoMock;
+    private readonly AccountService _service;
+
+    public AccountServiceTests()
+    {
+        _uowMock = new Mock<IUnitOfWork>();
+        _repoMock = new Mock<IAccountRepository>();
+        _uowMock.Setup(x => x.Accounts).Returns(_repoMock.Object);
+        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        _service = new AccountService(_uowMock.Object, Mock.Of<ILogger<AccountService>>());
+    }
+
+    [Fact]
+    public async Task CreateAsync_ValidRequest_ReturnsSuccessWithDto()
+    {
+        _repoMock.Setup(x => x.AddAsync(It.IsAny<Account>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await _service.CreateAsync(new CreateAccountRequest
+        {
+            Code = "1101", NameAr = "الصندوق", NameEn = "Cash",
+            Type = AccountType.Asset
+        }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("1101", result.Value.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DuplicateCode_ReturnsFailure()
+    {
+        _repoMock.Setup(x => x.AnyAsync(a => a.Code == "1101", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var result = await _service.CreateAsync(new CreateAccountRequest
+        {
+            Code = "1101", NameAr = "الصندوق", NameEn = "Cash",
+            Type = AccountType.Asset
+        }, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.DuplicateCode, result.Error);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ExistingAccount_ReturnsDto()
+    {
+        var account = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset);
+        _repoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(account);
+
+        var result = await _service.GetByIdAsync(1, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("1101", result.Value.Code);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_NotFound_ReturnsFailure()
+    {
+        _repoMock.Setup(x => x.GetByIdAsync(99, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Account?)null);
+
+        var result = await _service.GetByIdAsync(99, CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.NotFound, result.Error);
+    }
+}
+```
+
+#### JournalEntryServiceTests.cs
+
+```csharp
+[Fact]
+public async Task CreateAsync_ValidEntry_ReturnsSuccess()
+{
+    var request = new CreateJournalEntryRequest
+    {
+        TransactionDate = DateTime.Today,
+        Description = "قيد اختبار",
+        Type = JournalEntryType.Manual,
+        Lines = new List<JournalEntryLineRequest>
+        {
+            new() { AccountId = 1, AccountCode = "1101", AccountName = "الصندوق", Debit = 1000 },
+            new() { AccountId = 2, AccountCode = "4101", AccountName = "إيرادات", Credit = 1000 }
+        }
+    };
+
+    var result = await _service.CreateAsync(request, CancellationToken.None);
+
+    Assert.True(result.IsSuccess);
+    _repoMock.Verify(x => x.AddAsync(It.IsAny<JournalEntry>(), It.IsAny<CancellationToken>()), Times.Once);
+    _uowMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+}
+
+[Fact]
+public async Task CreateAsync_UnbalancedEntry_ReturnsFailure()
+{
+    var request = new CreateJournalEntryRequest
+    {
+        TransactionDate = DateTime.Today,
+        Description = "قيد غير متوازن",
+        Type = JournalEntryType.Manual,
+        Lines = new List<JournalEntryLineRequest>
+        {
+            new() { AccountId = 1, AccountCode = "1101", AccountName = "الصندوق", Debit = 1000 },
+            new() { AccountId = 2, AccountCode = "4101", AccountName = "إيرادات", Credit = 900 }
+        }
+    };
+
+    var result = await _service.CreateAsync(request, CancellationToken.None);
+
+    Assert.False(result.IsSuccess);
+    Assert.Contains("غير متوازن", result.Error);
+}
+
+[Fact]
+public async Task PostAsync_ValidEntry_ChangesStatusToPosted()
+{
+    var entry = CreateDraftEntry();
+    _repoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(entry);
+
+    var result = await _service.PostAsync(1, 1, CancellationToken.None);
+
+    Assert.True(result.IsSuccess);
+    Assert.True(entry.IsPosted);
+}
+
+[Fact]
+public async Task PostAsync_AlreadyPosted_ReturnsFailure()
+{
+    var entry = CreatePostedEntry();
+    _repoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(entry);
+
+    var result = await _service.PostAsync(1, 1, CancellationToken.None);
+
+    Assert.False(result.IsSuccess);
+}
+
+[Fact]
+public async Task CreateAsync_TransactionRollbackOnFailure()
+{
+    _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(Mock.Of<IDbContextTransaction>());
+
+    var request = new CreateJournalEntryRequest
+    {
+        TransactionDate = DateTime.Today,
+        Description = "قيد فاشل",
+        Type = JournalEntryType.Manual,
+        Lines = new List<JournalEntryLineRequest>()
+    };
+
+    var result = await _service.CreateAsync(request, CancellationToken.None);
+
+    Assert.False(result.IsSuccess);
+    _uowMock.Verify(x => x.RollbackTransactionAsync(It.IsAny<CancellationToken>()), Times.Once);
+}
+
+[Fact]
+public async Task CancelAsync_PostedEntry_CreatesReversalEntry()
+{
+    var entry = CreatePostedEntry();
+    _repoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(entry);
+
+    var result = await _service.CancelAsync(1, 1, DateTime.Today, CancellationToken.None);
+
+    Assert.True(result.IsSuccess);
+    // Verify reversal entry was created
+    _repoMock.Verify(x => x.AddAsync(
+        It.Is<JournalEntry>(e => e.Type == JournalEntryType.Reversal),
+        It.IsAny<CancellationToken>()), Times.Once);
+}
+```
+
+#### TrialBalanceServiceTests.cs
+
+```csharp
+[Fact]
+public async Task GetTrialBalanceAsync_ValidDateRange_ReturnsTrialBalance()
+{
+    var accounts = new List<Account>
+    {
+        Account.Create("1101", "الصندوق", "Cash", AccountType.Asset),
+        Account.Create("4101", "مبيعات", "Sales", AccountType.Revenue)
+    };
+    _accountRepo.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(accounts);
+
+    var result = await _service.GetTrialBalanceAsync(
+        new DateTime(2026, 1, 1), new DateTime(2026, 12, 31),
+        CancellationToken.None);
+
+    Assert.True(result.IsSuccess);
+    Assert.NotEmpty(result.Value.Accounts);
+}
+
+[Fact]
+public async Task GetTrialBalanceAsync_NoData_ReturnsEmptyReport()
+{
+    _accountRepo.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+        .ReturnsAsync(new List<Account>());
+
+    var result = await _service.GetTrialBalanceAsync(
+        new DateTime(2026, 1, 1), new DateTime(2026, 12, 31),
+        CancellationToken.None);
+
+    Assert.True(result.IsSuccess);
+    Assert.Empty(result.Value.Accounts);
+}
+
+[Fact]
+public async Task GetTrialBalanceAsync_TotalDebitEqualsTotalCredit()
+{
+    // Set up journal entries that are balanced
+    // Verify trial balance totals match
+    var result = await _service.GetTrialBalanceAsync(
+        new DateTime(2026, 1, 1), new DateTime(2026, 12, 31),
+        CancellationToken.None);
+
+    Assert.True(result.IsSuccess);
+    Assert.Equal(result.Value.TotalDebit, result.Value.TotalCredit);
+}
+```
+
+---
+
+### 3. FluentValidation Tests
+
+```csharp
+public class CreateAccountRequestValidatorTests
+{
+    private readonly CreateAccountRequestValidator _validator = new();
+
+    [Fact]
+    public void ValidRequest_PassesValidation()
+    {
+        var request = new CreateAccountRequest
+        {
+            Code = "1101", NameAr = "الصندوق", NameEn = "Cash",
+            Type = AccountType.Asset
+        };
+        var result = _validator.Validate(request);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void EmptyCode_FailsWithError()
+    {
+        var request = new CreateAccountRequest { Code = "", NameAr = "الصندوق", NameEn = "Cash", Type = AccountType.Asset };
+        var result = _validator.Validate(request);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Code");
+    }
+
+    [Fact]
+    public void NullNameAr_FailsWithError()
+    {
+        var request = new CreateAccountRequest { Code = "1101", NameAr = null!, NameEn = "Cash", Type = AccountType.Asset };
+        var result = _validator.Validate(request);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "NameAr");
+    }
+
+    [Fact]
+    public void CodeTooLong_FailsWithMaxLength()
+    {
+        var request = new CreateAccountRequest { Code = new string('1', 21), NameAr = "Test", NameEn = "Test", Type = AccountType.Asset };
+        var result = _validator.Validate(request);
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void InvalidAccountType_FailsWithError()
+    {
+        var request = new CreateAccountRequest { Code = "1101", NameAr = "Test", NameEn = "Test", Type = (AccountType)99 };
+        var result = _validator.Validate(request);
+        Assert.False(result.IsValid);
+    }
+}
+```
+
+```csharp
+public class CreateJournalEntryRequestValidatorTests
+{
+    private readonly CreateJournalEntryRequestValidator _validator = new();
+
+    [Fact]
+    public void ValidRequest_PassesValidation()
+    {
+        var request = new CreateJournalEntryRequest
+        {
+            TransactionDate = DateTime.Today,
+            Description = "قيد اختبار",
+            Type = JournalEntryType.Manual,
+            Lines = new List<JournalEntryLineRequest>
+            {
+                new() { AccountId = 1, AccountCode = "1101", AccountName = "الصندوق", Debit = 1000 },
+                new() { AccountId = 2, AccountCode = "4101", AccountName = "إيرادات", Credit = 1000 }
+            }
+        };
+        var result = _validator.Validate(request);
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void EmptyDescription_FailsWithError()
+    {
+        var request = new CreateJournalEntryRequest
+        {
+            TransactionDate = DateTime.Today,
+            Description = "",
+            Type = JournalEntryType.Manual,
+            Lines = new List<JournalEntryLineRequest>()
+        };
+        var result = _validator.Validate(request);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Description");
+    }
+
+    [Fact]
+    public void FutureTransactionDate_FailsWithError()
+    {
+        var request = new CreateJournalEntryRequest
+        {
+            TransactionDate = DateTime.Today.AddDays(1),
+            Description = "Test",
+            Type = JournalEntryType.Manual,
+            Lines = new List<JournalEntryLineRequest>()
+        };
+        var result = _validator.Validate(request);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "TransactionDate");
+    }
+
+    [Fact]
+    public void ZeroLines_FailsWithError()
+    {
+        var request = new CreateJournalEntryRequest
+        {
+            TransactionDate = DateTime.Today,
+            Description = "Test",
+            Type = JournalEntryType.Manual,
+            Lines = new List<JournalEntryLineRequest>()
+        };
+        var result = _validator.Validate(request);
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void SingleLine_FailsWithError()
+    {
+        var request = new CreateJournalEntryRequest
+        {
+            TransactionDate = DateTime.Today,
+            Description = "Test",
+            Type = JournalEntryType.Manual,
+            Lines = new List<JournalEntryLineRequest>
+            {
+                new() { AccountId = 1, AccountCode = "1101", AccountName = "الصندوق", Debit = 1000 }
+            }
+        };
+        var result = _validator.Validate(request);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "Lines");
+    }
+}
+```
+
+---
+
+### 4. API Controller Tests (Integration)
+
+```csharp
+public class AccountsControllerTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly HttpClient _client;
+
+    public AccountsControllerTests(WebApplicationFactory<Program> factory)
+    {
+        _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task GetAll_Returns200WithData()
+    {
+        var response = await _client.GetAsync("/api/v1/accounts");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetById_ExistingId_Returns200()
+    {
+        var response = await _client.GetAsync("/api/v1/accounts/1");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetById_NonExistentId_Returns404()
+    {
+        var response = await _client.GetAsync("/api/v1/accounts/9999");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_ValidRequest_Returns201()
+    {
+        var request = new { Code = "9999", NameAr = "اختبار", NameEn = "Test", Type = 1 };
+        var json = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+        var response = await _client.PostAsync("/api/v1/accounts", json);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_InvalidRequest_Returns400()
+    {
+        var request = new { Code = "", NameAr = "", NameEn = "", Type = 99 };
+        var json = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+        var response = await _client.PostAsync("/api/v1/accounts", json);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_ExistingId_Returns204()
+    {
+        var response = await _client.DeleteAsync("/api/v1/accounts/1");
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Unauthorized_Returns401()
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+        var response = await _client.GetAsync("/api/v1/accounts");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task JournalEntries_PostValid_Returns201()
+    {
+        var request = new
+        {
+            TransactionDate = DateTime.Today.ToString("yyyy-MM-dd"),
+            Description = "قيد اختبار",
+            Type = 1,
+            Lines = new[]
+            {
+                new { AccountId = 1, AccountCode = "1101", AccountName = "الصندوق", Debit = 1000, Credit = 0m },
+                new { AccountId = 2, AccountCode = "4101", AccountName = "إيرادات", Debit = 0m, Credit = 1000 }
+            }
+        };
+        var json = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+        var response = await _client.PostAsync("/api/v1/journal-entries", json);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+}
+```
+
+---
+
+### 5. Database Configuration Tests
+
+```csharp
+public class AccountConfigurationTests
+{
+    [Fact]
+    public void AccountConfiguration_HasCorrectPrecision()
+    {
+        var entityType = typeof(Account);
+        var builder = new ModelBuilder();
+        builder.ApplyConfiguration(new AccountConfiguration());
+
+        var entity = builder.Entity<Account>();
+        var decimalProps = entity.Metadata.GetProperties()
+            .Where(p => p.ClrType == typeof(decimal));
+
+        foreach (var prop in decimalProps)
+        {
+            Assert.Equal("decimal(18,2)", prop.GetColumnType());
+        }
+    }
+
+    [Fact]
+    public void AccountConfiguration_CodeIsRequired()
+    {
+        var builder = new ModelBuilder();
+        builder.ApplyConfiguration(new AccountConfiguration());
+
+        var entity = builder.Entity<Account>();
+        var codeProp = entity.Metadata.FindProperty(nameof(Account.Code));
+        Assert.False(codeProp.IsNullable);
+    }
+
+    [Fact]
+    public void AccountConfiguration_ForeignKeysUseRestrict()
+    {
+        var builder = new ModelBuilder();
+        builder.ApplyConfiguration(new AccountConfiguration());
+
+        var entity = builder.Entity<Account>();
+        var foreignKeys = entity.Metadata.GetForeignKeys();
+
+        foreach (var fk in foreignKeys)
+        {
+            Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior);
+        }
+    }
+
+    [Fact]
+    public void JournalEntryConfiguration_HasQueryFilter()
+    {
+        var builder = new ModelBuilder();
+        builder.ApplyConfiguration(new JournalEntryConfiguration());
+
+        var entity = builder.Entity<JournalEntry>();
+        var queryFilter = entity.Metadata.GetQueryFilter();
+        Assert.NotNull(queryFilter); // IsActive filter
+    }
+
+    [Fact]
+    public void JournalEntryLineConfiguration_DecimalPrecision()
+    {
+        var builder = new ModelBuilder();
+        builder.ApplyConfiguration(new JournalEntryLineConfiguration());
+
+        var entity = builder.Entity<JournalEntryLine>();
+        var debitProp = entity.Metadata.FindProperty(nameof(JournalEntryLine.Debit));
+        Assert.Equal("decimal(18,2)", debitProp.GetColumnType());
+
+        var creditProp = entity.Metadata.FindProperty(nameof(JournalEntryLine.Credit));
+        Assert.Equal("decimal(18,2)", creditProp.GetColumnType());
+    }
+}
+```
+
+---
+
+### 6. Phase 18-Specific Tests
+
+#### JournalEntry 3-State Lifecycle
+
+```csharp
+[Fact]
+public void Lifecycle_AllValidTransitions()
+{
+    // Draft (1) → Posted (2) → Cancelled (3): ALLOWED
+    var entry = CreateEntry();
+    Assert.Equal(InvoiceStatus.Draft, entry.Status);
+    entry.AddDebitLine(1, "1101", "الصندوق", 1000);
+    entry.AddCreditLine(2, "4101", "إيرادات", 1000);
+    entry.ValidateAndPost(1);
+    Assert.Equal(InvoiceStatus.Posted, entry.Status);
+    entry.CancelWithReversal(DateTime.Today, 1);
+    Assert.Equal(InvoiceStatus.Cancelled, entry.Status);
+}
+
+[Fact]
+public void Lifecycle_InvalidTransitions()
+{
+    var entry = CreatePostedEntry();
+    // Posted → Draft: FORBIDDEN
+    Assert.Throws<DomainException>(() => entry.SetDraft());
+    
+    // Cancelled → anything: FORBIDDEN (terminal state)
+    var cancelled = CreatePostedEntry();
+    cancelled.CancelWithReversal(DateTime.Today, 1);
+    Assert.Throws<DomainException>(() => cancelled.AddDebitLine(1, "1101", "الصندوق", 100));
+    Assert.Throws<DomainException>(() => cancelled.ValidateAndPost(1));
+}
+```
+
+#### JournalEntryLine Debit/Credit Balance
+
+```csharp
+[Fact]
+public void Line_DebitAndCreditCannotBothBePositive()
+{
+    var entry = CreateEntry();
+    var ex = Assert.Throws<DomainException>(() =>
+        entry.AddDebitLine(1, "1101", "الصندوق", 1000, credit: 500));
+    Assert.Contains("مدين أو دائن", ex.Message);
+}
+
+[Fact]
+public void Line_DebitAndCreditCannotBothBeZero()
+{
+    var entry = CreateEntry();
+    var ex = Assert.Throws<DomainException>(() =>
+        entry.AddDebitLine(1, "1101", "الصندوق", 0));
+    Assert.Contains("أكبر من", ex.Message);
+}
+```
+
+#### Annual Closing
+
+```csharp
+[Fact]
+public async Task AnnualClosing_CreatesClosingEntryAndMarksYearClosed()
+{
+    var result = await _closingService.CloseFiscalYearAsync(2026, 1, CancellationToken.None);
+    Assert.True(result.IsSuccess);
+    Assert.True(result.Value.IsClosed);
+    Assert.NotNull(result.Value.ClosingEntryId);
+}
+
+[Fact]
+public async Task AnnualClosing_AlreadyClosed_ReturnsFailure()
+{
+    await _closingService.CloseFiscalYearAsync(2026, 1, CancellationToken.None);
+    var result = await _closingService.CloseFiscalYearAsync(2026, 1, CancellationToken.None);
+    Assert.False(result.IsSuccess);
+    Assert.Contains("مغلق", result.Error);
+}
+
+[Fact]
+public async Task AnnualClosing_UnpostedEntriesExist_ReturnsFailure()
+{
+    // Arrange: create draft (unposted) entries in 2026
+    var result = await _closingService.CloseFiscalYearAsync(2026, 1, CancellationToken.None);
+    Assert.False(result.IsSuccess);
+    Assert.Contains("غير مرحّلة", result.Error);
+}
+```
+
+#### FiscalYear: IsDateInFiscalYear
+
+```csharp
+[Fact]
+public void IsDateInFiscalYear_DateInRange_ReturnsTrue()
+{
+    var closure = new FiscalYearClosure(2026, 1, 50000m, 100);
+    var date = new DateTime(2026, 6, 15);
+    // The closure covers the 2026 fiscal year
+}
+
+[Fact]
+public void IsDateInFiscalYear_DateOutOfRange_ReturnsFalse()
+{
+    var date = new DateTime(2025, 12, 31);
+    // Not in fiscal year 2026
+}
+```
+
+#### Account Tree Hierarchy: Level Validation
+
+```csharp
+[Fact]
+public void Account_Level_CalculatedCorrectly()
+{
+    // Level 1: 1 digit (e.g., "1")
+    var level1 = Account.Create("1", "أصول", "Assets", AccountType.Asset);
+    Assert.Equal(1, level1.Level);
+
+    // Level 2: 2 digits (e.g., "11")
+    var level2 = Account.Create("11", "أصول متداولة", "Current Assets", AccountType.Asset);
+    Assert.Equal(2, level2.Level);
+
+    // Level 4: 4 digits (e.g., "1101")
+    var level4 = Account.Create("1101", "الصندوق", "Cash", AccountType.Asset);
+    Assert.Equal(4, level4.Level);
+}
+
+[Fact]
+public void Account_ParentLevelMustBeLessThanChildLevel()
+{
+    var parent = Account.Create("1", "أصول", "Assets", AccountType.Asset);
+    var child = Account.Create("11", "أصول متداولة", "Current Assets", AccountType.Asset, parentId: 1);
+    Assert.True(child.Level > parent.Level);
+}
+```
+
+#### Reversal Entry: ReversedByEntryId FK
+
+```csharp
+[Fact]
+public void Reversal_ReversedByEntryId_SetCorrectly()
+{
+    var original = CreatePostedEntry();
+    var reversal = original.CreateReversal(DateTime.Today, 1);
+    Assert.Equal(original.Id, reversal.ReversedEntryId);
+}
+
+[Fact]
+public void Reversal_OriginalEntryLinkedToReversal()
+{
+    var original = CreatePostedEntry();
+    var reversal = original.CreateReversal(DateTime.Today, 1);
+    // When the reversal is saved, it should reference the original
+    Assert.Equal(JournalEntryType.Reversal, reversal.Type);
+}
+```
+
+---
+
+**Test count target:** 80+ tests across all test categories.
+
+**Estimate:** ~4 hours
+
+---
+
+## Task 9 — Simple Mode UX: Hide Debit/Credit for Non-Accountants
+
+**Requirement**: Analysis Part 3 line 10: "الشاشة لا تعرض مدين ودائن للمستخدم العادي" — Screens must NOT show Debit/Credit columns to regular users. Instead:
+1. Show simple transaction view (Amount, Description, Date)
+2. Provide a "View Accounting Entry" button (line 14: "يوجد زر عرض القيد المحاسبي")
+3. ⓘ explanations everywhere (line 18: "يوجد شرح ⓘ داخل الشاشة") — already handled in Task 8
+
+**Implementation**:
+```csharp
+public enum AccountingViewMode
+{
+    Simple = 0,     // Hide Debit/Credit — show amounts only
+    Accounting = 1  // Show full accounting entry with Debit/Credit
+}
+```
+
+- Add `UserPreferences.AccountingViewMode` to filter which columns display
+- Cashier/Manager roles default to `Simple` mode
+- Admin role defaults to `Accounting` mode
+- A toggle button in journal entry views: "ⓘ عرض القيد المحاسبي" / "عرض بسيط"
+- When in Simple mode: hide `Debit`/`Credit` columns, show single `Amount` column with `+`/`-` sign
+- The toggle is per-user, persisted in UserPreferences
+
+**XAML Pattern**:
+```xml
+<!-- Accounting Entry Button — only visible in Simple mode -->
+<Button Content="ⓘ عرض القيد المحاسبي" 
+        Command="{Binding ToggleAccountingViewCommand}"
+        Visibility="{Binding IsSimpleMode, Converter={StaticResource BoolToVisibility}}"
+        ToolTip="يعرض تفاصيل القيد المحاسبي كاملًاً (مدين / دائن)">
+    <Button.Style>
+        <Style TargetType="Button" BasedOn="{StaticResource InfoButtonStyle}"/>
+    </Button.Style>
+</Button>
+```
+
+**Files**: UserPreferences entity (add field), JournalEntry ViewModel (add toggle), JournalEntry View (add button + column visibility toggle), UserService (persist preference).
+
+**Estimate**: ~2 hours

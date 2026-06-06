@@ -22,11 +22,11 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
         builder.Property(x => x.IsActive).HasDefaultValue(true);
         builder.HasIndex(x => x.TransactionDate);
 
-        // Lines collection — Cascade delete (lines belong to entry)
+        // Lines collection — Restrict (soft-delete only, no hard deletes)
         builder.HasMany(x => x.Lines)
             .WithOne()
             .HasForeignKey(x => x.JournalEntryId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasQueryFilter(x => x.IsActive);
     }

@@ -9,6 +9,7 @@ public interface IUnitOfWork
 {
     IGenericRepository<User> Users { get; }
     IGenericRepository<Unit> Units { get; }
+    IGenericRepository<Tax> Taxes { get; }
     IGenericRepository<Category> Categories { get; }
     IGenericRepository<Product> Products { get; }
     IGenericRepository<Warehouse> Warehouses { get; }
@@ -42,6 +43,7 @@ public interface IUnitOfWork
     IGenericRepository<JournalEntry> JournalEntries { get; }
     IGenericRepository<JournalEntryLine> JournalEntryLines { get; }
     IGenericRepository<SystemAccountMappings> SystemAccountMappings { get; }
+    IGenericRepository<FiscalYearClosure> FiscalYearClosures { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
     Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken ct = default);

@@ -19,6 +19,7 @@ public class UnitOfWork : IUnitOfWork
     private readonly SalesDbContext _context;
     private IGenericRepository<User>? _users;
     private IGenericRepository<Unit>? _units;
+    private IGenericRepository<Tax>? _taxes;
     private IGenericRepository<Category>? _categories;
     private IGenericRepository<Product>? _products;
     private IGenericRepository<Warehouse>? _warehouses;
@@ -52,6 +53,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<JournalEntry>? _journalEntries;
     private IGenericRepository<JournalEntryLine>? _journalEntryLines;
     private IGenericRepository<SystemAccountMappings>? _systemAccountMappings;
+    private IGenericRepository<FiscalYearClosure>? _fiscalYearClosures;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -60,6 +62,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
 
     public IGenericRepository<User> Users => _users ??= new GenericRepository<User>(_context);
     public IGenericRepository<Unit> Units => _units ??= new GenericRepository<Unit>(_context);
+    public IGenericRepository<Tax> Taxes => _taxes ??= new GenericRepository<Tax>(_context);
     public IGenericRepository<Category> Categories => _categories ??= new GenericRepository<Category>(_context);
     public IGenericRepository<Product> Products => _products ??= new GenericRepository<Product>(_context);
     public IGenericRepository<Warehouse> Warehouses => _warehouses ??= new GenericRepository<Warehouse>(_context);
@@ -93,6 +96,7 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<JournalEntry> JournalEntries => _journalEntries ??= new GenericRepository<JournalEntry>(_context);
     public IGenericRepository<JournalEntryLine> JournalEntryLines => _journalEntryLines ??= new GenericRepository<JournalEntryLine>(_context);
     public IGenericRepository<SystemAccountMappings> SystemAccountMappings => _systemAccountMappings ??= new GenericRepository<SystemAccountMappings>(_context);
+    public IGenericRepository<FiscalYearClosure> FiscalYearClosures => _fiscalYearClosures ??= new GenericRepository<FiscalYearClosure>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
