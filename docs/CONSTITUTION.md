@@ -1,5 +1,5 @@
 # Project Constitution — Sales Management System
-# Version: 2.4 (v4.6.2) | Platform: .NET 10 LTS | Date: 2026
+# Version: 2.5 (v4.6.9) | Platform: .NET 10 LTS | Date: 2026
 
 ---
 
@@ -652,3 +652,117 @@ The following patterns are strictly prohibited:
 | Missing `SetDialogService()` call in Editor VM constructors | `ValidateAllAsync()` silently fails without a dialog service reference | Call `SetDialogService(_dialogService)` in every constructor |
 | Duplicating validation dialog logic in each Editor ViewModel | Violates DRY, each editor reimplements warning dialog | Use `ValidateAllAsync()` from ViewModelBase |
 | `Save buttons disabled when form has errors` | Blocks user from seeing why save fails; poor UX | Buttons ALWAYS enabled — validate on click with styled warning dialog |
+
+---
+
+## 10. Transaction Strategy & EF Core Execution (v4.6.8)
+
+### 10.1 Transaction Strategy
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-275 | NEVER use `BeginTransactionAsync()` / `CommitAsync()` / `RollbackAsync()` when `SqlServerRetryingExecutionStrategy` is configured — the execution strategy does not support user-initiated transactions. Use `IUnitOfWork.ExecuteTransactionAsync()` (which wraps `CreateExecutionStrategy().ExecuteAsync()` with an explicit transaction) or a single `SaveChangesAsync()` call (EF Core wraps it in an implicit transaction) instead. |
+| RULE-276 | Use `IUnitOfWork.ExecuteTransactionAsync(Func<Task> operation, CancellationToken ct)` for atomic multi-save operations — this wraps `DbContext.Database.CreateExecutionStrategy().ExecuteAsync()` with an explicit transaction inside the delegate. NEVER use `BeginTransactionAsync()` directly when retrying execution strategy is configured. |
+| RULE-277 | `ExchangeRate` on `CustomerPayment` and `SupplierPayment` MUST use `.HasPrecision(18, 2)` — NEVER leave exchange rate precision unspecified (defaults to truncation risk). |
+| RULE-278 | `JournalEntry` to `JournalEntryLine` relationship MUST use `.WithOne(x => x.JournalEntry)` specifying the navigation property — NEVER bare `.WithOne()` (creates shadow FK `JournalEntryId1`). |
+| RULE-279 | Editor ViewModels MUST follow the `CashBoxEditorViewModel` pattern: parameterless constructor delegating to parameterized constructor, `ValidateAsync()` calling `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()`, and `IToastNotificationService` for success feedback. |
+| RULE-280 | `LogSystemError()` is reserved for SYSTEM errors only (DB failures, API unreachable, JSON parse crashes) — NEVER call it for API business validation errors (e.g., duplicate name/code). Use `HandleFailure()` alone, which logs at Warning level per RULE-183. |
+
+### 10.2 Phase 18 & Phase 20 Code Review Remediations
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-281 | `IUnitOfWork` MUST have `ExecuteTransactionAsync(Func<Task> operation, CancellationToken ct)` method for atomic multi-save operations using `CreateExecutionStrategy().ExecuteAsync()` with an explicit `BeginTransactionAsync()` / `CommitAsync()` inside the delegate — NEVER perform two consecutive `SaveChangesAsync()` calls without a wrapping transaction. |
+| RULE-282 | `JournalEntryLineConfiguration` MUST have `CHK_DebitOrCredit` (exactly one of Debit/Credit is non-zero, or both zero) and `CHK_NoNegativeValues` (Debit >= 0 AND Credit >= 0) CHECK constraints via `builder.ToTable(t => t.HasCheckConstraint(...))`. |
+| RULE-283 | All enum properties in EF Core entity configurations MUST use `.HasConversion<int>()` explicitly — NEVER rely on EF Core convention alone (applies to `Account.AccountType`, `JournalEntry.EntryType`, and all other enum properties). |
+| RULE-284 | `SystemAccountMappings` navigation properties MUST be mapped with navigation lambda (e.g., `HasOne(x => x.DefaultCashAccount)`) — NEVER use bare `HasOne<Account>()` which leaves the nav property unmapped. |
+| RULE-285 | `JournalEntryLine.Account` navigation property MUST use `HasOne(x => x.Account)` with lambda — NEVER `HasOne<Account>()` without lambda (creates shadow FK or unmapped navigation). |
+| RULE-286 | `Currency.Create()` factory method MUST accept an `isSystem` parameter (default `false`) and assign it to `IsSystem` — NEVER hardcode `IsSystem = false` (breaks seed data protection for system currencies). |
+| RULE-287 | Filtered unique index on `Currency.IsBaseCurrency` MUST include `AND [IsActive] = 1` in the filter — a soft-deleted base currency must not prevent setting a new base currency. |
+| RULE-288 | Controller endpoints MUST return `404 NotFound` when the service returns `ErrorCodes.NotFound` (entity not found) and `400 BadRequest` for business validation errors — NEVER always return `BadRequest` for all failure types. |
+| RULE-289 | `CurrenciesListViewModel` (and all list ViewModels with EventBus subscriptions) MUST implement `IDisposable` and call `Cleanup()` (which disposes EventBus subscriptions) in `Dispose()` — use `IToastNotificationService.ShowSuccess()` for minor success messages, not modal dialogs. |
+| RULE-290 | `JournalEntryNumberGenerator` MUST query by today's date prefix (e.g., `EntryNumber.StartsWith("JE-20260606")`) for correct daily sequence reset — NEVER query the last entry globally by `Id` (breaks daily reset on quiet days). |
+
+### §10.3 — Phase 19 Code Review Remediations (Settings Module)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-291 | `SetBatchSystemSettingsAsync()` MUST NOT call `SaveChangesAsync()` directly — the repository only prepares entities, the caller (service layer) commits via `IUnitOfWork.SaveChangesAsync()`. This follows RULE-024 (repository NEVER owns transaction commit). |
+| RULE-292 | ALL Domain entity `Update()` methods MUST call `UpdateTimestamp()` at the end — NEVER leave `UpdatedAt` null after modifications (applies to `Tax.Update()`, `StoreSettings.Update()`, and all future entities). |
+| RULE-293 | `SystemSetting.Create()` MUST validate `Category` (not empty) and `DataType` (must be one of: string, int, bool, decimal) via guard clauses — NEVER allow invalid data types or empty categories to pass through. |
+| RULE-294 | Filtered unique indexes on soft-deletable entities MUST include `AND [IsActive] = 1` in the filter — a soft-deleted record must not prevent creating a new record with the same unique value (applies to `Tax.IsDefault`, `Currency.IsBaseCurrency`, and all future filtered indexes). |
+| RULE-295 | `SystemSettingsRepository.SetStringAsync()` MUST accept a `category` parameter (default `null` → `"General"`) for auto-created settings — NEVER hardcode `category: "Print"` which miscategorizes non-Print settings. |
+| RULE-296 | `DbSeeder` MUST seed ALL 25+ system settings from the plan specification — missing settings must be flagged and added during code review. Current seed count: 29 settings across Inventory (4), Sales (8), Purchases (3), Barcode (3), Accounting (1), Print (5), Notifications (4), General (3). |
+| RULE-297 | `StoreSettings` seed data MUST pass `defaultTaxRate: 0m` (deprecated — Tax entity is source of truth) — NEVER seed with `15m` which contradicts the deprecation strategy. |
+
+**Repository must not own transaction commit — code pattern:**
+```csharp
+// REPOSITORY — DO NOT call SaveChangesAsync
+public async Task SetBatchSystemSettingsAsync(Dictionary<string, string> settings, CancellationToken ct)
+{
+    foreach (var kvp in settings) { /* prepare entities */ }
+    InvalidateCache(); // caller commits via _uow.SaveChangesAsync()
+}
+
+// SERVICE — caller owns the commit
+public async Task<Result> UpdateSystemSettingsAsync(...)
+{
+    await _systemSettingsRepo.SetBatchSystemSettingsAsync(settings, ct);
+    await _uow.SaveChangesAsync(ct);  // service owns commit
+    return Result.Success();
+}
+```
+
+**Entity Update() must record timestamp:**
+```csharp
+public void Update(string name, decimal rate, bool isDefault)
+{
+    // ... validation and property assignments ...
+    UpdateTimestamp();  // REQUIRED — audit trail
+}
+```
+
+**SystemSetting.Create() validation:**
+```csharp
+public static SystemSetting Create(string settingKey, string settingValue,
+    string dataType = "string", string category = "General", ...)
+{
+    if (string.IsNullOrWhiteSpace(settingKey))
+        throw new DomainException("مفتاح الإعداد مطلوب.");
+    if (string.IsNullOrWhiteSpace(category))
+        throw new DomainException("تصنيف الإعداد مطلوب.");
+    var validDataTypes = new[] { "string", "int", "bool", "decimal" };
+    if (!validDataTypes.Contains(dataType))
+        throw new DomainException("نوع البيانات غير صالح.");
+    // ...
+}
+```
+
+**Filtered unique index must guard IsActive:**
+```csharp
+// CORRECT — prevents conflicts with soft-deleted records
+builder.HasIndex(t => t.IsDefault).IsUnique()
+    .HasFilter("[IsDefault] = 1 AND [IsActive] = 1");
+```
+
+**SetStringAsync must not hardcode category:**
+```csharp
+// CORRECT — accepts category parameter, defaults to "General"
+public async Task SetStringAsync(string key, string value,
+    string? category = null, int? userId = null, CancellationToken ct)
+{
+    var newSetting = SystemSetting.Create(key, value, category: category ?? "General");
+    // ...
+}
+```
+
+### §10.3.6 CurrencyCode Must Be Exactly 3 Characters
+
+ISO 4217 currency codes are always exactly 3 characters. The Domain entity must enforce this:
+
+```csharp
+if (code.Trim().Length != 3)
+    throw new DomainException("رمز العملة يجب أن يكون 3 أحرف.");
+```
+
+All validation layers (Domain, FluentValidation, Desktop VM) must consistently enforce exactly 3 characters.

@@ -61,6 +61,8 @@ public class PurchaseInvoice : BaseEntity
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
         if (dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow.Date))
             throw new DomainException("تاريخ الاستحقاق لا يمكن أن يكون في الماضي.");
+        if (currencyId.HasValue && !exchangeRate.HasValue)
+            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
 
         var invoice = new PurchaseInvoice
         {

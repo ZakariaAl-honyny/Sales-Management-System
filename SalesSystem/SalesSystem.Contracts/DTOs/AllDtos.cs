@@ -1,3 +1,5 @@
+using SalesSystem.Domain.Accounting.Enums;
+
 namespace SalesSystem.Contracts.DTOs;
 
 public record UserDto(int Id, string UserName, string FullName, byte Role, bool IsActive);
@@ -517,7 +519,7 @@ public record AccountBalanceDto(
     int AccountId,
     string AccountCode,
     string AccountNameAr,
-    byte AccountType,
+    AccountType AccountType,
     decimal TotalDebit,
     decimal TotalCredit,
     decimal Balance,
@@ -551,5 +553,49 @@ public record AccountStatementDto(
     decimal Debit,
     decimal Credit,
     decimal Balance
+);
+
+public record SystemAccountMappingsDto(
+    int Id,
+    int DefaultCashAccountId,
+    string? DefaultCashAccountName,
+    string? DefaultCashAccountCode,
+    int DefaultBankAccountId,
+    string? DefaultBankAccountName,
+    string? DefaultBankAccountCode,
+    int InventoryAssetAccountId,
+    string? InventoryAssetAccountName,
+    string? InventoryAssetAccountCode,
+    int AccountsReceivableAccountId,
+    string? AccountsReceivableAccountName,
+    string? AccountsReceivableAccountCode,
+    int AccountsPayableAccountId,
+    string? AccountsPayableAccountName,
+    string? AccountsPayableAccountCode,
+    int VatOutputAccountId,
+    string? VatOutputAccountName,
+    string? VatOutputAccountCode,
+    int VatInputAccountId,
+    string? VatInputAccountName,
+    string? VatInputAccountCode,
+    int CapitalAccountId,
+    string? CapitalAccountName,
+    string? CapitalAccountCode,
+    int SalesRevenueAccountId,
+    string? SalesRevenueAccountName,
+    string? SalesRevenueAccountCode,
+    int SalesReturnAccountId,
+    string? SalesReturnAccountName,
+    string? SalesReturnAccountCode,
+    int CogsAccountId,
+    string? CogsAccountName,
+    string? CogsAccountCode,
+    int GeneralExpenseAccountId,
+    string? GeneralExpenseAccountName,
+    string? GeneralExpenseAccountCode,
+    int SpoilageLossAccountId,
+    string? SpoilageLossAccountName,
+    string? SpoilageLossAccountCode,
+    int? BranchId
 );
 

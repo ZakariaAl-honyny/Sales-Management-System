@@ -49,6 +49,7 @@ public class CashBox : BaseEntity
             BranchId = branchId,
             AssignedUserId = assignedUserId,
             CurrencyId = currencyId,
+            OpeningBalance = initialBalance,
             CurrentBalance = initialBalance,
             IsActive = true
         };
@@ -106,7 +107,7 @@ public class CashBox : BaseEntity
 
         var transaction = CashTransaction.Create(
             Id, type, -amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes);
+            referenceType, referenceId, createdBy, notes, CurrencyId);
 
         _transactions.Add(transaction);
         return transaction;

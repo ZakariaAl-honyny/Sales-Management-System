@@ -84,6 +84,8 @@ public class SalesReturn : BaseEntity
             throw new DomainException("رقم الإرجاع مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
+        if (currencyId.HasValue && !exchangeRate.HasValue)
+            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
 
         var sr = new SalesReturn
         {

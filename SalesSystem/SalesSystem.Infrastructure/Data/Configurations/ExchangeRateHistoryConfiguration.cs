@@ -21,5 +21,6 @@ public class ExchangeRateHistoryConfiguration : IEntityTypeConfiguration<Exchang
             .HasForeignKey(e => e.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(e => e.IsActive);
+        builder.HasIndex(e => new { e.CurrencyId, e.EffectiveDate });
     }
 }

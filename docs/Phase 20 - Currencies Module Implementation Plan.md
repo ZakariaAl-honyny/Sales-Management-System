@@ -2161,3 +2161,62 @@ public void ExchangeRate_AcceptsSixDecimalPlaces()
 | Currency UI not needed | Remove DI registration + navigation entry — no data impact |
 | Desktop CurrencyApiService not working | Catch HTTP errors gracefully — system works without currency screen (invoices default to base currency) |
 | StoreSettings.CurrencyCode deprecation causes issues | Restore field visibility in SettingsView.xaml — no data loss |
+
+---
+
+## 12. v4.6.8 — Stabilization Fixes
+
+### 12.1 Problem: CurrencyService Uses Manual Transactions — CRASHES with SqlServerRetryingExecutionStrategy
+
+**Root Cause**: `CurrencyService.CreateAsync()`, `UpdateAsync()`, and `UpdateExchangeRateAsync()` all used `await using var transaction = await _uow.BeginTransactionAsync(ct)`. This is incompatible with EF Core's `SqlServerRetryingExecutionStrategy`, which throws `InvalidOperationException` when it detects a user-initiated transaction.
+
+**Error in API Log**:
+```
+System.InvalidOperationException: The configured execution strategy
+'SqlServerRetryingExecutionStrategy' does not support user-initiated transactions.
+```
+
+This exception was caught by the generic `catch (Exception ex)` in CurrencyService and replaced with the generic message `"حدث خطأ أثناء إضافة العملة."`. The user saw a confusing error dialog with no actionable information.
+
+**Fix**: Removed ALL manual `BeginTransactionAsync` / `CommitAsync` / `RollbackAsync` calls from all three methods. Each method now uses a single `SaveChangesAsync()` call, which EF Core automatically wraps in an implicit database transaction via `IDbContextTransaction`.
+
+### 12.2 Problem: ExchangeRate on Payment Entities Missing Precision
+
+**Root Cause**: `CustomerPayment.ExchangeRate` (decimal?) and `SupplierPayment.ExchangeRate` (decimal?) had no `.HasPrecision()` in their Fluent API configuration. EF Core defaults to `decimal(18,2)`, which silently truncates exchange rate values like `250.50` (fine) but would lose precision on rates with more decimal places (e.g., `0.000123`).
+
+**Fix**: Added `.HasPrecision(18, 2)` to both properties in `SystemConfigurations.cs`.
+
+### 12.3 Problem: JournalEntryId1 Shadow FK
+
+**Root Cause**: `JournalEntryConfiguration.cs` used bare `.WithOne()` without specifying the navigation property on `JournalEntryLine`. EF Core created a shadow FK property `JournalEntryId1` because it couldn't resolve whether to use the existing `JournalEntryId` property or create a new one for the relationship. The existing `JournalEntryId` was also an explicit property but not fully mapped.
+
+**Fix**: Changed `.WithOne()` to `.WithOne(x => x.JournalEntry)` — explicitly tells EF Core to use the `JournalEntry` navigation property on `JournalEntryLine`, which resolves to the existing `JournalEntryId` FK.
+
+### 12.4 Problem: CurrencyEditorViewModel ValidateAsync() Bypasses RULE-229
+
+**Root Cause**: The private `ValidateAsync()` method built its own `List<string>` and called `_dialogService.ShowValidationErrorsAsync(...)` directly. This completely bypassed the `INotifyDataErrorInfo` infrastructure (RULE-229 requirement to use `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()`).
+
+**Fix**: Replaced with `ClearAllErrors()` → `AddError()` for each field → `return await ValidateAllAsync()` pattern matching `CashBoxEditorViewModel`.
+
+### 12.5 Problem: LogSystemError Used for User Validation Failures
+
+**Root Cause**: The `else` block in `SaveOperationAsync` called `LogSystemError(...)` (which logs at `Serilog.Log.Error` level) when the API returned business validation errors (e.g., duplicate currency name). Per RULE-182/183, user validation mistakes should be logged at `Warning` level, not `Error`.
+
+**Fix**: Removed `LogSystemError` call from the `else` block. `HandleFailure()` already logs at Warning level — no additional logging needed.
+
+### 12.6 Problem: Missing Success Toast
+
+**Root Cause**: The editor ViewModel didn't inject `IToastNotificationService`. Users received no visual feedback when a currency was successfully created or updated — the window just closed.
+
+**Fix**: Added `IToastNotificationService` via dual constructor pattern, calling `_toastService.ShowSuccess("تم إضافة العملة بنجاح" / "تم تعديل العملة بنجاح")` before `RequestClose()`.
+
+### New Rules Added to AGENTS.md
+
+| Rule | Directive |
+|------|-----------|
+| RULE-275 | NEVER use `BeginTransactionAsync` when `SqlServerRetryingExecutionStrategy` is configured |
+| RULE-276 | For multi-write atomicity, use `CreateExecutionStrategy().ExecuteAsync()` not `BeginTransactionAsync` |
+| RULE-277 | `ExchangeRate` on payment entities MUST have `.HasPrecision(18, 2)` |
+| RULE-278 | `JournalEntry` → `JournalEntryLine` MUST use `.WithOne(x => x.JournalEntry)` |
+| RULE-279 | Editor VMs MUST follow CashBoxEditorViewModel pattern (ClearAllErrors → AddError → ValidateAllAsync, toast, dual constructor) |
+| RULE-280 | LogSystemError reserved for system errors — NEVER for API business validation errors |

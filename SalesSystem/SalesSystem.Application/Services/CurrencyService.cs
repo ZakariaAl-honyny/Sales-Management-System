@@ -20,12 +20,15 @@ public class CurrencyService : ICurrencyService
         _logger = logger;
     }
 
-    public async Task<Result<List<CurrencyDto>>> GetAllAsync(CancellationToken ct = default)
+    public async Task<Result<List<CurrencyDto>>> GetAllAsync(bool includeInactive = false, CancellationToken ct = default)
     {
         try
         {
             var currencies = await _uow.Currencies.GetAllAsync(ct);
-            var dtos = currencies.Select(MapToDto).ToList();
+            var filtered = includeInactive
+                ? currencies
+                : currencies.Where(c => c.IsActive).ToList();
+            var dtos = filtered.Select(MapToDto).ToList();
             return Result<List<CurrencyDto>>.Success(dtos);
         }
         catch (Exception ex)
@@ -49,6 +52,42 @@ public class CurrencyService : ICurrencyService
         {
             _logger.LogError(ex, "Failed to load currency {Id}", id);
             return Result<CurrencyDto>.Failure("فشل في تحميل العملة");
+        }
+    }
+
+    public async Task<Result<CurrencyDto>> GetByCodeAsync(string code, CancellationToken ct = default)
+    {
+        try
+        {
+            var currency = await _uow.Currencies.FirstOrDefaultAsync(
+                c => c.Code == code.Trim().ToUpperInvariant(), ct);
+            if (currency == null)
+                return Result<CurrencyDto>.Failure("العملة غير موجودة", ErrorCodes.NotFound);
+
+            return Result<CurrencyDto>.Success(MapToDto(currency));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load currency by code {Code}", code);
+            return Result<CurrencyDto>.Failure("فشل في تحميل العملة");
+        }
+    }
+
+    public async Task<Result<CurrencyDto>> GetBaseCurrencyAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var currency = await _uow.Currencies.FirstOrDefaultAsync(
+                c => c.IsBaseCurrency && c.IsActive, ct);
+            if (currency == null)
+                return Result<CurrencyDto>.Failure("لا توجد عملة أساسية", ErrorCodes.NotFound);
+
+            return Result<CurrencyDto>.Success(MapToDto(currency));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load base currency");
+            return Result<CurrencyDto>.Failure("فشل في تحميل العملة الأساسية");
         }
     }
 
@@ -76,34 +115,24 @@ public class CurrencyService : ICurrencyService
 
             currency.SetCreatedBy(userId);
 
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
-            try
+            // If setting as base currency, unset any existing base currency
+            if (request.IsBaseCurrency)
             {
-                // If setting as base currency, unset any existing base currency
-                if (request.IsBaseCurrency)
+                var existingBase = await _uow.Currencies.FirstOrDefaultAsync(c => c.IsBaseCurrency && c.IsActive, ct);
+                if (existingBase != null)
                 {
-                    var existingBase = await _uow.Currencies.FirstOrDefaultAsync(c => c.IsBaseCurrency && c.IsActive, ct);
-                    if (existingBase != null)
-                    {
-                        // Use Update to reflect that it's no longer base
-                        existingBase.Update(
-                            existingBase.Name,
-                            existingBase.Symbol,
-                            existingBase.ExchangeRateToBase,
-                            false,
-                            existingBase.FractionName);
-                    }
+                    // Use Update to reflect that it's no longer base
+                    existingBase.Update(
+                        existingBase.Name,
+                        existingBase.Symbol,
+                        existingBase.ExchangeRateToBase,
+                        false,
+                        existingBase.FractionName);
                 }
+            }
 
-                await _uow.Currencies.AddAsync(currency, ct);
-                await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+            await _uow.Currencies.AddAsync(currency, ct);
+            await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Currency {Id} created: {Name} ({Code})", currency.Id, currency.Name, currency.Code);
             return Result<CurrencyDto>.Success(MapToDto(currency));
@@ -130,56 +159,46 @@ public class CurrencyService : ICurrencyService
             // Track if exchange rate changed for history
             var rateChanged = currency.ExchangeRateToBase != request.ExchangeRateToBase;
 
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
-            try
+            // If setting as base currency, unset existing base currency
+            if (request.IsBaseCurrency && !currency.IsBaseCurrency)
             {
-                // If setting as base currency, unset existing base currency
-                if (request.IsBaseCurrency && !currency.IsBaseCurrency)
+                var existingBase = await _uow.Currencies.FirstOrDefaultAsync(
+                    c => c.IsBaseCurrency && c.IsActive && c.Id != id, ct);
+                if (existingBase != null)
                 {
-                    var existingBase = await _uow.Currencies.FirstOrDefaultAsync(
-                        c => c.IsBaseCurrency && c.IsActive && c.Id != id, ct);
-                    if (existingBase != null)
-                    {
-                        existingBase.Update(
-                            existingBase.Name,
-                            existingBase.Symbol,
-                            existingBase.ExchangeRateToBase,
-                            false,
-                            existingBase.FractionName);
-                    }
+                    existingBase.Update(
+                        existingBase.Name,
+                        existingBase.Symbol,
+                        existingBase.ExchangeRateToBase,
+                        false,
+                        existingBase.FractionName);
                 }
-
-                var oldRate = currency.ExchangeRateToBase;
-                currency.Update(
-                    request.Name,
-                    request.Symbol,
-                    request.ExchangeRateToBase,
-                    request.IsBaseCurrency,
-                    request.FractionName);
-                currency.SetUpdatedBy(userId);
-
-                // Record exchange rate change history
-                if (rateChanged)
-                {
-                    var history = ExchangeRateHistory.Create(
-                        currency.Id,
-                        oldRate,
-                        currency.ExchangeRateToBase,
-                        DateOnly.FromDateTime(DateTime.UtcNow),
-                        "Manual",
-                        $"تحديث بواسطة المستخدم {userId}",
-                        userId);
-                    await _uow.ExchangeRateHistories.AddAsync(history, ct);
-                }
-
-                await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
             }
-            catch
+
+            var oldRate = currency.ExchangeRateToBase;
+            currency.Update(
+                request.Name,
+                request.Symbol,
+                request.ExchangeRateToBase,
+                request.IsBaseCurrency,
+                request.FractionName);
+            currency.SetUpdatedBy(userId);
+
+            // Record exchange rate change history
+            if (rateChanged)
             {
-                await transaction.RollbackAsync(ct);
-                throw;
+                var history = ExchangeRateHistory.Create(
+                    currency.Id,
+                    oldRate,
+                    currency.ExchangeRateToBase,
+                    DateOnly.FromDateTime(DateTime.UtcNow),
+                    "Manual",
+                    $"تحديث بواسطة المستخدم {userId}",
+                    userId);
+                await _uow.ExchangeRateHistories.AddAsync(history, ct);
             }
+
+            await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Currency {Id} updated: {Name} ({Code})", id, currency.Name, currency.Code);
             return Result<CurrencyDto>.Success(MapToDto(currency));
@@ -259,30 +278,20 @@ public class CurrencyService : ICurrencyService
 
             var oldRate = currency.ExchangeRateToBase;
 
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
-            try
-            {
-                currency.UpdateExchangeRate(newRate);
-                currency.SetUpdatedBy(userId);
+            currency.UpdateExchangeRate(newRate);
+            currency.SetUpdatedBy(userId);
 
-                var history = ExchangeRateHistory.Create(
-                    currency.Id,
-                    oldRate,
-                    newRate,
-                    DateOnly.FromDateTime(DateTime.UtcNow),
-                    "Daily",
-                    $"تحديث سعر الصرف بواسطة المستخدم {userId}",
-                    userId);
-                await _uow.ExchangeRateHistories.AddAsync(history, ct);
+            var history = ExchangeRateHistory.Create(
+                currency.Id,
+                oldRate,
+                newRate,
+                DateOnly.FromDateTime(DateTime.UtcNow),
+                "Daily",
+                $"تحديث سعر الصرف بواسطة المستخدم {userId}",
+                userId);
+            await _uow.ExchangeRateHistories.AddAsync(history, ct);
 
-                await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(ct);
-                throw;
-            }
+            await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Exchange rate updated for currency {Id}: {OldRate} -> {NewRate}", id, oldRate, newRate);
             return Result.Success();

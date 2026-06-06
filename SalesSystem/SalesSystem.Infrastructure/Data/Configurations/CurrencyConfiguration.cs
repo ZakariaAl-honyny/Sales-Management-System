@@ -18,9 +18,9 @@ public class CurrencyConfiguration : IEntityTypeConfiguration<Currency>
         builder.Property(c => c.FractionName).HasMaxLength(20).IsRequired(false);
         builder.Property(c => c.IsSystem).HasDefaultValue(false);
         builder.HasQueryFilter(c => c.IsActive);
-        builder.HasIndex(c => c.Name).IsUnique();
-        builder.HasIndex(c => c.Code).IsUnique();
-        builder.HasIndex(c => c.IsBaseCurrency).IsUnique().HasFilter("[IsBaseCurrency] = 1");
+        builder.HasIndex(c => c.Name).IsUnique().HasFilter("[IsActive] = 1");
+        builder.HasIndex(c => c.Code).IsUnique().HasFilter("[IsActive] = 1");
+        builder.HasIndex(c => c.IsBaseCurrency).IsUnique().HasFilter("[IsBaseCurrency] = 1 AND [IsActive] = 1");
         builder.ToTable(t => t.HasCheckConstraint("CHK_Currencies_ExchangeRate", "[ExchangeRateToBase] > 0"));
     }
 }

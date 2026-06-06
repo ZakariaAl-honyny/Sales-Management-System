@@ -136,12 +136,12 @@
                                             Width="*" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
                         
-                        <DataGridTextColumn Header="الرمز (ISO)" 
+                        <DataGridTextColumn Header="رمز ISO" 
                                             Binding="{Binding Code}" 
                                             Width="100" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         
-                        <DataGridTextColumn Header="الرمز" 
+                        <DataGridTextColumn Header="إشارة" 
                                             Binding="{Binding Symbol}" 
                                             Width="80" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>

@@ -1,10 +1,10 @@
-using System.Windows;
+using System.Windows.Controls;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 
 namespace SalesSystem.DesktopPWF.Views.Currencies;
 
-public partial class CurrencyEditorView : Window
+public partial class CurrencyEditorView : UserControl
 {
     public CurrencyEditorView()
     {
@@ -14,14 +14,5 @@ public partial class CurrencyEditorView : Window
     public CurrencyEditorView(CurrencyEditorViewModel viewModel) : this()
     {
         DataContext = viewModel;
-        viewModel.CloseRequested += () => Close();
-        viewModel.FocusFirstInvalidFieldRequested += () =>
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                (ValidationFocusBehavior.FindFirstInvalid(this) ??
-                ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
-            });
-        };
     }
 }

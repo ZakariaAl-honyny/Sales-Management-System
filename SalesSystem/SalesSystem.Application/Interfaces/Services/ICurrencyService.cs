@@ -6,8 +6,10 @@ namespace SalesSystem.Application.Interfaces.Services;
 
 public interface ICurrencyService
 {
-    Task<Result<List<CurrencyDto>>> GetAllAsync(CancellationToken ct = default);
+    Task<Result<List<CurrencyDto>>> GetAllAsync(bool includeInactive = false, CancellationToken ct = default);
     Task<Result<CurrencyDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<CurrencyDto>> GetByCodeAsync(string code, CancellationToken ct = default);
+    Task<Result<CurrencyDto>> GetBaseCurrencyAsync(CancellationToken ct = default);
     Task<Result<CurrencyDto>> CreateAsync(CreateCurrencyRequest request, int userId, CancellationToken ct = default);
     Task<Result<CurrencyDto>> UpdateAsync(int id, UpdateCurrencyRequest request, int userId, CancellationToken ct = default);
     Task<Result> DeleteAsync(int id, int userId, CancellationToken ct = default);

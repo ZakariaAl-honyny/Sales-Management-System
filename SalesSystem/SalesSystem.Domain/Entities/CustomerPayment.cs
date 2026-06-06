@@ -41,6 +41,8 @@ public class CustomerPayment : BaseEntity
             throw new DomainException("العميل مطلوب.");
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
+        if (currencyId.HasValue && !exchangeRate.HasValue)
+            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
 
         var payment = new CustomerPayment
         {

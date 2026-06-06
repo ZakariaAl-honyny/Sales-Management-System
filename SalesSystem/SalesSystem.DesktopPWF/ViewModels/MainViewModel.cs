@@ -53,11 +53,14 @@ public class MainViewModel : ViewModelBase
                 Title = "نقطة البيع (الكاشير)",
                 OnClosed = (vm) =>
                 {
-                    if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+                    System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                     {
-                        var eventBus = App.GetService<IEventBus>();
-                        eventBus.Publish(new SalesSystem.DesktopPWF.Messaging.Messages.SaleInvoiceChangedMessage(editor.InvoiceId.Value));
-                    }
+                        if (vm is SalesInvoiceEditorViewModel editor && editor.InvoiceId.HasValue)
+                        {
+                            var eventBus = App.GetService<IEventBus>();
+                            eventBus.Publish(new SalesSystem.DesktopPWF.Messaging.Messages.SaleInvoiceChangedMessage(editor.InvoiceId.Value));
+                        }
+                    });
                 }
             });
         });

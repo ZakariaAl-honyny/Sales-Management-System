@@ -16,7 +16,7 @@ public class CurrencyApiService : ApiServiceBase, ICurrencyApiService
     public async Task<Result<List<CurrencyDto>>> GetAllAsync(bool includeInactive = false)
     {
         return await ExecuteAsync<List<CurrencyDto>>(
-            () => _httpClient.GetAsync("api/v1/currencies"),
+            () => _httpClient.GetAsync($"api/v1/currencies?includeInactive={includeInactive}"),
             "CurrencyApiService.GetAllAsync");
     }
 

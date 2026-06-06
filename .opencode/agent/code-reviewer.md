@@ -34,7 +34,7 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] All FKs use `DeleteBehavior.Restrict` (no Cascade)?
 
 ### Transactions
-- [ ] Multi-table operations in `BeginTransactionAsync`?
+- [ ] NOT using `BeginTransactionAsync` when `SqlServerRetryingExecutionStrategy` is configured? (Use single `SaveChangesAsync` or `CreateExecutionStrategy().ExecuteAsync()` instead)
 - [ ] Stock checked BEFORE transaction?
 - [ ] InventoryMovement created for every stock change?
 - [ ] Rollback on ANY failure?
@@ -209,6 +209,61 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] Dialog icon border = `44×44` or smaller?
 - [ ] Dialog button widths use `MinWidth` (80-100) not fixed `Width` (120/130)?
 - [ ] ScreenWindow MinWidth = 500, MinHeight = 350?
+
+### Currency Module Checks (v4.6.8)
+- [ ] Domain entities have `isSystem`/`IsSystem` guard in `MarkAsDeleted()` for protected records?
+- [ ] Factory methods accept necessary protection params (e.g., `bool isSystem = false`)?
+- [ ] Filtered unique indexes include `[IsActive] = 1` to prevent soft-delete conflicts?
+- [ ] Controller returns `404 NotFound` when service returns `ErrorCodes.NotFound`?
+- [ ] API service passes all query parameters (e.g., `includeInactive`) to the API URL?
+- [ ] FluentValidation exists for EVERY Request type (no missing validators)?
+- [ ] Update DTOs don't have unused `IsActive` fields that bypass soft-delete?
+- [ ] Desktop VMs implement `IDisposable` when using EventBus subscriptions?
+- [ ] Commands have NO CanExecute predicates (buttons always enabled per RULE-059)?
+- [ ] Minor success messages use `IToastNotificationService` (not modal dialogs)?
+- [ ] `LogSystemError` NOT used for API business validation errors (use `HandleFailure`)?
+- [ ] Database indexes match plan spec (composite indexes for common query patterns)?
+- [ ] XAML numeric format strings match precision (e.g., `N6` for `decimal(18,6)` fields)?
+- [ ] Auth policies match permissions matrix (read endpoints use `AllStaff`, not `AdminOnly`)?
+
+## v4.6.8 — Phase 18 & Phase 20 Remediations
+
+| Check ID | Check Description |
+|----------|------------------|
+| CHECK-011 | Does `AnnualClosingService` use `ExecuteTransactionAsync` or `CreateExecutionStrategy().ExecuteAsync()` for atomic multi-save? (Two bare `SaveChangesAsync()` without wrapping transaction is a CRITICAL data integrity bug.) |
+| CHECK-012 | Are ALL enum properties configured with `.HasConversion<int>()`? (Check `AccountConfiguration.AccountType`, `JournalEntryConfiguration.EntryType` — MUST have explicit conversion.) |
+| CHECK-013 | Are `SystemAccountMappings` navigation properties mapped with proper lambdas? (Check ALL 13 `HasOne(x => x.PropertyName)` — NOT bare `HasOne<Account>()`.) |
+| CHECK-014 | Does `JournalEntryLineConfiguration` have `CHK_DebitOrCredit` and `CHK_NoNegativeValues` CHECK constraints? (Both are REQUIRED per plan — must catch raw SQL inserts bypassing domain validation.) |
+| CHECK-015 | Does `JournalEntryConfiguration` have `ReversedByEntryId` FK with `DeleteBehavior.Restrict`? (Missing FK defaults to cascade/noaction — MUST be Restrict.) |
+| CHECK-016 | Do Controller endpoints (Delete, PermanentDelete) differentiate `404 NotFound` vs `400 BadRequest` based on `ErrorCodes.NotFound`? (Per RULE-025, NOT found → 404, business errors → 400.) |
+| CHECK-017 | Are list ViewModels implementing `IDisposable` (not just `Cleanup()`) and using `IToastNotificationService` for minor success messages? (EventBus subscriptions MUST be disposed, minor success MUST use toast per RULE-056/057.) |
+| CHECK-018 | Is the Currency filtered unique index on `IsBaseCurrency` guarded against soft-deleted records? (Filter MUST include `AND [IsActive] = 1` — otherwise base currency + soft-deleted base currency can coexist.) |
+| CHECK-019 | Does `Currency.Create()` accept `isSystem` parameter and set `IsSystem = isSystem`? (Without this, system currencies like YER/USD/SAR can be deleted by any admin.) |
+
+### Phase 20 CurrencyCode Validation
+- [ ] `Currency.Create()` validates `code.Trim().Length == 3` (not `> 10` or any generic length check).
+
+## v4.6.9 — Phase 19 Settings Module Remediations
+
+### Phase 20 Currency Module — Enhancement Checks (v4.6.9)
+- [ ] `CashBox.Create()` sets `OpeningBalance = initialBalance` (not just `CurrentBalance`).
+- [ ] `Currency` entity has `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods — NOT direct `IsBaseCurrency = true/false` in service code.
+- [ ] `InvokeOnUIThreadAsync` callbacks don't use `async` when no `await` exists in the lambda.
+
+### Key Checkpoints
+- [ ] `SetBatchSystemSettingsAsync()` does NOT call `SaveChangesAsync()` — check that the repo only prepares entities.
+- [ ] Every `Update()` method in Domain entities calls `UpdateTimestamp()` at the end.
+- [ ] `SystemSetting.Create()` validates `Category` (not empty) and `DataType` (whitelist: string/int/bool/decimal).
+- [ ] Filtered unique indexes on soft-deletable entities include `AND [IsActive] = 1`.
+- [ ] `SetStringAsync()` accepts a `category` parameter — no hardcoded categories.
+- [ ] DbSeeder seeds ALL system settings (target: 29+).
+- [ ] StoreSettings seed uses `defaultTaxRate: 0m`, not `15m`.
+- [ ] Controllers differentiate NotFound(404) vs BadRequest(400) via `ErrorCodes.NotFound`.
+
+### Phase 19 Settings Module — Enhancement Checks
+- [ ] `Tax` entity has `SetDefault()` and `ClearDefault()` domain methods — NOT direct `IsDefault = true/false` in service code.
+- [ ] `SystemSettingsViewModel` has ALL seeded settings as properties (check Print + Notifications sections exist).
+- [ ] `StoreSettingsService.UpdateSystemSettingsAsync()` validates known keys by type before saving (boolean → `bool.TryParse`, integer → `int.TryParse` with ranges).
 
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`

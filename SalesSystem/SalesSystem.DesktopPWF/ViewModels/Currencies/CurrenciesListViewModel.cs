@@ -12,7 +12,7 @@ using SalesSystem.Contracts.DTOs;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Currencies;
 
-public class CurrenciesListViewModel : ViewModelBase
+public class CurrenciesListViewModel : ViewModelBase, IDisposable
 {
     private readonly ICurrencyApiService _currencyService;
     private readonly IEventBus _eventBus;
@@ -42,10 +42,12 @@ public class CurrenciesListViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        RefreshCommand = new AsyncRelayCommand(LoadCurrenciesAsync);
+        RefreshCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(LoadCurrenciesOperationAsync,
+                ex => ErrorMessage = HandleException(ex, "CurrenciesListViewModel.LoadCurrenciesAsync"))));
         AddCommand = new RelayCommand(AddCurrency);
-        EditCommand = new RelayCommand(EditCurrency, () => SelectedCurrency != null);
-        DeleteCommand = new AsyncRelayCommand(DeleteCurrencyAsync, () => SelectedCurrency != null && SelectedCurrency.IsActive);
+        EditCommand = new RelayCommand(EditCurrency);
+        DeleteCommand = new AsyncRelayCommand(DeleteCurrencyAsync);
         RestoreCommand = new AsyncRelayCommand(RestoreCurrencyAsync, () => SelectedCurrency != null && !SelectedCurrency.IsActive);
         SearchCommand = new RelayCommand(Search);
 
@@ -75,8 +77,6 @@ public class CurrenciesListViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedCurrency, value))
             {
-                (EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                (DeleteCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
                 (RestoreCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
             }
         }
@@ -135,39 +135,33 @@ public class CurrenciesListViewModel : ViewModelBase
 
     public async Task LoadCurrenciesAsync()
     {
-        IsBusy = true;
+        await ExecuteAsync(LoadCurrenciesOperationAsync,
+            ex => ErrorMessage = HandleException(ex, "CurrenciesListViewModel.LoadCurrenciesAsync"));
+    }
+
+    private async Task LoadCurrenciesOperationAsync()
+    {
         ErrorMessage = null;
 
-        try
-        {
-            var result = await _currencyService.GetAllAsync(IncludeInactive);
+        var result = await _currencyService.GetAllAsync(IncludeInactive);
 
-            if (result.IsSuccess && result.Value != null)
+        if (result.IsSuccess && result.Value != null)
+        {
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Currencies.Clear();
+                foreach (var item in result.Value.OrderByDescending(x => x.Id))
                 {
-                    Currencies.Clear();
-                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
-                    {
-                        Currencies.Add(item);
-                    }
-                    SetupCollectionView();
-                    IsEmpty = Currencies.Count == 0;
-                });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملات", "CurrenciesListViewModel.LoadCurrenciesAsync");
+                    Currencies.Add(item);
+                }
+                SetupCollectionView();
                 IsEmpty = Currencies.Count == 0;
-            }
+            });
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "CurrenciesListViewModel.LoadCurrenciesAsync");
-        }
-        finally
-        {
-            IsBusy = false;
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملات", "CurrenciesListViewModel.LoadCurrenciesAsync");
+            IsEmpty = Currencies.Count == 0;
         }
     }
 
@@ -230,48 +224,41 @@ public class CurrenciesListViewModel : ViewModelBase
 
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsBusy = true;
+        var currency = SelectedCurrency;
+        await ExecuteAsync(() => DeleteCurrencyOperationAsync(strategy, currency),
+            ex => ErrorMessage = HandleException(ex, "CurrenciesListViewModel.DeleteCurrencyAsync"));
+    }
+
+    private async Task DeleteCurrencyOperationAsync(DeleteStrategy strategy, CurrencyDto currency)
+    {
         ErrorMessage = null;
 
-        try
+        if (strategy == DeleteStrategy.Deactivate)
         {
-            if (strategy == DeleteStrategy.Deactivate)
+            var deleteResult = await _currencyService.DeleteAsync(currency.Id);
+            if (deleteResult.IsSuccess)
             {
-                var deleteResult = await _currencyService.DeleteAsync(SelectedCurrency.Id);
-                if (deleteResult.IsSuccess)
-                {
-                    await LoadCurrenciesAsync();
-                    _toastService.ShowSuccess("تم إلغاء تنشيط العملة بنجاح");
-                }
-                else
-                {
-                    ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط العملة";
-                }
+                await LoadCurrenciesAsync();
+                _toastService.ShowSuccess("تم إلغاء تنشيط العملة بنجاح");
             }
-            else if (strategy == DeleteStrategy.Permanent)
+            else
             {
-                var deleteResult = await _currencyService.DeletePermanentlyAsync(SelectedCurrency.Id);
-                if (deleteResult.IsSuccess)
-                {
-                    await LoadCurrenciesAsync();
-                    _toastService.ShowSuccess("تم حذف العملة نهائياً");
-                }
-                else
-                {
-                    var error = deleteResult.Error ?? "فشل في حذف العملة";
-                    ErrorMessage = error;
-                    LogSystemError($"Hard delete failed for Currency {SelectedCurrency.Id}: {error}", "CurrenciesListViewModel.DeleteCurrencyAsync");
-                }
+                ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط العملة";
             }
         }
-        catch (Exception ex)
+        else if (strategy == DeleteStrategy.Permanent)
         {
-            ErrorMessage = "حدث خطأ غير متوقع أثناء الحذف";
-            HandleException(ex, "CurrenciesListViewModel.DeleteCurrencyAsync");
-        }
-        finally
-        {
-            IsBusy = false;
+            var deleteResult = await _currencyService.DeletePermanentlyAsync(currency.Id);
+            if (deleteResult.IsSuccess)
+            {
+                await LoadCurrenciesAsync();
+                _toastService.ShowSuccess("تم حذف العملة نهائياً");
+            }
+            else
+            {
+                var error = deleteResult.Error ?? "فشل في حذف العملة";
+                ErrorMessage = HandleFailure(error, "CurrenciesListViewModel.DeleteCurrencyAsync");
+            }
         }
     }
 
@@ -279,41 +266,34 @@ public class CurrenciesListViewModel : ViewModelBase
     {
         if (SelectedCurrency == null) return;
 
-        IsBusy = true;
+        var currency = SelectedCurrency;
+        await ExecuteAsync(() => RestoreCurrencyOperationAsync(currency),
+            ex => ErrorMessage = HandleException(ex, "CurrenciesListViewModel.RestoreCurrencyAsync"));
+    }
+
+    private async Task RestoreCurrencyOperationAsync(CurrencyDto currency)
+    {
         ErrorMessage = null;
 
-        try
-        {
-            var request = new SalesSystem.Contracts.Requests.UpdateCurrencyRequest(
-                SelectedCurrency.Name,
-                SelectedCurrency.Symbol,
-                SelectedCurrency.ExchangeRateToBase,
-                SelectedCurrency.IsBaseCurrency,
-                SelectedCurrency.FractionName,
-                true // IsActive
-            );
+        var request = new SalesSystem.Contracts.Requests.UpdateCurrencyRequest(
+            currency.Name,
+            currency.Symbol,
+            currency.ExchangeRateToBase,
+            currency.IsBaseCurrency,
+            currency.FractionName
+        );
 
-            var result = await _currencyService.UpdateAsync(SelectedCurrency.Id, request);
+        var result = await _currencyService.UpdateAsync(currency.Id, request);
 
-            if (result.IsSuccess)
-            {
-                await LoadCurrenciesAsync();
-                await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة العملة بنجاح");
-            }
-            else
-            {
-                ErrorMessage = result.Error ?? "فشل في استعادة العملة";
-                await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
-            }
-        }
-        catch (Exception ex)
+        if (result.IsSuccess)
         {
-            ErrorMessage = "حدث خطأ غير متوقع أثناء استعادة العملة";
-            HandleException(ex, "CurrenciesListViewModel.RestoreCurrencyAsync");
+            await LoadCurrenciesAsync();
+            _toastService.ShowSuccess("تم استعادة العملة بنجاح");
         }
-        finally
+        else
         {
-            IsBusy = false;
+            ErrorMessage = result.Error ?? "فشل في استعادة العملة";
+            await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
         }
     }
 
@@ -342,6 +322,11 @@ public class CurrenciesListViewModel : ViewModelBase
     {
         _eventBus.Unsubscribe<CurrencyChangedMessage>(OnCurrencyChanged);
         _eventBus.Unsubscribe<CurrencyRateChangedMessage>(OnCurrencyRateChanged);
+    }
+
+    public void Dispose()
+    {
+        Cleanup();
     }
 
     #endregion

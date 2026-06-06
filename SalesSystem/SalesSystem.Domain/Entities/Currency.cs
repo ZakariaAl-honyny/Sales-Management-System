@@ -21,7 +21,8 @@ public class Currency : BaseEntity
         string symbol,
         decimal exchangeRateToBase,
         bool isBaseCurrency = false,
-        string? fractionName = null)
+        string? fractionName = null,
+        bool isSystem = false)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم العملة مطلوب.");
@@ -29,8 +30,8 @@ public class Currency : BaseEntity
             throw new DomainException("اسم العملة لا يمكن أن يتجاوز 100 حرف.");
         if (string.IsNullOrWhiteSpace(code))
             throw new DomainException("رمز العملة مطلوب.");
-        if (code.Length > 10)
-            throw new DomainException("رمز العملة لا يمكن أن يتجاوز 10 أحرف.");
+        if (code.Trim().Length != 3)
+            throw new DomainException("رمز العملة يجب أن يكون 3 أحرف.");
         if (string.IsNullOrWhiteSpace(symbol))
             throw new DomainException("رمز العملة (Symbol) مطلوب.");
         if (symbol.Length > 10)
@@ -48,7 +49,7 @@ public class Currency : BaseEntity
             ExchangeRateToBase = exchangeRateToBase,
             IsBaseCurrency = isBaseCurrency,
             FractionName = fractionName?.Trim(),
-            IsSystem = false,
+            IsSystem = isSystem,
             IsActive = true
         };
     }
@@ -81,6 +82,18 @@ public class Currency : BaseEntity
         UpdateTimestamp();
     }
 
+    public void SetAsBaseCurrency()
+    {
+        IsBaseCurrency = true;
+        UpdateTimestamp();
+    }
+
+    public void UnsetBaseCurrency()
+    {
+        IsBaseCurrency = false;
+        UpdateTimestamp();
+    }
+
     public void UpdateExchangeRate(decimal newRate)
     {
         if (newRate <= 0)
@@ -89,8 +102,10 @@ public class Currency : BaseEntity
         UpdateTimestamp();
     }
 
-    public new void MarkAsDeleted()
+    public override void MarkAsDeleted()
     {
+        if (IsSystem)
+            throw new DomainException("لا يمكن حذف عملة النظام — العملة محمية");
         IsActive = false;
         UpdateTimestamp();
     }

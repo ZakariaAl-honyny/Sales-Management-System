@@ -49,6 +49,13 @@ public interface IUnitOfWork
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
     Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Executes the given operation within an execution strategy + explicit transaction.
+    /// Use this when multiple SaveChangesAsync calls must be atomic.
+    /// The execution strategy provides retry for transient failures; the transaction ensures atomicity.
+    /// </summary>
+    Task ExecuteTransactionAsync(Func<Task> operation, CancellationToken ct = default);
 }
 
 public interface IDbContextTransaction : IAsyncDisposable, IDisposable

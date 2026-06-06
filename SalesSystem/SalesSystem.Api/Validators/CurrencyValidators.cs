@@ -49,3 +49,12 @@ public class UpdateCurrencyRequestValidator : AbstractValidator<UpdateCurrencyRe
             .When(x => !string.IsNullOrEmpty(x.FractionName));
     }
 }
+
+public class UpdateExchangeRateRequestValidator : AbstractValidator<UpdateExchangeRateRequest>
+{
+    public UpdateExchangeRateRequestValidator()
+    {
+        RuleFor(x => x.NewRate)
+            .GreaterThan(0).WithMessage("سعر الصرف الجديد يجب أن يكون أكبر من صفر");
+    }
+}

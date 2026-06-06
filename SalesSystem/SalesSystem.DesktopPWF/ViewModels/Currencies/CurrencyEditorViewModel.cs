@@ -1,4 +1,5 @@
 using SalesSystem.DesktopPWF.Messaging.Messages;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -16,6 +17,7 @@ public class CurrencyEditorViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly ISoundService _soundService;
+    private readonly IToastNotificationService _toastService;
     private string _name = string.Empty;
     private string _code = string.Empty;
     private string _symbol = string.Empty;
@@ -28,11 +30,27 @@ public class CurrencyEditorViewModel : ViewModelBase
     private ObservableCollection<ExchangeRateHistoryDto> _rateHistory = new();
 
     public CurrencyEditorViewModel()
+        : this(
+            App.GetService<ICurrencyApiService>(),
+            App.GetService<IDialogService>(),
+            App.GetService<IEventBus>(),
+            App.GetService<ISoundService>(),
+            App.GetService<IToastNotificationService>())
     {
-        _currencyService = App.GetService<ICurrencyApiService>();
-        _eventBus = App.GetService<IEventBus>();
-        _dialogService = App.GetService<IDialogService>();
-        _soundService = App.GetService<ISoundService>();
+    }
+
+    public CurrencyEditorViewModel(
+        ICurrencyApiService currencyService,
+        IDialogService dialogService,
+        IEventBus eventBus,
+        ISoundService soundService,
+        IToastNotificationService? toastService = null)
+    {
+        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
+        _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _soundService = soundService ?? throw new ArgumentNullException(nameof(soundService));
+        _toastService = toastService ?? App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
         InitializeCommands();
     }
@@ -48,7 +66,6 @@ public class CurrencyEditorViewModel : ViewModelBase
         FractionName = currency.FractionName;
         WindowTitle = $"تعديل العملة: {currency.Name} ({currency.Code})";
 
-        // Load rate history in background
         _ = LoadRateHistoryAsync();
     }
 
@@ -59,7 +76,7 @@ public class CurrencyEditorViewModel : ViewModelBase
         var result = await _currencyService.GetRateHistoryAsync(_currencyDto.Id);
         if (result.IsSuccess && result.Value != null)
         {
-            await InvokeOnUIThreadAsync(async () =>
+            await InvokeOnUIThreadAsync(() =>
             {
                 RateHistory.Clear();
                 foreach (var item in result.Value.OrderByDescending(x => x.EffectiveDate))
@@ -72,7 +89,13 @@ public class CurrencyEditorViewModel : ViewModelBase
 
     private void InitializeCommands()
     {
-        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ العملة...")));
+        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync,
+            ex =>
+            {
+                ErrorMessage = HandleException(ex, "CurrencyEditorViewModel.SaveAsync");
+                _ = _dialogService.ShowErrorAsync("خطأ في حفظ العملة", ErrorMessage!);
+                _soundService.PlayError();
+            }, "جاري حفظ العملة...")));
         CancelCommand = new RelayCommand(() => RequestClose());
     }
 
@@ -189,7 +212,6 @@ public class CurrencyEditorViewModel : ViewModelBase
 
         ErrorMessage = null;
 
-        // If setting as base currency, show confirmation
         if (IsBaseCurrency && (_currencyDto == null || !_currencyDto.IsBaseCurrency))
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
@@ -206,45 +228,46 @@ public class CurrencyEditorViewModel : ViewModelBase
         }
         else
         {
-            var request = new UpdateCurrencyRequest(Name, Symbol, ExchangeRateToBase, IsBaseCurrency, FractionName, _currencyDto.IsActive);
+            var request = new UpdateCurrencyRequest(Name, Symbol, ExchangeRateToBase, IsBaseCurrency, FractionName);
             result = await _currencyService.UpdateAsync(_currencyDto.Id, request);
         }
 
-        if (result.IsSuccess && result.Value != null)
+        if (result.IsSuccess)
         {
-            _eventBus.Publish(new CurrencyChangedMessage(result.Value.Id));
+            var id = result.Value?.Id ?? 0;
+            _eventBus.Publish(new CurrencyChangedMessage(id));
+            _toastService.ShowSuccess(_currencyDto == null ? "تم إضافة العملة بنجاح" : "تم تعديل العملة بنجاح");
             _soundService.PlaySuccess();
             RequestClose();
         }
         else
         {
-            ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ العملة", "CurrencyEditorViewModel.SaveAsync");
-            await _dialogService.ShowErrorAsync("خطأ في حفظ العملة", ErrorMessage!);
+            var errorMsg = HandleFailure(result.Error ?? "فشل في حفظ العملة", "CurrencyEditorViewModel.SaveAsync");
+            ErrorMessage = errorMsg;
+            await _dialogService.ShowErrorAsync("خطأ في حفظ العملة", errorMsg);
             _soundService.PlayError();
         }
     }
 
     private async Task<bool> ValidateAsync()
     {
-        var errors = new List<string>();
-        if (string.IsNullOrWhiteSpace(Name))
-            errors.Add("• اسم العملة مطلوب");
-        if (string.IsNullOrWhiteSpace(Code))
-            errors.Add("• رمز العملة (ISO) مطلوب");
-        else if (Code.Trim().Length != 3)
-            errors.Add("• رمز ISO يجب أن يكون ثلاثي الأحرف — مثال: USD");
-        if (string.IsNullOrWhiteSpace(Symbol))
-            errors.Add("• رمز العملة مطلوب");
-        if (ExchangeRateToBase <= 0)
-            errors.Add("• سعر الصرف يجب أن يكون أكبر من صفر");
+        ClearAllErrors();
 
-        if (errors.Any())
-        {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-            RequestFocusFirstInvalidField();
-            return false;
-        }
-        return true;
+        if (string.IsNullOrWhiteSpace(Name))
+            AddError(nameof(Name), "اسم العملة مطلوب");
+
+        if (string.IsNullOrWhiteSpace(Code))
+            AddError(nameof(Code), "رمز العملة (ISO) مطلوب");
+        else if (Code.Trim().Length != 3)
+            AddError(nameof(Code), "رمز ISO يجب أن يكون ثلاثي الأحرف — مثال: USD");
+
+        if (string.IsNullOrWhiteSpace(Symbol))
+            AddError(nameof(Symbol), "رمز العملة مطلوب");
+
+        if (ExchangeRateToBase <= 0)
+            AddError(nameof(ExchangeRateToBase), "سعر الصرف يجب أن يكون أكبر من صفر");
+
+        return await ValidateAllAsync();
     }
 
     #endregion

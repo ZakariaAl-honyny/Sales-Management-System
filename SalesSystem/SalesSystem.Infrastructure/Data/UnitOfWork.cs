@@ -119,6 +119,30 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
         return await strategy.ExecuteAsync(operation);
     }
 
+    public async Task ExecuteTransactionAsync(Func<Task> operation, CancellationToken ct = default)
+    {
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync<Func<Task>, object?>(
+            operation,
+            async (ctx, op, token) =>
+            {
+                await using var transaction = await ctx.Database.BeginTransactionAsync(token);
+                try
+                {
+                    await op();
+                    await transaction.CommitAsync(token);
+                    return null;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(token);
+                    throw;
+                }
+            },
+            null,
+            ct).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Wrapper class that adapts EF Core's IDbContextTransaction to our custom IDbContextTransaction interface.
     /// </summary>

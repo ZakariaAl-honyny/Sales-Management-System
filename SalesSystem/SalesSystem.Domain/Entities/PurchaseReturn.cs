@@ -86,6 +86,8 @@ public class PurchaseReturn : BaseEntity
             throw new DomainException("المستودع مطلوب.");
         if (supplierId <= 0)
             throw new DomainException("المورد مطلوب.");
+        if (currencyId.HasValue && !exchangeRate.HasValue)
+            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
 
         var pr = new PurchaseReturn
         {

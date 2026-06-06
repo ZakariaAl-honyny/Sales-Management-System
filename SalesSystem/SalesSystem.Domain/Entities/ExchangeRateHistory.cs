@@ -29,7 +29,7 @@ public class ExchangeRateHistory : BaseEntity
     {
         if (currencyId <= 0)
             throw new DomainException("معرف العملة مطلوب.");
-        if (oldRate < 0)
+        if (oldRate <= 0)
             throw new DomainException("سعر الصرف القديم لا يمكن أن يكون سالباً.");
         if (newRate <= 0)
             throw new DomainException("سعر الصرف الجديد يجب أن يكون أكبر من صفر.");

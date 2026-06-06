@@ -13,7 +13,6 @@ public record UpdateCurrencyRequest(
     string Symbol,
     decimal ExchangeRateToBase,
     bool IsBaseCurrency,
-    string? FractionName,
-    bool IsActive);
+    string? FractionName);
 
 public record UpdateExchangeRateRequest(decimal NewRate);

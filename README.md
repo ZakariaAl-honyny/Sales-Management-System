@@ -11,13 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-<img src="https://img.shields.io/badge/Status-v4.6.7%20Complete-2ECC71?style=for-the-badge" 
+<img src="https://img.shields.io/badge/Status-v4.6.9%20Complete-2ECC71?style=for-the-badge" 
 alt="Status"/>
+
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.6.7-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6.9-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -59,7 +60,21 @@ The API-first architecture is designed to support **future web and mobile client
 - 💱 **Multi-Currency (Phase 20)**: YER/USD/SAR support with exchange rates, FractionName, IsSystem guard
 - 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Manager/Cashier/Accountant), 33 permission codes, MustChangePassword, lockout
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
+- 🧾 **Tax Module (Phase 19)** — Full tax management with `Tax` entity (name, rate, type percentage/fixed, `IsDefault`)
+  - `ITaxService` with CRUD operations, `TaxesController` API endpoints
+  - WPF Desktop UI: `TaxesListView` + `TaxEditorView` with `INotifyDataErrorInfo` validation
+  - `TaxId` FK on `SalesInvoice` and `PurchaseInvoice` with `DeleteBehavior.Restrict`
+  - `SetTax()` domain method on invoice entities
+  - `IsDefault` flag (soft-delete-safe filtered unique index `AND [IsActive] = 1`)
+- ⚙️ **System Settings with Memory Caching** — `IMemoryCache` + `ConcurrentDictionary` key tracker for `SystemSetting` lookups
+  - 5-minute sliding expiration with `PostEvictionCallback` for automatic cache invalidation
+  - `ISystemSettingsRepository` caching layer — `GetAllCachedAsync()` returns from cache or DB
+  - `SetStringAsync()`, `SetIntAsync()`, `SetBoolAsync()`, `SetDecimalAsync()` typed helpers with `category` parameter
+- 📋 **Store Settings with Deprecation Strategy** — Company information single-row entity
+  - Deprecated fields (`DefaultTaxRate`, `IsTaxEnabled`, `InvoicePrefix`, `CurrencyCode`) marked with comments — Tax entity is source of truth
+  - `StoreSettings.Update()` calls `UpdateTimestamp()` per RULE-292
 - 🔢 **InvoiceNo Strategy (v4.6.7)**: InvoiceNo = int, UNIQUE per document type, thread-safe auto-generation via DocumentSequenceService.GetNextIntAsync() with SemaphoreSlim lock
+- 💱 **Currency Module Stabilization (v4.6.8)**: Removed manual transactions conflicting with SqlServerRetryingExecutionStrategy, ExchangeRate precision (18,2) on payments, fixed JournalEntryLine shadow FK, standardized editor validation pattern
 - 📑 **Reports (Phase 31)**: 35+ report DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML
 - 👥 **Role-based access** — Admin, Manager, and Cashier with granular permissions
 - 📊 **Full audit trail** — Every stock change, price change, and financial transaction is tracked
@@ -117,6 +132,19 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - **`A4InvoiceDocument`** — QuestPDF document template (RTL Arabic, logo, tax breakdown)
 - **`ThermalReceiptGenerator`** — ESC/POS receipt builder (42-char columns, Windows-1256)
 - **`EscPos`** — Static class for ESC/POS command byte sequences
+
+### New Services (v4.6.9)
+- `ITaxService` — Full CRUD for Tax entity (name, rate, type, IsDefault) returning `Result<T>` and `Result`
+- `TaxesController` — 6 API endpoints (GET all, GET by id, POST create, PUT update, DELETE soft, DELETE permanent) with `AdminOnly` policy
+- `TaxesListViewModel` — WPF list view with newest-first sorting, toggle active, `IDisposable` for EventBus
+- `TaxEditorViewModel` — WPF editor with `INotifyDataErrorInfo` validation, `ValidateAsync()` base method, `IToastNotificationService` for success feedback
+- `CreateTaxRequestValidator` / `UpdateTaxRequestValidator` — FluentValidation with name required, rate > 0, type in enum
+- `SystemSettingsCachingService` — `IMemoryCache` with `ConcurrentDictionary` key tracker, 5-minute sliding expiration, `PostEvictionCallback` auto-cleanup
+- `SystemSettingsRepository.SetStringAsync(category, key, value)` — Typed helpers with auto-create and category support
+- `TaxSeeder` — Seeds default tax (VAT 15%) and `IsDefault` flag as part of `DbSeeder`
+- `SystemSettingsViewModel` — ViewModel with 32 strongly-typed settings across 8 categories (Inventory, Sales, Purchases, Barcode, Print, Notifications, Accounting, General) — added 14 missing properties for Sales/Purchases/Print/Notifications
+- `StoreSettingsService.ValidateSystemSettings()` — Validates 19 boolean keys and 6 integer keys with range validation before saving batch updates
+- `Tax.SetDefault()` / `Tax.ClearDefault()` — Domain methods for cleaner default-tax management with audit trail (`UpdateTimestamp()`)
 
 ### New Services (v4.6.7)
 - `IDocumentSequenceService.GetNextIntAsync()` — Thread-safe int sequence generation via SemaphoreSlim for InvoiceNo and other int sequences
@@ -214,6 +242,50 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - **Account Mappings** — `SystemAccountMappingsService` maps 7 operation types to COA accounts
   - Configurable per business for tax/custom rules
 
+### ⚙️ Settings Module (Phase 19)
+- **System Settings** — Key-value configuration store (`SystemSetting` entity) for all system-level settings across 8 categories:
+  - **Inventory** (4): LowStockThreshold, DefaultWarehouseId, EnableNegativeStock, StockAlertEnabled
+  - **Sales** (8): DefaultCustomerId, DefaultPaymentType, DefaultSaleMode, EnableDiscount, MaxDiscountPercent, EnableTax, TaxInclusivePricing, RequireCustomerForSale
+  - **Purchases** (3): DefaultSupplierId, AutoGenPO, RequireApproval
+  - **Barcode** (3): BarcodeSymbology, BarcodeWidth, BarcodeHeight
+  - **Accounting** (1): DefaultCostCenterId
+  - **Print** (5): ThermalPrinterName, A4PrinterName, LogoPath, ReceiptHeader, ReceiptFooter
+  - **Notifications** (4): LowStockNotification, DailyReportNotification, BackupNotification, ErrorNotification
+  - **General** (3): AppLanguage, DateFormat, CurrencyDisplay
+- **Memory Caching** — `IMemoryCache` with `ConcurrentDictionary` key tracker for SystemSettings (5-minute sliding expiration)
+  - `PostEvictionCallback` auto-removes tracker key on eviction
+  - `ISystemSettingsRepository.GetAllCachedAsync()` returns from cache or DB with single DB round-trip
+- **Costing Method** — Three costing methods configurable via SystemSettings: WeightedAverage (1), LastPurchasePrice (2), SupplierPrice (3)
+  - RadioButton group in Settings UI with Arabic explanations
+  - Persisted via API to `SystemSettings` key `"CostingMethod"` of type `int`
+- **Store Settings** — Company information single-row entity (name, phone, address, email, tax number, signature path)
+  - `StoreSettingsService` for get/update operations
+  - `StoreSettings.Update()` calls `UpdateTimestamp()` per RULE-292
+  - **Deprecated fields**: `DefaultTaxRate`, `IsTaxEnabled`, `InvoicePrefix`, `CurrencyCode` — marked with `// Deprecated` comments; Tax entity is source of truth
+- **Tax Module** — Full tax management with `Tax` entity (name, rate, type: percentage/fixed, `IsDefault`)
+  - `ITaxService` with CRUD operations returning `Result<T>` and `Result`
+  - `TaxesController` API endpoints with FluentValidation (`CreateTaxRequestValidator`, `UpdateTaxRequestValidator`)
+  - WPF Desktop UI: `TaxesListView` (newest-first sorting) + `TaxEditorView` (INotifyDataErrorInfo validation)
+  - `IsDefault` flag with `DeleteBehavior.Restrict` FK from invoices; filtered unique index `WHERE [IsActive] = 1`
+- **Tax on Invoices** — `TaxId` FK (nullable int) on `SalesInvoice` and `PurchaseInvoice`
+  - `DeleteBehavior.Restrict` — cannot delete a tax used by invoices
+  - `SetTax(int? taxId)` domain method on both invoice entities
+  - `GetTaxAmount(decimal subTotal)` computes tax based on Tax.Rate and Tax.Type (percentage/fixed)
+- **Print Settings** — Thermal printer name, A4 printer name, logo path (optional — graceful null handling), receipt header/footer text, ESC/POS code page, auto-print on post flag — stored with `Category = "Print"`
+- **Backup Settings** — Backup path, scheduled time, retention days, update server URL — stored as SystemSettings
+- **29 System Settings seeded** across 8 categories via `DbSeeder`
+- **Admin-only access** — All settings/taxes endpoints restricted to `[Authorize(Policy = "AdminOnly")]`
+
+### 💱 Currencies Module (Phase 20)
+- **Currency Entity** — Name, ISO code (3 chars), symbol, exchange rate to base, base currency flag, `FractionName` for sub-units (Fils, Cent), `IsSystem` guard for seeded currencies (YER/USD/SAR)
+- **Exchange Rate History** — Dated rate changes with `OldRate`/`NewRate` tracking, composite index on `(CurrencyId, EffectiveDate)` for fast lookups
+- **Multi-currency Invoice Support** — `CurrencyId` + `ExchangeRate` on sales/purchase invoices; exchange rate recorded per transaction
+- **Currency Conversion Service** — `GetBaseCurrency()` and `GetByCode()` API endpoints; `ConvertToBaseAsync()` for rate-based conversion
+- **Desktop CRUD** — Currency Editor + List ViewModels with full CRUD, `IDisposable` for EventBus, toast notifications for minor success, buttons always enabled (no CanExecute)
+- **Read Endpoints Public** — `AllStaff` policy for GET endpoints so all logged-in users can view exchange rates
+- **Rate precision** — Exchange rates displayed as `N6` in DataGrid (not truncated `N2`)
+- **v4.6.8 Fixes** — All 14 Critical/Bug items from Phase 20 code review fixed (isSystem param, MarkAsDeleted guard, filtered indexes, controller 404/400, missing validators, DI registration, includeInactive passthrough, composite index, AllStaff policy, N6 display)
+
 ### 🔄 Auto-Update System (v4.4)
 - Background update check 3 seconds after startup — NEVER blocks app
 - SHA256 checksum verification before launching installer
@@ -297,7 +369,6 @@ The following features are **not included** in the current MVP but are planned f
 | 🌐 Web interface | Future | API is ready — only a frontend client is needed |
 | 📱 Mobile application | Future | API supports any HTTP client |
 | 🏢 Multi-branch management | Future | Current scope is single-branch with multi-warehouse |
-| 📒 Full accounting system | Future | Current MVP handles sales/purchase ledgers only |
 | 🔗 External integrations | Future | E-commerce, payment gateways, tax authority APIs |
 | 📧 Email / SMS notifications | Future | Customer alerts and payment reminders |
 | 📈 Advanced analytics | Future | BI dashboards and trend analysis |
@@ -347,7 +418,8 @@ The following features are **not included** in the current MVP but are planned f
 | **Payments** | CustomerPayments, SupplierPayments |
 | **Cash Management** | CashBoxes, CashTransactions |
 | **Pricing & Costing** | ProductPriceHistory (price audit trail) |
-| **System** | SystemSettings (costing method), StoreSettings, DocumentSequences, InventoryMovements, SystemLog |
+| **Tax** | Taxes (name, rate, type, IsDefault, soft-deletable) |
+| **System** | SystemSettings (29 seeded settings across 8 categories), StoreSettings (company info), DocumentSequences, InventoryMovements, SystemLog |
 
 ### Key Constraints
 - `decimal(18,2)` for all money fields — **never** `float` or `double`
@@ -453,7 +525,11 @@ dotnet run
 | **v4.6.3** | **Architecture Alignment & Code Quality Audit** — Settings ViewModels/Views relocation, DI registration, MessageBox removal, async void refactoring, shadowing resolved | ✅ **Completed** |
 | **v4.6.4** | **Security Hardening & Code Quality** — Rate limiting (5/15min), user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes | ✅ **Completed** |
 | **v4.6.5** | **Invoice Number Removal & Touch POS Polish** — InvoiceNo removed from entities, services, controllers, ViewModels, DTOs. Touch POS product card layout fixed. Stock validation warning on product add. PlayWarning() added to ISoundService. Garbled Arabic fixes | ✅ **Completed** |
-| **v4.6.7** | **InvoiceNo Int Re-addition** — InvoiceNo re-added as `int` (not string) to SalesInvoice/PurchaseInvoice. NOT unique (duplicates allowed). Default `lastId + 1`. Build: 0 errors, 0 warnings. Migration added | ✅ **Completed** |
+| **v4.6.7** | **InvoiceNo Int Re-addition** — InvoiceNo re-added as `int` (not string) to SalesInvoice/PurchaseInvoice. UNIQUE per document type. Thread-safe via DocumentSequenceService. Accounting Foundation: Chart of Accounts, Journal Entries, Fiscal Years. Build: 0 errors, 0 warnings | ✅ **Completed** |
+| **Phase 18** | **Accounting Foundation** — Chart of Accounts (Account entity, 4 levels), Journal Entries (double-entry, manual creation), Journal Entry Lines (debit/credit), System Account Mappings (13 default account bindings), Fiscal Year Closure (revenue/expense zeroing, retained earnings transfer), Annual Closing Service (net income calculation), Account Balances/Ledger queries, FiscalYearClosure tracking | ✅ **Completed** |
+| **Phase 19** | **Settings Module** — SystemSetting key-value store (8 categories, 29 seeded settings), Tax Module (Tax entity, CRUD service, API, Desktop UI), Tax on Invoices (TaxId FK, SetTax(), GetTaxAmount()), Memory Caching (IMemoryCache + ConcurrentDictionary, 5-min sliding expiration), Store Settings (company info, deprecation strategy), Costing Method switcher (WeightedAverage/LastPurchasePrice/SupplierPrice), Print Settings (printer name, logo, receipt header/footer), Backup Settings (path, schedule, retention), Admin-only endpoints | ✅ **Completed** |
+| **Phase 20** | **Currencies Module** — Currency entity (name, code, symbol, exchange rate, base currency), Exchange Rate History (effective dated, change tracking), Multi-currency support for invoices, Currency conversion service, Currency Editor + List ViewModels with full CRUD, Exchange rate change events, GetByCode + GetBaseCurrency API endpoints, AllStaff policy for read endpoints (non-admin users can view rates) | ✅ **Completed** |
+| **v4.6.8** | **Currency Module Stabilization & EF Core Transaction Strategy** — Fixed BeginTransactionAsync conflict (3 methods). ExchangeRate precision (18,2). JournalEntry shadow FK. CurrencyEditorViewModel: RULE-229 validation, toast, dual constructor. Deep code review: fixed 14 bugs + 3 enhancements across Domain, API, Infrastructure, Desktop — including isSystem param, MarkAsDeleted guard, GetByCode/GetBaseCurrency endpoints, includeInactive passthrough, controller 404/400, filtered indexes, OldRate validation, UpdateExchangeRateRequestValidator, IDisposable, CanExecute removal, composite index, AllStaff policy, N6 display | ✅ **Completed** |
 | **v4.6.6** | **UI Compacting — Mobile-Ready Density** — Global UI resize (63 views) for more content per screen: Styles.xaml compact tokens (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted by ~25-30%, PurchaseInvoiceEditorView size reduction, MainWindow sidebar 220→200, touch control sizes preserved. Future mobile-ready foundation | ✅ **Completed** |
 
 ### Printing Engine — Phase 7 Breakdown
@@ -735,6 +811,76 @@ dotnet run
 
 ---
 
+## 🆕 What's New in v4.6.9 — Settings Module Complete (Phase 19)
+
+| Feature | Description |
+|---------|-------------|
+| **Tax Module (New)** | Full `Tax` entity (name, rate, type percentage/fixed, `IsDefault`) with `ITaxService` CRUD, `TaxesController` API endpoints, `TaxesListView` + `TaxEditorView` WPF UI with `INotifyDataErrorInfo` validation |
+| **Tax on Invoices** | `TaxId` FK (nullable int) on `SalesInvoice` and `PurchaseInvoice` with `DeleteBehavior.Restrict` — `SetTax(int? taxId)` domain method, `GetTaxAmount(decimal subTotal)` computes tax based on rate/type |
+| **Memory Caching for SystemSettings** | `IMemoryCache` with `ConcurrentDictionary` key tracker — 5-minute sliding expiration, `PostEvictionCallback` auto-removes tracker, `GetAllCachedAsync()` returns from cache or DB with single DB round-trip |
+| **29 System Settings Seeded** | 29 settings across 8 categories (Inventory 4, Sales 8, Purchases 3, Barcode 3, Accounting 1, Print 5, Notifications 4, General 3) via `DbSeeder` |
+| **Typed SystemSetting Helpers** | `SetStringAsync(category, key, value)`, `SetIntAsync()`, `SetBoolAsync()`, `SetDecimalAsync()` — auto-creates setting with correct `DataType` if not found |
+| **SystemSetting Guard Clauses** | `Create()` validates `Category` not empty and `DataType` is one of (string, int, bool, decimal) — per RULE-293 |
+| **Filtered Unique Index Fix** | All filtered unique indexes on soft-deletable entities include `AND [IsActive] = 1` — per RULE-294 |
+| **StoreSettings Deprecation Strategy** | `DefaultTaxRate`, `IsTaxEnabled`, `InvoicePrefix`, `CurrencyCode` deprecated with comments — Tax entity is source of truth. `StoreSettings.Update()` calls `UpdateTimestamp()` per RULE-292 |
+| **SetBatchSystemSettingsAsync Fix** | No longer calls `SaveChangesAsync()` directly — uses `_uow.SaveChangesAsync()` per RULE-291 |
+| **SystemSetting Create Validates Category & DataType** | Guard clauses reject empty categories and invalid data types per RULE-293 |
+| **SetStringAsync Accepts category Param** | No longer hardcodes `category: "Print"` — defaults to `"General"` per RULE-295 |
+| **StoreSettings Seed** | `defaultTaxRate: 0m` (not 15m) — Tax entity is the source of truth per RULE-297 |
+| **Taxes List View** | `TaxesListView` with newest-first sorting (`Id` descending), toggle active/inactive, edit/delete actions |
+| **Tax Editor View** | `TaxEditorView` with name, rate, type (percentage/fixed), IsDefault checkbox — `INotifyDataErrorInfo` validation, `ValidateAsync()` calls `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()` |
+| **Tax FluentValidators** | `CreateTaxRequestValidator` and `UpdateTaxRequestValidator` — name required, rate > 0, type in enum |
+| **IsDefault Filtered Unique Index** | `WHERE [IsActive] = 1` on `IX_Taxes_IsDefault` — soft-deleted default tax doesn't block setting a new default |
+| **Admin-Only Tax Endpoints** | All tax CRUD endpoints restricted to `[Authorize(Policy = "AdminOnly")]` |
+| **Build & Test** | 0 errors, 0 warnings across all 9 projects |
+| **BUG-008 Fix** | CurrencyCode domain validation now enforces exactly 3 characters (ISO 4217 standard) — `Currency.Create()` changed from `code.Length > 10` to `code.Trim().Length != 3` |
+| **SystemSettingsViewModel Enhancement** | Added 14 missing properties: `HideTaxInSales`, `ShowExpiryInInvoices` (Sales), `HideTaxInPurchases` (Purchases), `ShowLogo`, `FooterNote`, `ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber` (Print), `LowStockAlert`, `ExpiryAlert`, `ExpiryAlertDays`, `CreditLimitAlert` (Notifications) — all mapped via `MapFromDictionary`/`BuildDictionary` |
+| **Service-Level Validation** | `StoreSettingsService.UpdateSystemSettingsAsync()` validates 19 boolean keys via `bool.TryParse` and 6 integer keys via `int.TryParse` with range checks (CostingMethod 1-3, DecimalPlaces 0-6, StockAlertDays 1-365, ExpiryAlertDays 0+) |
+| **Tax Domain Methods** | Added `Tax.SetDefault()` and `Tax.ClearDefault()` — both call `UpdateTimestamp()` for audit trail, replaces service-level direct property manipulation |
+| **Phase 18 Review Doc Updated** | All 12 bugs (5 critical, 7 standard) in `docs/phase18_accounting_review.md` marked as `[FIXED]` with post-review fix status table |
+| **CashBox OpeningBalance Fix** | `CashBox.Create()` now sets `OpeningBalance = initialBalance` — was always `0` regardless of initial balance (ENH-005) |
+| **Currency Domain Methods** | Added `SetAsBaseCurrency()` and `UnsetBaseCurrency()` on `Currency` entity — both call `UpdateTimestamp()` for audit trail (ENH-007) |
+| **Removed Unnecessary async** | `CurrencyEditorViewModel.LoadRateHistoryAsync()` removed unnecessary `async` from `InvokeOnUIThreadAsync` lambda — no `await` inside (ENH-012) |
+
+### Key Rules Added to AGENTS.md
+- RULE-291 to RULE-301 covering Phase 19 settings module remediations
+- RULE-302 to RULE-304 covering Phase 20 currency enhancement remediations (CashBox.OpeningBalance, SetAsBaseCurrency/UnsetBaseCurrency, InvokeOnUIThreadAsync pattern)
+
+---
+
+## 🆕 What's New in v4.6.8 — Currency Module Stabilization & EF Core Transaction Strategy
+
+| Feature | Description |
+|---------|-------------|
+| **Fixed: BeginTransactionAsync conflict** | Removed manual `BeginTransactionAsync` from `CurrencyService.CreateAsync`/`UpdateAsync`/`UpdateExchangeRateAsync` — conflicts with `SqlServerRetryingExecutionStrategy` which throws `InvalidOperationException` on user-initiated transactions. Single `SaveChangesAsync` is now used (EF Core implicit transaction). |
+| **ExchangeRate precision (18,2)** | Added `.HasPrecision(18, 2)` on `CustomerPayment.ExchangeRate` and `SupplierPayment.ExchangeRate` — prevents silent decimal truncation |
+| **Fixed: JournalEntryId1 shadow FK** | Changed `JournalEntryConfiguration` bare `.WithOne()` to `.WithOne(x => x.JournalEntry)` — eliminates the shadow FK `JournalEntryId1` |
+| **Fixed: CurrencyEditorViewModel validation** | `ValidateAsync()` now follows RULE-229: calls `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()` instead of custom dialog bypassing INotifyDataErrorInfo |
+| **Fixed: Log level violation** | Removed `LogSystemError` from `SaveOperationAsync` else block — API validation errors (duplicate name/code) are user mistakes, not system errors. `HandleFailure` already logs at Warning |
+| **Added: IToastNotificationService** | CurrencyEditorViewModel now shows `"تم إضافة العملة بنجاح"` / `"تم تعديل العملة بنجاح"` success toast before closing |
+| **Dual constructor pattern** | CurrencyEditorViewModel now follows CashBoxEditorViewModel pattern: parameterless → parameterized, enabling unit testability |
+| **Added: isSystem param** | `Currency.Create()` now accepts `bool isSystem = false` — system currencies (YER/USD/SAR) can be protected from deletion |
+| **Added: IsSystem guard in MarkAsDeleted** | `Currency.MarkAsDeleted()` throws `DomainException` if `IsSystem == true` — prevents deleting system currencies |
+| **Added: GetByCode + GetBaseCurrency endpoints** | New API endpoints `GET /api/v1/currencies/by-code/{code}` and `GET /api/v1/currencies/base` |
+| **Fixed: includeInactive passthrough** | `CurrencyApiService.GetAllAsync()` now passes `?includeInactive=` to API; controller and service accept the parameter |
+| **Fixed: Controller 404 vs 400** | Delete, PermanentDelete, UpdateExchangeRate endpoints now return 404 NotFound when entity not found (was always 400) |
+| **Fixed: Filtered unique indexes** | Currency Name/Code indexes add `.HasFilter("[IsActive] = 1")`; IsBaseCurrency filter adds `AND [IsActive] = 1` |
+| **Fixed: OldRate validation** | `ExchangeRateHistory.Create()` now rejects `oldRate <= 0` (was allowing zero) |
+| **Fixed: UpdateExchangeRateRequestValidator** | Added missing FluentValidation validator for `NewRate > 0` and `UserId > 0` |
+| **Fixed: Removed IsActive from UpdateCurrencyRequest** | Removed unused `IsActive` parameter from update request — was confusing (sent but ignored by backend) |
+| **Fixed: IDisposable on list VM** | `CurrenciesListViewModel` now implements `IDisposable` — EventBus subscriptions cleaned up in `Dispose()` |
+| **Fixed: CanExecute predicates** | Removed CanExecute from `EditCommand` and `DeleteCommand` per RULE-059 — buttons always enabled |
+| **Fixed: Restore uses toast** | `RestoreCurrencyAsync` uses `_toastService.ShowSuccess()` instead of modal dialog |
+| **Fixed: LogSystemError discipline** | Hard-delete error path uses `HandleFailure()` (Warning) instead of `LogSystemError()` (Error) |
+| **Fixed: Missing composite index** | Added composite index on `ExchangeRateHistory(CurrencyId, EffectiveDate)` for fast lookups |
+| **Fixed: ExchangeRate display precision** | CurrencyEditorView XAML: OldRate/NewRate bindings use `N6` instead of `N2` |
+| **Fixed: AllStaff policy** | Read endpoints now use `[Authorize(Policy = "AllStaff")]` instead of restrictive `AdminOnly` |
+
+### Key Rules Added to AGENTS.md
+- RULE-275 to RULE-280 covering transaction strategy, precision, relationship config, editor pattern, and log level discipline
+
+---
+
 ## 🆕 What's New in v4.6.7 — InvoiceNo Int Re-addition & Accounting Foundation
 
 | Feature | Description |
@@ -827,7 +973,47 @@ dotnet run
 
 ## 📜 Version History
 
-### v4.6.7 — InvoiceNo Int Re-addition & Accounting Foundation (Current)
+### v4.6.9 — Settings Module Complete (Phase 19) (Current)
+- **Tax Module**: Full `Tax` entity (name, rate, type percentage/fixed, `IsDefault`) with CRUD service, API controller, WPF Desktop UI (list + editor views)
+- **Tax on Invoices**: `TaxId` FK on `SalesInvoice`/`PurchaseInvoice` with `DeleteBehavior.Restrict`, `SetTax()` domain method, `GetTaxAmount()` computation
+- **Memory Caching**: `IMemoryCache` + `ConcurrentDictionary` key tracker for SystemSettings — 5-minute sliding expiration with `PostEvictionCallback` auto-cleanup
+- **29 System Settings seeded** across 8 categories via `DbSeeder`
+- **Typed helpers**: `SetStringAsync(category, key, value)`, `SetIntAsync()`, `SetBoolAsync()`, `SetDecimalAsync()` with auto-create
+- **SystemSetting guard clauses**: `Create()` validates `Category` (not empty) and `DataType` (must be string/int/bool/decimal)
+- **Filtered unique index IsActive guard**: All filtered indexes on soft-deletable entities include `AND [IsActive] = 1`
+- **StoreSettings deprecation**: `DefaultTaxRate`, `IsTaxEnabled`, `InvoicePrefix`, `CurrencyCode` deprecated — Tax entity is source of truth
+- **SystemSettingsViewModel expanded**: Added 14 missing properties — `HideTaxInSales`, `ShowExpiryInInvoices` (Sales), `HideTaxInPurchases` (Purchases), `ShowLogo`, `FooterNote`, `ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber` (Print), `LowStockAlert`, `ExpiryAlert`, `ExpiryAlertDays`, `CreditLimitAlert` (Notifications)
+- **Service-level validation**: `StoreSettingsService.ValidateSystemSettings()` validates 19 bool keys + 6 int keys with ranges (CostingMethod 1-3, DecimalPlaces 0-6, StockAlertDays 1-365)
+- **Tax domain methods**: Added `SetDefault()` and `ClearDefault()` with `UpdateTimestamp()` audit trail
+- **Phase 18 review doc updated**: All 12 bugs marked `[FIXED]` with post-review fix table
+- **RULE-291 to RULE-301**: 7 settings + 3 enhancement rules for settings module integrity
+- **Build**: 0 errors, 0 warnings across all 9 projects
+
+### v4.6.8 — Currency Module Stabilization & EF Core Transaction Strategy
+- **BeginTransactionAsync removed**: Removed manual transactions from CurrencyService (3 methods)
+- **ExchangeRate precision (18,2)**: HasPrecision on CustomerPayment/SupplierPayment
+- **JournalEntryId1 shadow FK fixed**: bare `.WithOne()` → `.WithOne(x => x.JournalEntry)`
+- **CurrencyEditorViewModel RULE-229**: ValidateAsync pattern fixed, toast added, dual constructor
+- **isSystem parameter**: Currency.Create() now accepts `bool isSystem`; MarkAsDeleted() guards against system currency deletion
+- **includeInactive passthrough**: API service → controller → service chain now supports includeInactive query param
+- **Controller 404 vs 400**: Delete, PermanentDelete, UpdateExchangeRate return 404 for NotFound
+- **Filtered unique indexes**: Name/Code/IsBaseCurrency indexes filter `[IsActive] = 1`
+- **OldRate validation**: ExchangeRateHistory.Create() rejects `oldRate <= 0`
+- **UpdateExchangeRateRequestValidator**: Added FluentValidation for NewRate > 0
+- **IsActive removed from UpdateCurrencyRequest**: Confusing unused field removed
+- **IDisposable on CurrenciesListViewModel**: Prevents EventBus subscription leaks
+- **CanExecute removed**: EditCommand/DeleteCommand no longer have CanExecute predicates
+- **Restore uses toast**: `_toastService.ShowSuccess()` instead of modal dialog
+- **LogSystemError discipline**: HandleFailure used for API business errors, not LogSystemError
+- **Composite index**: ExchangeRateHistory(CurrencyId, EffectiveDate) for fast lookups
+- **N6 display**: ExchangeRate bindings in XAML use N6 instead of N2
+- **AllStaff policy**: Read endpoints use AllStaff, not AdminOnly
+- **GetByCode + GetBaseCurrency endpoints**: New API endpoints
+- **Deep code review**: 14 bugs + 3 enhancements fixed across Domain/API/Infrastructure/Desktop
+- **Build**: 0 errors, 0 warnings across all 9 projects
+- **AGENTS.md**: Added RULE-275 to RULE-280 + 15 new checklist items + 6 new FORBIDDEN items
+
+### v4.6.7 — InvoiceNo Int Re-addition & Accounting Foundation
 - **InvoiceNo Back as int**: SalesInvoice and PurchaseInvoice now have `int InvoiceNo` — user-facing invoice number
 - **UNIQUE per type**: InvoiceNo is UNIQUE within each table — prevents confusion in search/returns/reports
 - **Thread-Safe Auto-generation**: Uses `IDocumentSequenceService.GetNextIntAsync()` with `SemaphoreSlim` lock
@@ -870,7 +1056,7 @@ dotnet run
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 274 non-negotiable rules (RULE-001 to RULE-274)
+1. Read [`AGENTS.md`](AGENTS.md) — all 298 non-negotiable rules (RULE-001 to RULE-298)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

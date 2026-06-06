@@ -74,6 +74,16 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 42. **Accounting Foundation**: Chart of Accounts (60 accounts), JournalEntries with SystemAccountMappings, FiscalYears, Annual Closing
 43. **FIFO/FEFO**: PurchaseLots entity for batch tracking; FIFO on sale, FEFO if TrackExpiry=true
 44. **Multi-Currency**: Currency entity with exchange rates, CurrencyId FK on invoices, payments, journal entries
+45. **Transaction Strategy**: NEVER use `BeginTransactionAsync()` when `SqlServerRetryingExecutionStrategy` is configured. Use single `SaveChangesAsync()` (EF Core wraps in implicit transaction) or `CreateExecutionStrategy().ExecuteAsync()` for multi-write atomicity.
+46. **ExchangeRate Precision**: `CustomerPayment.ExchangeRate` and `SupplierPayment.ExchangeRate` MUST have `.HasPrecision(18, 2)` — NEVER leave unspecified (silent truncation).
+47. **JournalEntry → JournalEntryLine**: Relationship MUST use `.WithOne(x => x.JournalEntry)` — NEVER bare `.WithOne()` (creates shadow FK `JournalEntryId1`).
+48. **Editor ViewModel Pattern**: ALL editor ViewModels MUST follow CashBoxEditorViewModel pattern: `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()`, `IToastNotificationService` for success feedback, dual constructor (parameterless → parameterized).
+49. **LogSystemError Discipline**: `LogSystemError()` reserved for SYSTEM errors only (DB failures, API unreachable, JSON parse crashes). NEVER call for API business validation errors — use `HandleFailure()` alone (logs at Warning per RULE-183).
+50. **isSystem Protection Pattern**: Entities with system-protected records (e.g., Currencies) MUST accept `bool isSystem = false` in factory methods and guard `MarkAsDeleted()` against deleting system records.
+51. **Controller 404 vs 400**: Endpoints that look up entities by ID MUST return `404 NotFound` when `result.ErrorCode == ErrorCodes.NotFound` — not `400 BadRequest` for all failures.
+52. **includeInactive Passthrough**: API services MUST pass user-facing filter parameters (e.g., `includeInactive`, `includeDeleted`) from the Desktop client through to the API controller and the service layer. NEVER accept a parameter and ignore it.
+53. **Read Endpoints Auth Policy**: Read/GET endpoints MUST use `[Authorize(Policy = "AllStaff")]` — NOT `AdminOnly` which blocks read access for cashiers and managers.
+54. **Filtered Unique Indexes**: Unique indexes on `Name`, `Code`, etc. MUST include `.HasFilter("[IsActive] = 1")` to allow soft-deleted records to coexist with active records using the same name/code.
 
 ## Pattern to Follow
 ```csharp
@@ -94,3 +104,44 @@ public async Task<IActionResult> GetById(int id, CancellationToken ct)
     return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
 }
 ```
+
+## v4.6.8 — Phase 18 & Phase 20 Remediations
+
+### Accounting — Fiscal Year Guard
+- `JournalEntryService.CreateJournalEntryAsync()` MUST check for closed fiscal year BEFORE creating entries — query `_uow.FiscalYearClosures.AnyAsync(fyc => fyc.FiscalYear == request.TransactionDate.Year)` and return `Result<int>.Failure` with Arabic message when closed.
+
+### Accounting — Atomic Annual Closing
+- `AnnualClosingService` MUST use `IUnitOfWork.ExecuteTransactionAsync()` or `CreateExecutionStrategy().ExecuteAsync()` to wrap BOTH saves (JournalEntry + FiscalYearClosure) in a single explicit transaction — NEVER use two bare `SaveChangesAsync()` calls without a wrapping transaction.
+
+### Accounting — Daily Sequence Reset
+- `JournalEntryNumberGenerator` MUST query by today's prefix (`JE-{yyyyMMdd}`) and count today's entries rather than incrementing the last global entry number — fixes daily reset and race condition.
+
+### Accounting — SystemAccountMappingsDto
+- `SystemAccountMappingsDto` MUST include account name and code fields (e.g., `DefaultCashAccountName`, `DefaultCashAccountCode`) — loaded via batch query with `.Include()` on navigation properties.
+
+### Accounting — Account.Activate()
+- `Account` entity MUST have an `Activate()` method: `public void Activate() => IsActive = true;` — required for reactivating deactivated accounts.
+
+### Currency — isSystem in Create()
+- `Currency.Create()` MUST accept `bool isSystem = false` parameter and set `IsSystem = isSystem` (NOT hardcoded `false`). Seeded currencies (YER, USD, SAR) must be created with `isSystem: true`.
+
+### Currency — Controller HTTP Codes
+- `Delete`, `PermanentDelete`, `UpdateExchangeRate`, `GetRateHistory` endpoints MUST check `result.ErrorCode == ErrorCodes.NotFound` and return `NotFound()` — NOT `BadRequest()` for all failures.
+
+### Currency — Read Endpoints Auth Policy
+- GET endpoints for Currency (GetAll, GetById, GetByCode, GetBaseCurrency, GetRateHistory) MUST use `[Authorize(Policy = "AllStaff")]` — read-only access for all roles including cashiers.
+
+## v4.6.9 — Phase 19 Settings Module Remediations
+
+### Transaction Strategy for Settings
+- `StoreSettingsService.UpdateSettingsAsync()` and `SetCostingMethodAsync()` must use `ExecuteTransactionAsync()` (never `BeginTransactionAsync()` per RULE-275).
+- `StoreSettingsService.UpdateSystemSettingsAsync()` must call `_uow.SaveChangesAsync()` after `SetBatchSystemSettingsAsync()` — service owns the commit.
+
+### Controller Purity
+- SettingsController must NOT inject `ISystemSettingsRepository` directly. Delegate system settings endpoints through `IStoreSettingsService`.
+
+### Error Handling
+- Controllers must check `result.ErrorCode == ErrorCodes.NotFound` before returning NotFound(404) vs BadRequest(400).
+
+### Service Interface
+- `IStoreSettingsService` must expose `GetAllSystemSettingsAsync()` and `UpdateSystemSettingsAsync()` for system settings bulk operations.

@@ -68,12 +68,80 @@ public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest req, Canc
 }
 ```
 
+### ⚠️ Transaction Strategy — CRITICAL
+NEVER use `BeginTransactionAsync()` / `CommitAsync()` / `RollbackAsync()` in services because `SqlServerRetryingExecutionStrategy` is configured — it DOES NOT support user-initiated transactions.
+
+**CORRECT**: Single `SaveChangesAsync()` (EF Core wraps it in an implicit transaction):
+```csharp
+// Single SaveChangesAsync — atomic via EF Core implicit transaction
+await _uow.Currencies.AddAsync(currency, ct);
+await _uow.SaveChangesAsync(ct);
+```
+
+**CORRECT (multi-write atomicity)**: Use `CreateExecutionStrategy().ExecuteAsync()`:
+```csharp
+await _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+{
+    using var tx = await _dbContext.Database.BeginTransactionAsync(ct);
+    // multiple write operations...
+    await _dbContext.SaveChangesAsync(ct);
+    await tx.CommitAsync(ct);
+});
+```
+
+**WRONG — This throws InvalidOperationException:**
+```csharp
+await using var transaction = await _uow.BeginTransactionAsync(ct); // ❌ CRASHES
+try { ... await transaction.CommitAsync(ct); }
+catch { await transaction.RollbackAsync(ct); throw; }
+```
+
 ### InventoryService Contract
 ```csharp
 // DecreaseStockAsync: called INSIDE external transaction
 // IncreaseStockAsync: called INSIDE external transaction
 // Creates InventoryMovement record for EVERY stock change
 // Stores: QuantityChange, QuantityBefore, QuantityAfter
+```
+
+### isSystem Protection Pattern
+```csharp
+// Domain entity factory — add `isSystem` param for system-protected entities
+public static Currency Create(string name, string code, string symbol,
+    decimal exchangeRateToBase, bool isBaseCurrency = false,
+    string? fractionName = null, bool isSystem = false)
+{
+    // ... validation ...
+    return new Currency
+    {
+        Name = name.Trim(),
+        // ...
+        IsSystem = isSystem,  // NOT hardcoded false
+    };
+}
+
+// MarkAsDeleted — always guard system records
+public override void MarkAsDeleted()
+{
+    if (IsSystem)
+        throw new DomainException("لا يمكن حذف عملة النظام — العملة محمية");
+    IsActive = false;
+    UpdateTimestamp();
+}
+```
+
+### Controller 404 vs 400 Pattern
+```csharp
+[HttpDelete("{id:int}")]
+public async Task<IActionResult> Delete(int id, CancellationToken ct)
+{
+    var result = await _currencyService.DeleteAsync(id, userId, ct);
+    if (result.IsSuccess)
+        return Ok(new { message = "تم حذف العملة بنجاح" });
+    if (result.ErrorCode == ErrorCodes.NotFound)
+        return NotFound(new { error = result.Error });
+    return BadRequest(new { error = result.Error });
+}
 ```
 
 ### DocumentSequenceService
@@ -266,7 +334,9 @@ private async Task SaveAsync()
 
 ## FORBIDDEN (NEVER DO THESE)
 - float/double/real for money or quantity
-- Skip transactions for financial operations
+- Skip `SaveChangesAsync` for financial operations
+- Use `BeginTransactionAsync` when `SqlServerRetryingExecutionStrategy` is configured (use single `SaveChangesAsync` instead)
+- Bare `.WithOne()` on relationships — always specify `.WithOne(x => x.NavigationProperty)`
 - Install packages not in AGENTS.md §5
 - Console.WriteLine (use Serilog)
 - Direct DB access from Desktop
@@ -1009,6 +1079,284 @@ private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledEx
     
     e.Handled = true;
 }
+```
+
+## v4.6.8 — Phase 18 & Phase 20 Remediations
+
+### Transaction Strategy Enforcement (RULE-275/276)
+NEVER use `BeginTransactionAsync()` / `CommitAsync()` / `RollbackAsync()` when `SqlServerRetryingExecutionStrategy` is configured — it does NOT support user-initiated transactions.
+
+**For single-write atomicity**: Use a single `SaveChangesAsync()` (EF Core wraps in implicit transaction).
+
+**For multi-write atomicity** (e.g., Annual Closing Service that saves JournalEntry + FiscalYearClosure):
+```csharp
+await _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+{
+    using var tx = await _dbContext.Database.BeginTransactionAsync(ct);
+    await _uow.JournalEntries.AddAsync(closingEntry, ct);
+    await _uow.SaveChangesAsync(ct);
+    var closure = FiscalYearClosure.Create(..., closingEntryId: closingEntry.Id);
+    await _uow.FiscalYearClosures.AddAsync(closure, ct);
+    await _uow.SaveChangesAsync(ct);
+    await tx.CommitAsync(ct);
+});
+```
+
+### SystemAccountMappings Navigation Mappings
+ALL 13 navigation properties on `SystemAccountMappings` MUST be mapped with proper lambdas, NOT bare `HasOne<Account>()`:
+```csharp
+// CORRECT — specifies navigation property
+builder.HasOne(x => x.DefaultCashAccount).WithMany().HasForeignKey(x => x.DefaultCashAccountId).OnDelete(DeleteBehavior.Restrict);
+// REPEAT for all: DefaultBankAccount, AccountsReceivableAccount, InventoryAccount, etc.
+
+// WRONG — bare generic, navigation property NOT mapped
+builder.HasOne<Account>().WithMany().HasForeignKey(x => x.DefaultCashAccountId); // ❌
+```
+
+### JournalEntryLineConfiguration DB CHECK Constraints
+Two CHECK constraints are REQUIRED on `JournalEntryLineConfiguration`:
+```csharp
+builder.ToTable(t =>
+{
+    t.HasCheckConstraint("CHK_DebitOrCredit",
+        "(Debit > 0 AND Credit = 0) OR (Credit > 0 AND Debit = 0) OR (Debit = 0 AND Credit = 0)");
+    t.HasCheckConstraint("CHK_NoNegativeValues", "Debit >= 0 AND Credit >= 0");
+});
+```
+
+### Currency Filtered Indexes — IsActive Guard
+All unique indexes on Currency MUST exclude soft-deleted records:
+```csharp
+// CORRECT — includes IsActive filter
+builder.HasIndex(c => c.Name).IsUnique().HasFilter("[IsActive] = 1");
+builder.HasIndex(c => c.Code).IsUnique().HasFilter("[IsActive] = 1");
+builder.HasIndex(c => c.IsBaseCurrency).IsUnique().HasFilter("[IsBaseCurrency] = 1 AND [IsActive] = 1"); // Two conditions!
+```
+
+### JournalEntryLine.Account Navigation
+Use `HasOne(x => x.Account)` — NOT `HasOne<Account>()`:
+```csharp
+// CORRECT
+builder.HasOne(x => x.Account).WithMany(x => x.JournalLines).HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+// WRONG
+builder.HasOne<Account>().WithMany(x => x.JournalLines).HasForeignKey(x => x.AccountId); // ❌
+```
+
+### ReversedByEntryId FK Configuration
+The self-referencing FK on `JournalEntry` MUST be explicitly configured:
+```csharp
+builder.HasOne<JournalEntry>().WithMany().HasForeignKey(x => x.ReversedByEntryId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+```
+
+### JournalEntryNumberGenerator Daily Reset
+Generator MUST query by today's prefix, not global last entry:
+```csharp
+var prefix = $"JE-{DateTime.Today:yyyyMMdd}";
+var todayEntries = await _uow.JournalEntries.ToListAsync(je => je.EntryNumber.StartsWith(prefix), ct: ct);
+var nextNumber = todayEntries.Count + 1;
+return $"JE-{DateTime.Today:yyyyMMdd}-{nextNumber:D4}";
+```
+
+### Controller 404 vs 400 Pattern
+Delete/update endpoints MUST differentiate between NotFound and business errors:
+```csharp
+if (result.IsSuccess) return Ok(...);
+if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+return BadRequest(new { error = result.Error });
+```
+
+### Currency.Read Endpoints — AllStaff Policy
+GET endpoints for Currency MUST use `AllStaff` policy, not `AdminOnly`:
+```csharp
+[Authorize(Policy = "AllStaff")]
+[HttpGet]
+public async Task<IActionResult> GetAll(...)
+```
+
+## v4.6.9 — Phase 19 Settings Module Remediations
+
+### SystemSetting.Create() Pattern
+```csharp
+public static SystemSetting Create(string settingKey, string settingValue,
+    string dataType = "string", string category = "General", ...)
+{
+    if (string.IsNullOrWhiteSpace(settingKey))
+        throw new DomainException("مفتاح الإعداد مطلوب.");
+    if (string.IsNullOrWhiteSpace(category))
+        throw new DomainException("تصنيف الإعداد مطلوب.");
+    var validDataTypes = new[] { "string", "int", "bool", "decimal" };
+    if (!validDataTypes.Contains(dataType))
+        throw new DomainException("نوع البيانات غير صالح.");
+    // ...
+}
+```
+
+### Repository → Service Commit Pattern
+```csharp
+// Repository — only prepares entities
+public async Task SetBatchSystemSettingsAsync(...)
+{
+    // ... entity operations ...
+    // NO SaveChangesAsync here
+    InvalidateCache();
+}
+
+// Service — owns the commit
+public async Task<Result> UpdateSystemSettingsAsync(...)
+{
+    await _systemSettingsRepo.SetBatchSystemSettingsAsync(settings, ct);
+    await _uow.SaveChangesAsync(ct);
+    return Result.Success();
+}
+```
+
+### Tax.Update() Pattern
+```csharp
+public void Update(string name, decimal rate, bool isDefault)
+{
+    // ... guard clauses ...
+    Name = name.Trim();
+    Rate = rate;
+    IsDefault = isDefault;
+    UpdateTimestamp();  // REQUIRED
+}
+```
+
+### Controller Error Handling Pattern
+```csharp
+return result.ErrorCode == ErrorCodes.NotFound
+    ? NotFound(new { error = result.Error })
+    : BadRequest(new { error = result.Error });
+```
+
+## v4.6.9 — Phase 20 BUG-008 Fix: CurrencyCode Domain Validation
+
+When implementing Currency entity validation, use this pattern:
+
+```csharp
+if (string.IsNullOrWhiteSpace(code))
+    throw new DomainException("رمز العملة مطلوب.");
+if (code.Trim().Length != 3)
+    throw new DomainException("رمز العملة يجب أن يكون 3 أحرف.");
+// Then apply uppercase:
+code = code.Trim().ToUpperInvariant();
+```
+
+ISO 4217 currency codes are ALWAYS exactly 3 uppercase characters. Never use a generic max-length validation.
+
+## v4.6.9 — Phase 19 Settings Module Enhancement Patterns
+
+### Tax.ClearDefault() and Tax.SetDefault() Pattern
+```csharp
+public void SetDefault()
+{
+    IsDefault = true;
+    UpdateTimestamp();  // REQUIRED — audit trail
+}
+
+public void ClearDefault()
+{
+    IsDefault = false;
+    UpdateTimestamp();
+}
+```
+
+### SystemSettingsViewModel Property Pattern
+Every system setting seeded in DbSeeder MUST have a corresponding strongly-typed property in `SystemSettingsViewModel`, with mapping in both `MapFromDictionary()` and `BuildDictionary()`. Boolean settings use `ParseBool()`, integer settings use `ParseInt()`:
+
+```csharp
+private bool _hideTaxInSales;
+public bool HideTaxInSales
+{
+    get => _hideTaxInSales;
+    set => SetProperty(ref _hideTaxInSales, value);
+}
+
+// MapFromDictionary:
+HideTaxInSales = ParseBool(settings, "HideTaxInSales");
+
+// BuildDictionary:
+["HideTaxInSales"] = HideTaxInSales.ToString().ToLower(),
+```
+
+### Service-Level System Settings Validation Pattern
+When accepting `Dictionary<string, string>` for batch settings update, validate known keys before saving:
+
+```csharp
+private static string? ValidateSystemSettings(Dictionary<string, string> settings)
+{
+    foreach (var kvp in settings)
+    {
+        if (string.IsNullOrWhiteSpace(kvp.Key))
+            return "مفتاح الإعداد لا يمكن أن يكون فارغاً";
+        var value = kvp.Value;
+        switch (kvp.Key)
+        {
+            case "CostingMethod":
+            case "StockAlertDays":
+            case "DecimalPlaces":
+            case "ExpiryAlertDays":
+                if (!int.TryParse(value, out var intVal) || intVal < 0)
+                    return $"قيمة '{kvp.Key}' يجب أن تكون رقماً صحيحاً موجباً";
+                if (kvp.Key == "CostingMethod" && (intVal < 1 || intVal > 3))
+                    return "طريقة التكلفة يجب أن تكون 1-3";
+                if (kvp.Key == "DecimalPlaces" && (intVal < 0 || intVal > 6))
+                    return "عدد المنازل العشرية يجب أن يكون بين 0 و 6";
+                break;
+            case "AllowNegativeStock":
+            case "AutoPostInvoices":
+            // All boolean keys...
+                if (!bool.TryParse(value, out _))
+                    return $"قيمة '{kvp.Key}' يجب أن تكون true أو false";
+                break;
+        }
+    }
+    return null;
+}
+```
+
+## v4.6.9 — Phase 20 Currency Module Enhancement Patterns
+
+### CashBox.Create() — Fix OpeningBalance
+```csharp
+public static CashBox Create(... decimal initialBalance = 0)
+{
+    // ... guard clauses ...
+    return new CashBox
+    {
+        OpeningBalance = initialBalance,  // REQUIRED — was always 0!
+        CurrentBalance = initialBalance,
+        // ...
+    };
+}
+```
+
+### Currency SetAsBaseCurrency / UnsetBaseCurrency Pattern
+```csharp
+public void SetAsBaseCurrency()
+{
+    IsBaseCurrency = true;
+    UpdateTimestamp();  // REQUIRED — audit trail
+}
+
+public void UnsetBaseCurrency()
+{
+    IsBaseCurrency = false;
+    UpdateTimestamp();
+}
+```
+
+### InvokeOnUIThreadAsync — No Unnecessary async
+```csharp
+// CORRECT — no async keyword when no await inside
+await InvokeOnUIThreadAsync(() =>
+{
+    RateHistory.Clear();
+    foreach (var item in result.Value) { RateHistory.Add(item); }
+});
+
+// WRONG — async but no await
+await InvokeOnUIThreadAsync(async () => { /* no await */ });  // ❌
 ```
 
 ## Default Bug Fixing
