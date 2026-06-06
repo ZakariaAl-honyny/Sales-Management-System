@@ -20,8 +20,9 @@
         xmlns:viewsUnits="clr-namespace:SalesSystem.DesktopPWF.Views.Units"
         xmlns:viewsUsers="clr-namespace:SalesSystem.DesktopPWF.Views.Users"
         xmlns:viewsTransfers="clr-namespace:SalesSystem.DesktopPWF.Views.Transfers"
-        xmlns:viewsSettings="clr-namespace:SalesSystem.DesktopPWF.Views.Settings"
-        xmlns:vmSales="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Sales"
+             xmlns:viewsSettings="clr-namespace:SalesSystem.DesktopPWF.Views.Settings"
+             xmlns:vmSettings="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Settings"
+             xmlns:vmSales="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Sales"
         xmlns:vmReturns="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Returns"
         xmlns:vmPurchases="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Purchases"
         xmlns:vmPayments="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Payments"
@@ -34,6 +35,8 @@
         xmlns:vmCategories="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Categories"
         xmlns:vmUnits="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Units"
         xmlns:vmUsers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Users"
+        xmlns:vmTaxes="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Taxes"
+        xmlns:viewsTaxes="clr-namespace:SalesSystem.DesktopPWF.Views.Taxes"
         xmlns:vmTransfers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Transfers"
         mc:Ignorable="d"
         Title="نظام إدارة المبيعات"
@@ -122,11 +125,20 @@
             <DataTemplate DataType="{x:Type viewmodels:SettingsViewModel}">
                 <viewsSettings:SettingsView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmSettings:SystemSettingsViewModel}">
+                <viewsSettings:SystemSettingsView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmSettings:BackupViewModel}">
+                <viewsSettings:BackupView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmTransfers:StockTransfersListViewModel}">
                 <viewsTransfers:StockTransfersListView />
             </DataTemplate>
             <DataTemplate DataType="{x:Type vmInventory:InventoryViewModel}">
                 <viewsInventory:InventoryView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmTaxes:TaxesListViewModel}">
+                <viewsTaxes:TaxesListView />
             </DataTemplate>
         </ResourceDictionary>
     </Window.Resources>
@@ -190,6 +202,10 @@
                 <Separator/>
                 <MenuItem Header="إدارة المستخدمين" ToolTip="إدارة حسابات المستخدمين والصلاحيات" Click="UsersMenuItem_Click"/>
                 <Separator/>
+                <MenuItem Header="الضرائب" ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة" Click="TaxesMenuItem_Click"/>
+                <MenuItem Header="النسخ الاحتياطي" 
+                          Command="{Binding NavigateToBackupCommand}"
+                          ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
                 <MenuItem Header="فتح نافذة منتجات جديدة" ToolTip="فتح نافذة منتجات مستقلة في نافذة منفصلة" Click="OpenNewProductsWindow_Click"/>
                 <MenuItem Header="فتح نافذة عملاء جديدة" ToolTip="فتح نافذة عملاء مستقلة في نافذة منفصلة" Click="OpenNewCustomersWindow_Click"/>
                 <MenuItem Header="فتح نافذة موردين جديدة" ToolTip="فتح نافذة موردين مستقلة في نافذة منفصلة" Click="OpenNewSuppliersWindow_Click"/>
@@ -353,6 +369,18 @@
                                             Command="{Binding NavigateToSettingsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             ToolTip="إعدادات النظام والعملات والضرائب وتهيئة الطابعات"/>
+                                    <Button Content="إعدادات النظام" 
+                                            Command="{Binding NavigateToSystemSettingsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة جميع إعدادات النظام المخزنة — المخزون والمبيعات والمشتريات والباركود"/>
+                                    <Button Content="النسخ الاحتياطي" 
+                                            Command="{Binding NavigateToBackupCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة النسخ الاحتياطي — إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
+                                    <Button Content="الضرائب" 
+                                            Command="{Binding NavigateToTaxesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة"/>
                                     <Button Content="نقل المخزون" 
                                             Command="{Binding NavigateToStockTransfersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

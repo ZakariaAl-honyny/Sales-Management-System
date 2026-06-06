@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
+using SalesSystem.Contracts.Requests;
+using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.Services.App.Toast;
@@ -9,35 +11,48 @@ namespace SalesSystem.DesktopPWF.ViewModels.Settings;
 
 /// <summary>
 /// ViewModel for managing database backups — create, list, and restore.
+/// Also handles backup configuration settings (BackupPath, Schedule, Retention, Update URL).
 /// </summary>
 public class BackupViewModel : ViewModelBase
 {
     private readonly IBackupApiService _backupService;
+    private readonly ISettingsApiService _settingsApiService;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
+    private readonly IEventBus _eventBus;
 
     private ObservableCollection<BackupFileItem> _backupFiles = new();
     private BackupFileItem? _selectedBackupFile;
-    private string _backupPath = string.Empty;
+
+    private string _backupPathFromSettings = string.Empty;
+    private string _backupScheduleTime = "02:00";
+    private int _backupRetentionDays = 30;
+    private string _updateServerUrl = string.Empty;
 
     public BackupViewModel(
         IBackupApiService backupService,
+        ISettingsApiService settingsApiService,
         IDialogService dialogService,
-        IToastNotificationService toastService)
+        IToastNotificationService toastService,
+        IEventBus eventBus)
     {
         _backupService = backupService;
+        _settingsApiService = settingsApiService;
         _dialogService = dialogService;
         _toastService = toastService;
+        _eventBus = eventBus;
         SetDialogService(_dialogService);
-
-        BackupPath = "يمكن تعديل مسار النسخ من الإعدادات";
 
         CreateBackupCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(CreateBackupOperationAsync)));
         RestoreBackupCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(RestoreBackupOperationAsync)));
+        SaveBackupSettingsCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(SaveBackupSettingsOperationAsync)));
+        BrowseBackupPathCommand = new RelayCommand(_ => BrowseBackupPath());
 
         _ = ExecuteAsync(LoadBackupsOperationAsync);
+        _ = ExecuteAsync(LoadBackupSettingsOperationAsync);
     }
 
     #region Properties
@@ -54,10 +69,28 @@ public class BackupViewModel : ViewModelBase
         set => SetProperty(ref _selectedBackupFile, value);
     }
 
-    public string BackupPath
+    public string BackupPathFromSettings
     {
-        get => _backupPath;
-        set => SetProperty(ref _backupPath, value);
+        get => _backupPathFromSettings;
+        set => SetProperty(ref _backupPathFromSettings, value);
+    }
+
+    public string BackupScheduleTime
+    {
+        get => _backupScheduleTime;
+        set => SetProperty(ref _backupScheduleTime, value);
+    }
+
+    public int BackupRetentionDays
+    {
+        get => _backupRetentionDays;
+        set => SetProperty(ref _backupRetentionDays, value);
+    }
+
+    public string UpdateServerUrl
+    {
+        get => _updateServerUrl;
+        set => SetProperty(ref _updateServerUrl, value);
     }
 
     #endregion
@@ -66,10 +99,106 @@ public class BackupViewModel : ViewModelBase
 
     public AsyncRelayCommand CreateBackupCommand { get; }
     public AsyncRelayCommand RestoreBackupCommand { get; }
+    public AsyncRelayCommand SaveBackupSettingsCommand { get; }
+    public ICommand BrowseBackupPathCommand { get; }
 
     #endregion
 
     #region Operations
+
+    private async Task LoadBackupSettingsOperationAsync()
+    {
+        StatusMessage = string.Empty;
+
+        var result = await _settingsApiService.GetSettingsAsync();
+        if (result.IsSuccess && result.Value != null)
+        {
+            var s = result.Value;
+            BackupPathFromSettings = s.BackupPath ?? string.Empty;
+            BackupScheduleTime = s.BackupScheduleTime ?? "02:00";
+            BackupRetentionDays = s.BackupRetentionDays;
+            UpdateServerUrl = s.UpdateServerUrl ?? string.Empty;
+        }
+        else
+        {
+            LogSystemError($"Failed to load backup settings: {result.Error}", "BackupViewModel.LoadBackupSettingsAsync");
+            StatusMessage = "فشل في تحميل إعدادات النسخ الاحتياطي";
+        }
+    }
+
+    private async Task SaveBackupSettingsOperationAsync()
+    {
+        StatusMessage = string.Empty;
+
+        // Load current settings first to preserve non-backup fields
+        var currentResult = await _settingsApiService.GetSettingsAsync();
+        if (!currentResult.IsSuccess || currentResult.Value == null)
+        {
+            StatusMessage = HandleFailure(currentResult.Error ?? "فشل في تحميل الإعدادات الحالية",
+                "BackupViewModel.SaveBackupSettingsAsync");
+            return;
+        }
+
+        var current = currentResult.Value;
+
+        var request = new UpdateSettingsRequest(
+            current.StoreName,
+            current.Address,
+            current.Phone,
+            current.Email,
+            current.LogoPath,
+            current.CurrencyCode,
+            current.DefaultTaxRate,
+            current.IsTaxEnabled,
+            current.TaxNumber,
+            current.EnableStockAlerts,
+            current.AllowNegativeStock,
+            current.AutoUpdatePrices,
+            current.InvoicePrefix,
+            CostingMethod: current.CostingMethod,
+            BackupPath: BackupPathFromSettings,
+            BackupScheduleTime: BackupScheduleTime,
+            BackupRetentionDays: BackupRetentionDays,
+            UpdateServerUrl: UpdateServerUrl,
+            SignatureUrl: current.SignaturePath);
+
+        var result = await _settingsApiService.UpdateSettingsAsync(request);
+        if (result.IsSuccess)
+        {
+            _settingsApiService.RefreshCache();
+            _eventBus.Publish(new StoreSettingsChangedMessage());
+
+            StatusMessage = "✅ تم حفظ إعدادات النسخ الاحتياطي بنجاح";
+            _toastService.ShowSuccess("تم حفظ إعدادات النسخ الاحتياطي");
+        }
+        else
+        {
+            StatusMessage = HandleFailure(result.Error ?? "فشل في حفظ إعدادات النسخ الاحتياطي",
+                "BackupViewModel.SaveBackupSettingsAsync");
+            await _dialogService.ShowErrorAsync("خطأ في حفظ إعدادات النسخ", StatusMessage);
+        }
+    }
+
+    private void BrowseBackupPath()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "اختيار مجلد النسخ الاحتياطي",
+            Multiselect = false,
+            CheckFileExists = false,
+            ValidateNames = false,
+            FileName = "حدد المجلد"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            var dir = System.IO.Path.GetDirectoryName(dialog.FileName);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                BackupPathFromSettings = dir;
+            }
+        }
+    }
 
     private async Task LoadBackupsOperationAsync()
     {

@@ -20,6 +20,7 @@ using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
 using SalesSystem.DesktopPWF.ViewModels.Sales;
 using SalesSystem.DesktopPWF.ViewModels.Users;
+using SalesSystem.DesktopPWF.ViewModels.Taxes;
 
 namespace SalesSystem.DesktopPWF;
 
@@ -86,6 +87,7 @@ public partial class MainWindow : Window
     private void CustomerPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<CustomerPaymentsListViewModel>();
     private void SupplierPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SupplierPaymentsListViewModel>();
     private void InventoryStatusMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<InventoryViewModel>();
+    private void TaxesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<TaxesListViewModel>();
 
     private async void CheckForUpdatesMenuItem_Click(object sender, RoutedEventArgs e)
     {

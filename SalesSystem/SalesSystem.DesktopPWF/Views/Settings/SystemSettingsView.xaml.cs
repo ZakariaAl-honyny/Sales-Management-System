@@ -2,11 +2,10 @@ using System.Windows.Controls;
 
 namespace SalesSystem.DesktopPWF.Views.Settings;
 
-public partial class SettingsView : UserControl
+public partial class SystemSettingsView : UserControl
 {
-    public SettingsView()
+    public SystemSettingsView()
     {
         InitializeComponent();
     }
 }
-

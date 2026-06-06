@@ -83,10 +83,10 @@ public class CostingMethodSettingsViewModel : ViewModelBase
             var current = getResult.Value;
             var request = new UpdateSettingsRequest(
                 current.StoreName, current.Address, current.Phone, current.Email,
-                current.LogoPath, current.CurrencyCode, current.DefaultTaxRate,
-                current.IsTaxEnabled, current.TaxNumber,
+                current.LogoPath, current.CurrencyCode, current.DefaultTaxRate,  // DEPRECATED: DefaultTaxRate — use Tax entity instead
+                current.IsTaxEnabled, current.TaxNumber,                         // DEPRECATED: IsTaxEnabled — use Tax entity instead
                 current.EnableStockAlerts, current.AllowNegativeStock, current.AutoUpdatePrices,
-                current.InvoicePrefix,
+                current.InvoicePrefix,                                           // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead
                 _selectedMethodValue);
 
             var updateResult = await _settingsApi.UpdateSettingsAsync(request);

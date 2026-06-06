@@ -74,6 +74,9 @@ public record SalesInvoiceDto(
     decimal DueAmount,
     string? Notes,
     byte Status,
+    int? TaxId,
+    string? TaxName,
+    decimal? TaxRate,
     IReadOnlyList<SalesInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -119,6 +122,9 @@ public record PurchaseInvoiceDto(
     string? SupplierInvoiceNo,
     string? Notes,
     byte Status,
+    int? TaxId,
+    string? TaxName,
+    decimal? TaxRate,
     IReadOnlyList<PurchaseInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -295,7 +301,13 @@ public record PrintSettingsDto(
     bool AutoPrintOnPost,
     string ReceiptHeader,
     string ReceiptFooter,
-    int EscPosCodePage);
+    int EscPosCodePage,
+    string PaperSize,
+    int PrintCopies,
+    bool ShowBalanceOnPrint,
+    bool PrintSignature,
+    bool ShowLogo = true,
+    string FooterNote = "");
 
 public record StoreSettingsDto(
     int Id,
@@ -305,18 +317,19 @@ public record StoreSettingsDto(
     string? LogoPath,
     string? Email,
     string CurrencyCode,
-    decimal DefaultTaxRate,
-    bool IsTaxEnabled,
+    decimal DefaultTaxRate, // DEPRECATED: DefaultTaxRate — use Tax entity instead (kept for backwards compat). Remove in Phase 20.
+    bool IsTaxEnabled,      // DEPRECATED: IsTaxEnabled — use Tax entity instead (kept for backwards compat). Remove in Phase 20.
     string? TaxNumber,
     bool EnableStockAlerts,
     bool AllowNegativeStock,
     bool AutoUpdatePrices,
-    string InvoicePrefix,
+    string InvoicePrefix,    // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead (kept for backwards compat). Remove in Phase 20.
     int CostingMethod = 1,
     string? BackupPath = null,
     string? BackupScheduleTime = "02:00",
     int BackupRetentionDays = 30,
-    string? UpdateServerUrl = null);
+    string? UpdateServerUrl = null,
+    string? SignaturePath = null);
 
 public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
 
@@ -463,6 +476,8 @@ public record VatReportDto(
     decimal TaxableAmount,
     decimal TaxRate,
     decimal TaxAmount);
+
+public record TaxDto(int Id, string Name, decimal Rate, bool IsDefault, bool IsActive);
 
 // ─── Accounting DTOs ─────────────────────────────────
 public record AccountBalanceDto(

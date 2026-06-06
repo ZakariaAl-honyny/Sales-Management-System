@@ -16,6 +16,8 @@ using SalesSystem.DesktopPWF.ViewModels.Suppliers;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
 using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Users;
+using SalesSystem.DesktopPWF.ViewModels.Settings;
+using SalesSystem.DesktopPWF.ViewModels.Taxes;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -90,8 +92,11 @@ public class MainViewModel : ViewModelBase
         NavigateToUnitsCommand = new RelayCommand(() => NavigateTo<UnitListViewModel>());
         NavigateToUsersCommand = new RelayCommand(() => NavigateTo<UserListViewModel>());
         NavigateToSettingsCommand = new RelayCommand(() => NavigateTo<SettingsViewModel>());
+        NavigateToSystemSettingsCommand = new RelayCommand(() => NavigateTo<SystemSettingsViewModel>());
+        NavigateToBackupCommand = new RelayCommand(() => NavigateTo<BackupViewModel>());
         NavigateToStockTransfersCommand = new RelayCommand(() => NavigateTo<StockTransfersListViewModel>());
         NavigateToInventoryCommand = new RelayCommand(() => NavigateTo<InventoryViewModel>());
+        NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -206,14 +211,23 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة المستخدمين</summary>
     public ICommand NavigateToUsersCommand { get; }
 
-    /// <summary>نقل إلى الإعدادات</summary>
+    /// <summary>نقل إلى الإعدادات العامة</summary>
     public ICommand NavigateToSettingsCommand { get; }
+
+    /// <summary>نقل إلى إعدادات النظام — إدارة جميع إعدادات النظام المخزنة في قاعدة البيانات</summary>
+    public ICommand NavigateToSystemSettingsCommand { get; }
+
+    /// <summary>نقل إلى إدارة النسخ الاحتياطي — إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات</summary>
+    public ICommand NavigateToBackupCommand { get; }
 
     /// <summary>نقل إلى التحويلات المخزنية</summary>
     public ICommand NavigateToStockTransfersCommand { get; }
 
     /// <summary>نقل إلى شاشة المخزون</summary>
     public ICommand NavigateToInventoryCommand { get; }
+
+    /// <summary>نقل إلى إدارة الضرائب</summary>
+    public ICommand NavigateToTaxesCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
@@ -298,6 +312,7 @@ public class MainViewModel : ViewModelBase
             "Settings"         => _sessionService.CanAccess(Permission.Settings),
             "Categories"       => _sessionService.CanAccess(Permission.ProductManagement),
             "Units"            => _sessionService.CanAccess(Permission.ProductManagement),
+            "Taxes"            => _sessionService.CanAccess(Permission.Settings),
             _ => true // Dashboard, Sales, SalesReturns, Customers, CustomerPayments, POS, CashBoxes, Inventory
         };
     }
@@ -345,8 +360,11 @@ public class MainViewModel : ViewModelBase
             nameof(UnitListViewModel)               => "Units",
             nameof(UserListViewModel)               => "Users",
             nameof(SettingsViewModel)               => "Settings",
+            nameof(SystemSettingsViewModel)         => "Settings",
+            nameof(BackupViewModel)                 => "Settings",
             nameof(StockTransfersListViewModel)     => "StockTransfers",
             nameof(InventoryViewModel)              => "Inventory",
+            nameof(TaxesListViewModel)              => "Taxes",
             _                                        => viewModelType.Name
         };
     }

@@ -1,5 +1,5 @@
-# Product Requirements Document (PRD) & Master Implementation Reference
-# Sales Management System (v4.6.4 — Security Hardening & Code Quality)
+﻿# Product Requirements Document (PRD) & Master Implementation Reference
+# Sales Management System (v4.6.7 — InvoiceNo int Re-addition & Code Polish)
 # Platform: .NET 10 LTS | Clean Architecture | Year: 2026
 
 ---
@@ -45,12 +45,20 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Audit tracking on all entities (CreatedAt, CreatedByUserId, IsActive)
 - Role-based UI visibility and API authorization
 - Serilog logging for all critical operations
+- **Accounting Foundation (Phase 18)**: JournalEntry, Account, FiscalYear entities with multi-currency support; Simple Mode UX; Annual Closing workflow
+- **Chart of Accounts (Phase 22)**: 60-account hierarchical seed data with 5 account types (Asset/Liability/Equity/Revenue/Expense)
+- **Currencies Module (Phase 20)**: Multi-currency CRUD with exchange rate history, FractionName, IsSystem delete guard
+- **Users & Permissions (Phase 21)**: 4-role model (Admin/Manager/Cashier/Accountant), 33 permission codes, MustChangePassword, lockout policy
+- **Journal Entries (Phase 30)**: Auto-journal entries from all financial operations; manual entry; Annual Closing
+- **Reports (Phase 31)**: 35+ report DTOs; Hierarchical Income Statement + Balance Sheet; Excel via ClosedXML
+- **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with batch-level FIFO cost allocation and FEFO expiry-based inventory deduction
 
 ### Out of Scope (Future Phases)
-- Full accounting system with general ledger
 - Multi-branch management with branch-level P&L
 - Web or mobile client
 - External API integrations (payment gateways, e-commerce)
+- Payroll management
+- Fixed assets management with depreciation
 
 ---
 
@@ -93,7 +101,9 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Tax calculation (optional, from settings)
 - Payment type: Cash / Credit / Mixed
 - If Mixed: enter paid amount, system calculates due amount
-- Auto-generate invoice number (format: PUR-2026-000001)
+- InvoiceNo = int, UNIQUE per purchase invoice, auto-generated via DocumentSequenceService.GetNextIntAsync("PurchaseInvoice"), user can override (validated for uniqueness)
+- On Post: create PurchaseLot (batch) per line with FIFO cost allocation
+- FEFO: if product has expiry, batches tracked by expiry date
 - On Post: increase stock in selected warehouse
 - On Post: update supplier balance if credit/mixed
 - On Cancel: reverse stock and balance
@@ -105,7 +115,9 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Apply line-level and invoice-level discounts
 - Payment type: Cash / Credit / Mixed
 - Validate: quantity available in selected warehouse
-- Auto-generate invoice number (format: INV-2026-000001)
+- InvoiceNo = int, UNIQUE per sales invoice, auto-generated via DocumentSequenceService.GetNextIntAsync("SalesInvoice"), user can override (validated for uniqueness)
+- Batch allocation: FIFO (oldest batch first) or FEFO (closest expiry first)
+- COGS computed from actual batch cost, not average
 - On Post: decrease stock from selected warehouse
 - On Post: update customer balance if credit/mixed
 - On Cancel: reverse stock and balance
@@ -151,11 +163,14 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
   - Automatically calculates and displays suggested reorder amounts in "Wholesale Units + Remaining Retail Units" (e.g., 2 Boxes and 5 Pieces) based on the Conversion Factor.
   - Professional PDF export capability grouped by Warehouse.
 
-### 3.11 Settings
-- Store name, phone, address
-- Logo upload (stored as file path)
-- Default tax rate and tax toggle
-- Default warehouse selection
+### 3.11 Settings (v4.6.7)
+- 5-category system settings catalog: Company, System, Print, Tax, Security
+- **System Settings**: CostingMethod (1-3), AllowNegativeStock, EnableFefo, AutoPost, ShowProfitInInvoice, EnableBarcode, BarcodeInputType, DecimalPlaces, PreventBelowRetailPrice, AllowBelowCostSale, DefaultWarehouseId, LowStockAlertThreshold, CurrencyDisplayFormat
+- **Print Settings**: PaperSize, PrintCopies, ShowLogo, ShowBalanceOnPrint, PrintSignature, FooterNote
+- **Tax Settings**: Full Tax entity CRUD with multiple tax rates (compound/inclusive/exclusive)
+- **Store Info**: Store name, phone, address, logo (file path), signature, tax number
+- **Security**: User, Role, Permission management (Admin only)
+- CostingMethod exposed as RadioButton group in SettingsView (WeightedAverage/LastPurchasePrice/SupplierPrice)
 
 ### 3.12 Backup
 - Backup database via SQL Server BACKUP DATABASE command
@@ -319,6 +334,24 @@ foreach (var unit in product.Units)
 - `DuplicateCode` error constant removed from ErrorCodes
 - Code auto-generation services (`DocumentSequenceService` for PRD/CUST/SUP/WH) removed
 
+### 3.25 Accounting Foundation (Phase 18)
+- JournalEntry entity with multi-currency support (SourceType, SourceId, Status, Description)
+- JournalEntryLine: AccountId, Debit/Credit amounts, CurrencyId, ExchangeRate; CHECK (Debit > 0 OR Credit > 0)
+- Account entity: hierarchical (ParentAccountId), 5 types (Asset/Liability/Equity/Revenue/Expense), ⓘ per account
+- FiscalYear: StartDate, EndDate, IsClosed, close(userId) — prevents double close
+- 60 accounts seeded as default chart of accounts
+- 7 auto-journal entry providers (Sales, Purchases, Returns, Payments, Receipts, Transfers, Annual Closing)
+- Annual Closing: close revenue/expense accounts → transfer P&L to Retained Earnings → open new FiscalYear
+- Simple Mode UX: toggle hides/shows Debit/Credit columns for non-accountants
+
+### 3.26 FIFO/FEFO Batch Tracking (Phases 25/27/28)
+- PurchaseLot entity: ProductId, WarehouseId, BatchNo, ExpiryDate, CostPrice, QuantityReceived, QuantityRemaining
+- Each purchase creates PurchaseLot per line with cost allocation
+- On sale: FIFO deducts from oldest batch first; if TrackExpiry=true, FEFO deducts from closest-expiry first
+- Sales returns return to the original batch (if referenced)
+- Products with TrackBatch=false → WeightedAverage fallback
+- Products with TrackExpiry=true → FEFO applied during batch selection
+
 ---
 
 ## 4. Non-Functional Requirements
@@ -405,7 +438,7 @@ text
 SalesSystem/
 ├── SalesSystem.Contracts/       ← DTOs + Requests + Responses + Result<T>
 ├── SalesSystem.Domain/          ← Entities + Business Rules + Exceptions
-├── SalesSystem.Application/     ← Services + Interfaces + Use Cases + CQRS
+├── SalesSystem.Application/     ← Services + Interfaces + Use Cases
 ├── SalesSystem.Infrastructure/  ← EF Core + DbContext + Repositories + UoW
 ├── SalesSystem.Api/             ← Controllers + FluentValidation + Middleware + JWT
 └── SalesSystem.DesktopPWF/     ← WPF UI + MVVM + EventBus + Printing
@@ -438,8 +471,6 @@ SalesSystem/
 │   │   ├── AuthService.cs
 │   │   ├── BackupService.cs
 │   │   └── DocumentSequenceService.cs ⚠️ Thread-safe
-│   └── Queries/                        ← [NEW] CQRS Read models (SPEC-009)
-│       └── GetLowStockReportQuery.cs
 │
 ├── SalesSystem.Infrastructure/
 │   ├── Data/
@@ -555,491 +586,149 @@ SalesSystem/
 
 ---
 
-## 7. Implementation Phases
+## 7. Implementation Phases (Current - 14 Phases, Re-ordered as 18-31)
 
-### Phase 1 — Foundation
-Tasks:
+The current implementation follows Phases 18-31, corresponding to the post-MVP feature modules. Earlier phases (1-17) were completed in prior iterations.
 
-Create Solution with 6 projects
-Configure .NET 10 project references
-Write all Domain Entities
-Write all Contracts (DTOs, Requests, Result<T>)
-Write all Custom Exceptions
-Write SQL creation scripts with seed data
-Configure SalesDbContext with all Configurations
-Run initial EF Core Migration
-Definition of Done:
-
-Solution builds without errors
-Database created from migration
-Seed data inserted (admin user, default warehouse,
-cash customer, units)
-text
-
-
-### Phase 2 — Backend Core
-Tasks:
-
-Implement IUnitOfWork and repositories
-Implement AuthService with JWT
-Implement ProductService (simplest — use as template)
-Implement CustomerService, SupplierService
-Implement WarehouseService
-Implement DocumentSequenceService (thread-safe)
-Wire up API Controllers (Products, Customers,
-Suppliers, Warehouses, Auth)
-Add FluentValidation for all request models
-Add Serilog configuration
-Add Global Exception Handler middleware
-Add JWT authorization policies per role
-Definition of Done:
-
-All basic CRUD endpoints work via Swagger
-Invalid requests rejected with clear error messages
-All requests logged
-Unauthorized requests return 401/403
-text
-
-
-### Phase 3 — Business Logic (Critical)
-Tasks:
-
-Implement InventoryService ⚠️
-Implement PurchaseService ⚠️
-Implement SalesService ⚠️
-Implement SalesReturnService ⚠️
-Implement PurchaseReturnService ⚠️
-Implement StockTransferService ⚠️
-Implement PaymentService
-Wire up remaining API Controllers
-Definition of Done:
-
-Complete purchase flow works end-to-end
-Complete sales flow works end-to-end
-Stock deducted correctly on sale
-Stock increased correctly on purchase
-Returns reverse stock and balance correctly
-All operations are transactional (rollback tested)
-InventoryMovements populated on every stock change
-text
-
-
-### Phase 4 — Desktop Shell
-Tasks:
-
-Implement EventBus (with WeakReference and UI thread safety)
-Implement NavigationService
-Implement AuthApiService and token storage
-Build MainForm with Sidebar
-Build LoginForm
-Implement role-based sidebar visibility
-Build Common UserControls
-(SearchBar, Loading, SummaryCard, PaymentPanel)
-Implement NotificationService
-Implement DialogService
-Definition of Done:
-
-Login works and retrieves JWT token
-Role determines which sidebar items are visible
-Navigation between screens works
-Common controls render correctly
-text
-
-
-### Phase 5 — Desktop Modules
-Order of implementation:
-
-Products Module ← Use as template for others
-Customers Module
-Suppliers Module
-Warehouses Module
-Purchases Module ⚠️
-Sales Module ⚠️ Most important
-Returns Module ⚠️
-Stock Transfer Module
-Reports Module
-Payments Module
-Definition of Done per module:
-
-List screen with search and filter
-Add/Edit dialog
-Delete/Deactivate with confirmation
-EventBus messages published on changes
-Other screens refresh automatically on change
-text
-
-
-### Phase 6 — Printing
-Tasks:
-
-Build InvoicePrinter class
-Build ReceiptPrinter class (80mm thermal)
-Support store logo in header
-Support store name, phone, address in header
-Support invoice details and totals
-Print preview before printing
-Definition of Done:
-
-Full A4 invoice prints correctly
-80mm receipt prints correctly
-Logo appears in header when configured
-text
-
-
-### Phase 7 — Production Readiness
-Tasks:
-
-Implement BackupService (SQL Server .bak)
-Build Settings screen (Admin only)
-Build User Management screen (Admin only)
-Configure API as Windows Service
-Create Inno Setup installer script
-Encrypt connection string
-Final security review
-Performance testing with 1 year of data
-Definition of Done:
-
-System installs on clean Windows machine
-API starts automatically with Windows
-Backup creates valid .bak file
-Restore successfully restores data
-All role restrictions working in both API and Desktop
-text
-
-### Phase 8 — Dynamic UOM & Costing (v4.3)
-Tasks:
-- Implement ProductUnit entity with per-unit pricing and conversion factors
-- Implement UnitBarcode entity for multi-barcode support per product-unit
-- Build UpdateProductPricingService with 3 costing strategies (WeightedAverage, LastPurchasePrice, SupplierPrice)
-- Record all price/cost changes in ProductPriceHistory
-- Enforce ProductMustHaveAtLeastOneUnit rule in Domain
-- Add SmartUnitFormatter (UI-only) for quantity display
-Definition of Done:
-- Products support multiple units with per-unit pricing
-- Purchase posting triggers cost recalculation
-- All cost changes are audited in ProductPriceHistory
-- Cascade cost updates from base unit to all derived units × conversion factor
-text
-
-### Phase 9 — Cash Boxes (v4.3)
-Tasks:
-- Implement CashBox and CashTransaction entities
-- Link CashTransaction to invoices via CashBoxId
-- Enforce CashBox.CurrentBalance >= 0 validation
-- Implement cash transfer between boxes (dual transaction)
-- Build DailyClosure computation
-- Make CashTransactions immutable (offsetting entry for corrections)
-Definition of Done:
-- Cash box balance tracks correctly
-- Invoice payments reference correct cash box
-- Transfer between boxes creates two entries (out + in)
-- Daily closure calculates correctly
-text
-
-### Phase 10 — Print Engine (v4.3)
-Tasks:
-- Implement QuestPDF A4 invoice document (RTL, logo, tax breakdown)
-- Implement Win32 raw printing for 80mm thermal receipts (ESC/POS)
-- Build EscPos command builder (no external NuGet for thermal)
-- Desktop calls PrintController API for all printing (never direct)
-- Add PdfPreviewWindow for A4 preview
-- Store print settings in SystemSetting table (Category = "Print")
-- Handle missing logo gracefully (null check)
-Definition of Done:
-- A4 PDF generates correctly with store details
-- 80mm thermal receipt prints with Arabic text
-- Preview shows before printing
-- PrintResult returned (never throws exceptions)
-text
-
-### Phase 11 — Production Hardening (v4.4)
-Tasks:
-- Implement Auto-Update System (SHA256 verification, fire-and-forget, 8s timeout)
-- Implement DPAPI connection string encryption (ConnectionStringProtector)
-- Implement FirstRunSetupService with atomic file writes
-- Build ScheduledBackupWorker (daily 2 AM, configurable retention)
-- Implement BackupService (raw SQL, no SMO)
-- Configure API as Windows Service (SalesSystemService, auto-recovery)
-- Add Database Health Check endpoint (/health/database)
-- Desktop startup check with DatabaseErrorDialog (Retry/Exit)
-Definition of Done:
-- Updates downloaded and verified via SHA256
-- Connection strings encrypted with "DPAPI:" prefix
-- Backups created and old backups auto-cleaned
-- Windows Service starts with Windows, recovers on failure
-- Desktop shows friendly dialog on DB connection loss
-text
-
-### Phase 12 — Multi-Window & UI Polish (v4.5)
-Tasks:
-- Implement ScreenWindowService for non-modal editor opening
-- Build generic ScreenWindow.xaml (hosts any View/ViewModel)
-- Use WeakReference<Window> for window tracking (no memory leaks)
-- Implement cascade window positioning (30px × count % 10)
-- Add EventBus subscription management (subscribe in OnLoad, dispose in Dispose)
-- Implement newest-first sorting across all list screens
-- Add Arabic ToolTips to all interactive controls
-- Fix dialog self-ownership guard (PositionOverOwner)
-Definition of Done:
-- Editors open non-modally via ScreenWindowService
-- No MessageBox.Show in ViewModels — all via IDialogService
-- All buttons have Arabic ToolTips
-- Lists display newest items first
-text
-
-### Phase 13 — Identifier Strategy & Validation (v4.5.3–v4.6.2)
-Tasks:
-- Remove Code columns from Product, Customer, Supplier, Warehouse entities
-- Remove Code from all DTOs, ViewModels, and API responses
-- Remove DocumentSequenceService for entity codes (keep only for invoices)
-- Remove DuplicateCode from ErrorCodes (keep DuplicateBarcode)
-- Implement WPF ErrorTemplate: Red border + ❗ icon with ToolTip
-- Add INotifyDataErrorInfo standardization (no HasXxxError booleans)
-- Add SetDialogService() + ValidateAllAsync() to ViewModelBase
-- Update all 14 Editor VMs to use INotifyDataErrorInfo pattern
-Definition of Done:
-- No Code property exists anywhere in the system
-- All entities use auto-increment Id as sole identifier
-- Validation shows red border on invalid fields
-- Warning dialog lists all missing fields on save click
-text
-
+| Phase | Module | Key Deliverables |
+|-------|--------|-----------------|
+| **18** | **Accounting Foundation** | JournalEntry, Account, FiscalYear entities; Simple Mode UX toggle; 19 tooltips; 7 auto-journal entry providers; Annual Closing workflow |
+| **19** | **Settings Module** | 13 system settings per analysis; CostingMethod RadioButton; Print/Notification/Tax/Security settings; 8 seed entities |
+| **20** | **Currencies Module** | Multi-currency CRUD with exchange rate history; FractionName field; IsSystem delete guard; YER/USD/SAR seed |
+| **21** | **Users & Permissions** | 4 roles (Admin/Manager/Cashier/Accountant); 33 permission codes; default admin with MustChangePassword; lockout policy |
+| **22** | **Chart of Accounts** | 60-account hierarchical seed; 5 account types; Level validation (max 10); tooltip per account |
+| **23** | **Customers Module** | Account auto-creation under 1210/1110; CreditLimit; CustomerType; OpeningBalance auto journal entry |
+| **24** | **Suppliers Module** | Account auto-creation under 2110; OpeningBalance auto journal entry (debit Inventory, credit supplier) |
+| **25** | **Products Module** | Multi-unit via ProductUnit; Opening Stock via PurchaseLot; Price Validity; TrackExpiry/TrackBatch; Barcode via UnitBarcode |
+| **26** | **Warehouses Module** | Warehouse CRUD; Stock Transfer; Physical Count (V2); AdjustmentType; StockIssueReason |
+| **27** | **Purchases Module** | FIFO batch costing per line; PurchaseLot creation; Partial PO Receive; AdditionalCharge with AccountId; standalone returns; 47 Arabic guards |
+| **28** | **Sales Module** | FIFO/FEFO batch allocation; Barcode auto-add with ISoundService; CashTransaction RefundOut; credit limit; quotation expiry; SaleMode |
+| **29** | **Receipts & Payments** | CashBox.AccountId FK; CustomerPayment/SupplierPayment with auto accounting; Cheque; ActualCashCount; immutability; 10 tooltips |
+| **30** | **Journal Entries** | SystemAccountMappings in 7 auto-entry providers; FiscalYear integration; Annual Closing; Simple Mode UX |
+| **31** | **Reports Module** | 35+ report DTOs; Hierarchical Income Statement + Balance Sheet; BuildAccountTree; General Ledger; Excel via ClosedXML |
 
 ---
 
-### Phase 14 — Product Lifecycle & Media Management
+### Phase 18: Accounting Foundation
+- JournalEntry entity: EntryDate, EntryNumber, Description, SourceType, SourceId, Status, FiscalYearId, CurrencyId, ExchangeRate
+- JournalEntryLine: AccountId FK, DebitAmount(18,2), CreditAmount(18,2); CHECK (Debit > 0 OR Credit > 0)
+- Account entity: hierarchical (ParentAccountId self-FK), AccountType(1-5), AccountCode, IsSystemAccount
+- FiscalYear: StartDate, EndDate, IsClosed, ClosedByUserId; prevents double close
+- 60 accounts seeded as default chart of accounts with tooltip descriptions
+- 7 auto-journal entry providers (Sales, Purchases, Returns, Payments, Receipts, Transfers, Annual Closing)
+- Simple Mode UX: toggle hides/shows Debit/Credit columns
+- Annual Closing: close Revenue/Expense -> P&L to Retained Earnings -> open new FiscalYear
+- All DomainException messages in Arabic; 19 tooltips across all dialogs
 
-**Tasks:**
+### Phase 19: Settings Module
+- 8 seed entities: StoreSettings, SystemSetting, PrintSetting, NotificationSetting, TaxSetting, SecuritySetting, IntegrationSetting, BackupSetting
+- 13 system settings: CostingMethod(1-3), AllowNegativeStock, EnableFefo, AutoPost, ShowProfitInInvoice, EnableBarcode, BarcodeInputType, DecimalPlaces, PreventBelowRetailPrice, AllowBelowCostSale, DefaultWarehouseId, LowStockAlertThreshold, CurrencyDisplayFormat
+- CostingMethod RadioButton group (WeightedAverage/LastPurchasePrice/SupplierPrice)
+- Print Settings: PaperSize, PrintCopies, ShowLogo, ShowBalanceOnPrint, PrintSignature, FooterNote
+- Tax entity CRUD with multiple tax rates
+- Notification Settings: LowStockAlerts, ExpiryAlerts, DailyReport, EmailNotifications
+- FluentValidation for each settings category
 
-1. **Database Schema Update (EF Core / SQL Server):**
-* Add a nullable `ExpirationDate` (`DateTime?`) to the `Products` table to support products without an expiry.
-* Add an optional `ImagePath` (`string?`) or `ImageSubPath` field to store the local reference of the product image.
-* Create a `StockWriteOff` (جدول الإتلاف/المستبعد) table to log quantities removed due to expiration or damage, linked to the `JournalEntries` for automatic accounting impact.
+### Phase 20: Currencies Module
+- Currency entity: Name, Code, Symbol, FractionName, ExchangeRateToBase, IsBaseCurrency, IsSystem
+- CRUD with IsSystem delete guard (prevents deletion of YER/USD/SAR)
+- ExchangeRateHistory entity with date tracking
+- Seed: YER (base, rate=1), USD (rate~250), SAR (rate~66) - IsSystem=true
+- Validation: base currency exchange rate must be 1
 
-2. **UI Enhancements (Product Management Screen - WPF):**
-* Implement a CheckBox labeled "له تاريخ انتهاء" (Has Expiration Date).
-* Dynamically enable/disable the `DatePicker` control based on the CheckBox state using MVVM binding.
-* Add an optional Image Upload component (Image control, "اختيار صورة" button, and "حذف الصورة" button).
-* Ensure image loading utilizes **Lazy Loading** or async drawing to prevent the main product list Grid from lagging during scroll.
+### Phase 21: Users & Permissions
+- User entity: Status(Active/Inactive/Locked), MustChangePassword, LoginAttempts, IsLocked, DefaultCashBoxId, Email, Phone
+- 4 roles: Admin(1), Manager(2), Cashier(3), Accountant(4)
+- 33 permission codes by module (Products, Customers, Suppliers, Sales, Purchases, Accounting, Reports, Settings, Users)
+- Default admin seed: username="admin", name="مدير النظام", MustChangePassword=true
+- Password policy: BCrypt work factor 12, min 8 chars, complexity
+- Lockout after 5 failed attempts
 
-3. **Backend Logic & Guard Clauses:**
-* Enforce validation: If "Has Expiration Date" is checked, the `ExpirationDate` must be provided and cannot be a past date during the initial stock entry.
-* Implement image validation restricting files to standard formats (JPG, PNG) and limiting file size (e.g., max 2MB) before saving.
+### Phase 22: Chart of Accounts
+- 60 accounts seeded in hierarchical tree (max depth 10)
+- 5 account types: Asset(1), Liability(2), Equity(3), Revenue(4), Expense(5)
+- Level validation: child.Level > parent.Level (max 10, not strict +1)
+- IsSystemAccount on L1-L2 (prevents deletion)
+- tooltip per account: type, code, balance direction, level
+- SystemAccountMappings maps system operations to AccountId
 
-4. **Expired & Damaged Products Report:**
-* Build a dedicated reporting view with advanced data filtering:
-* *Expired Items:* Products whose expiration date is less than or equal to the current system date.
-* *Near-Expiry Items:* Products expiring within an adjustable threshold (e.g., next 30, 60, or 90 days) for proactive inventory control.
+### Phase 23: Customers Module
+- Account auto-creation under 1210 (Debtors) for Credit or 1110 (Cash) for Cash customers
+- OpeningBalance with auto journal entry (debit Customer account, credit OpeningBalance Equity)
+- Customer: CustomerType(Cash/Credit), CreditLimit, CurrencyId, AccountId FK
+- tooltips: Account impact, credit limit flows, opening balance entries
 
-* Add a "ترحيل كحذف/إتلاف" button inside the report to clear expired quantities from the active inventory and trigger a background accounting entry (قيد آلية: من حـ/ خسائر بضاعة تالفة إلى حـ/ المخزون).
+### Phase 24: Suppliers Module
+- Account auto-creation under 2110 (Creditors)
+- OpeningBalance with auto journal entry (debit Inventory, credit Supplier account)
+- Supplier: CreditLimit, CurrencyId, AccountId FK
+- tooltips: Account impact, opening balance entries
 
-**Definition of Done:**
+### Phase 25: Products Module
+- Multi-unit via ProductUnit (conversion factor, per-unit pricing)
+- TrackExpiry + TrackBatch flags for FIFO/FEFO support
+- AvgCost computed via WeightedAverage or PurchaseLot cost
+- Opening Stock via PurchaseLot with IsOpeningBatch=true
+- Price Validity Period per product
+- Barcode via UnitBarcode table
+- ProductPriceHistory for all cost/price changes
+- RULE-191: No Code column - auto-increment Id as sole identifier
 
-* Products can be created and updated smoothly with or without an expiration date.
-* Optional images render correctly in the UI without impacting application memory or rendering speed.
-* The Expired Products Report displays accurate real-time data based on the system clock.
-* Writing off expired stock decreases the available warehouse inventory immediately and reflects in the backend financial logs.
+### Phase 26: Warehouses Module
+- Warehouse CRUD with IsActive soft delete
+- Stock Transfer with validation
+- Physical Count (deferred to V2)
+- AdjustmentType: StockIn(1), StockOut(2), WrittenOff(3), FoundInExcess(4)
+- StockIssueReason enum
+- CHECK (Quantity >= 0) on WarehouseStocks
 
----
+### Phase 27: Purchases Module
+- Purchase Invoice with FIFO batch costing per line
+- PurchaseLot created on Post (batch tracking)
+- Partial PO Receive support
+- AdditionalCharge with AccountId FK (freight, customs, etc.)
+- Status: Draft(1) -> Posted(2) -> Cancelled(3)
+- Standalone purchase return
+- 47 Arabic guard clauses; SupplierInvoiceNo as external reference
+- InvoiceNo: int, UNIQUE, auto-generated via DocumentSequenceService.GetNextIntAsync("PurchaseInvoice"), user-editable (uniqueness validated on save)
 
-### 💡 توجيهات معمارية هامة لك قبل البدء في تطبيق هذه المرحلة:
+### Phase 28: Sales Module
+- FIFO/FEFO batch allocation (FIFO = oldest batch, FEFO = closest expiry)
+- Barcode auto-add event-driven with ISoundService.PlaySuccess()
+- CashTransaction RefundOut for sales returns
+- Credit limit check on save (CustomerType=Credit only)
+- Quotation expiry support
+- SaleMode: Retail(1) or Wholesale(2) per invoice
+- Customer account auto-credit on Post
+- 10 tooltips across all dialogs
 
-بما أنك تبني نظاماً تجارياً احترافياً ومستقراً، يرجى مراعاة النمذجة التالية أثناء توجيه المبرمجين أو الوكلاء لتنفيذ هذه المهام:
+### Phase 29: Receipts & Payments
+- CashBox with AccountId FK, CurrencyId FK
+- CustomerPayment: auto-accounting (debit Cash, credit Customer account)
+- SupplierPayment: auto-accounting (debit Supplier account, credit Cash)
+- Cheque support (ChequeNumber, ChequeDate, BankName)
+- ActualCashCount + Difference tracking
+- Immutability: offsetting entry for reversals
+- ValidateSufficientBalance before dispensing
+- 10 tooltips for journal impact, immutability rules
 
-1. **معالجة الصور (Image Storage Strategy):**
-* **احذر** من حفظ الصور كـ `byte[]` (BLOB) مباشرة داخل قاعدة بيانات SQL Server، لأن هذا سيجعل حجم ملف الـ `.bak` ضخماً جداً ويتسبب في بطء شديد أثناء النسخ الاحتياطي (Backup) والاسترجاع في المرحلة 7.
-* **الأفضل برمجياً:** حفظ الصورة في مجلد محلي داخل مسار النظام (مثلاً `%AppData%\SalesSystem\Images`) وحفظ **مسار الملف (String Path)** فقط في قاعدة البيانات.
+### Phase 30: Journal Entries
+- 7 auto-entry providers: SalesInvoice, PurchaseInvoice, CustomerPayment, SupplierPayment, Receipt, Return, AnnualClosing
+- Manual journal entry with Debit/Credit CHECK balance constraint
+- FiscalYear: cannot post to closed year
+- Annual Closing: close Revenue/Expense -> P&L to Retained Earnings
+- Cascade->Restrict on all FKs
+- Simple Mode UX toggle
 
-2. **محرك التنبيهات التلقائي (Proactive UX):**
-* بما أنك تركز على جعل النظام "يشرح نفسه للمستخدم بكل مرونة وسلاسة"، اجعل النظام يقوم بفحص التواريخ تلقائياً عند فتح شاشة النظام الرئيسية (Dashboard) في بداية اليوم.
-* إذا وجد النظام منتجات منتهية أو تشرف على الانتهاء، يعرض تنبيهاً علوياً خفيفاً (Badge/Notification) دون إزعاج المستخدم، لكي يتحرك التاجر ويتخذ إجراءً سريعاً قبل تكبد خسائر مالية.
-
----
-
-### Phase 15 — Touch-Optimized Quick POS Interface (Restaurant-Style Layout)
-
-**Tasks:**
-
-1. **UI/UX Architecture (Dual-Mode Sales Interface):**
-* Implement a switchable view mechanism within `SalesView.xaml` allowing the user to toggle between "المظهر القياسي (Retail Grid)" و "البيع السريع (Touch POS Layout)".
-* Apply a fully responsive **RTL Layout** customized for rapid screen interactions:
-* **الجانب الأيمن (Right Panel):** يحتوي على شجرة الفئات والأصناف مصفوفة كأزرار كبيرة (Tiles).
-* **الجانب الأيسر (Left Panel):** يحتوي على سلة البيع الحالية (Active Cart Grid) مع مجاميع الفاتورة وأزرار الدفع السريع في الأسفل.
-
-2. **Dynamic Categories & Items Component (WPF Layout):**
-* **Category Selector:** Use an `ItemsControl` bound to a `WrapPanel` or `UniformGrid` to display Product Categories as large, touch-friendly styled buttons. Clicking a category smoothly loads its corresponding products.
-* **Product Grid:** Displays products belonging to the selected category. Each product button must support:
-* Displaying the Product Name and Price clearly.
-* Rendering the optional product image (from Phase 8) as a background or icon with lazy loading.
-* Clicking/Touching the product button instantly executes an `AddToCartCommand` adding the item to the invoice lines (or incrementing its quantity if already present) without closing any menus.
-
-3. **In-Line Fast Cart Management:**
-* Redesign the active cart lines list using a lightweight DataGrid or customized ListView template.
-* Every invoice item line must feature immediate action buttons directly on the row:
-* `+` and `-` buttons to modify quantity instantly.
-* A quick delete/remove icon.
-* All total calculations (Total, Tax/VAT, Grand Total) must update in real-time instantly in the ViewModel via `RaisePropertyChanged` upon any quantity or item change.
-
-4. **Quick Checkout & On-Screen Numeric Keypad:**
-* Integrate an optional on-screen numeric keypad for touch-screen monitors to allow fast entry of paid amounts.
-* Add dedicated, one-click action buttons at the bottom of the invoice:
-* **[ كاش / Cash ]:** ترحيل فوري وطباعة الفاتورة مباشرة.
-* **[ شبكة / Card ]:** ترحيل الفاتورة كدفع إلكتروني.
-* **[ حفظ كمسودة / Draft ]:** تعليق الفاتورة لخدمة العملاء المترددين والعودة لها لاحقاً.
-
-5. **Backend & Shared ViewModel Integration:**
-* Ensure this new Touch UI reuses the EXACT same core Business Logic, Entities, and Application commands (`CreateInvoiceCommand`, `DraftInvoiceCommand`) used by the standard screen to enforce Clean Architecture principles and avoid duplication of validation rules.
-
-**Definition of Done:**
-
-* The user can toggle between the Retail Grid view and the Touch POS view seamlessly without losing current cart data.
-* Clicking a product button adds it to the active invoice in less than 50 milliseconds (No UI lag).
-* The layout adapts correctly to standard touch-screen monitors without any element overlapping or overflowing.
-* Executing a quick checkout validates the invoice locally (using Client-Side Validation) and saves/posts the data correctly to the database.
-
----
-
-### 💡 توجيهات معمارية لإصدار الـ MVP:
-
-عندما يبدأ الوكلاء الذكيون (Agents) في كتابة كود هذه الشاشة، وجههم للالتزام بالآتي لضمان أعلى أداء (Performance):
-
-1. **الابتعاد عن الأبعاد الثابتة (No Hardcoded Sizes):**
-يجب أن تُبنى أزرار المنتجات والفئات داخل `UniformGrid` أو `WrapPanel` مع ضبط الـ `Width` والـ `Height` لتكون ديناميكية أو تعتمد على نسبة مئوية، لكي يتكيف حجم الأزرار تلقائياً سواء كان العميل يعرض النظام على شاشة كاشير صغيرة (15 بوصة) أو شاشة حاسوب ضخمة.
-2. **استغلال الـ Virtualization:**
-إذا كان لدى العميل فئة تحتوي على مئات الأصناف، فإن رندرة (Rendering) مئات الأزرار دفعة واحدة سيسبب بطء في الواجهة. يجب تفعيل خاصية `VirtualizingStackPanel.IsVirtualizing="True"` لضمان سرعة استجابة الشاشة وثبات الذاكرة (Memory) أثناء التنقل الفوري بين الفئات.
-
-### Phase 16 — Critical Business Rules Reference
-SALES FLOW:
-
-Validate all items have sufficient stock in warehouse
-Generate invoice number (thread-safe)
-BEGIN TRANSACTION
-Create invoice (Draft status)
-Add all items (Domain calculates LineTotal)
-Domain validates: PaidAmount <= TotalAmount
-Post invoice (status = Posted)
-Save invoice to DB (get invoice ID)
-For each item: decrease WarehouseStock
-For each item: create InventoryMovement record
-If DueAmount > 0: increase Customer.CurrentBalance
-COMMIT TRANSACTION
-→ Any failure: ROLLBACK ALL
-PURCHASE FLOW: (mirror of sales with suppliers)
-RETURN FLOW: (reverse of original operation)
-TRANSFER FLOW: (decrease source, increase destination — same transaction)
-PAYMENT FLOW: (decrease balance, no stock change)
-
----
-
-### Phase 17 — Collapsible Tree Sidebar Navigation
-
-تحويل القائمة الجانبية (Sidebar) إلى قائمة شجرية منسدلة أو ممتدة (Collapsible/Accordion Menu) هو الحل المعياري والمثالي للأنظمة الكبيرة. هذا التصميم يمنح النظام مظهراً رسمياً ومحترفاً يشبه مواقع الويب الحديثة، ويحل مشكلة تكدس الأزرار مع نمو النظام وإضافة ميزات جديدة.
-
-في واجهات المستخدم الاحترافية، نقوم بهيكلة هذه القائمة إلى مستويين (Two Levels) لضمان عدم تشتيت المستخدم:
-
-1. **المستوى الأول (Main Modules):** المجموعات الرئيسية وتكون مصحوبة بأيقونة معبرة وسهم يشير لحالة القائمة (مفتوحة/مغلقة).
-2. **المستوى الثاني (Sub-Items / Screens):** الشاشات التفصيلية التي تظهر فقط عندما يضغط المستخدم على المجموعة الرئيسية.
-
-إليك التصميم الهيكلي للقائمة الجانبية متوافقاً مع اتجاه القراءة العربي (RTL - من اليمين إلى اليسار):
-
-#### 1. الهيكل البصري للقائمة (RTL Sidebar Structure)
-
-```text
-[شعار النظام أو اسم المؤسسة]
------------------------------------------
-🔻 [أيقونة] المبيعات والتوزيع
-      ▪️ شاشة البيع السريع (POS)
-      ▪️ الفواتير المعلقة (المسودات)
-      ▪️ إدارة المرتجعات
-🔻 [أيقونة] المشتريات والموردين
-      ▪️ فاتورة مشتريات جديدة
-      ▪️ إدارة الموردين
-🔻 [أيقونة] الحسابات والمالية
-      ▪️ القيود اليومية
-      ▪️ شجرة الحسابات
-🔻 [أيقونة] التقارير والتحليلات
-      ▪️ التقارير التشغيلية
-      ▪️ الأرباح والخسائر
-      ▪️ تقارير العملاء التفصيلية
-🔻 [أيقونة] الإعدادات والتهيئة
-      ▪️ إعدادات النظام
-      ▪️ صلاحيات المستخدمين
-```
-
-#### 2. التنفيذ البرمجي النظيف (WPF XAML Example)
-
-إذا كنت تبني الواجهات باستخدام **WPF**، فإن أفضل وأسهل أداة برمجية تحقق مظهر الويب المرن دون تعقيد هي أداة **`Expander`** المضمنة داخل `StackPanel` أو `ScrollViewer`. تتيح لك هذه الأداة فتح وإغلاق المجموعات تلقائياً وحفظ المساحة.
-
-إليك كود XAML نظيف ورسمي يدعم الـ RTL:
-
-```xml
-<Grid FlowDirection="RightToLeft" Background="#F8F9FA">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Width="260" HorizontalAlignment="Right">
-        <StackPanel Background="#1E293B"> <Border Padding="20" Background="#0F172A">
-                <TextBlock Text="نظام إدارة المبيعات" Foreground="White" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
-            </Border>
-
-            <Expander Header="المبيعات والتوزيع" Foreground="White" FontSize="14" Margin="5" IsExpanded="True">
-                <StackPanel Background="#334155" Margin="0,5,0,0">
-                    <Button Content="شاشة البيع السريع" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
-                    <Button Content="الفواتير المعلقة (Drafts)" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
-                    <Button Content="إدارة المرتجعات" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
-                </StackPanel>
-            </Expander>
-
-            <Expander Header="الحسابات والمالية" Foreground="White" FontSize="14" Margin="5">
-                <StackPanel Background="#334155" Margin="0,5,0,0">
-                    <Button Content="القيود اليومية" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
-                    <Button Content="شجرة الحسابات" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
-                </StackPanel>
-            </Expander>
-
-            <Expander Header="التقارير والتحليلات" Foreground="White" FontSize="14" Margin="5">
-                <StackPanel Background="#334155" Margin="0,5,0,0">
-                    <Button Content="التقرير المالي العام" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
-                    <Button Content="ربحية العملاء" Style="{StaticResource SidebarSubMenuButtonStyle}"/>
-                </StackPanel>
-            </Expander>
-
-        </StackPanel>
-    </ScrollViewer>
-</Grid>
-```
-
-*(ملاحظة: الستايل `SidebarSubMenuButtonStyle` نقوم فيه بإلغاء الحواف وجعل الخلفية شفافة لتبدو الأزرار الفرعية كنصوص أنيقة يتم النقر عليها، مع إزاحة خفيفة جهة اليمين Padding لإعطاء انطباع التبعية للمجموعة الرئيسية).*
-
-#### 3. ربط القائمة مع هندسة النظام (Navigation Pattern)
-
-لكي تظل معمارية الكود نظيفة (Clean Architecture) ومتوافقة مع نمط MVVM، لا تقم بكتابة كود فتح الشاشات داخل أحداث النقر المباشر (Click Events) في الواجهة. بدلاً من ذلك، استخدم **`NavigationService`** أو **`MainViewModel`** لإدارة تبديل الشاشات:
-
-1. كل زر فرعي يتم ربطه بأمر `Command` يمرر نوع الشاشة المستهدفة كمعامل (Parameter).
-2. الشاشة الرئيسية تحتوي على منطقة مخصصة لعرض المحتوى النشط `ContentControl`.
-3. عند الضغط على زر فرعي، يتغير الـ `CurrentViewModel` داخل الـ `ContentControl` ليتم رسم الشاشة الجديدة فوراً في المساحة البيضاء المتبقية من التطبيق دون إعادة تحميل القائمة الجانبية.
-
-هذا التصميم يضمن لك مرونة تشغيلية لا نهائية؛ فمهما أضفت من موديولات أو شاشات مستقبلاً، كل ما عليك فعله هو إضافة سطر جديد داخل الـ `Expander` المناسب، وسيتكفل النظام بالباقي دون أي تداخل في الكود.
-
----
-
-### Phase 18 — Accounting Foundation Implementation Plan
-
-يرجى مراجعة ملف المواصفات وخطة التنفيذ المخصص لهذه المرحلة (بناء الهيكل المحاسبي المركزي):
-[Phase 18 — Accounting Foundation Implementation Plan](./Phase%2018%20%E2%80%94%20Accounting%20Foundation%20Implementation%20Plan.md)
-
-
-Sales Management System — PRD v4.6.2 (النسخة النهائية الشاملة)
-1. معلومات المشروع
-text
-
-الاسم:     Sales Management System
-الإصدار:   v4.6.2
-التاريخ:   2026
-المعمارية: Clean Architecture + WPF Desktop (MVVM) + ASP.NET Core API
-قاعدة البيانات: SQL Server
-2. وصف المشروع
-نظام إدارة مبيعات لمحل صغير يعمل على Desktop محلياً عبر ASP.NET Core Web API وقاعدة بيانات SQL Server. يشمل إدارة المنتجات، المخازن المتع5. قاعدة البيانات — Schema الكامل
-(Updated to match docs/database-schema.md)
-
-
+### Phase 31: Reports Module
+- 35+ report DTOs by module
+- Hierarchical Income Statement: Revenue -> COGS -> Gross Profit -> Expenses -> Net Income
+- Hierarchical Balance Sheet: Assets(Current/Non-Current), Liabilities(Current/Non-Current), Equity
+- BuildAccountTree recursive construction
+- General Ledger, Trial Balance, Account Statement
+- Product/Customer/Supplier reports
+- Excel via ClosedXML; PDF via QuestPDF
+- 5-step data flow: Desktop -> HttpClient -> API -> Service -> SQL
 <!-- END OF SECTION: 1. Functional & Non-Functional Requirements (English) -->
 
 
@@ -1085,6 +774,14 @@ Default schema: **`dbo`**
 - `PasswordHash` nvarchar(256) not null
 - `FullName` nvarchar(150) not null
 - `Role` tinyint not null (1=Admin, 2=Manager, 3=Cashier)
+- `MustChangePassword` bit not null default 0
+- `PasswordChangedAt` datetime2 null
+- `LoginAttempts` int not null default 0
+- `IsLocked` bit not null default 0
+- `Status` tinyint not null default 1 (1=Active, 2=Inactive, 3=Locked)
+- `DefaultCashBoxId` int null FK to CashBoxes
+- `Email` nvarchar(100) null
+- `Phone` nvarchar(20) null
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -1127,6 +824,10 @@ Default schema: **`dbo`**
 - `CategoryId` int null FK
 - `SupplierPrice` decimal(18,2) not null default 0
 - `ReorderLevel` decimal(18,3) not null default 0
+- `AvgCost` decimal(18,2) not null default 0
+- `TrackExpiry` bit not null default 0
+- `TrackBatch` bit not null default 1
+- `ExpiryAlertDays` int null default 30
 - `Description` nvarchar(500) null
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
@@ -1177,6 +878,9 @@ Default schema: **`dbo`**
 - `Address` nvarchar(250) null
 - `OpeningBalance` decimal(18,2) not null default 0
 - `CurrentBalance` decimal(18,2) not null default 0
+- `AccountId` int not null FK to Accounts
+- `CurrencyId` int null FK to Currencies
+- `CreditLimit` decimal(18,2) not null default 0
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -1194,6 +898,10 @@ Default schema: **`dbo`**
 - `Address` nvarchar(250) null
 - `OpeningBalance` decimal(18,2) not null default 0
 - `CurrentBalance` decimal(18,2) not null default 0
+- `AccountId` int not null FK to Accounts
+- `CurrencyId` int null FK to Currencies
+- `CreditLimit` decimal(18,2) not null default 0
+- `CustomerType` tinyint not null default 1 (1=Cash, 2=Credit)
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
@@ -1209,6 +917,11 @@ Default schema: **`dbo`**
 - `Id` int PK
 - `SupplierId` int not null FK
 - `WarehouseId` int not null FK
+- `InvoiceNo` int not null
+- `CurrencyId` int null FK
+- `ExchangeRate` decimal(18,6) not null default 1
+- `ExternalInvoiceNo` nvarchar(50) null
+- `AttachmentPath` nvarchar(255) null
 - `InvoiceDate` datetime2 not null
 - `DueDate` date null
 - `PaymentType` tinyint not null (1=Cash, 2=Credit, 3=Mixed)
@@ -1230,9 +943,10 @@ Default schema: **`dbo`**
 
 ## J) PurchaseInvoiceItems
 ### Columns
-- `PurchaseInvoiceItemId` int PK
+- `Id` int PK
 - `PurchaseInvoiceId` int not null FK
 - `ProductId` int not null FK
+- `ProductUnitId` int null FK
 - `Quantity` decimal(18,3) not null
 - `UnitCost` decimal(18,2) not null
 - `DiscountAmount` decimal(18,2) not null default 0
@@ -1248,6 +962,10 @@ Default schema: **`dbo`**
 - `Id` int PK
 - `CustomerId` int null FK
 - `WarehouseId` int not null FK
+- `InvoiceNo` int not null
+- `CurrencyId` int null FK
+- `ExchangeRate` decimal(18,6) not null default 1
+- `SaleMode` tinyint not null default 1 (1=Retail, 2=Wholesale)
 - `InvoiceDate` datetime2 not null
 - `DueDate` date null
 - `PaymentType` tinyint not null (1=Cash, 2=Credit, 3=Mixed)
@@ -1269,9 +987,11 @@ Default schema: **`dbo`**
 
 ## L) SalesInvoiceItems
 ### Columns
-- `SalesInvoiceItemId` int PK
+- `Id` int PK
 - `SalesInvoiceId` int not null FK
 - `ProductId` int not null FK
+- `ProductUnitId` int null FK
+- `UnitType` tinyint null (0=Retail, 1=Wholesale)
 - `Quantity` decimal(18,3) not null
 - `UnitPrice` decimal(18,2) not null
 - `DiscountAmount` decimal(18,2) not null default 0
@@ -1285,7 +1005,7 @@ Default schema: **`dbo`**
 ## M) PurchaseReturns
 ### Columns
 - `Id` int PK
-- `ReturnNo` nvarchar(30) not null unique
+- `ReturnNo` int not null
 - `PurchaseInvoiceId` int null FK
 - `SupplierId` int not null FK
 - `WarehouseId` int not null FK
@@ -1304,7 +1024,7 @@ Default schema: **`dbo`**
 
 ## N) PurchaseReturnItems
 ### Columns
-- `PurchaseReturnItemId` int PK
+- `Id` int PK
 - `PurchaseReturnId` int not null FK
 - `ProductId` int not null FK
 - `Quantity` decimal(18,3) not null
@@ -1316,7 +1036,7 @@ Default schema: **`dbo`**
 ## O) SalesReturns
 ### Columns
 - `Id` int PK
-- `ReturnNo` nvarchar(30) not null unique
+- `ReturnNo` int not null
 - `SalesInvoiceId` int null FK
 - `CustomerId` int not null FK
 - `WarehouseId` int not null FK
@@ -1335,7 +1055,7 @@ Default schema: **`dbo`**
 
 ## P) SalesReturnItems
 ### Columns
-- `SalesReturnItemId` int PK
+- `Id` int PK
 - `SalesReturnId` int not null FK
 - `ProductId` int not null FK
 - `Quantity` decimal(18,3) not null
@@ -1349,7 +1069,7 @@ Default schema: **`dbo`**
 ## Q) StockTransfers
 ### Columns
 - `Id` int PK
-- `TransferNo` nvarchar(30) not null unique
+- `TransferNo` int not null
 - `FromWarehouseId` int not null FK
 - `ToWarehouseId` int not null FK
 - `TransferDate` datetime2 not null
@@ -1365,7 +1085,7 @@ Default schema: **`dbo`**
 
 ## R) StockTransferItems
 ### Columns
-- `StockTransferItemId` int PK
+- `Id` int PK
 - `StockTransferId` int not null FK
 - `ProductId` int not null FK
 - `Quantity` decimal(18,3) not null
@@ -1378,7 +1098,7 @@ Default schema: **`dbo`**
 ## S) CustomerPayments
 ### Columns
 - `Id` int PK
-- `PaymentNo` nvarchar(30) not null unique
+- `PaymentNo` int not null
 - `CustomerId` int not null FK
 - `SalesInvoiceId` int null FK
 - `PaymentDate` datetime2 not null
@@ -1397,7 +1117,7 @@ Default schema: **`dbo`**
 ## T) SupplierPayments
 ### Columns
 - `Id` int PK
-- `PaymentNo` nvarchar(30) not null unique
+- `PaymentNo` int not null
 - `SupplierId` int not null FK
 - `PurchaseInvoiceId` int null FK
 - `PaymentDate` datetime2 not null
@@ -1428,6 +1148,122 @@ Default schema: **`dbo`**
 - `CreatedByUserId` int null FK
 - `UpdatedByUserId` int null FK
 - `IsActive` bit not null default 1
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## V2) Accounts (New - Chart of Accounts)
+### Columns
+- `Id` int PK
+- `Name` nvarchar(100) not null
+- `ParentAccountId` int null self-FK
+- `AccountType` tinyint not null (1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense)
+- `AccountCode` nvarchar(20) null
+- `IsSystemAccount` bit not null default 0
+- `CurrencyId` int null FK
+- `Description` nvarchar(500) null
+- `IsActive` bit not null default 1
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## W2) JournalEntries (New - Accounting Engine)
+### Columns
+- `Id` int PK
+- `EntryDate` datetime2 not null
+- `EntryNumber` int not null
+- `Description` nvarchar(500) not null
+- `SourceType` nvarchar(30) not null
+- `SourceId` int not null
+- `FiscalYearId` int null FK
+- `CurrencyId` int null FK
+- `ExchangeRate` decimal(18,6) not null default 1
+- `Status` tinyint not null (1=Draft, 2=Posted, 3=Cancelled)
+- `IsOpeningEntry` bit not null default 0
+- `ReversedByEntryId` int null self-FK
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## X2) JournalEntryLines (New)
+### Columns
+- `Id` int PK
+- `JournalEntryId` int not null FK
+- `AccountId` int not null FK
+- `DebitAmount` decimal(18,2) not null default 0
+- `CreditAmount` decimal(18,2) not null default 0
+- `Description` nvarchar(250) null
+
+---
+
+## Y2) PurchaseLots (New - FIFO/FEFO Batch Tracking)
+### Columns
+- `Id` int PK
+- `ProductId` int not null FK
+- `WarehouseId` int not null FK
+- `PurchaseInvoiceItemId` int null FK
+- `BatchNo` nvarchar(50) null
+- `QuantityReceived` decimal(18,3) not null
+- `QuantityRemaining` decimal(18,3) not null
+- `CostPrice` decimal(18,2) not null
+- `ProductionDate` date null
+- `ExpiryDate` date null
+- `IsOpeningBatch` bit not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## Z2) Currencies (New)
+### Columns
+- `Id` int PK
+- `Name` nvarchar(50) not null
+- `Code` nvarchar(10) not null unique
+- `Symbol` nvarchar(10) null
+- `FractionName` nvarchar(20) null
+- `ExchangeRateToBase` decimal(18,6) not null default 1
+- `IsBaseCurrency` bit not null default 0
+- `IsSystem` bit not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## AA2) Taxes (New)
+### Columns
+- `Id` int PK
+- `Name` nvarchar(100) not null
+- `Rate` decimal(5,2) not null
+- `IsDefault` bit not null default 0
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
+- `CreatedAt` datetime2 not null
+- `UpdatedAt` datetime2 null
+
+---
+
+## BB2) FiscalYears (New)
+### Columns
+- `Id` int PK
+- `Name` nvarchar(50) not null
+- `StartDate` date not null
+- `EndDate` date not null
+- `IsClosed` bit not null default 0
+- `ClosedByUserId` int null FK
+- `ClosedAt` datetime2 null
+- `CreatedByUserId` int null FK
+- `UpdatedByUserId` int null FK
 - `CreatedAt` datetime2 not null
 - `UpdatedAt` datetime2 null
 
@@ -1490,6 +1326,8 @@ Default schema: **`dbo`**
 ### Columns
 - `Id` int PK
 - `Name` nvarchar(100) not null
+- `AccountId` int not null FK to Accounts
+- `CurrencyId` int not null FK to Currencies
 - `OpeningBalance` decimal(18,2) not null default 0
 - `CurrentBalance` decimal(18,2) not null default 0
 - `IsDefault` bit not null default 0
@@ -1737,7 +1575,7 @@ CREATE TABLE dbo.PurchaseInvoices
 -- 10. PurchaseInvoiceItems
 CREATE TABLE dbo.PurchaseInvoiceItems
 (
-    PurchaseInvoiceItemId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoiceItems PRIMARY KEY,
+    Id   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoiceItems PRIMARY KEY,
     PurchaseInvoiceId       INT NOT NULL REFERENCES dbo.PurchaseInvoices(Id),
     ProductId               INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity                DECIMAL(18,3) NOT NULL,
@@ -1773,7 +1611,7 @@ CREATE TABLE dbo.SalesInvoices
 -- 12. SalesInvoiceItems
 CREATE TABLE dbo.SalesInvoiceItems
 (
-    SalesInvoiceItemId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoiceItems PRIMARY KEY,
+    Id   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoiceItems PRIMARY KEY,
     SalesInvoiceId       INT NOT NULL REFERENCES dbo.SalesInvoices(Id),
     ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity             DECIMAL(18,3) NOT NULL,
@@ -1829,7 +1667,7 @@ CREATE TABLE dbo.StoreSettings
 CREATE TABLE dbo.PurchaseReturns
 (
     Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturns PRIMARY KEY,
-    ReturnNo          NVARCHAR(30)  NOT NULL UNIQUE,
+    ReturnNo          INT           NOT NULL,
     PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
     SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
     WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
@@ -1848,7 +1686,7 @@ CREATE TABLE dbo.PurchaseReturns
 -- 16. PurchaseReturnItems
 CREATE TABLE dbo.PurchaseReturnItems
 (
-    PurchaseReturnItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturnItems PRIMARY KEY,
+    Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturnItems PRIMARY KEY,
     PurchaseReturnId     INT NOT NULL REFERENCES dbo.PurchaseReturns(Id),
     ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity             DECIMAL(18,3) NOT NULL,
@@ -1860,7 +1698,7 @@ CREATE TABLE dbo.PurchaseReturnItems
 CREATE TABLE dbo.SalesReturns
 (
     Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturns PRIMARY KEY,
-    ReturnNo          NVARCHAR(30)  NOT NULL UNIQUE,
+    ReturnNo          INT           NOT NULL,
     SalesInvoiceId    INT           NULL REFERENCES dbo.SalesInvoices(Id),
     CustomerId        INT           NOT NULL REFERENCES dbo.Customers(Id),
     WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
@@ -1879,7 +1717,7 @@ CREATE TABLE dbo.SalesReturns
 -- 18. SalesReturnItems
 CREATE TABLE dbo.SalesReturnItems
 (
-    SalesReturnItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturnItems PRIMARY KEY,
+    Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturnItems PRIMARY KEY,
     SalesReturnId     INT NOT NULL REFERENCES dbo.SalesReturns(Id),
     ProductId         INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity          DECIMAL(18,3) NOT NULL,
@@ -1891,7 +1729,7 @@ CREATE TABLE dbo.SalesReturnItems
 CREATE TABLE dbo.StockTransfers
 (
     Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransfers PRIMARY KEY,
-    TransferNo        NVARCHAR(30)  NOT NULL UNIQUE,
+    TransferNo        INT           NOT NULL,
     FromWarehouseId   INT           NOT NULL REFERENCES dbo.Warehouses(Id),
     ToWarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
     TransferDate      DATETIME2     NOT NULL,
@@ -1907,7 +1745,7 @@ CREATE TABLE dbo.StockTransfers
 -- 20. StockTransferItems
 CREATE TABLE dbo.StockTransferItems
 (
-    StockTransferItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransferItems PRIMARY KEY,
+    Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransferItems PRIMARY KEY,
     StockTransferId     INT NOT NULL REFERENCES dbo.StockTransfers(Id),
     ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
     Quantity            DECIMAL(18,3) NOT NULL,
@@ -1918,7 +1756,7 @@ CREATE TABLE dbo.StockTransferItems
 CREATE TABLE dbo.CustomerPayments
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CustomerPayments PRIMARY KEY,
-    PaymentNo       NVARCHAR(30)  NOT NULL UNIQUE,
+    PaymentNo       INT           NOT NULL,
     CustomerId      INT           NOT NULL REFERENCES dbo.Customers(Id),
     SalesInvoiceId  INT           NULL REFERENCES dbo.SalesInvoices(Id),
     PaymentDate     DATETIME2     NOT NULL,
@@ -1937,7 +1775,7 @@ CREATE TABLE dbo.CustomerPayments
 CREATE TABLE dbo.SupplierPayments
 (
     Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SupplierPayments PRIMARY KEY,
-    PaymentNo         NVARCHAR(30)  NOT NULL UNIQUE,
+    PaymentNo         INT           NOT NULL,
     SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
     PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
     PaymentDate       DATETIME2     NOT NULL,
@@ -1952,16 +1790,7 @@ CREATE TABLE dbo.SupplierPayments
     UpdatedAt         DATETIME2     NULL
 );
 
--- 23. DocumentSequences
-CREATE TABLE dbo.DocumentSequences
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_DocumentSequences PRIMARY KEY,
-    Prefix          NVARCHAR(10)  NOT NULL UNIQUE,
-    LastNumber      INT           NOT NULL CONSTRAINT DF_DocumentSequences_LastNumber DEFAULT(0),
-    UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_DocumentSequences_UpdatedAt DEFAULT(SYSDATETIME())
-);
-
--- 24. ProductUnits (v4.3 — Dynamic UOM)
+-- 23. ProductUnits (v4.3 — Dynamic UOM)
 CREATE TABLE dbo.ProductUnits
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductUnits PRIMARY KEY,
@@ -1981,7 +1810,7 @@ CREATE TABLE dbo.ProductUnits
     CONSTRAINT UQ_ProductUnits_Product_UnitName UNIQUE (ProductId, UnitName)
 );
 
--- 25. UnitBarcodes (v4.3)
+-- 24. UnitBarcodes (v4.3)
 CREATE TABLE dbo.UnitBarcodes
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_UnitBarcodes PRIMARY KEY,
@@ -1996,7 +1825,7 @@ CREATE TABLE dbo.UnitBarcodes
     CONSTRAINT UQ_UnitBarcodes_Barcode UNIQUE (Barcode)
 );
 
--- 26. CashBoxes (v4.3)
+-- 25. CashBoxes (v4.3)
 CREATE TABLE dbo.CashBoxes
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashBoxes PRIMARY KEY,
@@ -2011,7 +1840,7 @@ CREATE TABLE dbo.CashBoxes
     UpdatedAt       DATETIME2 NULL
 );
 
--- 27. CashTransactions (v4.3 — Immutable)
+-- 26. CashTransactions (v4.3 — Immutable)
 CREATE TABLE dbo.CashTransactions
 (
     Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashTransactions PRIMARY KEY,
@@ -2027,7 +1856,7 @@ CREATE TABLE dbo.CashTransactions
     CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME()
 );
 
--- 28. ProductPriceHistory (v4.3)
+-- 27. ProductPriceHistory (v4.3)
 CREATE TABLE dbo.ProductPriceHistory
 (
     Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductPriceHistory PRIMARY KEY,
@@ -2043,7 +1872,7 @@ CREATE TABLE dbo.ProductPriceHistory
     CreatedAt           DATETIME2 NOT NULL DEFAULT SYSDATETIME()
 );
 
--- 29. SystemSettings (v4.3)
+-- 28. SystemSettings (v4.3)
 CREATE TABLE dbo.SystemSettings
 (
     Id          INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemSettings PRIMARY KEY,
@@ -2057,7 +1886,7 @@ CREATE TABLE dbo.SystemSettings
     CONSTRAINT UQ_SystemSettings_Key UNIQUE ([Key])
 );
 
--- 30. SystemLog (v4.3)
+-- 29. SystemLog (v4.3)
 CREATE TABLE dbo.SystemLog
 (
     Id          INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemLog PRIMARY KEY,
@@ -2068,6 +1897,235 @@ CREATE TABLE dbo.SystemLog
     [Source]    NVARCHAR(200) NULL,
     CreatedAt   DATETIME2 NOT NULL DEFAULT SYSDATETIME()
 );
+
+-- 30. Currencies (New)
+CREATE TABLE dbo.Currencies
+(
+    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Currencies PRIMARY KEY,
+    Name                NVARCHAR(50)  NOT NULL,
+    Code                NVARCHAR(10)  NOT NULL,
+    Symbol              NVARCHAR(10)  NULL,
+    FractionName        NVARCHAR(20)  NULL,
+    ExchangeRateToBase  DECIMAL(18,6) NOT NULL CONSTRAINT DF_Currencies_ExchangeRateToBase DEFAULT(1),
+    IsBaseCurrency      BIT           NOT NULL CONSTRAINT DF_Currencies_IsBaseCurrency DEFAULT(0),
+    IsSystem            BIT           NOT NULL CONSTRAINT DF_Currencies_IsSystem DEFAULT(0),
+    CreatedByUserId     INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId     INT           NULL REFERENCES dbo.Users(Id),
+    IsActive            BIT           NOT NULL CONSTRAINT DF_Currencies_IsActive DEFAULT(1),
+    CreatedAt           DATETIME2     NOT NULL CONSTRAINT DF_Currencies_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt           DATETIME2     NULL,
+
+    CONSTRAINT UQ_Currencies_Code UNIQUE (Code)
+);
+
+-- 31. Taxes (New)
+CREATE TABLE dbo.Taxes
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Taxes PRIMARY KEY,
+    Name            NVARCHAR(100) NOT NULL,
+    Rate            DECIMAL(5,2)  NOT NULL,
+    IsDefault       BIT           NOT NULL CONSTRAINT DF_Taxes_IsDefault DEFAULT(0),
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_Taxes_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Taxes_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL
+);
+
+-- 32. FiscalYears (New)
+CREATE TABLE dbo.FiscalYears
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_FiscalYears PRIMARY KEY,
+    Name            NVARCHAR(50)  NOT NULL,
+    StartDate       DATE          NOT NULL,
+    EndDate         DATE          NOT NULL,
+    IsClosed        BIT           NOT NULL CONSTRAINT DF_FiscalYears_IsClosed DEFAULT(0),
+    ClosedByUserId  INT           NULL REFERENCES dbo.Users(Id),
+    ClosedAt        DATETIME2     NULL,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    IsActive        BIT           NOT NULL CONSTRAINT DF_FiscalYears_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_FiscalYears_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt       DATETIME2     NULL
+);
+
+-- 33. Accounts (Chart of Accounts)
+CREATE TABLE dbo.Accounts
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Accounts PRIMARY KEY,
+    Name              NVARCHAR(100) NOT NULL,
+    ParentAccountId   INT           NULL REFERENCES dbo.Accounts(Id),
+    AccountType       TINYINT       NOT NULL, -- 1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense
+    AccountCode       NVARCHAR(20)  NULL,
+    IsSystemAccount   BIT           NOT NULL CONSTRAINT DF_Accounts_IsSystemAccount DEFAULT(0),
+    CurrencyId        INT           NULL REFERENCES dbo.Currencies(Id),
+    Description       NVARCHAR(500) NULL,
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL CONSTRAINT DF_Accounts_IsActive DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL CONSTRAINT DF_Accounts_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 34. JournalEntries (Accounting Engine)
+CREATE TABLE dbo.JournalEntries
+(
+    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_JournalEntries PRIMARY KEY,
+    EntryDate         DATETIME2     NOT NULL,
+    EntryNumber       INT           NOT NULL,
+    Description       NVARCHAR(500) NOT NULL,
+    SourceType        NVARCHAR(30)  NOT NULL,
+    SourceId          INT           NOT NULL,
+    FiscalYearId      INT           NULL REFERENCES dbo.FiscalYears(Id),
+    CurrencyId        INT           NULL REFERENCES dbo.Currencies(Id),
+    ExchangeRate      DECIMAL(18,6) NOT NULL CONSTRAINT DF_JournalEntries_ExchangeRate DEFAULT(1),
+    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
+    IsOpeningEntry    BIT           NOT NULL CONSTRAINT DF_JournalEntries_IsOpeningEntry DEFAULT(0),
+    ReversedByEntryId INT           NULL REFERENCES dbo.JournalEntries(Id),
+    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
+    IsActive          BIT           NOT NULL CONSTRAINT DF_JournalEntries_IsActive DEFAULT(1),
+    CreatedAt         DATETIME2     NOT NULL CONSTRAINT DF_JournalEntries_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt         DATETIME2     NULL
+);
+
+-- 35. JournalEntryLines
+CREATE TABLE dbo.JournalEntryLines
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_JournalEntryLines PRIMARY KEY,
+    JournalEntryId  INT           NOT NULL REFERENCES dbo.JournalEntries(Id),
+    AccountId       INT           NOT NULL REFERENCES dbo.Accounts(Id),
+    DebitAmount     DECIMAL(18,2) NOT NULL CONSTRAINT DF_JournalEntryLines_DebitAmount DEFAULT(0),
+    CreditAmount    DECIMAL(18,2) NOT NULL CONSTRAINT DF_JournalEntryLines_CreditAmount DEFAULT(0),
+    Description     NVARCHAR(250) NULL
+);
+
+-- 36. PurchaseLots (FIFO/FEFO Batch Tracking)
+CREATE TABLE dbo.PurchaseLots
+(
+    Id                      INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseLots PRIMARY KEY,
+    ProductId               INT           NOT NULL REFERENCES dbo.Products(Id),
+    WarehouseId             INT           NOT NULL REFERENCES dbo.Warehouses(Id),
+    PurchaseInvoiceItemId   INT           NULL REFERENCES dbo.PurchaseInvoiceItems(Id),
+    BatchNo                 NVARCHAR(50)  NULL,
+    QuantityReceived        DECIMAL(18,3) NOT NULL,
+    QuantityRemaining       DECIMAL(18,3) NOT NULL,
+    CostPrice               DECIMAL(18,2) NOT NULL,
+    ProductionDate          DATE          NULL,
+    ExpiryDate              DATE          NULL,
+    IsOpeningBatch          BIT           NOT NULL CONSTRAINT DF_PurchaseLots_IsOpeningBatch DEFAULT(0),
+    CreatedByUserId         INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedByUserId         INT           NULL REFERENCES dbo.Users(Id),
+    IsActive                BIT           NOT NULL CONSTRAINT DF_PurchaseLots_IsActive DEFAULT(1),
+    CreatedAt               DATETIME2     NOT NULL CONSTRAINT DF_PurchaseLots_CreatedAt DEFAULT(SYSDATETIME()),
+    UpdatedAt               DATETIME2     NULL
+);
+
+-- 37. PermissionCodes
+CREATE TABLE dbo.PermissionCodes
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PermissionCodes PRIMARY KEY,
+    Code            NVARCHAR(50)  NOT NULL,
+    Name            NVARCHAR(100) NOT NULL,
+    Category        NVARCHAR(50)  NULL,
+    Description     NVARCHAR(250) NULL,
+    IsActive        BIT           NOT NULL CONSTRAINT DF_PermissionCodes_IsActive DEFAULT(1),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_PermissionCodes_CreatedAt DEFAULT(SYSDATETIME()),
+
+    CONSTRAINT UQ_PermissionCodes_Code UNIQUE (Code)
+);
+
+-- 38. RolePermissions
+CREATE TABLE dbo.RolePermissions
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_RolePermissions PRIMARY KEY,
+    RoleId          TINYINT       NOT NULL,
+    PermissionId    INT           NOT NULL REFERENCES dbo.PermissionCodes(Id),
+    IsGranted       BIT           NOT NULL CONSTRAINT DF_RolePermissions_IsGranted DEFAULT(1),
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_RolePermissions_CreatedAt DEFAULT(SYSDATETIME()),
+
+    CONSTRAINT UQ_RolePermissions_Role_Permission UNIQUE (RoleId, PermissionId)
+);
+
+-- 39. SystemAccountMappings
+CREATE TABLE dbo.SystemAccountMappings
+(
+    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemAccountMappings PRIMARY KEY,
+    MappingKey      NVARCHAR(100) NOT NULL,
+    AccountId       INT           NOT NULL REFERENCES dbo.Accounts(Id),
+    Description     NVARCHAR(250) NULL,
+    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
+    UpdatedAt       DATETIME2     NULL,
+
+    CONSTRAINT UQ_SystemAccountMappings_Key UNIQUE (MappingKey)
+);
+
+-- =============================================
+-- ALTER TABLE statements for new FK columns
+-- =============================================
+
+-- Customers: AccountId, CurrencyId, CreditLimit, CustomerType
+ALTER TABLE dbo.Customers ADD AccountId INT NOT NULL CONSTRAINT DF_Customers_AccountId DEFAULT(1);
+ALTER TABLE dbo.Customers ADD CONSTRAINT FK_Customers_Accounts FOREIGN KEY (AccountId) REFERENCES dbo.Accounts(Id);
+ALTER TABLE dbo.Customers ADD CurrencyId INT NULL;
+ALTER TABLE dbo.Customers ADD CONSTRAINT FK_Customers_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
+ALTER TABLE dbo.Customers ADD CreditLimit DECIMAL(18,2) NOT NULL CONSTRAINT DF_Customers_CreditLimit DEFAULT(0);
+ALTER TABLE dbo.Customers ADD CustomerType TINYINT NOT NULL CONSTRAINT DF_Customers_CustomerType DEFAULT(1);
+
+-- Suppliers: AccountId, CurrencyId, CreditLimit
+ALTER TABLE dbo.Suppliers ADD AccountId INT NOT NULL CONSTRAINT DF_Suppliers_AccountId DEFAULT(1);
+ALTER TABLE dbo.Suppliers ADD CONSTRAINT FK_Suppliers_Accounts FOREIGN KEY (AccountId) REFERENCES dbo.Accounts(Id);
+ALTER TABLE dbo.Suppliers ADD CurrencyId INT NULL;
+ALTER TABLE dbo.Suppliers ADD CONSTRAINT FK_Suppliers_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
+ALTER TABLE dbo.Suppliers ADD CreditLimit DECIMAL(18,2) NOT NULL CONSTRAINT DF_Suppliers_CreditLimit DEFAULT(0);
+
+-- Users: MustChangePassword, PasswordChangedAt, LoginAttempts, IsLocked, Status, DefaultCashBoxId, Email, Phone
+ALTER TABLE dbo.Users ADD MustChangePassword BIT NOT NULL CONSTRAINT DF_Users_MustChangePassword DEFAULT(0);
+ALTER TABLE dbo.Users ADD PasswordChangedAt DATETIME2 NULL;
+ALTER TABLE dbo.Users ADD LoginAttempts INT NOT NULL CONSTRAINT DF_Users_LoginAttempts DEFAULT(0);
+ALTER TABLE dbo.Users ADD IsLocked BIT NOT NULL CONSTRAINT DF_Users_IsLocked DEFAULT(0);
+ALTER TABLE dbo.Users ADD Status TINYINT NOT NULL CONSTRAINT DF_Users_Status DEFAULT(1);
+ALTER TABLE dbo.Users ADD DefaultCashBoxId INT NULL;
+ALTER TABLE dbo.Users ADD CONSTRAINT FK_Users_CashBoxes FOREIGN KEY (DefaultCashBoxId) REFERENCES dbo.CashBoxes(Id);
+ALTER TABLE dbo.Users ADD Email NVARCHAR(100) NULL;
+ALTER TABLE dbo.Users ADD Phone NVARCHAR(20) NULL;
+
+-- Products: AvgCost, TrackExpiry, TrackBatch, ExpiryAlertDays
+ALTER TABLE dbo.Products ADD AvgCost DECIMAL(18,2) NOT NULL CONSTRAINT DF_Products_AvgCost DEFAULT(0);
+ALTER TABLE dbo.Products ADD TrackExpiry BIT NOT NULL CONSTRAINT DF_Products_TrackExpiry DEFAULT(0);
+ALTER TABLE dbo.Products ADD TrackBatch BIT NOT NULL CONSTRAINT DF_Products_TrackBatch DEFAULT(1);
+ALTER TABLE dbo.Products ADD ExpiryAlertDays INT NULL CONSTRAINT DF_Products_ExpiryAlertDays DEFAULT(30);
+
+-- CashBoxes: AccountId, CurrencyId
+ALTER TABLE dbo.CashBoxes ADD AccountId INT NOT NULL CONSTRAINT DF_CashBoxes_AccountId DEFAULT(1);
+ALTER TABLE dbo.CashBoxes ADD CONSTRAINT FK_CashBoxes_Accounts FOREIGN KEY (AccountId) REFERENCES dbo.Accounts(Id);
+ALTER TABLE dbo.CashBoxes ADD CurrencyId INT NOT NULL CONSTRAINT DF_CashBoxes_CurrencyId DEFAULT(1);
+ALTER TABLE dbo.CashBoxes ADD CONSTRAINT FK_CashBoxes_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
+
+-- SalesInvoices: InvoiceNo, CurrencyId, ExchangeRate, SaleMode
+ALTER TABLE dbo.SalesInvoices ADD InvoiceNo INT NOT NULL CONSTRAINT DF_SalesInvoices_InvoiceNo DEFAULT(0);
+ALTER TABLE dbo.SalesInvoices ADD CurrencyId INT NULL;
+ALTER TABLE dbo.SalesInvoices ADD CONSTRAINT FK_SalesInvoices_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
+ALTER TABLE dbo.SalesInvoices ADD ExchangeRate DECIMAL(18,6) NOT NULL CONSTRAINT DF_SalesInvoices_ExchangeRate DEFAULT(1);
+ALTER TABLE dbo.SalesInvoices ADD SaleMode TINYINT NOT NULL CONSTRAINT DF_SalesInvoices_SaleMode DEFAULT(1);
+
+-- PurchaseInvoices: InvoiceNo, CurrencyId, ExchangeRate, ExternalInvoiceNo, AttachmentPath
+ALTER TABLE dbo.PurchaseInvoices ADD InvoiceNo INT NOT NULL CONSTRAINT DF_PurchaseInvoices_InvoiceNo DEFAULT(0);
+ALTER TABLE dbo.PurchaseInvoices ADD CurrencyId INT NULL;
+ALTER TABLE dbo.PurchaseInvoices ADD CONSTRAINT FK_PurchaseInvoices_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
+ALTER TABLE dbo.PurchaseInvoices ADD ExchangeRate DECIMAL(18,6) NOT NULL CONSTRAINT DF_PurchaseInvoices_ExchangeRate DEFAULT(1);
+ALTER TABLE dbo.PurchaseInvoices ADD ExternalInvoiceNo NVARCHAR(50) NULL;
+ALTER TABLE dbo.PurchaseInvoices ADD AttachmentPath NVARCHAR(255) NULL;
+
+-- SalesInvoiceItems: ProductUnitId, UnitType
+ALTER TABLE dbo.SalesInvoiceItems ADD ProductUnitId INT NULL;
+ALTER TABLE dbo.SalesInvoiceItems ADD CONSTRAINT FK_SalesInvoiceItems_ProductUnits FOREIGN KEY (ProductUnitId) REFERENCES dbo.ProductUnits(Id);
+ALTER TABLE dbo.SalesInvoiceItems ADD UnitType TINYINT NULL;
+
+-- PurchaseInvoiceItems: ProductUnitId
+ALTER TABLE dbo.PurchaseInvoiceItems ADD ProductUnitId INT NULL;
+ALTER TABLE dbo.PurchaseInvoiceItems ADD CONSTRAINT FK_PurchaseInvoiceItems_ProductUnits FOREIGN KEY (ProductUnitId) REFERENCES dbo.ProductUnits(Id);
 ```
 
 6. Domain Entities — C# Classes
@@ -6093,7 +6151,7 @@ Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
 > [!NOTE]
 > Recent phases executing real-time validation templates, architecture alignment, and security rate-limiting.
 
-## ✅ Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2)
+## ✅ WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2) — Historical
 
 **Goal**: Standardize validation UI with red border + ❗ icon ErrorTemplate, replace `HasXxxError` boolean pattern with `INotifyDataErrorInfo`, and add `ValidateAllAsync()` to ViewModelBase.
 
@@ -6123,7 +6181,7 @@ Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
 
 ---
 
-## ✅ Phase 19: Architecture Alignment & Code Quality Remediation (v4.6.3)
+## ✅ Architecture Alignment & Code Quality Remediation (v4.6.3) — Historical
 
 **Goal**: Align Costing settings with Clean Architecture boundaries (moving to `ISettingsApiService` via HTTP Client), resolve ViewModel compiler shadowing (CS0108 warnings), wrap async void operations in ViewModels with safe try-catches, and correct garbled Arabic text.
 
@@ -6134,7 +6192,7 @@ Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
 
 ---
 
-## ✅ Phase 20: Security Hardening & Code Quality (v4.6.4)
+## ✅ Security Hardening & Code Quality (v4.6.4) — Historical
 
 **Goal**: Harden security with rate limiting, protect user integrity, secure connection strings, enhance validation, fix build warnings.
 
@@ -6160,34 +6218,28 @@ Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
 ---
 
 
-<!-- END OF SECTION: 14.2 Advanced Security & Quality Hardening Phases (Phases 18-20) -->
+<!-- END OF SECTION: 14.2 Advanced Security & Quality Hardening (Historical) -->
 
 
 <!-- START OF SECTION: 14.3 Technical Debt & CQRS Roadmap -->
 
 > [!NOTE]
-> Partially implemented MediatR/CQRS trade-off explanations, technical debt notes, and retired WinForms components.
+> MediatR/CQRS is NOT used. Service Layer pattern is the standard. This section documents the decision and any remaining cleanup.
 
-## ⚠️ Partially Implemented
+## ✅ MediatR Removed (RULE-148)
 
-### MediatR
+- **Package:** MediatR v12.x **HAS BEEN REMOVED** from `SalesSystem.Application`
+- **All references replaced** with direct Service Interface injection
+- **No Commands/Queries directories** exist — Service Layer pattern is the standard
+- **No MediatR pipeline behaviors** — never used
+- **Status:** Fully removed per AGENTS.md RULE-147/148
 
-- **Package:** MediatR v12.4.1 installed in `SalesSystem.Application`
-- **Usage:** Only 1 file uses it (`ProductPriceQuery`)
-- **No Commands/Queries directories** exist
-- **No MediatR pipeline behaviors** registered
-- **Status:** Installed but NOT adopted
+## CQRS — NOT Adopted
 
-### CQRS
-
-- **Mentioned in AGENTS.md** RULE-043: "Strictly separate Read operations (Queries) from Write operations (Commands)"
-- **NOT implemented** — the codebase uses Service Layer pattern
-- **Services handle both reads and writes** in the same class
-- **Status:** Documented but not built
-
-### Why the gap?
-
-The project started with Service Layer pattern and it proved sufficient for the use cases. MediatR was installed as an experiment but never adopted project-wide. AGENTS.md RULE-043 reflects an aspirational goal, not current reality.
+- **AGENTS.md RULE-043** updated: "Service Layer pattern is the standard — NOT CQRS/MediatR"
+- **Service Layer pattern used**: Services handle both reads and writes
+- **Status:** Documented and final — no migration planned
+- **Why:** Service Layer provides sufficient separation at this scale without ceremony
 
 ---
 
@@ -6201,7 +6253,7 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 | **SharedKernel project** | ❌ Not started | Architecture uses layered, not shared kernel |
 | **DesignTokens.cs** | ❌ Not created | Styles live in `Resources/Styles.xaml` |
 | **Roslyn Analyzer** | ❌ Not created | No `HardcodedColorAnalyzer` or similar |
-| **ExecuteAsync() wrapper** | ❌ Not in ViewModelBase | Error handling uses `HandleException()` / `HandleFailure()` |
+| **ExecuteAsync() wrapper** | ✅ In ViewModelBase | RULE-141: All async commands use `ExecuteAsync()` wrapper |
 | **Vertical Slices** | ❌ Not adopted | Layered architecture is the standard |
 | **Camera-based barcode** | ❌ Not started | Only USB/HID keyboard scanner implemented |
 | **BarcodeScanViewModel** | ❌ Not created | Barcode handled via `IBarcodeInputService` event |

@@ -1204,20 +1204,20 @@ public interface ISoundService
 | RULE-252 | Editor ViewModels and any file with user-facing messages MUST be checked for Arabic encoding integrity at code review time |
 | RULE-253 | When reviewing PRs, spot-check 3-5 Arabic string literals by reading them aloud in the diff — if any look like `ط§ط®طھط¨ط§ط±` instead of `اختبار`, flag the entire file for encoding review |
 
-### 2.63 Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+### 2.63 Invoice Number Strategy — InvoiceNo as int, UNIQUE, Thread-Safe via DocumentSequenceService (v4.6.7)
 
-SalesInvoice and PurchaseInvoice have an `InvoiceNo` (int) property — a user-facing invoice number. This is separate from the auto-increment `Id` PK. The InvoiceNo is NOT unique (duplicates allowed).
+SalesInvoice and PurchaseInvoice have an `InvoiceNo` (int) property — a user-facing invoice number. This is separate from the auto-increment `Id` PK. The InvoiceNo MUST be UNIQUE per document type (SalesInvoice, PurchaseInvoice) and is generated thread-safely via `DocumentSequenceService` using `SemaphoreSlim` lock.
 
 | RULE | DIRECTIVE |
 |------|-----------|
 | RULE-254 | `SalesInvoice` and `PurchaseInvoice` MUST have `int InvoiceNo` (NOT string) — required property with guard `invoiceNo <= 0` |
-| RULE-255 | Default InvoiceNo when creating new invoice: service computes `lastId + 1` — user can override with any int |
-| RULE-256 | Request DTOs use `int? InvoiceNo` — null or ≤ 0 means "auto-generate" (service computes `lastId + 1`) |
+| RULE-255 | Default InvoiceNo: service calls `IDocumentSequenceService.GetNextIntAsync("SalesInvoice"\|"PurchaseInvoice", ct)` — thread-safe via `SemaphoreSlim` + DB sequence. NEVER use `lastId + 1` (not thread-safe). |
+| RULE-256 | Request DTOs use `int? InvoiceNo` — null or ≤ 0 means "auto-generate" via DocumentSequenceService. User override validated for uniqueness. |
 | RULE-257 | Search by invoice number: Desktop shows `InvoiceNo` column, search by int comparison |
 | RULE-258 | `SupplierInvoiceNo` (string?) is a SUPPLIER's invoice reference number — NOT the system InvoiceNo. Kept on `PurchaseInvoice` for supplier reference only |
 | RULE-259 | `SalesReportDto` and `PurchaseReportDto` use `int InvoiceNo` |
 | RULE-260 | `InvoicePrintDto` (print/PDF generation) uses `string InvoiceNumber` formatted from `InvoiceNo.ToString()` |
-| RULE-261 | No unique index on `InvoiceNo` — duplicates are explicitly allowed |
+| RULE-261 | InvoiceNo MUST have a UNIQUE index per document type (e.g., unique per SalesInvoice table, unique per PurchaseInvoice table). No duplicates allowed — analysis confirms duplicate invoice numbers cause confusion in search, returns, reports, and customer service. |
 
 ### 2.64 UI Compacting — Mobile-Ready Density (v4.6.6)
 
@@ -1335,11 +1335,11 @@ public enum InvoiceTypePrint : byte
 ❌ ToolTip that just repeats the button text (e.g., Button="منتج جديد" ToolTip="منتج جديد")
 ❌ Code column on Product, Customer, Supplier, or Warehouse entities (use Id instead)
 ❌ InvoiceNo as string on SalesInvoice or PurchaseInvoice entities (use int instead)
-❌ GetByNumberAsync/GetByNumber methods in services or controllers (search by Id)
-❌ InvoiceNo as string (use int, nullable in requests, NOT unique)
-❌ DocumentSequenceService for invoice numbering (INV/PUR prefixes — use InvoiceNo int)
+❌ `lastId + 1` for InvoiceNo generation (not thread-safe — use DocumentSequenceService)
+❌ InvoiceNo as string (use int, nullable in requests, UNIQUE per document type)
+❌ DocumentSequenceService for old INV/PUR prefix strings (use GetNextIntAsync instead for invoices)
 ❌ SupplierInvoiceNo used as system InvoiceNo (it's supplier's reference only)
-❌ Unique index on InvoiceNo (duplicates allowed — user can set any int)
+❌ Non-unique InvoiceNo (duplicates are NOT allowed — causes search/return/report confusion)
 ❌ WarehouseResponse still containing Code field
 ❌ ProductCode on invoice item DTOs (use ProductId only)
 ❌ Code auto-generation for products, customers, or suppliers
@@ -1554,12 +1554,12 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] SalesInvoice and PurchaseInvoice have `int InvoiceNo` (NOT string)?
 - [ ] `SalesInvoice.Create()` requires `int invoiceNo` (second param)?
 - [ ] `PurchaseInvoice.Create()` requires `int invoiceNo` (third param)?
-- [ ] Request DTOs use `int? InvoiceNo` (null = auto-generate)?
-- [ ] Service computes `lastId + 1` as default when `InvoiceNo` is null/≤0?
+- [ ] Request DTOs use `int? InvoiceNo` (null = auto-generate via DocumentSequenceService)?
+- [ ] Service calls `IDocumentSequenceService.GetNextIntAsync(key)` — NEVER `lastId + 1`?
 - [ ] Report DTOs (`SalesReportDto`, `PurchaseReportDto`, `InvoicePrintDto`) use `int InvoiceNo`?
 - [ ] `InvoicePrintDto.InvoiceNumber` (string) formatted via `.ToString()` on int?
 - [ ] `SupplierInvoiceNo` kept only as supplier's reference (not system InvoiceNo)?
-- [ ] No unique index on InvoiceNo (duplicates allowed)?
+- [ ] UNIQUE index on InvoiceNo per document type?
 - [ ] All search/filter uses Id or Name, not Code?
 - [ ] Invoice item DTOs carry ProductId only (no ProductCode)?
 - [ ] Report DTOs exclude Code fields?

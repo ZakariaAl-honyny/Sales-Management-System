@@ -1,0 +1,261 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Settings.SystemSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             FlowDirection="RightToLeft"
+             d:DesignHeight="700" d:DesignWidth="900"
+             Background="{StaticResource BackgroundBrush}">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="إعدادات النظام"
+                   FontSize="14" FontWeight="Bold"
+                   Foreground="#333"
+                   Margin="0,0,0,12"
+                   ToolTip="إدارة جميع إعدادات النظام المخزنة في قاعدة البيانات"/>
+
+        <!-- Scrollable Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- ════════════════════════════════════════════ -->
+                <!-- Card 1: Inventory (المخزون) -->
+                <!-- ════════════════════════════════════════════ -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="المخزون" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
+
+                        <!-- CostingMethod -->
+                        <TextBlock Text="طريقة احتساب التكلفة" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"
+                                   ToolTip="تحدد كيف يحتسب النظام تكلفة البضاعة في المخزن"/>
+                        <RadioButton Content="متوسط التكلفة المرجح (Weighted Average)"
+                                     IsChecked="{Binding IsWeightedAverageSelected}"
+                                     GroupName="SysCostingMethod"
+                                     Margin="0,0,0,4"
+                                     ToolTip="يجمع بين سعر البضاعة القديمة في المخزن والجديدة ليعطيك تكلفة موحدة ومتوازنة"/>
+                        <RadioButton Content="آخر سعر توريد (Last Purchase Price)"
+                                     IsChecked="{Binding IsLastPurchasePriceSelected}"
+                                     GroupName="SysCostingMethod"
+                                     Margin="0,0,0,4"
+                                     ToolTip="يستبدل تكلفة المنتج بسعر آخر فاتورة شراء مباشرةً"/>
+                        <RadioButton Content="سعر المورد (Supplier Catalog Price)"
+                                     IsChecked="{Binding IsSupplierPriceSelected}"
+                                     GroupName="SysCostingMethod"
+                                     Margin="0,0,0,8"
+                                     ToolTip="يعتمد على السعر المدخل في بطاقة الصنف من قائمة المورد ولا يتغير تلقائياً"/>
+
+                        <!-- AllowNegativeStock -->
+                        <CheckBox Content="السماح بالمخزون السالب"
+                                  IsChecked="{Binding AllowNegativeStock}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="السماح بجعل كمية المخزون أقل من صفر — قد يؤدي إلى أخطاء في التقارير المحاسبية"/>
+
+                        <!-- EnableFefo -->
+                        <CheckBox Content="استخدام FEFO (الصادر أولاً حسب تاريخ الانتهاء)"
+                                  IsChecked="{Binding EnableFefo}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="استخدام طريقة الصادر أولاً حسب تاريخ انتهاء الصلاحية — مناسبة للمواد الغذائية والأدوية"/>
+
+                        <!-- StockAlertDays -->
+                        <StackPanel Margin="0,0,0,2">
+                            <TextBlock Text="تحذير المخزون (أيام)" Style="{StaticResource LabelStyle}"
+                                       ToolTip="عدد الأيام قبل النفاد التي يبدأ فيها النظام بعرض تحذيرات المخزون"/>
+                            <TextBox Text="{Binding StockAlertDays, TargetNullValue=5}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="عدد الأيام للتحذير قبل نفاد المخزون — مثال: 5 أيام"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ════════════════════════════════════════════ -->
+                <!-- Card 2: Sales (المبيعات) -->
+                <!-- ════════════════════════════════════════════ -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="المبيعات" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
+
+                        <CheckBox Content="الترحيل التلقائي فور الحفظ"
+                                  IsChecked="{Binding AutoPostInvoices}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="عند حفظ فاتورة البيع، يتم ترحيلها مباشرة بدون الحاجة لضغط زر الترحيل"/>
+
+                        <CheckBox Content="السماح بالمسودات"
+                                  IsChecked="{Binding AllowDrafts}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="السماح بحفظ فاتورة البيع كمسودة دون ترحيل — يمكن العودة إليها لاحقاً"/>
+
+                        <CheckBox Content="إظهار الربح في شاشة البيع"
+                                  IsChecked="{Binding ShowProfitInInvoice}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إظهار هامش الربح (سعر البيع - التكلفة) في شاشة البيع للمساعدة في اتخاذ قرارات التسعير"/>
+
+                        <CheckBox Content="منع البيع بأقل من السعر الرسمي"
+                                  IsChecked="{Binding PreventBelowRetailPrice}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="منع إتمام عملية البيع إذا كان سعر البيع أقل من السعر الرسمي للمنتج"/>
+
+                        <CheckBox Content="السماح بالبيع بأقل من التكلفة"
+                                  IsChecked="{Binding AllowBelowCostSale}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="السماح بالبيع بسعر أقل من التكلفة مع عرض تحذير — قد يؤدي إلى خسارة"/>
+
+                        <StackPanel Margin="0,0,0,2">
+                            <TextBlock Text="العميل الافتراضي للمبيعات النقدية" Style="{StaticResource LabelStyle}"
+                                       ToolTip="رقم العميل الافتراضي الذي يتم استخدامه تلقائياً في فواتير البيع النقدي"/>
+                            <TextBox Text="{Binding DefaultCashCustomerId, TargetNullValue=1}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="أدخل رقم العميل الافتراضي — مثال: 1 للمبيعات النقدية"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ════════════════════════════════════════════ -->
+                <!-- Card 3: Purchases (المشتريات) -->
+                <!-- ════════════════════════════════════════════ -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="المشتريات" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
+
+                        <CheckBox Content="الترحيل التلقائي للمشتريات"
+                                  IsChecked="{Binding PurchaseAutoPost}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="عند حفظ فاتورة الشراء، يتم ترحيلها مباشرة بدون الحاجة لضغط زر الترحيل"/>
+
+                        <StackPanel Margin="0,0,0,2">
+                            <TextBlock Text="المورد الافتراضي للمشتريات النقدية" Style="{StaticResource LabelStyle}"
+                                       ToolTip="رقم المورد الافتراضي الذي يتم استخدامه تلقائياً في فواتير الشراء النقدي"/>
+                            <TextBox Text="{Binding DefaultCashSupplierId, TargetNullValue=1}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="أدخل رقم المورد الافتراضي — مثال: 1 للمشتريات النقدية"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ════════════════════════════════════════════ -->
+                <!-- Card 4: Barcode (الباركود) -->
+                <!-- ════════════════════════════════════════════ -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="الباركود" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
+
+                        <CheckBox Content="تفعيل الباركود"
+                                  IsChecked="{Binding EnableBarcode}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="تفعيل الباركود في النظام بالكامل — عند الإيقاف، يتم تعطيل ماسح الباركود"/>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="نوع إدخال الباركود" Style="{StaticResource LabelStyle}"
+                                       ToolTip="اختيار طريقة إدخال الباركود: ماسح ضوئي أو كاميرا"/>
+                            <ComboBox ItemsSource="{Binding BarcodeInputTypes}"
+                                      SelectedItem="{Binding BarcodeInputType}"
+                                      Style="{StaticResource ModernComboBox}"
+                                      ToolTip="Scanner = ماسح ضوئي متصل بالجهاز، Camera = استخدام كاميرا الهاتف أو الويب"/>
+                        </StackPanel>
+
+                        <CheckBox Content="توليد باركود تلقائي للمنتجات الجديدة"
+                                  IsChecked="{Binding AutoGenerateBarcode}"
+                                  Margin="0,0,0,2"
+                                  ToolTip="عند إضافة منتج جديد بدون باركود، يقوم النظام بتوليد باركود فريد تلقائياً"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ════════════════════════════════════════════ -->
+                <!-- Card 5: Accounting (المحاسبة) -->
+                <!-- ════════════════════════════════════════════ -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="المحاسبة" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
+
+                        <CheckBox Content="إنشاء قيود محاسبية تلقائياً"
+                                  IsChecked="{Binding AutoCreateJournalEntry}"
+                                  Margin="0,0,0,2"
+                                  ToolTip="عند ترحيل كل فاتورة بيع أو شراء، يتم إنشاء قيد محاسبي تلقائي في دفتر الأستاذ"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ════════════════════════════════════════════ -->
+                <!-- Card 6: General (العامة) -->
+                <!-- ════════════════════════════════════════════ -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="العامة" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="الكسور العشرية" Style="{StaticResource LabelStyle}"
+                                       ToolTip="عدد الخانات العشرية المعروضة للأسعار والمبالغ في النظام"/>
+                            <ComboBox ItemsSource="{Binding DecimalPlacesOptions}"
+                                      SelectedItem="{Binding DecimalPlaces}"
+                                      Style="{StaticResource ModernComboBox}"
+                                      ToolTip="اختيار عدد الخانات العشرية للأسعار — مثال: 2 للريال السعودي"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="لغة النظام" Style="{StaticResource LabelStyle}"
+                                       ToolTip="اللغة الافتراضية للنظام — العربية أو الإنجليزية"/>
+                            <ComboBox ItemsSource="{Binding LanguageOptions}"
+                                      SelectedItem="{Binding Language}"
+                                      Style="{StaticResource ModernComboBox}"
+                                      ToolTip="ar = العربية، en = الإنجليزية"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,2">
+                            <TextBlock Text="تنسيق التاريخ" Style="{StaticResource LabelStyle}"
+                                       ToolTip="تنسيق عرض التواريخ في جميع شاشات النظام"/>
+                            <TextBox Text="{Binding DateFormat}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="صيغة عرض التاريخ — مثال: dd/MM/yyyy لليوم/الشهر/السنة"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Padding="0,8,0,0" BorderThickness="0,1,0,0" BorderBrush="#E0E0E0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusMessage}"
+                           Foreground="#4CAF50"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="حفظ الإعدادات"
+                            Command="{Binding SaveCommand}"
+                            ToolTip="حفظ جميع إعدادات النظام — سيتم تطبيق التغييرات فوراً على جميع المستخدمين"
+                            Style="{StaticResource PrimaryButton}"
+                            MinWidth="100"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#80FFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"
+                             Background="#E3E8EE" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="جاري حفظ الإعدادات..." FontSize="14" Margin="0,12,0,0"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -161,23 +161,23 @@ public abstract class ViewModelBase : INotifyPropertyChanged, INotifyDataErrorIn
     }
 
     /// <summary>
-    /// Logs a system-level error to the AI_Error_Log.txt file (Serilog Error level).
-    /// Use for hard delete failures, API communication errors, and other system issues
-    /// that AI agents should be able to read and diagnose automatically.
+    /// Logs a system-level error via Serilog (Error level).
+    /// Use for hard delete failures, API communication errors, and other system issues.
     /// </summary>
     protected void LogSystemError(string message, string context, Exception? ex = null)
     {
-        string logMessage = $"[{context}] {message}";
+        var logMessage = $"[{context}] {message}";
         Serilog.Log.Error(ex, logMessage);
     }
 
     /// <summary>
-    /// Handles an exception by logging it locally and sending it to the API
+    /// Handles an exception by logging via LogSystemError and sending to the API.
+    /// Returns a user-friendly Arabic message.
     /// </summary>
     protected string HandleException(Exception ex, string context, string? logMessage = null, string? userMessage = null)
     {
-        string message = logMessage ?? $"[{context}] An unexpected error occurred.";
-        Serilog.Log.Error(ex, message);
+        var message = logMessage ?? $"[{context}] {ex.Message}";
+        LogSystemError(message, context, ex);
         
         // Send to API in background
         _ = SendRemoteLogAsync("Error", message, ex, context);

@@ -10,12 +10,11 @@
       Background="{StaticResource BackgroundBrush}">
 
     <Grid Margin="24,24,24,24">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
         <!-- Header -->
         <TextBlock Grid.Row="0"
@@ -25,7 +24,7 @@
                    AutomationProperties.AutomationId="SettingsPageTitle"/>
 
         <!-- Main Content -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
             <StackPanel>
                 <!-- Company Info -->
                 <Border Style="{StaticResource CardStyle}" Margin="0,0,0,12">
@@ -38,6 +37,7 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -67,14 +67,39 @@
                                 <TextBlock Text="العنوان" Style="{StaticResource LabelStyle}"/>
                                 <TextBox Text="{Binding Address}" TextWrapping="Wrap" AcceptsReturn="True" TabIndex="5" helpers:FocusHelper.AdvanceOnEnter="True" AutomationProperties.AutomationId="TxtCompanyAddress"/>
                             </StackPanel>
+
+                            <!-- Signature Path -->
+                            <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,8,0,0">
+                                <TextBlock Text="ملف التوقيع (للطباعة على الفواتير)" Style="{StaticResource LabelStyle}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding SignaturePath}" IsReadOnly="True"
+                                             AutomationProperties.AutomationId="TxtSignaturePath"
+                                             ToolTip="مسار ملف صورة التوقيع الذي سيظهر على الفواتير المطبوعة"/>
+                                    <Button Grid.Column="1" Content="تصفح..." Margin="8,0,0,0"
+                                            Command="{Binding BrowseSignatureCommand}"
+                                            AutomationProperties.AutomationId="BtnBrowseSignature"
+                                            ToolTip="اختيار ملف التوقيع لطباعته على الفواتير"/>
+                                    <Button Grid.Column="2" Content="✕" Margin="4,0,0,0"
+                                            Command="{Binding ClearSignatureCommand}"
+                                            AutomationProperties.AutomationId="BtnClearSignature"
+                                            ToolTip="إزالة التوقيع المحدد"/>
+                                </Grid>
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 </Border>
 
                 <!-- Invoice Settings -->
-                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,12">
+                <!-- DEPRECATED: DefaultTaxRate and InvoicePrefix are hidden. Tax entity is the source of truth. Remove in Phase 20. -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,12"
+                        Visibility="Collapsed">
                     <StackPanel>
-                        <TextBlock Text="📄 إعدادات الفواتير" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
+                        <TextBlock Text="📄 إعدادات الفواتير (ملغية)" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
                         
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -101,54 +126,22 @@
                         <TextBlock Text="⚙️ خيارات النظام" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
                         
                         <CheckBox Content="تفعيل نظام تنبيهات المخزون" IsChecked="{Binding EnableStockAlerts}" Margin="0,0,0,12" TabIndex="8" AutomationProperties.AutomationId="ChkEnableStockAlerts"/>
-                        <CheckBox Content="السماح بالبيع بالسالب" IsChecked="{Binding AllowNegativeStock}" Margin="0,0,0,12" TabIndex="9" AutomationProperties.AutomationId="ChkAllowNegativeStock"/>
-                        <CheckBox Content="تحديث الأسعار تلقائياً عند الشراء" IsChecked="{Binding AutoUpdatePrices}" TabIndex="10" AutomationProperties.AutomationId="ChkAutoUpdatePrices"/>
-                    </StackPanel>
-                </Border>
+                        <CheckBox Content="تحديث الأسعار تلقائياً عند الشراء" IsChecked="{Binding AutoUpdatePrices}" TabIndex="9" AutomationProperties.AutomationId="ChkAutoUpdatePrices"/>
 
-                <!-- Costing Method -->
-                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="💰 طريقة احتساب تكلفة المخزون" Style="{StaticResource HeaderStyle}" Margin="0,0,0,16"/>
-                        
-                        <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
-                                Padding="16" Margin="0,4" Background="#F1F8E9">
-                            <StackPanel>
-                                <RadioButton Content="متوسط التكلفة المرجح  (Weighted Average)"
-                                             IsChecked="{Binding IsWeightedAverageSelected}"
-                                             GroupName="CostingMethod"
-                                             FontSize="14" FontWeight="Bold"
-                                             ToolTip="يجمع بين سعر البضاعة القديمة في المخزن والجديدة ليعطيك تكلفة موحدة ومتوازنة"/>
-                                <TextBlock Margin="28,6,0,0" TextWrapping="Wrap" Foreground="#555" FontSize="12"
-                                           Text="يجمع بين سعر البضاعة القديمة في المخزن والجديدة ليعطيك تكلفة موحدة ومتوازنة. الأنسب للتقارير الضريبية الدقيقة وللمحاسبة القياسية."/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
-                                Padding="16" Margin="0,4">
-                            <StackPanel>
-                                <RadioButton Content="آخر سعر توريد  (Last Purchase Price)"
-                                             IsChecked="{Binding IsLastPriceSelected}"
-                                             GroupName="CostingMethod"
-                                             FontSize="14" FontWeight="Bold"
-                                             ToolTip="يستبدل تكلفة المنتج بسعر آخر فاتورة شراء مباشرةً"/>
-                                <TextBlock Margin="28,6,0,0" TextWrapping="Wrap" Foreground="#555" FontSize="12"
-                                           Text="يستبدل تكلفة المنتج بسعر آخر فاتورة شراء مباشرةً. مناسب للأسواق المتقلبة حيث تريد دائماً أن يعكس السعر الواقع الحالي."/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
-                                Padding="16" Margin="0,4">
-                            <StackPanel>
-                                <RadioButton Content="سعر المورد  (Supplier Catalog Price)"
-                                             IsChecked="{Binding IsSupplierPriceSelected}"
-                                             GroupName="CostingMethod"
-                                             FontSize="14" FontWeight="Bold"
-                                             ToolTip="يعتمد على السعر المدخل في بطاقة الصنف من قائمة المورد ولا يتغير تلقائياً عند الشراء"/>
-                                <TextBlock Margin="28,6,0,0" TextWrapping="Wrap" Foreground="#555" FontSize="12"
-                                           Text="يعتمد على السعر المدخل في بطاقة الصنف من قائمة المورد ولا يتغير تلقائياً عند الشراء. مناسب عندما تتفاوض على سعر ثابت مع المورد لفترة طويلة."/>
-                            </StackPanel>
-                        </Border>
+                        <!-- Costing Method -->
+                        <TextBlock Text="طريقة تقييم المخزون" Style="{StaticResource LabelStyle}" Margin="0,12,0,0"/>
+                        <RadioButton Content="المتوسط المرجح (Weighted Average)"
+                                     IsChecked="{Binding IsWeightedAverageSelected}"
+                                     ToolTip="المتوسط المرجح — طريقة تقييم المخزون الافتراضية"
+                                     GroupName="CostingMethod" Margin="0,4,0,2"/>
+                        <RadioButton Content="آخر سعر شراء (Last Purchase Price)"
+                                     IsChecked="{Binding IsLastPriceSelected}"
+                                     ToolTip="استخدام آخر سعر شراء كتكلفة للمخزون"
+                                     GroupName="CostingMethod" Margin="0,2,0,2"/>
+                        <RadioButton Content="سعر المورد (Supplier Price)"
+                                     IsChecked="{Binding IsSupplierPriceSelected}"
+                                     ToolTip="استخدام سعر المورد المدرج في كرت الصنف"
+                                     GroupName="CostingMethod" Margin="0,2,0,6"/>
                     </StackPanel>
                 </Border>
 
@@ -163,6 +156,10 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -247,112 +244,37 @@
                                     <TextBlock Text="طباعة اختبارية" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
+
+                            <!-- Paper Size -->
+                            <StackPanel Grid.Row="7" Grid.Column="0" Margin="0,0,12,16">
+                                <TextBlock Text="حجم الورق" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding PaperSize}" ToolTip="حجم الورق الافتراضي للطباعة (A4, A5, أو مخصص)"/>
+                            </StackPanel>
+
+                            <!-- Print Copies -->
+                            <StackPanel Grid.Row="7" Grid.Column="1" Margin="12,0,0,16">
+                                <TextBlock Text="عدد النسخ" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding PrintCopies}" ToolTip="عدد نسخ الطباعة الافتراضية"/>
+                            </StackPanel>
+
+                            <!-- Show Balance -->
+                            <CheckBox Grid.Row="8" Grid.ColumnSpan="2"
+                                      Content="إظهار الرصيد في الفاتورة"
+                                      IsChecked="{Binding ShowBalanceOnPrint}"
+                                      Margin="0,0,0,12"
+                                      ToolTip="عرض رصيد الحساب في الفاتورة المطبوعة"/>
+
+                            <!-- Print Signature -->
+                            <CheckBox Grid.Row="9" Grid.ColumnSpan="2"
+                                      Content="طباعة التوقيع"
+                                      IsChecked="{Binding PrintSignature}"
+                                      Margin="0,0,0,12"
+                                      ToolTip="طباعة صورة التوقيع في أسفل الفاتورة"/>
                         </Grid>
                     </StackPanel>
                 </Border>
 
-                <!-- Database Maintenance -->
-                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="💾 صيانة قاعدة البيانات (النسخ الاحتياطي)" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
-                        
-                        <TextBlock Text="تنبيه: ينصح بإجراء نسخة احتياطية بشكل دوري لضمان سلامة البيانات." 
-                                   Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,16"/>
-
-                        <Grid Margin="0,0,0,16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                <TextBlock Text="النسخ الاحتياطية المتوفرة" Style="{StaticResource LabelStyle}"/>
-                                <ComboBox ItemsSource="{Binding Backups}" 
-                                          SelectedItem="{Binding SelectedBackup}" 
-                                          AutomationProperties.AutomationId="CmbBackups"/>
-                            </StackPanel>
-
-                            <Button Grid.Column="1" 
-                                    Content="🔄 استعادة النسخة المختارة" 
-                                    Command="{Binding RestoreBackupCommand}"
-                                    Style="{StaticResource DangerButton}"
-                                    VerticalAlignment="Bottom"
-                                    Width="180"
-                                    AutomationProperties.AutomationId="BtnRestoreBackup"
-                                    ToolTip="استعادة النسخة الاحتياطية المحددة"/>
-                        </Grid>
-
-                        <Button Content="📦 إنشاء نسخة احتياطية جديدة الآن" 
-                                Command="{Binding CreateBackupCommand}"
-                                Style="{StaticResource SecondaryButton}"
-                                HorizontalAlignment="Left"
-                                Padding="12,6"
-                                AutomationProperties.AutomationId="BtnCreateBackup"
-                                ToolTip="إنشاء نسخة احتياطية فورية"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Backup & Update Settings -->
-                <Border Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <TextBlock Text="⚙️ إعدادات النسخ الاحتياطي والتحديث" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
-
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,16">
-                                <TextBlock Text="مجلد النسخ الاحتياطي" Style="{StaticResource LabelStyle}"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" Text="{Binding BackupPath}"
-                                             ToolTip="المسار الافتراضي لحفظ ملفات النسخ الاحتياطي (.bak)"
-                                             AutomationProperties.AutomationId="TxtBackupPath"/>
-                                    <Button Grid.Column="1" Content="تصفح..." Margin="8,0,0,0"
-                                            Command="{Binding BrowseBackupPathCommand}"
-                                            ToolTip="اختيار مجلد النسخ الاحتياطي"
-                                            AutomationProperties.AutomationId="BtnBrowseBackupPath"/>
-                                </Grid>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="0" Grid.Column="1" Margin="12,0,0,16">
-                                <TextBlock Text="وقت النسخ الاحتياطي التلقائي" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding BackupScheduleTime}" 
-                                         ToolTip="الوقت المحدد لعمل النسخ الاحتياطي التلقائي يومياً — صيغة HH:mm (مثال: 02:00)"
-                                         AutomationProperties.AutomationId="TxtBackupScheduleTime"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,12,16">
-                                <TextBlock Text="الاحتفاظ بالنسخ (أيام)" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding BackupRetentionDays}"
-                                         ToolTip="عدد الأيام للاحتفاظ بنسخ الاحتياط — يتم حذف النسخ الأقدم تلقائياً"
-                                         AutomationProperties.AutomationId="TxtBackupRetentionDays"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="1" Grid.Column="1" Margin="12,0,0,16">
-                                <TextBlock Text="رابط خادم التحديثات" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding UpdateServerUrl}"
-                                         ToolTip="رابط خادم التحديثات التلقائية — يجب أن يكون متاحاً عبر HTTP/HTTPS"
-                                         AutomationProperties.AutomationId="TxtUpdateServerUrl"/>
-                            </StackPanel>
-
-                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2"
-                                       Text="تنبيه: سيتم تطبيق إعدادات النسخ الاحتياطي والتحديث بعد حفظ الإعدادات."
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="12" TextWrapping="Wrap"/>
-                        </Grid>
-                    </StackPanel>
-                </Border>
+                <!-- Note: Backup & Database Maintenance moved to BackupView -->
             </StackPanel>
         </ScrollViewer>
 

@@ -25,7 +25,7 @@ alt="Status"/>
 
 ## 📋 Overview
 
-A **comprehensive sales management platform** built with Clean Architecture + CQRS principles, designed for small-to-medium retail businesses. The current version delivers a **WPF Desktop client (MVVM)** backed by an **ASP.NET Core Web API**, handling sales, purchases, inventory, returns, and financial tracking with full Arabic/English bilingual support.
+A **comprehensive sales management platform** built with Clean Architecture + Service Layer pattern, designed for small-to-medium retail businesses. The current version delivers a **WPF Desktop client (MVVM)** backed by an **ASP.NET Core Web API**, handling sales, purchases, inventory, returns, and financial tracking with full Arabic/English bilingual support.
 
 The API-first architecture is designed to support **future web and mobile clients** without any backend changes.
 
@@ -55,6 +55,12 @@ The API-first architecture is designed to support **future web and mobile client
 - 📦 **Multi-warehouse & Low Stock AI** — Track inventory across branches with auto-calculated reorder suggestions
   - `ReorderLevel` on each product
   - Smart low-stock reporting (e.g., "1 box + 3 pieces")
+- 📒 **Accounting Foundation (Phases 18-31)**: Chart of Accounts (60 accounts), Journal Entries, Fiscal Years, Annual Closing
+- 💱 **Multi-Currency (Phase 20)**: YER/USD/SAR support with exchange rates, FractionName, IsSystem guard
+- 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Manager/Cashier/Accountant), 33 permission codes, MustChangePassword, lockout
+- 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
+- 🔢 **InvoiceNo Strategy (v4.6.7)**: InvoiceNo = int, UNIQUE per document type, thread-safe auto-generation via DocumentSequenceService.GetNextIntAsync() with SemaphoreSlim lock
+- 📑 **Reports (Phase 31)**: 35+ report DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML
 - 👥 **Role-based access** — Admin, Manager, and Cashier with granular permissions
 - 📊 **Full audit trail** — Every stock change, price change, and financial transaction is tracked
 - 🌐 **API-first design** — RESTful API ready for web/mobile clients in future phases
@@ -111,6 +117,12 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - **`A4InvoiceDocument`** — QuestPDF document template (RTL Arabic, logo, tax breakdown)
 - **`ThermalReceiptGenerator`** — ESC/POS receipt builder (42-char columns, Windows-1256)
 - **`EscPos`** — Static class for ESC/POS command byte sequences
+
+### New Services (v4.6.7)
+- `IDocumentSequenceService.GetNextIntAsync()` — Thread-safe int sequence generation via SemaphoreSlim for InvoiceNo and other int sequences
+- `SystemAccountMappingsService` — Maps 7 system operation types to Chart of Accounts
+- `JournalEntryAutoService` — 7 auto-journal entry providers (Sales, Purchases, Returns, Payments, Receipts, Transfers, Annual Closing)
+- `FiscalYearService` — Fiscal year management with close validation
 
 ---
 
@@ -186,6 +198,21 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - `CashBox.CurrentBalance` never negative
 - Cash transfers require TWO transactions (Out + In)
 - `DailyClosure` for end-of-day reconciliation
+
+### 📒 Accounting Foundation (v4.6.7)
+- **Chart of Accounts** — 60-account hierarchical structure (Assets, Liabilities, Equity, Income, Expenses)
+  - System accounts protected by `IsSystem` guard — never deleted or edited
+- **Journal Entries** — Automatic journal entry creation for ALL financial transactions
+  - 7 auto-providers: Sales, Purchases, Returns, Payments, Receipts, Transfers, Annual Closing
+  - `JournalEntryAutoService` handles all providers centrally
+- **Fiscal Years** — Annual fiscal periods with open/close lifecycle
+  - `FiscalYearService` manages year creation, validation, and closing
+  - Closing entries automatically transfer revenue/expense to retained earnings
+- **Multi-Currency** — YER/USD/SAR support with exchange rate tables
+  - `FractionName` for sub-currency units (Fils, Cent)
+  - `IsSystem` guard on base currency
+- **Account Mappings** — `SystemAccountMappingsService` maps 7 operation types to COA accounts
+  - Configurable per business for tax/custom rules
 
 ### 🔄 Auto-Update System (v4.4)
 - Background update check 3 seconds after startup — NEVER blocks app
@@ -708,23 +735,24 @@ dotnet run
 
 ---
 
-## 🆕 What's New in v4.6.7 — InvoiceNo Int Re-addition
+## 🆕 What's New in v4.6.7 — InvoiceNo Int Re-addition & Accounting Foundation
 
 | Feature | Description |
 |---------|-------------|
 | **InvoiceNo Back as int** | `SalesInvoice` and `PurchaseInvoice` now have `int InvoiceNo` — user-facing invoice number, separate from auto-increment `Id` PK |
-| **NOT Unique** | Duplicate InvoiceNo values explicitly allowed — user can set any integer value |
-| **Auto-generate Default** | Service computes `lastId + 1` when `InvoiceNo` is null or ≤ 0 in create requests |
-| **Request DTO** | `int? InvoiceNo` in `CreateSalesInvoiceRequest` / `CreatePurchaseInvoiceRequest` — null = auto-generate |
-| **Desktop Display** | Editor ViewModels show/have `int InvoiceNo` field; list ViewModels display and filter by InvoiceNo |
-| **Migration Added** | `20260602050426_AddInvoiceNoColumn` — adds `InvoiceNo int NOT NULL DEFAULT 0` to both tables |
+| **UNIQUE per Document Type** | InvoiceNo is UNIQUE within each table — no duplicates allowed for search/return/report integrity |
+| **Thread-Safe Auto-generation** | Service uses `IDocumentSequenceService.GetNextIntAsync()` with `SemaphoreSlim` lock — NOT `lastId + 1` (not thread-safe) |
+| **Request DTO** | `int? InvoiceNo` in `CreateSalesInvoiceRequest` / `CreatePurchaseInvoiceRequest` — null/0 = auto-generate via DocumentSequenceService |
+| **Desktop Display** | Editor ViewModels show `int InvoiceNo` field; list ViewModels display and filter by InvoiceNo |
+| **Migration Added** | `20260602050426_AddInvoiceNoColumn` — adds `InvoiceNo int NOT NULL DEFAULT 0` to both tables + UNIQUE index |
+| **Accounting Foundation** | Chart of Accounts (60 accounts), 7 auto-journal entry providers, Fiscal Year management, Multi-Currency (YER/USD/SAR) |
 | **Build Verification** | **0 errors, 0 warnings** — all 9 projects compile clean |
 | **Tests** | 411 passed, 28 failed (all 28 failures are pre-existing garbled Arabic assertion mismatches — not InvoiceNo related) |
 
 ### Key Design Decisions
 - `InvoiceNo` is `int` (NOT string) — simpler, faster, no formatting overhead
-- NOT unique — duplicates allowed (user may enter any integer, e.g., to match paper invoices)
-- Default `lastId + 1` — computed service-side, not client-side
+- **UNIQUE** per document type — prevents confusion in search, returns, reports, and customer service
+- Auto-generated via `DocumentSequenceService.GetNextIntAsync()` with `SemaphoreSlim` lock — thread-safe
 - `SupplierInvoiceNo` (string?) stays on PurchaseInvoice as supplier's reference — NOT the system InvoiceNo
 - `InvoicePrintDto.InvoiceNumber` (string) still exists — formatted via `InvoiceNo.ToString()` in the builder
 
@@ -799,13 +827,14 @@ dotnet run
 
 ## 📜 Version History
 
-### v4.6.7 — InvoiceNo Int Re-addition (Current)
+### v4.6.7 — InvoiceNo Int Re-addition & Accounting Foundation (Current)
 - **InvoiceNo Back as int**: SalesInvoice and PurchaseInvoice now have `int InvoiceNo` — user-facing invoice number
-- **NOT Unique**: Duplicates explicitly allowed (unlike the old string InvoiceNo which was unique)
-- **Auto-generate**: Service defaults to `lastId + 1` when not provided
-- **Request DTOs**: `int? InvoiceNo` — null/0 means "auto-generate"
+- **UNIQUE per type**: InvoiceNo is UNIQUE within each table — prevents confusion in search/returns/reports
+- **Thread-Safe Auto-generation**: Uses `IDocumentSequenceService.GetNextIntAsync()` with `SemaphoreSlim` lock
+- **Request DTOs**: `int? InvoiceNo` — null/0 means auto-generate via DocumentSequenceService
 - **Desktop**: Editor VMs have `int InvoiceNo` field, list views display and filter by InvoiceNo
-- **Migration**: `20260602050426_AddInvoiceNoColumn` adds column to both tables
+- **Accounting Foundation**: Chart of Accounts (60 accounts), 7 auto-journal entry providers, Fiscal Year management, Multi-Currency (YER/USD/SAR)
+- **Migration**: `20260602050426_AddInvoiceNoColumn` adds column + UNIQUE index to both tables
 - **Build**: 0 errors, 0 warnings across 9 projects
 - **Tests**: 411 passed, 28 failed (pre-existing garbled Arabic, not InvoiceNo-related)
 

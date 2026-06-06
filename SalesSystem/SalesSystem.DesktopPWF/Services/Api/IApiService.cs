@@ -299,6 +299,8 @@ public interface ISettingsApiService
     Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default);
     Task<Result<int>> GetCostingMethodAsync(CancellationToken ct = default);
     Task<Result> SetCostingMethodAsync(UpdateCostingMethodRequest request, CancellationToken ct = default);
+    Task<Result<Dictionary<string, string>>> GetAllSystemSettingsAsync(CancellationToken ct = default);
+    Task<Result> UpdateSystemSettingsAsync(Dictionary<string, string> settings, CancellationToken ct = default);
     void RefreshCache();
 }
 
@@ -417,6 +419,16 @@ public record HealthCheckResult
     public bool IsDatabaseConnected { get; init; }
     public string? ErrorMessage { get; init; }
     public bool IsApiReachable { get; init; }
+}
+
+public interface ITaxesApiService
+{
+    Task<Result<List<TaxDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<TaxDto>> GetByIdAsync(int id);
+    Task<Result<TaxDto>> CreateAsync(CreateTaxRequest request);
+    Task<Result<TaxDto>> UpdateAsync(int id, UpdateTaxRequest request);
+    Task<Result> DeleteAsync(int id);
+    Task<Result> DeletePermanentlyAsync(int id);
 }
 
 public interface IFinancialReportApiService

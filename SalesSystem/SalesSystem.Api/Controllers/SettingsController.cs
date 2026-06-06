@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Domain.Enums;
@@ -15,13 +16,16 @@ public class SettingsController : ControllerBase
 {
     private readonly IStoreSettingsService _settingsService;
     private readonly IPrintDataService _printSettingsService;
+    private readonly ISystemSettingsRepository _systemSettingsRepo;
 
     public SettingsController(
         IStoreSettingsService settingsService,
-        IPrintDataService printSettingsService)
+        IPrintDataService printSettingsService,
+        ISystemSettingsRepository systemSettingsRepo)
     {
         _settingsService = settingsService;
         _printSettingsService = printSettingsService;
+        _systemSettingsRepo = systemSettingsRepo;
     }
 
     [HttpGet]
@@ -47,13 +51,36 @@ public class SettingsController : ControllerBase
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
         var result = await _settingsService.UpdateSettingsAsync(request, userId, ct);
         if (result.IsSuccess)
-        {
-            var costingResult = await _settingsService.SetCostingMethodAsync((CostingMethod)request.CostingMethod, userId, ct);
-            if (!costingResult.IsSuccess)
-                return Ok(new { warning = costingResult.Error, settings = result.Value });
             return Ok(result.Value);
-        }
         return BadRequest(new { error = result.Error });
+    }
+
+    // ─── System Settings Bulk Endpoints ──────
+
+    /// <summary>
+    /// GET /api/v1/settings/system — returns all SystemSettings as a flat key-value dictionary.
+    /// Used by the new SystemSettings UI screen.
+    /// </summary>
+    [HttpGet("system")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> GetAllSystemSettings(CancellationToken ct)
+    {
+        var settings = await _systemSettingsRepo.GetAllSystemSettingsAsync(ct);
+        return Ok(settings);
+    }
+
+    /// <summary>
+    /// PUT /api/v1/settings/system — batch update of SystemSettings key-value pairs.
+    /// </summary>
+    [HttpPut("system")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> UpdateSystemSettings([FromBody] Dictionary<string, string> settings, CancellationToken ct)
+    {
+        if (settings == null || settings.Count == 0)
+            return BadRequest(new { error = "لا توجد إعدادات للتحديث" });
+
+        await _systemSettingsRepo.SetBatchSystemSettingsAsync(settings, ct);
+        return Ok(new { message = "تم حفظ إعدادات النظام بنجاح" });
     }
 
     // ─── Costing Method Endpoints ────────────
