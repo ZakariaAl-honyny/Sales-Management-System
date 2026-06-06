@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Net.Http.Json;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 
@@ -24,5 +25,12 @@ public class AuthApiService : ApiServiceBase, IAuthApiService
         {
             return HandleConnectionError<LoginResponse>(ex, "AuthApiService.LoginAsync");
         }
+    }
+
+    public async Task<Result> ChangePasswordAsync(ChangePasswordRequest request)
+    {
+        return await ExecuteCommandAsync(
+            () => _httpClient.PostAsJsonAsync("api/v1/auth/change-password", request),
+            "AuthApiService.ChangePasswordAsync");
     }
 }

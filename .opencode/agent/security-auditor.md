@@ -204,3 +204,15 @@ Verify no sensitive data in logs.
 - [ ] User-overridden InvoiceNo validated for uniqueness before save (catching DbUpdateException for duplicate)?
 - [ ] DocumentSequenceService supports both `GetNextNumberAsync()` (string) and `GetNextIntAsync()` (int) methods?
 - [ ] `DocumentSequence` entity has both `IncrementAndGet()` and `IncrementNextInt()` methods?
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. Security implications to verify:
+1. **Passwordless creation**: Admin creates user WITHOUT password — user sets password on first login via SetPassword. The SetPassword endpoint requires a valid JWT from the MustChangePassword login flow (not AllowAnonymous).
+2. **Account lockout**: 5 failed login attempts → UserStatus.Locked. Admin-only Unlock(). RecordLoginAttempt() logs every attempt.
+3. **Permission.IsSystem**: System permissions (IsSystem = true) are protected from deletion/modification at both application and DB level.
+4. **AuditLog**: Every login success/failure creates an AuditLog entry. AuditLog uses long Id for high volume.
+5. **BCrypt work factor 12**: All password hashing uses BCrypt with work factor 12.
+6. **All FK Restrict**: Permission, RolePermission, AuditLog, UserSession all use DeleteBehavior.Restrict.
+7. **Rate limiting**: Login endpoint has [EnableRateLimiting("LoginPolicy")] — 5 attempts per 15 minutes per IP.
+8. **JWT**: 8-hour expiry, in-memory only on Desktop, never persisted to disk.

@@ -83,6 +83,7 @@ public class CurrencyEditorViewModel : ViewModelBase
                 {
                     RateHistory.Add(item);
                 }
+                return System.Threading.Tasks.Task.CompletedTask;
             });
         }
     }

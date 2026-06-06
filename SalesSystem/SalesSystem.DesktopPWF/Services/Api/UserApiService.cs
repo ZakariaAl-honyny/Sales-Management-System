@@ -56,4 +56,11 @@ public class UserApiService : ApiServiceBase, IUserApiService
             () => _httpClient.DeleteAsync($"{BasePath}/permanent/{id}"),
             "UserApiService.DeletePermanentlyAsync");
     }
+
+    public async Task<Result<CurrentUserDto>> GetCurrentUserAsync()
+    {
+        return await ExecuteAsync<CurrentUserDto>(
+            () => _httpClient.GetAsync($"{BasePath}/current"),
+            "UserApiService.GetCurrentUserAsync");
+    }
 }

@@ -613,4 +613,13 @@ ALL XAML views MUST use compact sizes. The Styles.xaml now provides compact defa
 - ENH-007 [FIXED]: Currency entity has `SetAsBaseCurrency()` / `UnsetBaseCurrency()` domain methods.
 - ENH-012 [FIXED]: Removed unnecessary `async` from lambda in CurrencyEditorViewModel.
 
+### Phase 21 — Users & Permissions Module (v4.6.9)
+- User entity rebuilt: passwordless creation, UserStatus enum, lockout 5 attempts, Phone/Email/Avatar/DefaultCashBoxId
+- Permission + RolePermission entities: 33 seed permissions, 4-role model, Permission Management UI with grouped checkboxes
+- AuditLog: long Id, 3 indexes, paginated browser with filters (action/entity/date)
+- Auth: MustChangePassword flow, SetPassword/ChangePassword screens, account lockout
+- Desktop: Enhanced UserEditor (avatar 80×80, Phone/Email), PasswordChangeScreen (3 fields, INotifyDataErrorInfo), AuditLog browser (DataGrid + filters), Permission Management (role tabs + category expanders + checkboxes)
+- MainWindow StatusBar: avatar, role badge, change password link, logout button
+- Permission-based nav visibility: ApplyPermissions() from API
+
 ```

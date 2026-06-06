@@ -51,6 +51,7 @@ Phase 19: Architecture Alignment & Code Quality Remediation (v4.6.3) → Costing
 Phase 20: Security Hardening & Code Quality (v4.6.4) → Rate limiting, user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes
 Phase 21: UI Compacting — Mobile-Ready Density (v4.6.6) → Global UI resize (63 views), Styles.xaml token compaction (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted ~25-30%, PurchaseInvoiceEditorView catch-up, MainWindow sidebar 220→200, touch views preserved, future mobile-ready foundation
 Phase 22: v4.6.8 Code Review Remediations → Fix Phase 18 + Phase 20 critical bugs (atomic transactions via CreateExecutionStrategy, nav property mappings on SystemAccountMappings/JournalEntryLine, CHECK constraints CHK_DebitOrCredit/CHK_NoNegativeValues, ReversedByEntryId FK with Restrict, Controller HTTP 404 vs 400 differentiation, Currency.Create() isSystem param, filtered unique index IsActive guard, ListVM IDisposable, remove CanExecute predicates, toast for minor success, AllStaff policy on read endpoints)
+Phase 23: Users & Permissions (v4.6.9) → 4 roles (Admin/Manager/Cashier), 33 permission codes, UserStatus enum (Active/Inactive/Locked), passwordless creation (MustChangePassword=true), lockout after 5 failed logins, AuditLog (bigint PK), Permission/RolePermission entities, 33 seeded permissions with 4-role matrix, All FK Restrict, DbSeeder updates
 ```
 
 ### Phase 18: WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2)
@@ -195,6 +196,35 @@ Phase 22: v4.6.8 Code Review Remediations → Fix Phase 18 + Phase 20 critical b
 - BUG-007 (Accounting): ReversedByEntryId FK with Restrict
 - BUG-008 (Accounting): JournalEntryLine.Account nav mapping fix
 - BUG-009 (Accounting): SystemAccountMappings nav mapping fix
+
+### Phase 21 (PRD Alignment): Users & Permissions Module (v4.6.9)
+
+**Goal**: Implement user management with 4 roles, 33 permission codes, lockout protection, audit logging, and user session tracking.
+
+**Key Changes:**
+- `User.Create()` — Passwordless creation (`PasswordHash = null`, `MustChangePassword = true`)
+- `UserStatus` enum replaces `IsActive` boolean: Active=1, Inactive=2, Locked=3
+- `RecordLoginAttempt()` — Success resets counter, failure increments; at 5 failures → Status = Locked
+- `SetInitialPassword()` — Guards against `MustChangePassword == false`
+- `Permission` entity — `IsSystem = true` protects system permissions from deletion
+- `RolePermission` entity — Many-to-many between Role and Permission
+- `AuditLog` entity — `long Id` (bigint) for high-volume audit; indexes on `(UserId, Timestamp DESC)`, `(EntityType, EntityId)`, `(Timestamp DESC)`
+- `UserSession` entity — Tracks active user sessions
+- `DbSeeder` — Seeds 33 permissions across 9 categories with 4-role assignments; default admin user passwordless
+- All FK Restrict — No cascade delete on any new entity
+- `PermissionService.UpdateRolePermissionsAsync()` — Uses `_uow.ExecuteTransactionAsync()` for atomic updates
+
+**Rules Added:**
+- RULE-305 to RULE-320: User creation, status management, login flow, permission protection, audit logging, session tracking, DbSeeder seeding
+
+**Verification:**
+- [ ] User created with `PasswordHash = null`, `MustChangePassword = true`
+- [ ] 5 failed logins locks account
+- [ ] Permission.IsSystem prevents deletion/modification
+- [ ] AuditLog created for every login success/failure
+- [ ] DbSeeder seeds 33 permissions with correct role assignments
+- [ ] All FK Restrict enforced on all new entities
+- [ ] Build: 0 errors, 0 warnings
 
 ## v4.6.9 — Phase 19 Settings Module Remediations
 

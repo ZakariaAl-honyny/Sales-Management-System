@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.6.9 — Settings Module Fixes, Phase 19 & Phase 20 Remediations)
+# AGENTS.md — Sales Management System (v4.6.9 — Phase 21 Users & Permissions Complete)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/020-currencies-module/plan.md](specs/020-currencies-module/plan.md)
+**Active Feature Plan**: [specs/021-users-permissions/plan.md](specs/021-users-permissions/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
@@ -1306,6 +1306,27 @@ Following the Phase 20 currencies review, 3 additional enhancements were applied
 | RULE-302 | `CashBox.Create()` MUST set `OpeningBalance = initialBalance` — not just `CurrentBalance`. NEVER leave `OpeningBalance` at default 0 when an initial balance is provided. |
 | RULE-303 | `Currency` entity MUST have `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods that set `IsBaseCurrency` and call `UpdateTimestamp()` — NEVER toggle `IsBaseCurrency` directly from service code. |
 | RULE-304 | `InvokeOnUIThreadAsync` callbacks MUST NOT use `async` keyword when the lambda contains no `await` — unnecessary `async` creates a fire-and-forget `Task` inside the dispatcher. |
+
+### 2.71 Phase 21 — Users & Permissions Module Rules (v4.6.9)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-305 | `User.Create()` MUST use passwordless creation — `PasswordHash = null`, `MustChangePassword = true`. NEVER accept or hash a password in the factory method. |
+| RULE-306 | `UserStatus` enum MUST replace `IsActive` boolean — Active=1, Inactive=2, Locked=3. EF Core query filter changes from `u.IsActive` to `u.Status == UserStatus.Active`. |
+| RULE-307 | `RecordLoginAttempt()` MUST be used for ALL login attempts — success resets counter, failure increments; at 5 failures sets `Status = UserStatus.Locked`. |
+| RULE-308 | `SetInitialPassword()` MUST be used for first-login password set — guards against `MustChangePassword == false`. |
+| RULE-309 | `Permission` entity MUST use `IsSystem` flag to protect system permissions — `IsSystem = true` permissions MUST NOT be deletable or modifiable. |
+| RULE-310 | `AuditLog` entity MUST use `long Id` (bigint) for high-volume audit tables — NEVER `int`. |
+| RULE-311 | `AuditLog` MUST have indexes on `(UserId, Timestamp DESC)`, `(EntityType, EntityId)`, and `(Timestamp DESC)` for query performance. |
+| RULE-312 | ALL new entities (Permission, RolePermission, AuditLog, UserSession) MUST use `DeleteBehavior.Restrict` on ALL foreign keys. |
+| RULE-313 | Login flow MUST check `MustChangePassword` before password verification — if true, return `RequiresPasswordSetup` error and redirect to password set screen. |
+| RULE-314 | `AuthService.SetPasswordAsync()` MUST validate `MustChangePassword == true` before allowing password set — prevents re-setting already-set password. |
+| RULE-315 | `AuthService.ChangePasswordAsync()` MUST verify current password via `BCrypt.Verify` before allowing change — NEVER skip current password validation. |
+| RULE-316 | Every login success/failure MUST create an `AuditLog` entry — `LoginSuccess`, `LoginFailed` (with attempt count), `LoginBlocked_Locked`. |
+| RULE-317 | `PermissionService.UpdateRolePermissionsAsync()` MUST use `_uow.ExecuteTransactionAsync()` for atomic role-permission updates — NEVER direct `SaveChangesAsync()` for remove+add operations. |
+| RULE-318 | Desktop UI permission filtering MUST use API-based permission checks (`CurrentUserDto.Permissions`) — NEVER hardcoded role-to-permission mappings in XAML. |
+| RULE-319 | `DbSeeder` MUST seed 33 permissions across 9 categories (Sales=7, Purchases=5, Inventory=3, Customers=3, Suppliers=3, Products=3, Reports=1, Accounting=2, System=2, Operations=3, Audit=1) with 4-role assignments. |
+| RULE-320 | Default admin user MUST be seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`) — NEVER seed with a hardcoded password hash. |
 
 ## 3. Enums (Use These EXACT Values)
 

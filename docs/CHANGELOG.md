@@ -42,6 +42,18 @@ All notable changes to this project will be documented in this file.
 ### New Rules (AGENTS.md §2.67)
 - RULE-291 through RULE-298 — Settings Module (291-297) + CurrencyCode validation (298) code review remediations
 
+### Phase 21 — Users & Permissions Module (v4.6.9)
+- **16 tasks** implemented: Domain entities (User rebuild, Permission, RolePermission, AuditLog, UserSession) -> Infrastructure configs + seed (33 permissions, 4 roles, passwordless admin) -> Application services (AuditLogService, PermissionService, AuthService update) -> API controllers (10 new endpoints) -> Desktop UI (5 new/updated screens) -> Tests + Migration.
+- **User entity rebuilt**: Passwordless creation, UserStatus enum (Active/Inactive/Locked), MustChangePassword, Phone/Email/Avatar/DefaultCashBoxId, account lockout (5 failed attempts).
+- **Permissions system**: DB-backed Permission+RolePermission entities, 33 seed permissions across 9 categories, 4-role model (Admin/Accountant/Cashier/Observer), PermissionService with transactional updates, PermissionManagement UI with grouped checkboxes.
+- **Audit & Security**: AuditLog entity (long Id, 3 indexes), AuditLogService (paginated/filtered queries), AuditLog browser UI, UserSession tracking, login audit trail (Success/Failed/Locked).
+- **Auth enhancements**: Passwordless first-login flow (SetPassword), ChangePassword with current password verification, account lockout, MustChangePassword redirect.
+- **API endpoints**: POST /auth/set-password, POST /auth/change-password, GET /users/current, POST /users/{id}/reset-password, GET /audit-logs, GET /audit-logs/user/{id}, GET /audit-logs/login-history, GET /permissions, GET /permissions/roles, PUT /permissions/roles/{role}.
+- **Desktop UI**: Enhanced UserEditor (avatar 80x80, Phone/Email), PasswordChangeScreen (3 fields, INotifyDataErrorInfo), AuditLog browser (paginated DataGrid, filters), PermissionManagement (4-role tabs, category expanders, checkboxes), MainWindow StatusBar (avatar, role badge, change password, logout), permission-based nav visibility.
+- **Validators**: ChangePasswordRequestValidator, SetPasswordRequestValidator, AuditLogQueryValidator -- all with Arabic messages.
+- **EF Migration**: Phase21_UsersAndPermissions generated.
+- **Build**: All 6 projects 0 errors, 0 warnings. Tests: 1,887 passed, 5 pre-existing failures, 70 skipped.
+
 ## v4.6.8 — Currency Module Stabilization & EF Core Transaction Strategy (2026-06-06)
 
 ### What's New

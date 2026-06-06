@@ -1359,6 +1359,101 @@ await InvokeOnUIThreadAsync(() =>
 await InvokeOnUIThreadAsync(async () => { /* no await */ });  // ❌
 ```
 
+## v4.6.9 — Phase 21 Users & Permissions Module Patterns
+
+### Passwordless User Creation
+```csharp
+public static User Create(string userName, string fullName, UserRole role,
+    string? phone = null, string? email = null, int? defaultCashBoxId = null,
+    int? createdByUserId = null)
+{
+    if (string.IsNullOrWhiteSpace(userName))
+        throw new DomainException("اسم المستخدم مطلوب.");
+    if (string.IsNullOrWhiteSpace(fullName))
+        throw new DomainException("الاسم الكامل مطلوب.");
+    return new User
+    {
+        UserName = userName.Trim(),
+        FullName = fullName.Trim(),
+        Role = role,
+        Status = UserStatus.Active,
+        Phone = phone?.Trim(),
+        Email = email?.Trim(),
+        DefaultCashBoxId = defaultCashBoxId,
+        MustChangePassword = true,
+        PasswordHash = null,
+        LoginAttempts = 0,
+        CreatedByUserId = createdByUserId,
+        CreatedAt = DateTime.UtcNow
+    };
+}
+```
+
+### Login Attempt Tracking Pattern
+```csharp
+public void RecordLoginAttempt(bool success)
+{
+    if (success)
+    {
+        LoginAttempts = 0;
+        Status = UserStatus.Active;
+        LastLoginAt = DateTime.UtcNow;
+    }
+    else
+    {
+        LoginAttempts++;
+        if (LoginAttempts >= 5)
+            Status = UserStatus.Locked;
+    }
+}
+```
+
+### AuthService Login — MustChangePassword + Lockout
+```csharp
+if (user.Status == UserStatus.Locked)
+    return Result<LoginResponse>.Failure("الحساب مغلق مؤقتاً", ErrorCodes.AccountLocked);
+
+if (user.MustChangePassword || string.IsNullOrWhiteSpace(user.PasswordHash))
+    return Result<LoginResponse>.Failure("يجب تعيين كلمة المرور", ErrorCodes.RequiresPasswordSetup);
+```
+
+### Audit Entity Pattern (long Id)
+```csharp
+public class AuditLog
+{
+    public long Id { get; private set; }  // bigint for high volume
+    public int? UserId { get; private set; }
+    public string Action { get; private set; } = string.Empty;
+    // ...
+}
+```
+
+### Permission Entity with IsSystem Guard
+```csharp
+public class Permission : BaseEntity
+{
+    public string Name { get; private set; }
+    public string DisplayNameAr { get; private set; }
+    public bool IsSystem { get; private set; }  // System permissions cannot be deleted
+}
+```
+
+### PermissionService Transactional Update
+```csharp
+public async Task<Result> UpdateRolePermissionsAsync(UserRole role, List<int> permissionIds, CancellationToken ct)
+{
+    await _uow.ExecuteTransactionAsync(async () =>
+    {
+        var existing = await _uow.RolePermissions.GetQueryable()
+            .Where(rp => rp.Role == role).ToListAsync(ct);
+        _uow.RolePermissions.RemoveRange(existing);
+        foreach (var permId in permissionIds)
+            await _uow.RolePermissions.AddAsync(RolePermission.Create(role, permId), ct);
+    }, ct);
+    return Result.Success();
+}
+```
+
 ## Default Bug Fixing
 
 When implementing new features or modifying existing code, you MUST:

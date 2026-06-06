@@ -219,4 +219,15 @@ public void Create_Valid3CharCode_Succeeds(string code)
     var currency = Currency.Create("Test", code, "$", 1.0m);
     currency.Code.Should().Be(code);
 }
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. Test coverage for this module includes:
+- User entity: Create (passwordless), RecordLoginAttempt (success resets, failure locks at 5), SetInitialPassword (guards MustChangePassword), ChangePassword (verifies current), Unlock (admin only)
+- PermissionService: GetByRoleAsync, UpdateRolePermissionsAsync (atomic transaction, rollback on failure)
+- AuthService: LoginAsync (MustChangePassword redirect, lockout detection, audit log creation), SetPasswordAsync, ChangePasswordAsync
+- AuditLogService: LogAsync (all action types), QueryAsync (pagination, filtering by action/entity/date/user)
+- API controllers: AuthController (set-password, change-password success/failure cases), UsersController (current, reset-password, CRUD)
+- Desktop ViewModels: UserEditorViewModel (passwordless create, Phone/Email validation), PasswordChangeViewModel (3-field validation, API integration), AuditLogListViewModel (pagination, filtering), PermissionManagementViewModel (role tabs, grouped checkboxes, save)
+Key test pattern: All service tests verify Result<T>.IsSuccess/IsFailure — never exception-based testing.
 ```

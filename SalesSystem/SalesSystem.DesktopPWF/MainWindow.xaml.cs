@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using SalesSystem.Application.Updates;
 using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.ViewModels;
@@ -62,10 +63,27 @@ public partial class MainWindow : Window
         });
     }
 
-    private void UpdateUserInfo()
+    public void UpdateUserInfo()
     {
         TxtUserName.Text = _session.GetUserName() ?? "مستخدم";
-        TxtUserRole.Text = GetRoleDisplayName(_session.GetUserRole());
+        var role = _session.GetUserRole();
+        TxtUserRole.Text = GetRoleDisplayName(role);
+
+        // Update role badge color
+        var badgeColor = role switch
+        {
+            UserRole.Admin => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"), // Green
+            UserRole.Manager => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#3B82F6"), // Blue
+            UserRole.Cashier => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#F59E0B"), // Amber
+            _ => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#6B7280")
+        };
+        if (badgeColor.HasValue)
+        {
+            RoleBadge.Background = new SolidColorBrush(System.Windows.Media.Color.FromArgb(25, badgeColor.Value.R, badgeColor.Value.G, badgeColor.Value.B));
+            TxtUserRole.Foreground = new SolidColorBrush(badgeColor.Value);
+        }
+
+        CurrentDateText.Text = DateTime.Now.ToString("dddd, yyyy/MM/dd HH:mm");
     }
 
     private string GetRoleDisplayName(UserRole? role)
@@ -77,6 +95,22 @@ public partial class MainWindow : Window
             UserRole.Cashier => "كاشير",
             _ => "غير معروف"
         };
+    }
+
+    private void BtnChangePassword_Click(object sender, RoutedEventArgs e)
+    {
+        var vm = new PasswordChangeViewModel(
+            App.GetService<IAuthApiService>(),
+            _dialogService,
+            App.GetService<Services.App.Toast.IToastNotificationService>());
+        var screenService = App.GetService<IScreenWindowService>();
+        screenService.OpenScreen(vm, new ScreenWindowOptions
+        {
+            Title = "تغيير كلمة المرور",
+            Width = 450,
+            Height = 300,
+            IsModal = true
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════

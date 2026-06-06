@@ -2,7 +2,22 @@ using SalesSystem.Domain.Accounting.Enums;
 
 namespace SalesSystem.Contracts.DTOs;
 
-public record UserDto(int Id, string UserName, string FullName, byte Role, bool IsActive);
+public record UserDto(int Id, string UserName, string FullName, byte Role,
+    byte Status, bool MustChangePassword, DateTime? PasswordChangedAt,
+    string? Phone, string? Email, string? AvatarPath,
+    DateTime? LastLoginAt, int LoginAttempts, int? DefaultCashBoxId);
+
+public record AuditLogDto(int Id, int? UserId, string? UserName, string Action,
+    string EntityType, int? EntityId, string? Details, string? IpAddress, DateTime Timestamp);
+
+public record PermissionDto(int Id, string Name, string DisplayNameAr, string? Category, bool IsActive);
+
+public record RolePermissionDto(byte Role, List<int> PermissionIds);
+
+public record CurrentUserDto(int Id, string UserName, string FullName, byte Role,
+    string? AvatarPath, List<string> Permissions);
+
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
 
 public record UnitDto(int Id, string Name, string? Symbol, bool IsActive);
 
@@ -598,4 +613,22 @@ public record SystemAccountMappingsDto(
     string? SpoilageLossAccountCode,
     int? BranchId
 );
+
+// ─── Audit ────────────────────────────────────────────
+
+public record AuditLogQuery
+{
+    public int? UserId { get; init; }
+    public string? Action { get; init; }
+    public string? EntityType { get; init; }
+    public DateTime? From { get; init; }
+    public DateTime? To { get; init; }
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 50;
+}
+
+public record PaginatedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize)
+{
+    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
+}
 

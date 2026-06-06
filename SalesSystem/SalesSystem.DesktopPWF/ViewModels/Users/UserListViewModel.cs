@@ -228,7 +228,7 @@ public class UserListViewModel : AdminOnlyViewModel
             return;
         }
 
-        if (SelectedUser.IsActive)
+        if (SelectedUser.Status == 1)
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
                 "تأكيد تعطيل الحساب",
@@ -273,7 +273,7 @@ public class UserListViewModel : AdminOnlyViewModel
         var request = new UpdateUserRequest(
             FullName: SelectedUser!.FullName,
             Role: SelectedUser.Role,
-            IsActive: true,
+            Status: (byte)1,
             Password: null
         );
 
@@ -309,7 +309,7 @@ public class UserListViewModel : AdminOnlyViewModel
         var request = new UpdateUserRequest(
             FullName: SelectedUser!.FullName,
             Role: SelectedUser.Role,
-            IsActive: SelectedUser.IsActive,
+            Status: SelectedUser.Status,
             Password: "123456"
         );
 

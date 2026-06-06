@@ -46,3 +46,7 @@ Service Layer pattern (NO CQRS/MediatR) — all business logic in Application Se
 - Write WinForms code (project is WPF/MVVM — use SalesSystem.DesktopPWF patterns)
 - Skip transaction planning for financial operations
 - Deviate from PRD solution structure
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. Implementation order for similar modules: Domain entities → Infrastructure configs + seed data → Application services → API controllers + validators → Desktop ViewModels + Views → Tests → EF Migration. Key architectural decisions: 1) Passwordless creation (admin creates user, user sets password on first login), 2) DB-backed permissions replacing hardcoded enum, 3) AuditLog with long PK for high-volume data.

@@ -266,4 +266,7 @@ public class ReceiptPrinter
             new RectangleF(0, y, PageWidth, 12), rightAlign);
     }
 }
-```
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. No direct changes to the printing engine. However, Desktop UI permission-based visibility now controls access to print buttons (e.g., Cashier may see print button but Observer may not). ApplyPermissions() in MainWindow controls nav visibility including print-related screens.

@@ -27,6 +27,8 @@ using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
+using SalesSystem.DesktopPWF.ViewModels.Audit;
+using SalesSystem.DesktopPWF.ViewModels.Permissions;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 
@@ -196,6 +198,10 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ITaxesApiService, TaxesApiService>();
         services.AddSingleton<ICurrencyApiService, CurrencyApiService>();
 
+        // Audit & Permission Services
+        services.AddSingleton<IAuditLogApiService, AuditLogApiService>();
+        services.AddSingleton<IPermissionApiService, PermissionApiService>();
+
         // Printing
         services.AddSingleton<Services.App.IInvoicePrinter, Services.Printing.InvoicePrinter>();
         services.AddSingleton<Services.App.IReceiptPrinter, Services.Printing.ReceiptPrinter>();
@@ -267,6 +273,11 @@ public partial class App : System.Windows.Application
         services.AddTransient<CashTransferViewModel>();
         services.AddTransient<DailyClosureViewModel>();
         services.AddTransient<ExpiredProductsReportViewModel>();
+
+        // Audit & Permission ViewModels
+        services.AddTransient<AuditLogListViewModel>();
+        services.AddTransient<PermissionManagementViewModel>();
+        services.AddTransient<PasswordChangeViewModel>();
 
         // Financial Report ViewModels
         services.AddTransient<ViewModels.Reports.IncomeStatementViewModel>();

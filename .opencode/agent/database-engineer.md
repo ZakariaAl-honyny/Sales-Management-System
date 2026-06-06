@@ -153,3 +153,127 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 ### Repository Patterns
 - `SetBatchSystemSettingsAsync()` must NOT call `SaveChangesAsync()` — let service layer commit via `_uow.SaveChangesAsync()`
 - `SetStringAsync()` must accept `category` parameter — never hardcode `category: "Print"`
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds 4 new tables and modifies the Users table.
+
+### New Tables
+
+#### Permissions
+- `Id` int PK
+- `Name` nvarchar(100) NOT NULL — unique, e.g., "Sales.Create", "Products.Edit"
+- `DisplayName` nvarchar(150) NOT NULL — Arabic display name
+- `Category` nvarchar(50) NOT NULL — e.g., "Sales", "Purchases", "Inventory"
+- `IsSystem` bit NOT NULL default 0 — system permissions (IsSystem=true) cannot be deleted/modified
+- `CreatedAt` datetime2 NOT NULL
+- Index: `Name` unique filtered `[IsSystem] = 0` (system permissions names are also unique but allow filtering)
+- FK: none
+
+#### RolePermissions
+- `RoleId` tinyint NOT NULL — FK to `UserRole` enum value (1=Admin, 2=Manager, 3=Cashier)
+- `PermissionId` int NOT NULL — FK to Permissions with Restrict
+- Composite PK: `(RoleId, PermissionId)`
+- FK: `DeleteBehavior.Restrict` on both FKs
+
+#### AuditLogs
+- `Id` bigint NOT NULL IDENTITY — **bigint** for high-volume audit (NEVER int)
+- `UserId` int NULL FK to Users
+- `Action` nvarchar(50) NOT NULL — e.g., "LoginSuccess", "LoginFailed", "PasswordSet", "PasswordChanged"
+- `EntityType` nvarchar(50) NULL — e.g., "User", "Permission", "SalesInvoice"
+- `EntityId` int NULL
+- `Details` nvarchar(500) NULL — JSON or free text with additional context
+- `Timestamp` datetime2 NOT NULL default GETUTCDATE()
+- `IpAddress` nvarchar(45) NULL
+- Indexes:
+  - `(UserId, Timestamp DESC)` — user activity history queries
+  - `(EntityType, EntityId)` — entity-specific audit queries
+  - `(Timestamp DESC)` — general chronological queries
+- FK: `DeleteBehavior.Restrict` on UserId FK
+
+#### UserSessions
+- `Id` int PK
+- `UserId` int NOT NULL FK to Users
+- `TokenHash` nvarchar(255) NOT NULL — SHA256 hash of JWT token
+- `IpAddress` nvarchar(45) NULL
+- `ExpiresAt` datetime2 NOT NULL
+- `IsRevoked` bit NOT NULL default 0
+- `CreatedAt` datetime2 NOT NULL
+- Index: `(UserId, IsRevoked)` — find active sessions
+- FK: `DeleteBehavior.Restrict` on UserId
+
+### Modified Tables
+
+#### Users (modified)
+- **REMOVED**: `IsActive` bit column
+- **ADDED**: `Status` tinyint NOT NULL default 1 — maps to `UserStatus` enum (Active=1, Inactive=2, Locked=3)
+- **ADDED**: `FailedLoginAttempts` int NOT NULL default 0
+- **ADDED**: `MustChangePassword` bit NOT NULL default 1 (true for new passwordless users)
+- **CHANGED**: `PasswordHash` nvarchar(255) NULL — nullable for passwordless creation
+- **CHANGED**: Global query filter: `.HasQueryFilter(u => u.Status == UserStatus.Active)` replaces `u.IsActive`
+
+### Fluent API Config Rules
+
+#### UserConfiguration
+```csharp
+builder.Property(u => u.Status).HasConversion<int>().IsRequired().HasDefaultValue(1);
+builder.Property(u => u.PasswordHash).HasMaxLength(255).IsRequired(false);
+builder.Property(u => u.FailedLoginAttempts).IsRequired().HasDefaultValue(0);
+builder.Property(u => u.MustChangePassword).IsRequired().HasDefaultValue(true);
+builder.HasQueryFilter(u => u.Status == UserStatus.Active);
+```
+
+#### PermissionConfiguration
+```csharp
+builder.Property(p => p.Name).HasMaxLength(100).IsRequired();
+builder.Property(p => p.DisplayName).HasMaxLength(150).IsRequired();
+builder.Property(p => p.Category).HasMaxLength(50).IsRequired();
+builder.HasIndex(p => p.Name).IsUnique().HasFilter("[IsSystem] = 0");
+```
+
+#### RolePermissionConfiguration
+```csharp
+builder.HasKey(rp => new { rp.RoleId, rp.PermissionId });
+builder.HasOne(rp => rp.Permission).WithMany().HasForeignKey(rp => rp.PermissionId).OnDelete(DeleteBehavior.Restrict);
+// RoleId is a value object (UserRole enum) — no FK navigation to a Roles table
+```
+
+#### AuditLogConfiguration
+```csharp
+builder.Property(a => a.Id).ValueGeneratedOnAdd(); // bigint identity
+builder.Property(a => a.Action).HasMaxLength(50).IsRequired();
+builder.Property(a => a.EntityType).HasMaxLength(50).IsRequired(false);
+builder.Property(a => a.Details).HasMaxLength(500).IsRequired(false);
+builder.Property(a => a.IpAddress).HasMaxLength(45).IsRequired(false);
+builder.HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+builder.HasIndex(a => new { a.UserId, a.Timestamp }).IsDescending(false, true);
+builder.HasIndex(a => new { a.EntityType, a.EntityId });
+builder.HasIndex(a => a.Timestamp);
+```
+
+#### UserSessionConfiguration
+```csharp
+builder.Property(us => us.TokenHash).HasMaxLength(255).IsRequired();
+builder.Property(us => us.IpAddress).HasMaxLength(45).IsRequired(false);
+builder.HasOne(us => us.User).WithMany().HasForeignKey(us => us.UserId).OnDelete(DeleteBehavior.Restrict);
+builder.HasIndex(us => new { us.UserId, us.IsRevoked });
+```
+
+### Seeded Data
+
+**Admin User:** Passwordless, MustChangePassword=true, Status=Active
+
+**33 Permissions across 9 categories:**
+- Sales (7): Create, Edit, Delete, View, Post, Cancel, Print
+- Purchases (5): Create, Edit, Delete, View, Post
+- Inventory (3): Adjust, Transfer, View
+- Customers (3): Create, Edit, View
+- Suppliers (3): Create, Edit, View
+- Products (3): Create, Edit, View
+- Reports (1): ViewAll
+- Accounting (2): ViewJournal, PostJournal
+- System (2): ManageUsers, ManageSettings
+- Operations (3): ManagePrinters, ManageBackup, ViewAuditLog
+- Audit (1): ViewAuditLog
+
+**4-Role Matrix:** Admin=ALL, Manager=subset (no System/Accounting post), Cashier=sales+customers view+inventory view

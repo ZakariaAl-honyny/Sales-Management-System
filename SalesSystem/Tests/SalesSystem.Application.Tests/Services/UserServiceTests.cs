@@ -5,6 +5,7 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using System.Linq.Expressions;
@@ -19,6 +20,7 @@ public class UserServiceTests
 {
     private readonly ITestOutputHelper _output;
     private readonly Mock<IUnitOfWork> _mockUow;
+    private readonly Mock<IPermissionService> _mockPermissionService;
     private readonly Mock<ILogger<UserService>> _mockLogger;
 
     private readonly UserService _sut;
@@ -29,9 +31,10 @@ public class UserServiceTests
         _output.WriteLine("[TEST] UserServiceTests initialized");
 
         _mockUow = new Mock<IUnitOfWork>();
+        _mockPermissionService = new Mock<IPermissionService>();
         _mockLogger = new Mock<ILogger<UserService>>();
 
-        _sut = new UserService(_mockUow.Object, _mockLogger.Object);
+        _sut = new UserService(_mockUow.Object, _mockPermissionService.Object, _mockLogger.Object);
     }
 
     #region GetByIdAsync Tests
@@ -41,7 +44,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingUser_ReturnsDto");
 
-        var user = User.Create("testuser", "hash123", "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", "hash123", "Test User", UserRole.Admin);
 
         _mockUow.Setup(u => u.Users.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
@@ -76,9 +79,9 @@ public class UserServiceTests
     #region CreateAsync Tests
 
     [Fact]
-    public async Task CreateAsync_ValidRequest_CreatesUserWithHashedPassword()
+    public async Task CreateAsync_ValidRequest_CreatesUserPasswordless()
     {
-        _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesUserWithHashedPassword");
+        _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesUserPasswordless");
 
         var usersList = new List<User>();
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
@@ -90,20 +93,20 @@ public class UserServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        var request = new SalesSystem.Contracts.Requests.CreateUserRequest("newuser", "password123", "New User", (byte)UserRole.Admin);
+        var request = new CreateUserRequest("newuser", "New User", (byte)UserRole.Admin);
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.UserName.Should().Be("newuser");
 
-        // Verify password is hashed (not stored in plain text)
+        // Verify user is created without password (passwordless flow)
         _mockUow.Verify(u => u.Users.AddAsync(
-            It.Is<User>(user => !user.PasswordHash.Equals("password123")),
+            It.Is<User>(user => user.PasswordHash == null && user.MustChangePassword),
             It.IsAny<CancellationToken>()), Times.Once,
-            "Password should be hashed before storage");
+            "User should be created without password");
 
-        _output.WriteLine("[PASS] CreateAsync hashes password correctly");
+        _output.WriteLine("[PASS] CreateAsync creates passwordless user");
     }
 
     [Fact]
@@ -111,12 +114,12 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] CreateAsync_DuplicateUsername_ReturnsFailure");
 
-        var existingUser = User.Create("existinguser", "hash123", "Existing User", UserRole.Admin);
+        var existingUser = User.CreateWithPassword("existinguser", "hash123", "Existing User", UserRole.Admin);
 
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<User> { existingUser });
 
-        var request = new SalesSystem.Contracts.Requests.CreateUserRequest("existinguser", "password123", "New User", (byte)UserRole.Admin); // Duplicate (case-insensitive)
+        var request = new CreateUserRequest("existinguser", "New User", (byte)UserRole.Admin); // Duplicate (case-insensitive)
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -131,12 +134,12 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] CreateAsync_CaseInsensitiveDuplicate_ReturnsFailure");
 
-        var existingUser = User.Create("TestUser", "hash123", "Test User", UserRole.Admin);
+        var existingUser = User.CreateWithPassword("TestUser", "hash123", "Test User", UserRole.Admin);
 
         _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<User> { existingUser });
 
-        var request = new SalesSystem.Contracts.Requests.CreateUserRequest("TESTUSER", "password123", "Another User", (byte)UserRole.Admin); // Same name different case
+        var request = new CreateUserRequest("TESTUSER", "Another User", (byte)UserRole.Admin); // Same name different case
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -155,7 +158,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesUser");
 
-        var user = User.Create("testuser", "hash123", "Original Name", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", "hash123", "Original Name", UserRole.Admin);
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync(user);
@@ -163,7 +166,7 @@ public class UserServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        var request = new SalesSystem.Contracts.Requests.UpdateUserRequest("Updated Name", (byte)UserRole.Manager, true, null); // No password change
+        var request = new UpdateUserRequest("Updated Name", (byte)UserRole.Manager, (byte)UserStatus.Active, null);
 
         var result = await _sut.UpdateAsync(1, request, CancellationToken.None);
 
@@ -178,7 +181,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] UpdateAsync_WithPasswordChange_UpdatesHashedPassword");
 
-        var user = User.Create("testuser", "oldhash", "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", "oldhash", "Test User", UserRole.Admin);
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync(user);
@@ -186,7 +189,7 @@ public class UserServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        var request = new SalesSystem.Contracts.Requests.UpdateUserRequest("Test User", (byte)UserRole.Admin, true, "newpassword123");
+        var request = new UpdateUserRequest("Test User", (byte)UserRole.Admin, (byte)UserStatus.Active, "newpassword123");
 
         var result = await _sut.UpdateAsync(1, request, CancellationToken.None);
 
@@ -205,7 +208,7 @@ public class UserServiceTests
         _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync((User?)null);
 
-        var request = new SalesSystem.Contracts.Requests.UpdateUserRequest("Updated", (byte)UserRole.Admin, true, null);
+        var request = new UpdateUserRequest("Updated", (byte)UserRole.Admin, (byte)UserStatus.Active, null);
 
         var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
 
@@ -224,7 +227,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] DeleteAsync_ExistingUser_SoftDeletes");
 
-        var user = User.Create("testuser", "hash123", "Test User", UserRole.Manager);
+        var user = User.CreateWithPassword("testuser", "hash123", "Test User", UserRole.Manager);
         user.Restore();
 
         _mockUow.Setup(u => u.Users.GetByIdAsync(1, It.IsAny<CancellationToken>()))
@@ -248,7 +251,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] DeleteAsync_LastActiveAdmin_ReturnsFailure");
 
-        var admin = User.Create("admin", "hash123", "Admin User", UserRole.Admin);
+        var admin = User.CreateWithPassword("admin", "hash123", "Admin User", UserRole.Admin);
         admin.Restore();
 
         var users = new List<User> { admin };
@@ -294,9 +297,9 @@ public class UserServiceTests
 
         var users = new List<User>
         {
-            User.Create("user1", "hash1", "User One", UserRole.Admin),
-            User.Create("user2", "hash2", "User Two", UserRole.Manager),
-            User.Create("user3", "hash3", "User Three", UserRole.Cashier)
+            User.CreateWithPassword("user1", "hash1", "User One", UserRole.Admin),
+            User.CreateWithPassword("user2", "hash2", "User Two", UserRole.Manager),
+            User.CreateWithPassword("user3", "hash3", "User Three", UserRole.Cashier)
         };
 
         _mockUow.Setup(u => u.Users.ToListAsync(It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
@@ -308,42 +311,6 @@ public class UserServiceTests
         result.Value.Should().HaveCount(3);
 
         _output.WriteLine("[PASS] GetAllAsync returns all users");
-    }
-
-    #endregion
-
-    #region Password Hashing Tests
-
-    [Fact]
-    public async Task CreateAsync_UsesBCryptWithWorkFactor12()
-    {
-        _output.WriteLine("[TEST] CreateAsync_UsesBCryptWithWorkFactor12");
-
-        var usersList = new List<User>();
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
-
-        User? capturedUser = null;
-        _mockUow.Setup(u => u.Users.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
-            .Callback<User, CancellationToken>((u, ct) => capturedUser = u)
-            .ReturnsAsync((User u, CancellationToken ct) => u);
-
-        _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        var request = new SalesSystem.Contracts.Requests.CreateUserRequest("testuser", "password123", "Test User", (byte)UserRole.Admin);
-
-        await _sut.CreateAsync(request, CancellationToken.None);
-
-        capturedUser.Should().NotBeNull();
-        // BCrypt hashes start with "$2"
-        capturedUser!.PasswordHash.Should().StartWith("$2");
-        // Verify it's a valid BCrypt hash by checking it's not the plain password
-        capturedUser.PasswordHash.Should().NotBe("password123");
-        // BCrypt hashes are typically 60 characters
-        capturedUser.PasswordHash.Length.Should().Be(60);
-
-        _output.WriteLine("[PASS] Password is hashed with BCrypt work factor 12");
     }
 
     #endregion

@@ -267,11 +267,13 @@ public interface IUserApiService
     Task<Result<UserDto>> UpdateAsync(int id, UpdateUserRequest request);
     Task<Result> DeleteAsync(int id);
     Task<Result> DeletePermanentlyAsync(int id);
+    Task<Result<CurrentUserDto>> GetCurrentUserAsync();
 }
 
 public interface IAuthApiService
 {
     Task<Result<LoginResponse>> LoginAsync(LoginRequest request);
+    Task<Result> ChangePasswordAsync(ChangePasswordRequest request);
 }
 
 public interface IDashboardApiService
@@ -450,6 +452,20 @@ public interface IFinancialReportApiService
     Task<Result<List<VatReportDto>>> GetVatReportAsync(DateTime from, DateTime to, CancellationToken ct = default);
     Task<Result<List<AccountStatementDto>>> GetCustomerAccountStatementAsync(int customerId, DateTime from, DateTime to, CancellationToken ct = default);
     Task<Result<List<AccountStatementDto>>> GetSupplierAccountStatementAsync(int supplierId, DateTime from, DateTime to, CancellationToken ct = default);
+}
+
+public interface IAuditLogApiService
+{
+    Task<Result<PagedResult<AuditLogDto>>> QueryAsync(AuditLogQuery query);
+    Task<Result<List<AuditLogDto>>> GetUserHistoryAsync(int userId, int limit = 50);
+    Task<Result<List<AuditLogDto>>> GetLoginHistoryAsync(int? userId, int limit = 50);
+}
+
+public interface IPermissionApiService
+{
+    Task<Result<List<PermissionDto>>> GetAllAsync();
+    Task<Result<Dictionary<byte, List<int>>>> GetRolePermissionsAsync();
+    Task<Result> UpdateRolePermissionsAsync(byte role, List<int> permissionIds);
 }
 
 

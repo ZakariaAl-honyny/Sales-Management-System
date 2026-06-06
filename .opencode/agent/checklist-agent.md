@@ -77,3 +77,16 @@ Enforces AGENTS.md rules and Clean Architecture constraints.
 ## Output Format
 For each item: `✅ PASS` or `❌ FAIL: [specific violation]`
 Summary: `X/Y checks passed`
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 is complete. Key checklist items for this module:
+- [ ] UserStatus enum: Active=1, Inactive=2, Locked=3
+- [ ] Passwordless User.Create() — no password parameter
+- [ ] RecordLoginAttempt() logic: success resets counter, failure increments (lock at 5)
+- [ ] Permission.IsSystem = true blocks deletion/modification
+- [ ] AuditLog uses long Id (bigint) with 3 indexes
+- [ ] All FK on Permission, RolePermission, AuditLog, UserSession use Restrict
+- [ ] PermissionService.UpdateRolePermissionsAsync() uses ExecuteTransactionAsync
+- [ ] DbSeeder seeds 33 permissions with 4-role assignments
+- [ ] Admin user seeded passwordless (PasswordHash = null)

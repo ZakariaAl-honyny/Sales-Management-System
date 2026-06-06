@@ -250,6 +250,20 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] `Currency` entity has `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods — NOT direct `IsBaseCurrency = true/false` in service code.
 - [ ] `InvokeOnUIThreadAsync` callbacks don't use `async` when no `await` exists in the lambda.
 
+### Phase 21 Users & Permissions — Complete Checklist (v4.6.9)
+- [ ] `User.Create()` uses passwordless creation — `PasswordHash = null`, `MustChangePassword = true`
+- [ ] `UserStatus` enum replaces `IsActive` bool — EF query filter on `Status == UserStatus.Active`
+- [ ] `RecordLoginAttempt()` used for ALL login attempts — lockout at 5 failures
+- [ ] `Permission` entity has `IsSystem` guard — system permissions never modifiable
+- [ ] `AuditLog` uses `long Id` with 3 performance indexes
+- [ ] All new entities use `DeleteBehavior.Restrict` on ALL FKs
+- [ ] `AuthService.LoginAsync` checks `MustChangePassword` before password verification
+- [ ] `AuthService.ChangePasswordAsync` validates current password via BCrypt
+- [ ] Login audit entries created for every success/failure/lockout
+- [ ] `PermissionService.UpdateRolePermissionsAsync` uses `ExecuteTransactionAsync`
+- [ ] DbSeeder seeds 33 permissions across 9 categories with 4-role assignments
+- [ ] Default admin seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`)
+
 ### Key Checkpoints
 - [ ] `SetBatchSystemSettingsAsync()` does NOT call `SaveChangesAsync()` — check that the repo only prepares entities.
 - [ ] Every `Update()` method in Domain entities calls `UpdateTimestamp()` at the end.

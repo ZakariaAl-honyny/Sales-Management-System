@@ -46,6 +46,10 @@ public interface IUnitOfWork
     IGenericRepository<FiscalYearClosure> FiscalYearClosures { get; }
     IGenericRepository<Currency> Currencies { get; }
     IGenericRepository<ExchangeRateHistory> ExchangeRateHistories { get; }
+    IGenericRepository<Permission> Permissions { get; }
+    IGenericRepository<RolePermission> RolePermissions { get; }
+    IGenericRepository<AuditLog> AuditLogs { get; }
+    IGenericRepository<UserSession> UserSessions { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
     Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken ct = default);

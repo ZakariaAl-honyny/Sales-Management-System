@@ -156,6 +156,8 @@ builder.Services.AddScoped<IProductUnitService, ProductUnitService>();
 builder.Services.AddScoped<IPrintDataService, PrintDataService>();
 builder.Services.AddScoped<InvoicePrintDtoBuilder>();
 builder.Services.AddScoped<ILogService, LogService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
 
 // ─── Accounting Services ────────────────────────────────────
 builder.Services.AddScoped<IJournalEntryService, JournalEntryService>();

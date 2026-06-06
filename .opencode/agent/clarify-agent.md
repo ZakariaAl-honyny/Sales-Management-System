@@ -33,3 +33,7 @@ Surface hidden assumptions and underspecified areas BEFORE planning begins.
 - Wait for human answers before proceeding
 - Reference PRD section in every question
 - Never write code or modify specs
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. Clarification questions for this module should focus on: role-permission matrix configuration, lockout policy customization, AuditLog retention requirements, and UserSession expiry cleanup strategy.
