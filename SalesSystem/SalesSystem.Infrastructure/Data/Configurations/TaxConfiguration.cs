@@ -15,6 +15,6 @@ public class TaxConfiguration : IEntityTypeConfiguration<Tax>
         builder.HasIndex(t => t.Name).IsUnique();
         builder.HasQueryFilter(t => t.IsActive);
         builder.ToTable(t => t.HasCheckConstraint("CHK_Taxes_Rate_Range", "[Rate] >= 0 AND [Rate] <= 100"));
-        builder.HasIndex(t => t.IsDefault).IsUnique().HasFilter("[IsDefault] = 1");
+        builder.HasIndex(t => t.IsDefault).IsUnique().HasFilter("[IsDefault] = 1 AND [IsActive] = 1");
     }
 }

@@ -22,8 +22,7 @@ public class SettingsViewModel : ViewModelBase
     private string? _phone;
     private string? _email;
     private string? _address;
-    private decimal _defaultTaxRate;
-    private string _invoicePrefix = "INV";
+    // DEPRECATED: backing fields for DefaultTaxRate and InvoicePrefix removed — keep properties as stubs
     private bool _enableStockAlerts = true;
     private bool _allowNegativeStock;
     private bool _autoUpdatePrices;
@@ -96,14 +95,14 @@ public class SettingsViewModel : ViewModelBase
     public decimal DefaultTaxRate
     {
         get => 0m;
-        set { _defaultTaxRate = 0m; OnPropertyChanged(); }
+        set { OnPropertyChanged(); }
     }
 
     // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead. Remove in Phase 20.
     public string InvoicePrefix
     {
         get => string.Empty;
-        set { _invoicePrefix = string.Empty; OnPropertyChanged(); }
+        set { OnPropertyChanged(); }
     }
 
     public bool EnableStockAlerts
@@ -458,7 +457,7 @@ public class SettingsViewModel : ViewModelBase
             App.GetService<IEventBus>().Publish(new StoreSettingsChangedMessage());
 
             StatusMessage = "✅ تم حفظ الإعدادات بنجاح";
-            _ = Task.Delay(3000).ContinueWith(_ => StatusMessage = string.Empty);
+            _ = Task.Run(async () => { await Task.Delay(3000); await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => StatusMessage = string.Empty); });
         }
         else
         {

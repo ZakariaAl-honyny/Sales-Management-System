@@ -262,7 +262,7 @@ public class BackupViewModel : ViewModelBase
             StatusMessage = "✅ تم استعادة قاعدة البيانات بنجاح. سيتم إغلاق النظام لإعادة التحميل.";
             await _dialogService.ShowSuccessAsync("نجاح الاستعادة", StatusMessage);
 
-            System.Windows.Application.Current.Shutdown();
+            _eventBus.Publish(new ApplicationShutdownMessage());
         }
         else
         {

@@ -25,6 +25,12 @@ public class SystemSetting : BaseEntity
     {
         if (string.IsNullOrWhiteSpace(settingKey))
             throw new DomainException("مفتاح الإعداد مطلوب.");
+        if (string.IsNullOrWhiteSpace(category))
+            throw new DomainException("تصنيف الإعداد مطلوب.");
+
+        var validDataTypes = new[] { "string", "int", "bool", "decimal" };
+        if (!validDataTypes.Contains(dataType))
+            throw new DomainException("نوع البيانات غير صالح. يجب أن يكون string أو int أو bool أو decimal.");
 
         return new SystemSetting
         {

@@ -99,6 +99,19 @@ public static class DbSeeder
                 SystemSetting.Create("PrintCopies", "1", "int", "Print", "عدد النسخ", "عدد نسخ الطباعة الافتراضية"),
                 SystemSetting.Create("ShowBalanceOnPrint", "true", "bool", "Print", "إظهار الرصيد", "إظهار رصيد الحساب في الفاتورة المطبوعة"),
                 SystemSetting.Create("PrintSignature", "false", "bool", "Print", "طباعة التوقيع", "طباعة التوقيع في أسفل الفاتورة"),
+                // ── Sales (continued) ──
+                SystemSetting.Create("HideTaxInSales", "false", "bool", "Sales", "إخفاء الضريبة في المبيعات", "إخفاء حقل الضريبة في شاشة فاتورة البيع"),
+                SystemSetting.Create("ShowExpiryInInvoices", "false", "bool", "Sales", "إظهار تاريخ الانتهاء", "إظهار تاريخ انتهاء الصلاحية في الفاتورة"),
+                // ── Purchases (continued) ──
+                SystemSetting.Create("HideTaxInPurchases", "false", "bool", "Purchases", "إخفاء الضريبة في المشتريات", "إخفاء حقل الضريبة في شاشة فاتورة الشراء"),
+                // ── Print (continued) ──
+                SystemSetting.Create("ShowLogo", "true", "bool", "Print", "إظهار الشعار", "إظهار شعار المتجر في الفواتير المطبوعة"),
+                SystemSetting.Create("FooterNote", "", "string", "Print", "ملاحظة في التذييل", "نص يظهر في تذييل جميع الفواتير المطبوعة"),
+                // ── Notifications ──
+                SystemSetting.Create("LowStockAlert", "true", "bool", "Notifications", "تنبيه المخزون المنخفض", "تفعيل التنبيه عند انخفاض المخزون عن الحد الأدنى"),
+                SystemSetting.Create("ExpiryAlert", "true", "bool", "Notifications", "تنبيه تواريخ الانتهاء", "تفعيل التنبيه عند اقتراب تاريخ انتهاء المنتجات"),
+                SystemSetting.Create("ExpiryAlertDays", "30", "int", "Notifications", "أيام تنبيه الانتهاء", "عدد الأيام قبل تاريخ الانتهاء لإرسال التنبيه"),
+                SystemSetting.Create("CreditLimitAlert", "true", "bool", "Notifications", "تنبيه الحد الائتماني", "تفعيل التنبيه عند تجاوز الحد الائتماني للعميل"),
             };
             db.SystemSettings.AddRange(settings);
             logger?.LogInformation("Seeded {Count} SystemSettings key-value pairs.", settings.Count);
@@ -124,7 +137,7 @@ public static class DbSeeder
         // ═══════════════════════════════════════════════════
         if (!await db.StoreSettings.AnyAsync())
         {
-            var storeSettings = StoreSettings.Create("متجري", currencyCode: "SAR", defaultTaxRate: 15m, isTaxEnabled: false, enableStockAlerts: true, allowNegativeStock: false, autoUpdatePrices: true, invoicePrefix: "INV");
+            var storeSettings = StoreSettings.Create("متجري", currencyCode: "SAR", defaultTaxRate: 0m, isTaxEnabled: false, enableStockAlerts: true, allowNegativeStock: false, autoUpdatePrices: true, invoicePrefix: "INV");
             db.StoreSettings.Add(storeSettings);
             logger?.LogInformation("Seeded StoreSettings.");
         }

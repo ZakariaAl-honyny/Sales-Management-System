@@ -14,6 +14,7 @@ public class CustomerPaymentConfiguration : IEntityTypeConfiguration<CustomerPay
         builder.HasIndex(cp => cp.PaymentNo).IsUnique();
         builder.Property(cp => cp.Amount).IsRequired().HasPrecision(18, 2);
         builder.Property(cp => cp.PaymentMethod).IsRequired();
+        builder.Property(cp => cp.ExchangeRate).HasPrecision(18, 2);
         builder.Property(cp => cp.ReferenceNo).HasMaxLength(50);
         builder.Property(cp => cp.Notes).HasMaxLength(500);
 
@@ -36,6 +37,7 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
         builder.HasIndex(sp => sp.PaymentNo).IsUnique();
         builder.Property(sp => sp.Amount).IsRequired().HasPrecision(18, 2);
         builder.Property(sp => sp.PaymentMethod).IsRequired();
+        builder.Property(sp => sp.ExchangeRate).HasPrecision(18, 2);
         builder.Property(sp => sp.ReferenceNo).HasMaxLength(50);
         builder.Property(sp => sp.Notes).HasMaxLength(500);
 

@@ -42,10 +42,11 @@ public sealed class StoreSettingsService : IStoreSettingsService
     {
         try
         {
-            await using var tx = await _uow.BeginTransactionAsync(ct);
-            try
+            StoreSettings? settings = null;
+
+            await _uow.ExecuteTransactionAsync(async () =>
             {
-                var settings = (await _uow.StoreSettings.GetAllAsync(ct)).FirstOrDefault();
+                settings = (await _uow.StoreSettings.GetAllAsync(ct)).FirstOrDefault();
 
                 if (settings == null)
                 {
@@ -92,25 +93,18 @@ public sealed class StoreSettingsService : IStoreSettingsService
                 // Write SystemSettings via repo (no internal SaveChanges — tracked by ChangeTracker)
                 var costingMethod = (Domain.Enums.CostingMethod)request.CostingMethod;
                 await _systemSettingsRepo.SetCostingMethodAsync(costingMethod, ct);
-                await _systemSettingsRepo.SetStringAsync("Backup.BackupPath", request.BackupPath ?? "", userId, ct);
-                await _systemSettingsRepo.SetStringAsync("Backup.ScheduleTime", request.BackupScheduleTime ?? "02:00", userId, ct);
-                await _systemSettingsRepo.SetStringAsync("Backup.RetentionDays", request.BackupRetentionDays.ToString(), userId, ct);
-                await _systemSettingsRepo.SetStringAsync("Update.ServerUrl", request.UpdateServerUrl ?? "", userId, ct);
+                await _systemSettingsRepo.SetStringAsync("Backup.BackupPath", request.BackupPath ?? "", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync("Backup.ScheduleTime", request.BackupScheduleTime ?? "02:00", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync("Backup.RetentionDays", request.BackupRetentionDays.ToString(), userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync("Update.ServerUrl", request.UpdateServerUrl ?? "", userId: userId, ct: ct);
 
                 // Second save: persist SystemSettings changes within the same transaction
                 await _uow.SaveChangesAsync(ct);
+            }, ct);
 
-                await tx.CommitAsync(ct);
+            _logger.LogInformation("Store settings updated by user {UserId}", userId);
 
-                _logger.LogInformation("Store settings updated by user {UserId}", userId);
-
-                return Result<StoreSettingsDto>.Success(await MapToDto(settings, ct));
-            }
-            catch
-            {
-                await tx.RollbackAsync(ct);
-                throw;
-            }
+            return Result<StoreSettingsDto>.Success(await MapToDto(settings!, ct));
         }
         catch (DomainException ex)
         {
@@ -141,27 +135,108 @@ public sealed class StoreSettingsService : IStoreSettingsService
     {
         try
         {
-            await using var tx = await _uow.BeginTransactionAsync(ct);
-            try
+            await _uow.ExecuteTransactionAsync(async () =>
             {
                 await _systemSettingsRepo.SetCostingMethodAsync(method, ct);
                 await _uow.SaveChangesAsync(ct);
-                await tx.CommitAsync(ct);
+            }, ct);
 
-                _logger.LogInformation("Costing method updated by user {UserId}", userId);
-                return Result.Success();
-            }
-            catch
-            {
-                await tx.RollbackAsync(ct);
-                throw;
-            }
+            _logger.LogInformation("Costing method updated by user {UserId}", userId);
+            return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error saving costing method");
             return Result.Failure("فشل في حفظ طريقة التكلفة");
         }
+    }
+
+    public async Task<Result<Dictionary<string, string>>> GetAllSystemSettingsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var settings = await _systemSettingsRepo.GetAllSystemSettingsAsync(ct);
+            return Result<Dictionary<string, string>>.Success(settings);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading system settings");
+            return Result<Dictionary<string, string>>.Failure("فشل في تحميل إعدادات النظام");
+        }
+    }
+
+    public async Task<Result> UpdateSystemSettingsAsync(Dictionary<string, string> settings, CancellationToken ct = default)
+    {
+        try
+        {
+            var validationError = ValidateSystemSettings(settings);
+            if (validationError != null)
+                return Result.Failure(validationError);
+
+            await _systemSettingsRepo.SetBatchSystemSettingsAsync(settings, ct);
+            await _uow.SaveChangesAsync(ct);  // Service owns the commit (RULE-024)
+            _logger.LogInformation("System settings updated in batch ({Count} keys)", settings.Count);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving system settings");
+            return Result.Failure("فشل في حفظ إعدادات النظام");
+        }
+    }
+
+    private static string? ValidateSystemSettings(Dictionary<string, string> settings)
+    {
+        foreach (var kvp in settings)
+        {
+            if (string.IsNullOrWhiteSpace(kvp.Key))
+                return "مفتاح الإعداد لا يمكن أن يكون فارغاً";
+
+            var value = kvp.Value;
+            switch (kvp.Key)
+            {
+                // Integer-only settings
+                case "CostingMethod":
+                case "StockAlertDays":
+                case "DecimalPlaces":
+                case "DefaultCashCustomerId":
+                case "DefaultCashSupplierId":
+                case "ExpiryAlertDays":
+                    if (!int.TryParse(value, out var intVal) || intVal < 0)
+                        return $"قيمة '{kvp.Key}' يجب أن تكون رقماً صحيحاً موجباً";
+                    if (kvp.Key == "CostingMethod" && (intVal < 1 || intVal > 3))
+                        return "طريقة التكلفة يجب أن تكون 1 (متوسط مرجح) أو 2 (آخر سعر شراء) أو 3 (سعر المورد)";
+                    if (kvp.Key == "DecimalPlaces" && (intVal < 0 || intVal > 6))
+                        return "عدد المنازل العشرية يجب أن يكون بين 0 و 6";
+                    if (kvp.Key == "StockAlertDays" && (intVal < 1 || intVal > 365))
+                        return "أيام تنبيه المخزون يجب أن تكون بين 1 و 365";
+                    break;
+
+                // Boolean-only settings
+                case "AllowNegativeStock":
+                case "EnableFefo":
+                case "AutoPostInvoices":
+                case "AllowDrafts":
+                case "ShowProfitInInvoice":
+                case "PreventBelowRetailPrice":
+                case "AllowBelowCostSale":
+                case "HideTaxInSales":
+                case "ShowExpiryInInvoices":
+                case "PurchaseAutoPost":
+                case "HideTaxInPurchases":
+                case "EnableBarcode":
+                case "AutoGenerateBarcode":
+                case "ShowLogo":
+                case "LowStockAlert":
+                case "ExpiryAlert":
+                case "CreditLimitAlert":
+                case "AutoCreateJournalEntry":
+                    if (!bool.TryParse(value, out _))
+                        return $"قيمة '{kvp.Key}' يجب أن تكون true أو false";
+                    break;
+            }
+        }
+        return null;
     }
 
     private async Task<StoreSettingsDto> MapToDto(StoreSettings s, CancellationToken ct)

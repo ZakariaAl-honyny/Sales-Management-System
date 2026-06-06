@@ -44,15 +44,17 @@ public class StoreSettingsServiceTests : IDisposable
 
         _mockUow.Setup(u => u.StoreSettings).Returns(new InMemoryEfCoreRepository<StoreSettings>(_dbContext));
 
-        var mockTransaction = new Mock<IDbContextTransaction>();
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 await _dbContext.SaveChangesAsync();
                 return 1;
             });
-        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockTransaction.Object);
+        _mockUow.Setup(u => u.ExecuteTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<Task>, CancellationToken>(async (operation, ct) =>
+            {
+                await operation();
+            });
 
         _sut = new StoreSettingsService(_mockUow.Object, _mockSystemSettingsRepo.Object, _mockLogger.Object);
     }
