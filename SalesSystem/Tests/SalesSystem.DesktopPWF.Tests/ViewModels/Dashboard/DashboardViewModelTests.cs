@@ -394,6 +394,9 @@ public class DashboardViewModelTests : IDisposable
             DueAmount: 0,
             Notes: null,
             Status: status,
+            TaxId: null,
+            TaxName: null,
+            TaxRate: null,
             Items: new List<SalesInvoiceItemDto>());
     }
 

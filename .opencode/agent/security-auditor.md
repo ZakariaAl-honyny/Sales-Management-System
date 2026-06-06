@@ -196,3 +196,11 @@ Verify no sensitive data in logs.
 - [ ] No plaintext connection strings in any `appsettings.*.json` file?
 - [ ] `_comment` property explaining env var usage present in config?
 - [ ] All connection strings loaded from `SALESSYSTEM_DB_CONNECTION` env var?
+
+#### InvoiceNo Uniqueness & Thread Safety
+- [ ] InvoiceNo uniqueness enforced at DB level (UNIQUE index on SalesInvoices.InvoiceNo and PurchaseInvoices.InvoiceNo)?
+- [ ] DocumentSequenceService uses `static SemaphoreSlim` for cross-instance thread safety?
+- [ ] `SemaphoreSlim.Release()` called in `finally` block (guaranteed release even on exception)?
+- [ ] User-overridden InvoiceNo validated for uniqueness before save (catching DbUpdateException for duplicate)?
+- [ ] DocumentSequenceService supports both `GetNextNumberAsync()` (string) and `GetNextIntAsync()` (int) methods?
+- [ ] `DocumentSequence` entity has both `IncrementAndGet()` and `IncrementNextInt()` methods?

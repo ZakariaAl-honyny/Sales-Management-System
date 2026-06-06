@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Api.Controllers;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Contracts.Common;
@@ -17,6 +18,7 @@ public class SettingsControllerTests
 {
     private readonly Mock<IStoreSettingsService> _settingsServiceMock;
     private readonly Mock<IPrintDataService> _printSettingsServiceMock;
+    private readonly Mock<ISystemSettingsRepository> _systemSettingsRepoMock;
     private readonly Mock<ILogger<SettingsController>> _loggerMock;
     private readonly SettingsController _controller;
 
@@ -24,8 +26,9 @@ public class SettingsControllerTests
     {
         _settingsServiceMock = new Mock<IStoreSettingsService>();
         _printSettingsServiceMock = new Mock<IPrintDataService>();
+        _systemSettingsRepoMock = new Mock<ISystemSettingsRepository>();
         _loggerMock = new Mock<ILogger<SettingsController>>();
-        _controller = new SettingsController(_settingsServiceMock.Object, _printSettingsServiceMock.Object);
+        _controller = new SettingsController(_settingsServiceMock.Object, _printSettingsServiceMock.Object, _systemSettingsRepoMock.Object);
 
         var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, "1") };
         var identity = new ClaimsIdentity(claims);

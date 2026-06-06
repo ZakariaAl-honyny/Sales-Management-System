@@ -139,14 +139,14 @@ public class SalesServiceTests : IDisposable
 
         // Setup stock validation to FAIL
         _mockInventoryService.Setup(i => i.ValidateStockAsync(1, 1, 100m, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Failure("ط§ظ„ظ…ط®ط²ظˆظ† ط؛ظٹط± ظƒط§ظپظچ"));
+            .ReturnsAsync(Result.Failure("المخزون غير كافٍ"));
 
         _output.WriteLine("[STEP 1] Calling PostAsync with insufficient stock...");
         var result = await _sut.PostAsync(invoice.Id, userId: 1, CancellationToken.None);
 
         _output.WriteLine($"[STEP 2] Verifying result is failure...");
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("ط§ظ„ظ…ط®ط²ظˆظ† ط؛ظٹط± ظƒط§ظپظچ");
+        result.Error.Should().Contain("المخزون غير كافٍ");
 
         // CRITICAL: Transaction should NOT have started
         _output.WriteLine($"[STEP 3] Verifying NO transaction started...");
@@ -164,7 +164,7 @@ public class SalesServiceTests : IDisposable
         var result = await _sut.PostAsync(999, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©");
+        result.Error.Should().Contain("غير موجودة");
 
         _output.WriteLine("[PASS] Non-existent invoice returns NotFound");
     }
@@ -186,7 +186,7 @@ public class SalesServiceTests : IDisposable
         var result = await _sut.PostAsync(invoice.Id, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("ظ…ط³ظˆط¯ط©");
+        result.Error.Should().Contain("مسودة");
 
         _output.WriteLine("[PASS] Already posted invoice cannot be posted again");
     }
@@ -336,7 +336,7 @@ public class SalesServiceTests : IDisposable
         var action = () => invoice.SetPaidAmount(1500m); // Exceeds total
 
         action.Should().Throw<Domain.Exceptions.DomainException>()
-            .WithMessage("*ط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ظ…ط¯ظپظˆط¹ ط£ظƒط¨ط± ظ…ظ† ط§ظ„ط¥ط¬ظ…ط§ظ„ظٹ*");
+            .WithMessage("*المبلغ المدفوع أكبر من الإجمالي*");
 
         _output.WriteLine("[PASS] SetPaidAmount throws when exceeding total");
     }

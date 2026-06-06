@@ -78,9 +78,19 @@ public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest req, Canc
 
 ### DocumentSequenceService
 ```csharp
-// Uses: private static readonly SemaphoreSlim _lock = new(1, 1);
-// Format: {PREFIX}-{YEAR}-{LastNumber:D6}
-// Example: INV-2026-000001, PUR-2026-000001
+// Thread-safe via: private static readonly SemaphoreSlim _lock = new(1, 1);
+// Supports both string prefix sequences and int sequences
+
+// String format: {PREFIX}-{YEAR}-{LastNumber:D6}
+// Example: GetNextNumberAsync("INV", ct) → "INV-2026-000001"
+// Example: GetNextNumberAsync("PUR", ct) → "PUR-2026-000001"
+
+// Int format: simple incrementing integer
+// Example: GetNextIntAsync("SalesInvoice", ct) → 42
+// Example: GetNextIntAsync("PurchaseInvoice", ct) → 17
+
+// DocumentSequence entity has both GetNextNumber() and GetNextInt() methods
+// ALWAYS use GetNextIntAsync for InvoiceNo generation — NEVER lastId + 1
 ```
 
 ### ViewModel Pattern (v4.5 — ExecuteAsync)
@@ -271,6 +281,8 @@ private async Task SaveAsync()
 - Strong references for window tracking (use WeakReference)
 - UI operations in OnClosed callback without Dispatcher.InvokeAsync()
 - Serilog.Log.Error directly in ViewModels (use LogSystemError from ViewModelBase instead)
+- lastId + 1 for InvoiceNo generation (use DocumentSequenceService.GetNextIntAsync instead — not thread-safe)
+- Non-unique InvoiceNo (duplicates cause search/return/report confusion — use UNIQUE index per document type)
 
 ### Error Message Pattern (v4.5.1)
 
@@ -474,16 +486,16 @@ public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName, ...
 9. Remove from tests
 10. Remove auto-generation logic from services
 
-### Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+### Invoice Number Strategy — InvoiceNo as int, UNIQUE, Thread-Safe via DocumentSequenceService (v4.6.7)
 
-SalesInvoice and PurchaseInvoice have `int InvoiceNo` — a user-facing invoice number, separate from the auto-increment `Id` PK. NOT unique (duplicates allowed). Default = `lastId + 1` when not provided.
+SalesInvoice and PurchaseInvoice have `int InvoiceNo` — a user-facing invoice number, separate from the auto-increment `Id` PK. UNIQUE per document type (duplicates NOT allowed). Default generated thread-safely via `IDocumentSequenceService.GetNextIntAsync()`.
 
 ```csharp
 // CORRECT — int InvoiceNo property (NOT string)
 public class SalesInvoice : BaseEntity
 {
     public int Id { get; private set; }       // Auto-increment PK
-    public int InvoiceNo { get; private set; } // User-facing invoice number
+    public int InvoiceNo { get; private set; } // User-facing invoice number (UNIQUE per type)
     public int WarehouseId { get; private set; }
 }
 
@@ -500,13 +512,42 @@ public static SalesInvoice Create(
     // ...
 }
 
-// CORRECT — service computes default when request has null/0 InvoiceNo
+// CORRECT — service generates default via DocumentSequenceService (NEVER lastId + 1)
 var invoiceNo = request.InvoiceNo ?? 0;
 if (invoiceNo <= 0)
 {
-    var lastInvoice = await _uow.SalesInvoices.GetAll()
-        .OrderByDescending(i => i.Id).FirstOrDefaultAsync(ct);
-    invoiceNo = (lastInvoice?.Id ?? 0) + 1;
+    invoiceNo = await _documentSequenceService.GetNextIntAsync("SalesInvoice", ct);
+}
+
+// CORRECT — DocumentSequenceService with SemaphoreSlim (thread-safe)
+public class DocumentSequenceService : IDocumentSequenceService
+{
+    private static readonly SemaphoreSlim _lock = new(1, 1);
+
+    public async Task<int> GetNextIntAsync(string sequenceKey, CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct);
+        try
+        {
+            var sequence = await _uow.DocumentSequences
+                .FindByKeyAsync(sequenceKey, ct);
+            if (sequence == null)
+            {
+                sequence = DocumentSequence.Create(sequenceKey, 1);
+                await _uow.DocumentSequences.AddAsync(sequence, ct);
+            }
+            else
+            {
+                sequence.IncrementNextInt();
+            }
+            await _uow.SaveChangesAsync(ct);
+            return sequence.CurrentInt;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
 }
 
 // CORRECT — searching by InvoiceNo (int comparison)
@@ -532,16 +573,16 @@ public record InvoicePrintDto(
 // Builder: .InvoiceNumber = invoice.InvoiceNo.ToString()
 ```
 
-**When adding/supporting InvoiceNo as int:**
+**When adding/supporting InvoiceNo as int, UNIQUE, with DocumentSequenceService:**
 1. Add `int InvoiceNo` property to Domain entity with guard `invoiceNo <= 0`
 2. Add `int invoiceNo` parameter to factory methods (Create)
-3. Remove old string `InvoiceNo` config, keep plain int (no HasMaxLength)
+3. Remove old string `InvoiceNo` config, keep int with `.HasIndex(i => i.InvoiceNo).IsUnique()`
 4. Add `int InvoiceNo` to DTOs and Responses
-5. Service checks `if (invoiceNo <= 0)` to compute `lastId + 1`
-6. Validators: `GreaterThan(0)` rule only when InvoiceNo is provided
-7. Desktop VM: int property, `InvoiceNo = 0` for new (service computes)
+5. Service calls `IDocumentSequenceService.GetNextIntAsync("SalesInvoice"/"PurchaseInvoice", ct)` — NEVER `lastId + 1`
+6. Validators: `GreaterThan(0)` rule only when InvoiceNo is provided; validate uniqueness on user override
+7. Desktop VM: int property, `InvoiceNo = 0` for new (service computes via DocumentSequenceService)
 8. Search/filter by `InvoiceNo == parsedInt || Id == parsedInt`
-9. No unique index on InvoiceNo (duplicates allowed)
+9. UNIQUE index on InvoiceNo per document type — catch DbUpdateException on user override duplicate
 
 **Note:** `SupplierInvoiceNo` (string?) on `PurchaseInvoice` is the SUPPLIER's invoice reference number — this is NOT the system InvoiceNo and is kept for supplier reference only. Do not confuse it.
 

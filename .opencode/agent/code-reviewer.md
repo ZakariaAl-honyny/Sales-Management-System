@@ -96,16 +96,18 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] No `code:` named parameter in any Warehouse.Create() call?
 - [ ] All Warehouse.Create() calls use the new 4-param signature (name, location, isDefault, createdByUserId)?
 
-### Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+### Invoice Number Strategy — InvoiceNo as int, UNIQUE (v4.6.7)
 - [ ] SalesInvoice and PurchaseInvoice have `int InvoiceNo` (NOT string)?
 - [ ] `SalesInvoice.Create()` requires `int invoiceNo` (second param)?
 - [ ] `PurchaseInvoice.Create()` requires `int invoiceNo` (third param)?
-- [ ] Request DTOs use `int? InvoiceNo` (null = auto-generate)?
-- [ ] Service computes `lastId + 1` as default when `InvoiceNo` is null/≤0?
+- [ ] Request DTOs use `int? InvoiceNo` (null = auto-generate via DocumentSequenceService)?
+- [ ] InvoiceNo generated via DocumentSequenceService.GetNextIntAsync() (not lastId + 1)?
+- [ ] DocumentSequenceService uses SemaphoreSlim for thread safety?
+- [ ] UNIQUE index on InvoiceNo per document type?
+- [ ] User overridden InvoiceNo validated for uniqueness (catch DbUpdateException)?
 - [ ] Report DTOs (`SalesReportDto`, `PurchaseReportDto`) use `int InvoiceNo`?
 - [ ] `InvoicePrintDto` uses `string InvoiceNumber` formatted from `InvoiceNo.ToString()`?
 - [ ] `SupplierInvoiceNo` kept only as supplier's reference (not system InvoiceNo)?
-- [ ] No unique index on InvoiceNo (duplicates allowed)?
 
 ### Interactive Validation (v4.6)
 - [ ] Save/Post/Print commands have NO CanExecute predicates (always enabled)?

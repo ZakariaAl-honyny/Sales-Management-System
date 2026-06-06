@@ -114,7 +114,7 @@ Quality assurance and test automation specialist for the SalesSystem.
 | TC-20-009 | FallbackErrorDialog: Displays on unhandled WPF exception | Thread-safe fallback dialog shows exception message; `Log.Error` called; app does not crash silently |
 | TC-20-010 | Build: No CS0109 or CS1540 warnings across all projects | `dotnet build` produces 0 warnings; `new` keyword removed from derived `_dialogService` fields |
 
-### v4.6.7 — InvoiceNo Int Re-addition
+### v4.6.7 — InvoiceNo Int Re-addition & DocumentSequenceService
 
 | Test Case | Description | Expected Result |
 |-----------|-------------|-----------------|
@@ -123,7 +123,8 @@ Quality assurance and test automation specialist for the SalesSystem.
 | TC-21-003 | SalesInvoice List: Search by InvoiceNo int | Entering number in search filters by `InvoiceNo == parsedInt` |
 | TC-21-004 | SalesReportDto: Has int InvoiceNo field | DTO contains `int InvoiceNo` (not string) |
 | TC-21-005 | InvoicePrintDto.InvoiceNumber: Formatted from int | `string InvoiceNumber` set via `InvoiceNo.ToString()` in builder |
-| TC-21-006 | Service: Auto-generates InvoiceNo = lastId+1 | When request.InvoiceNo is null or ≤0, service computes `(last?.Id ?? 0) + 1` |
-| TC-21-007 | EF Config: No unique index on InvoiceNo | Duplicate InvoiceNo values do NOT throw unique constraint violation |
-| TC-21-006 | TouchPos: Stock validation warning shown | Adding product with insufficient stock shows `ShowWarningAsync` dialog with stock details |
-| TC-21-007 | ISoundService: PlayWarning exists | `PlayWarning()` method exists and plays system warning sound |
+| TC-21-006 | Service: Auto-generates InvoiceNo via DocumentSequenceService | When InvoiceNo is null/≤0, service calls `_sequenceService.GetNextIntAsync("SalesInvoice", ct)` |
+| TC-21-007 | DocumentSequenceService: Thread-safe SemaphoreSlim | static SemaphoreSlim(1,1) used; lock.Release() in finally block |
+| TC-21-008 | EF Config: UNIQUE index on InvoiceNo | Duplicate InvoiceNo throws DbUpdateException with unique constraint violation |
+| TC-21-009 | User override: Duplicate InvoiceNo handled | Service catches DbUpdateException, returns `Result.Failure("رقم الفاتورة مستخدم مسبقاً")` |
+| TC-21-010 | DocumentSequence.GetNextInt(): Returns incrementing int | First call → 1, second call → 2, independent per sequenceKey |

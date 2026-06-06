@@ -486,6 +486,9 @@ public class PurchaseService : IPurchaseService
             i.SupplierInvoiceNo,
             i.Notes,
             (byte)i.Status,
+            i.TaxId,
+            i.Tax?.Name,
+            (decimal?)i.Tax?.Rate,
             i.Items.Select(it => new PurchaseInvoiceItemDto(
                 it.Id,
                 it.ProductId,

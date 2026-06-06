@@ -67,10 +67,13 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 35. **Desktop Client Separation**: WPF ViewModels and UI controllers MUST NOT reference `ISystemSettingsRepository` or DB context. Use API clients (e.g., `ISettingsApiService`) to interact with the backend services.
 36. **Thread-Safe Exception Handling**: Avoid raw `MessageBox.Show` in global unhandled exceptions. Use secure logging with structured fallback screens.
 37. **Safe Exception Swallowing**: Swallowing exceptions via empty catch blocks is forbidden. Always log the error or provide documented, safe fallback logic.
-38. **InvoiceNo as int (NOT string)**: SalesInvoice and PurchaseInvoice have `int InvoiceNo` — user-facing invoice number, separate from auto-increment `Id` PK. NOT unique (duplicates allowed). Default = `lastId + 1` when null/0 in request.
+38. **InvoiceNo as int (NOT string)**: SalesInvoice and PurchaseInvoice have `int InvoiceNo` — user-facing invoice number, separate from auto-increment `Id` PK. UNIQUE per document type (duplicates NOT allowed).
 39. **SupplierInvoiceNo is NOT System InvoiceNo**: `SupplierInvoiceNo` (string?) on PurchaseInvoice is the supplier's external reference only — do NOT use it as the system InvoiceNo.
-40. **Service Computes Default InvoiceNo**: If `request.InvoiceNo` is null or ≤ 0, service computes `lastId + 1` from last invoice's PK Id. User may override with any int.
-41. **No Unique Index on InvoiceNo**: Duplicates explicitly allowed — user can set any integer value.
+40. **Service Generates Default InvoiceNo via DocumentSequenceService**: If `request.InvoiceNo` is null or ≤ 0, service calls `IDocumentSequenceService.GetNextIntAsync("SalesInvoice"/"PurchaseInvoice", ct)` — NEVER compute `lastId + 1` (not thread-safe for concurrent users). User may override with any int, validated for uniqueness.
+41. **UNIQUE Index on InvoiceNo**: InvoiceNo MUST have a UNIQUE index per document type — on SalesInvoices table and PurchaseInvoices table separately. Duplicates cause confusion in search, returns, reports, and customer service.
+42. **Accounting Foundation**: Chart of Accounts (60 accounts), JournalEntries with SystemAccountMappings, FiscalYears, Annual Closing
+43. **FIFO/FEFO**: PurchaseLots entity for batch tracking; FIFO on sale, FEFO if TrackExpiry=true
+44. **Multi-Currency**: Currency entity with exchange rates, CurrencyId FK on invoices, payments, journal entries
 
 ## Pattern to Follow
 ```csharp

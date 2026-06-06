@@ -87,6 +87,62 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.ToTable("Accounts", (string)null);
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.FiscalYearClosure", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ClosedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<int>("ClosedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClosingEntryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FiscalYear")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<decimal>("NetIncome")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClosedByUserId");
+
+                    b.HasIndex("ClosingEntryId");
+
+                    b.HasIndex("FiscalYear")
+                        .IsUnique()
+                        .HasDatabaseName("IX_FiscalYearClosures_FiscalYear");
+
+                    b.ToTable("FiscalYearClosures", (string)null);
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -1189,6 +1245,9 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int?>("TaxId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1207,6 +1266,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("CashBoxId");
 
                     b.HasIndex("SupplierId");
+
+                    b.HasIndex("TaxId");
 
                     b.HasIndex("WarehouseId");
 
@@ -1466,6 +1527,9 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int?>("TaxId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1484,6 +1548,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("CashBoxId");
 
                     b.HasIndex("CustomerId");
+
+                    b.HasIndex("TaxId");
 
                     b.HasIndex("WarehouseId");
 
@@ -1903,6 +1969,10 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("SignaturePath")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
                     b.Property<string>("StoreName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -2168,6 +2238,56 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.ToTable("SystemSettings", (string)null);
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Entities.Tax", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDefault")
+                        .IsUnique()
+                        .HasFilter("[IsDefault] = 1");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Taxes", null, t =>
+                        {
+                            t.HasCheckConstraint("CHK_Taxes_Rate_Range", "[Rate] >= 0 AND [Rate] <= 100");
+                        });
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.Unit", b =>
                 {
                     b.Property<int>("Id")
@@ -2402,6 +2522,25 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.FiscalYearClosure", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Entities.User", "ClosedByUser")
+                        .WithMany()
+                        .HasForeignKey("ClosedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", "ClosingEntry")
+                        .WithMany()
+                        .HasForeignKey("ClosingEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ClosedByUser");
+
+                    b.Navigation("ClosingEntry");
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntryLine", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
@@ -2413,7 +2552,7 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", null)
                         .WithMany("Lines")
                         .HasForeignKey("JournalEntryId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", "JournalEntry")
@@ -2657,6 +2796,11 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SalesSystem.Domain.Entities.Tax", "Tax")
+                        .WithMany()
+                        .HasForeignKey("TaxId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SalesSystem.Domain.Entities.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
@@ -2666,6 +2810,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("CashBox");
 
                     b.Navigation("Supplier");
+
+                    b.Navigation("Tax");
 
                     b.Navigation("Warehouse");
                 });
@@ -2745,6 +2891,11 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SalesSystem.Domain.Entities.Tax", "Tax")
+                        .WithMany()
+                        .HasForeignKey("TaxId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SalesSystem.Domain.Entities.Warehouse", "Warehouse")
                         .WithMany()
                         .HasForeignKey("WarehouseId")
@@ -2754,6 +2905,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("CashBox");
 
                     b.Navigation("Customer");
+
+                    b.Navigation("Tax");
 
                     b.Navigation("Warehouse");
                 });

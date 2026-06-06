@@ -9,6 +9,7 @@ public class SalesInvoice : BaseEntity
     public int? CustomerId { get; private set; }
     public int WarehouseId { get; private set; }
     public int? CashBoxId { get; private set; }
+    public int? TaxId { get; private set; }
     public DateTime InvoiceDate { get; private set; }
     public DateOnly? DueDate { get; private set; }
     public PaymentType PaymentType { get; private set; }
@@ -25,6 +26,7 @@ public class SalesInvoice : BaseEntity
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual CashBox? CashBox { get; private set; }
+    public virtual Tax? Tax { get; private set; }
     public virtual List<SalesInvoiceItem> Items { get; private set; } = new();
 
     private SalesInvoice() { }
@@ -39,6 +41,7 @@ public class SalesInvoice : BaseEntity
         decimal discountAmount = 0,
         string? notes = null,
         int? cashBoxId = null,
+        int? taxId = null,
         int? createdByUserId = null)
     {
         if (warehouseId <= 0)
@@ -55,6 +58,7 @@ public class SalesInvoice : BaseEntity
             WarehouseId = warehouseId,
             InvoiceNo = invoiceNo,
             CashBoxId = cashBoxId,
+            TaxId = taxId,
             CustomerId = customerId,
             InvoiceDate = invoiceDate ?? DateTime.UtcNow,
             DueDate = dueDate,
@@ -111,6 +115,15 @@ public class SalesInvoice : BaseEntity
     {
         if (taxAmount < 0)
             throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
+        TaxAmount = taxAmount;
+        RecalculateTotals();
+    }
+
+    public void SetTax(int? taxId, decimal taxAmount)
+    {
+        if (taxAmount < 0)
+            throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
+        TaxId = taxId;
         TaxAmount = taxAmount;
         RecalculateTotals();
     }

@@ -131,6 +131,9 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             SupplierInvoiceNo: null,
             Notes: null,
             Status: 1,
+            TaxId: null,
+            TaxName: null,
+            TaxRate: null,
             Items: new List<PurchaseInvoiceItemDto>
         {
             new PurchaseInvoiceItemDto(1, 1, "منتج 1", 10, 100m, 0, 1000m, 1)

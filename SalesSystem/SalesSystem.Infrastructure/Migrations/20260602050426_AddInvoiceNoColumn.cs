@@ -22,6 +22,24 @@ namespace SalesSystem.Infrastructure.Migrations
                 name: "ProductUnitId1",
                 table: "ProductPriceHistories");
 
+            // Drop existing nvarchar InvoiceNo columns before adding int InvoiceNo (InvoiceNo was nvarchar in InitialCreate)
+            // Must drop indexes first because they depend on the column
+            migrationBuilder.DropIndex(
+                name: "IX_SalesInvoices_InvoiceNo",
+                table: "SalesInvoices");
+
+            migrationBuilder.DropIndex(
+                name: "IX_PurchaseInvoices_InvoiceNo",
+                table: "PurchaseInvoices");
+
+            migrationBuilder.DropColumn(
+                name: "InvoiceNo",
+                table: "SalesInvoices");
+
+            migrationBuilder.DropColumn(
+                name: "InvoiceNo",
+                table: "PurchaseInvoices");
+
             migrationBuilder.AddColumn<int>(
                 name: "InvoiceNo",
                 table: "SalesInvoices",
@@ -40,6 +58,7 @@ namespace SalesSystem.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // Drop the new int InvoiceNo columns first
             migrationBuilder.DropColumn(
                 name: "InvoiceNo",
                 table: "SalesInvoices");
@@ -47,6 +66,33 @@ namespace SalesSystem.Infrastructure.Migrations
             migrationBuilder.DropColumn(
                 name: "InvoiceNo",
                 table: "PurchaseInvoices");
+
+            // Restore the original nvarchar InvoiceNo columns and indexes
+            migrationBuilder.AddColumn<string>(
+                name: "InvoiceNo",
+                table: "SalesInvoices",
+                type: "nvarchar(30)",
+                maxLength: 30,
+                nullable: false,
+                defaultValue: "");
+
+            migrationBuilder.AddColumn<string>(
+                name: "InvoiceNo",
+                table: "PurchaseInvoices",
+                type: "nvarchar(30)",
+                maxLength: 30,
+                nullable: false,
+                defaultValue: "");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SalesInvoices_InvoiceNo",
+                table: "SalesInvoices",
+                column: "InvoiceNo");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PurchaseInvoices_InvoiceNo",
+                table: "PurchaseInvoices",
+                column: "InvoiceNo");
 
             migrationBuilder.AddColumn<int>(
                 name: "ProductUnitId1",

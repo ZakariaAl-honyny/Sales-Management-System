@@ -94,6 +94,7 @@ public class StoreSettingsConfiguration : IEntityTypeConfiguration<StoreSettings
         builder.Property(ss => ss.DefaultTaxRate).HasPrecision(18, 2);
         builder.Property(ss => ss.TaxNumber).HasMaxLength(50);
         builder.Property(ss => ss.InvoicePrefix).HasMaxLength(20).HasDefaultValue("INV");
+        builder.Property(ss => ss.SignaturePath).HasMaxLength(255);
 
         builder.HasQueryFilter(ss => ss.IsActive);
     }

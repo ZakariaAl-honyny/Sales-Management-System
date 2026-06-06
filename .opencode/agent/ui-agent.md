@@ -207,9 +207,11 @@ catch (Exception ex)
 - Use auto-increment Id (int PK) as sole identifier for display and search
 - WarehouseResponse bindings must NOT include a Code field — it was removed from the record
 
-### Invoice Number Strategy — InvoiceNo as int (v4.6.7)
+### Invoice Number Strategy — InvoiceNo as int, UNIQUE (v4.6.7)
 - SalesInvoice and PurchaseInvoice editor screens MUST have an InvoiceNo (int) text field — user-facing invoice number
-- Editor ViewModel: `int InvoiceNo` property, `InvoiceNo = 0` for new invoices (service computes default as `lastId + 1`)
+- Editor ViewModel: `int InvoiceNo` property, `InvoiceNo = 0` for new invoices (service computes via DocumentSequenceService — NOT lastId+1)
+- Editor shows suggested next InvoiceNo loaded from API; user can override (validated for uniqueness)
+- DocumentSequenceService used on Desktop via IApiService call to API endpoint (`GET /api/v1/sequences/next/{key}`)
 - Invoice list ViewModels display `InvoiceNo` column and filter by `InvoiceNo == parsedInt || Id == parsedInt`
 - `SupplierInvoiceNo` display is kept for purchase invoices (supplier's reference) and labeled as "رقم فاتورة المورد" (supplier invoice number) — distinct from system "رقم الفاتورة"
 - Report ViewModels MUST include `int InvoiceNo` in DTOs

@@ -71,11 +71,11 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - `Product`, `Customer`, `Supplier`, `Warehouse` entities MUST NOT have a `Code` column — use auto-increment `Id` as sole identifier
 - `Product.Code`, `Customer.Code`, `Supplier.Code`, `Warehouse.Code` unique indexes are REMOVED
 - `DuplicateCode` error constant is REMOVED from ErrorCodes
-- `SalesInvoice.InvoiceNo` is `int` (NOT string, NOT nullable, NOT unique) — user-facing invoice number
-- `PurchaseInvoice.InvoiceNo` is `int` (NOT string, NOT nullable, NOT unique) — user-facing invoice number
-- `SalesInvoiceConfiguration` and `PurchaseInvoiceConfiguration`: InvoiceNo is a plain `int` column — no HasMaxLength, no HasIndex (no unique constraint), no IsRequired needed
-- Service computes default `lastId + 1` when request InvoiceNo is null/≤0
-- Migration adds `InvoiceNo int NOT NULL DEFAULT 0` to both tables
+- `SalesInvoice.InvoiceNo` is `int` (NOT string, NOT nullable, UNIQUE per document type)
+- `PurchaseInvoice.InvoiceNo` is `int` (NOT string, NOT nullable, UNIQUE per document type)
+- `SalesInvoiceConfiguration` and `PurchaseInvoiceConfiguration`: InvoiceNo MUST have `.HasIndex(i => i.InvoiceNo).IsUnique()` — no HasMaxLength, no IsRequired needed
+- Service calls `IDocumentSequenceService.GetNextIntAsync("SalesInvoice"/"PurchaseInvoice", ct)` when request InvoiceNo is null/≤0 — NEVER `lastId + 1`
+- Migration adds `InvoiceNo int NOT NULL UNIQUE` to both tables (separate unique per table)
 - `SupplierInvoiceNo` on PurchaseInvoice is the supplier's external reference — distinct from system InvoiceNo
 - Entity configurations for Product, Customer, Supplier, Warehouse must NOT include Code property, HasMaxLength, or HasIndex for Code
 - `SystemSettings` table key-value configuration: Seed `CostingMethod` (Key = "CostingMethod", Value = "1" [WeightedAverage]) and ensure the API settings client correctly maps update requests.
@@ -86,3 +86,13 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - `ProductUnit.BaseConversionFactor`: MUST use `.HasPrecision(18, 3)` — NOT `(18, 6)`
 - `StoreSettings.DefaultTaxRate`: SHOULD use `.HasPrecision(18, 2)` — currently uses `(5, 2)`
 - `SalesInvoices` and `PurchaseInvoices`: SHOULD have DB-level `CHECK (PaidAmount >= 0 AND PaidAmount <= TotalAmount)` constraint
+- NO unique indexes on `ReturnNo`, `TransferNo`, `PaymentNo` columns — these are int but NOT unique
+- `DocumentSequences` table kept (NOT removed) — used for both string prefix sequences and int sequences (GetNextNumber vs GetNextInt)
+- New entities added for accounting: `Accounts`, `JournalEntries`, `JournalEntryLines`
+- New entities added for batch tracking: `PurchaseLots`
+- New entities added for multi-currency: `Currencies`, `Taxes`
+- New entity for fiscal year management: `FiscalYears`
+- New FK columns: `Customers.AccountId` (FK to Accounts), `Suppliers.AccountId`, `CashBoxes.AccountId`, `Products.AvgCost` (decimal(18,2))
+- `Users.Status` column for user status tracking
+- `InvoiceNo` = int, UNIQUE per document type in SalesInvoices and PurchaseInvoices tables
+- `DocumentSequence` entity supports both `GetNextNumber()` (string) and `GetNextInt()` (int) methods

@@ -58,6 +58,14 @@ Enforces AGENTS.md rules and Clean Architecture constraints.
 - [ ] Fluent API config — no DataAnnotations on entities
 - [ ] All FKs use `DeleteBehavior.Restrict`
 
+## InvoiceNo Checklist
+- [ ] InvoiceNo = int (NOT string)
+- [ ] InvoiceNo generated via DocumentSequenceService.GetNextIntAsync() (never lastId + 1)
+- [ ] UNIQUE index on InvoiceNo column per document type
+- [ ] User override validated for uniqueness (catch DbUpdateException)
+- [ ] DocumentSequenceService uses SemaphoreSlim (static) for thread safety
+- [ ] Lock released in finally block
+
 ## UI Checklist
 - [ ] EventBus: subscribe in `OnLoad`, unsubscribe in `Dispose`
 - [ ] EventBus handlers marshal to UI thread

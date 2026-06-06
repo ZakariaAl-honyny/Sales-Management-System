@@ -70,6 +70,52 @@ public class DocumentSequenceService : IDocumentSequenceService
         }
     }
 
+    public async Task<Result<int>> GetNextIntAsync(string sequenceKey, CancellationToken ct)
+    {
+        try
+        {
+            await _lock.WaitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return Result<int>.Failure("تم إلغاء العملية");
+        }
+
+        try
+        {
+            var year = DateTime.Now.Year;
+
+            var sequence = await _uow.DocumentSequences.FirstOrDefaultAsync(
+                s => s.DocumentType == sequenceKey && s.Year == year, ct);
+
+            if (sequence == null)
+            {
+                sequence = DocumentSequence.Create(sequenceKey, sequenceKey, year);
+                await _uow.DocumentSequences.AddAsync(sequence, ct);
+            }
+
+            var nextNumber = sequence.GetNextInt();
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Generated sequence int {Number} for {Key}", nextNumber, sequenceKey);
+
+            return Result<int>.Success(nextNumber);
+        }
+        catch (DomainException ex)
+        {
+            return Result<int>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating next int for sequence {Key}", sequenceKey);
+            return Result<int>.Failure("حدث خطأ أثناء توليد الرقم المتسلسل");
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
     private static string DetermineDocumentType(string prefix)
     {
         return prefix.ToUpper() switch

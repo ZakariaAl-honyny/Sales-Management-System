@@ -472,6 +472,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             if (settingsResult.IsSuccess && settingsResult.Value != null)
             {
                 TaxNumber = settingsResult.Value.TaxNumber;
+                // TODO: Phase 20 — switch to Tax entity (DefaultTaxRate and IsTaxEnabled are deprecated)
                 if (settingsResult.Value.IsTaxEnabled)
                 {
                     TaxRate = settingsResult.Value.DefaultTaxRate;
