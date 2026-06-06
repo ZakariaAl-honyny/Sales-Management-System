@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Accounting.Entities;
 
 namespace SalesSystem.Application.Accounting.Services;
@@ -17,7 +18,7 @@ public class SystemAccountService : ISystemAccountService
         _logger = logger;
     }
 
-    public async Task<Result<SystemAccountMappings>> GetMappingsAsync(int? branchId = null, CancellationToken ct = default)
+    public async Task<Result<SystemAccountMappingsDto>> GetMappingsAsync(int? branchId = null, CancellationToken ct = default)
     {
         try
         {
@@ -27,14 +28,97 @@ public class SystemAccountService : ISystemAccountService
                 ct: ct);
 
             if (mappings == null)
-                return Result<SystemAccountMappings>.Failure("لم يتم إعداد حسابات النظام — يرجى الاتصال بالمسؤول");
+                return Result<SystemAccountMappingsDto>.Failure("لم يتم إعداد حسابات النظام — يرجى الاتصال بالمسؤول");
 
-            return Result<SystemAccountMappings>.Success(mappings);
+            // Load all referenced accounts in a single query for name/code resolution
+            var accountIds = new HashSet<int>
+            {
+                mappings.DefaultCashAccountId,
+                mappings.DefaultBankAccountId,
+                mappings.InventoryAssetAccountId,
+                mappings.AccountsReceivableAccountId,
+                mappings.AccountsPayableAccountId,
+                mappings.VatOutputAccountId,
+                mappings.VatInputAccountId,
+                mappings.CapitalAccountId,
+                mappings.SalesRevenueAccountId,
+                mappings.SalesReturnAccountId,
+                mappings.CogsAccountId,
+                mappings.GeneralExpenseAccountId,
+                mappings.SpoilageLossAccountId
+            };
+
+            var accounts = await _uow.Accounts.ToListAsync(
+                a => accountIds.Contains(a.Id), ct: ct);
+
+            var accountLookup = accounts.ToDictionary(a => a.Id);
+
+            static (string? name, string? code) GetAccountInfo(Dictionary<int, Account> lookup, int id)
+                => lookup.TryGetValue(id, out var acc) ? (acc.NameAr, acc.AccountCode) : (null, null);
+
+            var (cashName, cashCode) = GetAccountInfo(accountLookup, mappings.DefaultCashAccountId);
+            var (bankName, bankCode) = GetAccountInfo(accountLookup, mappings.DefaultBankAccountId);
+            var (invName, invCode) = GetAccountInfo(accountLookup, mappings.InventoryAssetAccountId);
+            var (arName, arCode) = GetAccountInfo(accountLookup, mappings.AccountsReceivableAccountId);
+            var (apName, apCode) = GetAccountInfo(accountLookup, mappings.AccountsPayableAccountId);
+            var (vatOutName, vatOutCode) = GetAccountInfo(accountLookup, mappings.VatOutputAccountId);
+            var (vatInName, vatInCode) = GetAccountInfo(accountLookup, mappings.VatInputAccountId);
+            var (capName, capCode) = GetAccountInfo(accountLookup, mappings.CapitalAccountId);
+            var (revName, revCode) = GetAccountInfo(accountLookup, mappings.SalesRevenueAccountId);
+            var (retName, retCode) = GetAccountInfo(accountLookup, mappings.SalesReturnAccountId);
+            var (cogsName, cogsCode) = GetAccountInfo(accountLookup, mappings.CogsAccountId);
+            var (expName, expCode) = GetAccountInfo(accountLookup, mappings.GeneralExpenseAccountId);
+            var (spoilName, spoilCode) = GetAccountInfo(accountLookup, mappings.SpoilageLossAccountId);
+
+            var dto = new SystemAccountMappingsDto(
+                Id: mappings.Id,
+                DefaultCashAccountId: mappings.DefaultCashAccountId,
+                DefaultCashAccountName: cashName,
+                DefaultCashAccountCode: cashCode,
+                DefaultBankAccountId: mappings.DefaultBankAccountId,
+                DefaultBankAccountName: bankName,
+                DefaultBankAccountCode: bankCode,
+                InventoryAssetAccountId: mappings.InventoryAssetAccountId,
+                InventoryAssetAccountName: invName,
+                InventoryAssetAccountCode: invCode,
+                AccountsReceivableAccountId: mappings.AccountsReceivableAccountId,
+                AccountsReceivableAccountName: arName,
+                AccountsReceivableAccountCode: arCode,
+                AccountsPayableAccountId: mappings.AccountsPayableAccountId,
+                AccountsPayableAccountName: apName,
+                AccountsPayableAccountCode: apCode,
+                VatOutputAccountId: mappings.VatOutputAccountId,
+                VatOutputAccountName: vatOutName,
+                VatOutputAccountCode: vatOutCode,
+                VatInputAccountId: mappings.VatInputAccountId,
+                VatInputAccountName: vatInName,
+                VatInputAccountCode: vatInCode,
+                CapitalAccountId: mappings.CapitalAccountId,
+                CapitalAccountName: capName,
+                CapitalAccountCode: capCode,
+                SalesRevenueAccountId: mappings.SalesRevenueAccountId,
+                SalesRevenueAccountName: revName,
+                SalesRevenueAccountCode: revCode,
+                SalesReturnAccountId: mappings.SalesReturnAccountId,
+                SalesReturnAccountName: retName,
+                SalesReturnAccountCode: retCode,
+                CogsAccountId: mappings.CogsAccountId,
+                CogsAccountName: cogsName,
+                CogsAccountCode: cogsCode,
+                GeneralExpenseAccountId: mappings.GeneralExpenseAccountId,
+                GeneralExpenseAccountName: expName,
+                GeneralExpenseAccountCode: expCode,
+                SpoilageLossAccountId: mappings.SpoilageLossAccountId,
+                SpoilageLossAccountName: spoilName,
+                SpoilageLossAccountCode: spoilCode,
+                BranchId: mappings.BranchId);
+
+            return Result<SystemAccountMappingsDto>.Success(dto);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving system account mappings for branch {BranchId}", branchId);
-            return Result<SystemAccountMappings>.Failure("حدث خطأ أثناء استرجاع حسابات النظام");
+            return Result<SystemAccountMappingsDto>.Failure("حدث خطأ أثناء استرجاع حسابات النظام");
         }
     }
 }

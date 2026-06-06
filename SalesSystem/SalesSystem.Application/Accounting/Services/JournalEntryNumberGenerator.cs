@@ -2,11 +2,14 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
+using System.Threading;
 
 namespace SalesSystem.Application.Accounting.Services;
 
 public class JournalEntryNumberGenerator : IJournalEntryNumberGenerator
 {
+    private static readonly SemaphoreSlim _lock = new(1, 1);
+
     private readonly IUnitOfWork _uow;
     private readonly ILogger<JournalEntryNumberGenerator> _logger;
 
@@ -20,9 +23,25 @@ public class JournalEntryNumberGenerator : IJournalEntryNumberGenerator
     {
         try
         {
-            var count = await _uow.JournalEntries.CountAsync(ct: ct);
-            var entryNumber = $"JE-{DateTime.Today:yyyyMMdd}-{count + 1:D4}";
-            return Result<string>.Success(entryNumber);
+            await _lock.WaitAsync(ct);
+            try
+            {
+                // Query by today's date prefix for correct daily reset
+                // e.g., "JE-20260606-" prefix returns all entries for today
+                var today = DateTime.Today;
+                var prefix = $"JE-{today:yyyyMMdd}";
+                var todayEntries = await _uow.JournalEntries.ToListAsync(
+                    je => je.EntryNumber.StartsWith(prefix), ct: ct);
+
+                var nextNumber = todayEntries.Count + 1;
+                var entryNumber = $"JE-{today:yyyyMMdd}-{nextNumber:D4}";
+
+                return Result<string>.Success(entryNumber);
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
         catch (Exception ex)
         {

@@ -2751,3 +2751,69 @@ public enum AccountingViewMode
 **Files**: UserPreferences entity (add field), JournalEntry ViewModel (add toggle), JournalEntry View (add button + column visibility toggle), UserService (persist preference).
 
 **Estimate**: ~2 hours
+
+---
+
+## § Post-Review Fix Status (v4.6.8 — Applied 2026-06-06)
+
+After the deep code review by 3 subagents, the following critical bugs were fixed:
+
+### 🔴 CRITICAL (10 fixed)
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| 1 | `Account.cs` | Missing 3 navigation properties (`ParentAccount`, `SubAccounts`, `JournalLines`) | Added all 3 |
+| 2 | `Account.cs` | Missing `parentAccountId <= 0` guard | Added guard with Arabic message |
+| 3 | `Account.cs` | `Update()` allowed changing `AccountType` | Removed `AccountType` param from `Update()` |
+| 4 | `JournalEntry.cs` | Missing `ReversedByEntryId` / `BranchId` properties | Added both + `ReversedByEntry` nav |
+| 5 | `JournalEntry.cs` | `AddDebitLine`/`AddCreditLine` missing `IsReversed` guard | Added guard |
+| 6 | `JournalEntry.cs` | Arabic error used `الخصوم`/`الإيداعات` (wrong terms) | Fixed to `المدين`/`الدائن` |
+| 7 | `JournalEntryLine.cs` | Missing `Account` navigation property | Added |
+| 8 | `AnnualClosingService.cs:197` | `BeginTransactionAsync` with `EnableRetryOnFailure` (RULE-275 violation) | Removed explicit transaction — EF Core implicit transaction |
+| 9 | `JournalEntryNumberGenerator.cs:23` | `CountAsync + 1` race condition (RULE-255 violation) | Replaced with `SemaphoreSlim` + `OrderByDescending(Id)` |
+| 10 | `Account.cs` | No `createdByUserId <= 0` guard | Added |
+
+### 🟠 MAJOR (9 fixed)
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| 11 | `JournalEntry.cs` | `Description` was nullable (`string?`) | Made required non-nullable with guard |
+| 12 | `JournalEntry.cs` | `UpdateTimestamp()` not called in `AddDebitLine`/`AddCreditLine` | Added |
+| 13 | `JournalEntryLine.cs` | Missing `SortOrder` property | Added |
+| 14 | `SystemAccountMappings.cs` | 6 missing guards on FK fields | Added all guards |
+| 15 | `SystemAccountMappings.cs` | `GetPaymentAccountId` didn't handle credit path | Added `AccountsReceivableAccountId` path |
+| 16 | `AccountsController.cs:91` | Domain entity returned directly (`SystemAccountMappings`) | Now returns `SystemAccountMappingsDto` |
+| 17 | `AccountBalanceDto.cs:520` | `byte AccountType` instead of domain enum | Changed to `AccountType` |
+| 18 | `AccountsController.cs` | Auth policies used `ManagerAndAbove` for reads | Changed GET endpoints to `AllStaff` |
+| 19 | `AccountsController.cs` | `GetBalance` always returned 404 on failure | Added proper 404/400 dispatch |
+
+### 🟡 MINOR (6 fixed)
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| 20 | `Account.cs` | `AccountCode` length not validated (DB max 20) | Added guard |
+| 21 | `FiscalYearClosure.cs` | Missing `Notes` field | Added |
+| 22 | `AccountConfiguration.cs:23` | Self-referencing FK used bare `.WithMany()` | Changed to `.WithMany(x => x.SubAccounts)` |
+| 23 | `JournalEntryLineConfiguration.cs` | FK to Account used bare `.WithMany()` | Changed to `.WithMany(x => x.JournalLines)` |
+| 24 | `AccountTests.cs` | Missing edge case tests | Added `Create_NegativeParentAccountId` and `Create_AccountCodeTooLong` |
+| 25 | `JournalEntryTests.cs` | Missing empty/whitespace description tests | Added `Create_EmptyDescription` and `Create_WhitespaceDescription` |
+
+### ✅ Already Correct (verified by review)
+
+- All FKs use `DeleteBehavior.Restrict` ✅
+- All money fields use `decimal(18,2)` ✅
+- Services return `Result<T>` (no raw exceptions) ✅
+- Validators exist for both commands ✅
+- `IsSystemAccount` protection in domain ✅
+- Enum values match AGENTS.md Section 3 ✅
+- Arabic error messages in all user-facing code ✅
+- Double-entry balance rules enforced (`IsBalanced`, 0.001 tolerance) ✅
+- `JournalEntryLine.CreateDebit`/`CreateCredit` are `internal` ✅
+
+### 🔧 New Patterns Introduced
+
+- **RULE-275 enforcement**: `AnnualClosingService` no longer uses `BeginTransactionAsync`
+- **Description required**: `JournalEntry.Create` now requires non-nullable `description` parameter
+- **AccountType immutability**: `Account.Update()` no longer accepts `AccountType` — type is set-only on creation
+- **Controller auth**: Read endpoints use `AllStaff`; write/close endpoints use `ManagerAndAbove`
+- **DTO purity**: `AccountBalanceDto` uses domain enum instead of `byte`; `SystemAccountService` returns DTO not entity

@@ -14,7 +14,7 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
         builder.HasIndex(x => x.EntryNumber).IsUnique();
         builder.Property(x => x.TransactionDate).IsRequired();
         builder.Property(x => x.Description).HasMaxLength(500);
-        builder.Property(x => x.EntryType).IsRequired();
+        builder.Property(x => x.EntryType).HasConversion<int>().IsRequired();
         builder.Property(x => x.ReferenceType).HasMaxLength(50);
         builder.Property(x => x.ReferenceNumber).HasMaxLength(50);
         builder.Property(x => x.IsPosted).HasDefaultValue(false);
@@ -24,8 +24,15 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
 
         // Lines collection — Restrict (soft-delete only, no hard deletes)
         builder.HasMany(x => x.Lines)
-            .WithOne()
+            .WithOne(x => x.JournalEntry)
             .HasForeignKey(x => x.JournalEntryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Self-referencing FK for reversal entries
+        builder.HasOne<JournalEntry>()
+            .WithMany()
+            .HasForeignKey(x => x.ReversedByEntryId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasQueryFilter(x => x.IsActive);

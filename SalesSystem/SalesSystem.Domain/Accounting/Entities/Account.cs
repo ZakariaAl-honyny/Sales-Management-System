@@ -17,6 +17,13 @@ public class Account : BaseEntity
     public bool IsSystemAccount { get; private set; }
     public string? Notes { get; private set; }
 
+    // ─── Navigation Properties ──────────────────────────
+    public Account? ParentAccount { get; private set; }
+    private readonly List<Account> _subAccounts = new();
+    public IReadOnlyList<Account> SubAccounts => _subAccounts.AsReadOnly();
+    private readonly List<JournalEntryLine> _journalLines = new();
+    public IReadOnlyList<JournalEntryLine> JournalLines => _journalLines.AsReadOnly();
+
     private Account() { } // EF Core
 
     public static Account Create(
@@ -38,6 +45,15 @@ public class Account : BaseEntity
         if (!Enum.IsDefined(typeof(AccountType), accountType))
             throw new DomainException("نوع الحساب غير صالح");
 
+        if (parentAccountId.HasValue && parentAccountId.Value <= 0)
+            throw new DomainException("رقم الحساب الأب غير صالح");
+
+        if (createdByUserId <= 0)
+            throw new DomainException("منشئ الحساب مطلوب");
+
+        if (accountCode.Trim().Length > 20)
+            throw new DomainException("رمز الحساب لا يمكن أن يتجاوز 20 حرف");
+
         var account = new Account
         {
             AccountCode = accountCode.Trim(),
@@ -56,7 +72,6 @@ public class Account : BaseEntity
     public void Update(
         string nameAr,
         string nameEn,
-        AccountType accountType,
         int? parentAccountId = null,
         string? notes = null,
         int? updatedByUserId = null)
@@ -67,14 +82,20 @@ public class Account : BaseEntity
         if (string.IsNullOrWhiteSpace(nameAr))
             throw new DomainException("اسم الحساب بالعربية مطلوب");
 
-        if (!Enum.IsDefined(typeof(AccountType), accountType))
-            throw new DomainException("نوع الحساب غير صالح");
-
         NameAr = nameAr.Trim();
         NameEn = nameEn?.Trim() ?? string.Empty;
-        AccountType = accountType;
         ParentAccountId = parentAccountId;
         Notes = notes?.Trim();
+        SetUpdatedBy(updatedByUserId);
+        UpdateTimestamp();
+    }
+
+    public void Activate(int? updatedByUserId = null)
+    {
+        if (IsSystemAccount)
+            throw new DomainException("لا يمكن تعديل حساب نظامي");
+
+        IsActive = true;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }

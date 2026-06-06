@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -34,15 +35,20 @@ public class AccountsController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Account balance with debit/credit totals.</returns>
     [HttpGet("{id:int}/balance")]
-    [Authorize(Policy = "ManagerAndAbove")]
+    [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetBalance(int id, [FromQuery] DateTime? asOfDate, CancellationToken ct)
     {
         var result = await _journalEntryService.GetAccountBalanceAsync(id, asOfDate, ct);
-        return result.IsSuccess
-            ? Ok(result.Value)
-            : NotFound(new { error = result.Error });
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorCode == ErrorCodes.NotFound)
+                return NotFound(new { error = result.Error });
+            return BadRequest(new { error = result.Error });
+        }
+        return Ok(result.Value);
     }
 
     /// <summary>
@@ -54,7 +60,7 @@ public class AccountsController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Account ledger with opening balance, lines, and closing balance.</returns>
     [HttpGet("{id:int}/ledger")]
-    [Authorize(Policy = "ManagerAndAbove")]
+    [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -67,7 +73,7 @@ public class AccountsController : ControllerBase
         var result = await _journalEntryService.GetAccountLedgerAsync(id, startDate, endDate, ct);
         if (!result.IsSuccess)
         {
-            if (result.ErrorCode == "NOT_FOUND")
+            if (result.ErrorCode == ErrorCodes.NotFound)
                 return NotFound(new { error = result.Error });
             return BadRequest(new { error = result.Error });
         }
@@ -81,14 +87,19 @@ public class AccountsController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>System account mappings.</returns>
     [HttpGet("mappings")]
-    [Authorize(Policy = "ManagerAndAbove")]
+    [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMappings([FromQuery] int? branchId, CancellationToken ct)
     {
         var result = await _systemAccountService.GetMappingsAsync(branchId, ct);
-        return result.IsSuccess
-            ? Ok(result.Value)
-            : NotFound(new { error = result.Error });
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorCode == ErrorCodes.NotFound)
+                return NotFound(new { error = result.Error });
+            return BadRequest(new { error = result.Error });
+        }
+        return Ok(result.Value);
     }
 }

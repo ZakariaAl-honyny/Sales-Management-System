@@ -52,6 +52,13 @@ public class JournalEntryService : IJournalEntryService
                     return Result<int>.Failure("يجب أن يكون للبند قيمة خصم أو إيداع");
             }
 
+            // 3.5. Check if fiscal year is closed
+            var isFiscalYearClosed = await _uow.FiscalYearClosures.AnyAsync(
+                fyc => fyc.FiscalYear == request.TransactionDate.Year, ct);
+            if (isFiscalYearClosed)
+                return Result<int>.Failure(
+                    $"السنة المالية {request.TransactionDate.Year} مغلقة — لا يمكن إضافة قيود محاسبية في سنة مالية مغلقة");
+
             // 4. Generate entry number
             var numberResult = await _numberGenerator.GenerateAsync(ct);
             if (!numberResult.IsSuccess)
@@ -76,9 +83,9 @@ public class JournalEntryService : IJournalEntryService
             var entry = Domain.Accounting.Entities.JournalEntry.Create(
                 numberResult.Value!,
                 request.TransactionDate,
+                request.Description ?? string.Empty,
                 request.EntryType,
                 request.CreatedBy,
-                request.Description,
                 request.ReferenceType,
                 request.ReferenceId,
                 request.ReferenceNumber);
@@ -147,7 +154,7 @@ public class JournalEntryService : IJournalEntryService
                 accountId,
                 account.AccountCode,
                 account.NameAr,
-                (byte)account.AccountType,
+                account.AccountType,
                 totalDebit,
                 totalCredit,
                 balance,

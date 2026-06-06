@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
@@ -40,6 +41,7 @@ public class JournalEntriesController : ControllerBase
     [Authorize(Policy = "ManagerAndAbove")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] CreateJournalEntryRequest request, CancellationToken ct)
     {
         var result = await _journalEntryService.CreateJournalEntryAsync(request, ct);
@@ -51,6 +53,9 @@ public class JournalEntriesController : ControllerBase
                 message = "تم إنشاء القيد المحاسبي وترحيله بنجاح"
             });
         }
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 
@@ -85,12 +90,19 @@ public class JournalEntriesController : ControllerBase
     [HttpGet("closed-years")]
     [Authorize(Policy = "ManagerAndAbove")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAllClosures(CancellationToken ct)
     {
         var result = await _annualClosingService.GetAllClosuresAsync(ct);
-        return result.IsSuccess
-            ? Ok(result.Value ?? new List<FiscalYearClosureDto>())
-            : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+        {
+            return Ok(result.Value ?? new List<FiscalYearClosureDto>());
+        }
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     /// <summary>
@@ -103,12 +115,17 @@ public class JournalEntriesController : ControllerBase
     [Authorize(Policy = "ManagerAndAbove")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> IsFiscalYearClosed(int fiscalYear, CancellationToken ct)
     {
         var result = await _annualClosingService.IsFiscalYearClosedAsync(fiscalYear, ct);
-        return result.IsSuccess
-            ? Ok(new { fiscalYear, isClosed = result.Value })
-            : BadRequest(new { error = result.Error });
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorCode == ErrorCodes.NotFound)
+                return NotFound(new { error = result.Error });
+            return BadRequest(new { error = result.Error });
+        }
+        return Ok(new { fiscalYear, isClosed = result.Value });
     }
 
     /// <summary>

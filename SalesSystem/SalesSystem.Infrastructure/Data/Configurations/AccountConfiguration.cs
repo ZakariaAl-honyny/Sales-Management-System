@@ -14,14 +14,14 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.HasIndex(x => x.AccountCode).IsUnique();
         builder.Property(x => x.NameAr).IsRequired().HasMaxLength(200);
         builder.Property(x => x.NameEn).HasMaxLength(200);
-        builder.Property(x => x.AccountType).IsRequired();
+        builder.Property(x => x.AccountType).HasConversion<int>().IsRequired();
         builder.Property(x => x.Notes).HasMaxLength(500);
         builder.Property(x => x.IsSystemAccount).HasDefaultValue(false);
         builder.Property(x => x.IsActive).HasDefaultValue(true);
 
-        // Self-referencing parent relationship
-        builder.HasOne<Account>()
-            .WithMany()
+        // Self-referencing parent relationship with navigation properties
+        builder.HasOne(x => x.ParentAccount)
+            .WithMany(x => x.SubAccounts)
             .HasForeignKey(x => x.ParentAccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
