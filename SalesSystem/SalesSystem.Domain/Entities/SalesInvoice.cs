@@ -20,12 +20,15 @@ public class SalesInvoice : BaseEntity
     public decimal PaidAmount { get; private set; }
     public decimal DueAmount { get; private set; }
     public int InvoiceNo { get; private set; }
+    public int? CurrencyId { get; private set; }
+    public decimal? ExchangeRate { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual CashBox? CashBox { get; private set; }
+    public virtual Currency? Currency { get; private set; }
     public virtual Tax? Tax { get; private set; }
     public virtual List<SalesInvoiceItem> Items { get; private set; } = new();
 
@@ -42,6 +45,8 @@ public class SalesInvoice : BaseEntity
         string? notes = null,
         int? cashBoxId = null,
         int? taxId = null,
+        int? currencyId = null,
+        decimal? exchangeRate = null,
         int? createdByUserId = null)
     {
         if (warehouseId <= 0)
@@ -64,6 +69,8 @@ public class SalesInvoice : BaseEntity
             DueDate = dueDate,
             PaymentType = paymentType,
             DiscountAmount = discountAmount,
+            CurrencyId = currencyId,
+            ExchangeRate = exchangeRate,
             Notes = notes,
             Status = InvoiceStatus.Draft
         };

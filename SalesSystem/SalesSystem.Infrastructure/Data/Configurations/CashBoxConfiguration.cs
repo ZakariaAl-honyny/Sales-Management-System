@@ -13,8 +13,13 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
         builder.Property(x => x.BoxName).IsRequired().HasMaxLength(100);
         builder.Property(x => x.OpeningBalance).HasPrecision(18, 2);
         builder.Property(x => x.CurrentBalance).HasPrecision(18, 2);
-        builder.Property(x => x.CurrencyCode).HasMaxLength(10).HasDefaultValue("SAR");
+        builder.Ignore(x => x.CurrencyCode); // DEPRECATED — computed from Currency navigation
+        builder.Property(x => x.CurrencyId).IsRequired(false);
         builder.Property(x => x.Notes).HasMaxLength(500);
+        builder.HasOne(x => x.Currency)
+            .WithMany()
+            .HasForeignKey(x => x.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Property(x => x.IsActive).HasDefaultValue(true);
         builder.HasIndex(x => x.BoxName);
 

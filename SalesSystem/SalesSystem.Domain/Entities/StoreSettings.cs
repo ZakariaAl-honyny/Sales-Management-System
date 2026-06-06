@@ -10,7 +10,7 @@ public class StoreSettings : BaseEntity
     public string? Address { get; private set; }
     public string? LogoPath { get; private set; }
     public string? Email { get; private set; }
-    public string CurrencyCode { get; private set; } = "SAR";
+    public string CurrencyCode { get; private set; } = "SAR"; // DEPRECATED: CurrencyCode — use Currencies table instead. Kept in DB for backwards compat. Remove in Phase 20.
     public decimal DefaultTaxRate { get; private set; } // DEPRECATED: DefaultTaxRate — use Tax entity instead. Remove in Phase 20.
     public bool IsTaxEnabled { get; private set; }      // DEPRECATED: IsTaxEnabled — use Tax entity instead. Remove in Phase 20.
     public string? TaxNumber { get; private set; }

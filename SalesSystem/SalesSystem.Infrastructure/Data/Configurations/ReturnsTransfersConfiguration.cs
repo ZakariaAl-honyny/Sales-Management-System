@@ -27,6 +27,13 @@ public class SalesReturnConfiguration : IEntityTypeConfiguration<SalesReturn>
             .HasForeignKey(sr => sr.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(sr => sr.Currency)
+            .WithMany()
+            .HasForeignKey(sr => sr.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(sr => sr.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
+
         builder.HasMany(sr => sr.Items)
             .WithOne(i => i.SalesReturn)
             .HasForeignKey(i => i.SalesReturnId)
@@ -79,6 +86,13 @@ public class PurchaseReturnConfiguration : IEntityTypeConfiguration<PurchaseRetu
             .WithMany()
             .HasForeignKey(pr => pr.WarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(pr => pr.Currency)
+            .WithMany()
+            .HasForeignKey(pr => pr.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(pr => pr.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
 
         builder.HasMany(pr => pr.Items)
             .WithOne(i => i.PurchaseReturn)

@@ -57,11 +57,14 @@ public class PurchaseReturn : BaseEntity
     public string? Notes { get; private set; }
     public decimal SubTotal { get; private set; }
     public decimal TotalAmount { get; private set; }
+    public int? CurrencyId { get; private set; }
+    public decimal? ExchangeRate { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
     public virtual Supplier? Supplier { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
+    public virtual Currency? Currency { get; private set; }
     public virtual List<PurchaseReturnItem> Items { get; private set; } = new();
 
     private PurchaseReturn() { }
@@ -73,6 +76,8 @@ public class PurchaseReturn : BaseEntity
         int? purchaseInvoiceId = null,
         DateTime? returnDate = null,
         string? notes = null,
+        int? currencyId = null,
+        decimal? exchangeRate = null,
         int? userId = null)
     {
         if (string.IsNullOrWhiteSpace(returnNo))
@@ -89,6 +94,8 @@ public class PurchaseReturn : BaseEntity
             SupplierId = supplierId,
             PurchaseInvoiceId = purchaseInvoiceId,
             ReturnDate = returnDate ?? DateTime.UtcNow,
+            CurrencyId = currencyId,
+            ExchangeRate = exchangeRate,
             Notes = notes,
             Status = InvoiceStatus.Draft
         };

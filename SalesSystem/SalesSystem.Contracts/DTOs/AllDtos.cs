@@ -77,6 +77,8 @@ public record SalesInvoiceDto(
     int? TaxId,
     string? TaxName,
     decimal? TaxRate,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     IReadOnlyList<SalesInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -125,6 +127,8 @@ public record PurchaseInvoiceDto(
     int? TaxId,
     string? TaxName,
     decimal? TaxRate,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     IReadOnlyList<PurchaseInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -164,6 +168,8 @@ public record SalesReturnDto(
     decimal TaxAmount,
     decimal DiscountAmount,
     decimal TotalAmount,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     string? Notes,
     byte Status, IReadOnlyList<SalesReturnItemDto> Items)
 {
@@ -196,6 +202,8 @@ public record PurchaseReturnDto(
     decimal TaxAmount,
     decimal DiscountAmount,
     decimal TotalAmount,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     string? Notes,
     byte Status, IReadOnlyList<PurchaseReturnItemDto> Items)
 {
@@ -244,6 +252,8 @@ public record CustomerPaymentDto(
     string CustomerName,
     decimal Amount,
     byte PaymentMethod,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     DateTime PaymentDate,
     int? SalesInvoiceId,
     string? Notes)
@@ -264,6 +274,8 @@ public record SupplierPaymentDto(
     string SupplierName,
     decimal Amount,
     byte PaymentMethod,
+    int? CurrencyId,
+    decimal? ExchangeRate,
     DateTime PaymentDate,
     int? PurchaseInvoiceId,
     string? Notes)
@@ -478,6 +490,27 @@ public record VatReportDto(
     decimal TaxAmount);
 
 public record TaxDto(int Id, string Name, decimal Rate, bool IsDefault, bool IsActive);
+
+public record CurrencyDto(
+    int Id,
+    string Name,
+    string Code,
+    string Symbol,
+    decimal ExchangeRateToBase,
+    bool IsBaseCurrency,
+    string? FractionName,
+    bool IsSystem,
+    bool IsActive);
+
+public record ExchangeRateHistoryDto(
+    int Id,
+    int CurrencyId,
+    decimal OldRate,
+    decimal NewRate,
+    DateOnly EffectiveDate,
+    string? RateType,
+    string? Notes,
+    int? ChangedByUserId);
 
 // ─── Accounting DTOs ─────────────────────────────────
 public record AccountBalanceDto(

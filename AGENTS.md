@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/018-accounting-foundation/plan.md](specs/018-accounting-foundation/plan.md)
+**Active Feature Plan**: [specs/020-currencies-module/plan.md](specs/020-currencies-module/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview

@@ -37,6 +37,8 @@
         xmlns:vmUsers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Users"
         xmlns:vmTaxes="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Taxes"
         xmlns:viewsTaxes="clr-namespace:SalesSystem.DesktopPWF.Views.Taxes"
+        xmlns:vmCurrencies="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Currencies"
+        xmlns:viewsCurrencies="clr-namespace:SalesSystem.DesktopPWF.Views.Currencies"
         xmlns:vmTransfers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Transfers"
         mc:Ignorable="d"
         Title="نظام إدارة المبيعات"
@@ -140,6 +142,12 @@
             <DataTemplate DataType="{x:Type vmTaxes:TaxesListViewModel}">
                 <viewsTaxes:TaxesListView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmCurrencies:CurrenciesListViewModel}">
+                <viewsCurrencies:CurrenciesListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmCurrencies:CurrencyEditorViewModel}">
+                <viewsCurrencies:CurrencyEditorView />
+            </DataTemplate>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -203,6 +211,7 @@
                 <MenuItem Header="إدارة المستخدمين" ToolTip="إدارة حسابات المستخدمين والصلاحيات" Click="UsersMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="الضرائب" ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة" Click="TaxesMenuItem_Click"/>
+                <MenuItem Header="العملات" Command="{Binding NavigateToCurrenciesCommand}" ToolTip="إدارة العملات وأسعار الصرف"/>
                 <MenuItem Header="النسخ الاحتياطي" 
                           Command="{Binding NavigateToBackupCommand}"
                           ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
@@ -381,6 +390,10 @@
                                             Command="{Binding NavigateToTaxesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة"/>
+                                    <Button Content="العملات" 
+                                            Command="{Binding NavigateToCurrenciesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة العملات وأسعار الصرف — إضافة وتعديل العملات"/>
                                     <Button Content="نقل المخزون" 
                                             Command="{Binding NavigateToStockTransfersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

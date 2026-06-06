@@ -45,6 +45,8 @@ public class SalesDbContext : DbContext
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
     public DbSet<SystemAccountMappings> SystemAccountMappings => Set<SystemAccountMappings>();
     public DbSet<Tax> Taxes => Set<Tax>();
+    public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<ExchangeRateHistory> ExchangeRateHistories => Set<ExchangeRateHistory>();
     public DbSet<FiscalYearClosure> FiscalYearClosures => Set<FiscalYearClosure>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }

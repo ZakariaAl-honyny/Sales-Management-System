@@ -6,7 +6,9 @@ public record CashBoxDto(
     decimal OpeningBalance,
     decimal CurrentBalance,
     int? BranchId,
-    string CurrencyCode,
+    int? CurrencyId,
+    string? CurrencyName,
+    string? CurrencyCode,
     int? AssignedUserId,
     string? Notes,
     bool IsActive

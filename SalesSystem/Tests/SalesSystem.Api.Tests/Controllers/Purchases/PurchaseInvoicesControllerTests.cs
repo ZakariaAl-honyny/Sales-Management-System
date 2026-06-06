@@ -207,6 +207,8 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         TaxId: null,
         TaxName: null,
         TaxRate: null,
+        CurrencyId: null,
+        ExchangeRate: null,
         Items: new List<PurchaseInvoiceItemDto>
         {
             new(id * 10, 1, "منتج اختبار", 5.000m, 40.00m, 0.00m, 200.00m, 1)

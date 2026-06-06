@@ -397,6 +397,8 @@ public class DashboardViewModelTests : IDisposable
             TaxId: null,
             TaxName: null,
             TaxRate: null,
+            CurrencyId: null,
+            ExchangeRate: null,
             Items: new List<SalesInvoiceItemDto>());
     }
 

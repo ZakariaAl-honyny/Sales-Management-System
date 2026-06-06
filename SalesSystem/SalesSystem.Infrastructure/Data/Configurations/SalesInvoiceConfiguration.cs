@@ -40,6 +40,13 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
             .HasForeignKey(si => si.TaxId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(si => si.Currency)
+            .WithMany()
+            .HasForeignKey(si => si.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(si => si.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
+
         builder.HasMany(si => si.Items)
             .WithOne(i => i.SalesInvoice)
             .HasForeignKey(i => i.SalesInvoiceId)

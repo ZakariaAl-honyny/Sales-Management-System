@@ -41,6 +41,13 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
             .HasForeignKey(pi => pi.TaxId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(pi => pi.Currency)
+            .WithMany()
+            .HasForeignKey(pi => pi.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(pi => pi.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
+
         builder.HasMany(pi => pi.Items)
             .WithOne(i => i.PurchaseInvoice)
             .HasForeignKey(i => i.PurchaseInvoiceId)

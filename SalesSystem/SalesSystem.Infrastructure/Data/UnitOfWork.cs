@@ -54,6 +54,8 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<JournalEntryLine>? _journalEntryLines;
     private IGenericRepository<SystemAccountMappings>? _systemAccountMappings;
     private IGenericRepository<FiscalYearClosure>? _fiscalYearClosures;
+    private IGenericRepository<Currency>? _currencies;
+    private IGenericRepository<ExchangeRateHistory>? _exchangeRateHistories;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -97,6 +99,8 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<JournalEntryLine> JournalEntryLines => _journalEntryLines ??= new GenericRepository<JournalEntryLine>(_context);
     public IGenericRepository<SystemAccountMappings> SystemAccountMappings => _systemAccountMappings ??= new GenericRepository<SystemAccountMappings>(_context);
     public IGenericRepository<FiscalYearClosure> FiscalYearClosures => _fiscalYearClosures ??= new GenericRepository<FiscalYearClosure>(_context);
+    public IGenericRepository<Currency> Currencies => _currencies ??= new GenericRepository<Currency>(_context);
+    public IGenericRepository<ExchangeRateHistory> ExchangeRateHistories => _exchangeRateHistories ??= new GenericRepository<ExchangeRateHistory>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {

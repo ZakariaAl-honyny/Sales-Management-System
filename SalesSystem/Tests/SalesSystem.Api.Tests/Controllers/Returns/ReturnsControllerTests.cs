@@ -126,6 +126,8 @@ public class SalesReturnsControllerTests : ControllerTestBase
         TaxAmount: 0.00m,
         DiscountAmount: 0.00m,
         TotalAmount: 100.00m,
+        CurrencyId: null,
+        ExchangeRate: null,
         Notes: "ملاحظات",
         Status: 1,
         Items: new List<SalesReturnItemDto>
@@ -261,6 +263,8 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         TaxAmount: 0.00m,
         DiscountAmount: 0.00m,
         TotalAmount: 200.00m,
+        CurrencyId: null,
+        ExchangeRate: null,
         Notes: "ملاحظات",
         Status: 1,
         Items: new List<PurchaseReturnItemDto>

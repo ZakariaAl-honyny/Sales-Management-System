@@ -11,6 +11,9 @@ public class SupplierPayment : BaseEntity
     public DateTime PaymentDate { get; private set; }
     public decimal Amount { get; private set; }
     public byte PaymentMethod { get; private set; }
+    public int? CurrencyId { get; private set; }
+    public decimal? ExchangeRate { get; private set; }
+    public Currency? Currency { get; private set; }
     public string? ReferenceNo { get; private set; }
     public string? Notes { get; private set; }
 
@@ -27,6 +30,8 @@ public class SupplierPayment : BaseEntity
         int? purchaseInvoiceId = null,
         string? referenceNo = null,
         string? notes = null,
+        int? currencyId = null,
+        decimal? exchangeRate = null,
         int? createdByUserId = null,
         DateTime? paymentDate = null)
     {
@@ -44,6 +49,8 @@ public class SupplierPayment : BaseEntity
             Amount = amount,
             PaymentMethod = paymentMethod,
             PurchaseInvoiceId = purchaseInvoiceId,
+            CurrencyId = currencyId,
+            ExchangeRate = exchangeRate,
             ReferenceNo = referenceNo,
             Notes = notes,
             PaymentDate = paymentDate ?? DateTime.UtcNow

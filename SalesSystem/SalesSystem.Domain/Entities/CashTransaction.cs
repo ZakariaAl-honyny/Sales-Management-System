@@ -21,6 +21,8 @@ public class CashTransaction : BaseEntity
     public decimal BalanceAfter { get; private set; }
     public string? ReferenceType { get; private set; } // e.g., "SalesInvoice", "PurchaseInvoice"
     public int? ReferenceId { get; private set; }
+    public int? CurrencyId { get; private set; }
+    public Currency? Currency { get; private set; }
     public string? Notes { get; private set; }
 
     // Navigation
@@ -40,7 +42,8 @@ public class CashTransaction : BaseEntity
         string? referenceType,
         int? referenceId,
         int createdBy,
-        string? notes)
+        string? notes,
+        int? currencyId = null)
     {
         var tx = new CashTransaction
         {
@@ -51,6 +54,7 @@ public class CashTransaction : BaseEntity
             BalanceAfter = balanceAfter,
             ReferenceType = referenceType,
             ReferenceId = referenceId,
+            CurrencyId = currencyId,
             Notes = notes,
             CreatedAt = DateTime.UtcNow
         };

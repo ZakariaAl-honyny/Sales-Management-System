@@ -489,6 +489,8 @@ public class PurchaseService : IPurchaseService
             i.TaxId,
             i.Tax?.Name,
             (decimal?)i.Tax?.Rate,
+            null, // CurrencyId — system setting
+            null, // ExchangeRate — system setting
             i.Items.Select(it => new PurchaseInvoiceItemDto(
                 it.Id,
                 it.ProductId,

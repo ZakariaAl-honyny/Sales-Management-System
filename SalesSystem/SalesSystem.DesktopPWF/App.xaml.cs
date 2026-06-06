@@ -25,6 +25,7 @@ using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
 using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
+using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
@@ -193,6 +194,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ICashBoxApiService, CashBoxApiService>();
         services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
         services.AddSingleton<ITaxesApiService, TaxesApiService>();
+        services.AddSingleton<ICurrencyApiService, CurrencyApiService>();
 
         // Printing
         services.AddSingleton<Services.App.IInvoicePrinter, Services.Printing.InvoicePrinter>();
@@ -253,6 +255,10 @@ public partial class App : System.Windows.Application
         // Tax ViewModels
         services.AddTransient<TaxesListViewModel>();
         services.AddTransient<TaxEditorViewModel>();
+
+        // Currency ViewModels
+        services.AddTransient<CurrenciesListViewModel>();
+        services.AddTransient<CurrencyEditorViewModel>();
 
         // Cash Box ViewModels
         services.AddTransient<CashBoxEditorViewModel>();

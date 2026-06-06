@@ -484,6 +484,8 @@ public class SalesService : ISalesService
             i.TaxId,
             i.Tax?.Name,
             (decimal?)i.Tax?.Rate,
+            null, // CurrencyId — system setting
+            null, // ExchangeRate — system setting
             i.Items.Select(it => new SalesInvoiceItemDto(
                 it.Id,
                 it.ProductId,
