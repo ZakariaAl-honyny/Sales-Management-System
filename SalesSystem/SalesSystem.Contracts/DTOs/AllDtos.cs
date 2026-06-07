@@ -532,6 +532,60 @@ public record ExchangeRateHistoryDto(
     string? Notes,
     int? ChangedByUserId);
 
+// ═══════════════════════════════════════════════════════
+// Phase 22 — Chart of Accounts DTOs
+// ═══════════════════════════════════════════════════════
+
+public record AccountDto(
+    int Id,
+    string AccountCode,
+    string NameAr,
+    string NameEn,
+    byte AccountType,
+    int Level,
+    int? ParentAccountId,
+    string? ParentAccountName,
+    bool IsSystemAccount,
+    bool IsActive,
+    string? Description,
+    string? ColorCode,
+    bool AllowTransactions,
+    decimal? OpeningBalance,
+    string? Explanation,
+    string? Notes)
+{
+    public string AccountTypeDisplay => AccountType switch
+    {
+        1 => "أصل",
+        2 => "خصم",
+        3 => "حق ملكية",
+        4 => "إيراد",
+        5 => "مصروف",
+        _ => "غير معروف"
+    };
+
+    public string LevelDisplay => Level switch
+    {
+        1 => "رئيسي (مجموعة)",
+        2 => "فرعي",
+        3 => "فرعي فرعي",
+        4 => "تفصيلي",
+        _ => "غير معروف"
+    };
+}
+
+public record AccountTreeNodeDto(
+    int Id,
+    string AccountCode,
+    string NameAr,
+    byte AccountType,
+    int Level,
+    string? ColorCode,
+    bool AllowTransactions,
+    decimal? OpeningBalance,
+    string? Explanation,
+    List<AccountTreeNodeDto> Children);
+
 // ─── Accounting DTOs ─────────────────────────────────
 public record AccountBalanceDto(
     int AccountId,

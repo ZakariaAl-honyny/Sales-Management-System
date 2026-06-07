@@ -69,7 +69,7 @@ public class DatabaseHealthCheckService : IDatabaseHealthCheckService
         }
         catch (HttpRequestException ex)
         {
-            Log.Error(ex, "API server is not reachable during health check");
+            Log.Warning(ex, "API server is not reachable during health check");
             return new HealthCheckResult
             {
                 IsApiReachable = false,
@@ -79,7 +79,7 @@ public class DatabaseHealthCheckService : IDatabaseHealthCheckService
         }
         catch (TaskCanceledException)
         {
-            Log.Error("Health check timed out");
+            Log.Warning("Health check timed out");
             return new HealthCheckResult
             {
                 IsApiReachable = false,
@@ -89,7 +89,7 @@ public class DatabaseHealthCheckService : IDatabaseHealthCheckService
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Unexpected error during health check");
+            Log.Error(ex, "Unexpected error during health check");  // Keep Error for UNEXPECTED exceptions
             return new HealthCheckResult
             {
                 IsApiReachable = false,

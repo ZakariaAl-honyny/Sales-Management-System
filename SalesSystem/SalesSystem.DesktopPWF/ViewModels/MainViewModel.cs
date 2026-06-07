@@ -19,6 +19,7 @@ using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
+using SalesSystem.DesktopPWF.ViewModels.Accounts;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
@@ -116,6 +117,7 @@ public class MainViewModel : ViewModelBase
         NavigateToInventoryCommand = new RelayCommand(() => NavigateTo<InventoryViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
+        NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
 
         ChangePasswordCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadChangePasswordAsync)));
     }
@@ -290,6 +292,9 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة العملات — إضافة وتعديل العملات وأسعار الصرف</summary>
     public ICommand NavigateToCurrenciesCommand { get; }
 
+    /// <summary>نقل إلى دليل الحسابات — عرض وتعديل الحسابات المحاسبية</summary>
+    public ICommand NavigateToChartOfAccountsCommand { get; }
+
     // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
     // ═══════════════════════════════════════════════════════════════
@@ -430,6 +435,7 @@ public class MainViewModel : ViewModelBase
             nameof(InventoryViewModel)              => "Inventory",
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
+            nameof(AccountsListViewModel)           => "Settings",
             _                                        => viewModelType.Name
         };
     }

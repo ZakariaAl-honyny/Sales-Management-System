@@ -167,6 +167,31 @@ Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User
 #### AuditLog
 - `long Id` (bigint) — required for high-volume audit logging
 - Indexes: `(UserId, Timestamp DESC)`, `(EntityType, EntityId)`, `(Timestamp DESC)`
+
+---
+
+### Phase 22 Code Review Bug Fixes (v4.6.9+)
+
+#### HasChildren() & Entity Fetch
+- **RULE-341**: `HasChildren()` domain guard is DEFENSE-IN-DEPTH only — service MUST use `AnyAsync(a => a.ParentAccountId == id)` DB query before `MarkAsDeleted()`
+- **RULE-342**: NEVER fetch entity twice in `DeleteAsync()`/`PermanentDeleteAsync()` — use already-loaded entity
+- **RULE-335**: `PermanentDeleteAsync()` MUST catch `DbUpdateException` and return `Result.Failure` with Arabic message
+
+#### Explanation Field Cross-Layer
+- **RULE-343**: `Explanation` field (`string?` nullable) REQUIRED in ALL layers: Domain entity, EF config (`nvarchar(500)`), DTO, Request, Service mapping, Validator (`MaxLength(500)`), Seeder
+- **RULE-347**: ALL seeded accounts MUST have Arabic `explanation` text — NEVER null for seed data
+
+#### Controller Routes
+- **RULE-345**: NEVER use `:byte`/`:sbyte`/`:short` route constraints — causes HTTP 500. Use `:int:min(1):max(N)` instead
+- **RULE-350**: Route ranges MUST match enum value range (e.g., AccountType 1-5, not hardcoded `3`)
+
+#### Validator Completeness
+- **RULE-346**: Update Validators MUST have SAME field validations as Create Validators
+- **RULE-344**: Level-1 account code length = exactly 3 chars in Create validator
+- **RULE-351**: Use `nameof` operator in `RuleFor` calls — string literals break on rename
+
+#### Health Check
+- **RULE-352**: Health check MUST use `SecureDbContextFactory.GetDecryptedConnectionString()` — never raw `IConfiguration`
 - `AuditLogService` — `LogAsync(string action, string entityType, int entityId, int? userId, string? details)`
 - Auto-logged events: login success, login failure (with attempt count), login blocked (locked), password set, password change
 

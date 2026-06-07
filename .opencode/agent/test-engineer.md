@@ -220,6 +220,276 @@ public void Create_Valid3CharCode_Succeeds(string code)
     currency.Code.Should().Be(code);
 }
 
+## Phase 22 — Chart of Accounts Test Patterns (v4.6.9+)
+
+### Account Entity Tests
+
+```csharp
+public class AccountTests
+{
+    [Fact]
+    public void Create_ValidParameters_SetsPropertiesCorrectly()
+    {
+        var account = Account.Create("1101", "النقدية", "Cash", AccountType.Asset, 3,
+            null, true, "النقدية في الصندوق", "#2196F3", false, 0m, null, 1);
+
+        account.AccountCode.Should().Be("1101");
+        account.NameAr.Should().Be("النقدية");
+        account.Level.Should().Be(3);
+        account.AllowTransactions.Should().BeFalse();
+        account.IsSystemAccount.Should().BeTrue();
+        account.ColorCode.Should().Be("#2196F3");
+        account.IsActive.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(0)]    // Below minimum
+    [InlineData(11)]   // Above maximum
+    [InlineData(-1)]   // Negative
+    public void Create_InvalidLevel_ThrowsDomainException(int invalidLevel)
+    {
+        Action action = () => Account.Create("1101", "Test", null, AccountType.Asset,
+            invalidLevel, null, false, null, null, false, 0m, null, 1);
+
+        action.Should().Throw<DomainException>().WithMessage("*بين 1 و 10*");
+    }
+
+    [Fact]
+    public void Create_EmptyCode_ThrowsDomainException()
+    {
+        Action action = () => Account.Create("", "Test", null, AccountType.Asset, 4,
+            null, false, null, null, false, 0m, null, 1);
+
+        action.Should().Throw<DomainException>().WithMessage("*مطلوب*");
+    }
+
+    [Fact]
+    public void Create_EmptyNameAr_ThrowsDomainException()
+    {
+        Action action = () => Account.Create("1101", "", null, AccountType.Asset, 4,
+            null, false, null, null, false, 0m, null, 1);
+
+        action.Should().Throw<DomainException>().WithMessage("*مطلوب*");
+    }
+
+    [Fact]
+    public void Update_SystemAccount_ThrowsDomainException()
+    {
+        var account = Account.Create("1101", "النقدية", "Cash", AccountType.Asset, 3,
+            null, true, null, null, false, 0m, null, 1);
+
+        Action action = () => account.Update(AccountType.Liability, 3, null, null, true);
+
+        action.Should().Throw<DomainException>().WithMessage("*حساب نظام*");
+    }
+
+    [Fact]
+    public void MarkAsDeleted_SystemAccount_ThrowsDomainException()
+    {
+        var account = Account.Create("1101", "النقدية", "Cash", AccountType.Asset, 3,
+            null, true, null, null, false, 0m, null, 1);
+
+        Action action = () => account.MarkAsDeleted();
+
+        action.Should().Throw<DomainException>().WithMessage("*حساب نظام*");
+    }
+
+    [Fact]
+    public void MarkAsDeleted_AccountWithChildren_ThrowsDomainException()
+    {
+        var parent = Account.Create("1100", "الأصول المتداولة", null, AccountType.Asset, 2,
+            null, false, null, null, false, 0m, null, 1);
+        var child = Account.Create("1101", "النقدية", null, AccountType.Asset, 3,
+            1, false, null, null, false, 0m, null, 1);
+        // Add child via reflection or by building tree
+
+        Action action = () => parent.MarkAsDeleted();
+        // The HasChildren() check requires _children to be populated
+        // This typically tests through the service layer or reflection
+    }
+
+    [Fact]
+    public void IsDebitNormal_ForAsset_ReturnsTrue()
+    {
+        var account = Account.Create("1101", "النقدية", null, AccountType.Asset, 4,
+            null, false, null, null, true, 1000m, null, 1);
+
+        account.IsDebitNormal().Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsDebitNormal_ForLiability_ReturnsFalse()
+    {
+        var account = Account.Create("2101", "دائنون", null, AccountType.Liability, 4,
+            null, false, null, null, true, 0m, null, 1);
+
+        account.IsDebitNormal().Should().BeFalse();
+    }
+
+    [Fact]
+    public void Create_WithValidColorCode_StoresCorrectly()
+    {
+        var account = Account.Create("1101", "النقدية", null, AccountType.Asset, 4,
+            null, false, null, "#2196F3", true, 0m, null, 1);
+
+        account.ColorCode.Should().Be("#2196F3");
+    }
+
+    [Fact]
+    public void Create_Level4_AllowTransactionsTrue()
+    {
+        var account = Account.Create("110101", "الصندوق", null, AccountType.Asset, 4,
+            null, false, null, null, true, 5000m, null, 1);
+
+        account.AllowTransactions.Should().BeTrue();
+        account.OpeningBalance.Should().Be(5000m);
+    }
+}
+```
+
+### AccountService Tests
+
+```csharp
+public class AccountServiceTests
+{
+    [Fact]
+    public async Task CreateAsync_ValidRequest_ReturnsSuccess()
+    {
+        // Arrange
+        var request = new CreateAccountRequest
+        {
+            AccountCode = "110101",
+            NameAr = "الصندوق",
+            AccountType = AccountType.Asset,
+            Level = 4,
+            AllowTransactions = true,
+            OpeningBalance = 5000m
+        };
+
+        // Act
+        var result = await _service.CreateAsync(request, 1, CancellationToken.None);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().NotBeNull();
+        result.Value.NameAr.Should().Be("الصندوق");
+    }
+
+    [Fact]
+    public async Task CreateAsync_InvalidParent_ReturnsNotFound()
+    {
+        var request = new CreateAccountRequest
+        {
+            AccountCode = "999999",
+            NameAr = "حساب وهمي",
+            AccountType = AccountType.Asset,
+            Level = 4,
+            ParentAccountId = 99999  // Non-existent parent
+        };
+
+        var result = await _service.CreateAsync(request, 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.NotFound);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DuplicateCode_ReturnsDuplicateEntry()
+    {
+        // First create
+        var request1 = new CreateAccountRequest { AccountCode = "110101", NameAr = "Test1", ... };
+        await _service.CreateAsync(request1, 1, CancellationToken.None);
+
+        // Second create with same code
+        var request2 = new CreateAccountRequest { AccountCode = "110101", NameAr = "Test2", ... };
+        var result = await _service.CreateAsync(request2, 1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.DuplicateEntry);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_SystemAccount_ReturnsFailure()
+    {
+        var result = await _service.UpdateAsync(1, new UpdateAccountRequest { ... }, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("حساب نظام");
+    }
+
+    [Fact]
+    public async Task DeleteAsync_AccountWithChildren_ReturnsFailure()
+    {
+        // Arrange: parent with existing children
+        var result = await _service.DeleteAsync(1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("حسابات فرعية");
+    }
+
+    [Fact]
+    public async Task PermanentDeleteAsync_ReferencedAccount_ReturnsFailure()
+    {
+        // Arrange: account referenced by journal entries
+        var result = await _service.PermanentDeleteAsync(1, CancellationToken.None);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Contain("مستخدم");
+    }
+}
+```
+
+### Tree Building Tests
+
+```csharp
+[Fact]
+public async Task GetTreeAsync_ReturnsHierarchicalTree()
+{
+    var tree = await _service.GetTreeAsync(CancellationToken.None);
+
+    tree.IsSuccess.Should().BeTrue();
+    tree.Value.Should().NotBeNull();
+    tree.Value.Should().AllSatisfy(node =>
+    {
+        node.Level.Should().Be(1);  // Root nodes are Level 1
+        node.Children.Should().NotBeNull();
+        if (node.Children.Any())
+        {
+            node.Children.Should().AllSatisfy(child =>
+                child.Level.Should().BeGreaterThan(1));
+        }
+    });
+}
+
+[Fact]
+public void BuildTreeNode_FlatList_CreatesRecursiveStructure()
+{
+    // Arrange: create flat list of 3 accounts (grandparent → parent → child)
+    var accounts = new List<Account>
+    {
+        CreateAccount(1, "1000", null, 1),  // L1 root
+        CreateAccount(2, "1100", 1, 2),     // L2 child of 1
+        CreateAccount(3, "1101", 2, 3),     // L3 child of 2
+    };
+
+    // Act: use reflection or test helper to call BuildTreeNode
+    var tree = BuildTreeForTest(accounts);
+
+    // Assert
+    tree.Should().HaveCount(1);
+    tree[0].Children.Should().HaveCount(1);
+    tree[0].Children[0].Children.Should().HaveCount(1);
+    tree[0].Children[0].Children[0].AccountCode.Should().Be("1101");
+}
+```
+
+### Key Test Rules for Phase 22
+- **18+ new domain tests** for Account entity covering: Create (valid, empty code, empty NameAr, invalid level, negative opening balance), Update (system account guard), MarkAsDeleted (system account guard, children guard), IsDebitNormal (asset=true, liability=false)
+- **10+ new service tests** for AccountService covering: CreateAsync (success, invalid parent, duplicate code, level > parent), UpdateAsync (system account guard), DeleteAsync (children guard, not found), PermanentDeleteAsync (FK guard)
+- **Controller integration tests**: All CRUD endpoints, auth policy enforcement (AllStaff, ManagerAndAbove, AdminOnly), 404 vs 400 differentiation
+- All service tests verify `Result<T>.IsSuccess` / `IsFailure` — never exception-based testing
+- Tree building tests verify recursive structure from flat list (no N+1)
+
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
 Phase 21 (PRD alignment) — Users & Permissions is now complete. Test coverage for this module includes:

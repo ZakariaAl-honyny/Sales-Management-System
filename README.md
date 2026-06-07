@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-<img src="https://img.shields.io/badge/Status-v4.6.9%20Complete-2ECC71?style=for-the-badge" 
+<img src="https://img.shields.io/badge/Status-v4.6.9%2B%20Complete-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.6.9-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.6.9%2B-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -226,6 +226,21 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - `CashBox.CurrentBalance` never negative
 - Cash transfers require TWO transactions (Out + In)
 - `DailyClosure` for end-of-day reconciliation
+
+### 📒 Chart of Accounts — Phase 22 (v4.6.9+)
+- **60-Account Hierarchy** (4 levels): Group → Main → Sub → Detail
+  - 5 Level 1 Groups: Assets, Liabilities, Equity, Income, Expenses
+  - 8 Level 2 Main: Current Assets, Fixed Assets, Current Liabilities, Equity, Revenue, COGS, Operating Expenses, Other Expenses
+  - 20 Level 3 Sub: 27 Level 4 Detail accounts
+  - System accounts (L1-L2) protected by `IsSystem` — never deleted or edited
+  - Leaf accounts (L4) allow transactions; parent accounts (L1-L3) block transactions
+  - Color-coded per account type (#2196F3 Assets, #F44336 Liabilities, #4CAF50 Equity/Revenue, #FF9800 Expenses)
+  - `CHK_Account_Level_Range [Level] >= 1 AND [Level] <= 10` CHECK constraint
+  - `SetAsBaseCurrency()`/`UnsetBaseCurrency()` domain methods for clean service code
+- **Two-Pass Seeder**: Creates parent accounts first (L1→L2) with SaveChanges, queries IDs, then creates children (L3→L4)
+- **SystemAccountMappings Updated**: Maps 13 system account codes (Cash, Bank, AR, AP, VAT, Capital, Sales, COGS, etc.)
+- **Dual-Mode Desktop UI**: TreeView (HierarchicalDataTemplate) + DataGrid flat view toggle
+- **Full CRUD API**: 7 endpoints with proper policies — reads AllStaff, writes ManagerAndAbove, permanent delete AdminOnly
 
 ### 📒 Accounting Foundation (v4.6.7)
 - **Chart of Accounts** — 60-account hierarchical structure (Assets, Liabilities, Equity, Income, Expenses)
@@ -1058,6 +1073,70 @@ dotnet run
 
 ---
 
+## 📋 What's New in Phase 22 — Chart of Accounts Module (v4.6.9+)
+
+| Feature | Description |
+|---------|-------------|
+| **60-Account Hierarchy** | 4 levels: Group (L1) → Main (L2) → Sub (L3) → Detail (L4). 5 Groups, 8 Main, 20 Sub, 27 Detail. Numeric codes (4-10 digits), hierarchical by prefix. |
+| **Account Entity** | `Account` with 13-param `Create()` factory method. New properties: `Level` (int, 1-10), `Description`, `ColorCode` (hex), `AllowTransactions` (L4+), `OpeningBalance`. 24 core properties total. |
+| **DB Constraints** | `CHK_Account_Level_Range [Level] >= 1 AND [Level] <= 10` CHECK constraint. Self-referencing `ParentAccountId` FK with `DeleteBehavior.Restrict`. All enum properties use `.HasConversion<int>()` explicitly. |
+| **System Account Protection** | L1-L2 accounts marked `IsSystemAccount = true` — `MarkAsDeleted()` and `Update()` guard against modification. `HasChildren()` prevents deletion of parent accounts with children. |
+| **Two-Pass Seeder** | First pass creates L1-L2 groups with `SaveChangesAsync()`, queries back IDs, second pass creates L3-L4 with correct `ParentAccountId`. 60 accounts seeded with Arabic names, color codes, and descriptions. |
+| **SystemAccountMappings** | Updated with new account codes — maps 13 system operation types (Cash, Bank, AR, AP, VAT, Capital, Sales, COGS, Inventory, Expense, Revenue, Discount, RetainedEarnings) for journal entry services. |
+| **AccountDto + AccountTreeNodeDto** | `AccountDto` has computed `AccountTypeDisplay` and `LevelDisplay` for UI binding. `AccountTreeNodeDto` has recursive `Children` list for TreeView rendering. Service builds tree from flat list (no N+1 queries). |
+| **FluentValidation** | `CreateAccountRequestValidator` validates code format (4-10 digits), NameAr required, ColorCode hex, OpeningBalance non-negative. `UpdateAccountRequestValidator` validates NameAr/AccountType/Level. |
+| **AccountService** | 8 methods: `GetTreeAsync` (recursive tree), `GetAllAsync`, `GetByIdAsync`, `GetByTypeAsync`, `CreateAsync` (parent/level/code validation), `UpdateAsync` (system account guard), `DeleteAsync` (soft delete, children guard), `PermanentDeleteAsync` (hard delete, `DbUpdateException` catch). |
+| **AccountsController** | 7 CRUD endpoints appended to existing balance/ledger controller. Policies: `AllStaff` for reads, `ManagerAndAbove` for writes, `AdminOnly` for permanent delete. Returns 404 vs 400 via `ErrorCodes.NotFound`. |
+| **Dual-Mode Desktop UI** | `AccountsListView` with toggleable TreeView (`HierarchicalDataTemplate`) / DataGrid views. Search by name or code. Filter by AccountType. Search/filter works in BOTH TreeView and DataGrid modes. `AccountsListViewModel` implements `IDisposable` for EventBus, with Edit/Delete toolbar commands. |
+| **AccountEditorView** | Full form: Code, NameAr, NameEn, Type (combo), Level (read-only), ColorCode, OpeningBalance, AllowTransactions, **Explanation** (new field). `INotifyDataErrorInfo` validation. Level auto-set from parent. `ValidateAsync()` uses `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()`. **Edit mode** supported — loads existing account, `AccountCode` read-only during edit. |
+| **Desktop API Services** | `IAccountApiService` / `AccountApiService` — typed HTTP client with content-type guard, try-catch, Serilog logging. `AccountChangedMessage` EventBus for auto-refresh. |
+| **Desktop Navigation** | Sidebar "دليل الحسابات" button + "الحسابات" menu item. `NavigateToChartOfAccountsCommand` in MainViewModel. |
+| **Tests** | 18 new Domain tests for Account entity (Create guards, Update, MarkAsDeleted, IsDebitNormal, Level range). 1,906 total tests, 0 failures. Build: 0 errors, 0 warnings. |
+
+### Phase 22 Bug Fixes (v4.6.9+)
+
+| Bug | Fix | Layer |
+|-----|-----|-------|
+| **Bug-1**: `HasChildren()` domain guard on `MarkAsDeleted()` never executed — `SubAccounts` nav property not loaded by EF Core | Service now uses `AnyAsync(a => a.ParentAccountId == id)` DB query BEFORE calling `MarkAsDeleted()`. Domain guard retained as defense-in-depth. | Domain + Service |
+| **Bug-2/3**: `DeleteAsync()` fetched entity twice — first to check children, second to mark deleted | `DeleteAsync()` now loads once, calls `MarkAsDeleted()` on already-loaded entity. `PermanentDeleteAsync()` uses `DeleteRange(new[] { account })` on already-loaded entity. | Service |
+| **Bug-4**: `Explanation` field missing from Domain entity, EF config, DTOs, Requests, Validator, and Seeder | Added `string? Explanation` with `nvarchar(500)` config across ALL layers. All 60 seed accounts now have Arabic explanation text. | Cross-layer |
+| **Bug-5**: Level-1 account codes had no special length validation | `CreateAccountRequestValidator` now enforces exactly 3 characters for Level-1 account codes. | API |
+| **Bug-6**: `UpdateAccountRequestValidator` was missing `NameAr` Arabic message, `NameEn` MaxLength, `ColorCode` hex validation | Update validator now has SAME rules as Create validator. | API |
+| **`:byte` route constraint**: `{type:byte}` causes HTTP 500 — ASP.NET Core has no built-in `:byte` constraint | Changed to `{type:int:min(1):max(5)}` — matches AccountType enum range (1-5). | API |
+| **Health check leak**: `DatabaseHealthCheck` used raw `IConfiguration.GetConnectionString()` returning `""` (empty per RULE-040), bypassing DPAPI decryption | Rewritten to inject `SecureDbContextFactory` and call `GetDecryptedConnectionString()` — single source of truth. | Infrastructure |
+
+| Enhancement | Description | Layer |
+|-------------|-------------|-------|
+| **Enh-3**: Account edit mode | AccountEditorView loads existing account data, populates fields, sets `AccountCode` read-only. | Desktop |
+| **Enh-4**: Edit/Delete toolbar | AccountsListViewModel has `EditSelectedAccountCommand` + `DeleteSelectedAccountCommand` with toolbar buttons. | Desktop |
+| **Enh-5**: TreeView search | Search/filter now works in BOTH TreeView and DataGrid modes — filter matching tree nodes. | Desktop |
+
+### Key Rules (AGENTS.md §2.72-2.74)
+
+Phase 22 added RULE-321 through RULE-340 covering:
+- RULE-321: Account Level CHECK constraint (1-10 range)
+- RULE-322: Account.Create() with 13 parameters including Level
+- RULE-323: MarkAsDeleted guards IsSystemAccount + HasChildren
+- RULE-324: Update guards system accounts
+- RULE-325: Two-pass seeder approach
+- RULE-326: AllowTransactions = false for levels < 4
+- RULE-327: IsSystemAccount = true for L1-L2 only
+- RULE-328: Color codes per AccountType
+- RULE-329: AccountDto computed properties (AccountTypeDisplay, LevelDisplay)
+- RULE-330: AccountTreeNodeDto recursive Children
+- RULE-331: Controller policies per operation type
+- RULE-332: IDisposable for EventBus ViewModels
+- RULE-333: Service builds tree from flat list (no N+1)
+- RULE-334: CreateAsync validation (parent, level, code uniqueness)
+- RULE-335: PermanentDeleteAsync catches DbUpdateException
+- RULE-336: Exactly 60 seeded accounts
+- RULE-337: SystemAccountMappings updated with new IDs
+- RULE-338: ValidateAsync follows ClearAllErrors → AddError → ValidateAllAsync
+- RULE-339: AccountTypeDisplay uses AccountType enum (not byte)
+- RULE-340: Dual-mode Desktop UI (TreeView + DataGrid toggle)
+
+---
+
 ## 👤 What's New in Phase 21 — Users & Permissions Module (v4.6.9)
 
 | Feature | Description |
@@ -1105,7 +1184,7 @@ Phase 21 added RULE-305 through RULE-320 covering:
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 320 non-negotiable rules (RULE-001 to RULE-320)
+1. Read [`AGENTS.md`](AGENTS.md) — all 352 non-negotiable rules (RULE-001 to RULE-352)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

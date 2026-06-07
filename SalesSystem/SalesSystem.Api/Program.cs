@@ -108,9 +108,9 @@ builder.Services.AddDbContext<SalesDbContext>((serviceProvider, options) =>
 // ============================================
 // 3b. Security & Backup DI Registrations
 // ============================================
-builder.Services.AddScoped<IConnectionStringProtector, ConnectionStringProtector>();
+builder.Services.AddSingleton<IConnectionStringProtector, ConnectionStringProtector>();
 builder.Services.AddScoped<FirstRunSetupService>();
-builder.Services.AddScoped<SecureDbContextFactory>();
+builder.Services.AddSingleton<SecureDbContextFactory>();
 builder.Services.Configure<BackupSettings>(builder.Configuration.GetSection(BackupSettings.SectionName));
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddHostedService<ScheduledBackupWorker>();
@@ -164,6 +164,7 @@ builder.Services.AddScoped<IJournalEntryService, JournalEntryService>();
 builder.Services.AddScoped<ISystemAccountService, SystemAccountService>();
 builder.Services.AddScoped<IJournalEntryNumberGenerator, JournalEntryNumberGenerator>();
 builder.Services.AddScoped<IAnnualClosingService, AnnualClosingService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
 
 builder.Services.AddSingleton(jwtSettings);
 

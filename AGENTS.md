@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.6.9 — Phase 21 Users & Permissions Complete)
+# AGENTS.md — Sales Management System (v4.6.9+ — Phases 21-22 Complete + Bug Fixes)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -1328,6 +1328,54 @@ Following the Phase 20 currencies review, 3 additional enhancements were applied
 | RULE-319 | `DbSeeder` MUST seed 33 permissions across 9 categories (Sales=7, Purchases=5, Inventory=3, Customers=3, Suppliers=3, Products=3, Reports=1, Accounting=2, System=2, Operations=3, Audit=1) with 4-role assignments. |
 | RULE-320 | Default admin user MUST be seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`) — NEVER seed with a hardcoded password hash. |
 
+### 2.72 Phase 22 — Chart of Accounts Module Rules (v4.6.9+)
+
+### 2.73 Phase 22 — Code Review Bug Fix Rules (v4.6.9+)
+
+The Chart of Accounts module introduces a 4-level hierarchy (Group→Main→Sub→Detail) for the `Account` entity, with 60 seeded accounts, CRUD API, and Desktop tree/grid dual-mode UI. The following rules codify Phase 22 design decisions:
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-321 | `Account` entity MUST have `Level` (int, 1-10) property with DB CHECK constraint `CHK_Account_Level_Range [Level] >= 1 AND [Level] <= 10` — NEVER allow Level outside valid range. |
+| RULE-322 | `Account.Create()` MUST accept exactly 13 parameters (accountCode, nameAr, nameEn, accountType, level, parentAccountId, isSystemAccount, description, colorCode, allowTransactions, openingBalance, notes, createdByUserId) — NEVER omit the `level` parameter (required from Phase 22 onward). |
+| RULE-323 | `Account.MarkAsDeleted()` MUST guard against system accounts (`IsSystemAccount` → `DomainException`) AND parent accounts with children (`HasChildren()` → `DomainException`) — NEVER allow deletion of system or parent accounts. |
+| RULE-324 | `Account.Update()` MUST guard against modifying system accounts (`IsSystemAccount` → `DomainException`) — system accounts are read-only after seeding. |
+| RULE-325 | `AccountingSeeder` MUST use a two-pass approach: create all Level 1 accounts → `SaveChangesAsync` → query IDs → create Level 2 with `ParentAccountId` → `SaveChangesAsync` → Level 3 → Level 4 — NEVER create accounts with unresolved parent references. |
+| RULE-326 | Seeder MUST set `AllowTransactions = false` for levels < 4 (Group/Main/Sub) and `AllowTransactions = true` for level >= 4 (Detail/leaf accounts) — leaf accounts must allow transactions, parent accounts must not. |
+| RULE-327 | Seeder MUST set `IsSystemAccount = true` for Level 1 (Group) and Level 2 (Main) accounts only — Level 3 (Sub) and Level 4 (Detail) accounts are NOT system accounts (user-modifiable). |
+| RULE-328 | Seeder color codes MUST follow: Asset=`#2196F3` (blue), Liability=`#F44336` (red), Equity/Revenue=`#4CAF50` (green), Expense=`#FF9800` (orange) — color codes enable visual identification in TreeView. |
+| RULE-329 | `AccountDto` MUST have computed properties `AccountTypeDisplay` and `LevelDisplay` for UI binding — NEVER require ViewModel to translate byte/int to display string. |
+| RULE-330 | `AccountTreeNodeDto` MUST have a recursive `Children` list (`List<AccountTreeNodeDto>`) for TreeView rendering — the service `GetTreeAsync()` builds this from a flat list. |
+| RULE-331 | `AccountsController` GET endpoints MUST use `AllStaff` policy, POST/PUT use `ManagerAndAbove`, DELETE soft use `ManagerAndAbove`, DELETE permanent use `AdminOnly` — protect write operations appropriately. |
+| RULE-332 | `AccountsListViewModel` (and all list ViewModels with EventBus subscriptions) MUST implement `IDisposable` and call `Cleanup()` (which unsubscribes from EventBus) in `Dispose()` — prevent EventBus memory leaks. |
+| RULE-333 | `AccountService.GetTreeAsync()` MUST build a recursive tree from a flat `List<Account>` using `BuildTreeNode()` — NEVER query the database recursively (N+1 problem). |
+| RULE-334 | `AccountService.CreateAsync()` MUST validate: parent exists, `request.Level > parent.Level` (child deeper than parent), `request.Level <= 10`, and unique `AccountCode` — return `Result.Failure` with Arabic message on any violation. |
+| RULE-335 | `AccountService.PermanentDeleteAsync()` MUST catch `DbUpdateException` (reference integrity) and return `Result.Failure` with Arabic message — NEVER let FK exception crash the API. |
+| RULE-336 | Seeder MUST seed exactly 60 accounts: 5 Level 1 (Groups), 8 Level 2 (Main), 20 Level 3 (Sub), 27 Level 4 (Detail) — the hierarchical structure must match the plan in `docs/Phase 22 — Chart of Accounts Module Implementation Plan.md`. |
+| RULE-337 | `SystemAccountMappings` in `AccountingSeeder` MUST be updated with the new account IDs after the two-pass seed — maps cash, bank, AR, AP, VAT, capital, sales, COGS, etc. for journal entry services. |
+| RULE-338 | `AccountEditorViewModel.ValidateAsync()` MUST follow RULE-229: `ClearAllErrors()` → `AddError()` for each field → `await ValidateAllAsync()` (which shows the styled validation warning dialog automatically) — NEVER call `ShowValidationErrorsAsync` manually. |
+| RULE-339 | `AccountDto.AccountTypeDisplay` MUST use the `AccountType` enum (not hardcoded byte values) for compile-time safety — cast byte to `AccountType` and switch on enum members. |
+| RULE-340 | Desktop Accounts View MUST provide dual-mode display (TreeView with `HierarchicalDataTemplate` + DataGrid flat view) toggleable by the user — accountants prefer tree, casual users prefer grid. |
+
+### 2.74 Phase 22 — Code Review Bug Fix Rules (v4.6.9+)
+
+The following rules codify the bugs found and fixed during Phase 22 code review. These rules prevent regression and ensure all Phase 22 modules (Chart of Accounts) maintain consistency across Domain, Service, API, and Desktop layers.
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-341 | `HasChildren()` domain guard on `Account.MarkAsDeleted()` is DEFENSE-IN-DEPTH only — the `_subAccounts` list is NEVER loaded by EF Core. Service-level `DeleteAsync()`/`PermanentDeleteAsync()` MUST use `AnyAsync(a => a.ParentAccountId == id)` BEFORE calling `MarkAsDeleted()`. NEVER rely on the domain guard alone to protect parent accounts. |
+| RULE-342 | `AccountService.DeleteAsync()` MUST NOT fetch the entity twice — call `await _uow.Accounts.GetByIdAsync(id, ct)` once, then call `account.MarkAsDeleted()` on the loaded entity. `PermanentDeleteAsync()` MUST use `DeleteRange(new[] { account })` on the already-loaded entity. NEVER call `GetByIdAsync` a second time within the same operation. |
+| RULE-343 | All new entities with an `Explanation` field MUST add it to: Domain entity (nullable `string?`), EF config (`nvarchar(500)`), DTO (`AccountDto`, `AccountTreeNodeDto`), Create/Update Request DTOs, Service mapping (`MapToDto()`), Validator (`MaxLength(500)`), and Seeder (Arabic text for seed records). The `Explanation` field MUST be a `string?` nullable — NEVER `string` (non-nullable) as it's optional user input. |
+| RULE-344 | Level-1 (Group-level) accounts MUST have an `AccountCode` length of exactly 3 characters — enforced in `CreateAccountRequestValidator` with `MustNotExceedCodeLength(1, 3)`. Level 2+ (Main/Sub/Detail) accounts have standard `4-10` character codes. NEVER allow Level-1 accounts to have codes longer than 3 characters (breaks financial reporting standards). |
+| RULE-345 | ALL controller route parameters MUST use built-in ASP.NET Core route constraints only — `:byte` is NOT a supported route constraint and will cause `InvalidOperationException` (HTTP 500). Use `:int`, `:int:min(1):max(N)`, `:guid`, or `:string` instead. NEVER use `:byte`, `:sbyte`, `:short`, `:ushort`, `:uint`, or `:ulong` as route constraints. |
+| RULE-346 | All Update Validators MUST have the same field validations as their corresponding Create Validators — `NameAr` required + Arabic error message, `NameEn` with `MaxLength`, `ColorCode` with hex format validation (`Regex("^#[0-9A-Fa-f]{6}$")`). NEVER create an Update validator that is less strict than the Create validator. |
+| RULE-347 | All seeded accounts in `AccountingSeeder` MUST have an Arabic `explanation` text describing the account's purpose — NEVER leave `explanation` as `null` for seeded accounts. The explanation helps users understand the chart of accounts hierarchy and account purpose without external documentation. |
+| RULE-348 | Account editor ViewModels in Desktop MUST support edit mode — when opening an existing account, the VM must load the account data via API, populate all fields, and set `AccountCode` as read-only (`IsAccountCodeReadOnly = true`). NEVER allow changing the account code on an existing account (breaks integrity of chart of accounts references). |
+| RULE-349 | List ViewModels for Chart of Accounts MUST implement `EditSelectedAccountCommand` and `DeleteSelectedAccountCommand` with ToolBar/ToolBarTray buttons — open editor non-modally for edit, use `IDialogService.ShowDeleteConfirmationAsync` for delete. Search/filter MUST work in BOTH TreeView mode and DataGrid mode. |
+| RULE-350 | The `AccountsController` route `{type:int:min(1):max(5)}` MUST use the correct `AccountType` enum range — AccountType enum values are 1-5 (Asset=1, Liability=2, Equity=3, Revenue=4, Expense=5). NEVER hardcode a different range that doesn't match the enum. |
+| RULE-351 | `nameof` operator MUST be used for validator property names instead of string literals — e.g., `RuleFor(x => x.NameAr)` NOT `RuleFor("NameAr")`. String literals for property names cause silent validator failures when properties are renamed. |
+| RULE-352 | Desktop health check MUST use `SecureDbContextFactory.GetDecryptedConnectionString()` as the single source of truth for connection strings — NEVER inject raw `IConfiguration` into health check services. The health check bypass must still go through DPAPI decryption to avoid false "connection refused" errors. |
+
 ## 3. Enums (Use These EXACT Values)
 
 ```csharp
@@ -1475,6 +1523,17 @@ public enum InvoiceTypePrint : byte
 ❌ Hardcoded `category: "Print"` in `SetStringAsync()` auto-create
 ❌ Seed data with `defaultTaxRate: 15m` (must be `0m`)
 ❌ CurrencyCode validation using `Length > N` instead of `Length != 3` (ISO 4217 requires exactly 3 characters)
+❌ `HasChildren()` domain guard used as sole protection for parent accounts (service MUST use `AnyAsync()` DB query)
+❌ Fetching entity twice in `DeleteAsync()`/`PermanentDeleteAsync()` (use already-loaded entity)
+❌ `Explanation` field missing from any layer (Domain, EF, DTO, Request, Service, Validator, Seeder)
+❌ `:byte` route constraint on controller endpoints (use `:int:min(1):max(N)` instead)
+❌ Controller route range not matching the enum value range (e.g., hardcoded `1-3` instead of `1-5`)
+❌ Update Validators with fewer rules than Create Validators
+❌ System account with empty `explanation` in seed data (all seeded accounts need Arabic explanations)
+❌ Account code not read-only during edit mode (breaks integration with existing references)
+❌ `string` (non-nullable) for `Explanation` field (must be `string?` nullable)
+❌ `nameof` operator NOT used in validator `RuleFor` calls (string literals break on rename)
+❌ Health check injecting raw `IConfiguration` instead of `SecureDbContextFactory`
 ```
 
 ---
@@ -1718,3 +1777,15 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] `LogSystemError` NOT called for business validation errors — only for system errors?
 - [ ] Editor ViewModels have `IToastNotificationService` for success feedback?
 - [ ] `result.IsSuccess` used without `&& result.Value != null` guard (Result<T> invariant guarantees non-null)?
+- [ ] `HasChildren()` NOT used as sole parent-account guard — service uses `AnyAsync` DB query?
+- [ ] Entity NOT fetched twice in `DeleteAsync()`/`PermanentDeleteAsync()`?
+- [ ] Every new entity with an `Explanation` field has it in ALL layers (Domain, EF, DTO, Request, Service, Validator, Seeder)?
+- [ ] No `:byte` or unsupported route constraints on controller endpoints?
+- [ ] Controller route ranges match the actual enum value range (e.g., AccountType 1-5)?
+- [ ] Update Validators have same rules as Create Validators (NameAr, NameEn, ColorCode)?
+- [ ] All seeded accounts have Arabic `explanation` text?
+- [ ] Account code is read-only during edit mode in Desktop?
+- [ ] List ViewModels for Accounts have Edit/Delete commands with toolbar buttons?
+- [ ] Search/filter works in BOTH TreeView and DataGrid modes?
+- [ ] `nameof` operator used in validator `RuleFor` calls (no string literals)?
+- [ ] Health check uses `SecureDbContextFactory.GetDecryptedConnectionString()` (not raw `IConfiguration`)?

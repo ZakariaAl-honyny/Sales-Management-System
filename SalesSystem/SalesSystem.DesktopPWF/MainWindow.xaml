@@ -37,8 +37,10 @@
         xmlns:vmUsers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Users"
         xmlns:vmTaxes="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Taxes"
         xmlns:viewsTaxes="clr-namespace:SalesSystem.DesktopPWF.Views.Taxes"
-        xmlns:vmCurrencies="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Currencies"
-        xmlns:viewsCurrencies="clr-namespace:SalesSystem.DesktopPWF.Views.Currencies"
+             xmlns:vmCurrencies="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Currencies"
+             xmlns:viewsCurrencies="clr-namespace:SalesSystem.DesktopPWF.Views.Currencies"
+             xmlns:vmAccounts="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Accounts"
+             xmlns:viewsAccounts="clr-namespace:SalesSystem.DesktopPWF.Views.Accounts"
          xmlns:vmTransfers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Transfers"
          xmlns:audit="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Audit"
          xmlns:perms="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Permissions"
@@ -152,6 +154,12 @@
             <DataTemplate DataType="{x:Type vmCurrencies:CurrencyEditorViewModel}">
                 <viewsCurrencies:CurrencyEditorView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmAccounts:AccountsListViewModel}">
+                <viewsAccounts:AccountsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmAccounts:AccountEditorViewModel}">
+                <viewsAccounts:AccountEditorView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type audit:AuditLogListViewModel}">
                 <viewsAudit:AuditLogListView />
             </DataTemplate>
@@ -222,6 +230,7 @@
                 <Separator/>
                 <MenuItem Header="الضرائب" ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة" Click="TaxesMenuItem_Click"/>
                 <MenuItem Header="العملات" Command="{Binding NavigateToCurrenciesCommand}" ToolTip="إدارة العملات وأسعار الصرف"/>
+                <MenuItem Header="دليل الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}" ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
                 <MenuItem Header="النسخ الاحتياطي" 
                           Command="{Binding NavigateToBackupCommand}"
                           ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
@@ -404,6 +413,10 @@
                                             Command="{Binding NavigateToCurrenciesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             ToolTip="إدارة العملات وأسعار الصرف — إضافة وتعديل العملات"/>
+                                    <Button Content="دليل الحسابات" 
+                                            Command="{Binding NavigateToChartOfAccountsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
                                     <Button Content="نقل المخزون" 
                                             Command="{Binding NavigateToStockTransfersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

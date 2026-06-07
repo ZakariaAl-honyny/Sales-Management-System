@@ -18,7 +18,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Role).IsRequired().HasConversion<byte>();
 
         // Status replaces IsActive for the query filter
-        builder.Property(u => u.Status).IsRequired().HasConversion<byte>().HasDefaultValue(UserStatus.Active);
+        builder.Property(u => u.Status).IsRequired().HasConversion<byte>().HasDefaultValue(UserStatus.Active).HasSentinel((UserStatus)0);
         builder.HasQueryFilter(u => u.Status == UserStatus.Active);
 
         builder.Property(u => u.MustChangePassword).IsRequired().HasDefaultValue(true);

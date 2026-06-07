@@ -27,8 +27,10 @@ using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
+using SalesSystem.DesktopPWF.ViewModels.Accounts;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
+using SalesSystem.DesktopPWF.Views.Accounts;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 
@@ -112,22 +114,28 @@ public partial class App : System.Windows.Application
     {
         var healthService = _serviceProvider!.GetRequiredService<IDatabaseHealthCheckService>();
 
-        var result = await healthService.CheckAsync();
-
-        if (result.IsDatabaseConnected)
-            return true;
-
-        var retry = await Dispatcher.InvokeAsync(() =>
+        while (true)
         {
+            var result = await healthService.CheckAsync();
+
+            if (result.IsDatabaseConnected)
+                return true;
+
+            var retry = await Dispatcher.InvokeAsync(() =>
+            {
             var dialog = new Views.Dialogs.DatabaseErrorDialog(
                 result.ErrorMessage ?? "تعذر الاتصال بقاعدة البيانات",
                 () => healthService.CheckAsync());
 
-            dialog.ShowDialog();
-            return dialog.RetryClicked;
-        });
+                dialog.ShowDialog();
+                return dialog.RetryClicked;
+            });
 
-        return retry;
+            if (!retry)
+                return false;
+
+            await Task.Delay(1000);
+        }
     }
 
     private void Application_Exit(object sender, ExitEventArgs e)
@@ -198,6 +206,9 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ITaxesApiService, TaxesApiService>();
         services.AddSingleton<ICurrencyApiService, CurrencyApiService>();
 
+        // Account API Service
+        services.AddSingleton<IAccountApiService, AccountApiService>();
+
         // Audit & Permission Services
         services.AddSingleton<IAuditLogApiService, AuditLogApiService>();
         services.AddSingleton<IPermissionApiService, PermissionApiService>();
@@ -265,6 +276,10 @@ public partial class App : System.Windows.Application
         // Currency ViewModels
         services.AddTransient<CurrenciesListViewModel>();
         services.AddTransient<CurrencyEditorViewModel>();
+
+        // Account ViewModels
+        services.AddTransient<AccountsListViewModel>();
+        services.AddTransient<AccountEditorViewModel>();
 
         // Cash Box ViewModels
         services.AddTransient<CashBoxEditorViewModel>();

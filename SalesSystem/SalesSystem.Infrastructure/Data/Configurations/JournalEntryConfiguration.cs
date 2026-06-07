@@ -28,8 +28,8 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
             .HasForeignKey(x => x.JournalEntryId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Self-referencing FK for reversal entries
-        builder.HasOne<JournalEntry>()
+        // Self-referencing FK for reversal entries — use navigation lambda (not generic HasOne)
+        builder.HasOne(x => x.ReversedByEntry)
             .WithMany()
             .HasForeignKey(x => x.ReversedByEntryId)
             .IsRequired(false)

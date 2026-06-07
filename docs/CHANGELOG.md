@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.6.9 — Phase 22 Bug Fixes + Chart of Accounts Complete (2026-06-08)
+
+### Phase 22 — Chart of Accounts Module (v4.6.9+)
+- **60-Account Hierarchy**: 4 levels (Group→Main→Sub→Detail), 5 Groups + 8 Main + 20 Sub + 27 Detail accounts
+- **Account entity**: Level (int 1-10), ColorCode (hex), AllowTransactions (L4+), OpeningBalance, Description, Explanation (new string? field)
+- **DB Constraints**: CHK_Account_Level_Range, self-referencing ParentAccountId FK with Restrict delete, HasConversion<int> on all enum properties
+- **Two-Pass Seeder**: Creates L1→SaveChanges→Query IDs→L2→SaveChanges→L3→L4 — 60 accounts seeded with Arabic names, color codes, and Arabic explanation text
+- **SystemAccountMappings**: Updated with new account codes — maps 13 system operation types
+- **AccountDto + AccountTreeNodeDto**: Computed AccountTypeDisplay/LevelDisplay, recursive Children for TreeView
+- **AccountService**: 8 methods — GetTreeAsync (builds from flat list, no N+1), CRUD with parent/level/code validation, DbUpdateException handling
+- **AccountsController**: 7 CRUD endpoints, AllStaff/ManagerAndAbove/AdminOnly policies, 404 vs 400 differentiation
+- **Desktop dual-mode UI**: TreeView (HierarchicalDataTemplate) + DataGrid toggle, search/filter in both modes, Edit/Delete toolbar commands, edit mode with read-only AccountCode
+- **FluentValidators**: CreateAccountRequestValidator (code format, Level-1 exact 3 chars, NameAr, ColorCode hex), UpdateAccountRequestValidator (same rules as Create)
+
+### Phase 22 Code Review — Bug Fixes
+- **BUG-001 [FIXED]**: `HasChildren()` domain guard on `Account.MarkAsDeleted()` never executed — `SubAccounts` nav property not loaded by EF. Service now uses `AnyAsync(a => a.ParentAccountId == id)` DB query before calling `MarkAsDeleted()`. Domain guard retained as defense-in-depth.
+- **BUG-002/003 [FIXED]**: Double entity fetch in `DeleteAsync()`/`PermanentDeleteAsync()` — now loads entity once, uses already-loaded instance for `MarkAsDeleted()` and `DeleteRange()`.
+- **BUG-004 [FIXED]**: `Explanation` field missing across ALL layers — added to Domain entity (string? nullable), EF config (nvarchar(500)), DTOs, Requests, Service mapping, Validator (MaxLength(500)), and Seeder (Arabic text for all 60 accounts).
+- **BUG-005 [FIXED]**: Level-1 account codes lacked special length validation — `CreateAccountRequestValidator` now enforces exactly 3 characters for Level-1 accounts.
+- **BUG-006 [FIXED]**: `UpdateAccountRequestValidator` missing `NameAr` Arabic message, `NameEn` MaxLength, `ColorCode` hex validation — now has SAME rules as Create validator.
+- **`:byte` route constraint [FIXED]**: `AccountsController` used `{type:byte}` which causes HTTP 500 (no built-in `:byte` in ASP.NET Core) — changed to `{type:int:min(1):max(5)}`.
+- **Health check leak [FIXED]**: `DatabaseHealthCheck` used raw `IConfiguration.GetConnectionString()` returning `""` (empty per RULE-040), bypassing DPAPI decryption — rewritten to inject `SecureDbContextFactory.GetDecryptedConnectionString()` (single source of truth).
+- **Enh-3 [FIXED]**: Account editor edit mode — loads existing account, populates fields, sets `AccountCode` read-only.
+- **Enh-4 [FIXED]**: Edit/Delete commands with toolbar buttons in `AccountsListViewModel`.
+- **Enh-5 [FIXED]**: Search/filter works in BOTH TreeView and DataGrid modes.
+- **Log.Error → Log.Warning [FIXED]**: `DatabaseHealthCheckService.cs` retry/timeout messages lowered to Warning level (per RULE-182).
+- **RULE-341 through RULE-352** added to AGENTS.md — Phase 22 code review bug fix rules.
+
+### New Rules (AGENTS.md §2.73-2.74)
+- RULE-341 through RULE-352 — Phase 22 Code Review Bug Fixes (HasChildren→AnyAsync, double entity fetch, Explanation field, :byte route, Update validator completeness, health check source of truth)
+
+### Documentation & Subagent Updates
+- AGENTS.md: Header updated to "v4.6.9+ — Phases 21-22 Complete + Bug Fixes"; Section 2.74 added (12 bug fix rules); FORBIDDEN section updated (12 new items); Checklist updated (13 new items)
+- README.md: Phase 22 bug fixes table added; Contributing section updated to "352 rules"
+- code-reviewer.md: "Phase 22 Code Review Bug Fixes" section added with 18 checklist items across 6 categories
+- backend-architect.md: Phase 22 bug fix patterns added (HasChildren→AnyAsync, double fetch, Explanation, routes, validators, health check)
+- database-engineer.md: Phase 22 bug fix sections added (Explanation field, AccountCode length, UpdateValidator, route constraints)
+- ui-agent.md: Phase 22 UI fix patterns added (edit mode, list VM commands, dual-mode search)
+- implement-agent.md: Phase 22 code patterns added (DeleteAsync, PermanentDeleteAsync, route constraints)
+
 ## v4.6.9 — Settings Module Fixes & Phase 19 Remediations (2026-06-06)
 
 ### Phase 19 Settings Module — Code Review Fixes

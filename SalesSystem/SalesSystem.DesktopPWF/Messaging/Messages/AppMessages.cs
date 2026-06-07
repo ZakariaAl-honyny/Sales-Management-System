@@ -31,3 +31,5 @@ public record StoreSettingsChangedMessage;
 /// </summary>
 public record ApplicationShutdownMessage;
 
+public record AccountChangedMessage(int AccountId);
+

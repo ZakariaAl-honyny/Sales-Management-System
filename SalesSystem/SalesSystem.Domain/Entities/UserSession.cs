@@ -9,8 +9,8 @@ namespace SalesSystem.Domain.Entities;
 /// </summary>
 public class UserSession : BaseEntity
 {
-    public int UserId { get; private set; }
-    public User User { get; private set; } = null!;
+    public int? UserId { get; private set; }
+    public User? User { get; private set; }
     public string TokenHash { get; private set; } = string.Empty;
     public DateTime LoginAt { get; private set; }
     public DateTime? LastActivityAt { get; private set; }
