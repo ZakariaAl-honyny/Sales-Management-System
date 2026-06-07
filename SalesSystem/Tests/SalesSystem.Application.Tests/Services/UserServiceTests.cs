@@ -21,6 +21,7 @@ public class UserServiceTests
     private readonly ITestOutputHelper _output;
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IPermissionService> _mockPermissionService;
+    private readonly Mock<IAuditLogService> _mockAuditLogService;
     private readonly Mock<ILogger<UserService>> _mockLogger;
 
     private readonly UserService _sut;
@@ -32,9 +33,10 @@ public class UserServiceTests
 
         _mockUow = new Mock<IUnitOfWork>();
         _mockPermissionService = new Mock<IPermissionService>();
+        _mockAuditLogService = new Mock<IAuditLogService>();
         _mockLogger = new Mock<ILogger<UserService>>();
 
-        _sut = new UserService(_mockUow.Object, _mockPermissionService.Object, _mockLogger.Object);
+        _sut = new UserService(_mockUow.Object, _mockPermissionService.Object, _mockAuditLogService.Object, _mockLogger.Object);
     }
 
     #region GetByIdAsync Tests
@@ -79,13 +81,14 @@ public class UserServiceTests
     #region CreateAsync Tests
 
     [Fact]
-    public async Task CreateAsync_ValidRequest_CreatesUserPasswordless()
+    public async Task CreateAsync_ValidRequest_CreatesUserWithDefaultPassword()
     {
-        _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesUserPasswordless");
+        _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesUserWithDefaultPassword");
 
-        var usersList = new List<User>();
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.AnyIgnoreFiltersAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         _mockUow.Setup(u => u.Users.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((User u, CancellationToken ct) => u);
@@ -100,13 +103,13 @@ public class UserServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Value!.UserName.Should().Be("newuser");
 
-        // Verify user is created without password (passwordless flow)
+        // Verify user is created with a hashed default password and MustChangePassword = true
         _mockUow.Verify(u => u.Users.AddAsync(
-            It.Is<User>(user => user.PasswordHash == null && user.MustChangePassword),
+            It.Is<User>(user => user.PasswordHash != null && user.MustChangePassword),
             It.IsAny<CancellationToken>()), Times.Once,
-            "User should be created without password");
+            "User should be created with default password hash");
 
-        _output.WriteLine("[PASS] CreateAsync creates passwordless user");
+        _output.WriteLine("[PASS] CreateAsync creates user with default password");
     }
 
     [Fact]
@@ -116,8 +119,10 @@ public class UserServiceTests
 
         var existingUser = User.CreateWithPassword("existinguser", "hash123", "Existing User", UserRole.Admin);
 
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<User> { existingUser });
+        _mockUow.Setup(u => u.Users.AnyIgnoreFiltersAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var request = new CreateUserRequest("existinguser", "New User", (byte)UserRole.Admin); // Duplicate (case-insensitive)
 
@@ -136,8 +141,10 @@ public class UserServiceTests
 
         var existingUser = User.CreateWithPassword("TestUser", "hash123", "Test User", UserRole.Admin);
 
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<User> { existingUser });
+        _mockUow.Setup(u => u.Users.AnyIgnoreFiltersAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         var request = new CreateUserRequest("TESTUSER", "Another User", (byte)UserRole.Admin); // Same name different case
 
@@ -259,8 +266,10 @@ public class UserServiceTests
         _mockUow.Setup(u => u.Users.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(admin);
 
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(users);
+        _mockUow.Setup(u => u.Users.CountIgnoreFiltersAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
         var result = await _sut.DeleteAsync(1, CancellationToken.None);
 

@@ -12,4 +12,5 @@ public static class ErrorCodes
     public const string DuplicateBarcode = "DUPLICATE_BARCODE";
     public const string RequiresPasswordSetup = "REQUIRES_PASSWORD_SETUP";
     public const string AccountLocked = "ACCOUNT_LOCKED";
+    public const string InvalidToken = "INVALID_RESET_TOKEN";
 }

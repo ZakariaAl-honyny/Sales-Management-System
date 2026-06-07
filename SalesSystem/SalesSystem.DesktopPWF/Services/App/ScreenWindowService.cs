@@ -229,6 +229,10 @@ public class ScreenWindowService : IScreenWindowService
         window.WindowStyle = options.Style;
         window.WindowStartupLocation = options.StartupLocation;
 
+        // Set ScreenOptions on ScreenWindow so it can read PreventClose and other options in OnClosing
+        if (window is Views.ScreenWindow screenWin)
+            screenWin.ScreenOptions = options;
+
         if (options.Left.HasValue)
             window.Left = options.Left.Value;
         if (options.Top.HasValue)

@@ -10,6 +10,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
     {
         builder.ToTable("AuditLogs");
         builder.HasKey(a => a.Id);
+        builder.Property(a => a.Id).HasColumnType("bigint");
         builder.Property(a => a.Action).IsRequired().HasMaxLength(100);
         builder.Property(a => a.EntityType).IsRequired().HasMaxLength(100);
         builder.Property(a => a.Details).HasMaxLength(2000);
@@ -19,6 +20,8 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.HasIndex(a => a.Timestamp).IsDescending();
         builder.HasIndex(a => new { a.UserId, a.Timestamp }).IsDescending();
         builder.HasIndex(a => new { a.EntityType, a.EntityId });
+
+        builder.HasQueryFilter(a => a.IsActive);
 
         builder.HasOne(a => a.User)
             .WithMany()

@@ -83,27 +83,31 @@ public class PermissionService : IPermissionService
     {
         try
         {
-            // 1. Get existing role permissions
+            // 1. Get existing role permissions (read — outside transaction)
             var existing = await _uow.RolePermissions.ToListAsync(
                 rp => rp.Role == role,
                 ct: ct);
 
-            // 2. Remove permissions that are no longer assigned
-            var toRemove = existing.Where(rp => !permissionIds.Contains(rp.PermissionId)).ToList();
-            if (toRemove.Any())
-                _uow.RolePermissions.DeleteRange(toRemove);
-
-            // 3. Add new permissions
-            var existingIds = existing.Select(rp => rp.PermissionId).ToHashSet();
-            var toAdd = permissionIds.Where(id => !existingIds.Contains(id)).ToList();
-
-            foreach (var permissionId in toAdd)
+            // 2. Execute atomic write operations inside a transaction (RULE-317)
+            await _uow.ExecuteTransactionAsync(async () =>
             {
-                var rp = RolePermission.Create(role, permissionId);
-                await _uow.RolePermissions.AddAsync(rp, ct);
-            }
+                // Remove permissions that are no longer assigned
+                var toRemove = existing.Where(rp => !permissionIds.Contains(rp.PermissionId)).ToList();
+                if (toRemove.Any())
+                    _uow.RolePermissions.DeleteRange(toRemove);
 
-            await _uow.SaveChangesAsync(ct);
+                // Add new permissions
+                var existingIds = existing.Select(rp => rp.PermissionId).ToHashSet();
+                var toAdd = permissionIds.Where(id => !existingIds.Contains(id)).ToList();
+
+                foreach (var permissionId in toAdd)
+                {
+                    var rp = RolePermission.Create(role, permissionId);
+                    await _uow.RolePermissions.AddAsync(rp, ct);
+                }
+
+                await _uow.SaveChangesAsync(ct);
+            }, ct);
 
             _logger.LogInformation("Updated permissions for role {Role}: {Count} permissions assigned",
                 role, permissionIds.Count);

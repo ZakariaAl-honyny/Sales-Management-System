@@ -23,7 +23,7 @@ public class AuditLogService : IAuditLogService
 
     public async Task<Result> LogAsync(int? userId, string action, string entityType,
         int? entityId = null, string? details = null, string? ipAddress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, bool autoSave = true)
     {
         try
         {
@@ -34,7 +34,9 @@ public class AuditLogService : IAuditLogService
                 entityId, details, ipAddress);
 
             await _uow.AuditLogs.AddAsync(auditLog, ct);
-            await _uow.SaveChangesAsync(ct);
+
+            if (autoSave)
+                await _uow.SaveChangesAsync(ct);
 
             return Result.Success();
         }

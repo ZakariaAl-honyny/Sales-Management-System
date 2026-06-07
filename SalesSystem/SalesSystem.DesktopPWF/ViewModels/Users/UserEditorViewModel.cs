@@ -24,7 +24,6 @@ public class UserEditorViewModel : ViewModelBase
     private int _id;
     private string _username = string.Empty;
     private string _fullName = string.Empty;
-    private string _password = string.Empty;
     private UserRole _role = UserRole.Cashier;
     private bool _isActive = true;
     private bool _isEditMode;
@@ -34,7 +33,6 @@ public class UserEditorViewModel : ViewModelBase
     private int? _defaultCashBoxId;
     private ObservableCollection<CashBoxOptionItem> _cashBoxOptions = new();
     private bool _isLocked;
-
     public bool IsEditMode
     {
         get => _isEditMode;
@@ -109,21 +107,6 @@ public class UserEditorViewModel : ViewModelBase
                     AddError(nameof(FullName), "الاسم بالكامل مطلوب");
                 else
                     ClearErrors(nameof(FullName));
-            }
-        }
-    }
-
-    public string Password
-    {
-        get => _password;
-        set
-        {
-            if (SetProperty(ref _password, value))
-            {
-                if (!IsEditMode && string.IsNullOrWhiteSpace(value))
-                    AddError(nameof(Password), "كلمة المرور مطلوبة للمستخدم الجديد");
-                else
-                    ClearErrors(nameof(Password));
             }
         }
     }
@@ -209,11 +192,11 @@ public class UserEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
-    public ObservableCollection<object> RoleOptions { get; } = new()
+    public ObservableCollection<RoleOption> RoleOptions { get; } = new()
     {
-        new { Value = UserRole.Admin, Display = "مدير نظام" },
-        new { Value = UserRole.Manager, Display = "مدير فرع" },
-        new { Value = UserRole.Cashier, Display = "كاشير" }
+        new RoleOption { Value = UserRole.Admin, Display = "مدير نظام" },
+        new RoleOption { Value = UserRole.Manager, Display = "مدير فرع" },
+        new RoleOption { Value = UserRole.Cashier, Display = "كاشير" }
     };
     #endregion
 
@@ -257,20 +240,28 @@ public class UserEditorViewModel : ViewModelBase
         _toastService.ShowSuccess("تم إزالة الصورة الشخصية");
     }
 
-    private void OpenChangePassword()
+    private async void OpenChangePassword()
     {
         if (_id <= 0) return;
-        var vm = new PasswordChangeViewModel(
-            App.GetService<IAuthApiService>(),
-            _dialogService,
-            _toastService);
-        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+
+        var confirm = await _dialogService.ShowConfirmationAsync(
+            "إعادة تعيين كلمة المرور",
+            $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {FullName}؟\n\n" +
+            $"سيتم تعيين كلمة المرور إلى: 12345678\n" +
+            $"وسيُطلب من المستخدم تغييرها عند أول تسجيل دخول.");
+
+        if (!confirm) return;
+
+        var result = await _userService.ResetPasswordAsync(_id);
+        if (result.IsSuccess)
         {
-            Title = "تغيير كلمة المرور",
-            Width = 450,
-            Height = 300,
-            IsModal = true
-        });
+            _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم {FullName} إلى 12345678");
+        }
+        else
+        {
+            await _dialogService.ShowErrorAsync("خطأ في إعادة تعيين كلمة المرور",
+                HandleFailure(result.Error ?? "حدث خطأ أثناء إعادة تعيين كلمة المرور", "UserEditorViewModel.OpenChangePassword"));
+        }
     }
 
     private async Task<bool> ValidateAsync()
@@ -282,9 +273,6 @@ public class UserEditorViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(FullName))
             AddError(nameof(FullName), "الاسم بالكامل مطلوب — سيظهر هذا الاسم في الفواتير والتقارير");
-
-        if (!IsEditMode && string.IsNullOrWhiteSpace(Password))
-            AddError(nameof(Password), "كلمة المرور مطلوبة — يجب أن تكون كلمة مرور قوية لحماية الحساب");
 
         if (!string.IsNullOrWhiteSpace(Phone) && Phone.Length > 20)
             AddError(nameof(Phone), "رقم الهاتف لا يتجاوز 20 رقم");
@@ -309,8 +297,8 @@ public class UserEditorViewModel : ViewModelBase
             var request = new UpdateUserRequest(
                 FullName: FullName,
                 Role: (byte)Role,
-                Status: (byte)(IsActive ? 1 : 0),
-                Password: string.IsNullOrWhiteSpace(Password) ? null : Password,
+                Status: (byte)(IsActive ? SalesSystem.Domain.Enums.UserStatus.Active : SalesSystem.Domain.Enums.UserStatus.Inactive),
+                Password: null,
                 Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                 Email: string.IsNullOrWhiteSpace(Email) ? null : Email,
                 DefaultCashBoxId: DefaultCashBoxId);
@@ -344,3 +332,9 @@ public class UserEditorViewModel : ViewModelBase
 }
 
 public record CashBoxOptionItem(int Id, string Name);
+
+public class RoleOption
+{
+    public UserRole Value { get; set; }
+    public string Display { get; set; } = string.Empty;
+}

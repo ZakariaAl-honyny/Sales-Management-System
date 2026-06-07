@@ -12,6 +12,7 @@ public class PasswordChangeViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
 
+    private readonly bool _isMandatory;
     private string _currentPassword = string.Empty;
     private string _newPassword = string.Empty;
     private string _confirmPassword = string.Empty;
@@ -23,19 +24,42 @@ public class PasswordChangeViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
+    /// <summary>
+    /// Set to true when the password was successfully changed.
+    /// The caller can check this to determine if navigation should proceed.
+    /// </summary>
+    public bool DialogResult { get; private set; }
+
     public PasswordChangeViewModel(IAuthApiService authService, IDialogService dialogService,
-        IToastNotificationService toastService)
+        IToastNotificationService toastService, bool isMandatory = false)
     {
         _authService = authService;
         _dialogService = dialogService;
         _toastService = toastService;
+        _isMandatory = isMandatory;
+        ShowCancelButton = !isMandatory;
         SetDialogService(dialogService);
 
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync)));
-        CancelCommand = new RelayCommand(() => RequestClose());
+        CancelCommand = new RelayCommand(() =>
+        {
+            if (!_isMandatory)
+                RequestClose();
+        });
     }
 
     #region Properties
+
+    /// <summary>
+    /// When true, the Cancel button is hidden and the window cannot be closed without changing the password.
+    /// </summary>
+    public bool ShowCancelButton { get; }
+
+    /// <summary>
+    /// Header title depends on whether this is a mandatory change (first login with default password)
+    /// or a voluntary change (admin-initiated).
+    /// </summary>
+    public string HeaderTitle => _isMandatory ? "تغيير كلمة المرور — مطلوب" : "تغيير كلمة المرور";
 
     public string CurrentPassword
     {
@@ -120,6 +144,7 @@ public class PasswordChangeViewModel : ViewModelBase
         if (result.IsSuccess)
         {
             _toastService.ShowSuccess("تم تغيير كلمة المرور بنجاح");
+            DialogResult = true;
             RequestClose();
         }
         else

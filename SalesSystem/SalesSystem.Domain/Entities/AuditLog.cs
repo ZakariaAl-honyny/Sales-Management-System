@@ -8,7 +8,7 @@ namespace SalesSystem.Domain.Entities;
 /// Examples: LoginSuccess, CreateUser, PostInvoice, CancelInvoice, etc.
 /// Audit logs are immutable — once created, they cannot be modified or deleted.
 /// </summary>
-public class AuditLog : BaseEntity
+public class AuditLog : BaseEntityLong
 {
     public int? UserId { get; private set; }
     public User? User { get; private set; }

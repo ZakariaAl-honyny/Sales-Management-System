@@ -4,6 +4,7 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 
@@ -11,23 +12,44 @@ namespace SalesSystem.Application.Services;
 
 public class UserService : IUserService
 {
+    /// <summary>
+    /// Default password assigned to new users and used for admin-initiated resets.
+    /// </summary>
+    private const string DefaultPassword = "12345678";
+
     private readonly IUnitOfWork _uow;
     private readonly IPermissionService _permissionService;
+    private readonly IAuditLogService _auditLogService;
     private readonly ILogger<UserService> _logger;
 
     public UserService(
         IUnitOfWork uow,
         IPermissionService permissionService,
+        IAuditLogService auditLogService,
         ILogger<UserService> logger)
     {
         _uow = uow;
         _permissionService = permissionService;
+        _auditLogService = auditLogService;
         _logger = logger;
     }
 
     public async Task<Result<UserDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var user = await _uow.Users.GetByIdAsync(id, ct);
+        if (user == null)
+            return Result<UserDto>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
+
+        return Result<UserDto>.Success(MapToDto(user));
+    }
+
+    public async Task<Result<UserDto>> GetByUserNameAsync(string userName, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(userName))
+            return Result<UserDto>.Failure("اسم المستخدم مطلوب", ErrorCodes.ValidationError);
+
+        var user = await _uow.Users.FirstOrDefaultIgnoreFiltersAsync(
+            u => u.UserName == userName, ct);
         if (user == null)
             return Result<UserDto>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 
@@ -54,21 +76,25 @@ public class UserService : IUserService
     {
         try
         {
-            // 1. Check duplicate username
-            var existingUsers = await _uow.Users.GetAllAsync(ct);
-            if (existingUsers.Any(u => u.UserName.Equals(request.UserName, StringComparison.OrdinalIgnoreCase)))
+            // 1. Check duplicate username — use AnyAsync instead of loading all users
+            var duplicateExists = await _uow.Users.AnyIgnoreFiltersAsync(
+                u => u.UserName.ToLower() == request.UserName.ToLower().Trim(), ct);
+            if (duplicateExists)
             {
                 return Result<UserDto>.Failure("اسم المستخدم موجود بالفعل", ErrorCodes.DuplicateEntry);
             }
 
-            // 2. Create entity — passwordless! User sets password via SetInitialPassword.
-            var user = User.Create(
+            // 2. Create entity with default password — user must change on first login.
+            string defaultPasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword, workFactor: 12);
+            var user = User.CreateWithPassword(
                 request.UserName,
+                defaultPasswordHash,
                 request.FullName,
                 (UserRole)request.Role,
                 request.Phone,
                 request.Email,
-                request.DefaultCashBoxId
+                request.DefaultCashBoxId,
+                mustChangePassword: true
             );
 
             await _uow.Users.AddAsync(user, ct);
@@ -145,8 +171,8 @@ public class UserService : IUserService
 
             if (user.Role == UserRole.Admin && user.Status == UserStatus.Active)
             {
-                var users = await _uow.Users.GetAllAsync(ct);
-                var activeAdmins = users.Count(u => u.Role == UserRole.Admin && u.Status == UserStatus.Active);
+                var activeAdmins = await _uow.Users.CountIgnoreFiltersAsync(
+                    u => u.Role == UserRole.Admin && u.Status == UserStatus.Active, ct);
                 if (activeAdmins <= 1)
                 {
                     return Result.Failure("لا يمكن تعطيل آخر مدير نشط في النظام", ErrorCodes.InvalidOperation);
@@ -173,24 +199,30 @@ public class UserService : IUserService
             ErrorCodes.InvalidOperation);
     }
 
-    public async Task<Result> ResetPasswordAsync(int id, CancellationToken ct = default)
+    public async Task<Result<ResetPasswordResponse>> ResetPasswordAsync(int id, CancellationToken ct = default)
     {
         try
         {
             var user = await _uow.Users.GetByIdAsync(id, ct);
             if (user == null)
-                return Result.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
+                return Result<ResetPasswordResponse>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 
-            user.ResetPassword();
+            // Hash the default password and reset the user's password
+            string defaultPasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword, workFactor: 12);
+            user.ResetPassword(defaultPasswordHash);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Password reset for user {UserName} (Id={UserId})", user.UserName, user.Id);
-            return Result.Success();
+            _logger.LogInformation("Password reset for user {UserName} (Id={UserId}) to default", user.UserName, user.Id);
+            await _auditLogService.LogAsync(null, "AdminForcePasswordChange", "User", user.Id,
+                $"تم إعادة تعيين كلمة المرور للمستخدم {user.UserName} إلى الافتراضية من قبل المسؤول", null, ct);
+
+            return Result<ResetPasswordResponse>.Success(new ResetPasswordResponse(
+                user.Id, "تم إعادة تعيين كلمة المرور إلى 12345678"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error resetting password for user {Id}", id);
-            return Result.Failure("حدث خطأ أثناء إعادة تعيين كلمة المرور.");
+            return Result<ResetPasswordResponse>.Failure("حدث خطأ أثناء إعادة تعيين كلمة المرور.");
         }
     }
 

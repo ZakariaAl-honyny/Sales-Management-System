@@ -278,6 +278,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<AuditLogListViewModel>();
         services.AddTransient<PermissionManagementViewModel>();
         services.AddTransient<PasswordChangeViewModel>();
+        services.AddTransient<SetPasswordViewModel>();
 
         // Financial Report ViewModels
         services.AddTransient<ViewModels.Reports.IncomeStatementViewModel>();

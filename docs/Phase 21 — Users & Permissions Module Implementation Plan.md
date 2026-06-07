@@ -1,6 +1,6 @@
 # Phase 21 — Users & Permissions Module: Comprehensive Implementation Plan
 
-> **Version**: 2.0 — Updated after full re-read of Analysis Part 5 (lines 3711-5044) — Added 4-role model, exact permission codes from analysis, passwordless user creation flow, MustChangePassword, UserStatus (Active/Inactive/Locked)
+> **Version**: 2.1 — Updated from passwordless creation to default-password flow (v4.6.9 design refinement). Admin creates user with default password "12345678", user forced to change on first login. No token-based SetPassword flow.
 > **Scope**: Complete Users & Permissions system with 3 sub-modules — User Management (Enhanced), Permissions System (New), Audit & Security (New)
 
 ---
@@ -114,7 +114,7 @@ The Users & Permissions module is divided into **3 sub-modules** based on the an
 |-------|------|--------|-------|
 | `Id` | `int PK` | ✅ | Inherited from `BaseEntity` |
 | `UserName` | `string(50)` | ✅ | Unique index |
-| `PasswordHash` | `string(256)` | ✅ | BCrypt hash |
+| `PasswordHash` | `string(256)` | ✅ | BCrypt hash of default password "12345678" on create |
 | `FullName` | `string(150)` | ✅ | Display name |
 | `Role` | `UserRole (byte)` | ✅ | 1=Admin, 2=Manager, 3=Cashier |
 | `IsActive` | `bool` | ✅ | Global query filter |
@@ -157,10 +157,11 @@ The Users & Permissions module is divided into **3 sub-modules** based on the an
 - Serilog: `Log.Information` on login, `Log.Warning` on failed attempt
 
 **UserService features**:
-- `CreateAsync`: checks duplicate username, hashes password, saves
+- `CreateAsync`: checks duplicate username, hashes password (default "12345678" if none provided), saves. If `CreateUserRequest.Password` is null or empty, hashes "12345678" as default. Sets `MustChangePassword = true`.
 - `UpdateAsync`: updates fullName + role + optional password + IsActive
 - `DeleteAsync`: soft delete with guard against deactivating last admin
 - `PermanentDeleteAsync`: **GUARDED** — returns `Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي")` per RULE-244
+- `ResetPasswordAsync`: resets user's password to default "12345678" hash, sets `MustChangePassword = true`. Logs audit event.
 - All methods return `Result<T>` per RULE-006
 - Uses `IUnitOfWork` per RULE-024
 
@@ -350,11 +351,11 @@ public enum UserStatus : byte
 
 Note: Replaces the simple `IsActive` bool per analysis requirement (lines 5007-5018 of Analysis Part 5 — Active/Inactive/Locked states).
 
-### 4.2 User Entity (Extended per Analysis Part 5 lines 4890-5043)
+### 4.2 User Entity (Extended — Default Password Flow)
 
 **File**: `Domain/Entities/User.cs` — Extended from current
 
-**Critical analysis requirement**: Admin creates user WITHOUT password. User must set password on first login (MustChangePassword).
+**Design decision (v4.6.9)**: Admin creates user with a default password "12345678". The user is forced to change it on first login (MustChangePassword = true). No passwordless creation, no token-based SetPassword flow. The default password is immediately hashed via BCrypt at creation time.
 
 ```csharp
 public class User : BaseEntity
@@ -362,8 +363,8 @@ public class User : BaseEntity
     // Existing
     public string UserName { get; private set; } = string.Empty;
 
-    // CHANGED: PasswordHash is NULLABLE — user created without password (analysis lines 4908-4915)
-    public string? PasswordHash { get; private set; }
+    // REQUIRED (not nullable) — BCrypt hash of "12345678" on create, replaced on first change
+    public string PasswordHash { get; private set; } = string.Empty;
     public string FullName { get; private set; } = string.Empty;
     public UserRole Role { get; private set; }
 
@@ -380,7 +381,7 @@ public class User : BaseEntity
     // CHANGED: IsLocked replaced by UserStatus.Locked, but keep as computed helper
     public bool IsLocked => Status == UserStatus.Locked;
 
-    // NEW: Password management (analysis lines 4890-5043)
+    // NEW: Password management
     public bool MustChangePassword { get; private set; } = true;  // Default: must change on first login
     public DateTime? PasswordChangedAt { get; private set; }
 
@@ -389,47 +390,52 @@ public class User : BaseEntity
 
     protected User() { } // EF Core
 
-    // CHANGED: PasswordHash is OPTIONAL — admin creates WITHOUT password (analysis lines 4898-4915)
-    // MustChangePassword = true by default
+    /// <summary>
+    /// Creates a new user with a default BCrypt-hashed password ("12345678" if none provided).
+    /// MustChangePassword = true by default — user is forced to change on first login.
+    /// </summary>
     public static User Create(string userName, string fullName,
         UserRole role, string? phone = null, string? email = null,
-        int? defaultCashBoxId = null, int? createdByUserId = null)
+        int? defaultCashBoxId = null, int? createdByUserId = null,
+        string? passwordHash = null)
     {
         if (string.IsNullOrWhiteSpace(userName))
             throw new DomainException("اسم المستخدم مطلوب.");
         if (string.IsNullOrWhiteSpace(fullName))
             throw new DomainException("الاسم الكامل مطلوب.");
+
+        // Default password is "12345678" — always hashed, never stored in plaintext
+        var hash = passwordHash ?? BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
+
         return new User
         {
             UserName = userName.Trim(),
             FullName = fullName.Trim(),
             Role = role,
             Status = UserStatus.Active,
+            PasswordHash = hash,
             Phone = phone?.Trim(),
             Email = email?.Trim(),
             DefaultCashBoxId = defaultCashBoxId,
-            MustChangePassword = true,      // Forces password creation on first login
-            PasswordHash = null,             // No password set by admin
+            MustChangePassword = true,      // Forces password change on first login
             CreatedByUserId = createdByUserId,
             CreatedAt = DateTime.UtcNow
         };
     }
 
-    // NEW: Set initial password on first login (analysis lines 4921-4949)
-    public void SetInitialPassword(string passwordHash)
-    {
-        if (!MustChangePassword)
-            throw new DomainException("كلمة المرور تم تعيينها مسبقاً.");
-        if (string.IsNullOrWhiteSpace(passwordHash))
-            throw new DomainException("كلمة المرور مطلوبة.");
-        PasswordHash = passwordHash;
-        MustChangePassword = false;
-        PasswordChangedAt = DateTime.UtcNow;
-    }
-
     // NEW methods
     public void UpdateProfile(string fullName, UserRole role, string? phone, string? email,
         int? defaultCashBoxId = null, int? updatedByUserId = null)
+    {
+        FullName = fullName.Trim();
+        Role = role;
+        Phone = phone?.Trim();
+        Email = email?.Trim();
+        DefaultCashBoxId = defaultCashBoxId;
+        UpdatedByUserId = updatedByUserId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void ChangePassword(string newPasswordHash, int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(newPasswordHash))
@@ -440,15 +446,63 @@ public class User : BaseEntity
         UpdatedByUserId = updatedByUserId;
         UpdatedAt = DateTime.UtcNow;
     }
-    public void RecordLoginAttempt(bool success)  // Increments on fail, resets on success
-    public void Lock()    // Status = UserStatus.Locked
-    public void Unlock()  // Status = UserStatus.Active, LoginAttempts = 0
-    public void SetAvatar(string avatarPath)
-    public void ClearAvatar()
-    public void RecordLogin() // Sets LastLoginAt, resets LoginAttempts = 0, MustChangePassword = false
-    public void ResetPassword() // Admin reset: PasswordHash = null, MustChangePassword = true (analysis lines 4965-4986)
+
+    public void RecordLoginAttempt(bool success)
+    {
+        if (success)
+        {
+            LoginAttempts = 0;
+            LastLoginAt = DateTime.UtcNow;
+            // Do NOT auto-unlock — use explicit Unlock() for that
+        }
+        else
+        {
+            LoginAttempts++;
+            if (LoginAttempts >= 5)
+                Status = UserStatus.Locked;
+        }
+    }
+
+    public void Lock()    => Status = UserStatus.Locked;
+    public void Unlock()  => Status = UserStatus.Active;
+    public void SetAvatar(string avatarPath) => AvatarPath = avatarPath;
+    public void ClearAvatar() => AvatarPath = null;
     public void Deactivate() // Status = UserStatus.Inactive (soft deactivate)
+    {
+        Status = UserStatus.Inactive;
+        IsActive = false;  // Keep BaseEntity.IsActive in sync
+    }
     public void Activate()   // Status = UserStatus.Active
+    {
+        Status = UserStatus.Active;
+        IsActive = true;   // Keep BaseEntity.IsActive in sync
+    }
+
+    /// <summary>
+    /// Admin reset: sets password back to default "12345678" hash.
+    /// MustChangePassword = true — user forced to change on next login.
+    /// </summary>
+    public void ResetPassword()
+    {
+        PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
+        MustChangePassword = true;
+        PasswordChangedAt = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    // Override BaseEntity.MarkAsDeleted to keep Status in sync
+    public new void MarkAsDeleted()
+    {
+        Status = UserStatus.Inactive;
+        IsActive = false;
+    }
+
+    // Override BaseEntity.Restore to keep Status in sync
+    public new void Restore()
+    {
+        Status = UserStatus.Active;
+        IsActive = true;
+    }
 }
 ```
 
@@ -457,7 +511,7 @@ public class User : BaseEntity
 - `if (string.IsNullOrWhiteSpace(fullName))` → `throw new DomainException("الاسم الكامل مطلوب.")`
 - `if (phone?.Length > 20)` → `throw new DomainException("رقم الهاتف لا يتجاوز 20 رقماً.")`
 - `if (email?.Length > 100)` → `throw new DomainException("البريد الإلكتروني لا يتجاوز 100 حرفاً.")`
-- `if (!MustChangePassword && string.IsNullOrWhiteSpace(PasswordHash))` → `throw new DomainException("كلمة المرور غير محددة.")` — integrity check
+- `if (string.IsNullOrWhiteSpace(newPasswordHash))` → `throw new DomainException("كلمة المرور الجديدة مطلوبة.")`
 - `if (LoginAttempts < 0)` → `throw new DomainException("محاولات تسجيل الدخول غير صالحة.")`
 
 ### 4.3 UserConfiguration (Extended)
@@ -474,8 +528,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.UserName).IsRequired().HasMaxLength(50);
         builder.HasIndex(u => u.UserName).IsUnique();
 
-        // CHANGED: PasswordHash is NULLABLE (user created without password)
-        builder.Property(u => u.PasswordHash).HasMaxLength(256);  // No IsRequired
+        // PasswordHash is REQUIRED — default "12345678" hash set at creation
+        builder.Property(u => u.PasswordHash).IsRequired().HasMaxLength(256);
 
         builder.Property(u => u.FullName).IsRequired().HasMaxLength(150);
         builder.Property(u => u.Role).IsRequired().HasConversion<byte>();
@@ -501,9 +555,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey(u => u.DefaultCashBoxId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // CHANGED: Query filter uses UserStatus, not IsActive
-        // Cast to byte because HasConversion<byte>() prevents EF from translating enum constants
-        builder.HasQueryFilter(u => (byte)u.Status == (byte)UserStatus.Active);
+        // CHANGED: Query filter uses UserStatus + IsActive for defense-in-depth
+        builder.HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte)UserStatus.Active);
     }
 }
 ```
@@ -665,7 +718,7 @@ public class UserSession
 }
 ```
 
-### 4.8 DTO Changes (Passwordless Creation)
+### 4.8 DTO Changes (Default Password Flow)
 
 **UserDto — Extended**:
 ```csharp
@@ -673,7 +726,7 @@ public class UserSession
 // New: Status replaces IsActive, adds MustChangePassword, PasswordChangedAt, DefaultCashBoxId
 public record UserDto(int Id, string UserName, string FullName, byte Role,
     byte Status,                       // UserStatus: 1=Active, 2=Inactive, 3=Locked
-    bool MustChangePassword,           // NEW: true = user must set password on login
+    bool MustChangePassword,           // NEW: true = user must change password on login
     DateTime? PasswordChangedAt,       // NEW: when password was last changed
     string? Phone, string? Email, string? AvatarPath,
     DateTime? LastLoginAt,
@@ -681,21 +734,32 @@ public record UserDto(int Id, string UserName, string FullName, byte Role,
     int? DefaultCashBoxId);            // NEW: default cashbox for user receipts
 ```
 
-**Request Changes — Passwordless Creation**:
+**Request Changes — Default Password Flow**:
 ```csharp
-// CHANGED (analysis lines 4898-4915): No Password field — admin creates WITHOUT password
+// CHANGED: Password field is OPTIONAL — defaults to "12345678" if null/empty
+// Admin can set a custom password during creation if desired
 public record CreateUserRequest(string UserName, string FullName, byte Role,
+    string? Password,                       // Optional — defaults to "12345678"
     string? Phone, string? Email, int? DefaultCashBoxId);
 
 // CHANGED: IsActive replaced by Status
-public record UpdateUserRequest(string FullName, byte Role, byte Status, string? Password,     // Password is optional (only when changing)
+// Password is optional (only when admin wants to change it)
+public record UpdateUserRequest(string FullName, byte Role, byte Status,
+    string? Password,                       // Optional — only when changing password
     string? Phone, string? Email, int? DefaultCashBoxId);
 
-// NEW: Set password on first login (used by first-login flow)
-public record SetPasswordRequest(string Password, string ConfirmPassword);
+// REMOVED: SetPasswordRequest — no longer needed (default password flow replaces passwordless)
 
-// NEW: Admin reset user password
+// Admin reset user password
 public record ResetUserPasswordRequest(int UserId);
+```
+
+**Response Changes**:
+```csharp
+// NEW: LoginResponse includes RequiresPasswordChange flag
+public record LoginResponse(int UserId, string UserName, string FullName, byte Role,
+    string Token, DateTime ExpiresAt,
+    bool RequiresPasswordChange);          // NEW: true = user must change password
 ```
 
 **New DTOs**:
@@ -850,50 +914,53 @@ if (!await db.Set<Permission>().AnyAsync())
 
 ### 4.9.1 Seed Data — Default Admin User
 
-**Critical requirement** (Analysis Part 5 lines 4890-4919): The system MUST include a default admin account on first run so the user can log in immediately after installation.
+**Critical requirement**: The system MUST include a default admin account on first run so the user can log in immediately after installation.
 
 **Design**:
-- Password is NOT set during seeding (passwordless creation flow — Analysis Part 5)
-- `MustChangePassword = true` forces the admin to set a password on first login
+- Admin account created with default password "12345678" (BCrypt hashed immediately)
+- `MustChangePassword = true` forces the admin to change password on first login
 - The admin user has the `Admin` role with ALL permissions
+- No passwordless creation, no token-based flow
 
 ```csharp
 // ═══════════════════════════════════════════════════════
-// Seed Default Admin User (passwordless — must change on first login)
+// Seed Default Admin User (default password "12345678" — must change on first login)
 // ═══════════════════════════════════════════════════════
 if (!await db.Set<User>().AnyAsync())
 {
     var adminUser = User.Create(
-        username: "admin",
-        nameAr: "مدير النظام",
-        nameEn: "System Admin",
+        userName: "admin",
+        fullName: "مدير النظام",
         role: UserRole.Admin,
-        phone: "",
-        email: "",
+        phone: null,
+        email: null,
         createdByUserId: null  // System-created
+        // PasswordHash defaults to BCrypt hash of "12345678"
     );
-    // PasswordHash remains null — user MUST set password on first login
-    adminUser.SetMustChangePassword(true);
+    // MustChangePassword is already true by default from User.Create()
     db.Set<User>().Add(adminUser);
-    logger?.LogInformation("Seeded default admin user: admin/مدير النظام");
+    logger?.LogInformation("Seeded default admin user: admin/مدير النظام (default password)");
     await db.SaveChangesAsync(ct);
 }
 ```
 
 **Note on first-run flow**:
 1. On first application launch, no users exist → `User.AnyAsync()` returns false
-2. `DbSeeder` creates the admin user with null password
-3. Login screen: user enters "admin" as username, leaves password empty (or enters anything — system detects MustChangePassword)
-4. System redirects to password creation screen with message: "مرحباً بك في النظام — يرجى إنشاء كلمة المرور الخاصة بك"
-5. After setting password, user can log in normally
-6. Admin can then create additional users from the User Management screen
+2. `DbSeeder` creates the admin user with BCrypt hash of "12345678", `MustChangePassword = true`
+3. Login screen: user enters "admin" as username and "12345678" as password
+4. Login succeeds → `LoginResponse.RequiresPasswordChange = true`
+5. Desktop displays mandatory password change screen (cannot be closed/dismissed)
+6. User enters new password (min 8 chars) + confirmation → calls `ChangePasswordAsync`
+7. `MustChangePassword = false`, user is logged in normally
+8. Admin can then create additional users from the User Management screen
 
-**IDs**: The seeded admin user always gets Id = 1 (first user in the system). This is referenced as `CreatedByUserId = 1` in seed data for other entities (customer cash, supplier cash, default warehouse, etc.).
+**IDs**: The seeded admin user always gets Id = 1 (first user in the system). This is referenced as `CreatedByUserId = 1` in seed data for other entities.
 
 **Security**:
-- Without a password set, login attempts with any password fail
-- The password creation screen requires: New Password + Confirm Password (minimum 8 chars, complexity requirements)
-- After password is set, `MustChangePassword = false` and `PasswordHash` stores the BCrypt hash
+- Default password "12345678" is never stored in plaintext — hashed immediately via BCrypt (work factor 12)
+- `MustChangePassword = true` — user cannot bypass the mandatory password change
+- Password change requires: Current Password (verification) + New Password (min 8 chars) + Confirmation
+- After password change, `MustChangePassword = false` and `PasswordHash` stores the new BCrypt hash
 
 ### 4.10 IAuditLogService Interface (NEW)
 
@@ -943,7 +1010,7 @@ public interface IPermissionService
 | Field | Current | Required | Action |
 |-------|---------|----------|--------|
 | `UserName` | ✅ | ✅ | No change |
-| `PasswordHash` | ✅ (NOT NULL) | ✅ (NULLABLE) | **CHANGE** — nullable (passwordless creation; admin never sets password) |
+| `PasswordHash` | ✅ (NOT NULL) | ✅ (NOT NULL) | **KEEP** — required, default "12345678" hash on create |
 | `FullName` | ✅ | ✅ | No change |
 | `Role` | ✅ (3 roles) | ✅ (4 roles) | **EXTEND** — add Accountant=2, Observer=4 |
 | `IsActive (bool)` | ✅ | ❌ | **REPLACE** with `Status` enum (Active/Inactive/Locked) |
@@ -957,13 +1024,13 @@ public interface IPermissionService
 | `LastLoginAt` | ❌ | ✅ | ADD — nullable datetime2 |
 | `LoginAttempts` | ❌ | ✅ | ADD — int default 0 |
 
-### 5.2 Auth (Updated per Analysis Part 5 lines 4890-4995)
+### 5.2 Auth (Default Password Flow)
 
 | Feature | Current | Required | Action |
 |---------|---------|----------|--------|
-| User creation flow | Requires password | **Passwordless** (analysis lines 4898-4915) | **CHANGE** — `CreateUserRequest` has NO Password field; admin creates user without password; `PasswordHash` = null, `MustChangePassword` = true |
-| First login flow | Normal password check | **Must set password** (analysis lines 4921-4949) | **CHANGE** — if `MustChangePassword=true`, redirect to `SetPassword` page; user creates password on first login |
-| Password reset (admin) | Admin can set password | **Admin forces reset** (analysis lines 4965-4986) | **CHANGE** — admin chooses "إعادة تعيين كلمة المرور" → `PasswordHash` = null, `MustChangePassword` = true; user must set new password on next login |
+| User creation flow | Requires password | **Default password** | **CHANGE** — `CreateUserRequest.Password` is optional (defaults to "12345678" if null/empty). Admin can set custom password. `MustChangePassword` = true always on create. |
+| First login flow | Normal password check | **Must change password** | **CHANGE** — login with default password succeeds but `LoginResponse.RequiresPasswordChange = true`. Desktop shows mandatory password change screen (cannot close). User calls `ChangePasswordAsync` to set new password → `MustChangePassword = false`. |
+| Password reset (admin) | Admin can set password | **Admin resets to default** | **CHANGE** — admin chooses "إعادة تعيين كلمة المرور" → `PasswordHash` set to hash of "12345678", `MustChangePassword` = true. User must change on next login. No token needed. |
 | BCrypt work factor 12 | ✅ | ✅ | No change |
 | JWT token generation | ✅ | ✅ | No change |
 | Track login attempts | ❌ | ✅ | ADD — `RecordLoginAttempt()` + lock after 5 fails |
@@ -971,7 +1038,7 @@ public interface IPermissionService
 | Auto-unlock | ❌ | ✅ | ADD — deferred to V2 (manual unlock via Admin for now) |
 | Last login display | ❌ | ✅ | ADD — `User.LastLoginAt` on success |
 | Password change endpoint | ❌ | ✅ | ADD — `POST /api/v1/auth/change-password` |
-| Set password endpoint | ❌ | ✅ | ADD — `POST /api/v1/auth/set-password` (for first-login flow) |
+| Set password endpoint | ❌ | ❌ | **NOT NEEDED** — default password flow replaces token-based SetPassword |
 | Rate limiting | ✅ | ✅ | Already on login endpoint |
 
 ### 5.3 Permissions (Updated per Analysis Part 5 lines 3981-4022)
@@ -1061,16 +1128,16 @@ The current `[Flags] Permission` enum in DesktopPWF will be migrated to **DB-bac
 - Server resizes to 128×128 max on upload
 - Desktop shows avatar in StatusBar (small 32×32) and UserEditor (128×128)
 
-### 6.4 Password Policy (Updated per Analysis Part 5 lines 4890-4995)
+### 6.4 Password Policy (Default Password Flow)
 
-- **Passwordless creation**: Admin creates user WITHOUT password (analysis lines 4898-4915). `PasswordHash` = null, `MustChangePassword` = true
-- **First login**: User must set password via `POST /api/v1/auth/set-password` (analysis lines 4921-4949). After setting password, `MustChangePassword` = false, `PasswordChangedAt` = now
+- **Default password**: Admin creates user with password "12345678" (BCrypt hashed immediately). Admin can set a custom password during creation if desired. `MustChangePassword` = true always.
+- **First login**: User logs in with "12345678" → password verified via BCrypt → login succeeds but `LoginResponse.RequiresPasswordChange = true`. Desktop displays **mandatory** password change screen (cannot be dismissed/escaped). User enters CurrentPassword + NewPassword (min 8 chars) + ConfirmPassword → calls `POST /api/v1/auth/change-password` → `MustChangePassword = false`, user proceeds to main screen.
 - **Minimum length**: 8 characters (validated by FluentValidation)
 - **BCrypt work factor**: 12 (RULE-039 — already implemented)
 - **No password expiry** in V1 (deferred to future phase)
 - **Account lockout**: 5 failed attempts → `Status = UserStatus.Locked`, login returns "الحساب مغلق مؤقتاً"
 - **Admin unlock**: Admin sets `Status = UserStatus.Active`, `LoginAttempts = 0` via UserEditor
-- **Password reset (Admin)**: Admin clicks "إعادة تعيين كلمة المرور" → `PasswordHash` = null, `MustChangePassword` = true, `Status` unchanged. User must set new password on next login (analysis lines 4965-4986)
+- **Password reset (Admin)**: Admin clicks "إعادة تعيين كلمة المرور" → `PasswordHash` = hash of "12345678", `MustChangePassword` = true, `Status` unchanged. User must change password on next login. No token needed.
 
 ### 6.5 Session Timeout
 
@@ -1100,6 +1167,22 @@ Observer (4)   = مراقب          → Reports only (view sales/purchases/inve
 
 2FA was mentioned in analysis as "نظام التشفير للحماية" (Encryption system). This refers to BCrypt for password hashing (already implemented), NOT a separate 2FA system. True 2FA (TOTP/SMS) is deferred to a future phase.
 
+### 6.8 Design Rationale: Why Default Password Instead of Passwordless?
+
+The original plan specified **passwordless user creation** — admin creates user without a password (`PasswordHash = null`), and the user must use a token-based `SetPassword` flow on first login. This was changed to a **default password flow** during v4.6.9 implementation. Here's why:
+
+| Factor | Passwordless (original) | Default Password (new) | Winner |
+|--------|------------------------|----------------------|--------|
+| **Security** | `PasswordHash = null` required null-check guards everywhere; any code path that assumes non-null `PasswordHash` could NRE | `PasswordHash` is always non-null, no special null handling needed | ✅ Default Password |
+| **Attack surface** | `POST /api/v1/auth/set-password` was `[AllowAnonymous]` with `userId` from query string — an attacker could call it for any user if `MustChangePassword` is true | No `set-password` endpoint exists — attacker cannot set/reset passwords via API | ✅ Default Password |
+| **Token management** | Required `PasswordResetToken` + `PasswordResetTokenExpiresAt` fields on User entity, plus secure token generation/validation | No tokens needed — user simply logs in with default password and is forced to change | ✅ Default Password |
+| **Admin experience** | Admin creates user and must communicate a separate token/link to the user — adds friction | Admin creates user, tells them "your password is 12345678, change it on first login" — simple and familiar | ✅ Default Password |
+| **User experience** | User needs to understand a token-based flow — unfamiliar to many retail shop employees | User logs in with a password they already know (told by admin), then changes it — familiar pattern | ✅ Default Password |
+| **Implementation complexity** | Required: `SetPasswordRequest` DTO, `SetPasswordAsync()`, `SetInitialPassword()`, `PasswordResetToken`, token validation, separate endpoint with auth | Required: Default hash in `User.Create()`, `RequiresPasswordChange` flag in `LoginResponse`, mandatory password change screen in desktop | ✅ Default Password |
+| **Consistency with existing codebase** | `PasswordHash` column changes from NOT NULL to NULL — breaking schema change requiring migration | `PasswordHash` stays NOT NULL — no schema change; BCrypt hash of "12345678" is stored just like any other password | ✅ Default Password |
+
+**Conclusion**: The default password flow is simpler, more secure (no anonymous SetPassword endpoint), more familiar to users, and requires fewer code changes. The passwordless/token approach was designed for enterprise systems with email infrastructure — overkill for a local retail sales management system.
+
 ---
 
 ## 7. Non-V1 Items (Deferred)
@@ -1125,7 +1208,7 @@ Observer (4)   = مراقب          → Reports only (view sales/purchases/inve
 
 All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), ToolTips (RULE-185-190), and UI Compact styles (RULE-262-274).
 
-### Task 1 — Rebuild User Entity (Passwordless Creation + UserStatus + MustChangePassword + Phone/Email/Avatar/DefaultCashBox) + Migration
+### Task 1 — Rebuild User Entity (Default Password + UserStatus + MustChangePassword + Phone/Email/Avatar/DefaultCashBox) + Migration
 
 **Files**:
 
@@ -1136,29 +1219,33 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 | `Infrastructure/Data/Configurations/UserConfiguration.cs` | Update Fluent API — PasswordHash nullable, Status replaces IsActive, add all new fields, query filter on Status |
 | `Infrastructure/Data/Migrations/` | New migration: schema changes |
 | `Contracts/DTOs/AllDtos.cs` — `UserDto` | Extend with all new fields |
-| `Contracts/Requests/UserRequests.cs` | Passwordless CreateUserRequest (no Password field), add SetPasswordRequest, ResetUserPasswordRequest |
+| `Contracts/Requests/UserRequests.cs` | CreateUserRequest with optional Password (default "12345678"), no SetPasswordRequest needed |
 
-**User.Create — Passwordless (Analysis Part 5 lines 4898-4915)**:
+**User.Create — Default Password Flow**:
 ```csharp
 public static User Create(string userName, string fullName, UserRole role,
     string? phone = null, string? email = null, int? defaultCashBoxId = null,
-    int? createdByUserId = null)
+    int? createdByUserId = null, string? passwordHash = null)
 {
     if (string.IsNullOrWhiteSpace(userName))
         throw new DomainException("اسم المستخدم مطلوب.");
     if (string.IsNullOrWhiteSpace(fullName))
         throw new DomainException("الاسم الكامل مطلوب.");
+
+    // If no password hash provided, hash the default "12345678"
+    var hash = passwordHash ?? BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
+
     return new User
     {
         UserName = userName.Trim(),
         FullName = fullName.Trim(),
         Role = role,
         Status = UserStatus.Active,
+        PasswordHash = hash,               // Always hashed — never stored in plaintext
         Phone = phone?.Trim(),
         Email = email?.Trim(),
         DefaultCashBoxId = defaultCashBoxId,
-        MustChangePassword = true,       // Forces password creation on first login
-        PasswordHash = null,              // No password set by admin
+        MustChangePassword = true,         // Forces password change on first login
         LoginAttempts = 0,
         CreatedByUserId = createdByUserId,
         CreatedAt = DateTime.UtcNow
@@ -1173,8 +1260,8 @@ public void RecordLoginAttempt(bool success)
     if (success)
     {
         LoginAttempts = 0;
-        Status = UserStatus.Active;
         LastLoginAt = DateTime.UtcNow;
+        // Do NOT auto-unlock — use explicit Unlock() for that
     }
     else
     {
@@ -1184,21 +1271,17 @@ public void RecordLoginAttempt(bool success)
     }
 }
 
-public void SetInitialPassword(string passwordHash)  // First-login flow (analysis lines 4921-4949)
-{
-    if (!MustChangePassword)
-        throw new DomainException("كلمة المرور تم تعيينها مسبقاً.");
-    if (string.IsNullOrWhiteSpace(passwordHash))
-        throw new DomainException("كلمة المرور مطلوبة.");
-    PasswordHash = passwordHash;
-    MustChangePassword = false;
-    PasswordChangedAt = DateTime.UtcNow;
-}
+// REMOVED: SetInitialPassword() — no longer needed (default password flow replaces passwordless)
 
-public void ResetPassword()  // Admin reset flow (analysis lines 4965-4986)
+/// <summary>
+/// Admin reset: sets password back to default "12345678" hash.
+/// MustChangePassword = true — user forced to change on next login.
+/// </summary>
+public void ResetPassword()
 {
-    PasswordHash = null;
+    PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
     MustChangePassword = true;
+    PasswordChangedAt = null;
     UpdatedAt = DateTime.UtcNow;
 }
 
@@ -1215,10 +1298,32 @@ public void ChangePassword(string newPasswordHash, int? updatedByUserId = null)
 
 public void Lock() => Status = UserStatus.Locked;
 public void Unlock() => Status = UserStatus.Active;
-public void Deactivate() => Status = UserStatus.Inactive;
-public void Activate() => Status = UserStatus.Active;
+public void Deactivate()
+{
+    Status = UserStatus.Inactive;
+    IsActive = false;
+}
+public void Activate()
+{
+    Status = UserStatus.Active;
+    IsActive = true;
+}
 public void SetAvatar(string avatarPath) => AvatarPath = avatarPath;
 public void ClearAvatar() => AvatarPath = null;
+
+// Override BaseEntity.MarkAsDeleted to keep Status in sync
+public new void MarkAsDeleted()
+{
+    Status = UserStatus.Inactive;
+    IsActive = false;
+}
+
+// Override BaseEntity.Restore to keep Status in sync
+public new void Restore()
+{
+    Status = UserStatus.Active;
+    IsActive = true;
+}
 ```
 
 **Logging**: 
@@ -1227,10 +1332,9 @@ public void ClearAvatar() => AvatarPath = null;
 - `Log.Information("Password reset by admin for user {UserId}", userId)` — RULE-182
 
 **Validation** (RULE-044):
-- `CreateUserRequestValidator` — UserName required, FullName required, Role valid, Phone max 20 chars (optional), Email max 100 chars + valid format (optional)
+- `CreateUserRequestValidator` — UserName required, FullName required, Role valid, Password (optional — if provided, min 8 chars), Phone max 20 chars (optional), Email max 100 chars + valid format (optional)
 - `UpdateUserRequestValidator` — Same
-- `SetPasswordRequestValidator` — Password min 8 chars, ConfirmPassword must match
-- `ChangePasswordRequestValidator` — CurrentPassword required, NewPassword min 8 chars
+- `ChangePasswordRequestValidator` — CurrentPassword required, NewPassword min 8 chars, ConfirmPassword must match
 
 **Estimate**: ~2 hours
 
@@ -1460,50 +1564,17 @@ public async Task<Result> UpdateRolePermissionsAsync(UserRole role,
 
 ---
 
-### Task 7 — Update AuthService (Passwordless Flow, SetPassword, Login Attempts, Lockout, Audit Trail)
+### Task 7 — Update AuthService (Default Password Flow, Login Attempts, Lockout, Audit Trail, Mandatory Password Change)
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Application/Services/AuthService.cs` | After BCrypt verify: call `user.RecordLoginAttempt(success)`, check `Status == Locked`, write AuditLog entry; ADD `SetPasswordAsync()` for first-login flow |
-| `Application/Interfaces/Services/IAuthService.cs` | Add `ChangePasswordAsync()` and `SetPasswordAsync()` method signatures |
-| `Application/Services/AuthService.cs` | Add `SetPasswordAsync(SetPasswordRequest, int userId)` + `ChangePasswordAsync(ChangePasswordRequest, int userId)` |
+| `Application/Services/AuthService.cs` | After BCrypt verify: call `user.RecordLoginAttempt(success)`, check `Status == Locked`, write AuditLog entry; check `MustChangePassword` and set `RequiresPasswordChange` in response |
+| `Application/Interfaces/Services/IAuthService.cs` | Add `ChangePasswordAsync()` method signature |
+| `Application/Services/AuthService.cs` | Add `ChangePasswordAsync(ChangePasswordRequest, int userId)` |
 
-**NEW: SetPasswordAsync — First-login passwordless flow (Analysis Part 5 lines 4921-4949)**:
-```csharp
-public async Task<Result> SetPasswordAsync(SetPasswordRequest request, int userId, CancellationToken ct)
-{
-    var user = await _uow.Users.GetByIdAsync(userId, ct);
-    if (user == null)
-        return Result.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
-    
-    // User must be in MustChangePassword state
-    if (!user.MustChangePassword)
-        return Result.Failure("كلمة المرور تم تعيينها مسبقاً", ErrorCodes.ValidationError);
-
-    // Verify passwords match
-    if (request.Password != request.ConfirmPassword)
-        return Result.Failure("كلمة المرور وتأكيدها غير متطابقتين", ErrorCodes.ValidationError);
-
-    // Verify minimum length
-    if (request.Password.Length < 8)
-        return Result.Failure("كلمة المرور يجب أن تكون 8 أحرف على الأقل", ErrorCodes.ValidationError);
-
-    // Hash and save
-    string newHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
-    user.SetInitialPassword(newHash);
-    await _uow.SaveChangesAsync(ct);
-
-    _logger.LogInformation("Initial password set for user {UserId} (first login)", userId);
-    await _auditLogService.LogAsync(userId, "InitialPasswordSet", "User", userId,
-        "First login password set", null, ct);
-
-    return Result.Success();
-}
-```
-
-**Updated LoginAsync logic — Check MustChangePassword**:
+**LoginAsync logic — Default password with MustChangePassword check**:
 ```csharp
 public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken ct)
 {
@@ -1519,15 +1590,7 @@ public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, Cancel
             ErrorCodes.Forbidden);
     }
 
-    // 4. Check MustChangePassword (passwordless creation)
-    if (user.MustChangePassword || string.IsNullOrWhiteSpace(user.PasswordHash))
-    {
-        _logger.LogInformation("User {UserName} must set password before login", request.UserName);
-        return Result<LoginResponse>.Failure("يجب تعيين كلمة المرور قبل تسجيل الدخول لأول مرة",
-            ErrorCodes.RequiresPasswordSetup);
-    }
-
-    // 5. Verify password
+    // 4. Verify password (BCrypt)
     bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
     user.RecordLoginAttempt(isPasswordValid);
 
@@ -1546,12 +1609,28 @@ public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, Cancel
         return Result<LoginResponse>.Failure("بيانات الاعتماد غير صالحة", ErrorCodes.Unauthorized);
     }
 
-    // 6. Success — record login
+    // 5. Success — record login
     await _auditLogService.LogAsync(user.Id, "LoginSuccess", "User", user.Id, null, ipAddress, ct);
 
-    // 7. Generate JWT
+    // 6. Check if user must change password (first login with default password)
+    bool requiresPasswordChange = user.MustChangePassword;
+    if (requiresPasswordChange)
+    {
+        _logger.LogInformation("User {UserName} must change password (MustChangePassword=true)",
+            request.UserName);
+    }
+
+    // 7. Generate JWT with RequiresPasswordChange flag
     string token = _jwtTokenGenerator.GenerateToken(user);
-    // ... return LoginResponse
+    return Result<LoginResponse>.Success(new LoginResponse(
+        UserId: user.Id,
+        UserName: user.UserName,
+        FullName: user.FullName,
+        Role: (byte)user.Role,
+        Token: token,
+        ExpiresAt: DateTime.UtcNow.AddHours(8),
+        RequiresPasswordChange: requiresPasswordChange
+    ));
 }
 ```
 
@@ -1594,44 +1673,34 @@ public async Task<Result> ChangePasswordAsync(ChangePasswordRequest request, int
 
 **Validation** (RULE-044):
 - `ChangePasswordRequestValidator`: CurrentPassword required, NewPassword min 8 chars, ConfirmPassword must match
-- `SetPasswordRequestValidator`: Password min 8 chars, ConfirmPassword must match
-- `LoginRequestValidator`: UserName required, Password required (skipped when MustChangePassword)
+- `LoginRequestValidator`: UserName required, Password required
 
 **Logging**:
 - `Log.Warning("Login blocked: User {UserName} is locked")` — user mistake (RULE-183)
 - `Log.Warning("Login failed: Incorrect password for user {UserName} (attempt {Attempts})")` — user mistake
 - `Log.Information("Password changed for user {UserId}")` — system operation (RULE-182)
-- `Log.Information("Initial password set for user {UserId} (first login)")` — system operation
+- `Log.Information("User {UserId} logged in with MustChangePassword=true")` — system operation
 - Never log the password itself (RULE-037)
 
 **Estimate**: ~2.5 hours
 
 ---
 
-### Task 8 — Create New API Endpoints (SetPassword, Password Change, Reset Password, Avatar, Current User, Audit Log, Permissions)
+### Task 8 — Create New API Endpoints (Password Change, Reset Password, Avatar, Current User, Audit Log, Permissions)
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Api/Controllers/AuthController.cs` | Add `POST /api/v1/auth/set-password` (first login — NO auth required), `POST /api/v1/auth/change-password` (authenticated), `POST /api/v1/auth/reset-password` (admin only) |
+| `Api/Controllers/AuthController.cs` | Add `POST /api/v1/auth/change-password` (authenticated — used for both first-login forced change and voluntary change) |
 | `Api/Controllers/UsersController.cs` | Add `GET /api/v1/users/current`, `POST /api/v1/users/avatar`, `GET /api/v1/users/{id}/avatar`, `POST /api/v1/users/{id}/reset-password` (admin) |
 | `Api/Controllers/AuditLogsController.cs` | **NEW** — 4 endpoints for audit log query |
 | `Api/Controllers/PermissionsController.cs` | **NEW** — 3 endpoints for permission management |
 
+**Note**: No `set-password` endpoint exists — the default password flow ("12345678") replaces the token-based SetPassword flow. Users log in with the default password, then are forced to change it via `change-password`.
+
 **AuthController additions**:
 ```csharp
-[AllowAnonymous]
-[HttpPost("set-password")]
-public async Task<IActionResult> SetPassword([FromBody] SetPasswordRequest request,
-    [FromQuery] int userId, CancellationToken ct)
-{
-    var result = await _authService.SetPasswordAsync(request, userId, ct);
-    if (result.IsSuccess)
-        return Ok(new { message = "تم تعيين كلمة المرور بنجاح" });
-    return BadRequest(new { error = result.Error });
-}
-
 [Authorize]
 [HttpPost("change-password")]
 public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
@@ -1660,7 +1729,7 @@ public async Task<IActionResult> ResetPassword(int id, CancellationToken ct)
 {
     var result = await _userService.ResetPasswordAsync(id, ct);
     if (result.IsSuccess)
-        return Ok(new { message = "تم إعادة تعيين كلمة المرور — سيطلب من المستخدم تعيين كلمة جديدة عند تسجيل الدخول" });
+        return Ok(new { message = "تم إعادة تعيين كلمة المرور إلى 12345678 — سيطلب من المستخدم تغييرها عند تسجيل الدخول" });
     return BadRequest(new { error = result.Error });
 }
 
@@ -1772,8 +1841,8 @@ private async Task<bool> ValidateAsync()
         errors.Add("• اسم المستخدم مطلوب — تأكد من إدخال اسم فريد للدخول إلى النظام");
     if (string.IsNullOrWhiteSpace(FullName))
         errors.Add("• الاسم بالكامل مطلوب — سيظهر هذا الاسم في الفواتير والتقارير");
-    if (!IsEditMode && string.IsNullOrWhiteSpace(Password))
-        errors.Add("• كلمة المرور مطلوبة — يجب أن تكون كلمة مرور قوية لحماية الحساب");
+    // NOTE: Password is optional on create — defaults to "12345678" if empty.
+    // MustChangePassword = true forces user to change on first login.
     if (!string.IsNullOrWhiteSpace(Email) && !IsValidEmail(Email))
         errors.Add("• البريد الإلكتروني غير صالح — أدخل بريداً إلكترونياً صحيحاً");
     if (!string.IsNullOrWhiteSpace(Phone) && Phone.Length > 20)
@@ -2283,7 +2352,7 @@ services.AddTransient<PermissionManagementViewModel>();
 
 #### 1. Domain Entity Tests
 
-**User.Create()** — Test with valid inputs creates entity with `Status = UserStatus.Active`, `MustChangePassword = true`, `PasswordHash = null`. Test with empty `userName` → `DomainException("اسم المستخدم مطلوب.")`. Test with empty `fullName` → `DomainException("الاسم الكامل مطلوب.")`. Test `RecordLoginAttempt(true)` resets `LoginAttempts` to 0 and sets `LastLoginAt`. Test `RecordLoginAttempt(false)` increments counter; after 5 failures → `Status = UserStatus.Locked`. Test `SetInitialPassword()` sets hash, sets `MustChangePassword = false`. Test `SetInitialPassword()` when `MustChangePassword = false` → `DomainException`. Test `Lock()`, `Unlock()`, `Deactivate()`, `Activate()` — status transitions. Test `ChangePassword()` with null/empty hash → `DomainException`.
+**User.Create()** — Test with valid inputs creates entity with `Status = UserStatus.Active`, `MustChangePassword = true`, `PasswordHash` is non-null (BCrypt hash of default "12345678"). Test with empty `userName` → `DomainException("اسم المستخدم مطلوب.")`. Test with empty `fullName` → `DomainException("الاسم الكامل مطلوب.")`. Test `RecordLoginAttempt(true)` resets `LoginAttempts` to 0 and sets `LastLoginAt` (does NOT set Status = Active). Test `RecordLoginAttempt(false)` increments counter; after 5 failures → `Status = UserStatus.Locked`. Test `ChangePassword()` sets hash, sets `MustChangePassword = false`. Test `ChangePassword()` with null/empty hash → `DomainException`. Test `ResetPassword()` sets password back to hash of "12345678" and sets `MustChangePassword = true`. Test `Lock()`, `Unlock()`, `Deactivate()`, `Activate()` — status transitions, BaseEntity.IsActive stays in sync.
 
 **Permission.Create()** — Valid inputs create entity. Empty `name` → `DomainException("اسم الصلاحية مطلوب")`. Empty `displayNameAr` → `DomainException("الاسم العربي للصلاحية مطلوب")`. `IsSystem = true` locks permissions.
 
@@ -2294,20 +2363,16 @@ services.AddTransient<PermissionManagementViewModel>();
 #### 2. Service Tests (using Mock<IUnitOfWork>)
 
 **AuthService.LoginAsync()**:
-- Valid credentials → `Result<LoginResponse>.Success` with JWT token
+- Valid credentials with MustChangePassword=false → `Result<LoginResponse>.Success` with JWT token, `RequiresPasswordChange = false`
+- Valid credentials with MustChangePassword=true → `Result<LoginResponse>.Success` with JWT token, `RequiresPasswordChange = true`
 - Invalid username → `Result<LoginResponse>.Failure` with `ErrorCodes.NotFound`
 - Invalid password → `Result<LoginResponse>.Failure` with `ErrorCodes.Unauthorized`; increments `LoginAttempts`
 - Locked account (5 failed attempts) → `Result<LoginResponse>.Failure("الحساب مغلق مؤقتاً")`
-- `MustChangePassword = true` → `Result<LoginResponse>.Failure("يجب تعيين كلمة المرور")`
+- MustChangePassword = true + valid password → Login SUCCEEDS (not blocked), `RequiresPasswordChange = true`
 - Successful login → AuditLog entry created with action "LoginSuccess"
 
-**AuthService.SetPasswordAsync()**:
-- Valid request → `Result.Success()`; user.PasswordHash set; MustChangePassword = false
-- User not found → `Result.Failure` with `ErrorCodes.NotFound`
-- MustChangePassword = false → `Result.Failure("كلمة المرور تم تعيينها مسبقاً")`
-
-**AuthService.ChangePasswordAsync()**:
-- Valid request → `Result.Success()`; password hash updated; password history updated
+**AuthService.ChangePasswordAsync()** (used for both first-login forced change and voluntary change):
+- Valid request → `Result.Success()`; password hash updated; MustChangePassword = false; PasswordChangedAt set
 - Incorrect current password → `Result.Failure("كلمة المرور الحالية غير صحيحة")`
 
 **UserService.CreateAsync()**:
@@ -2327,11 +2392,8 @@ services.AddTransient<PermissionManagementViewModel>();
 **ChangePasswordRequestValidator**:
 - Valid request passes; missing CurrentPassword fails; NewPassword < 8 chars fails; ConfirmPassword != NewPassword fails
 
-**SetPasswordRequestValidator**:
-- Valid request passes; Password < 8 chars fails; ConfirmPassword mismatch fails
-
 **CreateUserRequestValidator**:
-- Valid passes; empty UserName fails; invalid Role byte fails; Phone > 20 chars fails; invalid email format fails
+- Valid passes (Password optional — defaults to "12345678"); empty UserName fails; invalid Role byte fails; Password < 8 chars (if provided) fails; Phone > 20 chars fails; invalid email format fails
 
 #### 4. Database Configuration Tests
 
@@ -2345,7 +2407,7 @@ services.AddTransient<PermissionManagementViewModel>();
 
 - 33 permission codes match seed data exactly — check each against Section 1.2 table
 - EF Core query filter: `(byte)u.Status == (byte)UserStatus.Active` translates to correct SQL
-- MustChangePassword flow: login redirects to password change when `MustChangePassword = true`; admin reset sets `PasswordHash = null` and `MustChangePassword = true`
+- MustChangePassword flow: login with default password succeeds with `RequiresPasswordChange = true`; desktop shows mandatory password change; after `ChangePasswordAsync()`, `MustChangePassword = false`; admin reset sets password back to hash of "12345678" and `MustChangePassword = true`
 - Account lockout: 5 failed attempts → `UserStatus.Locked`; admin unlock → `LoginAttempts = 0`, `Status = UserStatus.Active`
 - `DefaultCashBoxId` FK integrity: delete CashBox → Restrict prevents if user references it
 - AuditLog: all audit events recorded correctly (LoginSuccess, LoginFailed, PasswordChanged, InitialPasswordSet, LoginBlocked_Locked)
@@ -2371,7 +2433,7 @@ services.AddTransient<PermissionManagementViewModel>();
 | **RULE-035** | Serilog for logging | All services — login attempts, password changes, permission updates, audit writes | ✅ |
 | **RULE-036** | Log critical operations | Login success/failure, account lockout, password change, permission update | ✅ |
 | **RULE-037** | NEVER log passwords/conn strings | Verified — passwords never logged, audit stores no secrets | ✅ |
-| **RULE-038** | ALL endpoints `[Authorize]` (except login) | AuditLogsController (AdminOnly), PermissionsController (AdminOnly), UsersController (AdminOnly) | ✅ |
+| **RULE-038** | ALL endpoints `[Authorize]` (except login) | AuditLogsController (AdminOnly), PermissionsController (AdminOnly), UsersController (AdminOnly) — NO `[AllowAnonymous]` SetPassword endpoint (removed in default-password redesign) | ✅ |
 | **RULE-039** | BCrypt work factor 12 | AuthService.ChangePasswordAsync + UserService.CreateAsync | ✅ |
 | **RULE-042** | Rich Domain — `private set` + domain methods | User: `RecordLoginAttempt()`, `Lock()`, `Unlock()`, `RecordLogin()` | ✅ |
 | **RULE-044** | FluentValidation for EVERY Command | ChangePasswordRequestValidator, AuditLogQueryValidator, CreateUserRequestValidator | ✅ |

@@ -57,7 +57,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<Currency>? _currencies;
     private IGenericRepository<Permission>? _permissions;
     private IGenericRepository<RolePermission>? _rolePermissions;
-    private IGenericRepository<AuditLog>? _auditLogs;
+    private IAuditLogRepository? _auditLogs;
     private IGenericRepository<UserSession>? _userSessions;
     private IGenericRepository<ExchangeRateHistory>? _exchangeRateHistories;
 
@@ -106,7 +106,7 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<Currency> Currencies => _currencies ??= new GenericRepository<Currency>(_context);
     public IGenericRepository<Permission> Permissions => _permissions ??= new GenericRepository<Permission>(_context);
     public IGenericRepository<RolePermission> RolePermissions => _rolePermissions ??= new GenericRepository<RolePermission>(_context);
-    public IGenericRepository<AuditLog> AuditLogs => _auditLogs ??= new GenericRepository<AuditLog>(_context);
+    public IAuditLogRepository AuditLogs => _auditLogs ??= new AuditLogRepository(_context);
     public IGenericRepository<UserSession> UserSessions => _userSessions ??= new GenericRepository<UserSession>(_context);
     public IGenericRepository<ExchangeRateHistory> ExchangeRateHistories => _exchangeRateHistories ??= new GenericRepository<ExchangeRateHistory>(_context);
 

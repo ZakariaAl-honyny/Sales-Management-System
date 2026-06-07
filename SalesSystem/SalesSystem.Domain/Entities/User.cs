@@ -20,6 +20,10 @@ public class User : BaseEntity
     public int LoginAttempts { get; private set; }
     public int? DefaultCashBoxId { get; private set; }
 
+    // ─── Password Reset Token ──────────────────────
+    public string? PasswordResetToken { get; private set; }
+    public DateTime? PasswordResetTokenExpiresAt { get; private set; }
+
     // Navigation
     public CashBox? DefaultCashBox { get; private set; }
     public User? CreatedByUser { get; private set; }
@@ -143,12 +147,14 @@ public class User : BaseEntity
     }
 
     /// <summary>
-    /// Resets the password — clears PasswordHash and forces MustChangePassword.
-    /// Typically called by admin for password reset flow.
+    /// Resets the password to a new hash (admin-initiated reset).
+    /// Sets MustChangePassword = true to force the user to change on next login.
     /// </summary>
-    public void ResetPassword()
+    public void ResetPassword(string newPasswordHash)
     {
-        PasswordHash = null;
+        if (string.IsNullOrWhiteSpace(newPasswordHash))
+            throw new DomainException("كلمة المرور مطلوبة.");
+        PasswordHash = newPasswordHash;
         MustChangePassword = true;
         PasswordChangedAt = null;
         LoginAttempts = 0;
@@ -207,6 +213,47 @@ public class User : BaseEntity
 
     public void SetAvatar(string avatarPath) => AvatarPath = avatarPath;
     public void ClearAvatar() => AvatarPath = null;
+
+    // ─── Password Reset Token ─────────────────────
+    /// <summary>
+    /// Generates a one-time password reset token and stores it as plaintext
+    /// (high-entropy, short-lived, one-time use — acceptable for reset tokens).
+    /// Sets MustChangePassword to force the user to set a new password on next login.
+    /// </summary>
+    public void GeneratePasswordResetToken(string token, int expiryHours = 24)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            throw new DomainException("رمز إعادة تعيين كلمة المرور مطلوب.");
+        if (expiryHours < 1 || expiryHours > 168)
+            throw new DomainException("فترة صلاحية الرمز يجب أن تكون بين ساعة و 168 ساعة (7 أيام).");
+
+        PasswordResetToken = token;
+        PasswordResetTokenExpiresAt = DateTime.UtcNow.AddHours(expiryHours);
+        PasswordHash = null;
+        MustChangePassword = true;
+        LoginAttempts = 0;
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Validates the provided token against the stored reset token and expiry.
+    /// Returns true if the token is valid and not expired.
+    /// </summary>
+    public bool IsPasswordResetTokenValid(string token) =>
+        !string.IsNullOrWhiteSpace(token) &&
+        PasswordResetToken == token &&
+        PasswordResetTokenExpiresAt.HasValue &&
+        PasswordResetTokenExpiresAt.Value > DateTime.UtcNow;
+
+    /// <summary>
+    /// Consumes (clears) the password reset token after successful password set.
+    /// </summary>
+    public void ConsumePasswordResetToken()
+    {
+        PasswordResetToken = null;
+        PasswordResetTokenExpiresAt = null;
+        UpdateTimestamp();
+    }
 
     // ─── Password Policy ──────────────────────────
 

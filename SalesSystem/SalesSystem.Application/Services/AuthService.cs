@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -41,9 +43,9 @@ public class AuthService : IAuthService
         {
             _logger.LogInformation("Login attempt for user: {UserName}", request.UserName);
 
-            // 1. Find user
-            var users = await _uow.Users.GetAllAsync(ct);
-            var user = users.FirstOrDefault(u => u.UserName.Equals(request.UserName, StringComparison.OrdinalIgnoreCase));
+            // 1. Find user — query with predicate instead of loading all users into memory
+            var user = await _uow.Users.FirstOrDefaultAsync(
+                u => u.UserName.ToLower() == request.UserName.ToLower().Trim(), ct);
 
             if (user == null)
             {
@@ -56,7 +58,8 @@ public class AuthService : IAuthService
             {
                 _logger.LogWarning("Login failed: User {UserName} account is locked", request.UserName);
                 await _auditLogService.LogAsync(user.Id, "LoginFailed_Locked", "User", user.Id,
-                    "محاولة دخول لحساب مقفول", null, ct);
+                    "محاولة دخول لحساب مقفول", null, ct, autoSave: false);
+                await _uow.SaveChangesAsync(ct);
                 return Result<LoginResponse>.Failure("الحساب مقفول — يرجى الاتصال بالمسؤول", ErrorCodes.AccountLocked);
             }
 
@@ -67,10 +70,14 @@ public class AuthService : IAuthService
                 return Result<LoginResponse>.Failure("الحساب معطل", ErrorCodes.Forbidden);
             }
 
-            // 4. Check if password hash is null (passwordless setup required)
+            // 4. Check if password hash is null (edge case from old seed data)
+            // With the default-password flow, new users always have a password set.
             if (string.IsNullOrWhiteSpace(user.PasswordHash))
             {
-                _logger.LogWarning("Login failed: User {UserName} has no password set", request.UserName);
+                _logger.LogWarning("Login failed: User {UserName} has no password set — requires password setup", request.UserName);
+                await _auditLogService.LogAsync(user.Id, "LoginRequiresPasswordSetup", "User", user.Id,
+                    "تسجيل الدخول يتطلب تعيين كلمة المرور الأولية", null, ct, autoSave: false);
+                await _uow.SaveChangesAsync(ct);
                 return Result<LoginResponse>.Failure("يجب تعيين كلمة المرور أولاً", ErrorCodes.RequiresPasswordSetup);
             }
 
@@ -86,7 +93,8 @@ public class AuthService : IAuthService
                 _logger.LogWarning("Login failed: Incorrect password for user {UserName} (attempt {LoginAttempts})",
                     request.UserName, user.LoginAttempts);
                 await _auditLogService.LogAsync(user.Id, "LoginFailed", "User", user.Id,
-                    $"محاولة دخون فاشلة — المحاولة {user.LoginAttempts}", null, ct);
+                    $"محاولة دخول فاشلة — المحاولة {user.LoginAttempts}", null, ct, autoSave: false);
+                await _uow.SaveChangesAsync(ct);
                 return Result<LoginResponse>.Failure("بيانات الاعتماد غير صالحة", ErrorCodes.Unauthorized);
             }
 
@@ -95,11 +103,17 @@ public class AuthService : IAuthService
             {
                 _logger.LogInformation("Login requires password change for user: {UserName}", request.UserName);
                 await _auditLogService.LogAsync(user.Id, "LoginRequiresPasswordChange", "User", user.Id,
-                    "تسجيل الدخول يتطلب تغيير كلمة المرور", null, ct);
+                    "تسجيل الدخول يتطلب تغيير كلمة المرور", null, ct, autoSave: false);
 
                 // Return a token anyway so the client can navigate to password change screen
                 string token = _jwtTokenGenerator.GenerateToken(user);
                 var expiresAt = DateTime.UtcNow.AddHours(_jwtSettings.ExpirationHours);
+
+                // Create session
+                var session = UserSession.Create(user.Id, HashToken(token), DateTime.UtcNow, _jwtSettings.ExpirationHours);
+                await _uow.UserSessions.AddAsync(session, ct);
+
+                await _uow.SaveChangesAsync(ct);
 
                 return Result<LoginResponse>.Success(new LoginResponse(
                     user.Id, user.UserName, user.FullName, (byte)user.Role,
@@ -110,11 +124,18 @@ public class AuthService : IAuthService
             string jwtToken = _jwtTokenGenerator.GenerateToken(user);
             var jwtExpiresAt = DateTime.UtcNow.AddHours(_jwtSettings.ExpirationHours);
 
+            // Create session
+            var userSession = UserSession.Create(user.Id, HashToken(jwtToken), DateTime.UtcNow, _jwtSettings.ExpirationHours);
+            await _uow.UserSessions.AddAsync(userSession, ct);
+
             _logger.LogInformation("Login successful for user: {UserName} (Id={UserId})", user.UserName, user.Id);
             await _auditLogService.LogAsync(user.Id, "LoginSuccess", "User", user.Id,
-                "تسجيل دخول ناجح", null, ct);
+                "تسجيل دخول ناجح", null, ct, autoSave: false);
 
-            // 9. Return success
+            // 9. Persist all changes (user session + audit log) atomically
+            await _uow.SaveChangesAsync(ct);
+
+            // 10. Return success
             return Result<LoginResponse>.Success(new LoginResponse(
                 user.Id, user.UserName, user.FullName, (byte)user.Role,
                 jwtToken, jwtExpiresAt, MustChangePassword: false));
@@ -123,48 +144,6 @@ public class AuthService : IAuthService
         {
             _logger.LogError(ex, "Error occurred during login for user: {UserName}", request.UserName);
             return Result<LoginResponse>.Failure("حدث خطأ أثناء تسجيل الدخول.");
-        }
-    }
-
-    public async Task<Result> SetPasswordAsync(SetPasswordRequest request, int userId, CancellationToken ct = default)
-    {
-        try
-        {
-            var user = await _uow.Users.GetByIdAsync(userId, ct);
-            if (user == null)
-            {
-                _logger.LogWarning("SetPassword failed: User {UserId} not found", userId);
-                return Result.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
-            }
-
-            if (request.Password != request.ConfirmPassword)
-            {
-                return Result.Failure("كلمة المرور وتأكيدها غير متطابقين", ErrorCodes.ValidationError);
-            }
-
-            if (request.Password.Length < 6)
-            {
-                return Result.Failure("كلمة المرور يجب أن تكون 6 أحرف على الأقل", ErrorCodes.ValidationError);
-            }
-
-            string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
-            user.SetInitialPassword(passwordHash);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Password set for user {UserId}", userId);
-            await _auditLogService.LogAsync(userId, "PasswordSet", "User", userId,
-                "تم تعيين كلمة المرور الأولية", null, ct);
-
-            return Result.Success();
-        }
-        catch (DomainException ex)
-        {
-            return Result.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error setting password for user {UserId}", userId);
-            return Result.Failure("حدث خطأ أثناء تعيين كلمة المرور.");
         }
     }
 
@@ -199,17 +178,20 @@ public class AuthService : IAuthService
             {
                 _logger.LogWarning("ChangePassword failed: Incorrect current password for user {UserId}", userId);
                 await _auditLogService.LogAsync(userId, "PasswordChangeFailed", "User", userId,
-                    "محاولة تغيير كلمة المرور — كلمة المرور الحالية غير صحيحة", null, ct);
+                    "محاولة تغيير كلمة المرور — كلمة المرور الحالية غير صحيحة", null, ct, autoSave: false);
+                await _uow.SaveChangesAsync(ct);
                 return Result.Failure("كلمة المرور الحالية غير صحيحة", ErrorCodes.Unauthorized);
             }
 
             string newPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, workFactor: 12);
             user.ChangePassword(newPasswordHash);
-            await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Password changed for user {UserId}", userId);
             await _auditLogService.LogAsync(userId, "PasswordChanged", "User", userId,
-                "تم تغيير كلمة المرور بنجاح", null, ct);
+                "تم تغيير كلمة المرور بنجاح", null, ct, autoSave: false);
+
+            // Persist all changes (user state + audit log) atomically
+            await _uow.SaveChangesAsync(ct);
 
             return Result.Success();
         }
@@ -222,5 +204,11 @@ public class AuthService : IAuthService
             _logger.LogError(ex, "Error changing password for user {UserId}", userId);
             return Result.Failure("حدث خطأ أثناء تغيير كلمة المرور.");
         }
+    }
+
+    private static string HashToken(string token)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 }

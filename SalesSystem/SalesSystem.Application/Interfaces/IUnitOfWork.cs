@@ -48,7 +48,7 @@ public interface IUnitOfWork
     IGenericRepository<ExchangeRateHistory> ExchangeRateHistories { get; }
     IGenericRepository<Permission> Permissions { get; }
     IGenericRepository<RolePermission> RolePermissions { get; }
-    IGenericRepository<AuditLog> AuditLogs { get; }
+    IAuditLogRepository AuditLogs { get; }
     IGenericRepository<UserSession> UserSessions { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);

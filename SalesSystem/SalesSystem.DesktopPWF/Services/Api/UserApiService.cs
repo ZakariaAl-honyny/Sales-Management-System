@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 
 namespace SalesSystem.DesktopPWF.Services.Api;
 
@@ -62,5 +63,12 @@ public class UserApiService : ApiServiceBase, IUserApiService
         return await ExecuteAsync<CurrentUserDto>(
             () => _httpClient.GetAsync($"{BasePath}/current"),
             "UserApiService.GetCurrentUserAsync");
+    }
+
+    public async Task<Result<ResetPasswordResponse>> ResetPasswordAsync(int id)
+    {
+        return await ExecuteAsync<ResetPasswordResponse>(
+            () => _httpClient.PostAsync($"{BasePath}/{id}/reset-password", null),
+            "UserApiService.ResetPasswordAsync");
     }
 }

@@ -19,15 +19,6 @@ public interface IAuthService
     Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// Sets the initial password for a passwordless user (first login flow).
-    /// </summary>
-    /// <param name="request">The set password request with new password and confirmation.</param>
-    /// <param name="userId">The user ID to set the password for.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>A result indicating success or failure.</returns>
-    Task<Result> SetPasswordAsync(SetPasswordRequest request, int userId, CancellationToken ct = default);
-
-    /// <summary>
     /// Changes the password for an authenticated user (requires current password).
     /// </summary>
     /// <param name="request">The change password request with current, new, and confirm passwords.</param>

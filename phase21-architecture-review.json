@@ -1,0 +1,175 @@
+{
+  "overall_assessment": "The Phase 21 (Users & Permissions Module) implementation is largely complete and follows Clean Architecture principles with appropriate separation of concerns. The Domain entities are well-designed with proper guard clauses, the Application services correctly return Result<T>, and the Controllers are thin. However, there are several architecture issues — including one critical (AuditLog Id type), two major violations (missing IsSystem guard on Permission, missing ExecuteTransactionAsync in PermissionService), and a pattern inconsistency in ChangePasswordRequest placement. The Desktop WPF layer is comprehensive with full User, Permission, and AuditLog views. Overall assessment: needs-work — the module is functional but requires remediation of identified issues before it can be considered production-ready.",
+  "compliance_score": 83,
+  "architecture_issues": [
+    {
+      "file": "SalesSystem.Domain.Entities.AuditLog",
+      "line": 11,
+      "severity": "critical",
+      "description": "RULE-310 violation: AuditLog inherits int Id from BaseEntity, but must use long Id (bigint) for high-volume audit tables. The current int will overflow with sustained audit logging (max ~2B entries).",
+      "recommendation": "Break inheritance from BaseEntity for AuditLog or add a separate long Id property. Consider creating a separate AuditLogBase with long Id, or configure AuditLog to use a long PK via Fluent API with ValueGeneratedOnAdd() and HasColumnType('bigint'). Note: BaseEntity would also need refactoring as its generic repository expects int PK."
+    },
+    {
+      "file": "SalesSystem.Domain.Entities.Permission.cs",
+      "line": 39,
+      "severity": "critical",
+      "description": "RULE-309 violation: Permission entity lacks a MarkAsDeleted() override that guards IsSystem permissions. The base class MarkAsDeleted() sets IsActive = false unconditionally, allowing system permissions (IsSystem = true) to be soft-deleted, which contradicts RULE-309's requirement that 'IsSystem = true permissions MUST NOT be deletable or modifiable'.",
+      "recommendation": "Add: public override void MarkAsDeleted() { if (IsSystem) throw new DomainException('لا يمكن حذف صلاحية نظامية.'); base.MarkAsDeleted(); } Also add a CanDelete() method returning !IsSystem for UI visibility."
+    },
+    {
+      "file": "SalesSystem.Application.Services.PermissionService.cs",
+      "line": 106,
+      "severity": "major",
+      "description": "RULE-317 violation: UpdateRolePermissionsAsync() uses direct _uow.SaveChangesAsync() for remove+add operations. For atomic role-permission updates, this must use _uow.ExecuteTransactionAsync() to wrap both the delete and create operations in a single explicit transaction.",
+      "recommendation": "Wrap the remove (DeleteRange) and add (AddAsync) operations in await _uow.ExecuteTransactionAsync(async () => { ... await _uow.SaveChangesAsync(ct); }, ct); Remove the bare SaveChangesAsync at line 106."
+    },
+    {
+      "file": "SalesSystem.Contracts.DTOs.AllDtos.cs",
+      "line": 23,
+      "severity": "major",
+      "description": "Architecture violation: ChangePasswordRequest (a Request/Command model) is defined in AllDtos.cs under Contracts/DTOs/ instead of Contracts/Requests/UserRequests.cs. This breaks the separation between DTOs (data transfer) and Requests (command/query models).",
+      "recommendation": "Move ChangePasswordRequest record to Contracts/Requests/UserRequests.cs and remove it from AllDtos.cs."
+    },
+    {
+      "file": "SalesSystem.Contracts.DTOs.AllDtos.cs",
+      "line": 622,
+      "severity": "major",
+      "description": "Architecture violation: AuditLogQuery (a query/filter model) is defined in AllDtos.cs under Contracts/DTOs/ instead of having its own file in Contracts/Requests/. This mixes query models with data transfer objects.",
+      "recommendation": "Move AuditLogQuery record to Contracts/Requests/AuditLogRequests.cs or similar and reference from there."
+    },
+    {
+      "file": "SalesSystem.Application.Services.AuditLogService.cs",
+      "line": 37,
+      "severity": "major",
+      "description": "AuditLogService.LogAsync() calls _uow.SaveChangesAsync() on EVERY single log entry. For high-volume audit logging, this creates significant database round-trips — one per action. When multiple audit-able actions happen in a transaction, this also creates nested SaveChanges calls.",
+      "recommendation": "Consider removing the immediate SaveChangesAsync from LogAsync() and let the caller manage the transaction lifecycle. Or add a batch/buffer mechanism that flushes periodically. For login auditing, the caller (AuthService) already calls SaveChangesAsync, so the audit log can piggyback on that."
+    },
+    {
+      "file": "SalesSystem.Domain.Entities.User.cs",
+      "line": 7,
+      "severity": "major",
+      "description": "Dual state tracking: User inherits IsActive from BaseEntity (line 55: IsActive = true) while also having its own Status property (UserStatus enum). HasQueryFilter uses u.Status == UserStatus.Active, but BaseEntity.MarkAsDeleted() and Restore() affect IsActive. The User override of MarkAsDeleted() correctly sets Status = UserStatus.Inactive, but also calls base.MarkAsDeleted() which sets IsActive = false — creating two sources of truth.",
+      "recommendation": "Either (1) Remove User-specific Status and use inherited IsActive with query filter on IsActive, OR (2) Remove the base.MarkAsDeleted() call from User.MarkAsDeleted() since the query filter only checks Status. Option 2 is simpler: remove 'base.MarkAsDeleted();' from User's MarkAsDeleted() override and similarly from Restore()."
+    },
+    {
+      "file": "SalesSystem.Contracts.DTOs.AllDtos.cs",
+      "line": 16,
+      "severity": "major",
+      "description": "PermissionDto is missing the IsSystem field. Without this field, the Desktop UI cannot distinguish system-protected permissions from user-created ones, making it impossible to visually indicate or enforce protection of system permissions (RULE-309).",
+      "recommendation": "Add 'bool IsSystem' to the PermissionDto record (line 16) and populate it from the entity in PermissionService.GetAllAsync(). The PermissionManagementViewModel can then disable checkboxes for IsSystem permissions."
+    },
+    {
+      "file": "SalesSystem.Api.Controllers.PermissionsController.cs",
+      "line": 38,
+      "severity": "minor",
+      "description": "RULE-288 violation: PermissionsController.GetAll() returns BadRequest for ALL failures instead of NotFound(404) when result.ErrorCode == ErrorCodes.NotFound. While GetAll currently never returns NotFound, the pattern is inconsistent with the project convention.",
+      "recommendation": "Add 404 check: if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(...); before returning BadRequest."
+    },
+    {
+      "file": "SalesSystem.Api.Controllers.AuditLogsController.cs",
+      "line": 37,
+      "severity": "minor",
+      "description": "RULE-288 violation: AuditLogsController.Query() and GetUserHistory() return BadRequest for all failures instead of NotFound for entity-not-found cases.",
+      "recommendation": "Add 404/400 branching based on result.ErrorCode."
+    },
+    {
+      "file": "SalesSystem.Api.Validators.AuthRequestValidators.cs",
+      "line": 13,
+      "severity": "minor",
+      "description": "Inconsistency: SetPasswordRequestValidator uses MinimumLength(8) for password but AuthService.SetPasswordAsync uses 'request.Password.Length < 6'. This means the validator rejects 6-7 char passwords that the service would accept, creating a mismatch between client and server validation.",
+      "recommendation": "Align both to the same minimum: change AuthService.SetPasswordAsync to use 'request.Password.Length < 8' or change the validator to MinimumLength(6)."
+    },
+    {
+      "file": "SalesSystem.Domain.Entities.UserSession.cs",
+      "line": 45,
+      "severity": "minor",
+      "description": "UserSession.Terminate() sets IsActive = false but does NOT call UpdateTimestamp(). This means UpdatedAt remains null after termination, breaking audit trail expectations.",
+      "recommendation": "Add 'UpdateTimestamp();' to the Terminate() method body."
+    },
+    {
+      "file": "SalesSystem.DesktopPWF.ViewModels.Permissions.PermissionManagementViewModel.cs",
+      "line": 210,
+      "severity": "minor",
+      "description": "PermissionCategoryGroup and PermissionCheckItem inherit from ViewModelBase unnecessarily. These are simple model classes (not ViewModels) and don't need the full ViewModelBase infrastructure (INotifyDataErrorInfo, IsBusy, DialogService, etc.). This adds unnecessary overhead.",
+      "recommendation": "Implement INotifyPropertyChanged directly on these model classes, or make them simple records/POCOs that raise PropertyChanged manually."
+    },
+    {
+      "file": "SalesSystem.DesktopPWF.ViewModels.Audit.AuditLogListViewModel.cs",
+      "line": 233,
+      "severity": "minor",
+      "description": "ViewUserHistoryAsync shows a placeholder info dialog instead of actually filtering by the user. The LoadLoginHistoryOperationAsync method correctly uses _sessionService.GetUserId() to filter login history by current user, but ViewUserHistoryAsync just shows a 'coming soon' message.",
+      "recommendation": "Implement proper user history filtering: call _auditLogService.GetUserHistoryAsync(userId) and populate the list, similar to LoadLoginHistoryOperationAsync."
+    },
+    {
+      "file": "SalesSystem.DesktopPWF.ViewModels.Users.UserEditorViewModel.cs",
+      "line": 306,
+      "severity": "minor",
+      "description": "Bug: In SaveOperationAsync, the Status parameter is computed as '(byte)(IsActive ? 1 : 0)' but UserStatus enum has Active=1, Inactive=2, Locked=3. Value 0 is not a valid UserStatus. This sends an invalid status value when IsActive is false.",
+      "recommendation": "Change to '(byte)(IsActive ? UserStatus.Active : UserStatus.Inactive)' i.e., '(byte)(IsActive ? 1 : 2)'."
+    },
+    {
+      "file": "SalesSystem.Domain.Entities.Permission.cs",
+      "line": 38,
+      "severity": "minor",
+      "description": "Permission entity has no domain methods for modifying or deleting the permission. While it has an IsSystem flag, there are no methods like UpdateDisplayName() or CanModify() to enforce the IsSystem protection at the domain level.",
+      "recommendation": "Add domain methods: public void UpdateDisplayName(string displayNameAr) { if (IsSystem) throw new DomainException(...); DisplayNameAr = displayNameAr; } and public bool CanDelete() => !IsSystem;"
+    },
+    {
+      "file": "SalesSystem.Api.Controllers.UsersController.cs",
+      "line": 110,
+      "severity": "minor",
+      "description": "UsersController.Update (PUT) returns BadRequest for ALL failures, including NotFound. User ID {id} may not exist (e.g., deleted by another admin), but 404 is never returned for the Update endpoint.",
+      "recommendation": "Check result.ErrorCode == ErrorCodes.NotFound and return NotFound() before BadRequest()."
+    },
+    {
+      "file": "SalesSystem.DesktopPWF.ViewModels.Users.SetPasswordViewModel.cs",
+      "line": 89,
+      "severity": "minor",
+      "description": "Inconsistency: SetPasswordViewModel validates MinimumLength(6) but the server-side SetPasswordRequestValidator uses MinimumLength(8). A user could enter a 6-7 char password that passes client validation but fails server validation without clear feedback.",
+      "recommendation": "Align to MinimumLength(8) on both sides, consistent with project's strong password policy."
+    }
+  ],
+  "missing_implementations": [
+    {
+      "feature": "Spec/Plan document",
+      "details": "specs/021-users-permissions/plan.md referenced in AGENTS.md but does not exist in the specs directory. This means there is no formal specification or implementation plan for Phase 21, making it difficult to verify completeness against requirements."
+    },
+    {
+      "feature": "PermissionDto.IsSystem field",
+      "details": "PermissionDto (AllDtos.cs:16) is missing the IsSystem boolean field that should be exposed from Permission.IsSystem. The Desktop permission management UI cannot distinguish system-protected permissions from user-created ones, defeating the purpose of the IsSystem protection flag."
+    },
+    {
+      "feature": "Permission.MarkAsDeleted() guard for IsSystem",
+      "details": "Permission entity has no MarkAsDeleted() override that throws DomainException when IsSystem is true. This means system permissions CAN be soft-deleted despite RULE-309 requiring them to be protected."
+    },
+    {
+      "feature": "AuditLog long Id (bigint PK)",
+      "details": "RULE-310 requires AuditLog to use long Id (bigint) for high-volume audit tables, but AuditLog inherits int Id from BaseEntity. This will overflow at ~2B entries."
+    },
+    {
+      "feature": "ExecuteTransactionAsync in PermissionService",
+      "details": "RULE-317 requires PermissionService.UpdateRolePermissionsAsync to use _uow.ExecuteTransactionAsync() for atomic role-permission updates, but it uses direct SaveChangesAsync() without transaction wrapping."
+    },
+    {
+      "feature": "User.PermanentDeleteAsync audit log",
+      "details": "RULE-245 requires that any attempt to hard-delete a user MUST be logged as a Serilog warning. UserService.PermanentDeleteAsync logs a warning but does not create an AuditLog entry. Should add await _auditLogService.LogAsync(...) to record the blocked attempt."
+    }
+  ],
+  "strengths": [
+    "Domain entities (User, Permission, RolePermission, UserSession, AuditLog) follow Clean Architecture with proper guard clauses, private setters, and factory methods.",
+    "Passwordless user creation (RULE-305) implemented correctly — User.Create() does not accept a password parameter.",
+    "Login flow correctly checks MustChangePassword before password verification (RULE-313).",
+    "Account lockout after 5 failed attempts (RULE-307) implemented correctly in RecordLoginAttempt().",
+    "SetInitialPassword() guards against re-setting already-set password (RULE-314).",
+    "ChangePasswordAsync() correctly verifies current password via BCrypt (RULE-315).",
+    "All 33 permissions seeded with 4-role assignments (Admin=33, Manager=24, Cashier=6) — exceeds the 4-role minimum from RULE-319.",
+    "Admin user seeded passwordless (RULE-320) — no hardcoded password hash.",
+    "All FK relationships use DeleteBehavior.Restrict (RULE-312) — verified in Permission, RolePermission, AuditLog, and UserSession configurations.",
+    "AuditLog has proper indexes on (UserId, Timestamp DESC), (EntityType, EntityId), and (Timestamp DESC) per RULE-311.",
+    "All Controllers are thin — no business logic, no direct DbContext injection (RULE-203).",
+    "All Application Services return Result<T> or Result (RULE-202).",
+    "Desktop layer has full ViewModel implementation for User management, Permission management, and Audit Log viewing.",
+    "ChangePasswordRequest defined in DTOs is used consistently by both API and Desktop layers.",
+    "JWT token includes Role claim for authorization policies."
+  ]
+}

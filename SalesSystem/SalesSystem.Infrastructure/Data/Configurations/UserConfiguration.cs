@@ -27,6 +27,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.AvatarPath).HasMaxLength(500);
         builder.Property(u => u.LoginAttempts).IsRequired().HasDefaultValue(0);
 
+        // Password reset token (nullable, plaintext — high-entropy, short-lived, one-time use)
+        builder.Property(u => u.PasswordResetToken).IsRequired(false).HasMaxLength(256);
+        builder.Property(u => u.PasswordResetTokenExpiresAt).IsRequired(false);
+
         // FK to CashBoxes
         builder.HasOne(u => u.DefaultCashBox)
             .WithMany()

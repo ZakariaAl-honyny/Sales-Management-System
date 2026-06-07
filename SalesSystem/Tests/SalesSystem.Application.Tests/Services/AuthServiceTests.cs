@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
@@ -23,6 +24,7 @@ public class AuthServiceTests
     private readonly Mock<IJwtTokenGenerator> _mockJwtGenerator;
     private readonly Mock<IAuditLogService> _mockAuditLogService;
     private readonly Mock<ILogger<AuthService>> _mockLogger;
+    private readonly Mock<IGenericRepository<UserSession>> _mockUserSessionRepo;
     private readonly SalesSystem.Contracts.Common.JwtSettings _jwtSettings;
 
     private readonly AuthService _sut;
@@ -33,6 +35,11 @@ public class AuthServiceTests
         _output.WriteLine("[TEST] AuthServiceTests initialized");
 
         _mockUow = new Mock<IUnitOfWork>();
+        _mockUserSessionRepo = new Mock<IGenericRepository<UserSession>>();
+        _mockUow.Setup(u => u.UserSessions).Returns(_mockUserSessionRepo.Object);
+        _mockUserSessionRepo.Setup(r => r.AddAsync(It.IsAny<UserSession>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((UserSession session, CancellationToken _) => session);
+
         _mockJwtGenerator = new Mock<IJwtTokenGenerator>();
         _mockAuditLogService = new Mock<IAuditLogService>();
         _mockLogger = new Mock<ILogger<AuthService>>();
@@ -62,15 +69,17 @@ public class AuthServiceTests
         var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
         user.Restore();
 
-        var usersList = new List<User> { user };
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         _mockJwtGenerator.Setup(g => g.GenerateToken(It.IsAny<User>()))
             .Returns("jwt-token-here");
 
         _mockAuditLogService.Setup(a => a.LogAsync(It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>(),
+            It.IsAny<bool>()))
             .ReturnsAsync(Result.Success());
 
         var request = new LoginRequest("testuser", "password123");
@@ -91,9 +100,10 @@ public class AuthServiceTests
     {
         _output.WriteLine("[TEST] LoginAsync_InvalidUsername_ReturnsUnauthorized");
 
-        var usersList = new List<User>();
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
 
         var request = new LoginRequest("nonexistent", "password123");
 
@@ -113,12 +123,14 @@ public class AuthServiceTests
         var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("correctpassword", workFactor: 12), "Test User", UserRole.Admin);
         user.Restore();
 
-        var usersList = new List<User> { user };
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         _mockAuditLogService.Setup(a => a.LogAsync(It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>(),
+            It.IsAny<bool>()))
             .ReturnsAsync(Result.Success());
 
         var request = new LoginRequest("testuser", "wrongpassword");
@@ -139,9 +151,10 @@ public class AuthServiceTests
         var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
         user.MarkAsDeleted(); // Makes Status = Inactive
 
-        var usersList = new List<User> { user };
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         var request = new LoginRequest("testuser", "password123");
 
@@ -161,12 +174,14 @@ public class AuthServiceTests
         var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
         user.Lock();
 
-        var usersList = new List<User> { user };
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         _mockAuditLogService.Setup(a => a.LogAsync(It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>(),
+            It.IsAny<bool>()))
             .ReturnsAsync(Result.Success());
 
         var request = new LoginRequest("testuser", "password123");
@@ -187,9 +202,10 @@ public class AuthServiceTests
         var user = User.Create("testuser", "Test User", UserRole.Admin); // Passwordless
         user.Restore();
 
-        var usersList = new List<User> { user };
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         var request = new LoginRequest("testuser", "anything");
 
@@ -209,15 +225,17 @@ public class AuthServiceTests
         var user = User.CreateWithPassword("TestUser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
         user.Restore();
 
-        var usersList = new List<User> { user };
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         _mockJwtGenerator.Setup(g => g.GenerateToken(It.IsAny<User>()))
             .Returns("jwt-token-here");
 
         _mockAuditLogService.Setup(a => a.LogAsync(It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>(),
+            It.IsAny<bool>()))
             .ReturnsAsync(Result.Success());
 
         var request = new LoginRequest("TESTUSER", "password123"); // Different case
@@ -238,15 +256,17 @@ public class AuthServiceTests
         var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
         user.Restore();
 
-        var usersList = new List<User> { user };
-        _mockUow.Setup(u => u.Users.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(usersList);
+        _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
+                It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         _mockJwtGenerator.Setup(g => g.GenerateToken(It.IsAny<User>()))
             .Returns("jwt-token-here");
 
         _mockAuditLogService.Setup(a => a.LogAsync(It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>(),
+            It.IsAny<bool>()))
             .ReturnsAsync(Result.Success());
 
         var request = new LoginRequest("testuser", "password123");

@@ -83,7 +83,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding ResetPasswordCommand}" Style="{StaticResource WarningButton}" Margin="0,0,4,0"
-                            ToolTip="إعادة تعيين كلمة المرور إلى 123456"
+                            ToolTip="إعادة تعيين كلمة المرور — سيتم مسح كلمة المرور الحالية ويُطلب من المستخدم تعيين كلمة مرور جديدة عند أول تسجيل دخول"
                             Visibility="{Binding SelectedUser, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔑" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -144,19 +144,22 @@
                           AutomationProperties.AutomationId="DgUsers">
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="تعديل" Command="{Binding EditCommand}">
+                            <MenuItem Header="تعديل" Command="{Binding EditCommand}"
+                                      ToolTip="تعديل بيانات المستخدم المختار — الاسم، الصلاحية، حالة الحساب">
                                 <MenuItem.Icon>
                                     <TextBlock Text="✏️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
-                            <MenuItem Header="إعادة تعيين كلمة المرور" Command="{Binding ResetPasswordCommand}">
+                            <MenuItem Header="إعادة تعيين كلمة المرور" Command="{Binding ResetPasswordCommand}"
+                                      ToolTip="مسح كلمة المرور الحالية للمستخدم — سيُطلب منه تعيين كلمة مرور جديدة عند أول تسجيل دخول">
                                 <MenuItem.Icon>
                                     <TextBlock Text="🔑"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
-                            <MenuItem Header="تعطيل / تفعيل" Command="{Binding ToggleStatusCommand}">
+                            <MenuItem Header="تعطيل / تفعيل" Command="{Binding ToggleStatusCommand}"
+                                      ToolTip="تعطيل الحساب يمنع المستخدم من تسجيل الدخول — تفعيل الحساب يعيد صلاحية الدخول">
                                 <MenuItem.Icon>
                                     <TextBlock Text="🔒"/>
                                 </MenuItem.Icon>
@@ -226,8 +229,11 @@
                                             <Style TargetType="Border" BasedOn="{StaticResource StatusBadgeStyle}">
                                                 <Setter Property="Background" Value="{StaticResource SuccessLightBrush}"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                    <DataTrigger Binding="{Binding Status}" Value="2">
                                                         <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="3">
+                                                        <Setter Property="Background" Value="{StaticResource WarningLightBrush}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -238,9 +244,13 @@
                                                     <Setter Property="Text" Value="نشط"/>
                                                     <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsActive}" Value="False">
+                                                        <DataTrigger Binding="{Binding Status}" Value="2">
                                                             <Setter Property="Text" Value="معطل"/>
                                                             <Setter Property="Foreground" Value="{StaticResource ErrorTextBrush}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="3">
+                                                            <Setter Property="Text" Value="مقفل"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource WarningTextBrush}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -259,8 +269,8 @@
                         <TextBlock Text="👥" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
                         <TextBlock Text="لا يوجد مستخدمون حالياً" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
                         <TextBlock Text="قم بإضافة طاقم العمل (محاسبين، مديرين) للبدء في استخدام النظام" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                        <Button Content="➕ إضافة أول مستخدم" Command="{Binding AddCommand}" Margin="0,12,0,0"
-                                ToolTip="إضافة مستخدم جديد"/>
+                        <Button Content="➕ إضافة أول مستخدم" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
+                                ToolTip="إضافة مستخدم جديد — فتح شاشة إضافة موظف جديد للنظام"/>
                     </StackPanel>
                 </Grid>
             </Grid>

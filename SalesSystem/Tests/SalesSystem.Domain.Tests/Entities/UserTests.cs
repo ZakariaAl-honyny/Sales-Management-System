@@ -210,7 +210,7 @@ public class UserTests
     }
 
     [Fact]
-    public void ResetPassword_ShouldClearHashAndForceChange()
+    public void ResetPassword_ShouldSetNewHashAndForceChange()
     {
         var user = User.Create(
             userName: "test",
@@ -218,12 +218,13 @@ public class UserTests
             role: UserRole.Cashier,
             createdByUserId: 1
         );
-        user.SetInitialPassword("some_hash");
+        user.SetInitialPassword("old_hash");
 
-        user.ResetPassword();
+        user.ResetPassword("new_default_hash");
 
-        user.PasswordHash.Should().BeNull();
+        user.PasswordHash.Should().Be("new_default_hash");
         user.MustChangePassword.Should().BeTrue();
+        user.PasswordChangedAt.Should().BeNull();
     }
 
     [Fact]

@@ -9,6 +9,7 @@ using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 
@@ -295,7 +296,9 @@ public class UserListViewModel : AdminOnlyViewModel
 
         var confirmed = await _dialogService.ShowConfirmationAsync(
             "تأكيد إعادة تعيين كلمة المرور",
-            $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}؟\n\nسيتم تعيين كلمة المرور الافتراضية: 123456");
+            $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}؟\n\n" +
+            $"سيتم تعيين كلمة المرور إلى: 12345678\n" +
+            $"وسيُطلب من المستخدم تغييرها عند أول تسجيل دخول.");
         if (!confirmed) return;
 
         await ExecuteAsync(ResetPasswordOperationAsync,
@@ -306,16 +309,15 @@ public class UserListViewModel : AdminOnlyViewModel
     {
         ErrorMessage = null;
 
-        var request = new UpdateUserRequest(
-            FullName: SelectedUser!.FullName,
-            Role: SelectedUser.Role,
-            Status: SelectedUser.Status,
-            Password: "123456"
-        );
-
-        var result = await _userService.UpdateAsync(SelectedUser.Id, request);
+        var result = await _userService.ResetPasswordAsync(SelectedUser!.Id);
         if (result.IsSuccess)
         {
+            await _dialogService.ShowInfoAsync(
+                "تم إعادة تعيين كلمة المرور",
+                $"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}\n\n" +
+                $"كلمة المرور الجديدة: 12345678\n\n" +
+                $"سيُطلب من المستخدم تغيير كلمة المرور عند أول تسجيل دخول.");
+
             _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}");
         }
         else

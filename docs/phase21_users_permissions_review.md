@@ -12,6 +12,8 @@
 
 Phase 21 is the **largest plan in the project** (2,463 lines, 123KB). It proposes a massive overhaul of the User/Auth/Permissions system. This review analyzes the **plan's proposed code** for bugs and architectural violations BEFORE implementation begins.
 
+> **📝 Post-Review Design Evolution**: During v4.6.9 implementation, the user creation flow was redesigned from **passwordless/token-based** to **default-password** ("12345678") based on usability and security analysis. This change resolved CRIT-001 (the `[AllowAnonymous]` SetPassword vulnerability) by eliminating the vulnerable endpoint entirely. See the Plan document §6.8 for the full design rationale. All status entries below reflect the final implemented design.
+
 | Severity | Count | Description |
 |----------|-------|-------------|
 | 🔴 **CRITICAL BUG** | 5 | Security vulnerabilities & breaking changes in plan code |
@@ -500,7 +502,7 @@ The plan's version (§Task 1, line 1207) correctly adds the guard clause.
 
 Despite the bugs above, the plan demonstrates strong architectural thinking in several areas:
 
-1. **Passwordless creation flow** — Innovative and user-friendly. Admin creates users without passwords, users set their own on first login. This is a modern security pattern.
+1. **Default password flow** (redesigned during implementation) — Simpler and more secure than the original passwordless/token approach. Admin creates user with "12345678", user forced to change on first login. No anonymous SetPassword endpoint, no token management, no null-PasswordHash edge cases. Familiar pattern for retail users.
 2. **4-role model** — Well-researched separation: Admin/Accountant/Cashier/Observer covers all retail use cases.
 3. **33 granular permissions** — The `Domain.Action` dot-notation is clean, extensible, and follows industry standards.
 4. **DB-backed permissions** — Moving from hardcoded `[Flags]` enum to DB tables enables admin-configurable permissions without code deployment.
@@ -517,7 +519,7 @@ All issues identified in this plan review were **fixed during implementation** i
 
 | # | Issue | Status | Notes |
 |---|-------|--------|-------|
-| CRIT-001 | SetPassword [AllowAnonymous] security vulnerability | ✅ FIXED | SetPassword now requires a valid JWT from the MustChangePassword login flow. AuthService validates MustChangePassword == true before allowing password set. |
+| CRIT-001 | SetPassword [AllowAnonymous] security vulnerability | ✅ FIXED | **Resolved by eliminating the SetPassword endpoint entirely.** The plan was redesigned from passwordless creation to default-password flow. No `[AllowAnonymous]` password-setting endpoint exists. Users log in with "12345678", see `RequiresPasswordChange = true`, and change via authenticated `change-password`. See §6.8 in plan for rationale. |
 | CRIT-002 | UserStatus vs BaseEntity.IsActive dual state | ✅ FIXED | User class overrides MarkAsDeleted() → Status = Inactive + IsActive = false; Restore() → Status = Active + IsActive = true. Query filter checks both: `u.Status == UserStatus.Active && u.IsActive` |
 | CRIT-003 | User.Create() seed data compilation errors | ✅ FIXED | DbSeeder uses correct signature: `User.Create(userName: "admin", fullName: "مدير النظام", role: UserRole.Admin, phone: null, email: null, createdByUserId: null)`. MustChangePassword defaults to true — no SetMustChangePassword() needed. |
 | CRIT-004 | RecordLoginAttempt auto-unlock | ✅ FIXED | RecordLoginAttempt(true) no longer sets Status = Active — it only resets LoginAttempts = 0 and sets LastLoginAt. Explicit Unlock() method required to restore Active status. |
@@ -525,7 +527,7 @@ All issues identified in this plan review were **fixed during implementation** i
 | BUG-001 | Permission count 22 vs 33 mismatch | ✅ FIXED | Plan and seed data consistently reference 33 permissions across 9 categories. |
 | BUG-002 | Accountant missing Sales.ViewProfit and Sales.EditPrice | ✅ FIXED | Accountant seed includes all matrix permissions. |
 | BUG-003 | Cashier includes Customer.Create | ✅ FIXED | Cashier seed updated — Customer.Create removed per matrix. |
-| BUG-004 | Password validation in passwordless flow | ✅ FIXED | UserEditorViewModel validates NO password on create — passwordless creation per plan spec. |
+| BUG-004 | Password validation in passwordless flow | ✅ FIXED | UserEditorViewModel accepts optional password on create (defaults to "12345678" if empty). Password validation removed for create mode per default-password flow design. |
 | BUG-005 | Missing DefaultCashBox navigation property | ✅ FIXED | User entity includes `public CashBox? DefaultCashBox { get; private set; }` navigation property with FK config. |
 | BUG-006 | AuditLog/UserSession don't inherit BaseEntity | ✅ FIXED | Both inherit BaseEntity with IsActive. AuditLog uses long Id explicitly, UserSession uses standard int Id. |
 | BUG-007 | UpdateProfile() method body missing | ✅ FIXED | User entity has full method bodies for UpdateProfile() and ChangePassword(). |
@@ -535,7 +537,7 @@ All issues identified in this plan review were **fixed during implementation** i
 | DESIGN-003 | AuditLog SaveChanges breaks caller transactions | ✅ FIXED | AuditLogService uses separate SaveChangesAsync call pattern. Login operations use transactional flow. |
 | DESIGN-004 | Missing ErrorCodes.RequiresPasswordSetup | ✅ FIXED | Added ErrorCodes.RequiresPasswordSetup constant in Contracts project. |
 | DESIGN-005 | AuditLog long Id vs int generic repository | ✅ FIXED | AuditLog has dedicated IAuditLogRepository (not generic IRepository) to handle long PK. |
-| DESIGN-006 | No migration strategy for existing admin | ✅ FIXED | DbSeeder creates admin passwordless (PasswordHash = null, MustChangePassword = true). Existing DBs: migration sets Status=Active for all users, keeps existing hashes. |
+| DESIGN-006 | No migration strategy for existing admin | ✅ FIXED | DbSeeder creates admin with default password (BCrypt hash of "12345678", MustChangePassword = true). Existing DBs: migration preserves existing password hashes for users, sets MustChangePassword = false for users who have already changed. |
 | DESIGN-007 | PermissionConfiguration missing IsSystem protection | ✅ FIXED | Permission entity has IsSystem flag with DB-level protection. System permissions blocked from deletion in PermissionService. |
 | DESIGN-008 | UserSession no expiry cleanup | ✅ FIXED | UserSession entity has ExpiresAt. Cleanup documented as future BackgroundService task. |
 | DESIGN-009 | Observer role missing from Desktop Permission enum | ✅ FIXED | PermissionFlags enum updated with Observer role mapping. Permission-based nav uses API (CurrentUserDto.Permissions). |

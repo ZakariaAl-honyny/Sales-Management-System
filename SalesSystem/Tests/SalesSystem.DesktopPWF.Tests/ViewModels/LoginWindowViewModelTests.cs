@@ -8,6 +8,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.DesktopPWF.Models;
 using SalesSystem.DesktopPWF.Services;
 using SalesSystem.DesktopPWF.ViewModels;
 
@@ -18,16 +19,19 @@ public class LoginWindowViewModelTests
 {
     private readonly Mock<IAuthApiService> _mockAuthService;
     private readonly Mock<ISessionService> _mockSessionService;
+    private readonly Mock<IScreenWindowService> _mockScreenWindowService;
     private readonly LoginWindowViewModel _viewModel;
 
     public LoginWindowViewModelTests()
     {
         _mockAuthService = new Mock<IAuthApiService>();
         _mockSessionService = new Mock<ISessionService>();
+        _mockScreenWindowService = new Mock<IScreenWindowService>();
 
         _viewModel = new LoginWindowViewModel(
             _mockAuthService.Object,
-            _mockSessionService.Object);
+            _mockSessionService.Object,
+            _mockScreenWindowService.Object);
     }
 
     #region Property Tests
@@ -123,29 +127,31 @@ public class LoginWindowViewModelTests
     #region LoginCommand CanExecute Tests
 
     [Fact]
-    public void LoginCommand_CannotExecute_WhenUsernameEmpty()
+    public void LoginCommand_AlwaysEnabled_WhenUsernameEmpty()
     {
+        // Per RULE-059: buttons are NEVER disabled via CanExecute predicate
         _viewModel.Username = "";
         _viewModel.Password = "password";
 
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.LoginCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
-    public void LoginCommand_CannotExecute_WhenPasswordEmpty()
+    public void LoginCommand_AlwaysEnabled_WhenPasswordEmpty()
     {
+        // Per RULE-059: buttons are NEVER disabled via CanExecute predicate
         _viewModel.Username = "admin";
         _viewModel.Password = "";
 
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.LoginCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
     public async Task LoginCommand_CannotExecute_WhileExecuting()
     {
-        var tcs = new TaskCompletionSource<Result<LoginResponse>>();
+        var tcs = new TaskCompletionSource<LoginResult>();
         _mockAuthService
-            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
             .Returns(tcs.Task);
 
         _viewModel.Username = "admin";
@@ -156,13 +162,17 @@ public class LoginWindowViewModelTests
 
         _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
 
-        tcs.SetResult(Result<LoginResponse>.Success(new LoginResponse(
-            UserId: 1,
-            UserName: "admin",
-            FullName: "Admin",
-            Role: (byte)UserRole.Admin,
-            Token: "token",
-            ExpiresAt: DateTime.UtcNow.AddHours(8))));
+        tcs.SetResult(new LoginResult
+        {
+            IsSuccess = true,
+            Response = new LoginResponse(
+                UserId: 1,
+                UserName: "admin",
+                FullName: "Admin",
+                Role: (byte)UserRole.Admin,
+                Token: "token",
+                ExpiresAt: DateTime.UtcNow.AddHours(8))
+        });
 
         await tcs.Task;
     }
@@ -177,21 +187,23 @@ public class LoginWindowViewModelTests
     }
 
     [Fact]
-    public void LoginCommand_CannotExecute_WhenUsernameWhitespace()
+    public void LoginCommand_AlwaysEnabled_WhenUsernameWhitespace()
     {
+        // Per RULE-059: buttons are NEVER disabled via CanExecute predicate
         _viewModel.Username = "   ";
         _viewModel.Password = "password";
 
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.LoginCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
-    public void LoginCommand_CannotExecute_WhenPasswordWhitespace()
+    public void LoginCommand_AlwaysEnabled_WhenPasswordWhitespace()
     {
+        // Per RULE-059: buttons are NEVER disabled via CanExecute predicate
         _viewModel.Username = "admin";
         _viewModel.Password = "   ";
 
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.LoginCommand.CanExecute(null).Should().BeTrue();
     }
 
     #endregion
@@ -210,8 +222,12 @@ public class LoginWindowViewModelTests
             ExpiresAt: DateTime.UtcNow.AddHours(8));
 
         _mockAuthService
-            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
-            .ReturnsAsync(Result<LoginResponse>.Success(loginResponse));
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
+            .ReturnsAsync(new LoginResult
+            {
+                IsSuccess = true,
+                Response = loginResponse
+            });
 
         _viewModel.Username = "admin";
         _viewModel.Password = "password";
@@ -232,8 +248,13 @@ public class LoginWindowViewModelTests
     public async Task LoginCommand_WhenFailed_SetsErrorMessage()
     {
         _mockAuthService
-            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
-            .ReturnsAsync(Result<LoginResponse>.Failure("اسم المستخدم أو كلمة المرور غير صحيحة"));
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
+            .ReturnsAsync(new LoginResult
+            {
+                IsSuccess = false,
+                Error = "اسم المستخدم أو كلمة المرور غير صحيحة",
+                ErrorCode = "Unknown"
+            });
 
         _viewModel.Username = "admin";
         _viewModel.Password = "wrong";
@@ -247,9 +268,9 @@ public class LoginWindowViewModelTests
     [Fact]
     public async Task LoginCommand_WhenExecuting_SetsIsBusyTrue()
     {
-        var tcs = new TaskCompletionSource<Result<LoginResponse>>();
+        var tcs = new TaskCompletionSource<LoginResult>();
         _mockAuthService
-            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
             .Returns(tcs.Task);
 
         _viewModel.Username = "admin";
@@ -258,13 +279,17 @@ public class LoginWindowViewModelTests
         _viewModel.LoginCommand.Execute(null);
         _viewModel.IsBusy.Should().BeTrue();
 
-        tcs.SetResult(Result<LoginResponse>.Success(new LoginResponse(
-            UserId: 1,
-            UserName: "admin",
-            FullName: "Admin",
-            Role: (byte)UserRole.Admin,
-            Token: "token",
-            ExpiresAt: DateTime.UtcNow.AddHours(8))));
+        tcs.SetResult(new LoginResult
+        {
+            IsSuccess = true,
+            Response = new LoginResponse(
+                UserId: 1,
+                UserName: "admin",
+                FullName: "Admin",
+                Role: (byte)UserRole.Admin,
+                Token: "token",
+                ExpiresAt: DateTime.UtcNow.AddHours(8))
+        });
 
         await tcs.Task;
 
@@ -274,32 +299,48 @@ public class LoginWindowViewModelTests
     [Fact]
     public async Task LoginCommand_ClearsErrorMessage_OnNewAttempt()
     {
+        // Arrange: Set a previous error message and delay the service response
         _viewModel.ErrorMessage = "خطأ سابق";
 
+        var tcs = new TaskCompletionSource<LoginResult>();
         _mockAuthService
-            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
-            .ReturnsAsync(Result<LoginResponse>.Success(new LoginResponse(
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
+            .Returns(tcs.Task);
+
+        _viewModel.Username = "admin";
+        _viewModel.Password = "password";
+
+        // Act: Execute the command (ErrorMessage should be cleared at start of LoginOperationAsync)
+        _viewModel.LoginCommand.Execute(null);
+
+        // Give time for the operation to start and clear ErrorMessage
+        await Task.Delay(10);
+
+        // Assert: ErrorMessage was cleared by LoginOperationAsync before awaiting the service
+        _viewModel.ErrorMessage.Should().BeNull();
+        _viewModel.IsBusy.Should().BeTrue();
+
+        // Cleanup: complete the pending operation
+        tcs.SetResult(new LoginResult
+        {
+            IsSuccess = true,
+            Response = new LoginResponse(
                 UserId: 1,
                 UserName: "admin",
                 FullName: "Admin",
                 Role: (byte)UserRole.Admin,
                 Token: "token",
-                ExpiresAt: DateTime.UtcNow.AddHours(8))));
+                ExpiresAt: DateTime.UtcNow.AddHours(8))
+        });
 
-        _viewModel.Username = "admin";
-        _viewModel.Password = "password";
-
-        _viewModel.LoginCommand.Execute(null);
-        await Task.Delay(100);
-
-        _viewModel.ErrorMessage.Should().BeNull();
+        await Task.Delay(50);
     }
 
     [Fact]
     public async Task LoginCommand_WhenExceptionThrown_SetsErrorMessage()
     {
         _mockAuthService
-            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
             .ThrowsAsync(new System.Net.Http.HttpRequestException("Network error"));
 
         _viewModel.Username = "admin";
@@ -316,7 +357,7 @@ public class LoginWindowViewModelTests
     public async Task LoginCommand_WhenExceptionThrown_SetsIsBusyFalse()
     {
         _mockAuthService
-            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
             .ThrowsAsync(new Exception("Unknown error"));
 
         _viewModel.Username = "admin";
@@ -328,30 +369,103 @@ public class LoginWindowViewModelTests
         _viewModel.IsBusy.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task LoginCommand_WithMustChangePassword_StoresSessionAndShowsModal()
+    {
+        // When MustChangePassword is true, session is stored but LoginWindow stays open.
+        // MainWindow navigation and LoginWindow close happen only after password change completes.
+        var loginResponse = new LoginResponse(
+            UserId: 1,
+            UserName: "user1",
+            FullName: "User One",
+            Role: (byte)UserRole.Cashier,
+            Token: "change-password-token",
+            ExpiresAt: DateTime.UtcNow.AddHours(8),
+            MustChangePassword: true);
+
+        _mockAuthService
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
+            .ReturnsAsync(new LoginResult
+            {
+                IsSuccess = true,
+                Response = loginResponse
+            });
+
+        _viewModel.Username = "user1";
+        _viewModel.Password = "oldpass";
+
+        _viewModel.LoginCommand.Execute(null);
+        await Task.Delay(100);
+
+        // Session must be stored immediately when MustChangePassword is true
+        _mockSessionService.Verify(
+            s => s.SetSession(
+                "change-password-token",
+                "user1",
+                1,
+                UserRole.Cashier),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task LoginCommand_WithRequiresPasswordSetup_ShowsErrorWhenNoUserId()
+    {
+        // When RequiresPasswordSetup is returned without a userId, show an error
+        _mockAuthService
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
+            .ReturnsAsync(new LoginResult
+            {
+                IsSuccess = false,
+                Error = "يجب تعيين كلمة المرور أولاً",
+                ErrorCode = ErrorCodes.RequiresPasswordSetup,
+                RequiresPasswordSetupUserId = null
+            });
+
+        _viewModel.Username = "newuser";
+        _viewModel.Password = "";
+
+        _viewModel.LoginCommand.Execute(null);
+        await Task.Delay(100);
+
+        _viewModel.ErrorMessage.Should().Contain("لم يتم العثور على المستخدم");
+    }
+
     #endregion
 
     #region Command CanExecute Notification Tests
 
     [Fact]
-    public void LoginCommand_RaisesCanExecuteChanged_WhenUsernameChanges()
+    public void Username_Set_RaisesPropertyChanged()
     {
-        var canExecuteChanged = false;
-        _viewModel.LoginCommand.CanExecuteChanged += (s, e) => canExecuteChanged = true;
+        // Per RULE-059: No CanExecute predicate — commands are always enabled.
+        // PropertyChanged fires via SetProperty in the Username setter.
+        var propertyChanged = false;
+        _viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(_viewModel.Username))
+                propertyChanged = true;
+        };
 
         _viewModel.Username = "admin";
 
-        canExecuteChanged.Should().BeTrue();
+        propertyChanged.Should().BeTrue();
     }
 
     [Fact]
-    public void LoginCommand_RaisesCanExecuteChanged_WhenPasswordChanges()
+    public void Password_Set_RaisesPropertyChanged()
     {
-        var canExecuteChanged = false;
-        _viewModel.LoginCommand.CanExecuteChanged += (s, e) => canExecuteChanged = true;
+        // Per RULE-059: No CanExecute predicate — commands are always enabled.
+        // PropertyChanged fires via SetProperty in the Password setter.
+        var propertyChanged = false;
+        _viewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(_viewModel.Password))
+                propertyChanged = true;
+        };
 
         _viewModel.Password = "password";
 
-        canExecuteChanged.Should().BeTrue();
+        propertyChanged.Should().BeTrue();
     }
 
     [Fact]
@@ -360,9 +474,9 @@ public class LoginWindowViewModelTests
         var canExecuteChangedCount = 0;
         _viewModel.LoginCommand.CanExecuteChanged += (s, e) => canExecuteChangedCount++;
 
-        var tcs = new TaskCompletionSource<Result<LoginResponse>>();
+        var tcs = new TaskCompletionSource<LoginResult>();
         _mockAuthService
-            .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
+            .Setup(s => s.LoginWithDetailsAsync(It.IsAny<LoginRequest>()))
             .Returns(tcs.Task);
 
         _viewModel.Username = "admin";
@@ -373,13 +487,17 @@ public class LoginWindowViewModelTests
 
         canExecuteChangedCount.Should().BeGreaterThan(0, "CanExecuteChanged should fire when command starts executing");
 
-        tcs.SetResult(Result<LoginResponse>.Success(new LoginResponse(
-            UserId: 1,
-            UserName: "admin",
-            FullName: "Admin",
-            Role: (byte)UserRole.Admin,
-            Token: "token",
-            ExpiresAt: DateTime.UtcNow.AddHours(8))));
+        tcs.SetResult(new LoginResult
+        {
+            IsSuccess = true,
+            Response = new LoginResponse(
+                UserId: 1,
+                UserName: "admin",
+                FullName: "Admin",
+                Role: (byte)UserRole.Admin,
+                Token: "token",
+                ExpiresAt: DateTime.UtcNow.AddHours(8))
+        });
 
         await tcs.Task;
     }

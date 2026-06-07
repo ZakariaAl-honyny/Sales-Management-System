@@ -61,14 +61,17 @@ public class UserManagementTests : TestBase, IDisposable
     /// Calls POST /api/v1/auth/set-password to set the admin password
     /// before any E2E test runs. This is required because the admin
     /// user is now seeded with PasswordHash=null and MustChangePassword=true.
+    /// The DbSeeder generates a known reset token "admin-reset-token-for-e2e"
+    /// for the admin user to enable this bootstrap flow.
     /// </summary>
     private static void EnsureAdminPasswordSet()
     {
         try
         {
-            var request = new SetPasswordRequest(AdminPassword, AdminPassword);
+            var request = new SetPasswordRequest(
+                AdminPassword, AdminPassword, "admin-reset-token-for-e2e");
             var response = _httpClient.PostAsJsonAsync(
-                $"api/v1/auth/set-password?userId={AdminUserId}", request)
+                "api/v1/auth/set-password", request)
                 .GetAwaiter().GetResult();
 
             if (response.IsSuccessStatusCode)

@@ -6,6 +6,7 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -153,22 +154,25 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Resets a user's password (admin function).
-    /// Clears the password hash and forces MustChangePassword — the user
-    /// will be prompted to set a new password on next login.
+    /// Resets a user's password to the default "12345678" (admin function).
+    /// Forces MustChangePassword = true so the user must change on next login.
     /// </summary>
     /// <param name="id">User ID to reset password for.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns success message.</returns>
     [HttpPost("{id:int}/reset-password")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ResetPassword(int id, CancellationToken ct)
     {
         var result = await _userService.ResetPasswordAsync(id, ct);
         if (result.IsSuccess)
-            return Ok(new { message = "تم إعادة تعيين كلمة المرور — سيطلب من المستخدم تعيين كلمة جديدة عند تسجيل الدخول" });
+            return Ok(new
+            {
+                userId = result.Value!.UserId,
+                message = result.Value.Message
+            });
         if (result.ErrorCode == ErrorCodes.NotFound)
             return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });

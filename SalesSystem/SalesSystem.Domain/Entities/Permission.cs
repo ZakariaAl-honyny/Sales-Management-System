@@ -36,4 +36,24 @@ public class Permission : BaseEntity
             IsSystem = isSystem
         };
     }
+
+    // ─── Domain Methods ───────────────────────────
+
+    /// <summary>
+    /// Returns true if this permission can be modified (non-system permissions only).
+    /// System permissions (IsSystem = true) are protected and cannot be deleted or modified.
+    /// </summary>
+    public bool CanModify() => !IsSystem;
+
+    /// <summary>
+    /// Marks this permission as deleted.
+    /// System permissions (IsSystem = true) cannot be deleted — they are protected.
+    /// </summary>
+    public override void MarkAsDeleted()
+    {
+        if (IsSystem)
+            throw new DomainException("لا يمكن حذف صلاحية نظامية.");
+
+        base.MarkAsDeleted();
+    }
 }

@@ -242,14 +242,17 @@ public static class DbSeeder
             return;
         }
 
-        // 7 (renumbered). Admin user — passwordless setup, password: Admin@123
-        var adminUser = User.Create(
+        // 7. Admin user — created with default password "12345678" (MustChangePassword=true).
+        // On first login, the admin must change their password.
+        string adminPasswordHash = BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
+        var adminUser = User.CreateWithPassword(
             userName: "admin",
+            passwordHash: adminPasswordHash,
             fullName: "Administrator",
             role: UserRole.Admin,
+            mustChangePassword: true,
             createdByUserId: null
         );
-        adminUser.SetInitialPassword(BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 12));
         db.Users.Add(adminUser);
 
         // 8. Default warehouse

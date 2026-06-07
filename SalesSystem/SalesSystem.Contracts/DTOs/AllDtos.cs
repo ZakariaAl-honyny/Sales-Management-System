@@ -5,9 +5,12 @@ namespace SalesSystem.Contracts.DTOs;
 public record UserDto(int Id, string UserName, string FullName, byte Role,
     byte Status, bool MustChangePassword, DateTime? PasswordChangedAt,
     string? Phone, string? Email, string? AvatarPath,
-    DateTime? LastLoginAt, int LoginAttempts, int? DefaultCashBoxId);
+    DateTime? LastLoginAt, int LoginAttempts, int? DefaultCashBoxId)
+{
+    public bool IsActive => Status == 1;
+}
 
-public record AuditLogDto(int Id, int? UserId, string? UserName, string Action,
+public record AuditLogDto(long Id, int? UserId, string? UserName, string Action,
     string EntityType, int? EntityId, string? Details, string? IpAddress, DateTime Timestamp);
 
 public record PermissionDto(int Id, string Name, string DisplayNameAr, string? Category, bool IsActive);

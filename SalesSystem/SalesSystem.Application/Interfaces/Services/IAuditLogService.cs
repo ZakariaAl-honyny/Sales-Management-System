@@ -10,10 +10,13 @@ public interface IAuditLogService
 {
     /// <summary>
     /// Records an audit log entry.
+    /// When autoSave is true (default), immediately persists the entry via SaveChangesAsync.
+    /// When autoSave is false, the caller is responsible for calling SaveChangesAsync.
+    /// Use autoSave=false when the audit log is part of a larger transaction managed by the caller.
     /// </summary>
     Task<Result> LogAsync(int? userId, string action, string entityType,
         int? entityId = null, string? details = null, string? ipAddress = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default, bool autoSave = true);
 
     /// <summary>
     /// Queries audit logs with optional filters and pagination.

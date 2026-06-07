@@ -1,15 +1,11 @@
-<Window x:Class="SalesSystem.DesktopPWF.Views.Users.UserEditorView"
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Users.UserEditorView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
         mc:Ignorable="d"
-        Title="{Binding WindowTitle}"
-        Height="620" Width="520"
         FlowDirection="RightToLeft"
-        WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize"
         Background="{StaticResource BackgroundBrush}">
 
     <Grid>
@@ -124,16 +120,17 @@
                                  ToolTip="الاسم الكامل للمستخدم — يظهر في الفواتير والتقارير"/>
                         <TextBlock Text="يظهر هذا الاسم في الفواتير والتقارير" Style="{StaticResource HelperTextStyle}" Margin="0,0,0,6"/>
 
-                        <!-- Password -->
-                        <TextBlock Text="كلمة المرور" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Password, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 Tag="أدخل كلمة مرور قوية"
-                                 TabIndex="3"
-                                 helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtUserPassword"
-                                 ToolTip="كلمة المرور مطلوبة عند إنشاء مستخدم جديد. اتركها فارغة عند التعديل إذا كنت لا تريد تغييرها"/>
-                        <TextBlock Text="اتركه فارغاً عند التعديل إذا كنت لا تريد تغيير كلمة المرور" Style="{StaticResource HelperTextStyle}" Margin="0,0,0,6"/>
+                        <!-- Default Password Notice -->
+                        <Border Background="#FFF8E1" Padding="10" CornerRadius="6" Margin="0,0,0,6"
+                                BorderBrush="#FFE082" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock FontWeight="Bold" FontSize="13" Text="🔑 كلمة المرور الافتراضية" Margin="0,0,0,4"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="12"
+                                           Text="كلمة المرور الافتراضية: 12345678 — سيُطلب من المستخدم تغييرها عند أول تسجيل دخول."/>
+                                <TextBlock TextWrapping="Wrap" FontSize="12" Margin="0,4,0,0"
+                                           Text="بعد تسجيل الدخول، سيفتح النظام شاشة تغيير كلمة المرور إجبارياً ولا يمكن تخطيها."/>
+                            </StackPanel>
+                        </Border>
 
                         <!-- Change Password Button (edit mode only) -->
                         <Button Command="{Binding ChangePasswordCommand}"
@@ -141,7 +138,7 @@
                                 MinWidth="140"
                                 Margin="0,0,0,6"
                                 Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"
-                                ToolTip="فتح نافذة تغيير كلمة المرور — إدخال كلمة المرور الحالية والجديدة">
+                                ToolTip="فتح نافذة تغيير كلمة مرور المستخدم — لا يمكن للمسؤول رؤية كلمة المرور الحالية">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🔑" Margin="0,0,6,0"/>
                                 <TextBlock Text="تغيير كلمة المرور"/>
@@ -174,8 +171,7 @@
                                 Margin="0,0,0,6">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="حالة الحساب:" FontWeight="SemiBold" Margin="0,0,8,0"/>
-                                <TextBlock Text="{Binding IsLocked, Converter={StaticResource BoolToVisibility}}"
-                                           Foreground="{StaticResource ErrorBrush}" FontWeight="Bold">
+                                <TextBlock Foreground="{StaticResource ErrorBrush}" FontWeight="Bold">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Text" Value="نشط"/>
@@ -289,4 +285,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</Window>
+</UserControl>

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
@@ -38,26 +39,9 @@ public class AuthController : ControllerBase
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var result = await _authService.LoginAsync(request, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-    }
-
-    /// <summary>
-    /// Sets the initial password for a passwordless user (first login flow).
-    /// No authentication required — user must have been created without a password.
-    /// </summary>
-    /// <param name="request">The set password request with new password and confirmation.</param>
-    /// <param name="userId">The user ID from query string.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns success message if password was set.</returns>
-    [HttpPost("set-password")]
-    [AllowAnonymous]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> SetPassword([FromBody] SetPasswordRequest request, [FromQuery] int userId, CancellationToken ct)
-    {
-        var result = await _authService.SetPasswordAsync(request, userId, ct);
         if (result.IsSuccess)
-            return Ok(new { message = "تم تعيين كلمة المرور بنجاح" });
+            return Ok(result.Value);
+
         return BadRequest(new { error = result.Error });
     }
 
@@ -70,6 +54,7 @@ public class AuthController : ControllerBase
     /// <returns>Returns success message if password was changed.</returns>
     [HttpPost("change-password")]
     [Authorize]
+    [EnableRateLimiting("LoginPolicy")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)

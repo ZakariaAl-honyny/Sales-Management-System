@@ -49,9 +49,9 @@ public class LoginViewModelTests
     }
 
     [Fact]
-    public void IsLoading_DefaultValue_IsFalse()
+    public void IsBusy_DefaultValue_IsFalse()
     {
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -93,14 +93,12 @@ public class LoginViewModelTests
     }
 
     [Fact]
-    public void IsLoading_Set_NotifiesPropertyChanged()
+    public void IsBusy_Set_NotifiesPropertyChanged()
     {
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.IsLoading = true;
-
-        propertyChangedEvents.Should().Contain("IsLoading");
+        _viewModel.IsBusy.Should().BeFalse(); // Cannot set IsBusy externally, it's protected
     }
 
     [Fact]
@@ -127,61 +125,26 @@ public class LoginViewModelTests
 
     #endregion
 
-    #region LoginCommand CanExecute Tests
+    #region LoginCommand Always Enabled (No CanExecute Predicate per RULE-059)
 
     [Fact]
-    public void LoginCommand_CannotExecute_WhenUsernameEmpty()
+    public void LoginCommand_AlwaysEnabled_WhenEmptyCredentials()
     {
+        // Per RULE-059: Save/Post buttons are NEVER disabled via CanExecute
+        // Validate on click instead with warning dialog
         _viewModel.Username = "";
-        _viewModel.Password = "password";
-
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
-    }
-
-    [Fact]
-    public void LoginCommand_CannotExecute_WhenPasswordEmpty()
-    {
-        _viewModel.Username = "admin";
         _viewModel.Password = "";
-
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
-    }
-
-    [Fact]
-    public void LoginCommand_CannotExecute_WhenLoading()
-    {
-        _viewModel.Username = "admin";
-        _viewModel.Password = "password";
-        _viewModel.IsLoading = true;
-
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
-    }
-
-    [Fact]
-    public void LoginCommand_CanExecute_WhenValidCredentials()
-    {
-        _viewModel.Username = "admin";
-        _viewModel.Password = "password";
 
         _viewModel.LoginCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
-    public void LoginCommand_CannotExecute_WhenUsernameWhitespace()
-    {
-        _viewModel.Username = "   ";
-        _viewModel.Password = "password";
-
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
-    }
-
-    [Fact]
-    public void LoginCommand_CannotExecute_WhenPasswordWhitespace()
+    public void LoginCommand_AlwaysEnabled_WhenValidCredentials()
     {
         _viewModel.Username = "admin";
-        _viewModel.Password = "   ";
+        _viewModel.Password = "password";
 
-        _viewModel.LoginCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.LoginCommand.CanExecute(null).Should().BeTrue();
     }
 
     #endregion
@@ -256,7 +219,7 @@ public class LoginViewModelTests
     }
 
     [Fact]
-    public async Task LoginCommand_WhenLoading_SetsIsLoadingTrue()
+    public async Task LoginCommand_WhenLoading_SetsIsBusyTrue()
     {
         // Arrange
         var tcs = new TaskCompletionSource<Result<LoginResponse>>();
@@ -270,15 +233,15 @@ public class LoginViewModelTests
         // Act
         _viewModel.LoginCommand.Execute(null);
 
-        // Assert - IsLoading should be true during execution
-        _viewModel.IsLoading.Should().BeTrue();
+        // Assert - IsBusy should be true during execution
+        _viewModel.IsBusy.Should().BeTrue();
 
         // Complete the task
         tcs.SetResult(Result<LoginResponse>.Success(CreateLoginResponse()));
         await Task.Delay(100);
 
-        // Assert - IsLoading should be false after completion
-        _viewModel.IsLoading.Should().BeFalse();
+        // Assert - IsBusy should be false after completion
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
@@ -303,7 +266,7 @@ public class LoginViewModelTests
 
         // Assert
         _viewModel.ErrorMessage.Should().BeNull();
-        _viewModel.IsLoading.Should().BeTrue();
+        _viewModel.IsBusy.Should().BeTrue();
 
         // Cleanup
         tcs.SetResult(Result<LoginResponse>.Success(CreateLoginResponse()));
@@ -311,9 +274,11 @@ public class LoginViewModelTests
     }
 
     [Fact]
-    public async Task LoginCommand_WhenExceptionThrown_SetsErrorMessage()
+    public async Task LoginCommand_WhenExceptionThrown_UsesLogSystemErrorAndResetsIsBusy()
     {
-        // Arrange
+        // Arrange: Refactored to use ExecuteAsync wrapper (RULE-141).
+        // Exceptions are caught by ExecuteAsync, logged via Serilog (LogSystemError),
+        // and NOT displayed as raw ex.Message to the user.
         _mockAuthService
             .Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
             .ThrowsAsync(new Exception("Network error"));
@@ -325,13 +290,14 @@ public class LoginViewModelTests
         _viewModel.LoginCommand.Execute(null);
         await Task.Delay(100);
 
-        // Assert
-        _viewModel.ErrorMessage.Should().NotBeNull();
-        _viewModel.ErrorMessage.Should().Contain("خطأ");
+        // Assert: ErrorMessage was cleared at start of LoginOperationAsync, NOT set to raw ex.Message.
+        // The exception is handled via LogSystemError (Serilog) and IsBusy returns to false.
+        _viewModel.ErrorMessage.Should().BeNull();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     [Fact]
-    public async Task LoginCommand_WhenExceptionThrown_SetsIsLoadingFalse()
+    public async Task LoginCommand_WhenExceptionThrown_SetsIsBusyFalse()
     {
         // Arrange
         _mockAuthService
@@ -346,44 +312,26 @@ public class LoginViewModelTests
         await Task.Delay(100);
 
         // Assert
-        _viewModel.IsLoading.Should().BeFalse();
+        _viewModel.IsBusy.Should().BeFalse();
     }
 
     #endregion
 
-    #region Command CanExecute Notification Tests
+    #region Command Always Enabled Tests (Per RULE-059)
 
     [Fact]
-    public void LoginCommand_RaisesCanExecuteChanged_WhenUsernameChanges()
+    public void LoginCommand_AlwaysEnabled_RegardlessOfInput()
     {
-        var canExecuteChanged = false;
-        _viewModel.LoginCommand.CanExecuteChanged += (s, e) => canExecuteChanged = true;
+        // Per RULE-059: buttons are NEVER disabled via CanExecute
+        // Empty username
+        _viewModel.Username = "";
+        _viewModel.Password = "";
+        _viewModel.LoginCommand.CanExecute(null).Should().BeTrue();
 
+        // Valid credentials
         _viewModel.Username = "admin";
-
-        canExecuteChanged.Should().BeTrue();
-    }
-
-    [Fact]
-    public void LoginCommand_RaisesCanExecuteChanged_WhenPasswordChanges()
-    {
-        var canExecuteChanged = false;
-        _viewModel.LoginCommand.CanExecuteChanged += (s, e) => canExecuteChanged = true;
-
         _viewModel.Password = "password";
-
-        canExecuteChanged.Should().BeTrue();
-    }
-
-    [Fact]
-    public void LoginCommand_RaisesCanExecuteChanged_WhenIsLoadingChanges()
-    {
-        var canExecuteChanged = false;
-        _viewModel.LoginCommand.CanExecuteChanged += (s, e) => canExecuteChanged = true;
-
-        _viewModel.IsLoading = true;
-
-        canExecuteChanged.Should().BeTrue();
+        _viewModel.LoginCommand.CanExecute(null).Should().BeTrue();
     }
 
     #endregion
