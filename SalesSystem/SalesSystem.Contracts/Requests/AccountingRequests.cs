@@ -19,3 +19,30 @@ public record JournalEntryLineRequest(
     decimal Credit,
     string? Description
 );
+
+public record CreateAccountRequest(
+    string AccountCode,
+    string NameAr,
+    string NameEn,
+    byte AccountType,
+    int Level,
+    int? ParentAccountId,
+    bool IsSystemAccount,
+    string? Description,
+    string? ColorCode,
+    bool AllowTransactions,
+    decimal? OpeningBalance,
+    string? Explanation,
+    string? Notes);
+
+public record UpdateAccountRequest(
+    string NameAr,
+    string NameEn,
+    byte AccountType,
+    int Level,
+    int? ParentAccountId,
+    string? Description,
+    string? ColorCode,
+    bool AllowTransactions,
+    string? Explanation,
+    string? Notes);

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Reflection;
 using System.Windows;
 using SalesSystem.DesktopPWF.Services.App;
 
@@ -54,6 +55,22 @@ public partial class ScreenWindow : Window
     protected override void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
-        // Lifecycle/cleanup handled by ScreenWindowService
+
+        // When PreventClose is set, prevent user from closing the window via X button or Alt+F4.
+        // Only allow close if the ViewModel's DialogResult is true (successful completion).
+        if (ScreenOptions?.PreventClose == true)
+        {
+            var vm = DataContext;
+            if (vm != null)
+            {
+                var dialogProp = vm.GetType().GetProperty("DialogResult", BindingFlags.Public | BindingFlags.Instance);
+                if (dialogProp != null && dialogProp.GetValue(vm) is bool dialogResult && dialogResult)
+                {
+                    // Successful completion — allow close
+                    return;
+                }
+            }
+            e.Cancel = true;
+        }
     }
 }

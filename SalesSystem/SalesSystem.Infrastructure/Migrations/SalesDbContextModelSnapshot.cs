@@ -35,14 +35,31 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<byte>("AccountType")
-                        .HasColumnType("tinyint");
+                    b.Property<int>("AccountType")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("AllowTransactions")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ColorCode")
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Explanation")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -53,6 +70,11 @@ namespace SalesSystem.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
+
+                    b.Property<int>("Level")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(4);
 
                     b.Property<string>("NameAr")
                         .IsRequired()
@@ -67,6 +89,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal?>("OpeningBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int?>("ParentAccountId")
                         .HasColumnType("int");
@@ -84,7 +110,10 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasIndex("ParentAccountId");
 
-                    b.ToTable("Accounts", (string)null);
+                    b.ToTable("Accounts", null, t =>
+                        {
+                            t.HasCheckConstraint("CHK_Account_Level_Range", "[Level] >= 1 AND [Level] <= 10");
+                        });
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.FiscalYearClosure", b =>
@@ -124,6 +153,9 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -151,6 +183,9 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("BranchId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -158,6 +193,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
@@ -166,8 +202,8 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<byte>("EntryType")
-                        .HasColumnType("tinyint");
+                    b.Property<int>("EntryType")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -201,6 +237,9 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("ReversedByEntryId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime2");
 
@@ -214,6 +253,8 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasIndex("EntryNumber")
                         .IsUnique();
+
+                    b.HasIndex("ReversedByEntryId");
 
                     b.HasIndex("TransactionDate");
 
@@ -267,8 +308,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int>("JournalEntryId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("JournalEntryId1")
-                        .HasColumnType("int");
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -282,9 +325,12 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasIndex("JournalEntryId");
 
-                    b.HasIndex("JournalEntryId1");
+                    b.ToTable("JournalEntryLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CHK_DebitOrCredit", "(Debit > 0 AND Credit = 0) OR (Credit > 0 AND Debit = 0) OR (Debit = 0 AND Credit = 0)");
 
-                    b.ToTable("JournalEntryLines", (string)null);
+                            t.HasCheckConstraint("CHK_NoNegativeValues", "Debit >= 0 AND Credit >= 0");
+                        });
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.SystemAccountMappings", b =>
@@ -383,6 +429,69 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("VatOutputAccountId");
 
                     b.ToTable("SystemAccountMappings", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int?>("EntityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Timestamp")
+                        .IsDescending();
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.HasIndex("UserId", "Timestamp")
+                        .IsDescending();
+
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashBox", b =>
@@ -611,14 +720,16 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
 
                     b.HasIndex("IsBaseCurrency")
                         .IsUnique()
-                        .HasFilter("[IsBaseCurrency] = 1");
+                        .HasFilter("[IsBaseCurrency] = 1 AND [IsActive] = 1");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
 
                     b.ToTable("Currencies", null, t =>
                         {
@@ -712,6 +823,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal?>("ExchangeRate")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<bool>("IsActive")
@@ -915,7 +1027,7 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CurrencyId");
+                    b.HasIndex("CurrencyId", "EffectiveDate");
 
                     b.ToTable("ExchangeRateHistories", (string)null);
                 });
@@ -994,6 +1106,54 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("ReferenceType", "ReferenceId");
 
                     b.ToTable("InventoryMovements", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.Permission", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DisplayNameAr")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.Product", b =>
@@ -1625,6 +1785,45 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.ToTable("PurchaseReturnItems", (string)null);
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Entities.RolePermission", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PermissionId")
+                        .HasColumnType("int");
+
+                    b.Property<byte>("Role")
+                        .HasColumnType("tinyint");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PermissionId");
+
+                    b.HasIndex("Role", "PermissionId")
+                        .IsUnique();
+
+                    b.ToTable("RolePermissions", (string)null);
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.SalesInvoice", b =>
                 {
                     b.Property<int>("Id")
@@ -2254,6 +2453,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal?>("ExchangeRate")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<bool>("IsActive")
@@ -2463,7 +2663,7 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasIndex("IsDefault")
                         .IsUnique()
-                        .HasFilter("[IsDefault] = 1");
+                        .HasFilter("[IsDefault] = 1 AND [IsActive] = 1");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -2569,11 +2769,22 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AvatarPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
+
+                    b.Property<int?>("DefaultCashBoxId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -2583,13 +2794,44 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LoginAttempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<bool>("MustChangePassword")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("PasswordChangedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("PasswordResetToken")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("PasswordResetTokenExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<byte>("Role")
                         .HasColumnType("tinyint");
+
+                    b.Property<byte>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint")
+                        .HasDefaultValue((byte)1);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -2604,10 +2846,63 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("DefaultCashBoxId");
+
                     b.HasIndex("UserName")
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.UserSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastActivityAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LoginAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserSessions", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.Warehouse", b =>
@@ -2702,10 +2997,12 @@ namespace SalesSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.Account", b =>
                 {
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
-                        .WithMany()
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "ParentAccount")
+                        .WithMany("SubAccounts")
                         .HasForeignKey("ParentAccountId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentAccount");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.FiscalYearClosure", b =>
@@ -2727,106 +3024,150 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("ClosingEntry");
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntry", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", "ReversedByEntry")
+                        .WithMany()
+                        .HasForeignKey("ReversedByEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ReversedByEntry");
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntryLine", b =>
                 {
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
-                        .WithMany()
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "Account")
+                        .WithMany("JournalLines")
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", "JournalEntry")
                         .WithMany("Lines")
                         .HasForeignKey("JournalEntryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.JournalEntry", "JournalEntry")
-                        .WithMany()
-                        .HasForeignKey("JournalEntryId1");
+                    b.Navigation("Account");
 
                     b.Navigation("JournalEntry");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.SystemAccountMappings", b =>
                 {
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "AccountsPayableAccount")
                         .WithMany()
                         .HasForeignKey("AccountsPayableAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "AccountsReceivableAccount")
                         .WithMany()
                         .HasForeignKey("AccountsReceivableAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "CapitalAccount")
                         .WithMany()
                         .HasForeignKey("CapitalAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "CogsAccount")
                         .WithMany()
                         .HasForeignKey("CogsAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "DefaultBankAccount")
                         .WithMany()
                         .HasForeignKey("DefaultBankAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "DefaultCashAccount")
                         .WithMany()
                         .HasForeignKey("DefaultCashAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "GeneralExpenseAccount")
                         .WithMany()
                         .HasForeignKey("GeneralExpenseAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "InventoryAssetAccount")
                         .WithMany()
                         .HasForeignKey("InventoryAssetAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "SalesReturnAccount")
                         .WithMany()
                         .HasForeignKey("SalesReturnAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "SalesRevenueAccount")
                         .WithMany()
                         .HasForeignKey("SalesRevenueAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "SpoilageLossAccount")
                         .WithMany()
                         .HasForeignKey("SpoilageLossAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "VatInputAccount")
                         .WithMany()
                         .HasForeignKey("VatInputAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", null)
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "VatOutputAccount")
                         .WithMany()
                         .HasForeignKey("VatOutputAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("AccountsPayableAccount");
+
+                    b.Navigation("AccountsReceivableAccount");
+
+                    b.Navigation("CapitalAccount");
+
+                    b.Navigation("CogsAccount");
+
+                    b.Navigation("DefaultBankAccount");
+
+                    b.Navigation("DefaultCashAccount");
+
+                    b.Navigation("GeneralExpenseAccount");
+
+                    b.Navigation("InventoryAssetAccount");
+
+                    b.Navigation("SalesReturnAccount");
+
+                    b.Navigation("SalesRevenueAccount");
+
+                    b.Navigation("SpoilageLossAccount");
+
+                    b.Navigation("VatInputAccount");
+
+                    b.Navigation("VatOutputAccount");
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.AuditLog", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashBox", b =>
@@ -3113,6 +3454,17 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("PurchaseReturn");
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Entities.RolePermission", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Entities.Permission", "Permission")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Permission");
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.SalesInvoice", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Entities.CashBox", "CashBox")
@@ -3318,6 +3670,32 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("ProductUnit");
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Entities.User", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId");
+
+                    b.HasOne("SalesSystem.Domain.Entities.CashBox", "DefaultCashBox")
+                        .WithMany()
+                        .HasForeignKey("DefaultCashBoxId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("DefaultCashBox");
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.UserSession", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.WarehouseStock", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Entities.Product", "Product")
@@ -3337,6 +3715,13 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.Account", b =>
+                {
+                    b.Navigation("JournalLines");
+
+                    b.Navigation("SubAccounts");
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntry", b =>
                 {
                     b.Navigation("Lines");
@@ -3345,6 +3730,11 @@ namespace SalesSystem.Infrastructure.Migrations
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashBox", b =>
                 {
                     b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.Permission", b =>
+                {
+                    b.Navigation("RolePermissions");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.Product", b =>

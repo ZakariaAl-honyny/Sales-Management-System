@@ -155,7 +155,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             }
             else
             {
-                LogSystemError("فشل في تحميل الصناديق النقدية", "LoadCashBoxesAsync");
+                Serilog.Log.Warning("[PurchaseInvoiceEditor.LoadCashBoxesAsync] فشل في تحميل الصناديق النقدية");
             }
         }
         catch (Exception ex)

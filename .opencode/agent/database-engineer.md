@@ -153,3 +153,337 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 ### Repository Patterns
 - `SetBatchSystemSettingsAsync()` must NOT call `SaveChangesAsync()` — let service layer commit via `_uow.SaveChangesAsync()`
 - `SetStringAsync()` must accept `category` parameter — never hardcode `category: "Print"`
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds 4 new tables and modifies the Users table.
+
+### New Tables
+
+#### Permissions
+- `Id` int PK
+- `Name` nvarchar(100) NOT NULL — unique, e.g., "Sales.Create", "Products.Edit"
+- `DisplayName` nvarchar(150) NOT NULL — Arabic display name
+- `Category` nvarchar(50) NOT NULL — e.g., "Sales", "Purchases", "Inventory"
+- `IsSystem` bit NOT NULL default 0 — system permissions (IsSystem=true) cannot be deleted/modified
+- `CreatedAt` datetime2 NOT NULL
+- Index: `Name` unique filtered `[IsSystem] = 0` (system permissions names are also unique but allow filtering)
+- FK: none
+
+#### RolePermissions
+- `RoleId` tinyint NOT NULL — FK to `UserRole` enum value (1=Admin, 2=Manager, 3=Cashier)
+- `PermissionId` int NOT NULL — FK to Permissions with Restrict
+- Composite PK: `(RoleId, PermissionId)`
+- FK: `DeleteBehavior.Restrict` on both FKs
+
+#### AuditLogs
+- `Id` bigint NOT NULL IDENTITY — **bigint** for high-volume audit (NEVER int)
+- `UserId` int NULL FK to Users
+- `Action` nvarchar(50) NOT NULL — e.g., "LoginSuccess", "LoginFailed", "PasswordSet", "PasswordChanged"
+- `EntityType` nvarchar(50) NULL — e.g., "User", "Permission", "SalesInvoice"
+- `EntityId` int NULL
+- `Details` nvarchar(500) NULL — JSON or free text with additional context
+- `Timestamp` datetime2 NOT NULL default GETUTCDATE()
+- `IpAddress` nvarchar(45) NULL
+- Indexes:
+  - `(UserId, Timestamp DESC)` — user activity history queries
+  - `(EntityType, EntityId)` — entity-specific audit queries
+  - `(Timestamp DESC)` — general chronological queries
+- FK: `DeleteBehavior.Restrict` on UserId FK
+
+#### UserSessions
+- `Id` int PK
+- `UserId` int NOT NULL FK to Users
+- `TokenHash` nvarchar(255) NOT NULL — SHA256 hash of JWT token
+- `IpAddress` nvarchar(45) NULL
+- `ExpiresAt` datetime2 NOT NULL
+- `IsRevoked` bit NOT NULL default 0
+- `CreatedAt` datetime2 NOT NULL
+- Index: `(UserId, IsRevoked)` — find active sessions
+- FK: `DeleteBehavior.Restrict` on UserId
+
+### Modified Tables
+
+#### Users (modified)
+- **REMOVED**: `IsActive` bit column
+- **ADDED**: `Status` tinyint NOT NULL default 1 — maps to `UserStatus` enum (Active=1, Inactive=2, Locked=3)
+- **ADDED**: `FailedLoginAttempts` int NOT NULL default 0
+- **ADDED**: `MustChangePassword` bit NOT NULL default 1 (true for new passwordless users)
+- **CHANGED**: `PasswordHash` nvarchar(255) NULL — nullable for passwordless creation
+- **CHANGED**: Global query filter: `.HasQueryFilter(u => u.Status == UserStatus.Active)` replaces `u.IsActive`
+
+### Fluent API Config Rules
+
+#### UserConfiguration
+```csharp
+builder.Property(u => u.Status).HasConversion<int>().IsRequired().HasDefaultValue(1);
+builder.Property(u => u.PasswordHash).HasMaxLength(255).IsRequired(false);
+builder.Property(u => u.FailedLoginAttempts).IsRequired().HasDefaultValue(0);
+builder.Property(u => u.MustChangePassword).IsRequired().HasDefaultValue(true);
+builder.HasQueryFilter(u => u.Status == UserStatus.Active);
+```
+
+#### PermissionConfiguration
+```csharp
+builder.Property(p => p.Name).HasMaxLength(100).IsRequired();
+builder.Property(p => p.DisplayName).HasMaxLength(150).IsRequired();
+builder.Property(p => p.Category).HasMaxLength(50).IsRequired();
+builder.HasIndex(p => p.Name).IsUnique().HasFilter("[IsSystem] = 0");
+```
+
+#### RolePermissionConfiguration
+```csharp
+builder.HasKey(rp => new { rp.RoleId, rp.PermissionId });
+builder.HasOne(rp => rp.Permission).WithMany().HasForeignKey(rp => rp.PermissionId).OnDelete(DeleteBehavior.Restrict);
+// RoleId is a value object (UserRole enum) — no FK navigation to a Roles table
+```
+
+#### AuditLogConfiguration
+```csharp
+builder.Property(a => a.Id).ValueGeneratedOnAdd(); // bigint identity
+builder.Property(a => a.Action).HasMaxLength(50).IsRequired();
+builder.Property(a => a.EntityType).HasMaxLength(50).IsRequired(false);
+builder.Property(a => a.Details).HasMaxLength(500).IsRequired(false);
+builder.Property(a => a.IpAddress).HasMaxLength(45).IsRequired(false);
+builder.HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+builder.HasIndex(a => new { a.UserId, a.Timestamp }).IsDescending(false, true);
+builder.HasIndex(a => new { a.EntityType, a.EntityId });
+builder.HasIndex(a => a.Timestamp);
+```
+
+#### UserSessionConfiguration
+```csharp
+builder.Property(us => us.TokenHash).HasMaxLength(255).IsRequired();
+builder.Property(us => us.IpAddress).HasMaxLength(45).IsRequired(false);
+builder.HasOne(us => us.User).WithMany().HasForeignKey(us => us.UserId).OnDelete(DeleteBehavior.Restrict);
+builder.HasIndex(us => new { us.UserId, us.IsRevoked });
+```
+
+## Phase 22 — Chart of Accounts Module (v4.6.9+)
+
+### Account Entity Design
+
+```csharp
+public class Account : BaseEntity
+{
+    public string AccountCode { get; private set; }      // nvarchar(10), unique
+    public string NameAr { get; private set; }           // nvarchar(150)
+    public string? NameEn { get; private set; }          // nvarchar(150)
+    public AccountType AccountType { get; private set; } // byte → int conversion
+    public int Level { get; private set; }               // int, 1-10 CHECK
+    public int? ParentAccountId { get; private set; }    // self-referencing FK
+    public bool IsSystemAccount { get; private set; }    // L1-L2 protected
+    public string? Description { get; private set; }     // nvarchar(500)
+    public string? ColorCode { get; private set; }       // nvarchar(7), #RRGGBB
+    public bool AllowTransactions { get; private set; }  // L4+ = true
+    public decimal OpeningBalance { get; private set; }  // decimal(18,2)
+    public string? Notes { get; private set; }           // nvarchar(500)
+
+    // Navigation
+    public Account? ParentAccount { get; private set; }
+    private readonly List<Account> _children = new();
+    public IReadOnlyCollection<Account> Children => _children.AsReadOnly();
+}
+```
+
+### Fluent API Configuration — Account Configuration
+
+```csharp
+public class AccountConfiguration : IEntityTypeConfiguration<Account>
+{
+    public void Configure(EntityTypeBuilder<Account> builder)
+    {
+        builder.ToTable(t => t.HasCheckConstraint("CHK_Account_Level_Range",
+            "[Level] >= 1 AND [Level] <= 10"));
+
+        builder.HasKey(x => x.Id);
+
+        // Properties
+        builder.Property(x => x.AccountCode).HasMaxLength(10).IsRequired();
+        builder.HasIndex(x => x.AccountCode).IsUnique();  // Unique code index
+        builder.Property(x => x.NameAr).HasMaxLength(150).IsRequired();
+        builder.Property(x => x.NameEn).HasMaxLength(150);
+        builder.Property(x => x.AccountType).HasConversion<int>().IsRequired();  // Enum → int
+        builder.Property(x => x.Level).IsRequired().HasDefaultValue(4);
+        builder.Property(x => x.Description).HasMaxLength(500);
+        builder.Property(x => x.ColorCode).HasMaxLength(7);    // #RRGGBB hex
+        builder.Property(x => x.AllowTransactions).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.OpeningBalance).HasPrecision(18, 2);
+        builder.Property(x => x.Notes).HasMaxLength(500);
+
+        // Self-referencing FK — Restrict delete (NO Cascade)
+        builder.HasOne(x => x.ParentAccount)
+            .WithMany(x => x.Children)
+            .HasForeignKey(x => x.ParentAccountId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // Soft delete query filter
+        builder.HasQueryFilter(x => x.IsActive);
+    }
+}
+```
+
+### Key Configuration Rules for Account
+
+| Rule | Implementation |
+|------|---------------|
+| CHECK constraint | `CHK_Account_Level_Range [Level] >= 1 AND [Level] <= 10` |
+| Enum conversion | `.HasConversion<int>()` on `AccountType` — NOT bare enum storage |
+| Unique code | `.HasIndex(x => x.AccountCode).IsUnique()` — no two accounts share a code |
+| FK delete | `DeleteBehavior.Restrict` on ALL FKs including self-referencing |
+| Decimal precision | `.HasPrecision(18, 2)` for `OpeningBalance` — NEVER 18,4 |
+| Soft delete | `.HasQueryFilter(x => x.IsActive)` on all entities |
+| MaxLength | Explicit `HasMaxLength` on all string properties — no nvarchar(max) |
+
+### Two-Pass Seeder Design
+
+**First Pass** — Create Level 1-2 accounts (no parent for L1, L2 references L1 by ID):
+```csharp
+// Create Level 1 groups
+var assets = Account.Create("1000", "الأصول", "Assets", AccountType.Asset, 1,
+    null, true, "موارد المنشأة", "#2196F3", false, 0m, null, adminId);
+await context.Accounts.AddAsync(assets);
+
+// Create Level 2 main accounts
+var currentAssets = Account.Create("1100", "الأصول المتداولة", "Current Assets",
+    AccountType.Asset, 2, null, true, "الأصول التي يمكن تحويلها إلى نقد", "#2196F3",
+    false, 0m, null, adminId);
+await context.Accounts.AddAsync(currentAssets);
+
+await context.SaveChangesAsync(ct);  // IDs generated here
+
+// Query back IDs
+var assetsId = (await context.Accounts.FirstAsync(a => a.AccountCode == "1000", ct)).Id;
+var currentAssetsId = (await context.Accounts.FirstAsync(a => a.AccountCode == "1100", ct)).Id;
+```
+
+**Second Pass** — Create Level 3-4 with parent references:
+```csharp
+// Level 3 sub accounts
+var cash = Account.Create("1101", "النقدية", "Cash", AccountType.Asset, 3,
+    currentAssetsId, true, "النقدية في الصندوق", "#2196F3", false, 0m, null, adminId);
+await context.Accounts.AddAsync(cash);
+
+// Level 4 detail accounts
+var pettyCash = Account.Create("110101", "الصندوق", "Petty Cash", AccountType.Asset, 4,
+    cashId, false, "صندوق النقدية الرئيسي", "#2196F3", true, 5000m, null, adminId);
+await context.Accounts.AddAsync(pettyCash);
+
+await context.SaveChangesAsync(ct);
+```
+
+### Database Schema — Accounts Table
+
+```sql
+CREATE TABLE [Accounts] (
+    [Id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    [AccountCode] nvarchar(10) NOT NULL,
+    [NameAr] nvarchar(150) NOT NULL,
+    [NameEn] nvarchar(150) NULL,
+    [AccountType] int NOT NULL,           -- Enum stored as int
+    [Level] int NOT NULL DEFAULT 4,
+    [ParentAccountId] int NULL,           -- Self-referencing FK
+    [IsSystemAccount] bit NOT NULL DEFAULT 0,
+    [Description] nvarchar(500) NULL,
+    [ColorCode] nvarchar(7) NULL,
+    [AllowTransactions] bit NOT NULL DEFAULT 0,
+    [OpeningBalance] decimal(18,2) NOT NULL DEFAULT 0,
+    [Notes] nvarchar(500) NULL,
+    [IsActive] bit NOT NULL DEFAULT 1,
+    [CreatedByUserId] int NULL,
+    [CreatedAt] datetime2 NOT NULL DEFAULT GETUTCDATE(),
+    [UpdatedAt] datetime2 NULL,
+    CONSTRAINT [CHK_Account_Level_Range] CHECK ([Level] >= 1 AND [Level] <= 10),
+    CONSTRAINT [UQ_Accounts_AccountCode] UNIQUE ([AccountCode]),
+    CONSTRAINT [FK_Accounts_ParentAccount] FOREIGN KEY ([ParentAccountId]) 
+        REFERENCES [Accounts]([Id]) ON DELETE NO ACTION  -- Restrict
+);
+```
+
+### SystemAccountMappings — Updated in Seeder
+
+After all 60 accounts are created, update mappings with new IDs:
+```csharp
+private async Task UpdateSystemAccountMappingsAsync(SalesDbContext context, CancellationToken ct)
+{
+    var mappings = await context.SystemAccountMappings.FirstAsync(ct);
+    mappings.UpdateCashAccount((await context.Accounts.FirstAsync(a => a.AccountCode == "1101", ct)).Id);
+    mappings.UpdateBankAccount((await context.Accounts.FirstAsync(a => a.AccountCode == "1102", ct)).Id);
+    mappings.UpdateAccountsReceivable((await context.Accounts.FirstAsync(a => a.AccountCode == "1103", ct)).Id);
+    mappings.UpdateAccountsPayable((await context.Accounts.FirstAsync(a => a.AccountCode == "2101", ct)).Id);
+    mappings.UpdateVatPayable((await context.Accounts.FirstAsync(a => a.AccountCode == "2102", ct)).Id);
+    mappings.UpdateCapitalAccount((await context.Accounts.FirstAsync(a => a.AccountCode == "3101", ct)).Id);
+    mappings.UpdateSalesRevenue((await context.Accounts.FirstAsync(a => a.AccountCode == "4101", ct)).Id);
+    mappings.UpdateCogsAccount((await context.Accounts.FirstAsync(a => a.AccountCode == "4201", ct)).Id);
+    mappings.UpdateInventoryAccount((await context.Accounts.FirstAsync(a => a.AccountCode == "1104", ct)).Id);
+    mappings.UpdateExpenseAccount((await context.Accounts.FirstAsync(a => a.AccountCode == "5101", ct)).Id);
+    mappings.UpdateRevenueAccount((await context.Accounts.FirstAsync(a => a.AccountCode == "4101", ct)).Id);
+    mappings.UpdateDiscountAccount((await context.Accounts.FirstAsync(a => a.AccountCode == "5105", ct)).Id);
+    mappings.UpdateRetainedEarnings((await context.Accounts.FirstAsync(a => a.AccountCode == "3201", ct)).Id);
+    await context.SaveChangesAsync(ct);
+}
+```
+
+### Seeded Data
+
+**Admin User:** Passwordless, MustChangePassword=true, Status=Active
+
+**33 Permissions across 9 categories:**
+- Sales (7): Create, Edit, Delete, View, Post, Cancel, Print
+- Purchases (5): Create, Edit, Delete, View, Post
+- Inventory (3): Adjust, Transfer, View
+- Customers (3): Create, Edit, View
+- Suppliers (3): Create, Edit, View
+- Products (3): Create, Edit, View
+- Reports (1): ViewAll
+- Accounting (2): ViewJournal, PostJournal
+- System (2): ManageUsers, ManageSettings
+- Operations (3): ManagePrinters, ManageBackup, ViewAuditLog
+- Audit (1): ViewAuditLog
+
+**4-Role Matrix:** Admin=ALL, Manager=subset (no System/Accounting post), Cashier=sales+customers view+inventory view
+
+---
+
+### Phase 22 Bug Fix: Explanation Field
+
+When adding any entity with an `Explanation` field, it MUST be present in ALL layers:
+- Domain entity: `public string? Explanation { get; private set; }` (nullable, NOT `string`)
+- EF config: `.Property(x => x.Explanation).HasMaxLength(500)` (nvarchar)
+- DTO: `public string? Explanation { get; set; }` in both flat DTO and tree-node DTO
+- Request: `public string? Explanation { get; set; }` in both Create and Update requests
+- Service mapping: `Explanation = account.Explanation` in `MapToDto()`
+- Validator: `.MaximumLength(500)` on both Create and Update validators
+- Seeder: Arabic text for ALL seeded records — NEVER leave null for seed data
+
+### Phase 22 Bug Fix: AccountCode Length for Level-1 Accounts
+
+Level-1 (Group-level) accounts MUST have `AccountCode` length = exactly 3 characters:
+```csharp
+// CreateAccountRequestValidator
+.When(x => x.Level == 1, () => {
+    RuleFor(x => x.AccountCode).Length(3).WithMessage("رمز المستوى الأول يجب أن يكون 3 أحرف بالضبط");
+});
+```
+
+### Phase 22 Bug Fix: UpdateValidator Completeness
+
+Update Validators MUST have the SAME field validations as Create Validators:
+```csharp
+// BOTH Create and Update MUST have these rules:
+RuleFor(x => x.NameAr).NotEmpty().WithMessage("اسم الحساب بالعربية مطلوب");
+RuleFor(x => x.NameEn).MaximumLength(200);
+RuleFor(x => x.ColorCode).Matches("^#[0-9A-Fa-f]{6}$").WithMessage("لون الحساب يجب أن يكون بصيغة Hex (#RRGGBB)");
+```
+
+### Phase 22 Bug Fix: Route Constraint Type
+
+NEVER use `:byte` route constraint — ASP.NET Core has no built-in `:byte` constraint, causing HTTP 500. Always use:
+```csharp
+// WRONG — causes HTTP 500:
+[HttpGet("by-type/{type:byte}")]
+
+// CORRECT:
+[HttpGet("by-type/{type:int:min(1):max(5)}")]
+```

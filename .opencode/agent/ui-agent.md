@@ -613,4 +613,395 @@ ALL XAML views MUST use compact sizes. The Styles.xaml now provides compact defa
 - ENH-007 [FIXED]: Currency entity has `SetAsBaseCurrency()` / `UnsetBaseCurrency()` domain methods.
 - ENH-012 [FIXED]: Removed unnecessary `async` from lambda in CurrencyEditorViewModel.
 
+### Phase 21 — Users & Permissions Module (v4.6.9)
+- User entity rebuilt: passwordless creation, UserStatus enum, lockout 5 attempts, Phone/Email/Avatar/DefaultCashBoxId
+- Permission + RolePermission entities: 33 seed permissions, 4-role model, Permission Management UI with grouped checkboxes
+- AuditLog: long Id, 3 indexes, paginated browser with filters (action/entity/date)
+- Auth: MustChangePassword flow, SetPassword/ChangePassword screens, account lockout
+- Desktop: Enhanced UserEditor (avatar 80×80, Phone/Email), PasswordChangeScreen (3 fields, INotifyDataErrorInfo), AuditLog browser (DataGrid + filters), Permission Management (role tabs + category expanders + checkboxes)
+- MainWindow StatusBar: avatar, role badge, change password link, logout button
+- Permission-based nav visibility: ApplyPermissions() from API
+
+## Phase 22 — Chart of Accounts Desktop UI (v4.6.9+)
+
+### Architecture
+```text
+Views/Accounts/
+├── AccountsListView.xaml + .xaml.cs        ← Dual-mode TreeView/DataGrid
+├── AccountEditorView.xaml + .xaml.cs       ← Account form
+
+ViewModels/Accounts/
+├── AccountsListViewModel.cs              ← Tree/grid toggle, search, filter, EventBus
+└── AccountEditorViewModel.cs             ← INotifyDataErrorInfo, level auto-set
+
+Services/Api/
+├── IAccountApiService.cs                 ← Typed HTTP client interface
+└── AccountApiService.cs                  ← HTTP implementation with try-catch
+
+Messaging/Messages/AppMessages.cs         ← AccountChangedMessage appended
 ```
+
+### AccountsListView — Dual-Mode (TreeView + DataGrid)
+- TreeView uses `HierarchicalDataTemplate` with recursive `Children` binding
+- Each TreeView node shows color indicator via `Background="{Binding ColorCode}"`
+- DataGrid shows flat view with columns: Code, NameAr, AccountType, Level, OpeningBalance
+- ToggleViewCommand switches between modes
+- Search by name or code filters both views
+- AccountType ComboBox filter for the DataGrid
+
+```xml
+<!-- TreeView Mode -->
+<TreeView ItemsSource="{Binding TreeData}" Grid.Column="1" 
+          Visibility="{Binding IsTreeView, Converter={StaticResource BoolToVisibility}}">
+    <TreeView.ItemTemplate>
+        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal">
+                <Border Background="{Binding ColorCode}" Width="12" Height="12"
+                        CornerRadius="2" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding AccountCode}" FontWeight="SemiBold" Margin="0,0,4,0"/>
+                <TextBlock Text="{Binding NameAr}"/>
+                <TextBlock Text="{Binding LevelDisplay}" Foreground="Gray" Margin="8,0,0,0"/>
+            </StackPanel>
+        </HierarchicalDataTemplate>
+    </TreeView.ItemTemplate>
+</TreeView>
+
+<!-- DataGrid Mode -->
+<DataGrid ItemsSource="{Binding FlatData}" AutoGenerateColumns="False"
+          Visibility="{Binding IsTreeView, Converter={StaticResource InvertedBoolToVisibility}}">
+    <DataGrid.Columns>
+        <DataGridTextColumn Header="الكود" Binding="{Binding AccountCode}" Width="80"/>
+        <DataGridTextColumn Header="الاسم (عربي)" Binding="{Binding NameAr}" Width="*"/>
+        <DataGridTextColumn Header="النوع" Binding="{Binding AccountTypeDisplay}" Width="100"/>
+        <DataGridTextColumn Header="المستوى" Binding="{Binding Level}" Width="60"/>
+        <DataGridTextColumn Header="الرصيد الافتتاحي" Binding="{Binding OpeningBalance, StringFormat=N2}" Width="120"/>
+        <DataGridCheckBoxColumn Header="يسمح بالحركات" Binding="{Binding AllowTransactions}" Width="80"/>
+    </DataGrid.Columns>
+</DataGrid>
+```
+
+### AccountsListViewModel — IDisposable + Dual-Mode Pattern
+```csharp
+public class AccountsListViewModel : ViewModelBase, IDisposable
+{
+    private readonly IAccountApiService _accountApiService;
+    private readonly IScreenWindowService _screenWindowService;
+    private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
+    private IDisposable? _subscription;
+
+    public ObservableCollection<AccountTreeNodeDto> TreeData { get; }      // TreeView source
+    public ObservableCollection<AccountDto> FlatData { get; }              // DataGrid source
+
+    private bool _isTreeView = true;
+    public bool IsTreeView
+    {
+        get => _isTreeView;
+        set
+        {
+            if (SetProperty(ref _isTreeView, value))
+                OnPropertyChanged(nameof(IsGridView));
+        }
+    }
+    public bool IsGridView => !IsTreeView;
+
+    public ICommand ToggleViewCommand { get; }
+    public ICommand AddCommand { get; }          // RelayCommand (NOT AsyncRelayCommand)
+    public ICommand EditCommand { get; }         // AsyncRelayCommand
+    public ICommand DeleteCommand { get; }       // AsyncRelayCommand
+
+    public AccountsListViewModel(...)
+    {
+        SetDialogService(dialogService);  // RULE-227
+        ToggleViewCommand = new RelayCommand(() => IsTreeView = !IsTreeView);
+        AddCommand = new RelayCommand(AddAccount);          // NO CanExecute per RULE-059
+        EditCommand = new AsyncRelayCommand(EditAccountAsync);
+        DeleteCommand = new AsyncRelayCommand(DeleteAccountAsync);
+
+        _subscription = eventBus.Subscribe<AccountChangedMessage>(_ => _ = LoadAccountsAsync());
+        _ = LoadAccountsAsync();
+    }
+
+    public void Dispose() => Cleanup();  // EventBus unsubscription
+}
+```
+
+### AccountEditorView — Form Layout
+- Full form: Code, NameAr, NameEn, AccountType (ComboBox), Level (read-only TextBlock),
+  ParentAccountId (hidden/parent selector), ColorCode (text input), OpeningBalance (NumericTextBox),
+  AllowTransactions (CheckBox), Description (TextArea), Notes (TextArea)
+- Required fields marked with `*` and have ToolTips
+- ColorCode shows a preview swatch next to the text input
+- Save command always enabled (NO CanExecute) — validates on click
+
+```xml
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="12">
+        <!-- Code + NameAr -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="الكود *" Style="{StaticResource LabelStyle}"/>
+            <TextBox Text="{Binding AccountCode}" ToolTip="كود الحساب — 4 إلى 10 أرقام" Grid.Column="1"/>
+            <TextBlock Text="الاسم (عربي) *" Grid.Column="3" Style="{StaticResource LabelStyle}"/>
+            <TextBox Text="{Binding NameAr}" ToolTip="اسم الحساب باللغة العربية — هذا الحقل إلزامي" Grid.Column="4"/>
+        </Grid>
+
+        <!-- NameEn + AccountType -->
+        <Grid Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="الاسم (إنجليزي)" Style="{StaticResource LabelStyle}"/>
+            <TextBox Text="{Binding NameEn}" Grid.Column="1"/>
+            <TextBlock Text="النوع *" Grid.Column="3" Style="{StaticResource LabelStyle}"/>
+            <ComboBox ItemsSource="{Binding AccountTypes}" SelectedItem="{Binding SelectedAccountType}"
+                      DisplayMemberPath="DisplayName" Grid.Column="4" ToolTip="اختر نوع الحساب"/>
+        </Grid>
+
+        <!-- Level (read-only) + ColorCode -->
+        <Grid Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="المستوى" Style="{StaticResource LabelStyle}"/>
+            <TextBlock Text="{Binding Level}" FontWeight="Bold" VerticalAlignment="Center" Grid.Column="1"/>
+            <TextBlock Text="اللون" Grid.Column="3" Style="{StaticResource LabelStyle}"/>
+            <TextBox Text="{Binding ColorCode}" ToolTip="كود اللون السداسي (مثل #2196F3)" Grid.Column="4"/>
+        </Grid>
+
+        <!-- OpeningBalance + AllowTransactions -->
+        <Grid Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="الرصيد الافتتاحي" Style="{StaticResource LabelStyle}"/>
+            <TextBox Text="{Binding OpeningBalance, StringFormat=N2}" Grid.Column="1"/>
+            <CheckBox Content="يسمح بالحركات" IsChecked="{Binding AllowTransactions}"
+                      ToolTip="تفعيل الحركات على هذا الحساب" Grid.Column="3" Grid.ColumnSpan="2" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Buttons -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,12,0,0">
+            <Button Command="{Binding SaveCommand}" Content="حفظ"
+                    ToolTip="حفظ بيانات الحساب — سيتم التحقق من صحة البيانات قبل الحفظ"
+                    Style="{StaticResource PrimaryButton}"/>
+            <Button Command="{Binding CancelCommand}" Content="إلغاء" Margin="8,0,0,0"
+                    ToolTip="إلغاء وإغلاق نافذة التحرير"/>
+        </StackPanel>
+    </StackPanel>
+</ScrollViewer>
+```
+
+### AccountEditorViewModel — INotifyDataErrorInfo + ValidateAllAsync
+```csharp
+public class AccountEditorViewModel : ViewModelBase
+{
+    // Dual constructor
+    public AccountEditorViewModel() : this(App.GetService<IAccountApiService>(),
+        App.GetService<IDialogService>(), App.GetService<IToastNotificationService>()) { }
+
+    public AccountEditorViewModel(IAccountApiService accountApiService,
+        IDialogService dialogService, IToastNotificationService toastService)
+    {
+        _accountApiService = accountApiService;
+        _toastService = toastService;
+        SetDialogService(dialogService);
+
+        SaveCommand = new AsyncRelayCommand(SaveAsync);  // NO CanExecute
+    }
+
+    // INotifyDataErrorInfo validation
+    private string _accountCode = string.Empty;
+    public string AccountCode
+    {
+        get => _accountCode;
+        set
+        {
+            _accountCode = value;
+            OnPropertyChanged();
+            ClearErrors(nameof(AccountCode));
+            if (string.IsNullOrWhiteSpace(value))
+                AddError(nameof(AccountCode), "كود الحساب مطلوب");
+            else if (value.Trim().Length < 4 || value.Trim().Length > 10)
+                AddError(nameof(AccountCode), "كود الحساب يجب أن يكون بين 4 و 10 أرقام");
+        }
+    }
+
+    // Pre-save validation — RULE-229/338
+    private async Task<bool> ValidateAsync()
+    {
+        ClearAllErrors();
+        // Manually trigger each property's setter validation
+        AccountCode = _accountCode;
+        NameAr = _nameAr;
+        // ...
+        return await ValidateAllAsync();  // Shows styled warning dialog
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!await ValidateAsync()) return;
+        await ExecuteAsync(async () =>
+        {
+            var result = await _accountApiService.CreateAsync(_dto);
+            if (result.IsSuccess)
+            {                _toastService.ShowSuccess("تم حفظ الحساب بنجاح");
+                _eventBus.Publish(new AccountChangedMessage(result.Value.Id));
+                CloseRequested?.Invoke();
+            }
+            else
+            {
+                await _dialogService.ShowWarningAsync("خطأ في حفظ الحساب", result.Error!);
+            }
+        });
+    }
+}
+```
+
+### AccountApiService — Typed HTTP Client
+```csharp
+public interface IAccountApiService
+{
+    Task<Result<List<AccountTreeNodeDto>>> GetTreeAsync(CancellationToken ct = default);
+    Task<Result<List<AccountDto>>> GetAllAsync(CancellationToken ct = default);
+    Task<Result<AccountDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<List<AccountDto>>> GetByTypeAsync(AccountType type, CancellationToken ct = default);
+    Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, CancellationToken ct = default);
+    Task<Result<AccountDto>> UpdateAsync(int id, UpdateAccountRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+    Task<Result> PermanentDeleteAsync(int id, CancellationToken ct = default);
+}
+
+public class AccountApiService : IAccountApiService
+{
+    private readonly HttpClient _http;
+
+    public async Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var response = await _http.PostAsJsonAsync("api/v1/accounts", request, ct);
+            return await HandleResponseAsync<AccountDto>(response);
+        }
+        catch (HttpRequestException ex)
+        {
+            Log.Error(ex, "فشل الاتصال بالخادم عند إنشاء الحساب");
+            return Result<AccountDto>.Failure("تعذر الاتصال بالخادم");
+        }
+    }
+
+    private async Task<Result<T>> HandleResponseAsync<T>(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(content))
+            return Result<T>.Failure("استجابة فارغة من الخادم");
+
+        try
+        {
+            var apiResponse = JsonSerializer.Deserialize<ApiResponse<T>>(content,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (apiResponse?.Success == true && apiResponse.Data != null)
+                return Result<T>.Success(apiResponse.Data);
+            return Result<T>.Failure(apiResponse?.Message ?? "فشل العملية");
+        }
+        catch (JsonException ex)
+        {
+            Log.Error(ex, "فشل تحليل استجابة API");
+            return Result<T>.Failure("خطأ في استجابة الخادم");
+        }
+    }
+}
+```
+
+### DI Registration (App.xaml.cs)
+```csharp
+// Services
+services.AddSingleton<IAccountApiService, AccountApiService>();
+
+// ViewModels
+services.AddTransient<AccountsListViewModel>();
+services.AddTransient<AccountEditorViewModel>();
+
+// Views
+services.AddTransient<AccountsListView>();
+services.AddTransient<AccountEditorView>();
+```
+
+### Navigation (MainWindow.xaml + MainViewModel.cs)
+```xml
+<!-- Sidebar button -->
+<Button Content="دليل الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}"
+        ToolTip="عرض وإدارة دليل الحسابات — هيكل حسابات المنشأة"
+        Style="{StaticResource SidebarButtonStyle}"/>
+
+<!-- Menu item -->
+<MenuItem Header="الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}"
+          ToolTip="فتح شاشة دليل الحسابات"/>
+```
+
+```csharp
+public ICommand NavigateToChartOfAccountsCommand { get; }
+
+// In constructor:
+NavigateToChartOfAccountsCommand = new AsyncRelayCommand(async () =>
+{
+    var vm = App.GetService<AccountsListViewModel>();
+    var view = new AccountsListView { DataContext = vm };
+    _screenWindowService.OpenScreen(view, new ScreenWindowOptions
+    {
+        Title = "دليل الحسابات",
+        Width = 1000,
+        Height = 700
+    });
+});
+```
+
+### Key UI Rules for Phase 22
+- **RULE-332**: AccountsListViewModel MUST implement `IDisposable` and call `Cleanup()` in `Dispose()` to unsubscribe from EventBus
+- **RULE-338**: AccountEditorViewModel.ValidateAsync() MUST follow `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()` pattern
+- **RULE-059**: Save/Edit/Delete commands MUST have NO CanExecute predicates (always enabled)
+- **RULE-227**: SetDialogService() MUST be called in every editor constructor
+- **RULE-185-190**: ALL interactive controls MUST have Arabic ToolTips
+- **RULE-262-274**: Compact styles — no hardcoded Height=36/40 or Padding=16+
+- **RULE-340**: Desktop Accounts View MUST provide dual-mode display (TreeView + DataGrid toggle)
+```
+
+### Phase 22 Code Review Fixes (v4.6.9+)
+
+#### Account Editor Edit Mode
+- **RULE-348**: Account code MUST be read-only during edit (`IsAccountCodeReadOnly = true`) — NEVER allow changing code on existing accounts
+- Load existing account data via `GetByIdAsync` before populating fields
+- Switch from `CreateAsync` to `UpdateAsync` when editing existing account
+
+#### Account List ViewModel
+- **RULE-349**: MUST implement `EditSelectedAccountCommand` + `DeleteSelectedAccountCommand` with ToolBar buttons
+- Edit: open AccountEditorView non-modally via `_screenWindowService.OpenScreen(vm)`
+- Delete: use `_dialogService.ShowDeleteConfirmationAsync()` for soft delete
+- Search/filter MUST work in BOTH TreeView mode (filter nodes) and DataGrid mode (filter rows)
+
+#### Dual-Mode Display
+- **RULE-340**: TreeView with `HierarchicalDataTemplate` (recursive children) + DataGrid flat view
+- Toggle via RadioButton/CheckBox in toolbar
+- TreeView selected item MUST sync with DataGrid selection when switching modes
+```
+
+```
+

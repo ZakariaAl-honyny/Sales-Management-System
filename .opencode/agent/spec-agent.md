@@ -42,3 +42,7 @@ Requirements ownership, user stories, and the source-of-truth for WHAT the syste
 - Modify data types defined in PRD
 - Remove requirements from PRD
 - Write implementation code
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. Spec details for this module: 4 roles (Admin/Accountant/Cashier/Observer), 33 permission codes in dot notation (e.g., "Sales.Create", "Inventory.View"), passwordless user creation flow, account lockout at 5 failed attempts, AuditLog with long PK and 3 performance indexes, UserSession for JWT tracking. Key spec decision: All FK relationships use DeleteBehavior.Restrict — no cascade.

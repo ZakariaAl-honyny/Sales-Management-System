@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Updates;
+using SalesSystem.Infrastructure.Repositories;
 using SalesSystem.Infrastructure.Services;
 using SalesSystem.Infrastructure.Updates;
 
@@ -16,6 +18,9 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructureServices(
         this IServiceCollection services)
     {
+        // Repositories
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+
         // LocalImageStorageService holds no scoped state (_basePath is static, ILogger is singleton)
         services.AddSingleton<ILocalImageStorageService, LocalImageStorageService>();
 

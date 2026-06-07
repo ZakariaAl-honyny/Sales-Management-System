@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Enums;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
@@ -18,7 +19,10 @@ using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
+using SalesSystem.DesktopPWF.ViewModels.Accounts;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
+using SalesSystem.DesktopPWF.ViewModels.Audit;
+using SalesSystem.DesktopPWF.ViewModels.Permissions;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -32,11 +36,20 @@ public class MainViewModel : ViewModelBase
     private ViewModelBase? _currentViewModel;
     private readonly ISessionService _sessionService;
     private readonly IDialogService _dialogService;
+    private readonly IUserApiService _userService;
+
+    private CurrentUserDto? _currentUser;
+    public CurrentUserDto? CurrentUser
+    {
+        get => _currentUser;
+        set => SetProperty(ref _currentUser, value);
+    }
 
     public MainViewModel(ISessionService sessionService, IDialogService dialogService)
     {
         _sessionService = sessionService;
         _dialogService = dialogService;
+        _userService = App.GetService<IUserApiService>();
 
         // Dashboard
         NavigateToDashboardCommand = new RelayCommand(() => NavigateTo<DashboardViewModel>());
@@ -95,6 +108,8 @@ public class MainViewModel : ViewModelBase
         NavigateToCategoriesCommand = new RelayCommand(() => NavigateTo<CategoryListViewModel>());
         NavigateToUnitsCommand = new RelayCommand(() => NavigateTo<UnitListViewModel>());
         NavigateToUsersCommand = new RelayCommand(() => NavigateTo<UserListViewModel>());
+        NavigateToAuditLogCommand = new RelayCommand(() => NavigateTo<AuditLogListViewModel>());
+        NavigateToPermissionsCommand = new RelayCommand(() => NavigateTo<PermissionManagementViewModel>());
         NavigateToSettingsCommand = new RelayCommand(() => NavigateTo<SettingsViewModel>());
         NavigateToSystemSettingsCommand = new RelayCommand(() => NavigateTo<SystemSettingsViewModel>());
         NavigateToBackupCommand = new RelayCommand(() => NavigateTo<BackupViewModel>());
@@ -102,6 +117,37 @@ public class MainViewModel : ViewModelBase
         NavigateToInventoryCommand = new RelayCommand(() => NavigateTo<InventoryViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
+        NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
+
+        ChangePasswordCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadChangePasswordAsync)));
+    }
+
+    private async Task LoadChangePasswordAsync()
+    {
+        var vm = new PasswordChangeViewModel(
+            App.GetService<IAuthApiService>(),
+            _dialogService,
+            App.GetService<Services.App.Toast.IToastNotificationService>());
+        var screenService = App.GetService<IScreenWindowService>();
+        screenService.OpenScreen(vm, new ScreenWindowOptions
+        {
+            Title = "تغيير كلمة المرور",
+            Width = 450,
+            Height = 300,
+            IsModal = true
+        });
+    }
+
+    public async Task LoadCurrentUserAsync()
+    {
+        await ExecuteAsync(async () =>
+        {
+            var result = await _userService.GetCurrentUserAsync();
+            if (result.IsSuccess && result.Value != null)
+            {
+                CurrentUser = result.Value;
+            }
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -216,6 +262,15 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة المستخدمين</summary>
     public ICommand NavigateToUsersCommand { get; }
 
+    /// <summary>نقل إلى سجل الأحداث — عرض جميع الحركات والإجراءات في النظام</summary>
+    public ICommand NavigateToAuditLogCommand { get; }
+
+    /// <summary>نقل إلى إدارة الصلاحيات — تعديل صلاحيات الأدوار</summary>
+    public ICommand NavigateToPermissionsCommand { get; }
+
+    /// <summary>تغيير كلمة المرور للمستخدم الحالي</summary>
+    public ICommand ChangePasswordCommand { get; private set; } = null!;
+
     /// <summary>نقل إلى الإعدادات العامة</summary>
     public ICommand NavigateToSettingsCommand { get; }
 
@@ -236,6 +291,9 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى إدارة العملات — إضافة وتعديل العملات وأسعار الصرف</summary>
     public ICommand NavigateToCurrenciesCommand { get; }
+
+    /// <summary>نقل إلى دليل الحسابات — عرض وتعديل الحسابات المحاسبية</summary>
+    public ICommand NavigateToChartOfAccountsCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
@@ -368,6 +426,8 @@ public class MainViewModel : ViewModelBase
             nameof(CategoryListViewModel)           => "Categories",
             nameof(UnitListViewModel)               => "Units",
             nameof(UserListViewModel)               => "Users",
+            nameof(AuditLogListViewModel)           => "Settings",
+            nameof(PermissionManagementViewModel)   => "Settings",
             nameof(SettingsViewModel)               => "Settings",
             nameof(SystemSettingsViewModel)         => "Settings",
             nameof(BackupViewModel)                 => "Settings",
@@ -375,6 +435,7 @@ public class MainViewModel : ViewModelBase
             nameof(InventoryViewModel)              => "Inventory",
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
+            nameof(AccountsListViewModel)           => "Settings",
             _                                        => viewModelType.Name
         };
     }

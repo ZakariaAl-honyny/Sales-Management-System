@@ -63,20 +63,24 @@
                     <TextBlock Text="اسم المستخدم" Style="{StaticResource LabelStyle}" Margin="0,0,0,10"/>
                     <TextBox x:Name="UsernameTextBox"
                              Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBox}"
                              Margin="0,0,0,25"
                              TabIndex="1"
                              helpers:FocusHelper.AdvanceOnEnter="True"
-                             AutomationProperties.AutomationId="UsernameInput"/>
+                             AutomationProperties.AutomationId="UsernameInput"
+                             ToolTip="أدخل اسم المستخدم الخاص بك للدخول إلى النظام"/>
 
                     <!-- Password -->
                     <TextBlock Text="كلمة المرور" Style="{StaticResource LabelStyle}" Margin="0,0,0,10"/>
                     <PasswordBox x:Name="PasswordBox"
+                                 Style="{StaticResource ModernPasswordBox}"
                                  helpers:PasswordBoxHelper.Attach="True"
                                  helpers:PasswordBoxHelper.Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                  Margin="0,0,0,20"
                                  TabIndex="2"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="PasswordInput"/>
+                                 AutomationProperties.AutomationId="PasswordInput"
+                                 ToolTip="أدخل كلمة المرور الخاصة بك"/>
 
                     <!-- Remember Me -->
                     <CheckBox Content="تذكر بياناتي على هذا الجهاز"
@@ -101,9 +105,11 @@
                     <!-- Submit Button -->
                     <Button Content="تسجيل الدخول"
                             Command="{Binding LoginCommand}"
+                            Style="{StaticResource PrimaryButton}"
                             IsDefault="True"
                             TabIndex="4"
-                            AutomationProperties.AutomationId="LoginSubmitButton"/>
+                            AutomationProperties.AutomationId="LoginSubmitButton"
+                            ToolTip="تسجيل الدخول إلى النظام باستخدام اسم المستخدم وكلمة المرور"/>
                 </StackPanel>
 
                 <!-- Loading Overlay -->

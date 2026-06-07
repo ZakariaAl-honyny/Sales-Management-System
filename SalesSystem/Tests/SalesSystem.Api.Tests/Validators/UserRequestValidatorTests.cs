@@ -114,7 +114,6 @@ public class CreateUserRequestValidatorTests
 
     private static CreateUserRequest CreateValidRequest() => new(
         UserName: "testuser",
-        Password: "password123",
         FullName: "Test User",
         Role: 1
     );
@@ -316,7 +315,7 @@ public class UpdateUserRequestValidatorTests
         var request = new UpdateUserRequest(
             FullName: "Updated User",
             Role: 2,
-            IsActive: true,
+            Status: 1,
             Password: null
         );
 
@@ -332,7 +331,7 @@ public class UpdateUserRequestValidatorTests
     private static UpdateUserRequest CreateValidRequest() => new(
         FullName: "Updated User",
         Role: 2,
-        IsActive: true,
+        Status: 1,
         Password: "newpass123"
     );
 }

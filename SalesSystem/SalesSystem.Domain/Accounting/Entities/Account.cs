@@ -16,6 +16,33 @@ public class Account : BaseEntity
     public int? ParentAccountId { get; private set; }
     public bool IsSystemAccount { get; private set; }
     public string? Notes { get; private set; }
+    public string? Explanation { get; private set; }
+
+    // ─── New Fields (v4.7 — Chart of Accounts Expansion) ──────────
+    /// <summary>
+    /// Hierarchical level: 1=Group, 2=Main, 3=Sub, 4=Detail (up to 10).
+    /// </summary>
+    public int Level { get; private set; }
+
+    /// <summary>
+    /// Help text for reports — explains the account's purpose and usage.
+    /// </summary>
+    public string? Description { get; private set; }
+
+    /// <summary>
+    /// Hex color code for visual distinction in reports/UI (e.g. "#2196F3").
+    /// </summary>
+    public string? ColorCode { get; private set; }
+
+    /// <summary>
+    /// False for parent (group/main/sub) accounts — only detail accounts allow direct journal entry transactions.
+    /// </summary>
+    public bool AllowTransactions { get; private set; }
+
+    /// <summary>
+    /// Initial balance for opening entries.
+    /// </summary>
+    public decimal? OpeningBalance { get; private set; }
 
     // ─── Navigation Properties ──────────────────────────
     public Account? ParentAccount { get; private set; }
@@ -31,8 +58,14 @@ public class Account : BaseEntity
         string nameAr,
         string nameEn,
         AccountType accountType,
+        int level,
         int? parentAccountId = null,
         bool isSystemAccount = false,
+        string? description = null,
+        string? colorCode = null,
+        bool allowTransactions = false,
+        decimal? openingBalance = null,
+        string? explanation = null,
         string? notes = null,
         int? createdByUserId = null)
     {
@@ -48,11 +81,14 @@ public class Account : BaseEntity
         if (parentAccountId.HasValue && parentAccountId.Value <= 0)
             throw new DomainException("رقم الحساب الأب غير صالح");
 
-        if (createdByUserId <= 0)
-            throw new DomainException("منشئ الحساب مطلوب");
-
         if (accountCode.Trim().Length > 20)
             throw new DomainException("رمز الحساب لا يمكن أن يتجاوز 20 حرف");
+
+        if (level < 1 || level > 10)
+            throw new DomainException("مستوى الحساب يجب أن يكون بين 1 و 10");
+
+        if (level >= 4 && !allowTransactions)
+            throw new DomainException("الحساب التفصيلي يجب أن يسمح بالحركات");
 
         var account = new Account
         {
@@ -60,9 +96,15 @@ public class Account : BaseEntity
             NameAr = nameAr.Trim(),
             NameEn = nameEn?.Trim() ?? string.Empty,
             AccountType = accountType,
+            Level = level,
             ParentAccountId = parentAccountId,
             IsSystemAccount = isSystemAccount,
+            Description = description?.Trim(),
+            ColorCode = colorCode?.Trim(),
+            AllowTransactions = allowTransactions,
+            OpeningBalance = openingBalance,
             Notes = notes?.Trim(),
+            Explanation = explanation?.Trim(),
             IsActive = true
         };
         account.SetCreatedBy(createdByUserId);
@@ -72,7 +114,13 @@ public class Account : BaseEntity
     public void Update(
         string nameAr,
         string nameEn,
+        AccountType accountType,
+        int level,
         int? parentAccountId = null,
+        string? description = null,
+        string? colorCode = null,
+        bool allowTransactions = false,
+        string? explanation = null,
         string? notes = null,
         int? updatedByUserId = null)
     {
@@ -82,11 +130,35 @@ public class Account : BaseEntity
         if (string.IsNullOrWhiteSpace(nameAr))
             throw new DomainException("اسم الحساب بالعربية مطلوب");
 
+        if (!Enum.IsDefined(typeof(AccountType), accountType))
+            throw new DomainException("نوع الحساب غير صالح");
+
+        if (level < 1 || level > 10)
+            throw new DomainException("مستوى الحساب يجب أن يكون بين 1 و 10");
+
+        if (level >= 4 && !allowTransactions)
+            throw new DomainException("الحساب التفصيلي يجب أن يسمح بالحركات");
+
         NameAr = nameAr.Trim();
         NameEn = nameEn?.Trim() ?? string.Empty;
+        AccountType = accountType;
+        Level = level;
         ParentAccountId = parentAccountId;
+        Description = description?.Trim();
+        ColorCode = colorCode?.Trim();
+        AllowTransactions = allowTransactions;
         Notes = notes?.Trim();
+        Explanation = explanation?.Trim();
         SetUpdatedBy(updatedByUserId);
+        UpdateTimestamp();
+    }
+
+    public void SetExplanation(string? explanation)
+    {
+        if (explanation?.Length > 500)
+            throw new DomainException("الشرح لا يمكن أن يتجاوز 500 حرف");
+
+        Explanation = explanation?.Trim();
         UpdateTimestamp();
     }
 
@@ -115,8 +187,16 @@ public class Account : BaseEntity
         if (IsSystemAccount)
             throw new DomainException("لا يمكن حذف حساب نظامي");
 
+        if (HasChildren())
+            throw new DomainException("لا يمكن حذف حساب رئيسي لديه حسابات فرعية — احذف الحسابات الفرعية أولاً");
+
         base.MarkAsDeleted();
     }
+
+    /// <summary>
+    /// Returns true if this account has sub-accounts (children).
+    /// </summary>
+    public bool HasChildren() => _subAccounts.Count > 0;
 
     /// <summary>
     /// Returns true if this account type has a normal debit balance (Asset or Expense).

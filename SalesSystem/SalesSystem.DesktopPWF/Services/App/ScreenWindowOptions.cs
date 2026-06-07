@@ -14,4 +14,11 @@ public class ScreenWindowOptions
     public bool CanResize { get; set; } = true;
     public WindowStyle Style { get; set; } = WindowStyle.SingleBorderWindow;
     public Action<object?>? OnClosed { get; set; }
+
+    /// <summary>
+    /// When true, the window cannot be closed by the user (X button, Alt+F4, system menu).
+    /// The window can only close when the ViewModel sets DialogResult = true and calls RequestClose().
+    /// Used for mandatory flows like forced password change on first login.
+    /// </summary>
+    public bool PreventClose { get; set; } = false;
 }

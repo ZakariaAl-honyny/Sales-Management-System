@@ -252,7 +252,7 @@ public class ReceiptPrinter
             Brushes.Black,
             new RectangleF(0, y, PageWidth, 15), center);
     }
-
+ 
     private void DrawReceiptTotal(Graphics g, float y, Font font,
         StringFormat rightAlign, string label, string value)
     {
@@ -261,4 +261,7 @@ public class ReceiptPrinter
             new RectangleF(0, y, PageWidth, 12), rightAlign);
     }
 }
-```
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. No direct changes to printing. Permission-based UI controls may affect print button visibility for different roles. Verify that PrintController endpoints respect [Authorize] attributes.

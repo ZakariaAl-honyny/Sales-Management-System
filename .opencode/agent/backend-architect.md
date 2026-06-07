@@ -145,3 +145,81 @@ public async Task<IActionResult> GetById(int id, CancellationToken ct)
 
 ### Service Interface
 - `IStoreSettingsService` must expose `GetAllSystemSettingsAsync()` and `UpdateSystemSettingsAsync()` for system settings bulk operations.
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User management with 4 roles, 33 permission codes, lockout, and audit logging.
+
+### Key Backend Changes
+
+#### User Entity
+- `User.Create()` — Passwordless: `PasswordHash = null`, `MustChangePassword = true`
+- `UserStatus` enum (Active=1, Inactive=2, Locked=3) replaces `IsActive` boolean
+- `RecordLoginAttempt(bool success)` — success resets `FailedLoginAttempts = 0`; failure increments counter, at 5 sets `Status = UserStatus.Locked`
+- `SetInitialPassword(string passwordHash)` — guards `MustChangePassword == true`
+- `ChangePassword(string currentPasswordHash, string newPasswordHash)` — verifies current via BCrypt
+
+#### Permission & RolePermission
+- `Permission` entity with `IsSystem` flag — system permissions (`IsSystem = true`) blocked from deletion/modification
+- `RolePermission` join entity linking `UserRole` (byte) to `Permission`
+- `PermissionService.UpdateRolePermissionsAsync(int role, List<int> permissionIds)` — uses `_uow.ExecuteTransactionAsync()` for atomic remove+add
+
+#### AuditLog
+- `long Id` (bigint) — required for high-volume audit logging
+- Indexes: `(UserId, Timestamp DESC)`, `(EntityType, EntityId)`, `(Timestamp DESC)`
+
+---
+
+### Phase 22 Code Review Bug Fixes (v4.6.9+)
+
+#### HasChildren() & Entity Fetch
+- **RULE-341**: `HasChildren()` domain guard is DEFENSE-IN-DEPTH only — service MUST use `AnyAsync(a => a.ParentAccountId == id)` DB query before `MarkAsDeleted()`
+- **RULE-342**: NEVER fetch entity twice in `DeleteAsync()`/`PermanentDeleteAsync()` — use already-loaded entity
+- **RULE-335**: `PermanentDeleteAsync()` MUST catch `DbUpdateException` and return `Result.Failure` with Arabic message
+
+#### Explanation Field Cross-Layer
+- **RULE-343**: `Explanation` field (`string?` nullable) REQUIRED in ALL layers: Domain entity, EF config (`nvarchar(500)`), DTO, Request, Service mapping, Validator (`MaxLength(500)`), Seeder
+- **RULE-347**: ALL seeded accounts MUST have Arabic `explanation` text — NEVER null for seed data
+
+#### Controller Routes
+- **RULE-345**: NEVER use `:byte`/`:sbyte`/`:short` route constraints — causes HTTP 500. Use `:int:min(1):max(N)` instead
+- **RULE-350**: Route ranges MUST match enum value range (e.g., AccountType 1-5, not hardcoded `3`)
+
+#### Validator Completeness
+- **RULE-346**: Update Validators MUST have SAME field validations as Create Validators
+- **RULE-344**: Level-1 account code length = exactly 3 chars in Create validator
+- **RULE-351**: Use `nameof` operator in `RuleFor` calls — string literals break on rename
+
+#### Health Check
+- **RULE-352**: Health check MUST use `SecureDbContextFactory.GetDecryptedConnectionString()` — never raw `IConfiguration`
+- `AuditLogService` — `LogAsync(string action, string entityType, int entityId, int? userId, string? details)`
+- Auto-logged events: login success, login failure (with attempt count), login blocked (locked), password set, password change
+
+#### AuthService Login Flow
+1. Check `MustChangePassword` → if true, return `RequiresPasswordSetup` error (redirect to set password screen)
+2. Verify password via `BCrypt.Verify` → fail calls `RecordLoginAttempt(false)`
+3. Success calls `RecordLoginAttempt(true)` → creates `AuditLog` entry
+4. Creates `UserSession` — tracks JWT token, expiration, IP address
+
+#### DbSeeder
+- Seeds 33 permissions across 9 categories with 4-role matrix
+- Default admin user: `username = "admin"`, `PasswordHash = null`, `MustChangePassword = true`
+- All FK Restrict on Permission, RolePermission, AuditLog, UserSession
+
+#### Key Rules
+- RULE-305: Passwordless creation
+- RULE-306: UserStatus enum replaces IsActive
+- RULE-307: RecordLoginAttempt() for all login attempts
+- RULE-308: SetInitialPassword() guards MustChangePassword
+- RULE-309: Permission.IsSystem protects system permissions
+- RULE-310: AuditLog uses long Id (bigint)
+- RULE-311: AuditLog indexes for query performance
+- RULE-312: All FK Restrict on new entities
+- RULE-313: Login checks MustChangePassword first
+- RULE-314: SetPasswordAsync validates MustChangePassword
+- RULE-315: ChangePasswordAsync verifies current password
+- RULE-316: Every login creates AuditLog entry
+- RULE-317: PermissionService uses ExecuteTransactionAsync
+- RULE-318: Desktop permission filtering via API-based checks
+- RULE-319: DbSeeder seeds all 33 permissions
+- RULE-320: Default admin user seeded passwordless

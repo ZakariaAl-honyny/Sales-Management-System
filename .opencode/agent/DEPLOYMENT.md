@@ -95,4 +95,14 @@ if (string.IsNullOrEmpty(connectionString))
     "DefaultConnection": "USE_ENVIRONMENT_VARIABLE"
   }
 }
-```
+
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete. Deployment impact:
+- **EF Migration**: `Phase21_UsersAndPermissions` must be applied — creates Permissions, RolePermissions, AuditLogs, UserSessions tables, alters Users table (adds Status, Phone, Email, Avatar, DefaultCashBoxId, LoginAttempts, LastLoginAt, MustChangePassword columns)
+- **Existing users**: Migration sets Status = Active for all existing users, preserves existing password hashes
+- **Default admin**: Seeded passwordless — first login requires password set (MustChangePassword = true)
+- **New dependencies**: AuditLogService, PermissionService registered in DI
+- **API changes**: 10 new endpoints (see CHANGELOG.md)
+- **Desktop UI**: 5 new/updated screens, StatusBar changes, permission-based nav filtering
+- **Rate limiting**: Applies to login endpoint — 5 attempts/15 min per IP

@@ -122,6 +122,26 @@ When asked to fix code quickly, always check for and fix:
 4. Shadowed `_dialogService` fields → use base class `DialogService` property
 5. Hardcoded `Height="36"` or `Padding="16+"` on buttons (should use style defaults)
 
+## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+
+Phase 21 (PRD alignment) — Users & Permissions is now complete.
+
+**Key facts:**
+- `User.Create()` uses passwordless creation (`PasswordHash = null`, `MustChangePassword = true`)
+- `UserStatus` enum: Active=1, Inactive=2, Locked=3
+- 5 failed logins → Status = Locked; `RecordLoginAttempt()` manages counter
+- `Permission.IsSystem = true` prevents deletion/modification of system permissions
+- 33 permissions seeded across 9 categories with 4-role assignments
+- `AuditLog` uses `long Id` (bigint) with indexes on (UserId, Timestamp), (EntityType, EntityId), (Timestamp)
+- All new FKs use `DeleteBehavior.Restrict`
+- Default admin user seeded passwordless (`MustChangePassword = true`)
+
+**Common fix patterns when touching Users & Permissions code:**
+1. `User.Create()` — NEVER accept or hash password here; use `SetInitialPassword()` separately
+2. `UserStatus` — Use `.HasConversion<int>()` in EF config; query filter on `Status == UserStatus.Active`
+3. `AuditLog` — Use `long` for PK, not `int`
+4. `PermissionService.UpdateRolePermissionsAsync()` — Use `_uow.ExecuteTransactionAsync()` for atomic remove+add
+
 ## v4.6.9 — Phase 20 BUG-008 Quick Check
 - CurrencyCode validation uses `code.Trim().Length != 3` (not `> 10`).
 

@@ -250,6 +250,20 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] `Currency` entity has `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods — NOT direct `IsBaseCurrency = true/false` in service code.
 - [ ] `InvokeOnUIThreadAsync` callbacks don't use `async` when no `await` exists in the lambda.
 
+### Phase 21 Users & Permissions — Complete Checklist (v4.6.9)
+- [ ] `User.Create()` uses passwordless creation — `PasswordHash = null`, `MustChangePassword = true`
+- [ ] `UserStatus` enum replaces `IsActive` bool — EF query filter on `Status == UserStatus.Active`
+- [ ] `RecordLoginAttempt()` used for ALL login attempts — lockout at 5 failures
+- [ ] `Permission` entity has `IsSystem` guard — system permissions never modifiable
+- [ ] `AuditLog` uses `long Id` with 3 performance indexes
+- [ ] All new entities use `DeleteBehavior.Restrict` on ALL FKs
+- [ ] `AuthService.LoginAsync` checks `MustChangePassword` before password verification
+- [ ] `AuthService.ChangePasswordAsync` validates current password via BCrypt
+- [ ] Login audit entries created for every success/failure/lockout
+- [ ] `PermissionService.UpdateRolePermissionsAsync` uses `ExecuteTransactionAsync`
+- [ ] DbSeeder seeds 33 permissions across 9 categories with 4-role assignments
+- [ ] Default admin seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`)
+
 ### Key Checkpoints
 - [ ] `SetBatchSystemSettingsAsync()` does NOT call `SaveChangesAsync()` — check that the repo only prepares entities.
 - [ ] Every `Update()` method in Domain entities calls `UpdateTimestamp()` at the end.
@@ -264,6 +278,139 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] `Tax` entity has `SetDefault()` and `ClearDefault()` domain methods — NOT direct `IsDefault = true/false` in service code.
 - [ ] `SystemSettingsViewModel` has ALL seeded settings as properties (check Print + Notifications sections exist).
 - [ ] `StoreSettingsService.UpdateSystemSettingsAsync()` validates known keys by type before saving (boolean → `bool.TryParse`, integer → `int.TryParse` with ranges).
+
+## Phase 22 — Chart of Accounts Module Checklist (v4.6.9+)
+
+### Account Entity
+- [ ] `Account.Create()` accepts exactly 13 parameters including `level` (5th param, required)?
+- [ ] Level range validated with guard (1-10) — `DomainException` for out of range?
+- [ ] `MarkAsDeleted()` guards `IsSystemAccount` AND `HasChildren()` — throws `DomainException` for either?
+- [ ] `Update()` guards `IsSystemAccount` — system accounts are read-only?
+- [ ] `HasChildren()` method exists for parent account deletion guard?
+- [ ] `AccountConfiguration` has `CHK_Account_Level_Range [Level] >= 1 AND [Level] <= 10` CHECK constraint?
+- [ ] `AccountConfiguration` has `.HasConversion<int>()` on `AccountType` enum property?
+- [ ] Self-referencing `ParentAccountId` FK uses `DeleteBehavior.Restrict` (NOT Cascade)?
+- [ ] `AccountConfiguration` has `.HasQueryFilter(x => x.IsActive)` for soft delete?
+- [ ] All decimal fields use correct precision (OpeningBalance 18,2; no 18,4 anywhere)?
+
+### AccountingSeeder
+- [ ] Two-pass approach: first create Level 1-2 with `SaveChangesAsync()`, query IDs, then create Level 3-4 with `ParentAccountId`?
+- [ ] Exactly 60 accounts seeded (5 L1 + 8 L2 + 20 L3 + 27 L4)?
+- [ ] `AllowTransactions = false` for levels < 4; `AllowTransactions = true` for level >= 4?
+- [ ] `IsSystemAccount = true` for Level 1-2 only (not L3-L4)?
+- [ ] Color codes match: Asset=#2196F3, Liability=#F44336, Equity/Revenue=#4CAF50, Expense=#FF9800?
+- [ ] `SystemAccountMappings` updated with new account codes (Cash, Bank, AR, AP, VAT, Capital, Sales, COGS, Inventory, Expense, Revenue, Discount, RetainedEarnings)?
+- [ ] Seeder is idempotent — skips if `Accounts.Any()`?
+- [ ] Semantics `accountCode` uses `==` (not `Equals(..., OrdinalIgnoreCase)`) in EF predicates (SQL is case-insensitive)?
+
+### AccountService
+- [ ] `CreateAsync()` validates: parent exists, `request.Level > parent.Level`, `request.Level <= 10`, unique `AccountCode`?
+- [ ] `UpdateAsync()` guards system accounts — returns `Result.Failure` (not `DomainException`)?
+- [ ] `DeleteAsync()` (soft delete) checks `HasChildren()` — returns `Result.Failure` with Arabic message?
+- [ ] `PermanentDeleteAsync()` catches `DbUpdateException` and returns `Result.Failure`?
+- [ ] `GetTreeAsync()` builds recursive tree from flat `List<Account>` — no recursive DB queries (N+1)?
+- [ ] All methods return `Result<T>` or `Result` — no raw exceptions?
+
+### ErrorCodes
+- [ ] Uses `ErrorCodes.DuplicateEntry` (not `ErrorCodes.DuplicateBarcode`) for duplicate account code?
+- [ ] Uses `ErrorCodes.NotFound` for entity not found?
+- [ ] Uses `ErrorCodes.SystemAccountProtected` or generic "لا يمكن تعديل/حذف حساب نظام" message?
+
+### AccountsController
+- [ ] GET endpoints use `[Authorize(Policy = "AllStaff")]`?
+- [ ] POST/PUT use `[Authorize(Policy = "ManagerAndAbove")]`?
+- [ ] DELETE soft uses `[Authorize(Policy = "ManagerAndAbove")]`?
+- [ ] DELETE permanent uses `[Authorize(Policy = "AdminOnly")]`?
+- [ ] Controller returns `404 NotFound` when service returns `ErrorCodes.NotFound`?
+- [ ] Controller returns `400 BadRequest` for business validation errors (not 404)?
+- [ ] Controller does NOT inject `DbContext` or `IUnitOfWork` directly?
+
+### Phase 22 Code Review Bug Fixes (v4.6.9+)
+
+These items MUST be checked for any code touching Chart of Accounts or Account entity:
+
+#### HasChildren() & Entity Fetch Rules
+- [ ] `HasChildren()` domain guard NOT used as sole parent-account protection — service uses `AnyAsync(a => a.ParentAccountId == id)` DB query?
+- [ ] Entity NOT fetched twice in `DeleteAsync()`/`PermanentDeleteAsync()` — use already-loaded entity?
+- [ ] `PermanentDeleteAsync()` catches `DbUpdateException` and returns `Result.Failure` with Arabic message?
+
+#### Explanation Field Completeness
+- [ ] `Explanation` field exists in ALL layers: Domain entity (`string?` nullable), EF config (`nvarchar(500)`), DTO, Request, Service mapping, Validator (`MaxLength(500)`), Seeder?
+- [ ] All seeded accounts have Arabic `explanation` text (not null)?
+- [ ] `Explanation` field is `string?` nullable (not `string` non-nullable)?
+
+#### Controller Route Constraints
+- [ ] No `:byte` or unsupported route constraints (`:sbyte`, `:short`, `:ushort`, `:uint`, `:ulong`) — use `:int`, `:int:min(1):max(N)`, `:guid`, or `:string` instead?
+- [ ] Route range matches the actual enum value range (e.g., AccountType 1-5, not hardcoded `3`)?
+
+#### Validator Completeness
+- [ ] Update Validators have SAME field validations as Create Validators?
+- [ ] Level-1 account code length enforced at exactly 3 characters in Create validator?
+- [ ] `nameof` operator used in `RuleFor` calls (not string literals)?
+
+#### Desktop ViewModel Integrity
+- [ ] Account code is read-only during edit mode (`IsAccountCodeReadOnly = true`)?
+- [ ] Edit/Delete commands implemented with toolbar buttons in ListViewModel?
+- [ ] Search/filter works in BOTH TreeView and DataGrid modes?
+
+#### Health Check
+- [ ] Health check uses `SecureDbContextFactory.GetDecryptedConnectionString()` (not raw `IConfiguration`)?
+- [ ] Connection string NOT leaked into logs or SqlConnection attempt before DPAPI decryption?
+
+### AccountValidators
+- [ ] `CreateAccountRequestValidator` validates: code format (4-10 digits), NameAr required, ColorCode hex format, OpeningBalance non-negative?
+- [ ] `UpdateAccountRequestValidator` validates: NameAr required, AccountType in enum, Level in range?
+
+### Contracts (DTOs)
+- [ ] `AccountDto` has `AccountTypeDisplay` (string from AccountType enum) and `LevelDisplay` (e.g., "المستوى 2") computed properties?
+- [ ] `AccountTreeNodeDto` has recursive `Children: List<AccountTreeNodeDto>` for TreeView rendering?
+
+### Desktop AccountApiService
+- [ ] Typed HTTP client with `try-catch` and `Serilog.Log.Error` for connection failures?
+- [ ] Content-type guard before `ReadFromJsonAsync`?
+- [ ] Arabic error messages for timeout/network failures?
+
+### Desktop AccountsListViewModel
+- [ ] Implements `IDisposable` (not just `Cleanup()`) — EventBus subscription disposed?
+- [ ] Dual-mode toggle (`IsTreeView` / `ToggleViewCommand`)?
+- [ ] Search by name or code; filter by AccountType?
+- [ ] Add/Edit/Delete commands have NO CanExecute predicates (always enabled per RULE-059)?
+- [ ] `AddCommand` uses `RelayCommand` (not `AsyncRelayCommand`) with no predicate?
+- [ ] Edit/Delete use `_screenWindowService.OpenScreen()` (non-modal) — NOT `ShowDialog()`?
+- [ ] Events: EventBus subscription with auto-refresh on `AccountChangedMessage`?
+- [ ] Minor success messages use `IToastNotificationService` (not modal dialogs)?
+
+### Desktop AccountEditorViewModel
+- [ ] Dual constructor: parameterless (delegates to service locator) + parameterized (DI)?
+- [ ] `SetDialogService()` called in constructor (RULE-227)?
+- [ ] `ValidateAsync()` follows RULE-229/338: `ClearAllErrors()` → `AddError()` per field → `await ValidateAllAsync()`?
+- [ ] `SaveCommand` has NO CanExecute predicate (RULE-059)?
+- [ ] `INotifyDataErrorInfo` for real-time validation (no `HasXxxError` booleans)?
+- [ ] Level auto-set from parent account when parent changes?
+- [ ] `IToastNotificationService` for success feedback after save?
+
+### Desktop Views (XAML)
+- [ ] `AccountsListView` has dual-mode: TreeView with `HierarchicalDataTemplate` + DataGrid flat view toggle?
+- [ ] TreeView uses `HierarchicalDataTemplate` with `ItemsSource="{Binding Children}"` for recursive rendering?
+- [ ] TreeView nodes show colored indicator (`Background="{Binding ColorCode}"`)?
+- [ ] Editor form has: Code, NameAr, NameEn, Type combo, Level (read-only), ColorCode, OpeningBalance, AllowTransactions checkbox?
+- [ ] All interactive controls have Arabic ToolTips (RULE-185-190)?
+- [ ] Compact styles per RULE-262-274 (no hardcoded Height=36/40, Padding=16+)?
+- [ ] Required fields marked with `*` and have ToolTip explaining validation rule?
+
+### Desktop DI + Navigation
+- [ ] `IAccountApiService` registered as singleton in `App.xaml.cs`?
+- [ ] `AccountsListViewModel` and `AccountEditorViewModel` registered as transient?
+- [ ] `AccountsListView` and `AccountEditorView` registered as transient?
+- [ ] MainWindow sidebar has "دليل الحسابات" button?
+- [ ] MainWindow menu has "الحسابات" item under appropriate category?
+- [ ] `MainViewModel` has `NavigateToChartOfAccountsCommand`?
+
+### Build & Tests
+- [ ] `dotnet build` — 0 errors, 0 warnings across all projects?
+- [ ] Domain tests for Account entity: Create (guards, 13 params), Update (system guard), MarkAsDeleted (system + children guard), IsDebitNormal, Level range?
+- [ ] Service tests: CreateAsync (success, parent not found, duplicate code), DeleteAsync (children guard, not found), PermanentDeleteAsync (hard delete guard)?
+- [ ] Controller integration tests: all CRUD endpoints, auth policies (AllStaff vs ManagerAndAbove vs AdminOnly)?
 
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`

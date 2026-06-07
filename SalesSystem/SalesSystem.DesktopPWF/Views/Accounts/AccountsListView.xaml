@@ -1,0 +1,171 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Accounts.AccountsListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             FlowDirection="RightToLeft"
+             Background="{StaticResource BackgroundBrush}">
+
+    <Grid Margin="16,16,16,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="📒  دليل الحسابات"
+                   Style="{StaticResource HeaderStyle}"/>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                <!-- Search Group -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="بحث" VerticalAlignment="Center" Margin="0,0,16,0" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBox Width="250"
+                             Style="{StaticResource ModernTextBox}"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="ابحث باسم الحساب أو رمزه..."
+                             ToolTip="ابحث باسم الحساب أو رمزه — البحث تلقائي أثناء الكتابة"/>
+                    <Button Command="{Binding SearchCommand}" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
+                            ToolTip="البحث في دليل الحسابات بالاسم أو الرمز">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="بحث" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Type Filter Group (visible in grid mode) -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5"
+                            Visibility="{Binding IsTreeView, Converter={StaticResource InverseBoolToVisibility}}">
+                    <TextBlock Text="النوع" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <ComboBox ItemsSource="{Binding AccountTypeFilters}"
+                              SelectedValue="{Binding FilterType}"
+                              SelectedValuePath="Key"
+                              DisplayMemberPath="Value"
+                              Width="140"
+                              Style="{StaticResource ModernComboBox}"
+                              ToolTip="تصفية الحسابات حسب النوع المحاسبي"/>
+                </StackPanel>
+
+                <!-- Actions Group -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding ToggleViewCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            ToolTip="تبديل بين العرض الشجري والجدولي">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="ToggleViewText" Text="📋 عرض جدولي" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding EditSelectedAccountCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0"
+                            ToolTip="تعديل الحساب المحدد — فتح نافذة تعديل بيانات الحساب"
+                            IsEnabled="{Binding CanEditOrDelete}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="✏️" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تعديل" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding DeleteSelectedAccountCommand}" Style="{StaticResource DangerButton}" Margin="0,0,4,0"
+                            ToolTip="حذف أو إلغاء تنشيط الحساب المحدد — سيتم طلب تأكيد الحذف"
+                            IsEnabled="{Binding CanEditOrDelete}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🗑️" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="حذف" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
+                            ToolTip="إضافة حساب جديد — سيتم فتح نافذة إنشاء حساب">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="إضافة حساب" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                            ToolTip="تحديث قائمة الحسابات — إعادة تحميل البيانات من الخادم">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <!-- Content -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <!-- TreeView (visible when IsTreeView = true) -->
+                <TreeView x:Name="AccountsTreeView"
+                          ItemsSource="{Binding TreeItems}"
+                          Visibility="{Binding IsTreeView, Converter={StaticResource BoolToVisibility}}"
+                          BorderThickness="0" Background="Transparent"
+                          SelectedItemChanged="TreeView_SelectedItemChanged">
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,2">
+                                <TextBlock Text="• " FontSize="13" Foreground="Gray"/>
+                                <TextBlock Text="{Binding NameAr}" FontSize="13"/>
+                                <TextBlock Text="{Binding AccountCode}" FontSize="11"
+                                           Foreground="Gray" Margin="6,0,0,0"/>
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                    <TreeView.ItemContainerStyle>
+                        <Style TargetType="TreeViewItem">
+                            <EventSetter Event="MouseDoubleClick" Handler="TreeViewItem_MouseDoubleClick"/>
+                        </Style>
+                    </TreeView.ItemContainerStyle>
+                </TreeView>
+
+                <!-- DataGrid (visible when IsTreeView = false) -->
+                <DataGrid ItemsSource="{Binding FlatItems}"
+                          Visibility="{Binding IsTreeView, Converter={StaticResource InverseBoolToVisibility}}"
+                          SelectedItem="{Binding SelectedItem}"
+                          Style="{StaticResource ModernDataGrid}"
+                          IsReadOnly="True"
+                          AutoGenerateColumns="False"
+                          SelectionMode="Single"
+                          IsSynchronizedWithCurrentItem="True"
+                          MouseDoubleClick="DataGrid_MouseDoubleClick">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="الكود" Binding="{Binding AccountCode}" Width="80"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                        <DataGridTextColumn Header="اسم الحساب" Binding="{Binding NameAr}" Width="*"
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
+                        <DataGridTextColumn Header="النوع" Binding="{Binding AccountTypeDisplay}" Width="100"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                        <DataGridTextColumn Header="المستوى" Binding="{Binding LevelDisplay}" Width="120"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                        <DataGridTextColumn Header="الوصف" Binding="{Binding Description}" Width="150"
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Empty State -->
+                <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="📒" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
+                        <TextBlock Text="لا توجد حسابات مسجلة" Style="{StaticResource HeaderStyle}" FontSize="14" HorizontalAlignment="Center"/>
+                        <TextBlock Text="ابدأ بإضافة حساب جديد من خلال الزر أعلاه" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                        <Button Content="➕ إضافة أول حساب" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
+                                ToolTip="فتح شاشة إضافة حساب جديد إلى دليل الحسابات"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#80FFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4" Background="#E3E8EE" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="جاري تحميل دليل الحسابات..." FontSize="14" Margin="0,12,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

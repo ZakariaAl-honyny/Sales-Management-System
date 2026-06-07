@@ -1,8 +1,12 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -10,7 +14,7 @@ namespace SalesSystem.Api.Controllers;
 /// Controller for managing system users.
 /// </summary>
 /// <remarks>
-/// Access restricted to Admin role only (Policy: AdminOnly).
+/// Access restricted to Admin role only (Policy: AdminOnly) except for GetCurrentUser.
 /// </remarks>
 [ApiController]
 [Route("api/v1/users")]
@@ -27,6 +31,7 @@ public class UsersController : ControllerBase
     /// <summary>
     /// Retrieves all users.
     /// </summary>
+    /// <param name="includeInactive">Whether to include inactive users.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns list of all users.</returns>
     [HttpGet]
@@ -55,9 +60,29 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new user.
+    /// Gets the current authenticated user's profile with permissions.
+    /// Accessible by all authenticated users.
     /// </summary>
-    /// <param name="request">Create user request with UserName, Password, FullName, and Role.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns the current user's profile with permissions.</returns>
+    [HttpGet("current")]
+    [Authorize]
+    [ProducesResponseType(typeof(CurrentUserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetCurrentUser(CancellationToken ct)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+            return Unauthorized(new { error = "المستخدم غير موثّق" });
+
+        var result = await _userService.GetCurrentUserAsync(userId, ct);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Creates a new user (passwordless — user must set password on first login).
+    /// </summary>
+    /// <param name="request">Create user request with UserName, FullName, and Role.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the created user with ID.</returns>
     [HttpPost]
@@ -73,7 +98,7 @@ public class UsersController : ControllerBase
     /// Updates an existing user.
     /// </summary>
     /// <param name="id">User ID to update.</param>
-    /// <param name="request">Update user request with FullName, Role, and optional Password.</param>
+    /// <param name="request">Update user request with FullName, Role, and optional fields.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the updated user.</returns>
     [HttpPut("{id:int}")]
@@ -101,6 +126,8 @@ public class UsersController : ControllerBase
         var result = await _userService.DeleteAsync(id, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم تعطيل المستخدم بنجاح", id });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 
@@ -123,6 +150,31 @@ public class UsersController : ControllerBase
         var result = await _userService.PermanentDeleteAsync(id, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم الحذف النهائي بنجاح", id });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Resets a user's password to the default "12345678" (admin function).
+    /// Forces MustChangePassword = true so the user must change on next login.
+    /// </summary>
+    /// <param name="id">User ID to reset password for.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Returns success message.</returns>
+    [HttpPost("{id:int}/reset-password")]
+    [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ResetPassword(int id, CancellationToken ct)
+    {
+        var result = await _userService.ResetPasswordAsync(id, ct);
+        if (result.IsSuccess)
+            return Ok(new
+            {
+                userId = result.Value!.UserId,
+                message = result.Value.Message
+            });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 }

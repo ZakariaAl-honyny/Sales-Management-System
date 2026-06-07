@@ -1359,6 +1359,465 @@ await InvokeOnUIThreadAsync(() =>
 await InvokeOnUIThreadAsync(async () => { /* no await */ });  // ❌
 ```
 
+## v4.6.9 — Phase 21 Users & Permissions Module Patterns
+
+### Passwordless User Creation
+```csharp
+public static User Create(string userName, string fullName, UserRole role,
+    string? phone = null, string? email = null, int? defaultCashBoxId = null,
+    int? createdByUserId = null)
+{
+    if (string.IsNullOrWhiteSpace(userName))
+        throw new DomainException("اسم المستخدم مطلوب.");
+    if (string.IsNullOrWhiteSpace(fullName))
+        throw new DomainException("الاسم الكامل مطلوب.");
+    return new User
+    {
+        UserName = userName.Trim(),
+        FullName = fullName.Trim(),
+        Role = role,
+        Status = UserStatus.Active,
+        Phone = phone?.Trim(),
+        Email = email?.Trim(),
+        DefaultCashBoxId = defaultCashBoxId,
+        MustChangePassword = true,
+        PasswordHash = null,
+        LoginAttempts = 0,
+        CreatedByUserId = createdByUserId,
+        CreatedAt = DateTime.UtcNow
+    };
+}
+```
+
+### Login Attempt Tracking Pattern
+```csharp
+public void RecordLoginAttempt(bool success)
+{
+    if (success)
+    {
+        LoginAttempts = 0;
+        Status = UserStatus.Active;
+        LastLoginAt = DateTime.UtcNow;
+    }
+    else
+    {
+        LoginAttempts++;
+        if (LoginAttempts >= 5)
+            Status = UserStatus.Locked;
+    }
+}
+```
+
+### AuthService Login — MustChangePassword + Lockout
+```csharp
+if (user.Status == UserStatus.Locked)
+    return Result<LoginResponse>.Failure("الحساب مغلق مؤقتاً", ErrorCodes.AccountLocked);
+
+if (user.MustChangePassword || string.IsNullOrWhiteSpace(user.PasswordHash))
+    return Result<LoginResponse>.Failure("يجب تعيين كلمة المرور", ErrorCodes.RequiresPasswordSetup);
+```
+
+### Audit Entity Pattern (long Id)
+```csharp
+public class AuditLog
+{
+    public long Id { get; private set; }  // bigint for high volume
+    public int? UserId { get; private set; }
+    public string Action { get; private set; } = string.Empty;
+    // ...
+}
+```
+
+### Permission Entity with IsSystem Guard
+```csharp
+public class Permission : BaseEntity
+{
+    public string Name { get; private set; }
+    public string DisplayNameAr { get; private set; }
+    public bool IsSystem { get; private set; }  // System permissions cannot be deleted
+}
+```
+
+### PermissionService Transactional Update
+```csharp
+public async Task<Result> UpdateRolePermissionsAsync(UserRole role, List<int> permissionIds, CancellationToken ct)
+{
+    await _uow.ExecuteTransactionAsync(async () =>
+    {
+        var existing = await _uow.RolePermissions.GetQueryable()
+            .Where(rp => rp.Role == role).ToListAsync(ct);
+        _uow.RolePermissions.RemoveRange(existing);
+        foreach (var permId in permissionIds)
+            await _uow.RolePermissions.AddAsync(RolePermission.Create(role, permId), ct);
+    }, ct);
+    return Result.Success();
+}
+```
+
+## Phase 22 — Chart of Accounts Module Patterns (v4.6.9+)
+
+### Account Entity — 13-param Create() with Level
+```csharp
+public class Account : BaseEntity
+{
+    // Core properties
+    public string AccountCode { get; private set; }         // Numeric string, 4-10 digits
+    public string NameAr { get; private set; }
+    public string NameEn { get; private set; }
+    public AccountType AccountType { get; private set; }    // Enum(byte)
+    public int Level { get; private set; }                  // 1-10, CHECK constraint
+    public int? ParentAccountId { get; private set; }       // Self-referencing FK
+    public Account? ParentAccount { get; private set; }
+    public bool IsSystemAccount { get; private set; }       // L1-L2 only
+    public string? Description { get; private set; }        // Max 500
+    public string? ColorCode { get; private set; }          // Hex, e.g. #2196F3
+    public bool AllowTransactions { get; private set; }     // L4+ = true
+    public decimal OpeningBalance { get; private set; }     // 18,2
+    public string? Notes { get; private set; }
+
+    // Children for tree building
+    private readonly List<Account> _children = new();
+    public IReadOnlyCollection<Account> Children => _children.AsReadOnly();
+
+    // Protected constructor for EF Core
+    protected Account() { }
+
+    // Static factory — 13 parameters, Level is required (5th param)
+    public static Account Create(string accountCode, string nameAr, string? nameEn,
+        AccountType accountType, int level, int? parentAccountId, bool isSystemAccount,
+        string? description, string? colorCode, bool allowTransactions,
+        decimal openingBalance, string? notes, int createdByUserId)
+    {
+        if (string.IsNullOrWhiteSpace(accountCode))
+            throw new DomainException("كود الحساب مطلوب");
+        if (string.IsNullOrWhiteSpace(nameAr))
+            throw new DomainException("اسم الحساب بالعربية مطلوب");
+        if (level < 1 || level > 10)
+            throw new DomainException("مستوى الحساب يجب أن يكون بين 1 و 10");
+        if (openingBalance < 0)
+            throw new DomainException("الرصيد الافتتاحي لا يمكن أن يكون سالباً");
+
+        return new Account
+        {
+            AccountCode = accountCode.Trim(),
+            NameAr = nameAr.Trim(),
+            NameEn = nameEn?.Trim(),
+            AccountType = accountType,
+            Level = level,
+            ParentAccountId = parentAccountId,
+            IsSystemAccount = isSystemAccount,
+            Description = description?.Trim(),
+            ColorCode = colorCode?.Trim(),
+            AllowTransactions = allowTransactions,
+            OpeningBalance = openingBalance,
+            Notes = notes?.Trim(),
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+    }
+
+    // Update — guards system accounts
+    public void Update(AccountType accountType, int level, string? description,
+        string? colorCode, bool allowTransactions)
+    {
+        if (IsSystemAccount)
+            throw new DomainException("لا يمكن تعديل حساب نظام — الحساب محمي");
+        AccountType = accountType;
+        Level = level;
+        Description = description?.Trim();
+        ColorCode = colorCode?.Trim();
+        AllowTransactions = allowTransactions;
+        UpdateTimestamp();
+    }
+
+    // HasChildren — prevents deletion of parent accounts
+    public bool HasChildren() => _children.Count > 0;
+
+    // MarkAsDeleted — guards system accounts AND parent accounts
+    public override void MarkAsDeleted()
+    {
+        if (IsSystemAccount)
+            throw new DomainException("لا يمكن حذف حساب نظام — الحساب محمي");
+        if (HasChildren())
+            throw new DomainException("لا يمكن حذف حساب رئيسي — لديه حسابات فرعية");
+        base.MarkAsDeleted();
+    }
+
+    // IsDebitNormal — preserved from Phase 18
+    public bool IsDebitNormal() => AccountType switch
+    {
+        AccountType.Asset => true,
+        AccountType.Expense => true,
+        AccountType.Liability => false,
+        AccountType.Equity => false,
+        AccountType.Revenue => false,
+        _ => true
+    };
+}
+```
+
+### Account Fluent API Configuration — CHECK Constraint + Self-Referencing FK
+```csharp
+public class AccountConfiguration : IEntityTypeConfiguration<Account>
+{
+    public void Configure(EntityTypeBuilder<Account> builder)
+    {
+        builder.ToTable(t => t.HasCheckConstraint("CHK_Account_Level_Range",
+            "[Level] >= 1 AND [Level] <= 10"));
+
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.AccountCode).HasMaxLength(10).IsRequired();
+        builder.HasIndex(x => x.AccountCode).IsUnique();
+        builder.Property(x => x.NameAr).HasMaxLength(150).IsRequired();
+        builder.Property(x => x.NameEn).HasMaxLength(150);
+        builder.Property(x => x.AccountType).HasConversion<int>().IsRequired();
+        builder.Property(x => x.Level).IsRequired().HasDefaultValue(4);
+        builder.Property(x => x.Description).HasMaxLength(500);
+        builder.Property(x => x.ColorCode).HasMaxLength(7);  // #RRGGBB
+        builder.Property(x => x.AllowTransactions).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.OpeningBalance).HasPrecision(18, 2);
+        builder.Property(x => x.Notes).HasMaxLength(500);
+
+        // Self-referencing FK with Restrict (NO Cascade)
+        builder.HasOne(x => x.ParentAccount)
+            .WithMany(x => x.Children)
+            .HasForeignKey(x => x.ParentAccountId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // Global query filter
+        builder.HasQueryFilter(x => x.IsActive);
+    }
+}
+```
+
+### Two-Pass Seeder — Account Hierarchy
+```csharp
+// First pass: create Level 1-2 accounts (Group + Main)
+var cash = Account.Create("1100", "النقدية", "Cash", AccountType.Asset, 2, null,
+    true, "النقدية في الصندوق", "#2196F3", false, 0m, null, adminId);
+await context.Accounts.AddAsync(cash);
+await context.SaveChangesAsync(ct);  // IDs generated here
+
+// Query back IDs after first save
+var cashAccount = await context.Accounts.FirstAsync(a => a.AccountCode == "1100", ct);
+
+// Second pass: create Level 3-4 with ParentAccountId
+var pettyCash = Account.Create("1101", "الصندوق", "Petty Cash", AccountType.Asset, 3,
+    cashAccount.Id, false, "صندوق النقدية الرئيسي", "#2196F3", false, 0m, null, adminId);
+await context.Accounts.AddAsync(pettyCash);
+await context.SaveChangesAsync(ct);
+
+// Update SystemAccountMappings after all accounts created
+var cashId = (await context.Accounts.FirstAsync(a => a.AccountCode == "1100", ct)).Id;
+mappings.UpdateCashAccount(cashId);
+```
+
+### AccountService — Tree Builder (No N+1)
+```csharp
+public async Task<Result<List<AccountTreeNodeDto>>> GetTreeAsync(CancellationToken ct)
+{
+    var accounts = await _uow.Accounts.GetQueryable()
+        .Where(a => a.IsActive)
+        .OrderBy(a => a.AccountCode)
+        .ToListAsync(ct);
+
+    var tree = accounts.Where(a => a.ParentAccountId == null)
+        .Select(a => BuildTreeNode(a, accounts))
+        .ToList();
+
+    return Result<List<AccountTreeNodeDto>>.Success(tree);
+}
+
+private AccountTreeNodeDto BuildTreeNode(Account account, List<Account> allAccounts)
+{
+    return new AccountTreeNodeDto
+    {
+        Id = account.Id,
+        AccountCode = account.AccountCode,
+        NameAr = account.NameAr,
+        NameEn = account.NameEn,
+        AccountType = account.AccountType,
+        AccountTypeDisplay = account.AccountType.ToString(),
+        Level = account.Level,
+        LevelDisplay = $"المستوى {account.Level}",
+        AllowTransactions = account.AllowTransactions,
+        ColorCode = account.ColorCode,
+        OpeningBalance = account.OpeningBalance,
+        Children = allAccounts.Where(a => a.ParentAccountId == account.Id)
+            .Select(a => BuildTreeNode(a, allAccounts))
+            .ToList()
+    };
+}
+```
+
+### CreateAsync — Parent/Level/Code Validation
+```csharp
+public async Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, int userId, CancellationToken ct)
+{
+    // Validate parent exists (if provided)
+    if (request.ParentAccountId.HasValue)
+    {
+        var parent = await _uow.Accounts.GetByIdAsync(request.ParentAccountId.Value, ct);
+        if (parent == null)
+            return Result<AccountDto>.Failure("الحساب الأب غير موجود", ErrorCodes.NotFound);
+        if (request.Level <= parent.Level)
+            return Result<AccountDto>.Failure("مستوى الحساب يجب أن يكون أعمق من الحساب الأب");
+    }
+
+    // Validate code uniqueness
+    var existing = await _uow.Accounts.GetQueryable()
+        .AnyAsync(a => a.AccountCode == request.AccountCode && a.IsActive, ct);
+    if (existing)
+        return Result<AccountDto>.Failure("كود الحساب موجود مسبقاً", ErrorCodes.DuplicateEntry);
+
+    var account = Account.Create(/* 13 params */);
+    await _uow.Accounts.AddAsync(account, ct);
+    await _uow.SaveChangesAsync(ct);
+    return Result<AccountDto>.Success(MapToDto(account));
+}
+```
+
+### Controller — 404 vs 400 + Policy Enforcement
+```csharp
+[HttpGet("tree")]
+[Authorize(Policy = "AllStaff")]
+public async Task<IActionResult> GetTree(CancellationToken ct)
+{
+    var result = await _accountService.GetTreeAsync(ct);
+    return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+}
+
+[HttpPost]
+[Authorize(Policy = "ManagerAndAbove")]
+public async Task<IActionResult> Create([FromBody] CreateAccountRequest request, CancellationToken ct)
+{
+    var userId = GetCurrentUserId();
+    var result = await _accountService.CreateAsync(request, userId, ct);
+    if (result.IsSuccess)
+        return CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value);
+    if (result.ErrorCode == ErrorCodes.NotFound)
+        return NotFound(new { error = result.Error });
+    return BadRequest(new { error = result.Error });
+}
+
+[HttpDelete("permanent/{id:int}")]
+[Authorize(Policy = "AdminOnly")]
+public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)
+{
+    var result = await _accountService.PermanentDeleteAsync(id, ct);
+    if (result.IsSuccess)
+        return Ok(new { message = "تم حذف الحساب نهائياً" });
+    if (result.ErrorCode == ErrorCodes.NotFound)
+        return NotFound(new { error = result.Error });
+    return BadRequest(new { error = result.Error });
+}
+```
+
+### Desktop AccountApiService — Typed HTTP Client
+```csharp
+public class AccountApiService : IAccountApiService
+{
+    private readonly HttpClient _http;
+
+    public async Task<Result<List<AccountTreeNodeDto>>> GetTreeAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await _http.GetAsync("api/v1/accounts/tree", ct);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadFromJsonAsync<ApiResponse<List<AccountTreeNodeDto>>>(ct);
+                return json?.Success == true
+                    ? Result<List<AccountTreeNodeDto>>.Success(json.Data!)
+                    : Result<List<AccountTreeNodeDto>>.Failure(json?.Message ?? "فشل تحميل شجرة الحسابات");
+            }
+            return await HandleResponseAsync<List<AccountTreeNodeDto>>(response);
+        }
+        catch (HttpRequestException ex)
+        {
+            Log.Error(ex, "فشل الاتصال بالخادم لتحميل شجرة الحسابات");
+            return Result<List<AccountTreeNodeDto>>.Failure("تعذر الاتصال بالخادم");
+        }
+    }
+}
+```
+
+### Desktop AccountsListViewModel — Dual-Mode Tree/Grid + IDisposable
+```csharp
+public class AccountsListViewModel : ViewModelBase, IDisposable
+{
+    private readonly IAccountApiService _accountApiService;
+    private readonly IScreenWindowService _screenWindowService;
+    private readonly IEventBus _eventBus;
+    private readonly IDialogService _dialogService;
+    private IDisposable? _subscription;
+
+    // Dual-mode toggle
+    private bool _isTreeView = true;
+    public bool IsTreeView { get => _isTreeView; set => SetProperty(ref _isTreeView, value); }
+
+    public ICommand ToggleViewCommand { get; }
+    public ICommand AddCommand { get; }
+    public ICommand EditCommand { get; }
+    public ICommand DeleteCommand { get; }
+
+    public AccountsListViewModel(IAccountApiService accountApiService,
+        IScreenWindowService screenWindowService, IEventBus eventBus,
+        IDialogService dialogService)
+    {
+        _accountApiService = accountApiService;
+        _screenWindowService = screenWindowService;
+        _eventBus = eventBus;
+        _dialogService = dialogService;
+
+        ToggleViewCommand = new RelayCommand(() => IsTreeView = !IsTreeView);
+        AddCommand = new RelayCommand(AddAccount);          // NO CanExecute per RULE-059
+        EditCommand = new AsyncRelayCommand(EditAccountAsync);  // NO CanExecute
+        DeleteCommand = new AsyncRelayCommand(DeleteAccountAsync);
+        RefreshCommand = new AsyncRelayCommand(async () => await LoadAccountsAsync());
+
+        _subscription = eventBus.Subscribe<AccountChangedMessage>(OnAccountChanged);
+        _ = LoadAccountsAsync();
+    }
+
+    public void Dispose() => Cleanup();  // EventBus unsubscription via base class
+}
+```
+
+### Desktop AccountEditorView — Dual Constructor + INotifyDataErrorInfo
+```csharp
+public class AccountEditorViewModel : ViewModelBase
+{
+    // Dual constructor: parameterless (for DI) + parameterized (for testing)
+    public AccountEditorViewModel() : this(App.GetService<IAccountApiService>(),
+        App.GetService<IDialogService>(), App.GetService<IToastNotificationService>()) { }
+
+    public AccountEditorViewModel(IAccountApiService accountApiService,
+        IDialogService dialogService, IToastNotificationService toastService)
+    {
+        _accountApiService = accountApiService;
+        _toastService = toastService;
+        SetDialogService(dialogService);  // RULE-227
+
+        SaveCommand = new AsyncRelayCommand(SaveAsync);  // NO CanExecute
+    }
+
+    // ValidateAsync follows RULE-229/338
+    private async Task<bool> ValidateAsync()
+    {
+        ClearAllErrors();  // Clear INotifyDataErrorInfo errors
+        if (string.IsNullOrWhiteSpace(AccountCode))
+            AddError(nameof(AccountCode), "كود الحساب مطلوب");
+        if (string.IsNullOrWhiteSpace(NameAr))
+            AddError(nameof(NameAr), "اسم الحساب بالعربية مطلوب");
+        // ... more field validations ...
+        return await ValidateAllAsync();  // Shows styled warning dialog automatically
+    }
+}
+```
+
 ## Default Bug Fixing
 
 When implementing new features or modifying existing code, you MUST:
@@ -1368,3 +1827,51 @@ When implementing new features or modifying existing code, you MUST:
 4. Fix any shadowed base class properties (e.g., `_dialogService` fields that shadow `DialogService` property)
 5. Fix any service locator patterns (`App.GetService<T>()` in ViewModels that should use constructor injection)
 6. Apply all relevant rules from AGENTS.md CONSTITUTION automatically without being asked
+
+### Phase 22 Code Review Fix Patterns (v4.6.9+)
+
+When implementing Account Service methods:
+
+**DeleteAsync Pattern (no double entity fetch):**
+```csharp
+// CORRECT - fetch once
+var account = await _uow.Accounts.GetByIdAsync(id, ct);
+if (account == null) return Result.Failure("الحساب غير موجود", ErrorCodes.NotFound);
+
+// Use DB query for children check, NOT account.HasChildren()
+var hasChildren = await _uow.Accounts.Query()
+    .AnyAsync(a => a.ParentAccountId == id, ct);
+if (hasChildren) return Result.Failure("لا يمكن حذف حساب رئيسي", ErrorCodes.HasChildren);
+
+account.MarkAsDeleted();
+await _uow.SaveChangesAsync(ct);
+return Result.Success();
+```
+
+**PermanentDeleteAsync Pattern (no double entity fetch):**
+```csharp
+var account = await _uow.Accounts.GetByIdAsync(id, ct);
+if (account == null) return Result.Failure("الحساب غير موجود", ErrorCodes.NotFound);
+
+try
+{
+    _uow.Accounts.DeleteRange(new[] { account }); // already-loaded entity
+    await _uow.SaveChangesAsync(ct);
+    return Result.Success();
+}
+catch (DbUpdateException ex)
+{
+    Log.Error(ex, "Failed to permanently delete account {Id}", id);
+    return Result.Failure("لا يمكن حذف الحساب لأنه مرتبط بعمليات أخرى");
+}
+```
+
+**Route Constraints - Never use :byte:**
+```csharp
+// WRONG - causes HTTP 500:
+// [HttpGet("by-type/{type:byte}")]
+
+// CORRECT:
+[HttpGet("by-type/{type:int:min(1):max(5)}")]
+public async Task<IActionResult> GetByType(AccountType type, CancellationToken ct)
+```

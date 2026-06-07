@@ -1,18 +1,19 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
+using SalesSystem.Infrastructure.Persistence;
 
 namespace SalesSystem.Infrastructure.Health;
 
 public class DatabaseHealthCheck : IHealthCheck
 {
-    private readonly IConfiguration _configuration;
+    private readonly SecureDbContextFactory _dbFactory;
     private readonly ILogger<DatabaseHealthCheck> _logger;
 
-    public DatabaseHealthCheck(IConfiguration configuration, ILogger<DatabaseHealthCheck> logger)
+    public DatabaseHealthCheck(SecureDbContextFactory dbFactory,
+        ILogger<DatabaseHealthCheck> logger)
     {
-        _configuration = configuration;
+        _dbFactory = dbFactory;
         _logger = logger;
     }
 
@@ -22,12 +23,7 @@ public class DatabaseHealthCheck : IHealthCheck
     {
         try
         {
-            var connString = _configuration.GetConnectionString("DefaultConnection");
-            if (string.IsNullOrEmpty(connString))
-                connString = Environment.GetEnvironmentVariable("SALESSYSTEM_DB_CONNECTION");
-
-            if (string.IsNullOrEmpty(connString))
-                return HealthCheckResult.Unhealthy("Unreachable");
+            var connString = _dbFactory.GetDecryptedConnectionString();
 
             var builder = new SqlConnectionStringBuilder(connString)
             {
@@ -41,6 +37,11 @@ public class DatabaseHealthCheck : IHealthCheck
             await command.ExecuteScalarAsync(ct);
 
             return HealthCheckResult.Healthy("Reachable");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Connection string", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(ex, "Database connection string not configured");
+            return HealthCheckResult.Unhealthy("Connection string not configured");
         }
         catch (Exception ex)
         {

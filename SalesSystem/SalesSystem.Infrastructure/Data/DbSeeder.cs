@@ -142,6 +142,98 @@ public static class DbSeeder
             logger?.LogInformation("Seeded StoreSettings.");
         }
 
+        // ═══════════════════════════════════════════════════
+        // 7. Seed Permissions + RolePermissions
+        // ═══════════════════════════════════════════════════
+        if (!await db.Set<Permission>().AnyAsync())
+        {
+            var permissions = new List<Permission>
+            {
+                // ── Sales (1–7) ──
+                Permission.Create("Sales.View", "عرض فواتير البيع", "Sales", isSystem: true),
+                Permission.Create("Sales.Create", "إنشاء فاتورة بيع", "Sales", isSystem: true),
+                Permission.Create("Sales.Edit", "تعديل فاتورة بيع", "Sales", isSystem: true),
+                Permission.Create("Sales.Delete", "حذف فاتورة بيع", "Sales", isSystem: true),
+                Permission.Create("Sales.Cancel", "إلغاء فاتورة بيع", "Sales", isSystem: true),
+                Permission.Create("Sales.Return", "مرتجع مبيعات", "Sales", isSystem: true),
+                Permission.Create("Sales.Print", "طباعة فاتورة بيع", "Sales", isSystem: true),
+                // ── Purchases (8–12) ──
+                Permission.Create("Purchases.View", "عرض فواتير الشراء", "Purchases", isSystem: true),
+                Permission.Create("Purchases.Create", "إنشاء فاتورة شراء", "Purchases", isSystem: true),
+                Permission.Create("Purchases.Edit", "تعديل فاتورة شراء", "Purchases", isSystem: true),
+                Permission.Create("Purchases.Cancel", "إلغاء فاتورة شراء", "Purchases", isSystem: true),
+                Permission.Create("Purchases.Print", "طباعة فاتورة شراء", "Purchases", isSystem: true),
+                // ── Inventory (13–15) ──
+                Permission.Create("Inventory.View", "عرض المخزون", "Inventory", isSystem: true),
+                Permission.Create("Inventory.Transfer", "تحويل مخزون", "Inventory", isSystem: true),
+                Permission.Create("Inventory.Adjust", "تعديل المخزون", "Inventory", isSystem: true),
+                // ── Customers (16–18) ──
+                Permission.Create("Customers.View", "عرض العملاء", "Customers", isSystem: true),
+                Permission.Create("Customers.Create", "إضافة عميل", "Customers", isSystem: true),
+                Permission.Create("Customers.Edit", "تعديل عميل", "Customers", isSystem: true),
+                // ── Suppliers (19–21) ──
+                Permission.Create("Suppliers.View", "عرض الموردين", "Suppliers", isSystem: true),
+                Permission.Create("Suppliers.Create", "إضافة مورد", "Suppliers", isSystem: true),
+                Permission.Create("Suppliers.Edit", "تعديل مورد", "Suppliers", isSystem: true),
+                // ── Products (22–24) ──
+                Permission.Create("Products.View", "عرض المنتجات", "Products", isSystem: true),
+                Permission.Create("Products.Create", "إضافة منتج", "Products", isSystem: true),
+                Permission.Create("Products.Edit", "تعديل منتج", "Products", isSystem: true),
+                // ── Reports (25) ──
+                Permission.Create("Reports.View", "عرض التقارير", "Reports", isSystem: true),
+                // ── Accounting (26–27) ──
+                Permission.Create("Accounting.View", "عرض الحسابات", "Accounting", isSystem: true),
+                Permission.Create("Accounting.Manage", "إدارة الحسابات", "Accounting", isSystem: true),
+                // ── System (28–29) ──
+                Permission.Create("System.Settings", "إعدادات النظام", "System", isSystem: true),
+                Permission.Create("System.Users", "إدارة المستخدمين", "System", isSystem: true),
+                // ── Operations (30–32) ──
+                Permission.Create("Operations.Cashbox", "إدارة الصندوق", "Operations", isSystem: true),
+                Permission.Create("Operations.Banking", "إدارة البنوك", "Operations", isSystem: true),
+                Permission.Create("Operations.Expenses", "إدارة المصروفات", "Operations", isSystem: true),
+                // ── Audit (33) ──
+                Permission.Create("Audit.Log", "سجل المراجعة", "Audit", isSystem: true),
+            };
+            db.Set<Permission>().AddRange(permissions);
+            await db.SaveChangesAsync();
+            logger?.LogInformation("Seeded {Count} permissions.", permissions.Count);
+
+            // ── RolePermissions ──
+            // Admin (1) — ALL permissions
+            var allPermissionIds = permissions.Select(p => p.Id).ToList();
+            foreach (var permId in allPermissionIds)
+            {
+                db.Set<RolePermission>().Add(RolePermission.Create(UserRole.Admin, permId));
+            }
+
+            // Manager (2) — Sales, Purchases, Inventory, Customers, Suppliers, Products, Reports, Accounting.View, Audit.Log
+            var managerPermIds = permissions
+                .Where(p => p.Category is "Sales" or "Purchases" or "Inventory" or "Customers" or "Suppliers" or "Products"
+                    || p.Name is "Reports.View" or "Accounting.View" or "Audit.Log")
+                .Select(p => p.Id)
+                .ToList();
+            foreach (var permId in managerPermIds)
+            {
+                db.Set<RolePermission>().Add(RolePermission.Create(UserRole.Manager, permId));
+            }
+
+            // Cashier (3) — Sales (View, Create, Print), Customers.View, Inventory.View, Operations.Cashbox
+            var cashierPermNames = new HashSet<string> { "Sales.View", "Sales.Create", "Sales.Print",
+                "Customers.View", "Inventory.View", "Operations.Cashbox" };
+            var cashierPermIds = permissions
+                .Where(p => cashierPermNames.Contains(p.Name))
+                .Select(p => p.Id)
+                .ToList();
+            foreach (var permId in cashierPermIds)
+            {
+                db.Set<RolePermission>().Add(RolePermission.Create(UserRole.Cashier, permId));
+            }
+
+            await db.SaveChangesAsync();
+            logger?.LogInformation("Seeded RolePermissions: Admin={0}, Manager={1}, Cashier={2}",
+                allPermissionIds.Count, managerPermIds.Count, cashierPermIds.Count);
+        }
+
         // Continue with existing seed logic below — system accounts, users, etc.
         // Skip remaining seed if admin user already exists
         if (await db.Users.AnyAsync())
@@ -150,12 +242,15 @@ public static class DbSeeder
             return;
         }
 
-        // 7. Admin user — password: Admin@123, BCrypt work factor 12
-        var adminUser = User.Create(
+        // 7. Admin user — created with default password "12345678" (MustChangePassword=true).
+        // On first login, the admin must change their password.
+        string adminPasswordHash = BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
+        var adminUser = User.CreateWithPassword(
             userName: "admin",
-            passwordHash: BCrypt.Net.BCrypt.HashPassword("Admin@123", workFactor: 12),
+            passwordHash: adminPasswordHash,
             fullName: "Administrator",
             role: UserRole.Admin,
+            mustChangePassword: true,
             createdByUserId: null
         );
         db.Users.Add(adminUser);

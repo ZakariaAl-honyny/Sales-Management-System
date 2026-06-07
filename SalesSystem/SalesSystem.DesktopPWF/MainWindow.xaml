@@ -37,10 +37,16 @@
         xmlns:vmUsers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Users"
         xmlns:vmTaxes="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Taxes"
         xmlns:viewsTaxes="clr-namespace:SalesSystem.DesktopPWF.Views.Taxes"
-        xmlns:vmCurrencies="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Currencies"
-        xmlns:viewsCurrencies="clr-namespace:SalesSystem.DesktopPWF.Views.Currencies"
-        xmlns:vmTransfers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Transfers"
-        mc:Ignorable="d"
+             xmlns:vmCurrencies="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Currencies"
+             xmlns:viewsCurrencies="clr-namespace:SalesSystem.DesktopPWF.Views.Currencies"
+             xmlns:vmAccounts="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Accounts"
+             xmlns:viewsAccounts="clr-namespace:SalesSystem.DesktopPWF.Views.Accounts"
+         xmlns:vmTransfers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Transfers"
+         xmlns:audit="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Audit"
+         xmlns:perms="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Permissions"
+         xmlns:viewsAudit="clr-namespace:SalesSystem.DesktopPWF.Views.Audit"
+         xmlns:viewsPerms="clr-namespace:SalesSystem.DesktopPWF.Views.Permissions"
+         mc:Ignorable="d"
         Title="نظام إدارة المبيعات"
         Height="700" Width="1200"
         MinHeight="600" MinWidth="900"
@@ -148,6 +154,18 @@
             <DataTemplate DataType="{x:Type vmCurrencies:CurrencyEditorViewModel}">
                 <viewsCurrencies:CurrencyEditorView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmAccounts:AccountsListViewModel}">
+                <viewsAccounts:AccountsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmAccounts:AccountEditorViewModel}">
+                <viewsAccounts:AccountEditorView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type audit:AuditLogListViewModel}">
+                <viewsAudit:AuditLogListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type perms:PermissionManagementViewModel}">
+                <viewsPerms:PermissionManagementView />
+            </DataTemplate>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -212,6 +230,7 @@
                 <Separator/>
                 <MenuItem Header="الضرائب" ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة" Click="TaxesMenuItem_Click"/>
                 <MenuItem Header="العملات" Command="{Binding NavigateToCurrenciesCommand}" ToolTip="إدارة العملات وأسعار الصرف"/>
+                <MenuItem Header="دليل الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}" ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
                 <MenuItem Header="النسخ الاحتياطي" 
                           Command="{Binding NavigateToBackupCommand}"
                           ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
@@ -394,6 +413,10 @@
                                             Command="{Binding NavigateToCurrenciesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             ToolTip="إدارة العملات وأسعار الصرف — إضافة وتعديل العملات"/>
+                                    <Button Content="دليل الحسابات" 
+                                            Command="{Binding NavigateToChartOfAccountsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
                                     <Button Content="نقل المخزون" 
                                             Command="{Binding NavigateToStockTransfersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
@@ -418,19 +441,46 @@
         <StatusBar Grid.Row="2" Style="{StaticResource StatusBarStyle}">
             <StatusBarItem>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="المستخدم: " Margin="0,0,5,0"/>
+                    <!-- Avatar indicator -->
+                    <Border Width="24" Height="24" CornerRadius="12"
+                            Background="{StaticResource SurfaceBrush}"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            Margin="0,0,6,0">
+                        <TextBlock Text="👤" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="المستخدم: " Margin="0,0,3,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                     <TextBlock x:Name="TxtUserName" FontWeight="Bold"/>
                 </StackPanel>
             </StatusBarItem>
             <Separator/>
             <StatusBarItem>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="الدور: " Margin="0,0,5,0"/>
-                    <TextBlock x:Name="TxtUserRole" FontWeight="Bold"/>
+                    <TextBlock Text="الدور: " Margin="0,0,3,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <Border x:Name="RoleBadge" CornerRadius="4" Padding="6,1">
+                        <TextBlock x:Name="TxtUserRole" FontWeight="Bold" FontSize="11"/>
+                    </Border>
                 </StackPanel>
             </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <Button x:Name="BtnChangePassword"
+                        Content="🔑"
+                        Style="{StaticResource SecondaryButton}"
+                        Padding="6,2"
+                        ToolTip="فتح نافذة تغيير كلمة المرور"
+                        Click="BtnChangePassword_Click"/>
+            </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock x:Name="CurrentDateText"/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="CurrentDateText" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <Button x:Name="BtnLogoutStatus"
+                            Content="🚪 خروج"
+                            Style="{StaticResource SecondaryButton}"
+                            Padding="8,2"
+                            Margin="8,0,0,0"
+                            ToolTip="تسجيل الخروج من النظام"
+                            Click="BtnLogout_Click"/>
+                </StackPanel>
             </StatusBarItem>
         </StatusBar>
     </Grid>

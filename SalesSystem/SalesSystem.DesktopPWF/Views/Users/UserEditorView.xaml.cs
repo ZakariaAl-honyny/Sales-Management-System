@@ -1,10 +1,10 @@
-﻿using System.Windows;
+﻿using System.Windows.Controls;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 
 namespace SalesSystem.DesktopPWF.Views.Users;
 
-public partial class UserEditorView : Window
+public partial class UserEditorView : UserControl
 {
     public UserEditorView()
     {
@@ -14,15 +14,6 @@ public partial class UserEditorView : Window
     public UserEditorView(UserEditorViewModel viewModel) : this()
     {
         DataContext = viewModel;
-        viewModel.CloseRequested += () => Close();
-        viewModel.FocusFirstInvalidFieldRequested += () =>
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                (ValidationFocusBehavior.FindFirstInvalid(this) ??
-                ValidationFocusBehavior.FindFirstEmptyRequired(this))?.Focus();
-            });
-        };
     }
 }
 

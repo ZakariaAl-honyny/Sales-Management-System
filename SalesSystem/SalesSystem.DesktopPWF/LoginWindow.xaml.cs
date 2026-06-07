@@ -30,8 +30,9 @@ public partial class LoginWindow : Window
         // Create ViewModel with services from DI
         var authService = App.GetService<IAuthApiService>();
         var sessionService = App.GetService<ISessionService>();
+        var screenWindowService = App.GetService<IScreenWindowService>();
 
-        DataContext = new LoginWindowViewModel(authService, sessionService);
+        DataContext = new LoginWindowViewModel(authService, sessionService, screenWindowService);
 
         // Enable window dragging
         MouseDown += (s, e) =>

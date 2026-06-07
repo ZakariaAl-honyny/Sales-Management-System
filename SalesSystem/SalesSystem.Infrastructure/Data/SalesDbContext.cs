@@ -48,6 +48,10 @@ public class SalesDbContext : DbContext
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<ExchangeRateHistory> ExchangeRateHistories => Set<ExchangeRateHistory>();
     public DbSet<FiscalYearClosure> FiscalYearClosures => Set<FiscalYearClosure>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 
