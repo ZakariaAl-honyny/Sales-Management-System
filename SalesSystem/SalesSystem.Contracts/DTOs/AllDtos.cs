@@ -768,3 +768,45 @@ public record CustomerAgingReportDto(
     DateTime CalculationDate
 );
 
+// ═══════════════════════════════════════════════════════
+// Phase 26 — Inventory Operation DTOs
+// ═══════════════════════════════════════════════════════
+
+public record InventoryOperationDto(
+    int Id,
+    string OperationNo,
+    int WarehouseId,
+    string WarehouseName,
+    byte OperationType,
+    DateTime OperationDate,
+    string? ReferenceNo,
+    string? Notes,
+    byte? AdjustmentType,
+    byte Status,
+    IReadOnlyList<InventoryOperationItemDto> Items)
+{
+    public string OperationTypeDisplay => OperationType switch
+    {
+        1 => "صرف مخزني",
+        2 => "توريد مخزني",
+        3 => "تسوية مخزنية",
+        _ => "غير معروف"
+    };
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "تم الترحيل",
+        3 => "ملغي",
+        _ => "غير معروف"
+    };
+}
+
+public record InventoryOperationItemDto(
+    int Id,
+    int ProductId,
+    string ProductName,
+    decimal Quantity,
+    decimal? UnitCost,
+    byte? StockIssueReason,
+    string? Notes);
+

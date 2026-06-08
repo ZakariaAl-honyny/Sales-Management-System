@@ -484,4 +484,13 @@ public interface IPermissionApiService
     Task<Result> UpdateRolePermissionsAsync(byte role, List<int> permissionIds);
 }
 
+public interface IInventoryOperationApiService
+{
+    Task<Result<List<InventoryOperationDto>>> GetAllAsync(int? warehouseId = null, byte? operationType = null, int page = 1, int pageSize = 1000);
+    Task<Result<InventoryOperationDto>> GetByIdAsync(int id);
+    Task<Result<InventoryOperationDto>> CreateAsync(CreateInventoryOperationRequest request);
+    Task<Result<InventoryOperationDto>> PostAsync(int id);
+    Task<Result<InventoryOperationDto>> CancelAsync(int id);
+}
+
 

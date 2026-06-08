@@ -57,3 +57,9 @@ public record InventoryBatchChangedMessage(int BatchId);
 /// </summary>
 public record ProductImageChangedMessage(int ImageId);
 
+/// <summary>
+/// Published when an inventory operation is created, posted, or cancelled.
+/// Carries the operation ID only — NO data payload (RULE-034).
+/// </summary>
+public record InventoryOperationChangedMessage(int Id);
+

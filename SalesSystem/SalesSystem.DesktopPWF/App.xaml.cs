@@ -16,6 +16,7 @@ using SalesSystem.DesktopPWF.ViewModels.Suppliers;
 using SalesSystem.DesktopPWF.ViewModels.Products;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Inventory;
+using SalesSystem.DesktopPWF.ViewModels.InventoryOperations;
 using SalesSystem.DesktopPWF.ViewModels.Payments;
 using SalesSystem.DesktopPWF.ViewModels.Returns;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
@@ -212,6 +213,9 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ITaxesApiService, TaxesApiService>();
         services.AddSingleton<ICurrencyApiService, CurrencyApiService>();
 
+        // Inventory Operation API Service
+        services.AddSingleton<IInventoryOperationApiService, InventoryOperationApiService>();
+
         // Account API Service
         services.AddSingleton<IAccountApiService, AccountApiService>();
 
@@ -292,6 +296,10 @@ public partial class App : System.Windows.Application
         // Currency ViewModels
         services.AddTransient<CurrenciesListViewModel>();
         services.AddTransient<CurrencyEditorViewModel>();
+
+        // Inventory Operation ViewModels
+        services.AddTransient<InventoryOperationListViewModel>();
+        services.AddTransient<InventoryOperationEditorViewModel>();
 
         // Account ViewModels
         services.AddTransient<AccountsListViewModel>();

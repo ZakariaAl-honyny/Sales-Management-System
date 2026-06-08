@@ -49,8 +49,10 @@
          xmlns:viewsAudit="clr-namespace:SalesSystem.DesktopPWF.Views.Audit"
           xmlns:viewsPerms="clr-namespace:SalesSystem.DesktopPWF.Views.Permissions"
           xmlns:viewsWarehouses="clr-namespace:SalesSystem.DesktopPWF.Views.Warehouses"
-          xmlns:vmWarehouses="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Warehouses"
-          mc:Ignorable="d"
+            xmlns:vmWarehouses="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Warehouses"
+            xmlns:viewsInventoryOps="clr-namespace:SalesSystem.DesktopPWF.Views.InventoryOperations"
+           xmlns:vmInventoryOps="clr-namespace:SalesSystem.DesktopPWF.ViewModels.InventoryOperations"
+           mc:Ignorable="d"
         Title="نظام إدارة المبيعات"
         Height="700" Width="1200"
         MinHeight="600" MinWidth="900"
@@ -146,7 +148,10 @@
             <DataTemplate DataType="{x:Type vmUsers:UserListViewModel}">
                 <viewsUsers:UsersListView />
             </DataTemplate>
-            <DataTemplate DataType="{x:Type viewmodels:SettingsViewModel}">
+             <DataTemplate DataType="{x:Type vmInventoryOps:InventoryOperationListViewModel}">
+                 <viewsInventoryOps:InventoryOperationListView />
+             </DataTemplate>
+             <DataTemplate DataType="{x:Type viewmodels:SettingsViewModel}">
                 <viewsSettings:SettingsView />
             </DataTemplate>
             <DataTemplate DataType="{x:Type vmSettings:SystemSettingsViewModel}">
@@ -491,16 +496,21 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavChartOfAccounts"
                                             ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
+                                    <Button Content="العمليات المخزنية" 
+                                             Command="{Binding NavigateToInventoryOperationsCommand}" 
+                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                             AutomationProperties.AutomationId="NavInventoryOperations"
+                                             ToolTip="إدارة عمليات الصرف والإستلام والتسوية المخزنية"/>
                                     <Button Content="نقل المخزون" 
-                                            Command="{Binding NavigateToStockTransfersCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavStockTransfers"
-                                            ToolTip="إدارة عمليات نقل البضائع بين المستودعات"/>
+                                             Command="{Binding NavigateToStockTransfersCommand}" 
+                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                             AutomationProperties.AutomationId="NavStockTransfers"
+                                             ToolTip="إدارة عمليات نقل البضائع بين المستودعات"/>
                                     <Button Content="المخزون" 
-                                            Command="{Binding NavigateToInventoryCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavInventory"
-                                            ToolTip="عرض حركة المخزون وإدارة الأصناف في المستودعات"/>
+                                             Command="{Binding NavigateToInventoryCommand}" 
+                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                             AutomationProperties.AutomationId="NavInventory"
+                                             ToolTip="عرض حركة المخزون وإدارة الأصناف في المستودعات"/>
                                 </StackPanel>
                             </Expander>
 

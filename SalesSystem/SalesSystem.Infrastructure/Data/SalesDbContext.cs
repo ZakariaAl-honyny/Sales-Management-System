@@ -55,6 +55,8 @@ public class SalesDbContext : DbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<InventoryOperation> InventoryOperations => Set<InventoryOperation>();
+    public DbSet<InventoryOperationItem> InventoryOperationItems => Set<InventoryOperationItem>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 

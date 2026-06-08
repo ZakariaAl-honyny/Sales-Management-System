@@ -26,6 +26,7 @@ using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
 
 using SalesSystem.DesktopPWF.ViewModels.Warehouses;
+using SalesSystem.DesktopPWF.ViewModels.InventoryOperations;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -122,6 +123,7 @@ public class MainViewModel : ViewModelBase
         NavigateToProductPricesCommand = new RelayCommand(() => NavigateTo<ProductPricesListViewModel>());
         NavigateToProductImagesCommand = new RelayCommand(() => NavigateTo<ProductImagesViewModel>());
         NavigateToInventoryBatchesCommand = new RelayCommand(() => NavigateTo<InventoryBatchesViewModel>());
+        NavigateToInventoryOperationsCommand = new RelayCommand(() => NavigateTo<InventoryOperationListViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
         NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
@@ -305,6 +307,9 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى إدارة الدفعات المخزنية — تتبع الكميات حسب تاريخ انتهاء الصلاحية</summary>
     public ICommand NavigateToInventoryBatchesCommand { get; }
+
+    /// <summary>نقل إلى العمليات المخزنية — الصرف والإستلام والتسوية</summary>
+    public ICommand NavigateToInventoryOperationsCommand { get; }
 
     /// <summary>نقل إلى إدارة الضرائب</summary>
     public ICommand NavigateToTaxesCommand { get; }
