@@ -69,7 +69,11 @@ public class CashBoxService : ICashBoxService
             }
             else
             {
-                accountId = await AutoCreateCashBoxAccountAsync(request.BoxName, ct);
+                // Create the account and persist it FIRST so EF Core populates account.Id with the real DB-generated value
+                var account = await CreateCashBoxAccountAsync(request.BoxName, ct);
+                await _uow.Accounts.AddAsync(account, ct);
+                await _uow.SaveChangesAsync(ct);
+                accountId = account.Id;
             }
 
             // Step 2: Create the CashBox entity
@@ -108,10 +112,11 @@ public class CashBoxService : ICashBoxService
     }
 
     /// <summary>
-    /// Auto-creates a Level-4 detail account under "1110 — النقدية" (Cash &amp; Cash Equivalents).
+    /// Creates a Level-4 detail Account entity under "1110 — النقدية" (Cash &amp; Cash Equivalents).
     /// Generates the next available account code (e.g., 1113, 1114, ...).
+    /// NOTE: Does NOT save to DB — caller must persist and use the returned Account.Id.
     /// </summary>
-    private async Task<int> AutoCreateCashBoxAccountAsync(string boxName, CancellationToken ct)
+    private async Task<Account> CreateCashBoxAccountAsync(string boxName, CancellationToken ct)
     {
         // Find the parent account "1110 — النقدية"
         var parentAccount = await _uow.Accounts.FirstOrDefaultAsync(
@@ -129,12 +134,10 @@ public class CashBoxService : ICashBoxService
         string nextCode;
         if (children.Count == 0)
         {
-            // No children yet — start from 1111
             nextCode = "1111";
         }
         else
         {
-            // Increment child code using max AccountCode
             var maxChildCode = children.First().AccountCode;
             if (int.TryParse(maxChildCode, out var maxCode))
                 nextCode = (maxCode + 1).ToString();
@@ -142,7 +145,7 @@ public class CashBoxService : ICashBoxService
                 nextCode = "1111";
         }
 
-        var account = Account.Create(
+        return Account.Create(
             accountCode: nextCode,
             nameAr: boxName,
             nameEn: boxName,
@@ -157,9 +160,46 @@ public class CashBoxService : ICashBoxService
             openingBalance: 0,
             notes: null,
             createdByUserId: 0);
+    }
 
-        await _uow.Accounts.AddAsync(account, ct);
-        return account.Id;
+    public async Task<Result<CashBoxDto>> UpdateAsync(int id, UpdateCashBoxRequest request, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var box = await _uow.CashBoxes.GetByIdAsync(id, ct);
+            if (box == null)
+                return Result<CashBoxDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
+
+            box.Update(
+                boxName: request.BoxName,
+                phoneNumber: request.PhoneNumber,
+                taxNumber: request.TaxNumber,
+                address: request.Address,
+                notes: request.Notes,
+                categoryId: request.CategoryId,
+                branchId: request.BranchId,
+                assignedUserId: request.AssignedUserId,
+                currencyId: request.CurrencyId);
+
+            box.SetUpdatedBy(userId);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Cash box updated: {BoxName} (ID: {Id}) by User {UserId}",
+                box.BoxName, id, userId);
+
+            return Result<CashBoxDto>.Success(MapToDto(box));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation updating cash box {Id}: {Message}", id, ex.Message);
+            return Result<CashBoxDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating cash box {Id}", id);
+            return Result<CashBoxDto>.Failure("حدث خطأ أثناء تحديث بيانات الصندوق");
+        }
     }
 
     public async Task<Result> DeactivateAsync(int id, CancellationToken ct)
@@ -257,49 +297,49 @@ public class CashBoxService : ICashBoxService
         if (request.SourceCashBoxId == request.DestinationCashBoxId)
             return Result.Failure("لا يمكن تحويل الأموال إلى نفس الصندوق");
 
-        await using var dbTransaction = await _uow.BeginTransactionAsync(ct);
+        // Validate source and destination exist BEFORE entering the transaction (per RULE-027)
+        var sourceBox = await _uow.CashBoxes.GetByIdAsync(request.SourceCashBoxId, ct);
+        if (sourceBox == null)
+        {
+            _logger.LogWarning("Source cash box {SourceCashBoxId} not found for transfer", request.SourceCashBoxId);
+            return Result.Failure("الصندوق المصدر غير موجود", ErrorCodes.NotFound);
+        }
+
+        var destBox = await _uow.CashBoxes.GetByIdAsync(request.DestinationCashBoxId, ct);
+        if (destBox == null)
+        {
+            _logger.LogWarning("Destination cash box {DestCashBoxId} not found for transfer", request.DestinationCashBoxId);
+            return Result.Failure("الصندوق الوجهة غير موجود", ErrorCodes.NotFound);
+        }
+
         try
         {
-            var sourceBox = await _uow.CashBoxes.GetByIdAsync(request.SourceCashBoxId, ct);
-            if (sourceBox == null)
+            // Use ExecuteTransactionAsync instead of BeginTransactionAsync (per RULE-275)
+            await _uow.ExecuteTransactionAsync(async () =>
             {
-                await dbTransaction.RollbackAsync(ct);
-                _logger.LogWarning("Source cash box {SourceCashBoxId} not found for transfer", request.SourceCashBoxId);
-                return Result.Failure("الصندوق المصدر غير موجود", ErrorCodes.NotFound);
-            }
+                var sourceRunningBalance = await ComputeRunningBalanceAsync(request.SourceCashBoxId, ct);
+                var destRunningBalance = await ComputeRunningBalanceAsync(request.DestinationCashBoxId, ct);
 
-            var destBox = await _uow.CashBoxes.GetByIdAsync(request.DestinationCashBoxId, ct);
-            if (destBox == null)
-            {
-                await dbTransaction.RollbackAsync(ct);
-                _logger.LogWarning("Destination cash box {DestCashBoxId} not found for transfer", request.DestinationCashBoxId);
-                return Result.Failure("الصندوق الوجهة غير موجود", ErrorCodes.NotFound);
-            }
+                // Create withdrawal from source
+                var sourceNewBalance = sourceRunningBalance - request.Amount;
+                var withdrawalTx = CashTransaction.Create(
+                    request.SourceCashBoxId, CashTransactionType.TransferOut,
+                    -request.Amount, sourceNewBalance,
+                    "CashTransfer", request.DestinationCashBoxId,
+                    userId, request.Notes, null);
+                await _uow.CashTransactions.AddAsync(withdrawalTx, ct);
 
-            // Compute running balances
-            var sourceRunningBalance = await ComputeRunningBalanceAsync(request.SourceCashBoxId, ct);
-            var destRunningBalance = await ComputeRunningBalanceAsync(request.DestinationCashBoxId, ct);
+                // Create deposit to destination
+                var destNewBalance = destRunningBalance + request.Amount;
+                var depositTx = CashTransaction.Create(
+                    request.DestinationCashBoxId, CashTransactionType.TransferIn,
+                    request.Amount, destNewBalance,
+                    "CashTransfer", request.SourceCashBoxId,
+                    userId, request.Notes, null);
+                await _uow.CashTransactions.AddAsync(depositTx, ct);
 
-            // Create withdrawal from source
-            var sourceNewBalance = sourceRunningBalance - request.Amount;
-            var withdrawalTx = CashTransaction.Create(
-                request.SourceCashBoxId, CashTransactionType.TransferOut,
-                -request.Amount, sourceNewBalance,
-                "CashTransfer", request.DestinationCashBoxId,
-                userId, request.Notes, null);
-            await _uow.CashTransactions.AddAsync(withdrawalTx, ct);
-
-            // Create deposit to destination
-            var destNewBalance = destRunningBalance + request.Amount;
-            var depositTx = CashTransaction.Create(
-                request.DestinationCashBoxId, CashTransactionType.TransferIn,
-                request.Amount, destNewBalance,
-                "CashTransfer", request.SourceCashBoxId,
-                userId, request.Notes, null);
-            await _uow.CashTransactions.AddAsync(depositTx, ct);
-
-            await _uow.SaveChangesAsync(ct);
-            await dbTransaction.CommitAsync(ct);
+                await _uow.SaveChangesAsync(ct);
+            }, ct);
 
             _logger.LogInformation(
                 "Cash transfer of {Amount:N2} from box {SourceBoxId} to box {DestBoxId} by User {UserId}",
@@ -309,14 +349,12 @@ public class CashBoxService : ICashBoxService
         }
         catch (DomainException ex)
         {
-            await dbTransaction.RollbackAsync(ct);
             _logger.LogWarning(ex, "Domain rule violation transferring cash from {SourceBoxId} to {DestBoxId}: {Message}",
                 request.SourceCashBoxId, request.DestinationCashBoxId, ex.Message);
             return Result.Failure(ex.Message);
         }
         catch (Exception ex)
         {
-            await dbTransaction.RollbackAsync(ct);
             _logger.LogError(ex, "Error transferring cash from {SourceBoxId} to {DestBoxId}",
                 request.SourceCashBoxId, request.DestinationCashBoxId);
             return Result.Failure("حدث خطأ أثناء تحويل الأموال");

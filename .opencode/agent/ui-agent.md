@@ -1,6 +1,6 @@
 ﻿---
 name: "UI Agent"
-reasoningEffect: high
+reasoningEffect: max
 role: "WPF UI specialist (MVVM)"
 activation: "When working on SalesSystem.DesktopPWF/**"
 mode: subagent

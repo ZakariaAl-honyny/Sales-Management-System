@@ -18,10 +18,12 @@
         <TextBlock Grid.Row="0"
                    Text="💰  إضافة صندوق جديد"
                    Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="TitleAddCashBox"
                    Visibility="{Binding IsEditMode, Converter={StaticResource InverseBoolToVisibility}}" Margin="0,0,0,12"/>
         <TextBlock Grid.Row="0"
                    Text="💰  تعديل صندوق"
                    Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="TitleEditCashBox"
                    Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,12"/>
 
         <!-- Main Content Card -->
@@ -61,6 +63,7 @@
                             <TextBlock Text="اسم الصندوق *" Style="{StaticResource LabelStyle}"/>
                             <TextBox Text="{Binding BoxName, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
+                                     AutomationProperties.AutomationId="TxtCashBoxName"
                                      ToolTip="اسم الصندوق النقدي — هذا الحقل إلزامي"/>
                         </StackPanel>
 
@@ -83,6 +86,7 @@
                                       SelectedItem="{Binding SelectedCategory}"
                                       DisplayMemberPath="Name"
                                       Style="{StaticResource ModernComboBox}"
+                                      AutomationProperties.AutomationId="CmbCashBoxCategory"
                                       ToolTip="اختيار فئة للصندوق (اختياري)"/>
                         </StackPanel>
 
@@ -91,6 +95,7 @@
                             <TextBlock Text="رقم الهاتف" Style="{StaticResource LabelStyle}"/>
                             <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
+                                     AutomationProperties.AutomationId="TxtCashBoxPhone"
                                      ToolTip="رقم الهاتف المسؤول عن الصندوق (اختياري)"/>
                         </StackPanel>
 
@@ -99,6 +104,7 @@
                             <TextBlock Text="الرقم الضريبي" Style="{StaticResource LabelStyle}"/>
                             <TextBox Text="{Binding TaxNumber, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
+                                     AutomationProperties.AutomationId="TxtCashBoxTaxNumber"
                                      ToolTip="الرقم الضريبي للصندوق (اختياري)"/>
                         </StackPanel>
 
@@ -108,6 +114,7 @@
                             <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
                                      AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="60"
+                                     AutomationProperties.AutomationId="TxtCashBoxAddress"
                                      ToolTip="عنوان موقع الصندوق (اختياري)"/>
                         </StackPanel>
 
@@ -121,6 +128,7 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                 <Button Command="{Binding SaveCommand}"
                         Style="{StaticResource PrimaryButton}"
+                        AutomationProperties.AutomationId="BtnSaveCashBox"
                         ToolTip="حفظ بيانات الصندوق النقدي">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="💾" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -131,6 +139,7 @@
                 <Button Command="{Binding CancelCommand}"
                         Style="{StaticResource SecondaryButton}"
                         Margin="4,0,0,0"
+                        AutomationProperties.AutomationId="BtnCancelCashBox"
                         ToolTip="إلغاء الأمر والعودة للقائمة">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="❌" Margin="0,0,8,0" VerticalAlignment="Center"/>

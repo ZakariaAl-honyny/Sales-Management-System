@@ -25,6 +25,8 @@ using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
 
+using SalesSystem.DesktopPWF.ViewModels.Warehouses;
+
 namespace SalesSystem.DesktopPWF.ViewModels;
 
 /// <summary>
@@ -117,6 +119,9 @@ public class MainViewModel : ViewModelBase
         NavigateToBackupCommand = new RelayCommand(() => NavigateTo<BackupViewModel>());
         NavigateToStockTransfersCommand = new RelayCommand(() => NavigateTo<StockTransfersListViewModel>());
         NavigateToInventoryCommand = new RelayCommand(() => NavigateTo<InventoryViewModel>());
+        NavigateToProductPricesCommand = new RelayCommand(() => NavigateTo<ProductPricesListViewModel>());
+        NavigateToProductImagesCommand = new RelayCommand(() => NavigateTo<ProductImagesViewModel>());
+        NavigateToInventoryBatchesCommand = new RelayCommand(() => NavigateTo<InventoryBatchesViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
         NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
@@ -292,6 +297,15 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى شاشة المخزون</summary>
     public ICommand NavigateToInventoryCommand { get; }
 
+    /// <summary>نقل إلى إدارة أسعار المنتجات — عرض وتحديث أسعار البيع متعددة العملات لكل وحدة منتج</summary>
+    public ICommand NavigateToProductPricesCommand { get; }
+
+    /// <summary>نقل إلى صور المنتجات — إدارة صور متعددة لكل منتج</summary>
+    public ICommand NavigateToProductImagesCommand { get; }
+
+    /// <summary>نقل إلى إدارة الدفعات المخزنية — تتبع الكميات حسب تاريخ انتهاء الصلاحية</summary>
+    public ICommand NavigateToInventoryBatchesCommand { get; }
+
     /// <summary>نقل إلى إدارة الضرائب</summary>
     public ICommand NavigateToTaxesCommand { get; }
 
@@ -442,6 +456,9 @@ public class MainViewModel : ViewModelBase
             nameof(BackupViewModel)                 => "Settings",
             nameof(StockTransfersListViewModel)     => "StockTransfers",
             nameof(InventoryViewModel)              => "Inventory",
+            nameof(ProductPricesListViewModel)      => "Products",
+            nameof(ProductImagesViewModel)          => "Products",
+            nameof(InventoryBatchesViewModel)       => "Products",
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
             nameof(AccountsListViewModel)           => "Settings",

@@ -16,8 +16,10 @@ public class CashBox : BaseEntity
 
     /// <summary>
     /// FK to the Chart of Accounts Account that holds this cash box's balance.
+    /// Nullable to support migration of existing data — auto-created by service layer
+    /// when not provided. Domain validation requires a valid AccountId for new boxes.
     /// </summary>
-    public int AccountId { get; private set; }
+    public int? AccountId { get; private set; }
     public Account? Account { get; private set; }
 
     /// <summary>
@@ -43,11 +45,12 @@ public class CashBox : BaseEntity
     private CashBox() { } // EF Core
 
     /// <summary>
-    /// Creates a new cash box linked to the specified Account.
+    /// Creates a new cash box. AccountId may be omitted — the service layer
+    /// auto-creates a Chart of Accounts sub-account under "1110 — النقدية".
     /// </summary>
     public static CashBox Create(
         string boxName,
-        int accountId,
+        int? accountId = null,
         int? categoryId = null,
         int? branchId = null,
         int? assignedUserId = null,
@@ -60,8 +63,7 @@ public class CashBox : BaseEntity
         if (string.IsNullOrWhiteSpace(boxName))
             throw new DomainException("اسم الصندوق مطلوب");
 
-        if (accountId <= 0)
-            throw new DomainException("الحساب المحاسبي للصندوق مطلوب");
+        // AccountId is validated at the service layer — auto-created if null
 
         return new CashBox
         {
@@ -102,5 +104,54 @@ public class CashBox : BaseEntity
             throw new DomainException("اسم الصندوق مطلوب");
 
         BoxName = newName.Trim();
+    }
+
+    /// <summary>
+    /// Updates all mutable fields of the cash box.
+    /// Only non-null values are applied — null means "keep current value".
+    /// </summary>
+    public void Update(
+        string? boxName,
+        string? phoneNumber,
+        string? taxNumber,
+        string? address,
+        string? notes,
+        int? categoryId,
+        int? branchId,
+        int? assignedUserId,
+        int? currencyId)
+    {
+        if (boxName != null)
+        {
+            if (string.IsNullOrWhiteSpace(boxName))
+                throw new DomainException("اسم الصندوق مطلوب");
+            BoxName = boxName.Trim();
+        }
+
+        if (phoneNumber != null)
+            PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+
+        if (taxNumber != null)
+            TaxNumber = string.IsNullOrWhiteSpace(taxNumber) ? null : taxNumber.Trim();
+
+        if (address != null)
+            Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+
+        if (notes != null)
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+
+        if (categoryId.HasValue)
+            CategoryId = categoryId.Value > 0 ? categoryId : null;
+
+        if (branchId.HasValue)
+            BranchId = branchId.Value > 0 ? branchId : null;
+
+        if (assignedUserId.HasValue)
+            AssignedUserId = assignedUserId.Value > 0 ? assignedUserId : null;
+
+        if (currencyId.HasValue)
+            CurrencyId = currencyId.Value > 0 ? currencyId : null;
+
+        UpdateTimestamp();
     }
 }

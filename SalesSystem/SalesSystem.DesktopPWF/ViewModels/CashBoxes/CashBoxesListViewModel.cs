@@ -201,14 +201,19 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
 
         var editorVm = _editorVmFactory.Value;
         editorVm.LoadForEdit(
+            SelectedCashBox.Id,
             SelectedCashBox.BoxName,
             SelectedCashBox.AccountId,
             SelectedCashBox.AccountName,
+            SelectedCashBox.CategoryId,
+            SelectedCashBox.CategoryName,
+            SelectedCashBox.BranchId,
+            SelectedCashBox.AssignedUserId,
+            SelectedCashBox.CurrencyId,
             SelectedCashBox.PhoneNumber,
             SelectedCashBox.TaxNumber,
             SelectedCashBox.Address,
-            SelectedCashBox.CategoryId,
-            SelectedCashBox.CategoryName);
+            SelectedCashBox.Notes);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
             Title = "تعديل الصندوق النقدي",

@@ -17,6 +17,7 @@ public class CashBoxEditorViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IToastNotificationService _toastService;
 
+    private int? _editingId;
     private string _boxName = string.Empty;
     private int? _accountId;
     private bool _isAccountAutoCreated = true;
@@ -25,6 +26,10 @@ public class CashBoxEditorViewModel : ViewModelBase
     private string? _phoneNumber;
     private string? _taxNumber;
     private string? _address;
+    private string? _notes;
+    private int? _branchId;
+    private int? _assignedUserId;
+    private int? _currencyId;
     private bool _isEditMode;
     private string? _errorMessage;
     private ObservableCollection<CategoryDto> _categories = new();
@@ -138,6 +143,30 @@ public class CashBoxEditorViewModel : ViewModelBase
         set => SetProperty(ref _address, value);
     }
 
+    public string? Notes
+    {
+        get => _notes;
+        set => SetProperty(ref _notes, value);
+    }
+
+    public int? BranchId
+    {
+        get => _branchId;
+        set => SetProperty(ref _branchId, value);
+    }
+
+    public int? AssignedUserId
+    {
+        get => _assignedUserId;
+        set => SetProperty(ref _assignedUserId, value);
+    }
+
+    public int? CurrencyId
+    {
+        get => _currencyId;
+        set => SetProperty(ref _currencyId, value);
+    }
+
     public bool IsEditMode
     {
         get => _isEditMode;
@@ -161,16 +190,21 @@ public class CashBoxEditorViewModel : ViewModelBase
 
     #region Methods
 
-    public void LoadForEdit(string boxName, int? accountId, string? accountName, string? phoneNumber, string? taxNumber, string? address, int? categoryId, string? categoryName)
+    public void LoadForEdit(int id, string boxName, int? accountId, string? accountName, int? categoryId, string? categoryName, int? branchId, int? assignedUserId, int? currencyId, string? phoneNumber, string? taxNumber, string? address, string? notes)
     {
+        _editingId = id;
         BoxName = boxName;
         AccountId = accountId;
         IsAccountAutoCreated = accountId == null;
         AccountInfo = accountName ?? "سيتم إنشاء حساب تلقائي";
+        CategoryId = categoryId;
+        BranchId = branchId;
+        AssignedUserId = assignedUserId;
+        CurrencyId = currencyId;
         PhoneNumber = phoneNumber;
         TaxNumber = taxNumber;
         Address = address;
-        CategoryId = categoryId;
+        Notes = notes;
         IsEditMode = true;
 
         // Pre-select category if available
@@ -215,6 +249,18 @@ public class CashBoxEditorViewModel : ViewModelBase
     {
         if (!await ValidateAsync()) return;
 
+        if (_editingId.HasValue)
+        {
+            await UpdateCashBoxAsync();
+        }
+        else
+        {
+            await CreateCashBoxAsync();
+        }
+    }
+
+    private async Task CreateCashBoxAsync()
+    {
         // Determine AccountId: null = auto-create
         int? requestAccountId = IsAccountAutoCreated ? null : AccountId;
         int? requestCategoryId = SelectedCategory?.Id ?? CategoryId;
@@ -223,13 +269,13 @@ public class CashBoxEditorViewModel : ViewModelBase
             BoxName.Trim(),
             requestAccountId,
             requestCategoryId,
-            null,   // BranchId
-            null,   // AssignedUserId
-            null,   // CurrencyId
+            BranchId,
+            AssignedUserId,
+            CurrencyId,
             string.IsNullOrWhiteSpace(PhoneNumber) ? null : PhoneNumber.Trim(),
             string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber.Trim(),
             string.IsNullOrWhiteSpace(Address) ? null : Address.Trim(),
-            null);  // Notes
+            string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim());
 
         var result = await _cashBoxService.CreateAsync(request);
 
@@ -248,6 +294,40 @@ public class CashBoxEditorViewModel : ViewModelBase
         }
     }
 
+    private async Task UpdateCashBoxAsync()
+    {
+        if (!_editingId.HasValue) return;
+
+        int id = _editingId.Value;
+        int? requestCategoryId = SelectedCategory?.Id ?? CategoryId;
+
+        var request = new UpdateCashBoxRequest(
+            BoxName.Trim(),
+            requestCategoryId,
+            BranchId,
+            AssignedUserId,
+            CurrencyId,
+            string.IsNullOrWhiteSpace(PhoneNumber) ? null : PhoneNumber.Trim(),
+            string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber.Trim(),
+            string.IsNullOrWhiteSpace(Address) ? null : Address.Trim(),
+            string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim());
+
+        var result = await _cashBoxService.UpdateAsync(id, request);
+
+        if (result.IsSuccess)
+        {
+            _eventBus.Publish(new CashBoxChangedMessage(id));
+            _toastService.ShowSuccess("تم تحديث بيانات الصندوق بنجاح");
+            RequestClose();
+        }
+        else
+        {
+            var error = HandleFailure(result.Error ?? "فشل في تحديث بيانات الصندوق", "CashBoxEditorViewModel.SaveOperationAsync", "[CashBoxEditorViewModel.SaveOperationAsync] Failed to update cash box.");
+            ErrorMessage = error;
+            await _dialogService.ShowErrorAsync("خطأ في تحديث الصندوق", error);
+        }
+    }
+
     private void Cancel()
     {
         RequestClose();
@@ -255,6 +335,9 @@ public class CashBoxEditorViewModel : ViewModelBase
 
     public override void Cleanup()
     {
+        _editingId = null;
+        IsEditMode = false;
+        ErrorMessage = null;
         Categories.Clear();
         base.Cleanup();
     }

@@ -167,16 +167,26 @@ public class ReportService : IReportService
             _logger.LogInformation("Generating expired products report with threshold {ThresholdDays} days (cutoff: {CutoffDate})",
                 thresholdDays, cutoffDate);
 
+            // Phase 25: ExpirationDate moved from Product to InventoryBatch.ExpiryDate
+            var productIds = await _uow.InventoryBatches.ToListAsync(
+                b => b.ExpiryDate.HasValue && b.ExpiryDate.Value <= cutoffDate,
+                null, ct, false);
+
+            var distinctProductIds = productIds.Select(b => b.ProductId).Distinct().ToList();
+
             var products = await _uow.Products.ToListAsync(
-                p => p.ExpirationDate.HasValue && p.ExpirationDate.Value <= cutoffDate,
-                q => q.OrderBy(p => p.ExpirationDate),
-                ct,
+                p => distinctProductIds.Contains(p.Id),
+                null, ct, false,
                 includePaths: new[] { "Category" });
 
+            // Get earliest expiry per product
+            var productEarliestExpiry = productIds
+                .GroupBy(b => b.ProductId)
+                .ToDictionary(g => g.Key, g => g.Min(b => b.ExpiryDate!.Value));
+
             // Fetch real stock quantities for expired products
-            var productIds = products.Select(p => p.Id).ToList();
             var stocks = await _uow.WarehouseStocks.ToListAsync(
-                ws => productIds.Contains(ws.ProductId),
+                ws => distinctProductIds.Contains(ws.ProductId),
                 null, ct, false, "Warehouse");
             var stockByProduct = stocks
                 .GroupBy(ws => ws.ProductId)
@@ -185,14 +195,15 @@ public class ReportService : IReportService
             var dtos = products.Select(p =>
             {
                 stockByProduct.TryGetValue(p.Id, out var totalStock);
+                var expiryDate = productEarliestExpiry.GetValueOrDefault(p.Id, DateTime.Today);
                 return new ExpiredProductDto(
                     p.Id,
                     p.Name,
                     p.Category?.Name,
                     null,
                     totalStock,
-                    p.ExpirationDate!.Value,
-                    (DateTime.Today - p.ExpirationDate!.Value).Days
+                    expiryDate,
+                    (DateTime.Today - expiryDate).Days
                 );
             }).ToList();
 

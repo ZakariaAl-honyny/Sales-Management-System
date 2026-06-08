@@ -1,6 +1,6 @@
 ---
 name: "Implement Agent"
-reasoningEffect: high
+reasoningEffect: max
 role: "Production-quality C# code writer"
 activation: "When implementing features"
 mode: subagent

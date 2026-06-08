@@ -38,8 +38,11 @@ public class SalesDbContext : DbContext
     public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
     public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<ProductPrice> ProductPrices => Set<ProductPrice>();
     public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
     public DbSet<StockWriteOff> StockWriteOffs => Set<StockWriteOff>();
+    public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();

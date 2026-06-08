@@ -44,6 +44,11 @@ public class CashBoxServiceTests
         _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(_dbTransactionMock.Object);
 
+        // ExecuteTransactionAsync must invoke the callback (per RULE-275)
+        _uowMock.Setup(x => x.ExecuteTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()))
+            .Callback<Func<Task>, CancellationToken>(async (operation, _) => await operation())
+            .Returns(Task.CompletedTask);
+
         _service = new CashBoxService(_uowMock.Object, _loggerMock.Object);
     }
 
@@ -135,7 +140,7 @@ public class CashBoxServiceTests
         // A new account should have been created
         _accountsRepoMock.Verify(r => r.AddAsync(It.IsAny<Account>(), It.IsAny<CancellationToken>()), Times.Once);
         _cashBoxRepoMock.Verify(r => r.AddAsync(It.Is<CashBox>(b => b.AccountId > 0), It.IsAny<CancellationToken>()), Times.Once);
-        _uowMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _uowMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     // ─── RecordExpenseAsync Tests ──────────────────────────
@@ -217,8 +222,6 @@ public class CashBoxServiceTests
             r => r.AddAsync(It.Is<CashTransaction>(t => t.CashBoxId == 2 && t.TransactionType == CashTransactionType.TransferIn && t.Amount == 200m), It.IsAny<CancellationToken>()),
             Times.Once);
         _uowMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _dbTransactionMock.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _dbTransactionMock.Verify(x => x.RollbackAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -246,8 +249,6 @@ public class CashBoxServiceTests
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("الصندوق المصدر غير موجود");
-        _dbTransactionMock.Verify(x => x.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
-        _dbTransactionMock.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // ─── PerformDailyClosureAsync Tests ────────────────────

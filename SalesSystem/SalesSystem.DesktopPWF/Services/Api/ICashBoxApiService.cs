@@ -9,6 +9,7 @@ public interface ICashBoxApiService
     Task<Result<List<CashBoxDto>>> GetAllAsync(CancellationToken ct = default);
     Task<Result<CashBoxDto>> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Result<CashBoxDto>> CreateAsync(CreateCashBoxRequest request, CancellationToken ct = default);
+    Task<Result<CashBoxDto>> UpdateAsync(int id, UpdateCashBoxRequest request, CancellationToken ct = default);
     Task<Result> DeactivateAsync(int id, CancellationToken ct = default);
     Task<Result<List<CashTransactionDto>>> GetTransactionsAsync(int cashBoxId, DateOnly? from, DateOnly? to, CancellationToken ct = default);
     Task<Result<CashTransactionDto>> RecordExpenseAsync(int cashBoxId, AddCashTransactionRequest request, CancellationToken ct = default);

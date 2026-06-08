@@ -222,7 +222,7 @@ public class SalesServiceTests : IDisposable
         _output.WriteLine("[TEST] GivenDraftInvoice_WhenCancelling_ThenNoStockOrBalanceChanges");
 
         var warehouse = Warehouse.Create(name: "Main Warehouse", isDefault: true);
-        var product = Product.Create(name: "Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create(name: "Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -266,7 +266,7 @@ public class SalesServiceTests : IDisposable
 
         // Setup warehouse and product first (same as Draft test)
         var warehouse = Warehouse.Create(name: "Main Warehouse", isDefault: true);
-        var product = Product.Create(name: "Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create(name: "Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();

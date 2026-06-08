@@ -1,6 +1,6 @@
 ---
 name: "Checklist Agent"
-reasoningEffect: high
+reasoningEffect: max
 role: "Quality validation checklists"
 activation: "Before merging any feature"
 mode: subagent

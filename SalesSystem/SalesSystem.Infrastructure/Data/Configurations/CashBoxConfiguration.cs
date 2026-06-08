@@ -12,8 +12,8 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.BoxName).IsRequired().HasMaxLength(100);
 
-        // FK to Account (required — balance lives on the Chart of Accounts)
-        builder.Property(x => x.AccountId).IsRequired();
+        // FK to Account (optional — auto-created by service layer when null)
+        builder.Property(x => x.AccountId).IsRequired(false);
         builder.HasOne(x => x.Account)
             .WithMany()
             .HasForeignKey(x => x.AccountId)
@@ -45,7 +45,7 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
             .HasForeignKey(x => x.CashBoxId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.Ignore(x => x.Currency); // Keep EF from mapping the navigation twice — mapped above
+        // Currency is already mapped via HasForeignKey above — no need to ignore or remap
 
         builder.HasQueryFilter(x => x.IsActive);
     }

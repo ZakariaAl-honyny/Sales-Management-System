@@ -47,8 +47,10 @@
          xmlns:audit="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Audit"
          xmlns:perms="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Permissions"
          xmlns:viewsAudit="clr-namespace:SalesSystem.DesktopPWF.Views.Audit"
-         xmlns:viewsPerms="clr-namespace:SalesSystem.DesktopPWF.Views.Permissions"
-         mc:Ignorable="d"
+          xmlns:viewsPerms="clr-namespace:SalesSystem.DesktopPWF.Views.Permissions"
+          xmlns:viewsWarehouses="clr-namespace:SalesSystem.DesktopPWF.Views.Warehouses"
+          xmlns:vmWarehouses="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Warehouses"
+          mc:Ignorable="d"
         Title="نظام إدارة المبيعات"
         Height="700" Width="1200"
         MinHeight="600" MinWidth="900"
@@ -113,6 +115,15 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type vmProducts:ProductListViewModel}">
                 <viewsProducts:ProductsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmProducts:ProductPricesListViewModel}">
+                <viewsProducts:ProductPricesView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmProducts:ProductImagesViewModel}">
+                <viewsProducts:ProductImagesView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmWarehouses:InventoryBatchesViewModel}">
+                <viewsWarehouses:InventoryBatchesView />
             </DataTemplate>
             <DataTemplate DataType="{x:Type vmCustomers:CustomerListViewModel}">
                 <viewsCustomers:CustomersListView />
@@ -289,14 +300,17 @@
                                     <Button Content="نقطة البيع" 
                                             Command="{Binding NavigateToPosCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavPos"
                                             ToolTip="شاشة البيع المباشر وإتمام عمليات البيع للعملاء"/>
                                     <Button Content="فواتير البيع" 
                                             Command="{Binding NavigateToSalesInvoicesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavSalesInvoices"
                                             ToolTip="عرض وإدارة فواتير البيع بجميع حالاتها"/>
                                     <Button Content="مرتجعات المبيعات" 
                                             Command="{Binding NavigateToSalesReturnsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavSalesReturns"
                                             ToolTip="إدارة مرتجعات المبيعات وإعادة الأصناف للمخزون"/>
                                 </StackPanel>
                             </Expander>
@@ -308,10 +322,12 @@
                                     <Button Content="فواتير الشراء" 
                                             Command="{Binding NavigateToPurchasesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavPurchaseInvoices"
                                             ToolTip="عرض وإدارة فواتير الشراء من الموردين"/>
                                     <Button Content="مرتجعات المشتريات" 
                                             Command="{Binding NavigateToPurchaseReturnsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavPurchaseReturns"
                                             ToolTip="إدارة مرتجعات المشتريات وإعادة البضائع للموردين"/>
                                 </StackPanel>
                             </Expander>
@@ -323,18 +339,22 @@
                                     <Button Content="مدفوعات العملاء" 
                                             Command="{Binding NavigateToCustomerPaymentsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCustomerPayments"
                                             ToolTip="تسجيل المبالغ المستلمة من العملاء لتسوية المديونيات"/>
                                     <Button Content="مدفوعات الموردين" 
                                             Command="{Binding NavigateToSupplierPaymentsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavSupplierPayments"
                                             ToolTip="تسجيل المبالغ المدفوعة للموردين لتسوية الحسابات"/>
                                     <Button Content="الخزينة" 
                                             Command="{Binding NavigateToCashBoxesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCashBoxes"
                                             ToolTip="إدارة الصناديق النقدية ومتابعة الأرصدة والحركات"/>
                                     <Button Content="القيود اليومية" 
                                             Command="{Binding NavigateToJournalEntriesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavJournalEntries"
                                             ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"/>
                                 </StackPanel>
                             </Expander>
@@ -346,31 +366,38 @@
                                     <Button Content="التقارير" 
                                             Command="{Binding NavigateToReportsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavReports"
                                             ToolTip="توليد وعرض التقارير المالية والمبيعات والمخزون"/>
                                     <Button Content="نواقص المخزون" 
                                             Command="{Binding NavigateToLowStockCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavLowStock"
                                             ToolTip="عرض الأصناف التي وصلت للحد الأدنى للمخزون مع مقترحات الطلب"/>
                                     <Button Content="المنتجات المنتهية" 
                                             Command="{Binding NavigateToExpiredProductsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavExpiredProducts"
                                             ToolTip="عرض المنتجات منتهية الصلاحية وإدارة إتلافها"/>
                                     <Separator Margin="16,4"/>
                                     <Button Content="قائمة الدخل" 
                                             Command="{Binding NavigateToIncomeStatementCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavIncomeStatement"
                                             ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح"/>
                                     <Button Content="التدفق النقدي" 
                                             Command="{Binding NavigateToCashFlowReportCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCashFlow"
                                             ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة"/>
                                     <Button Content="ضريبة القيمة المضافة" 
                                             Command="{Binding NavigateToVatReportCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavVatReport"
                                             ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة"/>
                                     <Button Content="كشف حساب" 
                                             Command="{Binding NavigateToAccountStatementCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavAccountStatement"
                                             ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة"/>
                                 </StackPanel>
                             </Expander>
@@ -382,66 +409,97 @@
                                     <Button Content="المنتجات" 
                                             Command="{Binding NavigateToProductsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavProducts"
                                             ToolTip="إدارة قائمة المنتجات والأسعار والباركود"/>
+                                    <Button Content="أسعار المنتجات" 
+                                            Command="{Binding NavigateToProductPricesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavProductPrices"
+                                            ToolTip="إدارة أسعار المنتجات متعددة العملات — تحديد سعر التجزئة والجملة والمزيد لكل عملة"/>
+                                    <Button Content="صور المنتجات" 
+                                            Command="{Binding NavigateToProductImagesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavProductImages"
+                                            ToolTip="إدارة صور المنتجات — إضافة وعرض صور متعددة لكل منتج"/>
+                                    <Button Content="الدفعات المخزنية" 
+                                            Command="{Binding NavigateToInventoryBatchesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavInventoryBatches"
+                                            ToolTip="إدارة دفعات المخزون — تتبع الكميات حسب التاريخ وتاريخ انتهاء الصلاحية"/>
                                     <Button Content="العملاء" 
                                             Command="{Binding NavigateToCustomersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCustomers"
                                             ToolTip="إدارة بيانات العملاء والحسابات وتاريخ المعاملات"/>
                                     <Button Content="مجموعات العملاء" 
                                             Command="{Binding NavigateToCustomerGroupsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCustomerGroups"
                                             ToolTip="إدارة مجموعات العملاء — تصنيف العملاء في مجموعات للتقارير والتحليلات"/>
                                     <Button Content="الموردين" 
                                             Command="{Binding NavigateToSuppliersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavSuppliers"
                                             ToolTip="إدارة بيانات الموردين ومتابعة المستحقات المالية"/>
                                     <Button Content="المستودعات" 
                                             Command="{Binding NavigateToWarehousesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavWarehouses"
                                             ToolTip="إدارة الفروع والمستودعات ومواقع تخزين المنتجات"/>
                                     <Button Content="التصنيفات" 
                                             Command="{Binding NavigateToCategoriesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCategories"
                                             ToolTip="إدارة التصنيفات الرئيسية والفرعية للأصناف والمنتجات"/>
                                     <Button Content="الوحدات" 
                                             Command="{Binding NavigateToUnitsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavUnits"
                                             ToolTip="إدارة وحدات القياس المستخدمة في المخزون والفواتير"/>
                                     <Button Content="المستخدمين" 
                                             Command="{Binding NavigateToUsersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavUsers"
                                             ToolTip="إدارة حسابات الموظفين والصلاحيات وبيانات الدخول"/>
                                     <Button Content="الإعدادات" 
                                             Command="{Binding NavigateToSettingsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavSettings"
                                             ToolTip="إعدادات النظام والعملات والضرائب وتهيئة الطابعات"/>
                                     <Button Content="إعدادات النظام" 
                                             Command="{Binding NavigateToSystemSettingsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavSystemSettings"
                                             ToolTip="إدارة جميع إعدادات النظام المخزنة — المخزون والمبيعات والمشتريات والباركود"/>
                                     <Button Content="النسخ الاحتياطي" 
                                             Command="{Binding NavigateToBackupCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavBackup"
                                             ToolTip="إدارة النسخ الاحتياطي — إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
                                     <Button Content="الضرائب" 
                                             Command="{Binding NavigateToTaxesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavTaxes"
                                             ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة"/>
                                     <Button Content="العملات" 
                                             Command="{Binding NavigateToCurrenciesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCurrencies"
                                             ToolTip="إدارة العملات وأسعار الصرف — إضافة وتعديل العملات"/>
                                     <Button Content="دليل الحسابات" 
                                             Command="{Binding NavigateToChartOfAccountsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavChartOfAccounts"
                                             ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
                                     <Button Content="نقل المخزون" 
                                             Command="{Binding NavigateToStockTransfersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavStockTransfers"
                                             ToolTip="إدارة عمليات نقل البضائع بين المستودعات"/>
                                     <Button Content="المخزون" 
                                             Command="{Binding NavigateToInventoryCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavInventory"
                                             ToolTip="عرض حركة المخزون وإدارة الأصناف في المستودعات"/>
                                 </StackPanel>
                             </Expander>

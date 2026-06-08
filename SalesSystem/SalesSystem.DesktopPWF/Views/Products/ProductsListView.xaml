@@ -41,6 +41,7 @@
                     <TextBox Width="160"
                              Style="{StaticResource ModernTextBox}"
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.AutomationId="TxtProductSearch"
                              Tag="اسم المنتج..."
                              TabIndex="1"
                              helpers:FocusHelper.AdvanceOnEnter="True">
@@ -51,6 +52,7 @@
                     <Button Command="{Binding SearchCommand}" 
                             Style="{StaticResource PrimaryButton}"
                             Margin="4,0,0,0"
+                            AutomationProperties.AutomationId="BtnProductSearch"
                             ToolTip="اضغط هنا للبحث عن المنتجات بالاسم">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -64,13 +66,16 @@
                     <CheckBox Content="عرض غير النشطة" 
                                IsChecked="{Binding IncludeInactive}" 
                                VerticalAlignment="Center" 
-                               FontSize="11"/>
+                               FontSize="11"
+                               AutomationProperties.AutomationId="ChkIncludeInactive"
+                               ToolTip="عرض المنتجات المعطلة/غير النشطة أيضاً في القائمة"/>
                 </StackPanel>
 
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                     <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
-                            ToolTip="فتح شاشة إضافة منتج جديد">
+                            ToolTip="فتح شاشة إضافة منتج جديد"
+                            AutomationProperties.AutomationId="BtnAddProduct">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="منتج جديد" VerticalAlignment="Center"/>
@@ -78,7 +83,8 @@
                     </Button>
 
                     <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
-                            ToolTip="تعديل العنصر المحدد">
+                            ToolTip="تعديل العنصر المحدد"
+                            AutomationProperties.AutomationId="BtnEditProduct">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="✏️" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="تعديل" VerticalAlignment="Center"/>
@@ -86,7 +92,8 @@
                     </Button>
 
                     <Button Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,4,0"
-                            Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}"
+                            AutomationProperties.AutomationId="BtnDeleteProduct"
+                            Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}"
                             ToolTip="حذف أو إلغاء تنشيط العنصر المحدد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🗑️" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -96,6 +103,7 @@
 
                     <Button Command="{Binding RestoreCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}"
+                            AutomationProperties.AutomationId="BtnRestoreProduct"
                             ToolTip="استعادة العنصر المحذوف">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="♻️" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -104,6 +112,7 @@
                     </Button>
 
                     <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}" Padding="8,0"
+                            AutomationProperties.AutomationId="BtnRefreshProducts"
                             ToolTip="تحديث قائمة البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
@@ -145,19 +154,22 @@
                           AutomationProperties.AutomationId="DgProducts">
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="تعديل" Command="{Binding EditCommand}">
+                            <MenuItem Header="تعديل" Command="{Binding EditCommand}"
+                              ToolTip="فتح نافذة تعديل بيانات المنتج المحدد">
                                 <MenuItem.Icon>
                                     <TextBlock Text="✏️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
                             <MenuItem Header="حذف" Command="{Binding DeleteCommand}"
+                                      ToolTip="إلغاء تنشيط المنتج المحدد — لن يظهر في قوائم الاختيار"
                                       Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource BoolToVisibility}}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="🗑️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem Header="استعادة" Command="{Binding RestoreCommand}"
+                                      ToolTip="إعادة تنشيط المنتج — سيظهر في قوائم الاختيار مرة أخرى"
                                       Visibility="{Binding SelectedProduct.IsActive, Converter={StaticResource InverseBoolToVisibility}}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="♻️"/>
@@ -243,14 +255,15 @@
                         <TextBlock Text="لا توجد منتجات حالياً" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                         <TextBlock Text="ابدأ بإضافة منتجاتك وتعريف الأصناف للبدء في عمليات البيع والمخزون" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                         <Button Content="➕ إضافة أول منتج" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
-                                ToolTip="فتح شاشة إضافة منتج جديد"/>
+                                ToolTip="فتح شاشة إضافة منتج جديد"
+                                AutomationProperties.AutomationId="BtnEmptyAddProduct"/>
                     </StackPanel>
                 </Grid>
             </Grid>
         </Border>
 
         <!-- Footer -->
-        <Border Grid.Row="4" Background="White" Padding="16,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="4" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                     <TextBlock Text="إجمالي المنتجات: " FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>

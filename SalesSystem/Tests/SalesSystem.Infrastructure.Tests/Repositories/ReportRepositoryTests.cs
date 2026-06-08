@@ -170,9 +170,6 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailPrice: 100m,
-            wholesalePrice: 900m,
-            purchasePrice: 50m,
             retailUnitId: context.Units.First().Id,
             wholesaleUnitId: context.Units.First().Id,
             conversionFactor: 10m,
@@ -210,9 +207,6 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailPrice: 100m,
-            wholesalePrice: 900m,
-            purchasePrice: 50m,
             retailUnitId: 1,
             wholesaleUnitId: 1,
             conversionFactor: 1m
@@ -257,9 +251,6 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailPrice: 100m,
-            wholesalePrice: 900m,
-            purchasePrice: 50m,
             retailUnitId: 1,
             wholesaleUnitId: 1,
             conversionFactor: 1m
@@ -293,9 +284,6 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Normal Stock Product",
-            retailPrice: 100m,
-            wholesalePrice: 900m,
-            purchasePrice: 50m,
             retailUnitId: 1,
             wholesaleUnitId: 1,
             conversionFactor: 1m
@@ -411,9 +399,6 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailPrice: 100m,
-            wholesalePrice: 900m,
-            purchasePrice: 50m,
             retailUnitId: 1,
             wholesaleUnitId: 1,
             conversionFactor: 1m
@@ -456,9 +441,6 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailPrice: 100m,
-            wholesalePrice: 900m,
-            purchasePrice: 50m,
             retailUnitId: 1,
             wholesaleUnitId: 1,
             conversionFactor: 1m

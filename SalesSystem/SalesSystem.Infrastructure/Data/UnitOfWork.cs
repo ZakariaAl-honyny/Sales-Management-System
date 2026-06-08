@@ -61,6 +61,9 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<UserSession>? _userSessions;
     private IGenericRepository<ExchangeRateHistory>? _exchangeRateHistories;
     private IGenericRepository<CustomerGroup>? _customerGroups;
+    private IGenericRepository<InventoryBatch>? _inventoryBatches;
+    private IGenericRepository<ProductPrice>? _productPrices;
+    private IGenericRepository<ProductImage>? _productImages;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -111,6 +114,9 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<UserSession> UserSessions => _userSessions ??= new GenericRepository<UserSession>(_context);
     public IGenericRepository<ExchangeRateHistory> ExchangeRateHistories => _exchangeRateHistories ??= new GenericRepository<ExchangeRateHistory>(_context);
     public IGenericRepository<CustomerGroup> CustomerGroups => _customerGroups ??= new GenericRepository<CustomerGroup>(_context);
+    public IGenericRepository<InventoryBatch> InventoryBatches => _inventoryBatches ??= new GenericRepository<InventoryBatch>(_context);
+    public IGenericRepository<ProductPrice> ProductPrices => _productPrices ??= new GenericRepository<ProductPrice>(_context);
+    public IGenericRepository<ProductImage> ProductImages => _productImages ??= new GenericRepository<ProductImage>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {

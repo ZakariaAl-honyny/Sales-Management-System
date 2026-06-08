@@ -303,8 +303,8 @@ public static class DbSeeder
             db.ProductUnits.Add(ProductUnit.CreateBaseUnit(
                 product.Id,
                 "قطعة",
-                product.RetailPrice,
-                product.PurchasePrice
+                0m, // TODO: Phase 25 — RetailPrice moved to ProductPrices table
+                0m  // TODO: Phase 25 — PurchasePrice moved to ProductPrices table
             ));
         }
 
@@ -315,6 +315,47 @@ public static class DbSeeder
         await AccountingSeeder.SeedAsync(db, logger);
 
         await db.SaveChangesAsync();
+
+        // ═══════════════════════════════════════════════════
+        // 14. Seed ProductPrices for each product's base unit
+        //     (requires ProductUnits to be saved first for IDs)
+        // ═══════════════════════════════════════════════════
+        if (!await db.Set<ProductPrice>().AnyAsync())
+        {
+            var baseProductUnits = await db.ProductUnits
+                .Where(pu => pu.IsBaseUnit)
+                .ToListAsync();
+
+            if (baseProductUnits.Any())
+            {
+                var productPrices = new List<ProductPrice>();
+                foreach (var pu in baseProductUnits)
+                {
+                    productPrices.Add(ProductPrice.Create(
+                        productUnitId: pu.Id,
+                        currencyId: 1,
+                        priceLevel: PriceLevel.Retail,
+                        price: 100m,
+                        effectiveFrom: DateTime.UtcNow,
+                        createdByUserId: 1
+                    ));
+                    productPrices.Add(ProductPrice.Create(
+                        productUnitId: pu.Id,
+                        currencyId: 1,
+                        priceLevel: PriceLevel.Wholesale,
+                        price: 85m,
+                        effectiveFrom: DateTime.UtcNow,
+                        createdByUserId: 1
+                    ));
+                }
+
+                db.Set<ProductPrice>().AddRange(productPrices);
+                await db.SaveChangesAsync();
+                logger?.LogInformation("Seeded {Count} ProductPrices for {ProductUnitCount} base units.",
+                    productPrices.Count, baseProductUnits.Count);
+            }
+        }
+
         logger?.LogInformation("Seed data completed successfully.");
     }
 }

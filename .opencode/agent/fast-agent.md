@@ -1,6 +1,6 @@
 ---
-name: sales-management-fast-agent
-reasoningEffect: high
+name: "Fast Agent"
+reasoningEffect: max
 role: "Code cleaner and fixer for simple tasks"
 activation: "When there are simple code issues that can be fixed without changing business logic or adding features."
 mode: subagent

@@ -23,10 +23,17 @@ public class CashBoxTests
     }
 
     [Fact]
-    public void Create_InvalidAccountId_ShouldThrow()
+    public void Create_AccountIdIsOptional_AllowsZeroOrNegative_ServiceValidates()
     {
-        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", accountId: 0));
-        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", accountId: -1));
+        // AccountId validation moved to service layer — domain allows nullable
+        var boxZero = CashBox.Create("Test Box", accountId: 0);
+        Assert.Equal(0, boxZero.AccountId);
+
+        var boxNegative = CashBox.Create("Test Box", accountId: -1);
+        Assert.Equal(-1, boxNegative.AccountId);
+
+        var boxNull = CashBox.Create("Test Box"); // no accountId
+        Assert.Null(boxNull.AccountId);
     }
 
     [Fact]

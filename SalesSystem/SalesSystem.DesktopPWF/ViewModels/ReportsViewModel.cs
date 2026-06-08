@@ -438,11 +438,11 @@ public class ReportsViewModel : ViewModelBase
             {
                 var row = table.NewRow();
                 row["اسم العميل"] = cb.CustomerName;
-                row["الرصيد الافتتاحي"] = 0m; // TODO: Account balance lookup from Chart of Accounts
+                row["الرصيد الافتتاحي"] = cb.OpeningBalance;
                 row["إجمالي المبيعات"] = cb.TotalSales;
                 row["إجمالي المرتجعات"] = cb.TotalReturns;
                 row["إجمالي المدفوعات"] = cb.TotalPayments;
-                row["الرصيد الحالي"] = 0m; // TODO: Account balance lookup from Chart of Accounts
+                row["الرصيد الحالي"] = cb.CurrentBalance;
                 table.Rows.Add(row);
             }
             ErrorMessage = null;
@@ -473,11 +473,11 @@ public class ReportsViewModel : ViewModelBase
             {
                 var row = table.NewRow();
                 row["اسم المورد"] = sb.SupplierName;
-                row["الرصيد الافتتاحي"] = 0m; // TODO: Account balance lookup from Chart of Accounts
+                row["الرصيد الافتتاحي"] = sb.OpeningBalance;
                 row["إجمالي المشتريات"] = sb.TotalPurchases;
                 row["إجمالي المرتجعات"] = sb.TotalReturns;
                 row["إجمالي المدفوعات"] = sb.TotalPayments;
-                row["الرصيد الحالي"] = 0m; // TODO: Account balance lookup from Chart of Accounts
+                row["الرصيد الحالي"] = sb.CurrentBalance;
                 table.Rows.Add(row);
             }
             ErrorMessage = null;

@@ -37,8 +37,7 @@ public class ProductService : IProductService
         // Build predicate for the search conditions only (IsActive is handled by query filter)
         var searchVal = search;
         System.Linq.Expressions.Expression<System.Func<Product, bool>> predicate = p =>
-            (string.IsNullOrWhiteSpace(searchVal) || p.Name.Contains(searchVal) ||
-             (p.Barcode != null && p.Barcode.Contains(searchVal))) &&
+            (string.IsNullOrWhiteSpace(searchVal) || p.Name.Contains(searchVal)) &&
             (!categoryId.HasValue || p.CategoryId == categoryId.Value);
 
         var includes = new[] { "Category", "RetailUnit", "WholesaleUnit" };
@@ -54,26 +53,6 @@ public class ProductService : IProductService
     {
         try
         {
-            // Normalize barcode: treat empty/whitespace as null to avoid unique index conflicts
-            string? barcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
-
-            // Validate barcode uniqueness only when a barcode was actually provided
-            if (barcode != null)
-            {
-                if (await _uow.Products.AnyIgnoreFiltersAsync(p => p.Barcode == barcode, ct))
-                {
-                    _logger.LogWarning("Product creation failed: Duplicate barcode {Barcode} (including inactive)", barcode);
-                    return Result<ProductDto>.Failure("باركود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateBarcode);
-                }
-            }
-
-            // Validate ExpirationDate is not in the past
-            if (request.ExpirationDate.HasValue && request.ExpirationDate.Value < DateTime.Today)
-            {
-                _logger.LogWarning("Product creation failed: ExpirationDate {Date} is in the past", request.ExpirationDate.Value);
-                return Result<ProductDto>.Failure("تاريخ الانتهاء لا يمكن أن يكون في الماضي");
-            }
-
             // Sanitize ImagePath: reject path traversal sequences only
             // (Forward/backward slashes are valid in relative DB paths like "product_42/abc.jpg")
             if (request.ImagePath != null && request.ImagePath.Contains("..", StringComparison.Ordinal))
@@ -82,19 +61,17 @@ public class ProductService : IProductService
                 return Result<ProductDto>.Failure("مسار الصورة غير صالح");
             }
 
+            // TODO: Create ProductUnit + UnitBarcode + ProductPrice from request
+            // Barcode, PurchasePrice, RetailPrice, WholesalePrice, ExpirationDate moved to sub-entities
+
             var product = Product.Create(
                 request.Name,
-                request.PurchasePrice,
-                request.RetailPrice,
-                request.WholesalePrice,
                 request.ConversionFactor,
                 request.MinStock,
-                barcode,          // Use normalized barcode (null if empty)
                 request.CategoryId,
                 request.RetailUnitId,
                 request.WholesaleUnitId,
                 request.Description,
-                request.ExpirationDate,
                 request.ImagePath
             );
 
@@ -130,22 +107,8 @@ public class ProductService : IProductService
             if (product == null)
                 return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
-            // Normalize barcode: treat empty/whitespace as null to avoid unique index conflicts
-            string? barcode = string.IsNullOrWhiteSpace(request.Barcode) ? null : request.Barcode.Trim();
-
-            // Validate barcode uniqueness only when a real barcode was provided
-            if (barcode != null && barcode != product.Barcode)
-            {
-                if (await _uow.Products.AnyIgnoreFiltersAsync(p => p.Barcode == barcode && p.Id != id, ct))
-                    return Result<ProductDto>.Failure("باركود المنتج مستخدم بالفعل (موجود في الأرشيف)", ErrorCodes.DuplicateBarcode);
-            }
-
-            // Validate ExpirationDate is not in the past
-            if (request.ExpirationDate.HasValue && request.ExpirationDate.Value < DateTime.Today)
-            {
-                _logger.LogWarning("Product update failed: ExpirationDate {Date} is in the past", request.ExpirationDate.Value);
-                return Result<ProductDto>.Failure("تاريخ الانتهاء لا يمكن أن يكون في الماضي");
-            }
+            // TODO: Validate barcode uniqueness via UnitBarcode entity when barcode is provided
+            // Barcode validation moved to UnitBarcode entity (Phase 25)
 
             // Sanitize ImagePath: reject path traversal sequences only
             // (Forward/backward slashes are valid in relative DB paths like "product_42/abc.jpg")
@@ -157,18 +120,13 @@ public class ProductService : IProductService
 
             product.Update(
                 request.Name,
-                request.PurchasePrice,
-                request.RetailPrice,
-                request.WholesalePrice,
                 request.ConversionFactor,
                 request.MinStock,
-                barcode,          // Use normalized barcode (null if empty)
                 request.CategoryId,
                 request.RetailUnitId,
                 request.WholesaleUnitId,
                 request.Description,
                 null,               // updatedByUserId (stays null for now)
-                request.ExpirationDate,
                 request.ImagePath
             );
 
@@ -249,8 +207,21 @@ public class ProductService : IProductService
         if (string.IsNullOrWhiteSpace(barcode))
             return Result<ProductDto>.Failure("الباركود مطلوب");
 
+        // Search via UnitBarcode → ProductUnit → Product (Phase 25 restructuring)
+        var barcodeEntry = await _uow.UnitBarcodes.FirstOrDefaultAsync(
+            b => b.BarcodeValue == barcode, ct);
+
+        if (barcodeEntry == null)
+            return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
+
+        var productUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
+            u => u.Id == barcodeEntry.ProductUnitId, ct);
+
+        if (productUnit == null)
+            return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
+
         var product = await _uow.Products.FirstOrDefaultAsync(
-            p => p.Barcode == barcode, ct, "Category", "RetailUnit", "WholesaleUnit");
+            p => p.Id == productUnit.ProductId, ct, "Category", "RetailUnit", "WholesaleUnit");
 
         if (product == null)
             return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
@@ -276,18 +247,13 @@ public class ProductService : IProductService
             var imagePath = saveResult.Value!;
             product.Update(
                 product.Name,
-                product.PurchasePrice,
-                product.RetailPrice,
-                product.WholesalePrice,
                 product.ConversionFactor,
                 product.MinStock,
-                product.Barcode,
                 product.CategoryId,
                 product.RetailUnitId,
                 product.WholesaleUnitId,
                 product.Description,
                 null,               // updatedByUserId
-                product.ExpirationDate,
                 imagePath
             );
 
@@ -326,15 +292,25 @@ public class ProductService : IProductService
         {
             var cutoffDate = DateTime.Today.AddDays(thresholdDays);
 
+            // Phase 25: ExpirationDate moved to InventoryBatches entity
+            // Get batches that are expiring within threshold days
+            var expiringBatches = await _uow.InventoryBatches.ToListAsync(
+                b => b.ExpiryDate.HasValue && b.ExpiryDate.Value <= cutoffDate,
+                q => q.OrderBy(b => b.ExpiryDate),
+                ct,
+                includePaths: new[] { "Product", "Product.Category" });
+
+            // Group by product to get unique products
+            var productIds = expiringBatches.Select(b => b.ProductId).Distinct().ToList();
             var products = await _uow.Products.ToListAsync(
-                p => p.ExpirationDate.HasValue && p.ExpirationDate.Value <= cutoffDate,
-                q => q.OrderBy(p => p.ExpirationDate),
+                p => productIds.Contains(p.Id),
+                q => q.OrderBy(p => p.Name),
                 ct,
                 includePaths: new[] { "Category", "RetailUnit", "WholesaleUnit" });
 
             var dtos = products.Select(MapToDto).ToList();
 
-            _logger.LogInformation("Found {Count} products expiring within {ThresholdDays} days (cutoff: {CutoffDate})",
+            _logger.LogInformation("Found {Count} products with batches expiring within {ThresholdDays} days (cutoff: {CutoffDate})",
                 dtos.Count, thresholdDays, cutoffDate);
 
             return Result<List<ProductDto>>.Success(dtos);
@@ -348,9 +324,12 @@ public class ProductService : IProductService
 
     private static ProductDto MapToDto(Product p)
     {
+        // Phase 25: Barcode, PurchasePrice, SalePrice, WholesalePrice, RetailPrice, ExpirationDate
+        // moved to sub-entities (UnitBarcode, ProductPrices, InventoryBatches).
+        // TODO: Load from UnitBarcode, ProductPrices, and InventoryBatches for full data.
         return new ProductDto(
             p.Id,
-            p.Barcode,
+            null, // TODO: Resolve from UnitBarcode entity
             p.Name,
             p.CategoryId,
             p.Category?.Name,
@@ -361,13 +340,13 @@ public class ProductService : IProductService
             p.RetailUnitId,
             p.RetailUnit?.Name,
             p.ConversionFactor,
-            p.PurchasePrice,
-            p.SalePrice, // Legacy
-            p.WholesalePrice,
-            p.RetailPrice,
+            0, // TODO: from ProductPrices (PriceLevel not mapped yet)
+            0, // TODO: from ProductPrices
+            0, // TODO: from ProductPrices
+            0, // TODO: from ProductPrices
             p.MinStock,
             p.Description,
-            p.ExpirationDate,
+            null, // TODO: earliest ExpiryDate from InventoryBatches
             p.ImagePath,
             p.IsActive
         );

@@ -1,6 +1,6 @@
 ---
 name: "Test Engineer"
-reasoningEffect: high
+reasoningEffect: max
 role: "Quality assurance and test automation specialist"
 activation: "When creating or running tests"
 mode: subagent

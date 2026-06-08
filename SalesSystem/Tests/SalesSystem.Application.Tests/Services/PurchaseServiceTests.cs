@@ -129,7 +129,7 @@ public class PurchaseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        var product = Product.Create("Test Product");
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -226,7 +226,7 @@ public class PurchaseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        var product = Product.Create("Test Product");
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -302,7 +302,7 @@ public class PurchaseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        var product = Product.Create("Test Product");
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 

@@ -34,6 +34,13 @@ public class CashBoxApiService : ApiServiceBase, ICashBoxApiService
             "CashBoxApiService.CreateAsync");
     }
 
+    public async Task<Result<CashBoxDto>> UpdateAsync(int id, UpdateCashBoxRequest request, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<CashBoxDto>(
+            () => _httpClient.PutAsJsonAsync($"api/v1/cash-boxes/{id}", request, ct),
+            "CashBoxApiService.UpdateAsync");
+    }
+
     public async Task<Result> DeactivateAsync(int id, CancellationToken ct = default)
     {
         return await ExecuteCommandAsync(

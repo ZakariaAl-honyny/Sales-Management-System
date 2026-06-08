@@ -39,3 +39,21 @@ public record AccountChangedMessage(int AccountId);
 /// </summary>
 public record JournalEntryChangedMessage(int EntryId);
 
+/// <summary>
+/// Published when a product price is created, updated, or deactivated.
+/// Carries the price ID only — NO data payload (RULE-034).
+/// </summary>
+public record ProductPriceChangedMessage(int PriceId);
+
+/// <summary>
+/// Published when an inventory batch is created or deactivated.
+/// Carries the batch ID only — NO data payload (RULE-034).
+/// </summary>
+public record InventoryBatchChangedMessage(int BatchId);
+
+/// <summary>
+/// Published when a product image is created, set as primary, or deleted.
+/// Carries the image ID only — NO data payload (RULE-034).
+/// </summary>
+public record ProductImageChangedMessage(int ImageId);
+

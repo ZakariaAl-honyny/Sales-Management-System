@@ -93,8 +93,8 @@ public class ReportRepository : IReportRepository
                 s.Warehouse!.Name,
                 s.Quantity,
                 s.ReorderLevel,
-                s.Product!.PurchasePrice,
-                s.Quantity * s.Product!.PurchasePrice
+                0m, // TODO: Phase 25 — PurchasePrice moved to ProductPrices table
+                s.Quantity * 0m // TODO: Phase 25 — total cost needs ProductUnit lookup
             ))
             .ToListAsync(ct);
     }

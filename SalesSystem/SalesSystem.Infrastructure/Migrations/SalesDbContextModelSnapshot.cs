@@ -511,6 +511,13 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<int?>("AssignedUserId")
                         .HasColumnType("int");
 
@@ -522,6 +529,9 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("BranchId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -530,10 +540,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.Property<int?>("CurrencyId")
                         .HasColumnType("int");
-
-                    b.Property<decimal>("CurrentBalance")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -544,9 +550,13 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<decimal>("OpeningBalance")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TaxNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -556,7 +566,11 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AccountId");
+
                     b.HasIndex("BoxName");
+
+                    b.HasIndex("CategoryId");
 
                     b.HasIndex("CurrencyId");
 
@@ -572,14 +586,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("BalanceAfter")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("BalanceBefore")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
@@ -610,6 +616,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<string>("ReferenceType")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("RunningBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<byte>("TransactionType")
                         .HasColumnType("tinyint");
@@ -1090,6 +1100,88 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.ToTable("ExchangeRateHistories", (string)null);
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Entities.InventoryBatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BatchNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasComment("رقم الدفعة / رقم التشغيلة");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2")
+                        .HasComment("تاريخ انتهاء الصلاحية");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("ManufactureDate")
+                        .HasColumnType("datetime2")
+                        .HasComment("تاريخ التصنيع");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PurchaseInvoiceItemId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)")
+                        .HasComment("الكمية المتبقية في الدفعة");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasComment("تكلفة الوحدة عند الشراء");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchNo")
+                        .HasDatabaseName("IX_InventoryBatches_BatchNo");
+
+                    b.HasIndex("ExpiryDate")
+                        .HasDatabaseName("IX_InventoryBatches_ExpiryDate")
+                        .HasFilter("[ExpiryDate] IS NOT NULL");
+
+                    b.HasIndex("PurchaseInvoiceItemId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("ProductId", "WarehouseId")
+                        .HasDatabaseName("IX_InventoryBatches_Product_Warehouse");
+
+                    b.ToTable("InventoryBatches", null, t =>
+                        {
+                            t.HasCheckConstraint("CHK_InventoryBatches_Quantity_NonNegative", "[Quantity] >= 0");
+
+                            t.HasCheckConstraint("CHK_InventoryBatches_UnitCost_NonNegative", "[UnitCost] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.InventoryMovement", b =>
                 {
                     b.Property<int>("Id")
@@ -1222,10 +1314,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Barcode")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
 
@@ -1245,9 +1333,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<DateTime?>("ExpirationDate")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("ImagePath")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -1264,26 +1349,12 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
-                    b.Property<decimal>("PurchasePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<decimal>("ReorderLevel")
                         .HasPrecision(18, 3)
                         .HasColumnType("decimal(18,3)");
 
-                    b.Property<decimal>("RetailPrice")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
-
                     b.Property<int?>("RetailUnitId")
                         .HasColumnType("int");
-
-                    b.Property<decimal>("SalePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int?>("UnitId")
                         .HasColumnType("int");
@@ -1294,20 +1365,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("UpdatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("WholesalePrice")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
-
                     b.Property<int?>("WholesaleUnitId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Barcode")
-                        .IsUnique()
-                        .HasFilter("[Barcode] IS NOT NULL");
 
                     b.HasIndex("CategoryId");
 
@@ -1367,6 +1428,121 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("ProductBarcodes", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.ProductImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ImagePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasComment("مسار ملف الصورة");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsPrimary")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false)
+                        .HasComment("صورة رئيسية للمنتج");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasComment("ترتيب العرض");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductImages", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.ProductPrice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CurrencyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EffectiveFrom")
+                        .HasColumnType("datetime2")
+                        .HasComment("تاريخ بدء السريان");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("datetime2")
+                        .HasComment("تاريخ انتهاء السريان (اختياري)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasComment("السعر");
+
+                    b.Property<int>("PriceLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1)
+                        .HasComment("مستوى السعر: 1=تجزئة, 2=جملة, 3=VIP, 4=موزع");
+
+                    b.Property<int>("ProductUnitId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrencyId");
+
+                    b.HasIndex("ProductUnitId", "CurrencyId", "PriceLevel", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ProductPrices_ProductUnit_Currency_Level_Date")
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("ProductPrices", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.ProductPriceHistory", b =>
@@ -2436,6 +2612,9 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AccountId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Address")
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
@@ -2485,6 +2664,9 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("IX_Suppliers_AccountId");
 
                     b.ToTable("Suppliers", (string)null);
                 });
@@ -3237,10 +3419,24 @@ namespace SalesSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashBox", b =>
                 {
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SalesSystem.Domain.Entities.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
                         .WithMany()
                         .HasForeignKey("CurrencyId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Category");
 
                     b.Navigation("Currency");
                 });
@@ -3325,6 +3521,32 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("Currency");
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Entities.InventoryBatch", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Entities.Product", "Product")
+                        .WithMany("InventoryBatches")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Entities.PurchaseInvoiceItem", "PurchaseInvoiceItem")
+                        .WithMany()
+                        .HasForeignKey("PurchaseInvoiceItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SalesSystem.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("PurchaseInvoiceItem");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.InventoryMovement", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Entities.User", "CreatedByUser")
@@ -3390,6 +3612,36 @@ namespace SalesSystem.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.ProductImage", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Entities.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.ProductPrice", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
+                        .WithMany()
+                        .HasForeignKey("CurrencyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SalesSystem.Domain.Entities.ProductUnit", "ProductUnit")
+                        .WithMany()
+                        .HasForeignKey("ProductUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Currency");
+
+                    b.Navigation("ProductUnit");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.ProductPriceHistory", b =>
@@ -3718,6 +3970,16 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("SalesSystem.Domain.Entities.Supplier", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Account");
+                });
+
             modelBuilder.Entity("SalesSystem.Domain.Entities.SupplierPayment", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
@@ -3822,6 +4084,10 @@ namespace SalesSystem.Infrastructure.Migrations
             modelBuilder.Entity("SalesSystem.Domain.Entities.Product", b =>
                 {
                     b.Navigation("Barcodes");
+
+                    b.Navigation("Images");
+
+                    b.Navigation("InventoryBatches");
 
                     b.Navigation("Units");
 

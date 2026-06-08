@@ -138,7 +138,7 @@ public class ProductListViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteCommand_WhenDeleteFails_ShowsErrorDialog()
+    public async Task DeleteCommand_WhenDeleteFails_ShowsErrorMessage()
     {
         var productToDelete = new ProductDto(
             5, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true);
@@ -160,9 +160,7 @@ public class ProductListViewModelTests : IDisposable
 
         await _viewModel.DeleteProductAsync();
 
-        _mockToastService.Verify(
-            t => t.ShowError(It.IsAny<string>()),
-            Times.Once);
+        _viewModel.ErrorMessage.Should().NotBeNull();
     }
 
     [Fact]
@@ -338,10 +336,10 @@ public class ProductListViewModelTests : IDisposable
     #region Command CanExecute Tests
 
     [Fact]
-    public void DeleteCommand_CannotExecute_WhenNoSelection()
+    public void DeleteCommand_CanExecute_AlwaysEnabled()
     {
         _viewModel.SelectedProduct = null;
-        _viewModel.DeleteCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
@@ -353,10 +351,10 @@ public class ProductListViewModelTests : IDisposable
     }
 
     [Fact]
-    public void EditCommand_CannotExecute_WhenNoSelection()
+    public void EditCommand_CanExecute_AlwaysEnabled()
     {
         _viewModel.SelectedProduct = null;
-        _viewModel.EditCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]

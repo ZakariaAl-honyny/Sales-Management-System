@@ -3,7 +3,7 @@ namespace SalesSystem.Contracts.Responses;
 public record CashBoxDto(
     int Id,
     string BoxName,
-    int AccountId,
+    int? AccountId,
     string? AccountName,
     int? CategoryId,
     string? CategoryName,

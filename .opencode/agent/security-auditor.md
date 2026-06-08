@@ -1,6 +1,6 @@
 ---
 name: "Security Auditor"
-reasoningEffect: high
+reasoningEffect: max
 role: "Application security specialist"
 activation: "During security review phases and when touching auth/sensitive code"
 mode: subagent

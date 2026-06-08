@@ -181,7 +181,7 @@ public class CategoryServiceTests : IDisposable
         _dbContext.Categories.Add(category);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Product", 10m, 100m, barcode: "P001", categoryId: category.Id);
+        var product = Product.Create("Product", categoryId: category.Id);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
