@@ -312,6 +312,8 @@ public partial class App : System.Windows.Application
         services.AddTransient<CashTransferViewModel>();
         services.AddTransient<DailyClosureViewModel>();
         services.AddTransient<ExpiredProductsReportViewModel>();
+        services.AddTransient<StockBalanceReportViewModel>();
+        services.AddTransient<WarehouseMovementReportViewModel>();
 
         // Journal Entry ViewModels
         services.AddTransient<JournalEntriesListViewModel>();

@@ -474,6 +474,35 @@ public record ExpiredProductDto(
     DateTime ExpirationDate,
     int DaysExpired);
 
+public record StockBalanceReportDto(
+    int ProductId,
+    string ProductName,
+    string? CategoryName,
+    int WarehouseId,
+    string WarehouseName,
+    decimal CurrentStock,
+    decimal ReorderLevel,
+    decimal AverageCost,
+    decimal TotalValue
+)
+{
+    public string BalanceStatus => CurrentStock < ReorderLevel ? "منخفض" : "طبيعي";
+    public bool IsLowStock => CurrentStock < ReorderLevel;
+}
+
+public record WarehouseMovementReportDto(
+    DateTime Date,
+    int ProductId,
+    string ProductName,
+    string WarehouseName,
+    string MovementType,
+    decimal QuantityChange,
+    decimal QuantityBefore,
+    decimal QuantityAfter,
+    string? ReferenceType,
+    int? ReferenceId
+);
+
 public record LowStockReportDto(
     int     ProductId,
     string  ProductName,

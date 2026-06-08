@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Enums;
@@ -9,10 +10,12 @@ namespace SalesSystem.Infrastructure.Repositories;
 public class ReportRepository : IReportRepository
 {
     private readonly SalesDbContext _context;
+    private readonly ILogger<ReportRepository> _logger;
 
-    public ReportRepository(SalesDbContext context)
+    public ReportRepository(SalesDbContext context, ILogger<ReportRepository> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<IEnumerable<SalesReportDto>> GetSalesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct)
@@ -199,6 +202,107 @@ public class ReportRepository : IReportRepository
             ))
             .ToListAsync(ct);
     }
+
+    public async Task<List<StockBalanceReportDto>> GetStockBalanceReportAsync(int? warehouseId, CancellationToken ct)
+    {
+        _logger.LogInformation("Fetching stock balance report for warehouse: {WarehouseId}", warehouseId);
+
+        var query = _context.WarehouseStocks
+            .Include(ws => ws.Product)
+                .ThenInclude(p => p!.Category)
+            .Include(ws => ws.Product)
+                .ThenInclude(p => p!.Units)
+            .Include(ws => ws.Warehouse)
+            .AsQueryable();
+
+        if (warehouseId.HasValue)
+            query = query.Where(ws => ws.WarehouseId == warehouseId.Value);
+
+        return await query
+            .OrderBy(ws => ws.Warehouse!.Name)
+            .ThenBy(ws => ws.Product!.Name)
+            .Select(ws => new StockBalanceReportDto(
+                ws.ProductId,
+                ws.Product!.Name,
+                ws.Product!.Category != null ? ws.Product!.Category.Name : null,
+                ws.WarehouseId,
+                ws.Warehouse!.Name,
+                ws.Quantity,
+                ws.ReorderLevel,
+                ws.Product.Units.Where(pu => pu.IsBaseUnit).Select(pu => pu.AverageCost).FirstOrDefault(),
+                ws.Quantity * ws.Product.Units.Where(pu => pu.IsBaseUnit).Select(pu => pu.AverageCost).FirstOrDefault()
+            ))
+            .ToListAsync(ct);
+    }
+
+    public async Task<List<WarehouseMovementReportDto>> GetWarehouseMovementsAsync(
+        int? warehouseId, DateTime? from, DateTime? to, CancellationToken ct)
+    {
+        _logger.LogInformation("Fetching warehouse movements — warehouseId: {Id}, from: {From}, to: {To}",
+            warehouseId, from, to);
+
+        var query = _context.InventoryMovements
+            .Include(im => im.Product)
+            .Include(im => im.Warehouse)
+            .AsQueryable();
+
+        if (warehouseId.HasValue)
+            query = query.Where(im => im.WarehouseId == warehouseId.Value);
+
+        if (from.HasValue)
+        {
+            var fromDate = from.Value.Date;
+            query = query.Where(im => im.MovementDate >= fromDate);
+        }
+
+        if (to.HasValue)
+        {
+            var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
+            query = query.Where(im => im.MovementDate <= toDate);
+        }
+
+        var items = await query
+            .OrderByDescending(im => im.MovementDate)
+            .Select(im => new
+            {
+                im.MovementDate,
+                im.ProductId,
+                ProductName = im.Product!.Name,
+                WarehouseName = im.Warehouse!.Name,
+                im.MovementType,
+                im.QuantityChange,
+                im.QuantityBefore,
+                im.QuantityAfter,
+                im.ReferenceType,
+                im.ReferenceId
+            })
+            .ToListAsync(ct);
+
+        return items.Select(im => new WarehouseMovementReportDto(
+            im.MovementDate,
+            im.ProductId,
+            im.ProductName,
+            im.WarehouseName,
+            GetMovementTypeArabic(im.MovementType),
+            im.QuantityChange,
+            im.QuantityBefore,
+            im.QuantityAfter,
+            im.ReferenceType,
+            im.ReferenceId
+        )).ToList();
+    }
+
+    private static string GetMovementTypeArabic(MovementType type) => type switch
+    {
+        MovementType.PurchaseIn => "مشتريات",
+        MovementType.SaleOut => "مبيعات",
+        MovementType.SaleReturnIn => "مرتجع مبيعات",
+        MovementType.PurchaseReturnOut => "مرتجع مشتريات",
+        MovementType.TransferOut => "تحويل خارج",
+        MovementType.TransferIn => "تحويل داخل",
+        MovementType.Adjustment => "تسوية",
+        _ => type.ToString()
+    };
 
     public async Task<DashboardSummaryDto> GetDashboardSummaryAsync(CancellationToken ct)
     {

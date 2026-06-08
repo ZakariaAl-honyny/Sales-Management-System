@@ -97,6 +97,8 @@ public class MainViewModel : ViewModelBase
         NavigateToReportsCommand = new RelayCommand(() => NavigateTo<ReportsViewModel>());
         NavigateToLowStockCommand = new RelayCommand(() => NavigateTo<LowStockViewModel>());
         NavigateToExpiredProductsCommand = new RelayCommand(() => NavigateTo<ExpiredProductsReportViewModel>());
+        NavigateToStockBalanceReportCommand = new RelayCommand(() => NavigateTo<StockBalanceReportViewModel>());
+        NavigateToWarehouseMovementReportCommand = new RelayCommand(() => NavigateTo<WarehouseMovementReportViewModel>());
 
         // Financial Reports
         NavigateToIncomeStatementCommand = new RelayCommand(() => NavigateTo<Reports.IncomeStatementViewModel>());
@@ -228,8 +230,14 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى تقرير نواقص المخزون</summary>
     public ICommand NavigateToLowStockCommand { get; }
 
-    /// <summary>نقل إلى تقرير المنتجات منتهية الصلاحية</summary>
-    public ICommand NavigateToExpiredProductsCommand { get; }
+        /// <summary>نقل إلى تقرير المنتجات منتهية الصلاحية</summary>
+        public ICommand NavigateToExpiredProductsCommand { get; }
+
+        /// <summary>نقل إلى كشف رصيد المخازن — عرض المخزون والقيمة الإجمالية لكل منتج في المستودعات</summary>
+        public ICommand NavigateToStockBalanceReportCommand { get; }
+
+        /// <summary>نقل إلى تقرير حركة المخازن — عرض تاريخ حركات المخزون (إضافة/خصم) مع التصفية حسب المستودع والفترة</summary>
+        public ICommand NavigateToWarehouseMovementReportCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Financial Reports Commands
@@ -443,6 +451,8 @@ public class MainViewModel : ViewModelBase
             nameof(ReportsViewModel)                => "Reports",
             nameof(LowStockViewModel)               => "LowStock",
             nameof(ExpiredProductsReportViewModel)  => "ExpiredProducts",
+            nameof(StockBalanceReportViewModel)     => "Reports",
+            nameof(WarehouseMovementReportViewModel) => "Reports",
             nameof(IncomeStatementViewModel)         => "Reports",
             nameof(CashFlowReportViewModel)           => "Reports",
             nameof(VatReportViewModel)                => "Reports",

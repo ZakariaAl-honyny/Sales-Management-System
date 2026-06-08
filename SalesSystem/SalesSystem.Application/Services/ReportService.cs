@@ -152,6 +152,36 @@ public class ReportService : IReportService
         }
     }
 
+    public async Task<Result<List<StockBalanceReportDto>>> GetStockBalanceReportAsync(int? warehouseId, CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating stock balance report for warehouse: {WarehouseId}", warehouseId);
+            var report = await _reportRepository.GetStockBalanceReportAsync(warehouseId, ct);
+            return Result<List<StockBalanceReportDto>>.Success(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating stock balance report");
+            return Result<List<StockBalanceReportDto>>.Failure("حدث خطأ أثناء إنشاء تقرير أرصدة المخزون");
+        }
+    }
+
+    public async Task<Result<List<WarehouseMovementReportDto>>> GetWarehouseMovementsAsync(int? warehouseId, DateTime? from, DateTime? to, CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating warehouse movements report for warehouse: {WarehouseId} from {From} to {To}", warehouseId, from, to);
+            var report = await _reportRepository.GetWarehouseMovementsAsync(warehouseId, from, to, ct);
+            return Result<List<WarehouseMovementReportDto>>.Success(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating warehouse movements report");
+            return Result<List<WarehouseMovementReportDto>>.Failure("حدث خطأ أثناء إنشاء تقرير حركات المستودع");
+        }
+    }
+
     public async Task<Result<IEnumerable<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays, CancellationToken ct)
     {
         try

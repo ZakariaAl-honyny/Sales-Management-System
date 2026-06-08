@@ -115,6 +115,12 @@
             <DataTemplate DataType="{x:Type vmReports:AccountStatementViewModel}">
                 <viewsReports:AccountStatementView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:StockBalanceReportViewModel}">
+                <viewsReports:StockBalanceReportView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:WarehouseMovementReportViewModel}">
+                <viewsReports:WarehouseMovementReportView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmProducts:ProductListViewModel}">
                 <viewsProducts:ProductsListView />
             </DataTemplate>
@@ -244,6 +250,9 @@
                 <MenuItem Header="التدفق النقدي" ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة" Tag="Reports" Click="ReportMenuItem_Click"/>
                 <MenuItem Header="ضريبة القيمة المضافة" ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة" Tag="Reports" Click="ReportMenuItem_Click"/>
                 <MenuItem Header="كشف حساب" ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="كشف رصيد المخازن" Command="{Binding NavigateToStockBalanceReportCommand}" ToolTip="عرض المخزون الحالي والقيمة الإجمالية لكل منتج في المستودعات"/>
+                <MenuItem Header="حركة المخازن" Command="{Binding NavigateToWarehouseMovementReportCommand}" ToolTip="عرض تاريخ حركات المخزون مع التصفية حسب المستودع والفترة"/>
             </MenuItem>
             <MenuItem Header="الإعدادات" ToolTip="قائمة الإعدادات" x:Name="SettingsMenuItem">
                 <MenuItem Header="إدارة المنتجات" ToolTip="إدارة قائمة المنتجات والأسعار" Click="ProductsMenuItem_Click"/>
@@ -404,6 +413,17 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavAccountStatement"
                                             ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة"/>
+                                    <Separator Margin="16,4"/>
+                                    <Button Content="كشف رصيد المخازن" 
+                                            Command="{Binding NavigateToStockBalanceReportCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavStockBalanceReport"
+                                            ToolTip="عرض كشف رصيد المخازن — المخزون الحالي والقيمة الإجمالية لكل منتج في المستودعات"/>
+                                    <Button Content="حركة المخازن" 
+                                            Command="{Binding NavigateToWarehouseMovementReportCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavWarehouseMovementReport"
+                                            ToolTip="عرض تقرير حركة المخازن — تاريخ حركات المخزون مع التصفية حسب المستودع والفترة"/>
                                 </StackPanel>
                             </Expander>
 

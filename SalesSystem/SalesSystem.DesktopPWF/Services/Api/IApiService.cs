@@ -307,6 +307,8 @@ public interface IReportApiService
     Task<Result<List<ProductMovementReportDto>>> GetProductMovementsReportAsync(int productId, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
     Task<Result<List<LowStockReportDto>>> GetLowStockReportAsync(int? warehouseId = null, CancellationToken ct = default);
     Task<Result<List<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays = 0, CancellationToken ct = default);
+    Task<Result<List<StockBalanceReportDto>>> GetStockBalanceReportAsync(int? warehouseId = null, CancellationToken ct = default);
+    Task<Result<List<WarehouseMovementReportDto>>> GetWarehouseMovementsAsync(int? warehouseId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
 }
 
 public interface ISettingsApiService

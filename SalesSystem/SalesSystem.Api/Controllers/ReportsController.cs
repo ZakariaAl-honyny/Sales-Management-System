@@ -110,6 +110,28 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
+    /// Generates stock balance report — shows current stock, reorder level, average cost, and total value per product/warehouse.
+    /// </summary>
+    [HttpGet("stock-balance")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> GetStockBalanceReport([FromQuery] int? warehouseId, CancellationToken ct)
+    {
+        var result = await _reportService.GetStockBalanceReportAsync(warehouseId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Generates warehouse movements report — shows inventory movements with quantities before/after.
+    /// </summary>
+    [HttpGet("warehouse-movements")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> GetWarehouseMovementsReport([FromQuery] int? warehouseId, [FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
+    {
+        var result = await _reportService.GetWarehouseMovementsAsync(warehouseId, from, to, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
     /// Gets list of expired or expiring products within the given threshold days.
     /// thresholdDays = 0 returns only already-expired products.
     /// </summary>

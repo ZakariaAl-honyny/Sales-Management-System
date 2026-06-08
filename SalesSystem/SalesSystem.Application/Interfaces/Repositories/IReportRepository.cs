@@ -18,6 +18,10 @@ public interface IReportRepository
     Task<IEnumerable<SupplierBalanceReportDto>> GetSupplierBalancesReportAsync(int? supplierId, CancellationToken ct);
     // Product Movements
     Task<IEnumerable<ProductMovementReportDto>> GetProductMovementsReportAsync(int productId, DateTime? from, DateTime? to, CancellationToken ct);
+    // Stock Balance Report (v4.6.9+ Phase 26)
+    Task<List<StockBalanceReportDto>> GetStockBalanceReportAsync(int? warehouseId, CancellationToken ct);
+    // Warehouse Movement Report (v4.6.9+ Phase 26)
+    Task<List<WarehouseMovementReportDto>> GetWarehouseMovementsAsync(int? warehouseId, DateTime? from, DateTime? to, CancellationToken ct);
     // Dashboard Summary
     Task<DashboardSummaryDto> GetDashboardSummaryAsync(CancellationToken ct);
 }

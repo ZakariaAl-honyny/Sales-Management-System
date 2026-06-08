@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Infrastructure.Data;
@@ -38,7 +40,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("SalesReportDb1");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var customer = Customer.Create(name: "Test Customer");
         context.Customers.Add(customer);
@@ -77,7 +79,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("SalesReportDb2");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var customer = Customer.Create(name: "Test Customer");
         context.Customers.Add(customer);
@@ -114,7 +116,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("SalesReportDb3");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var customer = Customer.Create(name: "Test Customer");
         context.Customers.Add(customer);
@@ -166,7 +168,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("StockReportDb1");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
             name: "Test Product",
@@ -199,7 +201,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("StockReportDb2");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var warehouse1 = context.Warehouses.First();
         var warehouse2 = Warehouse.Create(name: "Warehouse 2");
@@ -247,7 +249,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("LowStockDb1");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
             name: "Test Product",
@@ -280,7 +282,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("LowStockDb2");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
             name: "Normal Stock Product",
@@ -317,7 +319,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("CustomerBalanceDb1");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var customer1 = Customer.Create(name: "Customer 1", openingBalance: 1000m);
         var customer2 = Customer.Create(name: "Customer 2", openingBalance: 500m);
@@ -340,7 +342,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("CustomerBalanceDb2");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var customer1 = Customer.Create(name: "Customer 1", openingBalance: 1000m);
         var customer2 = Customer.Create(name: "Customer 2", openingBalance: 500m);
@@ -368,7 +370,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("SupplierBalanceDb1");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var supplier1 = Supplier.Create(name: "Supplier 1", openingBalance: 1000m);
         var supplier2 = Supplier.Create(name: "Supplier 2", openingBalance: 500m);
@@ -395,7 +397,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("ProductMovementDb1");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
             name: "Test Product",
@@ -437,7 +439,7 @@ public class ReportRepositoryTests
         await using var context = CreateContext("ProductMovementDb2");
         await SeedTestData(context);
 
-        var repository = new ReportRepository(context);
+        var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
             name: "Test Product",
