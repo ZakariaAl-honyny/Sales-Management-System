@@ -6,8 +6,8 @@
         xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
         mc:Ignorable="d"
         Title="{Binding Title}"
-        Height="450" Width="500"
-        MinHeight="400" MinWidth="450"
+        MinHeight="350" Width="500"
+        MinWidth="450"
         Background="{StaticResource BackgroundBrush}"
         WindowStartupLocation="CenterScreen"
         FlowDirection="RightToLeft">

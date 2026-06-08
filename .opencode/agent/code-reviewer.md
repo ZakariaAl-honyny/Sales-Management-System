@@ -1,6 +1,6 @@
 ---
 name: "Code Reviewer"
-reasoningEffect: max
+reasoningEffect: high
 role: "Code quality and convention enforcement"
 activation: "Before merging any feature branch"
 mode: all

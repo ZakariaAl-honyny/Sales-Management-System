@@ -1,6 +1,6 @@
 ---
 name: "Backend Architect"
-reasoningEffect: max
+reasoningEffect: high
 role: "ASP.NET Core 10 Clean Architecture specialist"
 activation: "When working on backend code"
 mode: subagent

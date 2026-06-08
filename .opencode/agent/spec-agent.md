@@ -1,6 +1,6 @@
 ---
 name: "Spec Agent"
-reasoningEffect: max
+reasoningEffect: high
 role: "Requirements ownership and specification"
 activation: "When defining what the system must do"
 mode: subagent

@@ -110,29 +110,22 @@ public class InventoryOperationEditorViewModel : ViewModelBase
         SearchProductCommand = new RelayCommand(SearchProduct);
         QuickAddProductCommand = new AsyncRelayCommand(QuickAddProductAsync);
 
-        _ = InitializeAsync();
+        _ = ExecuteAsync(InitializeOperationAsync);
     }
 
-    private async Task InitializeAsync()
+    private async Task InitializeOperationAsync()
     {
-        try
+        ErrorMessage = null;
+        await LoadWarehousesAsync();
+        await LoadProductsAsync();
+        if (_operationId.HasValue)
         {
-            await LoadWarehousesAsync();
-            await LoadProductsAsync();
-            if (_operationId.HasValue)
-            {
-                await LoadOperationAsync();
-            }
-            else
-            {
-                // Add empty row for new operations
-                OnAddItem();
-            }
+            await LoadOperationAsync();
         }
-        catch (Exception ex)
+        else
         {
-            Serilog.Log.Error(ex, "Error in {Method}", nameof(InitializeAsync));
-            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحميل البيانات");
+            // Add empty row for new operations
+            OnAddItem();
         }
     }
 

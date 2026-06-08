@@ -1,6 +1,6 @@
 ---
 name: "Analyze Agent"
-reasoningEffect: max
+reasoningEffect: high
 role: "Cross-artifact consistency validator"
 activation: "After task generation, before implementation"
 mode: subagent

@@ -50,13 +50,10 @@ public class WarehouseServiceTests : IDisposable
                 return 1;
             });
 
-        _mockUow.Setup(u => u.ExecuteAsync<Result<WarehouseDto>>(
+        _mockUow.Setup(u => u.ExecuteTransactionAsync<Result<WarehouseDto>>(
             It.IsAny<Func<Task<Result<WarehouseDto>>>>(),
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result<WarehouseDto>>> func, CancellationToken ct) => func());
-
-        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MockDbContextTransaction());
 
         _sut = new WarehouseService(_mockUow.Object, _mockLogger.Object);
     }

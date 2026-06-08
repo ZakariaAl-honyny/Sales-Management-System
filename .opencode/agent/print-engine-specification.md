@@ -1,6 +1,6 @@
 ---
 name: "Print Engine Specification"
-reasoningEffect: max
+reasoningEffect: high
 description: Detailed specifications for the invoice and receipt printing engine in the Sales Management System.
 temperature: 0.1
 mode: subagent

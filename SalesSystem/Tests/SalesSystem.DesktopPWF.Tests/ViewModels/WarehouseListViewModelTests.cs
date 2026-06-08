@@ -348,14 +348,15 @@ public class WarehouseListViewModelTests : IDisposable
     #region Command CanExecute Tests
 
     [Fact]
-    public void DeleteCommand_CannotExecute_WhenNoSelection()
+    public void DeleteCommand_AlwaysEnabled_WhenNoSelection()
     {
+        // RULE-059: All buttons ALWAYS enabled — guard is handled in the handler with a warning dialog
         _viewModel.SelectedWarehouse = null;
-        _viewModel.DeleteCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
-    public void DeleteCommand_CanExecute_WhenActiveWarehouseSelected()
+    public void DeleteCommand_AlwaysEnabled_WhenActiveWarehouseSelected()
     {
         var warehouse = new WarehouseDto(1, "مستودع", 1, null, null, null, null, true, true, null, null);
         _viewModel.SelectedWarehouse = warehouse;
@@ -363,14 +364,15 @@ public class WarehouseListViewModelTests : IDisposable
     }
 
     [Fact]
-    public void EditCommand_CannotExecute_WhenNoSelection()
+    public void EditCommand_AlwaysEnabled_WhenNoSelection()
     {
+        // RULE-059: All buttons ALWAYS enabled — guard is handled in the handler with a warning dialog
         _viewModel.SelectedWarehouse = null;
-        _viewModel.EditCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
-    public void EditCommand_CanExecute_WhenWarehouseSelected()
+    public void EditCommand_AlwaysEnabled_WhenWarehouseSelected()
     {
         var warehouse = new WarehouseDto(1, "مستودع", 1, null, null, null, null, true, true, null, null);
         _viewModel.SelectedWarehouse = warehouse;

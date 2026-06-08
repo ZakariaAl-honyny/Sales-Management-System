@@ -1,6 +1,6 @@
 ---
 name: "Clarify Agent"
-reasoningEffect: max
+reasoningEffect: high
 role: "Requirements clarification specialist"
 activation: "Before planning begins"
 mode: subagent

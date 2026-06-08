@@ -1,6 +1,6 @@
 ---
 name: "Database Engineer"
-reasoningEffect: max
+reasoningEffect: high
 role: "EF Core + SQL Server specialist"
 activation: "When working on entities, configurations, migrations, seed data"
 mode: subagent

@@ -16,7 +16,7 @@ namespace SalesSystem.DesktopPWF.ViewModels.InventoryOperations;
 /// ViewModel for Inventory Operations List View
 /// Supports three operation types: صرف مخزني (1), توريد مخزني (2), تسوية مخزنية (3)
 /// </summary>
-public class InventoryOperationListViewModel : ViewModelBase
+public class InventoryOperationListViewModel : ViewModelBase, IDisposable
 {
     private IInventoryOperationApiService? _operationService;
     private IWarehouseApiService? _warehouseService;
@@ -28,8 +28,6 @@ public class InventoryOperationListViewModel : ViewModelBase
     private IWarehouseApiService WarehouseService => _warehouseService ??= App.GetService<IWarehouseApiService>();
     private IEventBus EventBusService => _eventBus ??= App.GetService<IEventBus>();
     private IToastNotificationService ToastService => _toastService ??= App.GetService<IToastNotificationService>();
-
-    private new IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
 
     private ObservableCollection<InventoryOperationDto> _operations = new();
     private ICollectionView? _operationsView;
@@ -398,6 +396,11 @@ public class InventoryOperationListViewModel : ViewModelBase
         {
             _eventBus.Unsubscribe<InventoryOperationChangedMessage>(OnInventoryOperationChanged);
         }
+    }
+
+    public void Dispose()
+    {
+        Cleanup();
     }
 
     /// <summary>

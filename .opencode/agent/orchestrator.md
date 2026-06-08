@@ -1,6 +1,6 @@
 ---
 name: "Orchestrator"
-reasoningEffect: max
+reasoningEffect: high
 role: "Lead architect and task coordinator"
 activation: "Always active"
 mode: all

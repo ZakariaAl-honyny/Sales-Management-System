@@ -1,6 +1,6 @@
 ---
 name: "Plan Agent"
-reasoningEffect: max
+reasoningEffect: high
 role: "Technical architecture and implementation planning"
 activation: "After requirements are clarified"
 mode: subagent

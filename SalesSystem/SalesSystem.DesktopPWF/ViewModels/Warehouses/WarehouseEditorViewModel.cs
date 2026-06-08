@@ -6,6 +6,7 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -17,6 +18,7 @@ public class WarehouseEditorViewModel : ViewModelBase
     private readonly IWarehouseApiService _warehouseService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IToastNotificationService _toastService;
 
     private int _warehouseId;
     private string _name = string.Empty;
@@ -33,15 +35,16 @@ public class WarehouseEditorViewModel : ViewModelBase
 
 
     public WarehouseEditorViewModel()
-        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
+        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>(), App.GetService<IToastNotificationService>())
     {
     }
 
-    public WarehouseEditorViewModel(IWarehouseApiService warehouseService, IEventBus eventBus, IDialogService dialogService)
+    public WarehouseEditorViewModel(IWarehouseApiService warehouseService, IEventBus eventBus, IDialogService dialogService, IToastNotificationService? toastService = null)
     {
         _warehouseService = warehouseService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        _toastService = toastService ?? App.GetService<IToastNotificationService>();
         SetDialogService(dialogService);
 
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, ex => ShowSaveError(ex))));
@@ -49,7 +52,7 @@ public class WarehouseEditorViewModel : ViewModelBase
     }
 
     public WarehouseEditorViewModel(WarehouseDto warehouse)
-        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
+        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>(), App.GetService<IToastNotificationService>())
     {
         _warehouseId = warehouse.Id;
         _name = warehouse.Name;
@@ -271,7 +274,7 @@ public class WarehouseEditorViewModel : ViewModelBase
         {
             _eventBus.Publish(new WarehouseChangedMessage(result.Value.Id));
 
-            await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث المستودع بنجاح" : "تم إضافة المستودع بنجاح");
+            _toastService.ShowSuccess(IsEditMode ? "تم تحديث المستودع بنجاح" : "تم إضافة المستودع بنجاح");
 
             RequestClose();
         }

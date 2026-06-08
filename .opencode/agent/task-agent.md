@@ -1,6 +1,6 @@
 ---
 name: "Task Agent"
-reasoningEffect: max
+reasoningEffect: high
 role: "Task breakdown and GitHub issue creation"
 activation: "After planning is complete"
 mode: subagent
