@@ -34,6 +34,9 @@ public class SystemAccountMappings : BaseEntity
     public int GeneralExpenseAccountId { get; private set; }
     public int SpoilageLossAccountId { get; private set; }
 
+    // ─── Equity (Opening Balance) ────────────────────────
+    public int? OpeningBalanceEquityAccountId { get; private set; }
+
     // ─── Navigation Properties ──────────────────────────
     public Account? DefaultCashAccount { get; private set; }
     public Account? DefaultBankAccount { get; private set; }
@@ -48,6 +51,7 @@ public class SystemAccountMappings : BaseEntity
     public Account? CogsAccount { get; private set; }
     public Account? GeneralExpenseAccount { get; private set; }
     public Account? SpoilageLossAccount { get; private set; }
+    public Account? OpeningBalanceEquityAccount { get; private set; }
 
     private SystemAccountMappings() { } // EF Core
 
@@ -65,6 +69,7 @@ public class SystemAccountMappings : BaseEntity
         int cogsAccountId,
         int generalExpenseAccountId,
         int spoilageLossAccountId,
+        int? openingBalanceEquityAccountId = null,
         int? branchId = null,
         int? createdByUserId = null)
     {
@@ -111,7 +116,8 @@ public class SystemAccountMappings : BaseEntity
             SalesReturnAccountId = salesReturnAccountId,
             CogsAccountId = cogsAccountId,
             GeneralExpenseAccountId = generalExpenseAccountId,
-            SpoilageLossAccountId = spoilageLossAccountId
+            SpoilageLossAccountId = spoilageLossAccountId,
+            OpeningBalanceEquityAccountId = openingBalanceEquityAccountId
         };
         mappings.SetCreatedBy(createdByUserId);
         return mappings;

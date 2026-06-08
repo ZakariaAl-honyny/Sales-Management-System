@@ -138,6 +138,7 @@
                                 MinWidth="140"
                                 Margin="0,0,0,6"
                                 Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"
+                                AutomationProperties.AutomationId="BtnChangeUserPassword"
                                 ToolTip="فتح نافذة تغيير كلمة مرور المستخدم — لا يمكن للمسؤول رؤية كلمة المرور الحالية">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="🔑" Margin="0,0,6,0"/>

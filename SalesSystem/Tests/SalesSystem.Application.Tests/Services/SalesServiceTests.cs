@@ -35,6 +35,8 @@ public class SalesServiceTests : IDisposable
     private readonly Mock<ILogger<SalesService>> _mockLogger;
     private readonly Mock<IPrintDataService> _mockPrintDataService = new();
     private readonly Mock<IPrintService> _mockPrintService = new();
+    private readonly Mock<IAccountingIntegrationService> _mockAccountingService = new();
+    private readonly Mock<IDocumentSequenceService> _mockDocumentSequenceService = new();
     private int _saveChangesCallCount = 0;
 
     private readonly SalesService _sut;
@@ -100,12 +102,31 @@ public class SalesServiceTests : IDisposable
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result<SalesInvoiceDto>>> func, CancellationToken ct) => func());
 
+        // Setup accounting service to return success by default
+        _mockAccountingService.Setup(a => a.CreateSalesPostEntryAsync(
+            It.IsAny<SalesInvoice>(),
+            It.IsAny<int>(),
+            It.IsAny<decimal>(),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+
+        _mockAccountingService.Setup(a => a.ReverseSalesPostEntryAsync(
+            It.IsAny<SalesInvoice>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+
+        _mockDocumentSequenceService.Setup(s => s.GetNextIntAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+
         _sut = new SalesService(
             _mockUow.Object,
             _mockInventoryService.Object,
             _cashBoxServiceMock.Object,
             _mockPrintDataService.Object,
             _mockPrintService.Object,
+            _mockAccountingService.Object,
+            _mockDocumentSequenceService.Object,
             _mockLogger.Object);
     }
 
@@ -201,7 +222,7 @@ public class SalesServiceTests : IDisposable
         _output.WriteLine("[TEST] GivenDraftInvoice_WhenCancelling_ThenNoStockOrBalanceChanges");
 
         var warehouse = Warehouse.Create(name: "Main Warehouse", isDefault: true);
-        var product = Product.Create(name: "Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create(name: "Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -245,7 +266,7 @@ public class SalesServiceTests : IDisposable
 
         // Setup warehouse and product first (same as Draft test)
         var warehouse = Warehouse.Create(name: "Main Warehouse", isDefault: true);
-        var product = Product.Create(name: "Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create(name: "Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();

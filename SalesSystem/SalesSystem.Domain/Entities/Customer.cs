@@ -1,3 +1,4 @@
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Exceptions;
 
@@ -14,6 +15,28 @@ public class Customer : BaseEntity
     public decimal CreditLimit { get; private set; }
     public string? TaxNumber { get; private set; }
 
+    // ─── Phase 23: New Fields ─────────────────────────────────────
+    /// <summary>
+    /// FK to Chart of Accounts. Links this customer to an Account for financial reporting.
+    /// </summary>
+    public int? AccountId { get; private set; }
+
+    /// <summary>
+    /// FK to CustomerGroup. Groups customers for reporting and filtering.
+    /// </summary>
+    public int? CustomerGroupId { get; private set; }
+
+    // ─── Navigation Properties ─────────────────────────────────────
+    /// <summary>
+    /// Navigation property to the linked Account (Chart of Accounts).
+    /// </summary>
+    public virtual Account? Account { get; private set; }
+
+    /// <summary>
+    /// Navigation property to the CustomerGroup.
+    /// </summary>
+    public virtual CustomerGroup? CustomerGroup { get; private set; }
+
     private Customer() { }
 
     public static Customer Create(
@@ -24,7 +47,9 @@ public class Customer : BaseEntity
         string? address = null,
         string? taxNumber = null,
         decimal creditLimit = 0,
-        int? createdByUserId = null)
+        int? createdByUserId = null,
+        int? accountId = null,
+        int? customerGroupId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم العميل مطلوب.");
@@ -42,7 +67,9 @@ public class Customer : BaseEntity
             Email = email,
             Address = address,
             TaxNumber = taxNumber,
-            CreditLimit = creditLimit
+            CreditLimit = creditLimit,
+            AccountId = accountId,
+            CustomerGroupId = customerGroupId
         };
         customer.SetCreatedBy(createdByUserId);
         return customer;
@@ -62,6 +89,49 @@ public class Customer : BaseEntity
         CurrentBalance -= amount;
     }
 
+    /// <summary>
+    /// Checks if adding the given amount would exceed the credit limit.
+    /// Returns true if within limit, false if over limit.
+    /// NOTE: This is a non-throwing check — the caller decides whether to block or warn.
+    /// </summary>
+    public bool CheckCreditLimit(decimal additionalAmount)
+    {
+        if (CreditLimit <= 0)
+            return true; // No credit limit set — no enforcement
+
+        return (CurrentBalance + additionalAmount) <= CreditLimit;
+    }
+
+    /// <summary>
+    /// Links the customer to an Account in the Chart of Accounts.
+    /// </summary>
+    public void LinkToAccount(int accountId)
+    {
+        if (accountId <= 0)
+            throw new DomainException("معرّف الحساب غير صالح.");
+
+        AccountId = accountId;
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Assigns the customer to a CustomerGroup, or removes the assignment (null).
+    /// </summary>
+    public void SetCustomerGroup(int? customerGroupId)
+    {
+        CustomerGroupId = customerGroupId;
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Removes the link to the Chart of Accounts.
+    /// </summary>
+    public void UnlinkAccount()
+    {
+        AccountId = null;
+        UpdateTimestamp();
+    }
+
     public void Update(
         string name,
         string? phone,
@@ -69,7 +139,9 @@ public class Customer : BaseEntity
         string? address,
         string? taxNumber,
         decimal creditLimit,
-        int? updatedByUserId)
+        int? updatedByUserId,
+        int? accountId = null,
+        int? customerGroupId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم العميل مطلوب.");
@@ -82,6 +154,8 @@ public class Customer : BaseEntity
         Address = address;
         TaxNumber = taxNumber;
         CreditLimit = creditLimit;
+        AccountId = accountId;
+        CustomerGroupId = customerGroupId;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }

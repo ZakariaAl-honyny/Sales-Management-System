@@ -29,6 +29,7 @@ public class SupplierEditorViewModel : ViewModelBase
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
+    private int? _accountId;
 
 
     public SupplierEditorViewModel()
@@ -65,6 +66,7 @@ public class SupplierEditorViewModel : ViewModelBase
         _openingBalance = supplier.OpeningBalance;
         _isActive = supplier.IsActive;
         _isEditMode = true;
+        _accountId = supplier.AccountId;
     }
 
     #region Properties
@@ -154,6 +156,12 @@ public class SupplierEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
+    public int? AccountId
+    {
+        get => _accountId;
+        set => SetProperty(ref _accountId, value);
+    }
+
     #endregion
 
     #region Commands
@@ -194,7 +202,8 @@ public class SupplierEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
                 CreditLimit,
-                IsActive);
+                IsActive,
+                AccountId: AccountId);
 
             result = await _supplierService.UpdateAsync(_supplierId, updateRequest);
         }
@@ -207,7 +216,8 @@ public class SupplierEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
                 OpeningBalance,
-                CreditLimit);
+                CreditLimit,
+                AccountId: AccountId);
 
             result = await _supplierService.CreateAsync(createRequest);
         }

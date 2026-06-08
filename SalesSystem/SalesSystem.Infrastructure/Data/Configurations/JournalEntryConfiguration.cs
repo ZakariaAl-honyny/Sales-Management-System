@@ -17,6 +17,9 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
         builder.Property(x => x.EntryType).HasConversion<int>().IsRequired();
         builder.Property(x => x.ReferenceType).HasMaxLength(50);
         builder.Property(x => x.ReferenceNumber).HasMaxLength(50);
+        builder.Property(x => x.ReferenceId);
+        builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId })
+            .HasFilter("[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL");
         builder.Property(x => x.IsPosted).HasDefaultValue(false);
         builder.Property(x => x.IsReversed).HasDefaultValue(false);
         builder.Property(x => x.IsActive).HasDefaultValue(true);

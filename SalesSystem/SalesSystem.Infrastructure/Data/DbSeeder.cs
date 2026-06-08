@@ -37,20 +37,33 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 2. Default customer — seeded BEFORE SystemSettings so DefaultCashCustomerId = "1"
+        // 2. Default CustomerGroup — seeded BEFORE Customers
+        // ═══════════════════════════════════════════════════
+        if (!await db.Set<CustomerGroup>().AnyAsync())
+        {
+            db.Set<CustomerGroup>().Add(CustomerGroup.Create(
+                name: "عام",
+                description: "مجموعة العملاء الافتراضية"
+            ));
+            logger?.LogInformation("Seeded default customer group.");
+        }
+
+        // ═══════════════════════════════════════════════════
+        // 3. Default customer — seeded BEFORE SystemSettings so DefaultCashCustomerId = "1"
         // ═══════════════════════════════════════════════════
         if (!await db.Customers.AnyAsync())
         {
             db.Customers.Add(Customer.Create(
-                name: "العميل الافتراضي في النظام",
+                name: "عميل نقدي",
                 openingBalance: 0m,
-                createdByUserId: null
+                createdByUserId: null,
+                customerGroupId: 1
             ));
             logger?.LogInformation("Seeded default customer.");
         }
 
         // ═══════════════════════════════════════════════════
-        // 3. Default supplier — seeded BEFORE SystemSettings so DefaultCashSupplierId = "1"
+        // 4. Default supplier — seeded BEFORE SystemSettings so DefaultCashSupplierId = "1"
         // ═══════════════════════════════════════════════════
         if (!await db.Suppliers.AnyAsync())
         {
@@ -63,7 +76,7 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 4. Seed SystemSettings (key-value pairs) — references customer/supplier Id=1
+        // 5. Seed SystemSettings (key-value pairs) — references customer/supplier Id=1
         // ═══════════════════════════════════════════════════
         if (!await db.SystemSettings.AnyAsync())
         {
@@ -264,15 +277,7 @@ public static class DbSeeder
         );
         db.Warehouses.Add(warehouse);
 
-        // 9. Default cash box — main cash drawer for daily operations
-        var defaultCashBox = CashBox.Create(
-            boxName: "الصندوق الرئيسي",
-            initialBalance: 0m,
-            currencyId: null
-        );
-        db.CashBoxes.Add(defaultCashBox);
-
-        // 10. Base units of measure
+        // 9. Base units of measure
         db.Units.Add(Unit.Create("قطعة", "pcs", null));
         db.Units.Add(Unit.Create("كيلو", "kg", null));
         db.Units.Add(Unit.Create("لتر", "ltr", null));
@@ -298,8 +303,8 @@ public static class DbSeeder
             db.ProductUnits.Add(ProductUnit.CreateBaseUnit(
                 product.Id,
                 "قطعة",
-                product.RetailPrice,
-                product.PurchasePrice
+                0m, // TODO: Phase 25 — RetailPrice moved to ProductPrices table
+                0m  // TODO: Phase 25 — PurchasePrice moved to ProductPrices table
             ));
         }
 
@@ -310,6 +315,47 @@ public static class DbSeeder
         await AccountingSeeder.SeedAsync(db, logger);
 
         await db.SaveChangesAsync();
+
+        // ═══════════════════════════════════════════════════
+        // 14. Seed ProductPrices for each product's base unit
+        //     (requires ProductUnits to be saved first for IDs)
+        // ═══════════════════════════════════════════════════
+        if (!await db.Set<ProductPrice>().AnyAsync())
+        {
+            var baseProductUnits = await db.ProductUnits
+                .Where(pu => pu.IsBaseUnit)
+                .ToListAsync();
+
+            if (baseProductUnits.Any())
+            {
+                var productPrices = new List<ProductPrice>();
+                foreach (var pu in baseProductUnits)
+                {
+                    productPrices.Add(ProductPrice.Create(
+                        productUnitId: pu.Id,
+                        currencyId: 1,
+                        priceLevel: PriceLevel.Retail,
+                        price: 100m,
+                        effectiveFrom: DateTime.UtcNow,
+                        createdByUserId: 1
+                    ));
+                    productPrices.Add(ProductPrice.Create(
+                        productUnitId: pu.Id,
+                        currencyId: 1,
+                        priceLevel: PriceLevel.Wholesale,
+                        price: 85m,
+                        effectiveFrom: DateTime.UtcNow,
+                        createdByUserId: 1
+                    ));
+                }
+
+                db.Set<ProductPrice>().AddRange(productPrices);
+                await db.SaveChangesAsync();
+                logger?.LogInformation("Seeded {Count} ProductPrices for {ProductUnitCount} base units.",
+                    productPrices.Count, baseProductUnits.Count);
+            }
+        }
+
         logger?.LogInformation("Seed data completed successfully.");
     }
 }

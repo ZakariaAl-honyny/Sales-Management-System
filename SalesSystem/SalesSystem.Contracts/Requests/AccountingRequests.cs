@@ -9,7 +9,6 @@ public record CreateJournalEntryRequest(
     string? ReferenceType,
     int? ReferenceId,
     string? ReferenceNumber,
-    int CreatedBy,
     List<JournalEntryLineRequest> Lines
 );
 

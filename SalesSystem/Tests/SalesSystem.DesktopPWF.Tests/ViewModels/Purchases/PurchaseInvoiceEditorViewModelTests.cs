@@ -55,8 +55,8 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Name: "المستودع الرئيسي", Location: null, IsDefault: true, IsActive: true),
-            new WarehouseDto(Id: 2, Name: "المستودع الفرعي", Location: null, IsDefault: false, IsActive: true)
+            new WarehouseDto(Id: 1, Name: "المستودع الرئيسي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null),
+            new WarehouseDto(Id: 2, Name: "المستودع الفرعي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: false, IsActive: true, AccountId: null, Notes: null)
         };
 
         var products = new List<ProductDto>

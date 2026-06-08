@@ -1,7 +1,7 @@
 # 📋 Plan for Phases — Comprehensive Coverage Matrix
 
-> **Version**: 2.3 — Cross-phase gap analysis COMPLETE — 14 Phase plans (18–31) reviewed, 11 BLOCKING issues fixed, 9 HIGH gaps closed, 22 MEDIUM gaps resolved
-> **Total Phase plans**: 14 (Phases 18–31), all reviewed and fixed
+> **Version**: 2.4 — Cross-phase gap analysis COMPLETE — 15 Phase plans (18–32) reviewed, 11 BLOCKING issues fixed, 9 HIGH gaps closed, 22 MEDIUM gaps resolved
+> **Total Phase plans**: 15 (Phases 18–32), 14 reviewed+fixed, 1 planned (Suppliers Phase 32)
 > **Date**: June 5, 2026
 > **Purpose**: Verify every feature from analysis is covered by at least one Phase plan
 
@@ -17,7 +17,8 @@
 | 3 | المستخدمون والصلاحيات (Users & Permissions) | `Phase 21 — Users & Permissions Module Implementation Plan.md` | ✅ **REVIEWED & FIXED v2.0** | IsActive→Status, EF filter byte cast fix, 33 permission codes aligned §1.2↔§4.9 |
 | 4 | دليل الحسابات (Chart of Accounts) | `Phase 22 — Chart of Accounts Module Implementation Plan.md` | ✅ **REVIEWED & FIXED** | Level validation relaxed (strict +1→>), 60 accounts (up from 56), IsSystemAccount scoped L1-L2 |
 | 5 | العملاء (Customers) | `Phase 23 — Customers Module Implementation Plan.md` | ✅ **REVIEWED & FIXED** | Account auto-creation on Customer.Create (Credit type → sub-account under 1210) |
-| 6 | الموردون (Suppliers) | `Phase 24 — Suppliers Module Implementation Plan.md` | ✅ **REVIEWED & FIXED** | OpeningBalance→journal entry auto-creation, Account auto-creation |
+| 6 | ✅ المحاسبة الآلية (Accounting Automation) | `Phase 24 — Accounting Engine Automation Implementation Plan.md` | ✅ **IMPLEMENTED** | Auto journal entries for all money operations, payment reversals, COGS using AverageCost |
+| 6b | ✅ الموردون (Suppliers) | `Phase 32 — Suppliers Module Implementation Plan.md` | 📝 **PLANNED** | AccountId FK, SupplierType, CreditLimit validation, OpeningBalance→journal, UI balance display |
 | 7 | الأصناف (Products) | `Phase 25 — Products Module Implementation Plan.md` | ✅ **REVIEWED & FIXED** | Opening Stock section on creation (optional Qty/UnitCost/Expiry) |
 | 8 | المخازن (Warehouses) | `Phase 26 — Warehouses Module Implementation Plan.md` | ✅ **REVIEWED & FIXED** | Physical Count deferred to V2, AdjustmentType + StockIssueReason enums, Notes field |
 | 9 | المشتريات (Purchases) | `Phase 27 — Purchases Module Implementation Plan.md` | ✅ **REVIEWED & FIXED** | FIFO batch costing, partial PO→Invoice receive, AdditionalCharge.AccountId FK, standalone return, Arabic guards |
@@ -41,7 +42,7 @@ Maps every feature from the 22-item analysis checklist to the Phase plan that co
 | 3 | ✅ Chart of Accounts | دليل الحسابات | **Phase 22** | 4-level hierarchy, 56 accounts (vs 18 existing), self-referencing FK, color coding, tree UI, 12 tasks | None — comprehensive plan |
 | 4 | ✅ Users & Permissions | المستخدمون والصلاحيات | **Phase 21 v2.0** | Full 3 sub-modules: User Enhancement (passwordless creation, UserStatus, MustChangePassword, DefaultCashBoxId, account lockout), Permissions (30 exact dot-notation codes with 4-role model: Admin/Accountant/Cashier/Observer), Audit Log (2,333 lines, 15 tasks) — ALL analysis gaps filled | None — comprehensive plan v2.0 covers all analysis requirements from Part 5 lines 3711-5043 |
 | 5 | ✅ Customers | العملاء | **Phase 23** | AccountId FK, CustomerType, CustomerGroup, CreditLimit validation, 12 tasks | None — comprehensive plan |
-| 6 | ✅ Suppliers | الموردون | **Phase 24** | AccountId FK, SupplierType, CreditLimit, 15 tasks, ExecuteAsync() fix | None — comprehensive plan |
+| 6 | ✅ Suppliers | الموردون | **Phase 32** | AccountId FK, SupplierType, CreditLimit, OpeningBalance→journal, UI balance display | 📝 Planned — plan file not yet created |
 | 7 | ✅ CashBoxes | الصناديق | **Phase 29** (Receipts & Payments) | CashBox enhancement, CurrencyId FK, AccountId FK, Daily Closure, Cheque management | Partial — could use stronger visibility as sub-module |
 | 8 | ✅ Products | الأصناف | **Phase 25** | 7 sub-modules, FIFO batches, multi-currency pricing, BOM, images, 18 tasks (~40h) | None — comprehensive plan |
 | 9 | ✅ Units | الوحدات | **Phase 25** (sub-module) | ProductUnit, ConversionFactor, IsBaseUnit, 7 default units (حبة, كرتون, علبة, كيلو, جرام, لتر, متر) | None |
@@ -115,9 +116,9 @@ Maps every feature from the 22-item analysis checklist to the Phase plan that co
 
 **Status**: ✅ **REVIEWED & FIXED** — Account sub-account auto-creation added
 
-### Phase 24 — Suppliers Module ✅ FIXED
+### Phase 32 — Suppliers Module 📝 PLANNED
 
-**Status**: ✅ **REVIEWED & FIXED** — OpeningBalance journal entry + Account auto-creation added
+**Status**: 📝 **PLANNED** — AccountId FK, SupplierType, CreditLimit validation, OpeningBalance→journal, UI balance display
 
 ### Phase 25 — Products Module ✅ FIXED
 
@@ -164,7 +165,7 @@ Phase 22 — Chart of Accounts Module           (✅ REVIEWED & FIXED — 60 acc
      ↓
 Phase 23 — Customers Module                   (✅ REVIEWED & FIXED — Account auto-creation)
      ↓
-Phase 24 — Suppliers Module                   (✅ REVIEWED & FIXED — OpeningBalance→journal)
+Phase 24 — Accounting Engine Automation       (✅ IMPLEMENTED — auto journal entries for all money ops)
      ↓
 Phase 25 — Products Module                    (✅ REVIEWED & FIXED — Opening Stock section)
      ↓
@@ -179,6 +180,8 @@ Phase 29 — Receipts & Payments Module         (✅ REVIEWED & FIXED — Accoun
 Phase 30 — Journal Entries Module             (✅ REVIEWED & FIXED — SystemAccountMappings + FiscalYear)
      ↓
 Phase 31 — Reports Module                     (✅ REVIEWED & FIXED — hierarchical DTOs)
+     ↓
+Phase 32 — Suppliers Module                   (📝 PLANNED — AccountId FK, SupplierType, CreditLimit, OpeningBalance)
 ```
 
 ---
@@ -190,7 +193,7 @@ Phase 31 — Reports Module                     (✅ REVIEWED & FIXED — hierar
 | Features fully covered by Phase plans | 22 of 22 | ✅ |
 | Features with dedicated comprehensive Phase | 11 of 22 | ✅ |
 | Features needing NEW Phase | **0** — all covered | ✅ |
-| Total Phase plans | 14 (Phases 18-31) | 14 created ✅ |
+| Total Phase plans | 15 (Phases 18-32) | 14 reviewed+fixed ✅, 1 planned 📝 |
 | Phases with cross-phase gap fixes applied | 14 of 14 | ✅ |
 | BLOCKING issues found & fixed | 11 | ✅ |
 | HIGH gaps found & closed | 9 | ✅ |

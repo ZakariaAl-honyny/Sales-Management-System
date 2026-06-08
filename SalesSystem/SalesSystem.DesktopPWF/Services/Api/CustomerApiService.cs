@@ -57,4 +57,11 @@ public class CustomerApiService : ApiServiceBase, ICustomerApiService
             () => _httpClient.DeleteAsync($"api/v1/customers/permanent/{id}"),
             "CustomerApiService.DeletePermanentlyAsync");
     }
+
+    public async Task<Result<List<CustomerGroupDto>>> GetAllGroupsAsync(CancellationToken ct = default)
+    {
+        return await ExecuteAsync<List<CustomerGroupDto>>(
+            () => _httpClient.GetAsync("api/v1/customers/groups", ct),
+            "CustomerApiService.GetAllGroupsAsync");
+    }
 }

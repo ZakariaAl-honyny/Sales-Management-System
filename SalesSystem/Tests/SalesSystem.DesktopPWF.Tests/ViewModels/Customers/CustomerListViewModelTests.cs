@@ -307,10 +307,10 @@ public class CustomerListViewModelTests : IDisposable
     #region Command CanExecute Tests
 
     [Fact]
-    public void DeleteCommand_CannotExecute_WhenNoSelection()
+    public void DeleteCommand_CanExecute_Always_WhenNoSelection()
     {
         _viewModel.SelectedCustomer = null;
-        _viewModel.DeleteCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue(); // Always enabled per RULE-059
     }
 
     [Fact]
@@ -322,10 +322,10 @@ public class CustomerListViewModelTests : IDisposable
     }
 
     [Fact]
-    public void EditCommand_CannotExecute_WhenNoSelection()
+    public void EditCommand_CanExecute_Always_WhenNoSelection()
     {
         _viewModel.SelectedCustomer = null;
-        _viewModel.EditCommand.CanExecute(null).Should().BeFalse();
+        _viewModel.EditCommand.CanExecute(null).Should().BeTrue(); // Always enabled per RULE-059
     }
 
     [Fact]

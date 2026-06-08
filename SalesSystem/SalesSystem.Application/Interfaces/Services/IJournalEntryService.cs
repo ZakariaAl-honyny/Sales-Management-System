@@ -9,7 +9,20 @@ public interface IJournalEntryService
     /// <summary>
     /// Creates and posts a balanced journal entry.
     /// </summary>
-    Task<Result<int>> CreateJournalEntryAsync(CreateJournalEntryRequest request, CancellationToken ct = default);
+    /// <param name="request">Journal entry data (no CreatedBy — extracted from JWT).</param>
+    /// <param name="userId">Authenticated user ID from JWT claims.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result<int>> CreateJournalEntryAsync(CreateJournalEntryRequest request, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets a paginated list of journal entries, ordered by TransactionDate descending.
+    /// </summary>
+    Task<Result<List<JournalEntryListDto>>> GetAllAsync(int page = 1, int pageSize = 50, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets a single journal entry with all its lines by ID.
+    /// </summary>
+    Task<Result<JournalEntryDetailDto>> GetByIdAsync(int id, CancellationToken ct = default);
 
     /// <summary>
     /// Gets the account balance as of an optional date (default = all time).

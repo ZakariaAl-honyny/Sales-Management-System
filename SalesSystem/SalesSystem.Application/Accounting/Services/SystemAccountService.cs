@@ -48,6 +48,9 @@ public class SystemAccountService : ISystemAccountService
                 mappings.SpoilageLossAccountId
             };
 
+            if (mappings.OpeningBalanceEquityAccountId.HasValue)
+                accountIds.Add(mappings.OpeningBalanceEquityAccountId.Value);
+
             var accounts = await _uow.Accounts.ToListAsync(
                 a => accountIds.Contains(a.Id), ct: ct);
 
@@ -69,6 +72,10 @@ public class SystemAccountService : ISystemAccountService
             var (cogsName, cogsCode) = GetAccountInfo(accountLookup, mappings.CogsAccountId);
             var (expName, expCode) = GetAccountInfo(accountLookup, mappings.GeneralExpenseAccountId);
             var (spoilName, spoilCode) = GetAccountInfo(accountLookup, mappings.SpoilageLossAccountId);
+
+            var (obeName, obeCode) = mappings.OpeningBalanceEquityAccountId.HasValue
+                ? GetAccountInfo(accountLookup, mappings.OpeningBalanceEquityAccountId.Value)
+                : (null, (string?)null);
 
             var dto = new SystemAccountMappingsDto(
                 Id: mappings.Id,
@@ -111,6 +118,9 @@ public class SystemAccountService : ISystemAccountService
                 SpoilageLossAccountId: mappings.SpoilageLossAccountId,
                 SpoilageLossAccountName: spoilName,
                 SpoilageLossAccountCode: spoilCode,
+                OpeningBalanceEquityAccountId: mappings.OpeningBalanceEquityAccountId,
+                OpeningBalanceEquityAccountName: obeName,
+                OpeningBalanceEquityAccountCode: obeCode,
                 BranchId: mappings.BranchId);
 
             return Result<SystemAccountMappingsDto>.Success(dto);

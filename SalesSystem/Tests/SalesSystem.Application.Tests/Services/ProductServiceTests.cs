@@ -67,7 +67,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingProduct_ReturnsDto");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m, minStock: 5);
+        var product = Product.Create("Test Product", minStock: 5);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -75,7 +75,6 @@ public class ProductServiceTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("Test Product");
-        result.Value.SalePrice.Should().Be(100m);
 
         _output.WriteLine("[PASS] GetByIdAsync returns product dto");
     }
@@ -108,29 +107,8 @@ public class ProductServiceTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("New Product");
-        result.Value.SalePrice.Should().Be(100m);
-        result.Value.PurchasePrice.Should().Be(50m);
 
         _output.WriteLine("[PASS] CreateAsync creates product correctly");
-    }
-
-    [Fact]
-    public async Task CreateAsync_DuplicateBarcode_ReturnsFailure()
-    {
-        _output.WriteLine("[TEST] CreateAsync_DuplicateBarcode_ReturnsFailure");
-
-        var existing = Product.Create("Existing", purchasePrice: 10m, retailPrice: 100m, minStock: 0, barcode: "1234567890");
-        _dbContext.Products.Add(existing);
-        await _dbContext.SaveChangesAsync();
-
-        var request = new SalesSystem.Contracts.Requests.CreateProductRequest("1234567890", "New Product", null, null, null, null, 1m, 50m, 100m, 100m, 0m, 0m, null, null, null); // Duplicate
-
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("باركود المنتج مستخدم بالفعل");
-
-        _output.WriteLine("[PASS] Duplicate barcode returns failure");
     }
 
     #endregion
@@ -142,7 +120,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesProduct");
 
-        var product = Product.Create("Original", purchasePrice: 10m, retailPrice: 100m, minStock: 5);
+        var product = Product.Create("Original", minStock: 5);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -152,8 +130,6 @@ public class ProductServiceTests : IDisposable
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("Updated Product");
-        result.Value.PurchasePrice.Should().Be(20m);
-        result.Value.SalePrice.Should().Be(200m);
 
         _output.WriteLine("[PASS] UpdateAsync updates product correctly");
     }
@@ -182,7 +158,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_ExistingProduct_SoftDeletes");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m, minStock: 0);
+        var product = Product.Create("Test Product", minStock: 0);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -218,8 +194,8 @@ public class ProductServiceTests : IDisposable
         var category = Category.Create("Electronics", null, null);
         _dbContext.Categories.Add(category);
 
-        var product1 = Product.Create("Product 1", 10m, 100m, barcode: "P001", categoryId: 1);
-        var product2 = Product.Create("Product 2", 10m, 100m, barcode: "P002");
+        var product1 = Product.Create("Product 1", categoryId: 1);
+        var product2 = Product.Create("Product 2");
         _dbContext.Products.Add(product1);
         _dbContext.Products.Add(product2);
         await _dbContext.SaveChangesAsync();
@@ -238,8 +214,8 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetAllAsync_WithSearch_FiltersResults");
 
-        var product1 = Product.Create("Laptop", 10m, 100m, barcode: "P001");
-        var product2 = Product.Create("Mouse", 10m, 100m, barcode: "P002");
+        var product1 = Product.Create("Laptop");
+        var product2 = Product.Create("Mouse");
         _dbContext.Products.Add(product1);
         _dbContext.Products.Add(product2);
         await _dbContext.SaveChangesAsync();

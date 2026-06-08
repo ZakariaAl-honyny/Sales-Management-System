@@ -17,6 +17,8 @@ public class PurchaseService : IPurchaseService
     private readonly IStoreSettingsService _settingsService;
     private readonly IUpdateProductPricingService _pricingService;
     private readonly ICashBoxService _cashBoxService;
+    private readonly IAccountingIntegrationService _accountingService;
+    private readonly IDocumentSequenceService _documentSequenceService;
     private readonly ILogger<PurchaseService> _logger;
 
     public PurchaseService(
@@ -25,6 +27,8 @@ public class PurchaseService : IPurchaseService
         IStoreSettingsService settingsService,
         IUpdateProductPricingService pricingService,
         ICashBoxService cashBoxService,
+        IAccountingIntegrationService accountingService,
+        IDocumentSequenceService documentSequenceService,
         ILogger<PurchaseService> logger)
     {
         _uow = uow;
@@ -32,6 +36,8 @@ public class PurchaseService : IPurchaseService
         _settingsService = settingsService;
         _pricingService = pricingService;
         _cashBoxService = cashBoxService;
+        _accountingService = accountingService;
+        _documentSequenceService = documentSequenceService;
         _logger = logger;
     }
 
@@ -75,9 +81,8 @@ public class PurchaseService : IPurchaseService
              (i.SupplierInvoiceNo != null && i.SupplierInvoiceNo.ToLower().Contains(searchLower)) ||
              (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
              i.Items.Any(item =>
-                 item.Product != null && (
-                     item.Product.Name.ToLower().Contains(searchLower) ||
-                     (item.Product.Barcode ?? "").ToLower().Contains(searchLower))));
+                 item.Product != null &&
+                 item.Product.Name.ToLower().Contains(searchLower)));
 
         var includes = new[] { "Supplier", "Warehouse", "Items.Product" };
 
@@ -91,21 +96,31 @@ public class PurchaseService : IPurchaseService
 
     public async Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, int userId, CancellationToken ct)
     {
-        // Compute default InvoiceNo if not provided: last Id + 1
-        var invoiceNo = request.InvoiceNo ?? 0;
-        if (invoiceNo <= 0)
-        {
-            var lastInvoices = await _uow.PurchaseInvoices.ToListAsync(
-                predicate: null,
-                queryConfig: q => q.OrderByDescending(i => i.Id).Take(1),
-                ct: ct);
-            var lastId = lastInvoices.FirstOrDefault()?.Id ?? 0;
-            invoiceNo = lastId + 1;
-        }
-
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
+            // Resolve InvoiceNo INSIDE transaction — prevents TOCTOU race (RULE-384 fix)
+            int invoiceNo;
+            if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
+            {
+                var existing = await _uow.PurchaseInvoices.AnyAsync(i => i.InvoiceNo == request.InvoiceNo.Value, ct);
+                if (existing)
+                {
+                    await transaction.RollbackAsync(ct);
+                    return Result<PurchaseInvoiceDto>.Failure("رقم الفاتورة موجود بالفعل");
+                }
+                invoiceNo = request.InvoiceNo.Value;
+            }
+            else
+            {
+                var seqResult = await _documentSequenceService.GetNextIntAsync("PurchaseInvoice", ct);
+                if (!seqResult.IsSuccess)
+                {
+                    await transaction.RollbackAsync(ct);
+                    return Result<PurchaseInvoiceDto>.Failure("فشل في توليد رقم الفاتورة");
+                }
+                invoiceNo = seqResult.Value;
+            }
             var invoice = PurchaseInvoice.Create(
                 request.SupplierId,
                 request.WarehouseId,
@@ -235,22 +250,12 @@ public class PurchaseService : IPurchaseService
                 invoice.Post();
                 await _uow.SaveChangesAsync();
 
-                // AutoUpdatePrices: Update product purchase prices if enabled
+                // AutoUpdatePrices: Now handled by UpdateProductPricingService below (lines ~296-329)
+                // Phase 25: Product.UpdatePurchasePrice() removed — costs update via ProductUnit.UpdateCost()
                 var settingsResult = await _settingsService.GetSettingsAsync(ct);
                 if (settingsResult.IsSuccess && settingsResult.Value!.AutoUpdatePrices)
                 {
-                    foreach (var item in invoice.Items)
-                    {
-                        if (item.Product != null)
-                        {
-                            var retailUnitCost = item.Product.GetRetailQuantityEquivalent(1, item.Mode) > 0
-                                ? item.UnitCost / item.Product.GetRetailQuantityEquivalent(1, item.Mode)
-                                : item.UnitCost;
-                            item.Product.UpdatePurchasePrice(retailUnitCost, userId);
-                        }
-                    }
-                    await _uow.SaveChangesAsync(ct);
-                    _logger.LogInformation("AutoUpdatePrices: Updated purchase prices for {Count} products from invoice {Id}", invoice.Items.Count, invoice.Id);
+                    _logger.LogInformation("AutoUpdatePrices: Purchase costs queued for update for {Count} products from invoice {Id}", invoice.Items.Count, invoice.Id);
                 }
 
                 // Update Stock
@@ -345,6 +350,15 @@ public class PurchaseService : IPurchaseService
                 }
 
                 await _uow.SaveChangesAsync(ct);
+
+                // Create journal entry for purchase posting
+                var entryResult = await _accountingService.CreatePurchasePostEntryAsync(invoice, userId, ct);
+                if (!entryResult.IsSuccess)
+                {
+                    await transaction.RollbackAsync(ct);
+                    return Result<PurchaseInvoiceDto>.Failure(entryResult.Error!);
+                }
+
                 await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("Purchase Invoice posted: ID {Id} by User {UserId}", invoice.Id, userId);
@@ -384,6 +398,14 @@ public class PurchaseService : IPurchaseService
             {
                 if (invoice.Status == InvoiceStatus.Posted)
                 {
+                    // Create reversal journal entry for cancelled purchase
+                    var entryResult = await _accountingService.ReversePurchasePostEntryAsync(invoice, userId, ct);
+                    if (!entryResult.IsSuccess)
+                    {
+                        await transaction.RollbackAsync(ct);
+                        return Result<PurchaseInvoiceDto>.Failure(entryResult.Error!);
+                    }
+
                     // Reverse Stock
                     foreach (var item in invoice.Items)
                     {
@@ -417,13 +439,13 @@ public class PurchaseService : IPurchaseService
                         }
                     }
 
-                    // Create offsetting cash transaction
+                    // Create offsetting cash transaction (reverse the original SupplierPayment)
                     if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
                     {
                         var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
                             invoice.CashBoxId.Value,
                             invoice.PaidAmount,
-                            CashTransactionType.SupplierPayment,
+                            CashTransactionType.RefundOut,
                             "PurchaseInvoiceCancel",
                             invoice.Id,
                             userId,

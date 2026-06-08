@@ -32,6 +32,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using SalesSystem.Contracts.Requests;
+using SalesSystem.Api.Validators;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -127,6 +129,7 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<ICustomerGroupService, CustomerGroupService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IDocumentSequenceService, DocumentSequenceService>();
@@ -158,6 +161,8 @@ builder.Services.AddScoped<InvoicePrintDtoBuilder>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddScoped<IInventoryBatchService, InventoryBatchService>();
+builder.Services.AddScoped<IProductImageService, ProductImageService>();
 
 // ─── Accounting Services ────────────────────────────────────
 builder.Services.AddScoped<IJournalEntryService, JournalEntryService>();
@@ -165,6 +170,7 @@ builder.Services.AddScoped<ISystemAccountService, SystemAccountService>();
 builder.Services.AddScoped<IJournalEntryNumberGenerator, JournalEntryNumberGenerator>();
 builder.Services.AddScoped<IAnnualClosingService, AnnualClosingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationService>();
 
 builder.Services.AddSingleton(jwtSettings);
 
@@ -265,6 +271,12 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddHttpClient();
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Explicit validator registrations (redundant with auto-discovery, but ensure DI clarity)
+builder.Services.AddScoped<IValidator<CreateCustomerRequest>, CreateCustomerRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateCustomerRequest>, UpdateCustomerRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateCustomerGroupRequest>, CreateCustomerGroupRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateCustomerGroupRequest>, UpdateCustomerGroupRequestValidator>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>
 {

@@ -41,6 +41,7 @@
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                              Tag="اسم المستخدم..."
                              TabIndex="1"
+                             AutomationProperties.AutomationId="TxtSearchUsers"
                              helpers:FocusHelper.AdvanceOnEnter="True">
                         <TextBox.InputBindings>
                             <KeyBinding Key="Return" Command="{Binding SearchCommand}"/>
@@ -49,6 +50,7 @@
                     <Button Command="{Binding SearchCommand}" 
                             Style="{StaticResource PrimaryButton}"
                             Margin="8,0,0,0"
+                            AutomationProperties.AutomationId="BtnSearchUsers"
                             ToolTip="اضغط هنا للبحث عن المستخدمين">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -69,6 +71,7 @@
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                     <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnAddUser"
                             ToolTip="إضافة موظف جديد للنظام">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -76,6 +79,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnEditUser"
                             ToolTip="تعديل بيانات المستخدم المختار">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="📝" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -83,6 +87,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding ResetPasswordCommand}" Style="{StaticResource WarningButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnResetPassword"
                             ToolTip="إعادة تعيين كلمة المرور — سيتم مسح كلمة المرور الحالية ويُطلب من المستخدم تعيين كلمة مرور جديدة عند أول تسجيل دخول"
                             Visibility="{Binding SelectedUser, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed}">
                         <StackPanel Orientation="Horizontal">
@@ -91,6 +96,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding ToggleStatusCommand}" Style="{StaticResource DangerButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnToggleUserStatus"
                             ToolTip="تعطيل أو تفعيل حساب المستخدم المختار"
                             Visibility="{Binding SelectedUser, Converter={StaticResource NullToVisibility}, FallbackValue=Collapsed}">
                         <StackPanel Orientation="Horizontal">
@@ -99,6 +105,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.AutomationId="BtnRefreshUsers"
                             ToolTip="تحديث قائمة المستخدمين">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>

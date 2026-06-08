@@ -1,0 +1,188 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Reports.StockBalanceReportView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
+      mc:Ignorable="d"
+      d:DesignHeight="700" d:DesignWidth="1000"
+     
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Style="{StaticResource PageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="📊 كشف رصيد المخازن"
+                   Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="StockBalancePageTitle"/>
+
+        <!-- Filters Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="المستودع:" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox Width="200"
+                              ItemsSource="{Binding Warehouses}"
+                              SelectedValue="{Binding SelectedWarehouseId}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="Name"
+                              ToolTip="تصفية حسب المستودع — عرض مخزون مستودع معين"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            ToolTip="تصدير بيانات التقرير إلى ملف Excel">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تصدير Excel" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding LoadCommand}" Style="{StaticResource PrimaryButton}"
+                            ToolTip="تحديث بيانات التقرير">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تحديث" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Content Area -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <!-- Error Message -->
+                <Border Background="{StaticResource ErrorLightBrush}"
+                        Padding="10,6"
+                        Margin="0,0,0,0"
+                        VerticalAlignment="Top"
+                        Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <Button Grid.Column="2" Command="{Binding LoadCommand}" Style="{StaticResource SecondaryButton}" Height="28" Padding="12,0" FontSize="11"
+                                ToolTip="إعادة المحاولة">
+                            <TextBlock Text="إعادة المحاولة"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- DataGrid — Stock Balance -->
+                <DataGrid ItemsSource="{Binding ReportData}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          BorderThickness="0"
+                          Margin="0,0,0,0">
+                    <DataGrid.Style>
+                        <Style TargetType="DataGrid" BasedOn="{StaticResource ModernDataGrid}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Style>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="المنتج" Binding="{Binding ProductName}" Width="2*"
+                                            ToolTipService.ToolTip="اسم المنتج"/>
+                        <DataGridTextColumn Header="التصنيف" Binding="{Binding CategoryName}" Width="1*"
+                                            ToolTipService.ToolTip="التصنيف الذي ينتمي إليه المنتج"/>
+                        <DataGridTextColumn Header="المستودع" Binding="{Binding WarehouseName}" Width="1*"
+                                            ToolTipService.ToolTip="المستودع الذي يتواجد فيه المنتج"/>
+                        <DataGridTextColumn Header="الكمية" Binding="{Binding CurrentStock, StringFormat={}{0:N3}}" Width="100"
+                                            ToolTipService.ToolTip="الكمية المتوفرة حالياً في المخزون"/>
+                        <DataGridTextColumn Header="حد الطلب" Binding="{Binding ReorderLevel, StringFormat={}{0:N3}}" Width="100"
+                                            ToolTipService.ToolTip="الحد الأدنى للمخزون — عند الوصول لهذا الحد يجب إعادة الطلب"/>
+                        <DataGridTextColumn Header="متوسط التكلفة" Binding="{Binding AverageCost, StringFormat={}{0:N2}}" Width="120"
+                                            ToolTipService.ToolTip="متوسط تكلفة الوحدة الواحدة من هذا المنتج"/>
+                        <DataGridTextColumn Header="القيمة الإجمالية" Binding="{Binding TotalValue, StringFormat={}{0:N2}}" Width="120"
+                                            ToolTipService.ToolTip="القيمة الإجمالية للمخزون = الكمية × متوسط التكلفة"/>
+                        <DataGridTemplateColumn Header="حالة المخزون" Width="120">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLowStock}" Value="True">
+                                                        <Setter Property="Text" Value="⚠️ منخفض"/>
+                                                        <Setter Property="Foreground" Value="#E65100"/>
+                                                        <Setter Property="FontWeight" Value="Bold"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsLowStock}" Value="False">
+                                                        <Setter Property="Text" Value="✅ طبيعي"/>
+                                                        <Setter Property="Foreground" Value="#2E7D32"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                        <TextBlock.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock Text="هذا الصنف يحتاج إلى إعادة طلب — الكمية أقل من حد الطلب"/>
+                                            </ToolTip>
+                                        </TextBlock.ToolTip>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Empty State -->
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,0">
+                        <TextBlock Text="📦" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
+                        <TextBlock Text="لا توجد بيانات متاحة" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="لم يتم العثور على بيانات لكشف رصيد المخازن — قد لا توجد منتجات في المخازن المحددة" 
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Loading Overlay -->
+                <Border Background="#CCFFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="240" Height="6" Background="#E2E8F0" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="جاري تحميل البيانات..." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Footer — Summary -->
+        <Border Grid.Row="3" Style="{StaticResource FooterBarStyle}" Padding="12,8"
+                Visibility="{Binding HasData, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="📊 الملخص:" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding SummaryText}" FontSize="13" VerticalAlignment="Center"
+                           ToolTip="ملخص التقرير — إجمالي قيمة المخزون وعدد الأصناف منخفضة المخزون"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

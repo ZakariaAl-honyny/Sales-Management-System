@@ -5,6 +5,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
@@ -47,43 +48,33 @@ public class WarehouseService : IWarehouseService
 
     public async Task<Result<WarehouseDto>> CreateAsync(CreateWarehouseRequest request, CancellationToken ct)
     {
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<WarehouseDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
-            try
+            if (request.IsDefault)
             {
-                if (request.IsDefault)
-                {
-                    await UnsetOtherDefaultsAsync(ct);
-                }
-
-                var warehouse = Warehouse.Create(
-                    name: request.Name,
-                    location: request.Location,
-                    isDefault: request.IsDefault,
-                    createdByUserId: null
-                );
-
-                await _uow.Warehouses.AddAsync(warehouse, ct);
-                await _uow.SaveChangesAsync(ct);
-
-                await transaction.CommitAsync(ct);
-
-                _logger.LogInformation("Warehouse created: {WarehouseName} (ID: {WarehouseId}, Default: {IsDefault})",
-                    warehouse.Name, warehouse.Id, warehouse.IsDefault);
-
-                return Result<WarehouseDto>.Success(MapToDto(warehouse));
+                await UnsetOtherDefaultsAsync(ct);
             }
-            catch (DomainException ex)
-            {
-                return Result<WarehouseDto>.Failure(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "Error creating warehouse");
-                return Result<WarehouseDto>.Failure("حدث خطأ أثناء إضافة المستودع");
-            }
+
+            var warehouse = Warehouse.Create(
+                name: request.Name,
+                type: (WarehouseType)request.Type,
+                location: request.Location,
+                phone: request.Phone,
+                address: request.Address,
+                managerName: request.ManagerName,
+                isDefault: request.IsDefault,
+                accountId: request.AccountId,
+                notes: request.Notes,
+                createdByUserId: null
+            );
+
+            await _uow.Warehouses.AddAsync(warehouse, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Warehouse created: {WarehouseName} (ID: {WarehouseId}, Default: {IsDefault})",
+                warehouse.Name, warehouse.Id, warehouse.IsDefault);
+
+            return Result<WarehouseDto>.Success(MapToDto(warehouse));
         }, ct);
     }
 
@@ -93,49 +84,39 @@ public class WarehouseService : IWarehouseService
         if (warehouse == null)
             return Result<WarehouseDto>.Failure("المخزن غير موجود", ErrorCodes.NotFound);
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<WarehouseDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
-            try
+            if (request.IsDefault && !warehouse.IsDefault)
             {
-                if (request.IsDefault && !warehouse.IsDefault)
-                {
-                    await UnsetOtherDefaultsAsync(ct);
-                }
-
-                warehouse.Update(
-                    name: request.Name,
-                    location: request.Location,
-                    isDefault: request.IsDefault,
-                    updatedByUserId: null
-                );
-
-                if (request.IsActive != warehouse.IsActive)
-                {
-                    if (request.IsActive) warehouse.Restore();
-                    else warehouse.MarkAsDeleted();
-                }
-
-                await _uow.Warehouses.UpdateAsync(warehouse, ct);
-                await _uow.SaveChangesAsync(ct);
-
-                await transaction.CommitAsync(ct);
-
-                _logger.LogInformation("Warehouse updated: {WarehouseName} (ID: {WarehouseId}, Default: {IsDefault})",
-                    warehouse.Name, warehouse.Id, warehouse.IsDefault);
-
-                return Result<WarehouseDto>.Success(MapToDto(warehouse));
+                await UnsetOtherDefaultsAsync(ct);
             }
-            catch (DomainException ex)
+
+            warehouse.Update(
+                name: request.Name,
+                type: (WarehouseType)request.Type,
+                location: request.Location,
+                phone: request.Phone,
+                address: request.Address,
+                managerName: request.ManagerName,
+                isDefault: request.IsDefault,
+                accountId: request.AccountId,
+                notes: request.Notes,
+                updatedByUserId: null
+            );
+
+            if (request.IsActive != warehouse.IsActive)
             {
-                return Result<WarehouseDto>.Failure(ex.Message);
+                if (request.IsActive) warehouse.Restore();
+                else warehouse.MarkAsDeleted();
             }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "Error updating warehouse {Id}", id);
-                return Result<WarehouseDto>.Failure("حدث خطأ أثناء تحديث المستودع");
-            }
+
+            await _uow.Warehouses.UpdateAsync(warehouse, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Warehouse updated: {WarehouseName} (ID: {WarehouseId}, Default: {IsDefault})",
+                warehouse.Name, warehouse.Id, warehouse.IsDefault);
+
+            return Result<WarehouseDto>.Success(MapToDto(warehouse));
         }, ct);
     }
 
@@ -178,7 +159,7 @@ public class WarehouseService : IWarehouseService
             _logger.LogInformation("Warehouse permanently deleted: {WarehouseId}", id);
             return Result.Success();
         }
-        catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
+        catch (Exception ex) when (IsDbUpdateException(ex))
         {
             _logger.LogError(ex, "Failed to permanently delete warehouse {WarehouseId} due to database constraint", id);
             return Result.Failure("لا يمكن حذف المخزن نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
@@ -194,8 +175,14 @@ public class WarehouseService : IWarehouseService
         {
             w.Update(
                 name: w.Name,
+                type: w.Type,
                 location: w.Location,
+                phone: w.Phone,
+                address: w.Address,
+                managerName: w.ManagerName,
                 isDefault: false,
+                accountId: w.AccountId,
+                notes: w.Notes,
                 updatedByUserId: null
             );
             await _uow.Warehouses.UpdateAsync(w, ct);
@@ -207,9 +194,25 @@ public class WarehouseService : IWarehouseService
         return new WarehouseDto(
             w.Id,
             w.Name,
+            (byte)w.Type,
             w.Location,
+            w.Phone,
+            w.Address,
+            w.ManagerName,
             w.IsDefault,
-            w.IsActive
+            w.IsActive,
+            w.AccountId,
+            w.Notes
         );
+    }
+
+    /// <summary>
+    /// Checks if the exception is a database update exception by type name.
+    /// Avoids direct dependency on EF Core in the Application layer.
+    /// </summary>
+    private static bool IsDbUpdateException(Exception ex)
+    {
+        var typeName = ex.GetType().FullName ?? "";
+        return typeName.Contains("DbUpdateException", StringComparison.Ordinal);
     }
 }

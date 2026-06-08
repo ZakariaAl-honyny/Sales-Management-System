@@ -41,7 +41,7 @@ public class UpdateProductPricingServiceTests
     {
         _output.WriteLine("[TEST] WeightedAverage_WithExistingStock_CalculatesCorrectly");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create("Test Product");
         SetEntityId(product, 1);
         var baseUnit = ProductUnit.CreateBaseUnit(product.Id, "قطعة", 100m, 10m);
         product.AddUnit(baseUnit);
@@ -91,7 +91,7 @@ public class UpdateProductPricingServiceTests
     {
         _output.WriteLine("[TEST] WeightedAverage_WithZeroStock_UsesNewCost");
 
-        var product = Product.Create("New Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create("New Product");
         var baseUnit = ProductUnit.CreateBaseUnit(product.Id, "قطعة", 100m, 10m);
         product.AddUnit(baseUnit);
         SetNavigationProperty(baseUnit, "Product", product);
@@ -129,7 +129,7 @@ public class UpdateProductPricingServiceTests
     {
         _output.WriteLine("[TEST] LastPurchasePrice_OverwritesCost");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create("Test Product");
         var baseUnit = ProductUnit.CreateBaseUnit(product.Id, "قطعة", 100m, 10m);
         product.AddUnit(baseUnit);
         SetNavigationProperty(baseUnit, "Product", product);
@@ -168,7 +168,7 @@ public class UpdateProductPricingServiceTests
     {
         _output.WriteLine("[TEST] SupplierPrice_UsesSupplierPrice");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create("Test Product");
         var baseUnit = ProductUnit.CreateBaseUnit(product.Id, "قطعة", 100m, 10m);
         baseUnit.UpdateSupplierPrice(8m);
         product.AddUnit(baseUnit);
@@ -207,7 +207,7 @@ public class UpdateProductPricingServiceTests
     {
         _output.WriteLine("[TEST] SupplierPrice_FallsBackToInvoiceCost_WhenSupplierPriceIsZero");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create("Test Product");
         var baseUnit = ProductUnit.CreateBaseUnit(product.Id, "قطعة", 100m, 10m);
         product.AddUnit(baseUnit);
         SetNavigationProperty(baseUnit, "Product", product);
@@ -245,7 +245,7 @@ public class UpdateProductPricingServiceTests
     {
         _output.WriteLine("[TEST] CostCascades_ToAllDerivedUnits");
 
-        var product = Product.Create("Test Product", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create("Test Product");
         var baseUnit = ProductUnit.CreateBaseUnit(product.Id, "قطعة", 100m, 10m);
         var derivedUnit = ProductUnit.CreateDerivedUnit(product.Id, "صندوق", 12m, 1200m, 120m, sortOrder: 1);
         product.AddUnit(baseUnit);
@@ -315,7 +315,7 @@ public class UpdateProductPricingServiceTests
     {
         _output.WriteLine("[TEST] ReturnsFailure_WhenNoBaseUnit");
 
-        var product = Product.Create("No Base Unit", purchasePrice: 10m, retailPrice: 100m);
+        var product = Product.Create("No Base Unit");
         var derivedUnit = ProductUnit.CreateDerivedUnit(product.Id, "صندوق", 12m, 100m, 10m);
         product.AddUnit(derivedUnit);
         SetNavigationProperty(derivedUnit, "Product", product);

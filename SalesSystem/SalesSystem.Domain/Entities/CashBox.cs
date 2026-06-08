@@ -1,3 +1,4 @@
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
@@ -5,23 +6,36 @@ using SalesSystem.Domain.Exceptions;
 namespace SalesSystem.Domain.Entities;
 
 /// <summary>
-/// Represents a cash box for tracking cash flow.
-/// Can be assigned to a specific user or shared.
+/// Represents a cash register location. Balance is tracked on the linked Account
+/// in the Chart of Accounts. This entity is a lightweight register identifier
+/// with metadata (category, contact info) for operational use.
 /// </summary>
 public class CashBox : BaseEntity
 {
     public string BoxName { get; private set; } = string.Empty;
-    public decimal OpeningBalance { get; private set; }
-    public decimal CurrentBalance { get; private set; }
-    public int? BranchId { get; private set; }
+
     /// <summary>
-    /// DEPRECATED: Legacy CurrencyCode field — kept for backwards compatibility.
-    /// Use <see cref="CurrencyId"/> and <see cref="Currency"/> navigation instead.
+    /// FK to the Chart of Accounts Account that holds this cash box's balance.
+    /// Nullable to support migration of existing data — auto-created by service layer
+    /// when not provided. Domain validation requires a valid AccountId for new boxes.
     /// </summary>
-    public string CurrencyCode => Currency?.Code ?? string.Empty;
+    public int? AccountId { get; private set; }
+    public Account? Account { get; private set; }
+
+    /// <summary>
+    /// FK to Categories table for classifying the cash box type
+    /// (e.g., cashier, fund, bank, representative custody).
+    /// </summary>
+    public int? CategoryId { get; private set; }
+    public Category? Category { get; private set; }
+
+    public int? BranchId { get; private set; }
     public int? CurrencyId { get; private set; }
     public Currency? Currency { get; private set; }
     public int? AssignedUserId { get; private set; } // NULL = shared box
+    public string? PhoneNumber { get; private set; }
+    public string? TaxNumber { get; private set; }
+    public string? Address { get; private set; }
     public string? Notes { get; private set; }
 
     // Navigation
@@ -31,87 +45,43 @@ public class CashBox : BaseEntity
     private CashBox() { } // EF Core
 
     /// <summary>
-    /// Creates a new cash box.
+    /// Creates a new cash box. AccountId may be omitted — the service layer
+    /// auto-creates a Chart of Accounts sub-account under "1110 — النقدية".
     /// </summary>
     public static CashBox Create(
         string boxName,
+        int? accountId = null,
+        int? categoryId = null,
         int? branchId = null,
         int? assignedUserId = null,
         int? currencyId = null,
-        decimal initialBalance = 0)
+        string? phoneNumber = null,
+        string? taxNumber = null,
+        string? address = null,
+        string? notes = null)
     {
         if (string.IsNullOrWhiteSpace(boxName))
             throw new DomainException("اسم الصندوق مطلوب");
 
+        // AccountId is validated at the service layer — auto-created if null
+
         return new CashBox
         {
             BoxName = boxName.Trim(),
+            AccountId = accountId,
+            CategoryId = categoryId,
             BranchId = branchId,
             AssignedUserId = assignedUserId,
             CurrencyId = currencyId,
-            OpeningBalance = initialBalance,
-            CurrentBalance = initialBalance,
+            PhoneNumber = phoneNumber?.Trim(),
+            TaxNumber = taxNumber?.Trim(),
+            Address = address?.Trim(),
+            Notes = notes?.Trim(),
             IsActive = true
         };
     }
 
     // ─── Domain Methods ───────────────────────────
-
-    /// <summary>
-    /// Deposits cash INTO the box. Returns the transaction for audit.
-    /// </summary>
-    public CashTransaction Deposit(
-        decimal amount,
-        CashTransactionType type,
-        string? referenceType = null,
-        int? referenceId = null,
-        int createdBy = 0,
-        string? notes = null)
-    {
-        if (amount <= 0)
-            throw new DomainException("مبلغ الإيداع يجب أن يكون أكبر من صفر");
-
-        var balanceBefore = CurrentBalance;
-        CurrentBalance += amount;
-
-        var transaction = CashTransaction.Create(
-            Id, type, amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes, CurrencyId);
-
-        _transactions.Add(transaction);
-        return transaction;
-    }
-
-    /// <summary>
-    /// Withdraws cash FROM the box. Returns the transaction for audit.
-    /// Throws if insufficient balance.
-    /// </summary>
-    public CashTransaction Withdraw(
-        decimal amount,
-        CashTransactionType type,
-        string? referenceType = null,
-        int? referenceId = null,
-        int createdBy = 0,
-        string? notes = null)
-    {
-        if (amount <= 0)
-            throw new DomainException("مبلغ السحب يجب أن يكون أكبر من صفر");
-
-        if (CurrentBalance < amount)
-            throw new DomainException(
-                $"رصيد الصندوق غير كافٍ. الرصيد الحالي: {CurrentBalance:N2}، " +
-                $"المبلغ المطلوب: {amount:N2}");
-
-        var balanceBefore = CurrentBalance;
-        CurrentBalance -= amount;
-
-        var transaction = CashTransaction.Create(
-            Id, type, -amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes, CurrencyId);
-
-        _transactions.Add(transaction);
-        return transaction;
-    }
 
     /// <summary>
     /// Validates that a user can access this box.
@@ -134,5 +104,54 @@ public class CashBox : BaseEntity
             throw new DomainException("اسم الصندوق مطلوب");
 
         BoxName = newName.Trim();
+    }
+
+    /// <summary>
+    /// Updates all mutable fields of the cash box.
+    /// Only non-null values are applied — null means "keep current value".
+    /// </summary>
+    public void Update(
+        string? boxName,
+        string? phoneNumber,
+        string? taxNumber,
+        string? address,
+        string? notes,
+        int? categoryId,
+        int? branchId,
+        int? assignedUserId,
+        int? currencyId)
+    {
+        if (boxName != null)
+        {
+            if (string.IsNullOrWhiteSpace(boxName))
+                throw new DomainException("اسم الصندوق مطلوب");
+            BoxName = boxName.Trim();
+        }
+
+        if (phoneNumber != null)
+            PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+
+        if (taxNumber != null)
+            TaxNumber = string.IsNullOrWhiteSpace(taxNumber) ? null : taxNumber.Trim();
+
+        if (address != null)
+            Address = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+
+        if (notes != null)
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+
+        if (categoryId.HasValue)
+            CategoryId = categoryId.Value > 0 ? categoryId : null;
+
+        if (branchId.HasValue)
+            BranchId = branchId.Value > 0 ? branchId : null;
+
+        if (assignedUserId.HasValue)
+            AssignedUserId = assignedUserId.Value > 0 ? assignedUserId : null;
+
+        if (currencyId.HasValue)
+            CurrencyId = currencyId.Value > 0 ? currencyId : null;
+
+        UpdateTimestamp();
     }
 }

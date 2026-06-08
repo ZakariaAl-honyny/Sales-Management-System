@@ -6,6 +6,7 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -17,10 +18,16 @@ public class WarehouseEditorViewModel : ViewModelBase
     private readonly IWarehouseApiService _warehouseService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IToastNotificationService _toastService;
 
     private int _warehouseId;
     private string _name = string.Empty;
     private string _location = string.Empty;
+    private byte _type = 1;
+    private string? _phone;
+    private string? _address;
+    private string? _managerName;
+    private string? _notes;
     private bool _isDefault;
     private bool _isActive = true;
     private bool _isEditMode;
@@ -28,15 +35,16 @@ public class WarehouseEditorViewModel : ViewModelBase
 
 
     public WarehouseEditorViewModel()
-        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
+        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>(), App.GetService<IToastNotificationService>())
     {
     }
 
-    public WarehouseEditorViewModel(IWarehouseApiService warehouseService, IEventBus eventBus, IDialogService dialogService)
+    public WarehouseEditorViewModel(IWarehouseApiService warehouseService, IEventBus eventBus, IDialogService dialogService, IToastNotificationService? toastService = null)
     {
         _warehouseService = warehouseService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        _toastService = toastService ?? App.GetService<IToastNotificationService>();
         SetDialogService(dialogService);
 
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, ex => ShowSaveError(ex))));
@@ -44,11 +52,16 @@ public class WarehouseEditorViewModel : ViewModelBase
     }
 
     public WarehouseEditorViewModel(WarehouseDto warehouse)
-        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
+        : this(App.GetService<IWarehouseApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>(), App.GetService<IToastNotificationService>())
     {
         _warehouseId = warehouse.Id;
         _name = warehouse.Name;
         _location = warehouse.Location ?? string.Empty;
+        _type = warehouse.Type;
+        _phone = warehouse.Phone;
+        _address = warehouse.Address;
+        _managerName = warehouse.ManagerName;
+        _notes = warehouse.Notes;
         _isDefault = warehouse.IsDefault;
         _isActive = warehouse.IsActive;
         _isEditMode = true;
@@ -84,6 +97,84 @@ public class WarehouseEditorViewModel : ViewModelBase
         set => SetProperty(ref _location, value);
     }
 
+    /// <summary>
+    /// Warehouse type list for the ComboBox.
+    /// Key = byte (1-4), Value = Arabic display name.
+    /// </summary>
+    public List<KeyValuePair<byte, string>> TypeList { get; } = new()
+    {
+        new KeyValuePair<byte, string>(1, "رئيسي"),
+        new KeyValuePair<byte, string>(2, "فرعي"),
+        new KeyValuePair<byte, string>(3, "صالة عرض"),
+        new KeyValuePair<byte, string>(4, "تالف"),
+    };
+
+    public byte SelectedType
+    {
+        get => _type;
+        set
+        {
+            if (SetProperty(ref _type, value))
+            {
+                if (value < 1 || value > 4)
+                    AddError(nameof(SelectedType), "نوع المستودع يجب أن يكون بين 1 و 4");
+                else
+                    ClearErrors(nameof(SelectedType));
+            }
+        }
+    }
+
+    public string? Phone
+    {
+        get => _phone;
+        set
+        {
+            if (SetProperty(ref _phone, value))
+            {
+                if (!string.IsNullOrEmpty(value) && value.Length > 20)
+                    AddError(nameof(Phone), "رقم الهاتف لا يتجاوز 20 حرفاً");
+                else
+                    ClearErrors(nameof(Phone));
+            }
+        }
+    }
+
+    public string? Address
+    {
+        get => _address;
+        set => SetProperty(ref _address, value);
+    }
+
+    public string? ManagerName
+    {
+        get => _managerName;
+        set
+        {
+            if (SetProperty(ref _managerName, value))
+            {
+                if (!string.IsNullOrEmpty(value) && value.Length > 100)
+                    AddError(nameof(ManagerName), "اسم المدير لا يتجاوز 100 حرف");
+                else
+                    ClearErrors(nameof(ManagerName));
+            }
+        }
+    }
+
+    public string? Notes
+    {
+        get => _notes;
+        set
+        {
+            if (SetProperty(ref _notes, value))
+            {
+                if (!string.IsNullOrEmpty(value) && value.Length > 500)
+                    AddError(nameof(Notes), "الملاحظات لا تتجاوز 500 حرف");
+                else
+                    ClearErrors(nameof(Notes));
+            }
+        }
+    }
+
     public bool IsDefault
     {
         get => _isDefault;
@@ -117,6 +208,18 @@ public class WarehouseEditorViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(Name))
             AddError(nameof(Name), "اسم المستودع مطلوب");
 
+        if (SelectedType < 1 || SelectedType > 4)
+            AddError(nameof(SelectedType), "نوع المستودع مطلوب ويجب أن يكون بين 1 و 4");
+
+        if (!string.IsNullOrEmpty(Phone) && Phone.Length > 20)
+            AddError(nameof(Phone), "رقم الهاتف لا يتجاوز 20 حرفاً");
+
+        if (!string.IsNullOrEmpty(ManagerName) && ManagerName.Length > 100)
+            AddError(nameof(ManagerName), "اسم المدير لا يتجاوز 100 حرف");
+
+        if (!string.IsNullOrEmpty(Notes) && Notes.Length > 500)
+            AddError(nameof(Notes), "الملاحظات لا تتجاوز 500 حرف");
+
         return await ValidateAllAsync();
     }
 
@@ -141,9 +244,14 @@ public class WarehouseEditorViewModel : ViewModelBase
         {
             var updateRequest = new UpdateWarehouseRequest(
                 Name,
-                string.IsNullOrWhiteSpace(Location) ? null : Location,
-                IsDefault,
-                IsActive);
+                Type: SelectedType,
+                Location: string.IsNullOrWhiteSpace(Location) ? null : Location,
+                Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
+                Address: string.IsNullOrWhiteSpace(Address) ? null : Address,
+                ManagerName: string.IsNullOrWhiteSpace(ManagerName) ? null : ManagerName,
+                IsDefault: IsDefault,
+                IsActive: IsActive,
+                Notes: string.IsNullOrWhiteSpace(Notes) ? null : Notes);
 
             result = await _warehouseService.UpdateAsync(_warehouseId, updateRequest);
         }
@@ -151,8 +259,13 @@ public class WarehouseEditorViewModel : ViewModelBase
         {
             var createRequest = new CreateWarehouseRequest(
                 Name,
-                string.IsNullOrWhiteSpace(Location) ? null : Location,
-                IsDefault);
+                Type: SelectedType,
+                Location: string.IsNullOrWhiteSpace(Location) ? null : Location,
+                Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
+                Address: string.IsNullOrWhiteSpace(Address) ? null : Address,
+                ManagerName: string.IsNullOrWhiteSpace(ManagerName) ? null : ManagerName,
+                IsDefault: IsDefault,
+                Notes: string.IsNullOrWhiteSpace(Notes) ? null : Notes);
 
             result = await _warehouseService.CreateAsync(createRequest);
         }
@@ -161,7 +274,7 @@ public class WarehouseEditorViewModel : ViewModelBase
         {
             _eventBus.Publish(new WarehouseChangedMessage(result.Value.Id));
 
-            await _dialogService.ShowSuccessAsync("نجاح", IsEditMode ? "تم تحديث المستودع بنجاح" : "تم إضافة المستودع بنجاح");
+            _toastService.ShowSuccess(IsEditMode ? "تم تحديث المستودع بنجاح" : "تم إضافة المستودع بنجاح");
 
             RequestClose();
         }

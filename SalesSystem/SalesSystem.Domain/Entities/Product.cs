@@ -6,34 +6,39 @@ namespace SalesSystem.Domain.Entities;
 
 public class Product : BaseEntity
 {
-    public string? Barcode { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public int? CategoryId { get; private set; }
     public int? UnitId { get; private set; } // Legacy - Keep for now
     public int? WholesaleUnitId { get; private set; }
     public int? RetailUnitId { get; private set; }
     public decimal ConversionFactor { get; private set; } = 1m;
-    public decimal PurchasePrice { get; private set; }
-    public decimal SalePrice { get; private set; } // Legacy - Keep for now
-    public decimal WholesalePrice { get; private set; }
-    public decimal RetailPrice { get; private set; }
     public decimal MinStock { get; private set; }
     public decimal ReorderLevel { get; private set; }
     public string? Description { get; private set; }
-    public DateTime? ExpirationDate { get; private set; }
     public string? ImagePath { get; private set; }
 
     // Navigation properties
-    public virtual ICollection<ProductBarcode> Barcodes { get; private set; } = new List<ProductBarcode>();
     public virtual Category? Category { get; private set; }
     public virtual Unit? Unit { get; private set; } // Legacy
     public virtual Unit? WholesaleUnit { get; private set; }
     public virtual Unit? RetailUnit { get; private set; }
+    public virtual ICollection<ProductBarcode> Barcodes { get; private set; } = new List<ProductBarcode>();
     public virtual ICollection<WarehouseStock> WarehouseStocks { get; private set; } = new List<WarehouseStock>();
 
     // ─── Dynamic UOM (Phase 1) ───────────────────────────────────────────
     private readonly List<ProductUnit> _units = new();
     public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
+
+    // ─── Phase 25 — Multi-Currency Pricing & Batch Tracking ──────────────
+    // Prices are accessed via ProductUnit → ProductPrice (no direct Product → ProductPrice FK).
+    // Use service-layer aggregation: product.Units.SelectMany(u => u.Prices)
+    // to get all prices across all units.
+
+    private readonly List<InventoryBatch> _inventoryBatches = new();
+    public IReadOnlyCollection<InventoryBatch> InventoryBatches => _inventoryBatches.AsReadOnly();
+
+    private readonly List<ProductImage> _images = new();
+    public IReadOnlyCollection<ProductImage> Images => _images.AsReadOnly();
 
     private Product() { }
 
@@ -48,14 +53,8 @@ public class Product : BaseEntity
     public decimal ConvertWholesaleToRetail(decimal wholesaleQty)
         => wholesaleQty * ConversionFactor;
 
-    public decimal GetUnitPrice(SaleMode mode)
-        => mode == SaleMode.Wholesale ? WholesalePrice : RetailPrice;
-
     public decimal GetRetailQuantityEquivalent(decimal inputQty, SaleMode mode)
         => mode == SaleMode.Wholesale ? inputQty * ConversionFactor : inputQty;
-
-    public decimal GetPriceByUnit(UnitType unitType)
-        => unitType == UnitType.Wholesale ? WholesalePrice : RetailPrice;
 
     public decimal ConvertToSmallestUnit(decimal quantity, UnitType unitType)
         => unitType == UnitType.Wholesale ? quantity * ConversionFactor : quantity;
@@ -132,30 +131,54 @@ public class Product : BaseEntity
         _units.Add(unit);
     }
 
+    // ─── Image Collection Methods ──────────────────────────────────────
+
+    /// <summary>
+    /// Adds an image to the product. If marked as primary, unmarks any existing primary.
+    /// </summary>
+    public void AddImage(ProductImage image)
+    {
+        if (image.IsPrimary)
+        {
+            foreach (var img in _images)
+                img.UnsetPrimary();
+        }
+        _images.Add(image);
+    }
+
+    /// <summary>
+    /// Removes an image from the product.
+    /// </summary>
+    public void RemoveImage(ProductImage image)
+    {
+        _images.Remove(image);
+    }
+
+    // ─── Inventory Batch Methods ───────────────────────────────────────
+
+    /// <summary>
+    /// Adds an inventory batch to the product.
+    /// </summary>
+    public void AddInventoryBatch(InventoryBatch batch)
+    {
+        _inventoryBatches.Add(batch);
+    }
+
+    // ─── Factory ───────────────────────────────────────────────────────
+
     public static Product Create(
         string name,
-        decimal purchasePrice,
-        decimal retailPrice,
-        decimal wholesalePrice = 0,
         decimal conversionFactor = 1,
         decimal minStock = 0,
-        string? barcode = null,
         int? categoryId = null,
         int? retailUnitId = null,
         int? wholesaleUnitId = null,
         string? description = null,
-        DateTime? expirationDate = null,
         string? imagePath = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
-        if (purchasePrice < 0)
-            throw new DomainException("سعر الشراء لا يمكن أن يكون سالباً.");
-        if (retailPrice < 0)
-            throw new DomainException("سعر التجزئة لا يمكن أن يكون سالباً.");
-        if (wholesalePrice < 0)
-            throw new DomainException("سعر الجملة لا يمكن أن يكون سالباً.");
         if (conversionFactor <= 0)
             throw new DomainException("معامل التحويل يجب أن يكون أكبر من الصفر.");
         if (minStock < 0)
@@ -164,20 +187,14 @@ public class Product : BaseEntity
         var product = new Product
         {
             Name = name,
-            PurchasePrice = purchasePrice,
-            RetailPrice = retailPrice,
-            WholesalePrice = wholesalePrice,
             ConversionFactor = conversionFactor,
             MinStock = minStock,
-            Barcode = barcode,
             CategoryId = categoryId,
             RetailUnitId = retailUnitId,
             WholesaleUnitId = wholesaleUnitId,
             Description = description,
-            ExpirationDate = expirationDate,
             ImagePath = imagePath,
             // Sync legacy fields
-            SalePrice = retailPrice,
             UnitId = retailUnitId
         };
         product.SetCreatedBy(createdByUserId);
@@ -186,59 +203,32 @@ public class Product : BaseEntity
 
     public void Update(
         string name,
-        decimal purchasePrice,
-        decimal retailPrice,
-        decimal wholesalePrice,
         decimal conversionFactor,
         decimal minStock,
-        string? barcode,
         int? categoryId,
         int? retailUnitId,
         int? wholesaleUnitId,
         string? description,
         int? updatedByUserId,
-        DateTime? expirationDate = null,
         string? imagePath = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
-        if (purchasePrice < 0)
-            throw new DomainException("سعر الشراء لا يمكن أن يكون سالباً.");
-        if (retailPrice < 0)
-            throw new DomainException("سعر التجزئة لا يمكن أن يكون سالباً.");
-        if (wholesalePrice < 0)
-            throw new DomainException("سعر الجملة لا يمكن أن يكون سالباً.");
         if (conversionFactor <= 0)
             throw new DomainException("معامل التحويل يجب أن يكون أكبر من الصفر.");
         if (minStock < 0)
             throw new DomainException("الحد الأدنى للمخزون لا يمكن أن يكون سالباً.");
 
         Name = name;
-        PurchasePrice = purchasePrice;
-        RetailPrice = retailPrice;
-        WholesalePrice = wholesalePrice;
         ConversionFactor = conversionFactor;
         MinStock = minStock;
-        Barcode = barcode;
         CategoryId = categoryId;
         RetailUnitId = retailUnitId;
         WholesaleUnitId = wholesaleUnitId;
         Description = description;
-        ExpirationDate = expirationDate;
         ImagePath = imagePath;
-        SalePrice = retailPrice;
         UnitId = retailUnitId;
-        
-        SetUpdatedBy(updatedByUserId);
-        UpdateTimestamp();
-    }
 
-    public void UpdatePurchasePrice(decimal newPurchasePrice, int? updatedByUserId = null)
-    {
-        if (newPurchasePrice < 0)
-            throw new DomainException("سعر الشراء لا يمكن أن يكون سالباً.");
-
-        PurchasePrice = newPurchasePrice;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }

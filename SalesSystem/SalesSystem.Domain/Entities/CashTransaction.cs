@@ -5,7 +5,8 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// Represents a single cash transaction for audit trail.
-/// Balance snapshots (Before/After) are captured at transaction time.
+/// The balance of a cash box is now tracked on its linked Account (Chart of Accounts).
+/// This record serves as an audit trail of movements.
 /// </summary>
 public class CashTransaction : BaseEntity
 {
@@ -17,8 +18,12 @@ public class CashTransaction : BaseEntity
     /// </summary>
     public decimal Amount { get; private set; }
 
-    public decimal BalanceBefore { get; private set; }
-    public decimal BalanceAfter { get; private set; }
+    /// <summary>
+    /// Running balance of the cash box computed at transaction time (cumulative sum of Amount).
+    /// Captured for audit trail — may differ from Account balance if adjustments were made
+    /// directly on the linked Account.
+    /// </summary>
+    public decimal RunningBalance { get; private set; }
     public string? ReferenceType { get; private set; } // e.g., "SalesInvoice", "PurchaseInvoice"
     public int? ReferenceId { get; private set; }
     public int? CurrencyId { get; private set; }
@@ -31,14 +36,13 @@ public class CashTransaction : BaseEntity
     private CashTransaction() { } // EF Core
 
     /// <summary>
-    /// Creates a new cash transaction. Called internally by CashBox.
+    /// Creates a new cash transaction with a running balance snapshot.
     /// </summary>
-    internal static CashTransaction Create(
+    public static CashTransaction Create(
         int cashBoxId,
         CashTransactionType type,
         decimal amount,
-        decimal balanceBefore,
-        decimal balanceAfter,
+        decimal runningBalance,
         string? referenceType,
         int? referenceId,
         int createdBy,
@@ -50,8 +54,7 @@ public class CashTransaction : BaseEntity
             CashBoxId = cashBoxId,
             TransactionType = type,
             Amount = amount,
-            BalanceBefore = balanceBefore,
-            BalanceAfter = balanceAfter,
+            RunningBalance = runningBalance,
             ReferenceType = referenceType,
             ReferenceId = referenceId,
             CurrencyId = currencyId,

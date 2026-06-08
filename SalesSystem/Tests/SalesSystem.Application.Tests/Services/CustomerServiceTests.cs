@@ -4,8 +4,11 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
+using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -22,6 +25,7 @@ public class CustomerServiceTests : IDisposable
     private readonly TestDbContext _dbContext;
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<ILogger<CustomerService>> _mockLogger;
+    private readonly Mock<IAccountingIntegrationService> _mockAccountingService = new();
 
     private readonly CustomerService _sut;
 
@@ -41,6 +45,31 @@ public class CustomerServiceTests : IDisposable
 
         _mockUow.Setup(u => u.Customers).Returns(new InMemoryEfCoreRepository<Customer>(_dbContext));
 
+        // Seed AR parent account (1130 - العملاء) and a detail account under it (1131)
+        var arParent = Account.Create("1130", "العملاء", "Accounts Receivable", AccountType.Asset, 3,
+            colorCode: "#2196F3", description: "المبالغ المستحقة من العملاء");
+        _dbContext.Accounts.Add(arParent);
+        _dbContext.SaveChanges();
+
+        var arChild = Account.Create("1131", "العميل النقدي", "Cash Customer", AccountType.Asset, 4,
+            parentAccountId: arParent.Id, colorCode: "#2196F3", allowTransactions: true,
+            description: "عملاء الدفع النقدي");
+        _dbContext.Accounts.Add(arChild);
+        _dbContext.SaveChanges();
+
+        var mappings = SystemAccountMappings.Create(
+            defaultCashAccountId: 1, defaultBankAccountId: 1, inventoryAssetAccountId: 1,
+            accountsReceivableAccountId: arChild.Id,
+            accountsPayableAccountId: 1,
+            vatOutputAccountId: 1, vatInputAccountId: 1, capitalAccountId: 1,
+            salesRevenueAccountId: 1, salesReturnAccountId: 1, cogsAccountId: 1,
+            generalExpenseAccountId: 1, spoilageLossAccountId: 1);
+        _dbContext.SystemAccountMappings.Add(mappings);
+        _dbContext.SaveChanges();
+
+        _mockUow.Setup(u => u.Accounts).Returns(new InMemoryEfCoreRepository<Account>(_dbContext));
+        _mockUow.Setup(u => u.SystemAccountMappings).Returns(new InMemoryEfCoreRepository<SystemAccountMappings>(_dbContext));
+
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
@@ -48,7 +77,7 @@ public class CustomerServiceTests : IDisposable
                 return 1;
             });
 
-        _sut = new CustomerService(_mockUow.Object, _mockLogger.Object);
+        _sut = new CustomerService(_mockUow.Object, _mockLogger.Object, _mockAccountingService.Object);
     }
 
     public void Dispose()
@@ -99,7 +128,7 @@ public class CustomerServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.CreateCustomerRequest("New Customer", "1234567890", "test@test.com", "Test Address", null, 1000m);
 
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
+        var result = await _sut.CreateAsync(request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("New Customer");
@@ -124,7 +153,7 @@ public class CustomerServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.UpdateCustomerRequest("Updated Name", "0987654321", "updated@test.com", "New Address", null, 0, true);
 
-        var result = await _sut.UpdateAsync(customer.Id, request, CancellationToken.None);
+        var result = await _sut.UpdateAsync(customer.Id, request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("Updated Name");
@@ -140,7 +169,7 @@ public class CustomerServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.UpdateCustomerRequest("Updated Name", null, null, null, null, 0, true);
 
-        var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
+        var result = await _sut.UpdateAsync(999, request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("العميل غير موجود");
@@ -160,7 +189,7 @@ public class CustomerServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.UpdateCustomerRequest("Test Customer", null, null, null, null, 0, false); // Deactivate
 
-        var result = await _sut.UpdateAsync(customer.Id, request, CancellationToken.None);
+        var result = await _sut.UpdateAsync(customer.Id, request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.IsActive.Should().BeFalse();
@@ -181,7 +210,7 @@ public class CustomerServiceTests : IDisposable
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.DeleteAsync(customer.Id, CancellationToken.None);
+        var result = await _sut.DeleteAsync(customer.Id, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
 
@@ -197,7 +226,7 @@ public class CustomerServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_NonExistentCustomer_ReturnsNotFound");
 
-        var result = await _sut.DeleteAsync(999, CancellationToken.None);
+        var result = await _sut.DeleteAsync(999, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("العميل غير موجود");
@@ -261,7 +290,7 @@ public class CustomerServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.CreateCustomerRequest("New Customer", null, null, null, null, 500m); // Customer owes us 500
 
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
+        var result = await _sut.CreateAsync(request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.OpeningBalance.Should().Be(500m);
@@ -279,6 +308,8 @@ public class CustomerServiceTests : IDisposable
         public TestDbContext(DbContextOptions<TestDbContext> options) : base(options) { }
 
         public DbSet<Customer> Customers => Set<Customer>();
+        public DbSet<Account> Accounts => Set<Account>();
+        public DbSet<SystemAccountMappings> SystemAccountMappings => Set<SystemAccountMappings>();
     }
 
     private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity

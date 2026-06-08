@@ -13,8 +13,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: CashTransactionType.SalesIncome,
             amount: 500m,
-            balanceBefore: 1000m,
-            balanceAfter: 1500m,
+            runningBalance: 1500m,
             referenceType: "SalesInvoice",
             referenceId: 42,
             createdBy: 3,
@@ -24,8 +23,7 @@ public class CashTransactionTests
         transaction.CashBoxId.Should().Be(1);
         transaction.TransactionType.Should().Be(CashTransactionType.SalesIncome);
         transaction.Amount.Should().Be(500m);
-        transaction.BalanceBefore.Should().Be(1000m);
-        transaction.BalanceAfter.Should().Be(1500m);
+        transaction.RunningBalance.Should().Be(1500m);
         transaction.ReferenceType.Should().Be("SalesInvoice");
         transaction.ReferenceId.Should().Be(42);
         transaction.CreatedByUserId.Should().Be(3);
@@ -39,8 +37,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: CashTransactionType.SupplierPayment,
             amount: -200m,
-            balanceBefore: 1500m,
-            balanceAfter: 1300m,
+            runningBalance: 1300m,
             referenceType: "PurchaseInvoice",
             referenceId: 10,
             createdBy: 1,
@@ -58,8 +55,7 @@ public class CashTransactionTests
             cashBoxId: 2,
             type: CashTransactionType.TransferIn,
             amount: 1000m,
-            balanceBefore: 500m,
-            balanceAfter: 1500m,
+            runningBalance: 1500m,
             referenceType: "CashTransfer",
             referenceId: 5,
             createdBy: 1,
@@ -76,8 +72,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: CashTransactionType.TransferOut,
             amount: -500m,
-            balanceBefore: 2000m,
-            balanceAfter: 1500m,
+            runningBalance: 1500m,
             referenceType: "CashTransfer",
             referenceId: 5,
             createdBy: 1,
@@ -94,8 +89,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: CashTransactionType.CustomerPayment,
             amount: 300m,
-            balanceBefore: 1000m,
-            balanceAfter: 1300m,
+            runningBalance: 1300m,
             referenceType: null,
             referenceId: null,
             createdBy: 1,
@@ -112,8 +106,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: CashTransactionType.Expense,
             amount: -100m,
-            balanceBefore: 1300m,
-            balanceAfter: 1200m,
+            runningBalance: 1200m,
             referenceType: null,
             referenceId: null,
             createdBy: 1,
@@ -130,8 +123,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: CashTransactionType.CustomerPayment,
             amount: 100m,
-            balanceBefore: 0m,
-            balanceAfter: 100m,
+            runningBalance: 100m,
             referenceType: null,
             referenceId: null,
             createdBy: 1,
@@ -157,8 +149,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: type,
             amount: 100m,
-            balanceBefore: 0m,
-            balanceAfter: 100m,
+            runningBalance: 100m,
             referenceType: null,
             referenceId: null,
             createdBy: 1,
@@ -176,8 +167,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: CashTransactionType.SupplierPayment,
             amount: -500m,
-            balanceBefore: 1000m,
-            balanceAfter: 500m,
+            runningBalance: 500m,
             referenceType: "PurchaseInvoice",
             referenceId: 1,
             createdBy: 1,
@@ -194,8 +184,7 @@ public class CashTransactionTests
             cashBoxId: 1,
             type: CashTransactionType.CustomerPayment,
             amount: 0m,
-            balanceBefore: 0m,
-            balanceAfter: 0m,
+            runningBalance: 0m,
             referenceType: null,
             referenceId: null,
             createdBy: 1,
@@ -203,59 +192,14 @@ public class CashTransactionTests
         );
 
         transaction.Amount.Should().Be(0m);
-        transaction.BalanceBefore.Should().Be(0m);
-        transaction.BalanceAfter.Should().Be(0m);
-    }
-
-    [Fact]
-    public void Create_ComputesBalanceAfterFromBalanceBeforePlusAmount()
-    {
-        var before = 1000m;
-        var amount = 250m;
-        var after = before + amount;
-
-        var transaction = CashTransaction.Create(
-            cashBoxId: 1,
-            type: CashTransactionType.SalesIncome,
-            amount: amount,
-            balanceBefore: before,
-            balanceAfter: after,
-            referenceType: null,
-            referenceId: null,
-            createdBy: 1,
-            notes: null
-        );
-
-        transaction.BalanceAfter.Should().Be(transaction.BalanceBefore + transaction.Amount);
-    }
-
-    [Theory]
-    [InlineData(0, 100, 100)]
-    [InlineData(500, 200, 700)]
-    [InlineData(1000, -300, 700)]
-    [InlineData(999.99, 0.01, 1000)]
-    public void Create_BalanceRelationship_ShouldBePreserved(decimal before, decimal amount, decimal expectedAfter)
-    {
-        var transaction = CashTransaction.Create(
-            cashBoxId: 1,
-            type: CashTransactionType.SalesIncome,
-            amount: amount,
-            balanceBefore: before,
-            balanceAfter: expectedAfter,
-            referenceType: null,
-            referenceId: null,
-            createdBy: 1,
-            notes: null
-        );
-
-        transaction.BalanceAfter.Should().Be(transaction.BalanceBefore + transaction.Amount);
+        transaction.RunningBalance.Should().Be(0m);
     }
 
     [Fact]
     public void Create_SetsCreatedAtToUtcNow()
     {
         var before = DateTime.UtcNow;
-        var transaction = CashTransaction.Create(1, CashTransactionType.SalesIncome, 100m, 0m, 100m, null, null, 1, null);
+        var transaction = CashTransaction.Create(1, CashTransactionType.SalesIncome, 100m, 100m, null, null, 1, null);
         var after = DateTime.UtcNow;
 
         transaction.CreatedAt.Should().BeOnOrAfter(before);
@@ -265,12 +209,11 @@ public class CashTransactionTests
     [Fact]
     public void OnceCreated_Properties_ShouldBeImmutable()
     {
-        var transaction = CashTransaction.Create(1, CashTransactionType.SalesIncome, 100m, 0m, 100m, null, null, 1, null);
+        var transaction = CashTransaction.Create(1, CashTransactionType.SalesIncome, 100m, 100m, null, null, 1, null);
 
         // All setters are private — no public mutators exist
         transaction.GetType().GetProperty(nameof(CashTransaction.Amount))!.SetMethod!.IsPublic.Should().BeFalse();
-        transaction.GetType().GetProperty(nameof(CashTransaction.BalanceBefore))!.SetMethod!.IsPublic.Should().BeFalse();
-        transaction.GetType().GetProperty(nameof(CashTransaction.BalanceAfter))!.SetMethod!.IsPublic.Should().BeFalse();
+        transaction.GetType().GetProperty(nameof(CashTransaction.RunningBalance))!.SetMethod!.IsPublic.Should().BeFalse();
         transaction.GetType().GetProperty(nameof(CashTransaction.TransactionType))!.SetMethod!.IsPublic.Should().BeFalse();
     }
 }

@@ -4,6 +4,7 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Application.Accounting.Services;
@@ -24,7 +25,7 @@ public class JournalEntryService : IJournalEntryService
         _numberGenerator = numberGenerator;
     }
 
-    public async Task<Result<int>> CreateJournalEntryAsync(CreateJournalEntryRequest request, CancellationToken ct = default)
+    public async Task<Result<int>> CreateJournalEntryAsync(CreateJournalEntryRequest request, int userId, CancellationToken ct = default)
     {
         try
         {
@@ -85,7 +86,7 @@ public class JournalEntryService : IJournalEntryService
                 request.TransactionDate,
                 request.Description ?? string.Empty,
                 request.EntryType,
-                request.CreatedBy,
+                userId,
                 request.ReferenceType,
                 request.ReferenceId,
                 request.ReferenceNumber);
@@ -101,7 +102,7 @@ public class JournalEntryService : IJournalEntryService
             }
 
             // 8. Validate and post the entry
-            entry.ValidateAndPost(request.CreatedBy);
+            entry.ValidateAndPost(userId);
 
             // 9. Save to database
             await _uow.JournalEntries.AddAsync(entry, ct);
@@ -109,7 +110,7 @@ public class JournalEntryService : IJournalEntryService
 
             _logger.LogInformation(
                 "Journal entry {EntryNumber} (ID={Id}) created and posted for {EntryType} by User {UserId}",
-                entry.EntryNumber, entry.Id, entry.EntryType, request.CreatedBy);
+                entry.EntryNumber, entry.Id, entry.EntryType, userId);
 
             return Result<int>.Success(entry.Id);
         }
@@ -123,6 +124,124 @@ public class JournalEntryService : IJournalEntryService
             _logger.LogError(ex, "Error creating journal entry");
             return Result<int>.Failure("حدث خطأ أثناء إنشاء القيد المحاسبي");
         }
+    }
+
+    public async Task<Result<List<JournalEntryListDto>>> GetAllAsync(int page = 1, int pageSize = 50, CancellationToken ct = default)
+    {
+        try
+        {
+            var (items, totalCount) = await _uow.JournalEntries.GetPagedAsync(
+                predicate: null,
+                orderConfig: q => q.OrderByDescending(e => e.TransactionDate).ThenByDescending(e => e.Id),
+                page: page,
+                pageSize: pageSize,
+                ct: ct,
+                includePaths: "Lines");
+
+            var dtos = items.Select(MapToListDto).ToList();
+
+            _logger.LogInformation(
+                "Retrieved {Count} journal entries (page {Page}, pageSize {PageSize}, total {TotalCount})",
+                dtos.Count, page, pageSize, totalCount);
+
+            return Result<List<JournalEntryListDto>>.Success(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving journal entry list");
+            return Result<List<JournalEntryListDto>>.Failure("حدث خطأ أثناء استرجاع قائمة القيود المحاسبية");
+        }
+    }
+
+    public async Task<Result<JournalEntryDetailDto>> GetByIdAsync(int id, CancellationToken ct = default)
+    {
+        try
+        {
+            var entry = await _uow.JournalEntries.FirstOrDefaultAsync(
+                e => e.Id == id,
+                ct,
+                "Lines");
+
+            if (entry == null)
+                return Result<JournalEntryDetailDto>.Failure("القيد المحاسبي غير موجود", ErrorCodes.NotFound);
+
+            var dto = MapToDetailDto(entry);
+
+            return Result<JournalEntryDetailDto>.Success(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving journal entry {Id}", id);
+            return Result<JournalEntryDetailDto>.Failure("حدث خطأ أثناء استرجاع القيد المحاسبي");
+        }
+    }
+
+    // ─── Private Mapping Helpers ──────────────────────
+
+    private static string GetEntryTypeDisplay(JournalEntryType entryType) => entryType switch
+    {
+        JournalEntryType.Sales => "مبيعات",
+        JournalEntryType.SalesReturn => "مرتجع مبيعات",
+        JournalEntryType.Purchase => "مشتريات",
+        JournalEntryType.PurchaseReturn => "مرتجع مشتريات",
+        JournalEntryType.Expense => "مصروف",
+        JournalEntryType.StockWriteOff => "إعدام مخزون",
+        JournalEntryType.Transfer => "تحويل",
+        JournalEntryType.Manual => "يدوي",
+        JournalEntryType.OpeningBalance => "رصيد افتتاحي",
+        JournalEntryType.CustomerReceipt => "مقبوضات عميل",
+        JournalEntryType.SupplierPayment => "مدفوعات مورد",
+        _ => "غير معروف"
+    };
+
+    private static JournalEntryListDto MapToListDto(Domain.Accounting.Entities.JournalEntry entry)
+    {
+        return new JournalEntryListDto(
+            entry.Id,
+            entry.EntryNumber,
+            entry.TransactionDate,
+            entry.Description,
+            GetEntryTypeDisplay(entry.EntryType),
+            entry.ReferenceType,
+            entry.ReferenceId,
+            entry.ReferenceNumber,
+            entry.TotalDebit,
+            entry.TotalCredit,
+            entry.IsPosted,
+            entry.IsReversed,
+            entry.CreatedAt,
+            entry.CreatedByUserId
+        );
+    }
+
+    private static JournalEntryDetailDto MapToDetailDto(Domain.Accounting.Entities.JournalEntry entry)
+    {
+        var lineDtos = entry.Lines.Select(line => new JournalEntryLineDetailDto(
+            line.Id,
+            line.AccountId,
+            line.AccountCode,
+            line.AccountNameAr,
+            line.Debit,
+            line.Credit,
+            line.Description
+        )).ToList();
+
+        return new JournalEntryDetailDto(
+            entry.Id,
+            entry.EntryNumber,
+            entry.TransactionDate,
+            entry.Description,
+            GetEntryTypeDisplay(entry.EntryType),
+            entry.ReferenceType,
+            entry.ReferenceId,
+            entry.ReferenceNumber,
+            entry.IsPosted,
+            entry.IsReversed,
+            entry.ReversedByEntryId,
+            entry.CreatedAt,
+            entry.CreatedByUserId,
+            lineDtos
+        );
     }
 
     public async Task<Result<AccountBalanceDto>> GetAccountBalanceAsync(int accountId, DateTime? asOfDate = null, CancellationToken ct = default)

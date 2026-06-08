@@ -10,5 +10,7 @@ public enum JournalEntryType : byte
     StockWriteOff = 6,
     Transfer = 7,
     Manual = 8,
-    OpeningBalance = 9
+    OpeningBalance = 9,
+    CustomerReceipt = 10,
+    SupplierPayment = 11
 }

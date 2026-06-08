@@ -20,9 +20,13 @@ using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Accounts;
+using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
+
+using SalesSystem.DesktopPWF.ViewModels.Warehouses;
+using SalesSystem.DesktopPWF.ViewModels.InventoryOperations;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -93,6 +97,8 @@ public class MainViewModel : ViewModelBase
         NavigateToReportsCommand = new RelayCommand(() => NavigateTo<ReportsViewModel>());
         NavigateToLowStockCommand = new RelayCommand(() => NavigateTo<LowStockViewModel>());
         NavigateToExpiredProductsCommand = new RelayCommand(() => NavigateTo<ExpiredProductsReportViewModel>());
+        NavigateToStockBalanceReportCommand = new RelayCommand(() => NavigateTo<StockBalanceReportViewModel>());
+        NavigateToWarehouseMovementReportCommand = new RelayCommand(() => NavigateTo<WarehouseMovementReportViewModel>());
 
         // Financial Reports
         NavigateToIncomeStatementCommand = new RelayCommand(() => NavigateTo<Reports.IncomeStatementViewModel>());
@@ -103,6 +109,7 @@ public class MainViewModel : ViewModelBase
         // Settings section
         NavigateToProductsCommand = new RelayCommand(() => NavigateTo<ProductListViewModel>());
         NavigateToCustomersCommand = new RelayCommand(() => NavigateTo<CustomerListViewModel>());
+        NavigateToCustomerGroupsCommand = new RelayCommand(() => NavigateTo<CustomerGroupListViewModel>());
         NavigateToSuppliersCommand = new RelayCommand(() => NavigateTo<SupplierListViewModel>());
         NavigateToWarehousesCommand = new RelayCommand(() => NavigateTo<WarehouseListViewModel>());
         NavigateToCategoriesCommand = new RelayCommand(() => NavigateTo<CategoryListViewModel>());
@@ -115,9 +122,14 @@ public class MainViewModel : ViewModelBase
         NavigateToBackupCommand = new RelayCommand(() => NavigateTo<BackupViewModel>());
         NavigateToStockTransfersCommand = new RelayCommand(() => NavigateTo<StockTransfersListViewModel>());
         NavigateToInventoryCommand = new RelayCommand(() => NavigateTo<InventoryViewModel>());
+        NavigateToProductPricesCommand = new RelayCommand(() => NavigateTo<ProductPricesListViewModel>());
+        NavigateToProductImagesCommand = new RelayCommand(() => NavigateTo<ProductImagesViewModel>());
+        NavigateToInventoryBatchesCommand = new RelayCommand(() => NavigateTo<InventoryBatchesViewModel>());
+        NavigateToInventoryOperationsCommand = new RelayCommand(() => NavigateTo<InventoryOperationListViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
         NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
+        NavigateToJournalEntriesCommand = new RelayCommand(() => NavigateTo<JournalEntriesListViewModel>());
 
         ChangePasswordCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadChangePasswordAsync)));
     }
@@ -218,8 +230,14 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى تقرير نواقص المخزون</summary>
     public ICommand NavigateToLowStockCommand { get; }
 
-    /// <summary>نقل إلى تقرير المنتجات منتهية الصلاحية</summary>
-    public ICommand NavigateToExpiredProductsCommand { get; }
+        /// <summary>نقل إلى تقرير المنتجات منتهية الصلاحية</summary>
+        public ICommand NavigateToExpiredProductsCommand { get; }
+
+        /// <summary>نقل إلى كشف رصيد المخازن — عرض المخزون والقيمة الإجمالية لكل منتج في المستودعات</summary>
+        public ICommand NavigateToStockBalanceReportCommand { get; }
+
+        /// <summary>نقل إلى تقرير حركة المخازن — عرض تاريخ حركات المخزون (إضافة/خصم) مع التصفية حسب المستودع والفترة</summary>
+        public ICommand NavigateToWarehouseMovementReportCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Financial Reports Commands
@@ -246,6 +264,9 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى إدارة العملاء</summary>
     public ICommand NavigateToCustomersCommand { get; }
+
+    /// <summary>نقل إلى إدارة مجموعات العملاء — تصنيف وترتيب العملاء في مجموعات</summary>
+    public ICommand NavigateToCustomerGroupsCommand { get; }
 
     /// <summary>نقل إلى إدارة الموردين</summary>
     public ICommand NavigateToSuppliersCommand { get; }
@@ -286,6 +307,18 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى شاشة المخزون</summary>
     public ICommand NavigateToInventoryCommand { get; }
 
+    /// <summary>نقل إلى إدارة أسعار المنتجات — عرض وتحديث أسعار البيع متعددة العملات لكل وحدة منتج</summary>
+    public ICommand NavigateToProductPricesCommand { get; }
+
+    /// <summary>نقل إلى صور المنتجات — إدارة صور متعددة لكل منتج</summary>
+    public ICommand NavigateToProductImagesCommand { get; }
+
+    /// <summary>نقل إلى إدارة الدفعات المخزنية — تتبع الكميات حسب تاريخ انتهاء الصلاحية</summary>
+    public ICommand NavigateToInventoryBatchesCommand { get; }
+
+    /// <summary>نقل إلى العمليات المخزنية — الصرف والإستلام والتسوية</summary>
+    public ICommand NavigateToInventoryOperationsCommand { get; }
+
     /// <summary>نقل إلى إدارة الضرائب</summary>
     public ICommand NavigateToTaxesCommand { get; }
 
@@ -294,6 +327,9 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى دليل الحسابات — عرض وتعديل الحسابات المحاسبية</summary>
     public ICommand NavigateToChartOfAccountsCommand { get; }
+
+    /// <summary>نقل إلى القيود اليومية — عرض جميع قيود اليومية المحاسبية</summary>
+    public ICommand NavigateToJournalEntriesCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
@@ -415,6 +451,8 @@ public class MainViewModel : ViewModelBase
             nameof(ReportsViewModel)                => "Reports",
             nameof(LowStockViewModel)               => "LowStock",
             nameof(ExpiredProductsReportViewModel)  => "ExpiredProducts",
+            nameof(StockBalanceReportViewModel)     => "Reports",
+            nameof(WarehouseMovementReportViewModel) => "Reports",
             nameof(IncomeStatementViewModel)         => "Reports",
             nameof(CashFlowReportViewModel)           => "Reports",
             nameof(VatReportViewModel)                => "Reports",
@@ -433,9 +471,13 @@ public class MainViewModel : ViewModelBase
             nameof(BackupViewModel)                 => "Settings",
             nameof(StockTransfersListViewModel)     => "StockTransfers",
             nameof(InventoryViewModel)              => "Inventory",
+            nameof(ProductPricesListViewModel)      => "Products",
+            nameof(ProductImagesViewModel)          => "Products",
+            nameof(InventoryBatchesViewModel)       => "Products",
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
             nameof(AccountsListViewModel)           => "Settings",
+            nameof(JournalEntriesListViewModel)     => "Settings",
             _                                        => viewModelType.Name
         };
     }

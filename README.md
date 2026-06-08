@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-<img src="https://img.shields.io/badge/Status-v4.6.9%2B%20Complete-2ECC71?style=for-the-badge" 
+<img src="https://img.shields.io/badge/Status-v4.9%2B%20Complete%20(Phases%2018-24)-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.6.9%2B-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.9%2B%20%7C%20Phases%2025-31%20Planned-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -46,11 +46,12 @@ The API-first architecture is designed to support **future web and mobile client
   - `UpdateProductPricingService` handles all three methods
   - Cost cascade: ALL product units recalculate from base unit cost × conversion factor
   - `ProductPriceHistory` audit trail on EVERY cost change
-- 🏦 **Cash Box Management** — Track physical cash across multiple boxes
-  - `CashBox` with opening/current balance
-  - `CashTransaction` immutable entries (Opening, Income, Expense, Transfer, Refund, Payment)
-  - `CashBox.CurrentBalance` NEVER negative — validated before dispensing
-  - `DailyClosure` for end-of-day reconciliation
+- 🏦 **Cash Box Management (COA-Integrated)** — Cash registers linked to Chart of Accounts
+  - `CashBox` is a lightweight register with `AccountId` FK — balance lives on linked Account only
+  - `CashTransaction` uses `RunningBalance` (cumulative sum) — no `BalanceBefore`/`BalanceAfter`
+  - Auto-account creation under parent `"1110 — النقدية"` when CashBox created without AccountId
+  - Metadata fields: `CategoryId`, `PhoneNumber`, `TaxNumber`, `Address` for classifying registers
+  - No client-side balance validation — server validates via Account running balance
 - 🔌 **Hardware Integration** — Built-in barcode scanner support (Keyboard Emulation) with mobile camera scanning planned
 - 🔒 **Financial integrity** — All money calculations use `decimal` precision, never floating-point
 - 📦 **Multi-warehouse & Low Stock AI** — Track inventory across branches with auto-calculated reorder suggestions
@@ -220,12 +221,15 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - `ProductPriceHistory` audit on every change
 - Seeded as WeightedAverage by default
 
-### 🏦 Cash Box Management (v4.3)
-- Multiple cash boxes with opening/current balance
-- Immutable cash transactions (Open, Income, Expense, Transfer, Refund, Payment)
-- `CashBox.CurrentBalance` never negative
-- Cash transfers require TWO transactions (Out + In)
-- `DailyClosure` for end-of-day reconciliation
+### 🏦 Cash Box Management (v4.9 — Refactored for Chart of Accounts Integration)
+- **Lightweight register entity** — CashBox is a metadata wrapper (Name, Phone, TaxNumber, Address, CategoryId) with `AccountId` FK to Chart of Accounts
+- **Balance tracked on Account** — `OpeningBalance`/`CurrentBalance` removed from CashBox entity; balance lives on the linked Account in Chart of Accounts
+- **Auto-account creation** — Creating a CashBox without `AccountId` auto-creates a Level-4 detail account under parent `"1110 — النقدية"` (Cash & Cash Equivalents)
+- **CashTransaction with RunningBalance** — `BalanceBefore`/`BalanceAfter` replaced with `RunningBalance` (computed cumulative sum); `CashTransaction.Create()` made public
+- **Immutable transactions** — No editing, cancellation via offsetting entry
+- **Cash transfers** — TWO transactions (Out + In); server validates against running balance (no client-side balance validation)
+- **DailyClosure** — OpeningBalance from Account's opening balance via COA; ActualCashCount reconciliation
+- **Metadata fields** — `CategoryId` (FK to Categories), `PhoneNumber`, `TaxNumber`, `Address` for classifying cash registers by type (cashier desk, bank account, fund, representative custody)
 
 ### 📒 Chart of Accounts — Phase 22 (v4.6.9+)
 - **60-Account Hierarchy** (4 levels): Group → Main → Sub → Detail
@@ -435,6 +439,12 @@ The following features are **not included** in the current MVP but are planned f
 | **Pricing & Costing** | ProductPriceHistory (price audit trail) |
 | **Tax** | Taxes (name, rate, type, IsDefault, soft-deletable) |
 | **System** | SystemSettings (29 seeded settings across 8 categories), StoreSettings (company info), DocumentSequences, InventoryMovements, SystemLog |
+| **Pricing** | ProductPrices (multi-currency pricing per unit), PriceLevels |
+| **Batch Tracking** | InventoryBatches (FIFO/FEFO lots with cost/expiry) |
+| **Orders** | PurchaseOrders, PurchaseOrderItems, SalesQuotations, SalesQuotationItems |
+| **Payments** | PaymentAllocations, Cheques |
+| **Charges** | AdditionalCharges (landed cost distribution) |
+| **Products** | ProductImages (multiple images per product) |
 
 ### Key Constraints
 - `decimal(18,2)` for all money fields — **never** `float` or `double`
@@ -547,6 +557,13 @@ dotnet run
 | Phase 21 | **Users & Permissions Module** — 4 roles, 33 permissions, passwordless creation, lockout, AuditLog, Permission management UI | ✅ **Completed** |
 | **v4.6.8** | **Currency Module Stabilization & EF Core Transaction Strategy** — Fixed BeginTransactionAsync conflict (3 methods). ExchangeRate precision (18,2). JournalEntry shadow FK. CurrencyEditorViewModel: RULE-229 validation, toast, dual constructor. Deep code review: fixed 14 bugs + 3 enhancements across Domain, API, Infrastructure, Desktop — including isSystem param, MarkAsDeleted guard, GetByCode/GetBaseCurrency endpoints, includeInactive passthrough, controller 404/400, filtered indexes, OldRate validation, UpdateExchangeRateRequestValidator, IDisposable, CanExecute removal, composite index, AllStaff policy, N6 display | ✅ **Completed** |
 | **v4.6.6** | **UI Compacting — Mobile-Ready Density** — Global UI resize (63 views) for more content per screen: Styles.xaml compact tokens (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted by ~25-30%, PurchaseInvoiceEditorView size reduction, MainWindow sidebar 220→200, touch control sizes preserved. Future mobile-ready foundation | ✅ **Completed** |
+| Phase 25 | **Products Module** — Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (Retail/Wholesale/VIP/Distributor), product images, opening stock on creation | 📝 Planned |
+| Phase 26 | **Warehouses Module** — Warehouse type (Main/Store/Showroom), manager tracking, AccountId FK, stock adjustments (Addition/Deduction/Correction), stock issue (Damage/Expiry/InternalUse), physical count deferred to V2 | 📝 Planned |
+| Phase 27 | **Purchases Module** — Multi-currency purchases, AdditionalCharge with landed cost distribution, Purchase Order (PO) with Draft/Approved/Received/Cancelled, standalone returns, invoice attachments | 📝 Planned |
+| Phase 28 | **Sales Module** — Multi-currency sales, profit display per line, price override, Sales Quotation with expiry, continuous barcode POS mode, credit limit enforcement | 📝 Planned |
+| Phase 29 | **Receipts & Payments Module** — Multi-invoice payment distribution, Cheque management (Pending/Cleared/Bounced), PaymentAllocation entity, CashBox.AccountId FK, DailyClosure with ActualCashCount | 📝 Planned |
+| Phase 30 | **Journal Entries Module** — 3-state lifecycle (Draft/Posted/Cancelled), multi-currency support, attachments, FiscalYear entity, Annual Closing (revenue/expense → RetainedEarnings) | 📝 Planned |
+| Phase 31 | **Reports Module** — 35+ DTOs across 7 categories (Financial, Inventory, Sales, Purchases, Cash/Box, Transactions, Users), Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML | 📝 Planned |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -989,6 +1006,33 @@ dotnet run
 
 ---
 
+## 📋 What's Coming — Phases 25-31
+
+The following modules are planned for future development based on the comprehensive analysis in `docs/all new Anylysis for update system features/`:
+
+| Phase | Module | Key Features | Status |
+|-------|--------|-------------|--------|
+| **25** | **Products Module** | Multi-currency pricing, FIFO batches, BOM, images, PriceLevel enum (4 levels), opening stock on creation | 📝 Planned |
+| **26** | **Warehouses Module** | Warehouse types, AccountId FK, stock adjustments, issue reasons, physical count V2 | 📝 Planned |
+| **27** | **Purchases Module** | Multi-currency, landed cost distribution, Purchase Orders, standalone returns, attachments | 📝 Planned |
+| **28** | **Sales Module** | Multi-currency, profit display, quotations, barcode POS, credit limit enforcement | 📝 Planned |
+| **29** | **Receipts & Payments** | Multi-invoice distribution, cheques, PaymentAllocation, CashBox.AccountId, DailyClosure | 📝 Planned |
+| **30** | **Journal Entries** | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing | 📝 Planned |
+| **31** | **Reports** | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export | 📝 Planned |
+
+### Analysis-Driven Design Decisions
+
+These architecture decisions come from the comprehensive system analysis:
+
+1. **Multi-Currency Pricing** — Prices stored per-product-unit per-currency in `ProductPrices` table with effective date ranges. Supports real-time exchange rate conversion at invoice time.
+2. **FIFO/FEFO Batch Tracking** — `InventoryBatches` tracks purchase lots with expiry dates. Cost of goods sold computed from actual batch costs (FIFO) or nearest-expiry (FEFO).
+3. **Landed Cost Distribution** — `AdditionalCharge` entity distributes transport, customs, and handling costs across invoice items for true inventory valuation.
+4. **Standalone Returns** — Purchase/Sales returns work independently of original invoices, allowing returns for items purchased outside the system.
+5. **Payment Allocation** — `PaymentAllocation` enables partial payments across multiple invoices with full audit trail.
+6. **Chart of Accounts Integration** — Every money-affecting operation creates automatic journal entries. CashBox, Warehouse, Customer, and Supplier entities all link to the Chart of Accounts.
+
+---
+
 ## 📜 Version History
 
 ### v4.6.9 — Phase 21 Users & Permissions Complete (Current)
@@ -1137,6 +1181,96 @@ Phase 22 added RULE-321 through RULE-340 covering:
 
 ---
 
+## 👥 What's New in Phase 23 — Customers Module (v4.6.9+)
+
+| Feature | Description |
+|---------|-------------|
+| **CustomerType REMOVED** | `CustomerType` was removed entirely! Cash/Credit is a per-invoice decision on `SalesInvoice.PaymentType`, NOT a customer attribute. `CheckCreditLimit()` uses `CreditLimit > 0` directly. All layers cleaned: Domain entity, EF migration `Phase23_RemoveCustomerType`, Contracts DTOs/Requests, Validators, Desktop VM/XAML. |
+| **CustomerGroup entity** | New categorization entity with soft-delete and child reference guard — deletion blocked if customers reference the group |
+| **Account linking** | Optional FK (`AccountId`) from Customer to Account for journal entry integration |
+| **Credit Limit Enforcement** | `SalesService.PostAsync()` checks `customer.CheckCreditLimit(invoice.DueAmount)` before allowing credit sales — rolls back transaction with Arabic error if exceeded |
+| **API: CustomerGroupsController** | Full CRUD with kebab-case routes (`api/v1/customer-groups`), AllStaff read policy, ManagerAndAbove write policy |
+| **API: Report endpoints** | `GET /api/v1/customers/by-group/{groupId}`, `GET /api/v1/customers/reports/balance`, `GET /api/v1/customers/reports/aging` — all with proper auth policies |
+| **API: Customers endpoints enhanced** | `GET /api/v1/customers/groups` — group lookup endpoint; CustomerDto extended with AccountId, AccountName, CustomerType, CustomerGroupId, CustomerGroupName |
+| **FluentValidators hardened** | Phone regex `^05\d{8}$`, Email `.EmailAddress()`, CustomerType range 1-2, AccountId > 0, CustomerGroupId > 0 |
+| **Desktop: Customer Editor** | CustomerType (info only), CustomerGroup dropdown, Account lookup — loads AvailableGroups/AvailableAccounts on init. No hardcoded FontSize violations. Compact XAML. |
+| **Desktop: Customer List** | Group filter ComboBox for filtering customers by group. No CanExecute predicates. ExecuteAsync wrappers for all async operations. |
+| **Report DTOs** | `CustomerBalanceReportDto` (Id, Name, Phone, GroupName, CurrentBalance, CreditLimit, BalanceStatus) + `CustomerAgingReportDto` (Id, Name, Phone, CurrentBalance, AgingBucket, CalculationDate) |
+| **Seeded data** | Default "عام" group seeded before customers; default "عميل نقدي" with Cash type + GroupId reference |
+
+### Key Rules (AGENTS.md §2.75)
+
+Phase 23 added RULE-353 through RULE-370 (18 rules) covering:
+- RULE-353: CustomerType stored as byte (Cash=1, Credit=2)
+- RULE-354: AccountId optional FK for financial reporting
+- RULE-355: CustomerGroupId optional FK for categorization
+- RULE-356: CustomerGroup soft-deletable with child reference guard
+- RULE-357: CustomerType INFORMATIONAL ONLY — not used for business logic gating
+- RULE-358: CheckCreditLimit() returns bool (never throws)
+- RULE-359: Customer.Create() with optional account/type/group params
+- RULE-360: Customer.Update() with same optional params
+- RULE-361: CustomerDto with account/type/group display fields
+- RULE-362: Kebab-case route: `customer-groups`
+- RULE-363: AllStaff read, ManagerAndAbove write
+- RULE-364: Desktop Editor loads group/account lookups
+- RULE-365: CustomerGroupDto with Id/Name/Description/IsActive
+- RULE-366: Seeder seeds "عام" group + "عميل نقدي" with Cash type
+- RULE-367: CustomerType ≠ CustomerGroup (type=behavior, group=category)
+- RULE-368: `ModernTextBox` NOT on `ComboBox` (use `ModernComboBox`)
+- RULE-369: `DisplayMemberPath` + `ItemTemplate` NOT on same `ComboBox`
+- RULE-370: Phone regex `^05\d{8}$` + Email `.EmailAddress()` validation
+
+---
+
+## 📊 What's New in Phase 24 — Accounting Engine Automation (v4.6.9+)
+
+| Feature | Description |
+|---------|-------------|
+| **Account 1422 — OpeningBalanceEquity** | New Level 3 Equity account "أرصدة افتتاحية" seeded as `isSystemAccount: true` (protected from deletion). Linked via `SystemAccountMappings.OpeningBalanceEquityAccountId`. |
+| **IAccountingIntegrationService** | Interface with 10 methods covering ALL money operations: Customer/Supplier opening balance, Sales/Purchase post, Sales/Purchase cancel, Customer/Supplier payment, Payment reversal. |
+| **AccountingIntegrationService** | 700+ line implementation creating balanced double-entry journal entries for every operation. Uses SystemAccountMappings for account resolution. Returns `Result<int>` — never throws. |
+| **Customer OpeningBalance** | When creating a customer with `OpeningBalance > 0`: Dr AccountsReceivable (1131), Cr OpeningBalanceEquity (1422). Wrapped in `ExecuteTransactionAsync` for atomicity. |
+| **Supplier OpeningBalance** | When creating a supplier with `OpeningBalance > 0`: Dr OpeningBalanceEquity (1422), Cr AccountsPayable (1321). Same atomic transaction guarantee. |
+| **Sales Invoice Post** | TWO journal entry sets: Revenue side (Dr Cash/AR, Cr SalesRevenue, Cr VAT Output) + COGS side (Dr COGS using AverageCost, Cr Inventory). PaymentType logic handles Cash/Credit/Mixed correctly. |
+| **Sales Invoice Cancel** | Full reversal: looks up original entry by ReferenceId (int FK), mirrors with Dr↔Cr swapped. If original not found, computes COGS estimate from invoice items as computation fallback. |
+| **Purchase Invoice Post** | Dr Inventory, Dr VAT Input, Cr Cash/AP (depends on PaymentType). |
+| **Purchase Invoice Cancel** | Full reversal with Dr↔Cr swap. Uses `CashTransactionType.RefundOut` (not `SupplierPayment` — was a bug). |
+| **Customer Payment** | Dr Cash, Cr AccountsReceivable — inside existing transaction. |
+| **Supplier Payment** | Dr AccountsPayable, Cr Cash — inside existing transaction. |
+| **Payment Update/Delete Reversals** | **NEW**: `ReverseCustomerPaymentEntryAsync` / `ReverseSupplierPaymentEntryAsync` — payment updates now reverse the old entry before creating the new one. Payment deletions create reversal entries. |
+| **JournalEntryType Enum** | Extended with `OpeningBalance=9`, `CustomerReceipt=10`, `SupplierPayment=11`. |
+| **Security Fix: JWT userId** | `JournalEntriesController.Create()` now extracts `CreatedBy` from JWT claims (NOT client-supplied). `CustomerService`/`SupplierService` accept `int userId` from controller — no more hardcoded `createdByUserId: 1`. |
+| **Security Fix: Payment Reversals** | Payment Update/Delete now create reversal journal entries — ledger no longer diverges from sub-ledger. |
+| **Security Fix: InvoiceNo Generation** | Uses `IDocumentSequenceService.GetNextIntAsync()` with `SemaphoreSlim` lock — no more `lastId + 1` race conditions. |
+| **COGS Correctness** | Uses `ProductUnit.AverageCost` (weighted average) instead of `PurchaseCost` — respects system costing method. |
+| **NetRevenue Validation** | `DiscountAmount > SubTotal` now returns `Result.Failure` — no more unbalanced entries from clamping to zero. |
+| **Composite Index** | `JournalEntry(ReferenceType, ReferenceId)` with filtered index for fast reference-based journal entry lookups. |
+| **Migration** | `Phase24_AccountingIntegration` — adds `OpeningBalanceEquityAccountId` column to `SystemAccountMappings`, composite index, FK with Restrict. |
+
+### Key Rules (AGENTS.md §2.76)
+
+Phase 24 added RULE-371 through RULE-388 (18 rules) covering:
+- RULE-371: AccountingIntegrationService for all money operations
+- RULE-372: Customer/Supplier opening balance entries
+- RULE-373: Sales post — revenue + COGS entries
+- RULE-374: Purchase post — inventory + VAT entries
+- RULE-375: Reversal entries for cancellations
+- RULE-376: Payment entries (Dr Cash / Cr AR or Dr AP / Cr Cash)
+- RULE-377: Payment Update/Delete reversal entries
+- RULE-378: COGS uses AverageCost (not PurchaseCost)
+- RULE-379: NetRevenue validation (no clamping)
+- RULE-380: ReferenceId lookup (not ReferenceNumber string)
+- RULE-381: Computation fallback for missing original entries
+- RULE-382: JWT-derived CreatedBy (not client-supplied)
+- RULE-383: Customer/Supplier services accept userId from controller
+- RULE-384: InvoiceNo via DocumentSequenceService (thread-safe)
+- RULE-385: Account 1422 isSystemAccount=true exception
+- RULE-386: Composite index on JournalEntry(ReferenceType, ReferenceId)
+- RULE-387: CashTransactionType.RefundOut on purchase cancel
+- RULE-388: AccountingIntegrationService returns Result<int>, no transaction ownership
+
+---
+
 ## 👤 What's New in Phase 21 — Users & Permissions Module (v4.6.9)
 
 | Feature | Description |
@@ -1184,7 +1318,7 @@ Phase 21 added RULE-305 through RULE-320 covering:
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 352 non-negotiable rules (RULE-001 to RULE-352)
+1. Read [`AGENTS.md`](AGENTS.md) — all 370 non-negotiable rules (RULE-001 to RULE-370)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

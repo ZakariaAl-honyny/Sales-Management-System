@@ -47,12 +47,12 @@ public class ReportApiService : ApiServiceBase, IReportApiService
             "ReportApiService.GetStockReportAsync");
     }
 
-    public async Task<Result<List<CustomerBalanceReportDto>>> GetCustomerBalancesReportAsync(int? customerId = null, CancellationToken ct = default)
+    public async Task<Result<List<CustomerFinancialBalanceDto>>> GetCustomerBalancesReportAsync(int? customerId = null, CancellationToken ct = default)
     {
         var url = $"{BasePath}/customers";
         if (customerId.HasValue) url += $"?customerId={customerId}";
         
-        return await ExecuteAsync<List<CustomerBalanceReportDto>>(
+        return await ExecuteAsync<List<CustomerFinancialBalanceDto>>(
             () => _httpClient.GetAsync(url, ct),
             "ReportApiService.GetCustomerBalancesReportAsync");
     }
@@ -93,5 +93,29 @@ public class ReportApiService : ApiServiceBase, IReportApiService
         return await ExecuteAsync<List<ExpiredProductDto>>(
             () => _httpClient.GetAsync($"{BasePath}/expired-products?thresholdDays={thresholdDays}", ct),
             "ReportApiService.GetExpiredProductsReportAsync");
+    }
+
+    public async Task<Result<List<StockBalanceReportDto>>> GetStockBalanceReportAsync(int? warehouseId = null, CancellationToken ct = default)
+    {
+        var url = $"{BasePath}/stock-balance";
+        if (warehouseId.HasValue) url += $"?warehouseId={warehouseId}";
+
+        return await ExecuteAsync<List<StockBalanceReportDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "ReportApiService.GetStockBalanceReportAsync");
+    }
+
+    public async Task<Result<List<WarehouseMovementReportDto>>> GetWarehouseMovementsAsync(int? warehouseId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
+    {
+        var url = $"{BasePath}/warehouse-movements";
+        var queryParams = new List<string>();
+        if (warehouseId.HasValue) queryParams.Add($"warehouseId={warehouseId}");
+        if (from.HasValue) queryParams.Add($"from={from.Value:yyyy-MM-dd}");
+        if (to.HasValue) queryParams.Add($"to={to.Value:yyyy-MM-dd}");
+        if (queryParams.Count > 0) url += "?" + string.Join("&", queryParams);
+
+        return await ExecuteAsync<List<WarehouseMovementReportDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "ReportApiService.GetWarehouseMovementsAsync");
     }
 }

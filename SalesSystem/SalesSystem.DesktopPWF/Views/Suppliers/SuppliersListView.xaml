@@ -44,6 +44,7 @@
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                              Tag="ابحث عن اسم المورد..."
                              TabIndex="1"
+                             AutomationProperties.AutomationId="TxtSearchSuppliers"
                              helpers:FocusHelper.AdvanceOnEnter="True">
                         <TextBox.InputBindings>
                             <KeyBinding Key="Return" Command="{Binding SearchCommand}"/>
@@ -52,6 +53,7 @@
                     <Button Command="{Binding SearchCommand}" 
                             Style="{StaticResource PrimaryButton}"
                             Margin="4,0,0,0"
+                            AutomationProperties.AutomationId="BtnSearchSuppliers"
                             ToolTip="البحث عن مورد بالاسم">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -71,6 +73,7 @@
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                     <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnAddSupplier"
                             ToolTip="فتح شاشة إضافة مورد جديد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -79,6 +82,7 @@
                     </Button>
 
                     <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnEditSupplier"
                             ToolTip="تعديل العنصر المحدد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="✏️" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -88,6 +92,7 @@
 
                     <Button Command="{Binding DeleteCommand}" Style="{StaticResource DangerButton}" Margin="0,0,4,0"
                             Visibility="{Binding SelectedSupplier.IsActive, Converter={StaticResource BoolToVisibility}, FallbackValue=Visible}"
+                            AutomationProperties.AutomationId="BtnDeleteSupplier"
                             ToolTip="حذف أو إلغاء تنشيط العنصر المحدد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🗑️" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -97,6 +102,7 @@
 
                     <Button Command="{Binding RestoreCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             Visibility="{Binding SelectedSupplier.IsActive, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}"
+                            AutomationProperties.AutomationId="BtnRestoreSupplier"
                             ToolTip="استعادة العنصر المحذوف">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="♻️" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -105,6 +111,7 @@
                     </Button>
 
                     <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.AutomationId="BtnRefreshSuppliers"
                             ToolTip="تحديث قائمة البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
@@ -238,6 +245,7 @@
                         <TextBlock Text="لا توجد بيانات حالياً" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                         <TextBlock Text="انقر على 'إضافة مورد' للبدء في تسجيل البيانات" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                         <Button Content="➕ إضافة مورد" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
+                                AutomationProperties.AutomationId="BtnFirstSupplier"
                                 ToolTip="فتح شاشة إضافة مورد جديد"/>
                     </StackPanel>
                 </Grid>

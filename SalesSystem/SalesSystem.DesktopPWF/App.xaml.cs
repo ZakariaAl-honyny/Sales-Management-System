@@ -16,6 +16,7 @@ using SalesSystem.DesktopPWF.ViewModels.Suppliers;
 using SalesSystem.DesktopPWF.ViewModels.Products;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Inventory;
+using SalesSystem.DesktopPWF.ViewModels.InventoryOperations;
 using SalesSystem.DesktopPWF.ViewModels.Payments;
 using SalesSystem.DesktopPWF.ViewModels.Returns;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
@@ -23,11 +24,13 @@ using SalesSystem.DesktopPWF.ViewModels.Categories;
 using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
+using SalesSystem.DesktopPWF.ViewModels.Warehouses;
 using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.ViewModels.Accounts;
+using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
 using SalesSystem.DesktopPWF.Views.Accounts;
@@ -182,6 +185,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IProductApiService, ProductApiService>();
         services.AddSingleton<ICategoryApiService, CategoryApiService>();
         services.AddSingleton<IUnitApiService, UnitApiService>();
+        services.AddSingleton<ICustomerGroupApiService, CustomerGroupApiService>();
         services.AddSingleton<ICustomerApiService, CustomerApiService>();
         services.AddSingleton<ISupplierApiService, SupplierApiService>();
         services.AddSingleton<IWarehouseApiService, WarehouseApiService>();
@@ -201,13 +205,22 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IInventoryWriteOffApiService, InventoryWriteOffApiService>();
         services.AddSingleton<ILogsApiService, LogsApiService>();
         services.AddSingleton<IProductUnitApiService, ProductUnitApiService>();
+        services.AddSingleton<IProductPriceApiService, ProductPriceApiService>();
+        services.AddSingleton<IInventoryBatchApiService, InventoryBatchApiService>();
+        services.AddSingleton<IProductImageApiService, ProductImageApiService>();
         services.AddSingleton<ICashBoxApiService, CashBoxApiService>();
         services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
         services.AddSingleton<ITaxesApiService, TaxesApiService>();
         services.AddSingleton<ICurrencyApiService, CurrencyApiService>();
 
+        // Inventory Operation API Service
+        services.AddSingleton<IInventoryOperationApiService, InventoryOperationApiService>();
+
         // Account API Service
         services.AddSingleton<IAccountApiService, AccountApiService>();
+
+        // Journal Entry API Service
+        services.AddSingleton<IJournalEntryApiService, JournalEntryApiService>();
 
         // Audit & Permission Services
         services.AddSingleton<IAuditLogApiService, AuditLogApiService>();
@@ -237,6 +250,10 @@ public partial class App : System.Windows.Application
         services.AddTransient<PurchaseInvoiceEditorViewModel>();
         services.AddTransient<ProductListViewModel>();
         services.AddTransient<ProductEditorViewModel>();
+        services.AddTransient<ProductPricesListViewModel>();
+        services.AddTransient<ProductPriceEditorViewModel>();
+        services.AddTransient<ProductImagesViewModel>();
+        services.AddTransient<InventoryBatchesViewModel>();
         services.AddTransient<CustomerListViewModel>();
         services.AddTransient<CustomerEditorViewModel>();
         services.AddTransient<SupplierListViewModel>();
@@ -269,6 +286,9 @@ public partial class App : System.Windows.Application
         services.AddTransient<ProductUnitEditorViewModel>();
         services.AddTransient<ProductUnitsListViewModel>();
 
+        // Customer Group ViewModels
+        services.AddTransient<CustomerGroupListViewModel>();
+
         // Tax ViewModels
         services.AddTransient<TaxesListViewModel>();
         services.AddTransient<TaxEditorViewModel>();
@@ -276,6 +296,10 @@ public partial class App : System.Windows.Application
         // Currency ViewModels
         services.AddTransient<CurrenciesListViewModel>();
         services.AddTransient<CurrencyEditorViewModel>();
+
+        // Inventory Operation ViewModels
+        services.AddTransient<InventoryOperationListViewModel>();
+        services.AddTransient<InventoryOperationEditorViewModel>();
 
         // Account ViewModels
         services.AddTransient<AccountsListViewModel>();
@@ -288,6 +312,11 @@ public partial class App : System.Windows.Application
         services.AddTransient<CashTransferViewModel>();
         services.AddTransient<DailyClosureViewModel>();
         services.AddTransient<ExpiredProductsReportViewModel>();
+        services.AddTransient<StockBalanceReportViewModel>();
+        services.AddTransient<WarehouseMovementReportViewModel>();
+
+        // Journal Entry ViewModels
+        services.AddTransient<JournalEntriesListViewModel>();
 
         // Audit & Permission ViewModels
         services.AddTransient<AuditLogListViewModel>();

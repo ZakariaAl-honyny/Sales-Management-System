@@ -109,7 +109,7 @@ public class InventoryWriteOffService : IInventoryWriteOffService
                 MovementType.Adjustment,
                 "WriteOff",
                 writeOff.Id,
-                product.PurchasePrice,
+                0m, // TODO: unitPrice from ProductUnit.PurchaseCost (Phase 25)
                 userId,
                 ct);
 

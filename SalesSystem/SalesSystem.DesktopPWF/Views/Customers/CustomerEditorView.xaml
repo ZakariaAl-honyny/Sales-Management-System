@@ -24,7 +24,6 @@
         <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
             <StackPanel Orientation="Horizontal">
                 <Path Data="{StaticResource IconUser}" Fill="White" Width="24" Height="24" Margin="0,0,16,0" Stretch="Uniform"/>
-                <TextBlock Text="👤 " FontSize="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding Title}" Style="{StaticResource HeaderStyle}" Foreground="White" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
@@ -93,17 +92,29 @@
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                <TextBlock Text="الحد الائتماني" Style="{StaticResource LabelStyle}"/>
-<TextBox Text="{Binding CreditLimit, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
+                                <TextBlock Text="البريد الإلكتروني" Style="{StaticResource LabelStyle}"/>
+<TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                           Style="{StaticResource ModernTextBox}" 
-                                          Tag="0.00"
+                                          Tag="example@domain.com"
                                           TabIndex="6"
                                           helpers:FocusHelper.AdvanceOnEnter="True"
-                                          AutomationProperties.AutomationId="TxtCustomerCreditLimit"
-                              ToolTip="أقصى مبلغ يمكن أن يدين به العميل — أدخل 0 إذا كنت لا تريد تحديد حد"/>
-                                <TextBlock Text="أقصى مبلغ مديونية مسموح به" Style="{StaticResource HelperTextStyle}"/>
+                                          AutomationProperties.AutomationId="TxtCustomerEmail"
+                              ToolTip="البريد الإلكتروني الرسمي للعميل للمراسلة"/>
+                                <TextBlock Text="البريد الإلكتروني الرسمي للمراسلة" Style="{StaticResource HelperTextStyle}"/>
                             </StackPanel>
                         </Grid>
+                        <Border Height="12"/>
+
+                        <!-- Credit Limit -->
+                        <TextBlock Text="الحد الائتماني" Style="{StaticResource LabelStyle}"/>
+<TextBox Text="{Binding CreditLimit, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
+                                  Style="{StaticResource ModernTextBox}" 
+                                  Tag="0.00"
+                                  TabIndex="7"
+                                  helpers:FocusHelper.AdvanceOnEnter="True"
+                                  AutomationProperties.AutomationId="TxtCustomerCreditLimit"
+                              ToolTip="أقصى مبلغ يمكن أن يدين به العميل — أدخل 0 إذا كنت لا تريد تحديد حد"/>
+                        <TextBlock Text="أقصى مبلغ مديونية مسموح به — 0 يعني بدون حد ائتماني" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="12"/>
 
                         <!-- Opening Balance -->
@@ -112,19 +123,47 @@
 <TextBox Text="{Binding OpeningBalance, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
                                       Style="{StaticResource ModernTextBox}" 
                                       Tag="0.00"
-                                      TabIndex="7"
+                                      TabIndex="8"
                                       helpers:FocusHelper.AdvanceOnEnter="True"
                                       AutomationProperties.AutomationId="TxtCustomerOpeningBalance"
-                              ToolTip="رصيد سابق للعميل قبل استخدام النظام — أدخل المبلغ الذي يدين به العميل"/>
-                            <TextBlock Text="إذا كان العميل مدين لك بمبلغ سابق قبل البدء في استخدام هذا النظام، أدخله هنا كـ 'رصيد افتتاحي'." Style="{StaticResource HelperTextStyle}"/>
+                              ToolTip="الرصيد السابق للعميل — المبلغ المستحق عليك (بالسالب) أو المستحق له (بالموجب)"/>
+                            <TextBlock Text="المبلغ المستحق على العميل (بالموجب) أو المستحق له (بالسالب) قبل استخدام النظام" Style="{StaticResource HelperTextStyle}"/>
                             <Border Height="12"/>
                         </StackPanel>
 
+                        <!-- Customer Group -->
+                        <Border Height="12"/>
+                        <TextBlock Text="مجموعة العملاء" Style="{StaticResource LabelStyle}"/>
+                        <ComboBox ItemsSource="{Binding AvailableGroups}"
+                                  SelectedItem="{Binding SelectedGroup}"
+                                  Style="{StaticResource ModernComboBox}"
+                                  TabIndex="9"
+                                  ToolTip="اختر مجموعة العميل — تُستخدم لتصنيف العملاء لأغراض التقارير والتسعير">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="تصنيف اختياري يساعد في تجميع العملاء المتشابهين لأغراض التقارير فقط" Style="{StaticResource HelperTextStyle}"/>
+
+                        <!-- Account - Auto-created by system -->
+                        <Border Height="12"/>
+                        <Border Background="#E3F2FD" CornerRadius="6" Padding="12,8">
+                            <StackPanel>
+                                <TextBlock Text="الحساب المحاسبي" FontWeight="SemiBold" FontSize="13" Foreground="#1565C0"/>
+                                <TextBlock Text="سيتم إنشاء حساب محاسبي تلقائياً تحت حساب العملاء في دليل الحسابات" 
+                                           FontSize="11" Foreground="#1565C0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Status -->
+                        <Border Height="12"/>
                         <CheckBox Content="عميل نشط" IsChecked="{Binding IsActive}" FontSize="14" 
                                   Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}" 
-                                  TabIndex="8"
-                                  AutomationProperties.AutomationId="ChkCustomerActive"/>
+                                  TabIndex="11"
+                                  AutomationProperties.AutomationId="ChkCustomerActive"
+                                  ToolTip="تفعيل أو إلغاء تنشيط العميل — العميل غير النشط لن يظهر في قوائم الاختيار"/>
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -144,9 +183,9 @@
                             Width="140"
                             Margin="0,0,12,0"
                             IsDefault="True"
-                            TabIndex="9"
+                            TabIndex="12"
                             AutomationProperties.AutomationId="BtnSaveCustomer"
-                            ToolTip="حفظ البيانات المدخلة">
+                            ToolTip="حفظ بيانات العميل — سيتم التحقق من صحة الحقول الإلزامية قبل الحفظ">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,8,0" Stretch="Uniform"/>
                             <TextBlock Text="حفظ البيانات"/>
@@ -156,7 +195,7 @@
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
-                            TabIndex="10"
+                            TabIndex="13"
                             AutomationProperties.AutomationId="BtnCancelCustomer"
                             ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>

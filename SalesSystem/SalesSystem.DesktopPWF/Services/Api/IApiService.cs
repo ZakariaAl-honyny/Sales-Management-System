@@ -232,6 +232,15 @@ public interface IUnitApiService
     Task<Result> DeletePermanentlyAsync(int id);
 }
 
+public interface ICustomerGroupApiService
+{
+    Task<Result<List<CustomerGroupDto>>> GetAllAsync(CancellationToken ct = default);
+    Task<Result<CustomerGroupDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<CustomerGroupDto>> CreateAsync(CreateCustomerGroupRequest request, CancellationToken ct = default);
+    Task<Result<CustomerGroupDto>> UpdateAsync(int id, UpdateCustomerGroupRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+}
+
 public interface ICustomerApiService
 {
     Task<Result<List<CustomerDto>>> GetAllAsync(bool includeInactive = false);
@@ -240,6 +249,7 @@ public interface ICustomerApiService
     Task<Result<CustomerDto>> UpdateAsync(int id, UpdateCustomerRequest request);
     Task<Result> DeleteAsync(int id);
     Task<Result> DeletePermanentlyAsync(int id);
+    Task<Result<List<CustomerGroupDto>>> GetAllGroupsAsync(CancellationToken ct = default);
 }
 
 public interface ISupplierApiService
@@ -292,11 +302,13 @@ public interface IReportApiService
     Task<Result<List<SalesReportDto>>> GetSalesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct = default);
     Task<Result<List<PurchaseReportDto>>> GetPurchasesReportAsync(int? warehouseId, DateTime from, DateTime to, CancellationToken ct = default);
     Task<Result<List<StockReportDto>>> GetStockReportAsync(int? warehouseId = null, CancellationToken ct = default);
-    Task<Result<List<CustomerBalanceReportDto>>> GetCustomerBalancesReportAsync(int? customerId = null, CancellationToken ct = default);
+    Task<Result<List<CustomerFinancialBalanceDto>>> GetCustomerBalancesReportAsync(int? customerId = null, CancellationToken ct = default);
     Task<Result<List<SupplierBalanceReportDto>>> GetSupplierBalancesReportAsync(int? supplierId = null, CancellationToken ct = default);
     Task<Result<List<ProductMovementReportDto>>> GetProductMovementsReportAsync(int productId, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
     Task<Result<List<LowStockReportDto>>> GetLowStockReportAsync(int? warehouseId = null, CancellationToken ct = default);
     Task<Result<List<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays = 0, CancellationToken ct = default);
+    Task<Result<List<StockBalanceReportDto>>> GetStockBalanceReportAsync(int? warehouseId = null, CancellationToken ct = default);
+    Task<Result<List<WarehouseMovementReportDto>>> GetWarehouseMovementsAsync(int? warehouseId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
 }
 
 public interface ISettingsApiService
@@ -472,6 +484,15 @@ public interface IPermissionApiService
     Task<Result<List<PermissionDto>>> GetAllAsync();
     Task<Result<Dictionary<byte, List<int>>>> GetRolePermissionsAsync();
     Task<Result> UpdateRolePermissionsAsync(byte role, List<int> permissionIds);
+}
+
+public interface IInventoryOperationApiService
+{
+    Task<Result<List<InventoryOperationDto>>> GetAllAsync(int? warehouseId = null, byte? operationType = null, int page = 1, int pageSize = 1000);
+    Task<Result<InventoryOperationDto>> GetByIdAsync(int id);
+    Task<Result<InventoryOperationDto>> CreateAsync(CreateInventoryOperationRequest request);
+    Task<Result<InventoryOperationDto>> PostAsync(int id);
+    Task<Result<InventoryOperationDto>> CancelAsync(int id);
 }
 
 

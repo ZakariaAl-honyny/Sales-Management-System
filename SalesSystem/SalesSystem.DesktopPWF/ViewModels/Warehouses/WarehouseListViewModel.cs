@@ -26,15 +26,11 @@ public class WarehouseListViewModel : ViewModelBase
     private IEventBus EventBus => _eventBus ??= App.GetService<IEventBus>();
     private IToastNotificationService ToastService => _toastService ??= App.GetService<IToastNotificationService>();
 
-    // Uses 'new' to suppress CS0108 (inherited member hiding).
-    // DI constructor sets this directly; SetField("_dialogService", mock) also works in tests.
-    private new IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
-    private IDialogService? _dialogService;
-
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ICollectionView? _warehousesView;
     private WarehouseDto? _selectedWarehouse;
     private string _searchText = string.Empty;
+    private byte? _selectedTypeFilter;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
@@ -56,7 +52,6 @@ public class WarehouseListViewModel : ViewModelBase
         _warehouseService = warehouseService ?? throw new ArgumentNullException(nameof(warehouseService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
-        _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         SetDialogService(dialogService ?? throw new ArgumentNullException(nameof(dialogService)));
 
         InitializeCommands();
@@ -70,9 +65,9 @@ public class WarehouseListViewModel : ViewModelBase
     {
         RefreshCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadWarehousesOperationAsync)));
         AddCommand = new RelayCommand(AddWarehouse);
-        EditCommand = new RelayCommand(EditWarehouse, () => SelectedWarehouse != null);
-        DeleteCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(DeleteWarehouseOperationAsync, ex => ErrorMessage = HandleException(ex, "WarehouseListViewModel.DeleteWarehouseAsync"))), () => SelectedWarehouse != null && SelectedWarehouse.IsActive);
-        RestoreCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(RestoreWarehouseOperationAsync, ex => ErrorMessage = HandleException(ex, "WarehouseListViewModel.RestoreWarehouseAsync"))), () => SelectedWarehouse != null && !SelectedWarehouse.IsActive);
+        EditCommand = new RelayCommand(EditWarehouse);
+        DeleteCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(DeleteWarehouseOperationAsync, ex => ErrorMessage = HandleException(ex, "WarehouseListViewModel.DeleteWarehouseAsync"))));
+        RestoreCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(RestoreWarehouseOperationAsync, ex => ErrorMessage = HandleException(ex, "WarehouseListViewModel.RestoreWarehouseAsync"))));
         SearchCommand = new RelayCommand(Search);
 
         EventBus.Subscribe<WarehouseChangedMessage>(OnWarehouseChanged);
@@ -96,12 +91,7 @@ public class WarehouseListViewModel : ViewModelBase
         get => _selectedWarehouse;
         set
         {
-            if (SetProperty(ref _selectedWarehouse, value))
-            {
-                (EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                (DeleteCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-                (RestoreCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-            }
+            SetProperty(ref _selectedWarehouse, value);
         }
     }
 
@@ -142,6 +132,30 @@ public class WarehouseListViewModel : ViewModelBase
     }
 
     public int WarehousesCount => Warehouses.Count;
+
+    /// <summary>
+    /// Type filter list for the filter ComboBox (null = "الكل").
+    /// </summary>
+    public List<KeyValuePair<byte?, string>> TypeFilterList { get; } = new()
+    {
+        new KeyValuePair<byte?, string>(null, "الكل"),
+        new KeyValuePair<byte?, string>(1, "رئيسي"),
+        new KeyValuePair<byte?, string>(2, "فرعي"),
+        new KeyValuePair<byte?, string>(3, "صالة عرض"),
+        new KeyValuePair<byte?, string>(4, "تالف"),
+    };
+
+    public byte? SelectedTypeFilter
+    {
+        get => _selectedTypeFilter;
+        set
+        {
+            if (SetProperty(ref _selectedTypeFilter, value))
+            {
+                WarehousesView?.Refresh();
+            }
+        }
+    }
     #endregion
 
     #region Commands
@@ -204,6 +218,11 @@ public class WarehouseListViewModel : ViewModelBase
     {
         if (obj is not WarehouseDto warehouse) return false;
 
+        // Type filter
+        if (SelectedTypeFilter.HasValue && warehouse.Type != SelectedTypeFilter.Value)
+            return false;
+
+        // Text search
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var searchLower = SearchText.Trim().ToLower();
@@ -214,7 +233,7 @@ public class WarehouseListViewModel : ViewModelBase
     private void AddWarehouse()
     {
         var editorVm = new WarehouseEditorViewModel();
-        if (DialogService.ShowDialog(editorVm))
+        if (DialogService!.ShowDialog(editorVm))
         {
             _ = ExecuteAsync(LoadWarehousesOperationAsync);
         }
@@ -222,10 +241,14 @@ public class WarehouseListViewModel : ViewModelBase
 
     private void EditWarehouse()
     {
-        if (SelectedWarehouse == null) return;
+        if (SelectedWarehouse == null)
+        {
+            _ = DialogService!.ShowWarningAsync("تنبيه", "يرجى تحديد مستودع من القائمة أولاً");
+            return;
+        }
 
         var editorVm = new WarehouseEditorViewModel(SelectedWarehouse);
-        if (DialogService.ShowDialog(editorVm))
+        if (DialogService!.ShowDialog(editorVm))
         {
             _ = ExecuteAsync(LoadWarehousesOperationAsync);
         }
@@ -241,9 +264,14 @@ public class WarehouseListViewModel : ViewModelBase
 
     private async Task DeleteWarehouseOperationAsync()
     {
-        if (SelectedWarehouse == null) return;
+        if (SelectedWarehouse == null || !SelectedWarehouse.IsActive)
+        {
+            if (SelectedWarehouse == null)
+                await DialogService!.ShowWarningAsync("تنبيه", "يرجى تحديد مستودع من القائمة أولاً");
+            return;
+        }
 
-        var strategy = await DialogService.ShowDeleteConfirmationAsync($"المستودع: {SelectedWarehouse.Name}");
+        var strategy = await DialogService!.ShowDeleteConfirmationAsync($"المستودع: {SelectedWarehouse.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 
@@ -283,15 +311,25 @@ public class WarehouseListViewModel : ViewModelBase
 
     private async Task RestoreWarehouseOperationAsync()
     {
-        if (SelectedWarehouse == null) return;
+        if (SelectedWarehouse == null || SelectedWarehouse.IsActive)
+        {
+            if (SelectedWarehouse == null)
+                await DialogService!.ShowWarningAsync("تنبيه", "يرجى تحديد مستودع من القائمة أولاً");
+            return;
+        }
 
         ErrorMessage = null;
 
         var request = new UpdateWarehouseRequest(
             Name: SelectedWarehouse.Name,
+            Type: SelectedWarehouse.Type,
             Location: SelectedWarehouse.Location,
+            Phone: SelectedWarehouse.Phone,
+            Address: SelectedWarehouse.Address,
+            ManagerName: SelectedWarehouse.ManagerName,
             IsDefault: SelectedWarehouse.IsDefault,
-            IsActive: true
+            IsActive: true,
+            Notes: SelectedWarehouse.Notes
         );
 
         var result = await WarehouseService.UpdateAsync(SelectedWarehouse.Id, request);
@@ -300,12 +338,12 @@ public class WarehouseListViewModel : ViewModelBase
         {
             EventBus.Publish(new WarehouseChangedMessage(SelectedWarehouse.Id));
             await LoadWarehousesOperationAsync();
-            await DialogService.ShowSuccessAsync("نجاح", "تم استعادة المستودع بنجاح");
+            ToastService.ShowSuccess("تم استعادة المستودع بنجاح");
         }
         else
         {
             ErrorMessage = result.Error ?? "فشل في استعادة المستودع";
-            await DialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
+            await DialogService!.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
         }
     }
 

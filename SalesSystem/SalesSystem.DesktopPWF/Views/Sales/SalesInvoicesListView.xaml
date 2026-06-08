@@ -37,6 +37,7 @@
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                              Tag="رقم الفاتورة أو العميل..."
                              TabIndex="1"
+                             AutomationProperties.AutomationId="TxtSearchSalesInvoices"
                              helpers:FocusHelper.AdvanceOnEnter="True">
                         <TextBox.InputBindings>
                             <KeyBinding Key="Return" Command="{Binding SearchCommand}"/>
@@ -45,6 +46,7 @@
                     <Button Command="{Binding SearchCommand}" 
                             Style="{StaticResource PrimaryButton}"
                             Margin="8,0,0,0"
+                            AutomationProperties.AutomationId="BtnSearchSalesInvoices"
                             ToolTip="اضغط هنا للبحث عن الفواتير حسب البيانات التي أدخلتها">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -65,6 +67,7 @@
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                     <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnNewSalesInvoice"
                             ToolTip="اضغط هنا لفتح شاشة إنشاء فاتورة بيع جديدة">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -72,6 +75,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnEditSalesInvoice"
                             ToolTip="تعديل الفاتورة المختارة (للمسودات فقط)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="📝" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -79,6 +83,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding PostCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnPostSalesInvoice"
                             ToolTip="ترحيل الفاتورة المختارة نهائياً">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="✅" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -86,6 +91,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding PrintPreviewCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnPreviewSalesInvoice"
                             ToolTip="معاينة الفاتورة قبل الطباعة (للمرحّلة فقط)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🖨️" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -93,6 +99,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding PrintA4Command}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnPrintA4SalesInvoice"
                             ToolTip="طباعة A4 (للمرحّلة فقط)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🖨️" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -100,6 +107,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding PrintThermalCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnPrintThermalSalesInvoice"
                             ToolTip="طباعة حرارية (للمرحّلة فقط)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🧾" Margin="0,0,8,0" VerticalAlignment="Center"/>
@@ -107,6 +115,7 @@
                         </StackPanel>
                     </Button>
                     <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.AutomationId="BtnRefreshSalesInvoices"
                             ToolTip="تحديث قائمة البيانات">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
@@ -286,6 +295,7 @@
                         <TextBlock Text="لا توجد فواتير بيع حالياً" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
                         <TextBlock Text="ابدأ بتسجيل أول عملية بيع للعملاء لتظهر فواتيرك هنا" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                         <Button Content="➕ إنشاء أول فاتورة" Command="{Binding NewCommand}" Margin="0,12,0,0"
+                                AutomationProperties.AutomationId="BtnFirstSalesInvoice"
                                 ToolTip="إنشاء فاتورة جديدة"/>
                     </StackPanel>
                 </Grid>

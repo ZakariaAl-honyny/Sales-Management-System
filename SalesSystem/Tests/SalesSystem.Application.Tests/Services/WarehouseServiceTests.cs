@@ -50,13 +50,10 @@ public class WarehouseServiceTests : IDisposable
                 return 1;
             });
 
-        _mockUow.Setup(u => u.ExecuteAsync<Result<WarehouseDto>>(
+        _mockUow.Setup(u => u.ExecuteTransactionAsync<Result<WarehouseDto>>(
             It.IsAny<Func<Task<Result<WarehouseDto>>>>(),
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result<WarehouseDto>>> func, CancellationToken ct) => func());
-
-        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MockDbContextTransaction());
 
         _sut = new WarehouseService(_mockUow.Object, _mockLogger.Object);
     }
@@ -108,7 +105,7 @@ public class WarehouseServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesWarehouse");
 
-        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest("New Warehouse", "Building A", false);
+        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest(Name: "New Warehouse", Location: "Building A", IsDefault: false);
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -127,7 +124,7 @@ public class WarehouseServiceTests : IDisposable
         _dbContext.Warehouses.Add(existing);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest("New Default Warehouse", null, true); // Set as new default
+        var request = new SalesSystem.Contracts.Requests.CreateWarehouseRequest(Name: "New Default Warehouse", Location: null, IsDefault: true); // Set as new default
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -154,7 +151,7 @@ public class WarehouseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest("Updated Warehouse", "New Location", false, true);
+        var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest(Name: "Updated Warehouse", Location: "New Location", IsDefault: false, IsActive: true);
 
         var result = await _sut.UpdateAsync(warehouse.Id, request, CancellationToken.None);
 
@@ -176,7 +173,7 @@ public class WarehouseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse2);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest("Warehouse 2", null, true, true); // Set as new default
+        var request = new SalesSystem.Contracts.Requests.UpdateWarehouseRequest(Name: "Warehouse 2", Location: null, IsDefault: true, IsActive: true); // Set as new default
 
         var result = await _sut.UpdateAsync(warehouse2.Id, request, CancellationToken.None);
 

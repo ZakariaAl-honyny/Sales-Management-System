@@ -48,6 +48,12 @@ public interface IUnitOfWork
     IGenericRepository<ExchangeRateHistory> ExchangeRateHistories { get; }
     IGenericRepository<Permission> Permissions { get; }
     IGenericRepository<RolePermission> RolePermissions { get; }
+    IGenericRepository<InventoryBatch> InventoryBatches { get; }
+    IGenericRepository<ProductPrice> ProductPrices { get; }
+    IGenericRepository<CustomerGroup> CustomerGroups { get; }
+    IGenericRepository<ProductImage> ProductImages { get; }
+    IGenericRepository<InventoryOperation> InventoryOperations { get; }
+    IGenericRepository<InventoryOperationItem> InventoryOperationItems { get; }
     IAuditLogRepository AuditLogs { get; }
     IGenericRepository<UserSession> UserSessions { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);
@@ -60,6 +66,12 @@ public interface IUnitOfWork
     /// The execution strategy provides retry for transient failures; the transaction ensures atomicity.
     /// </summary>
     Task ExecuteTransactionAsync(Func<Task> operation, CancellationToken ct = default);
+
+    /// <summary>
+    /// Executes the given typed operation within an execution strategy + explicit transaction.
+    /// Returns the operation's result. Use when the operation must return a value atomically.
+    /// </summary>
+    Task<TResult> ExecuteTransactionAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct = default);
 }
 
 public interface IDbContextTransaction : IAsyncDisposable, IDisposable

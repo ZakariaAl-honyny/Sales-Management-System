@@ -31,6 +31,8 @@ public class PurchaseServiceTests : IDisposable
     private readonly Mock<IStoreSettingsService> _mockStoreSettingsService;
     private readonly Mock<IUpdateProductPricingService> _mockPricingService;
     private readonly Mock<ICashBoxService> _cashBoxServiceMock;
+    private readonly Mock<IAccountingIntegrationService> _mockAccountingService = new();
+    private readonly Mock<IDocumentSequenceService> _mockDocumentSequenceService = new();
     private readonly Mock<ILogger<PurchaseService>> _mockLogger;
 
     private readonly PurchaseService _sut;
@@ -88,12 +90,24 @@ public class PurchaseServiceTests : IDisposable
             It.IsAny<decimal?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success());
 
+        _mockAccountingService.Setup(a => a.CreatePurchasePostEntryAsync(
+            It.IsAny<PurchaseInvoice>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+        _mockAccountingService.Setup(a => a.ReversePurchasePostEntryAsync(
+            It.IsAny<PurchaseInvoice>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+
+        _mockDocumentSequenceService.Setup(s => s.GetNextIntAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+
         _sut = new PurchaseService(
             _mockUow.Object,
             _mockInventoryService.Object,
             _mockStoreSettingsService.Object,
             _mockPricingService.Object,
             _cashBoxServiceMock.Object,
+            _mockAccountingService.Object,
+            _mockDocumentSequenceService.Object,
             _mockLogger.Object);
     }
 
@@ -115,7 +129,7 @@ public class PurchaseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        var product = Product.Create("Test Product");
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -212,7 +226,7 @@ public class PurchaseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        var product = Product.Create("Test Product");
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -288,7 +302,7 @@ public class PurchaseServiceTests : IDisposable
         _dbContext.Warehouses.Add(warehouse);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Test Product", purchasePrice: 100m, retailPrice: 150m, wholesalePrice: 120m);
+        var product = Product.Create("Test Product");
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 

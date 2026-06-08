@@ -182,7 +182,7 @@ public class UnitServiceTests : IDisposable
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Product", 10m, 100m, barcode: "P001", retailUnitId: unit.Id);
+        var product = Product.Create("Product", retailUnitId: unit.Id);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 

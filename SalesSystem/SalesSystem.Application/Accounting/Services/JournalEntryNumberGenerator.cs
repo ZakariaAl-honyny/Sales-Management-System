@@ -2,20 +2,25 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
-using System.Threading;
 
 namespace SalesSystem.Application.Accounting.Services;
 
+/// <summary>
+/// Generates thread-safe journal entry numbers using IDocumentSequenceService.
+/// The sequence key "JournalEntry" is used with DocumentSequenceService's SemaphoreSlim
+/// lock held through SaveChangesAsync, ensuring no duplicate entry numbers under concurrency.
+/// Format: JE-{yyyyMMdd}-{D4}
+/// </summary>
 public class JournalEntryNumberGenerator : IJournalEntryNumberGenerator
 {
-    private static readonly SemaphoreSlim _lock = new(1, 1);
-
-    private readonly IUnitOfWork _uow;
+    private readonly IDocumentSequenceService _sequenceService;
     private readonly ILogger<JournalEntryNumberGenerator> _logger;
 
-    public JournalEntryNumberGenerator(IUnitOfWork uow, ILogger<JournalEntryNumberGenerator> logger)
+    public JournalEntryNumberGenerator(
+        IDocumentSequenceService sequenceService,
+        ILogger<JournalEntryNumberGenerator> logger)
     {
-        _uow = uow;
+        _sequenceService = sequenceService;
         _logger = logger;
     }
 
@@ -23,25 +28,17 @@ public class JournalEntryNumberGenerator : IJournalEntryNumberGenerator
     {
         try
         {
-            await _lock.WaitAsync(ct);
-            try
-            {
-                // Query by today's date prefix for correct daily reset
-                // e.g., "JE-20260606-" prefix returns all entries for today
-                var today = DateTime.Today;
-                var prefix = $"JE-{today:yyyyMMdd}";
-                var todayEntries = await _uow.JournalEntries.ToListAsync(
-                    je => je.EntryNumber.StartsWith(prefix), ct: ct);
+            // Use DocumentSequenceService.GetNextIntAsync which is thread-safe:
+            // SemaphoreSlim held through SaveChangesAsync prevents duplicate numbers.
+            var seqResult = await _sequenceService.GetNextIntAsync("JournalEntry", ct);
+            if (!seqResult.IsSuccess)
+                return Result<string>.Failure(seqResult.Error!);
 
-                var nextNumber = todayEntries.Count + 1;
-                var entryNumber = $"JE-{today:yyyyMMdd}-{nextNumber:D4}";
+            var today = DateTime.Today;
+            var entryNumber = $"JE-{today:yyyyMMdd}-{seqResult.Value:D4}";
 
-                return Result<string>.Success(entryNumber);
-            }
-            finally
-            {
-                _lock.Release();
-            }
+            _logger.LogDebug("Generated journal entry number: {EntryNumber}", entryNumber);
+            return Result<string>.Success(entryNumber);
         }
         catch (Exception ex)
         {

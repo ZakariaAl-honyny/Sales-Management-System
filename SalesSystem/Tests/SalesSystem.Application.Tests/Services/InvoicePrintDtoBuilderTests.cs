@@ -36,12 +36,10 @@ public class InvoicePrintDtoBuilderTests
             .SetValue(entity, value);
     }
 
-    private static Product CreateProduct(string name, decimal purchasePrice = 10m, decimal retailPrice = 20m)
+    private static Product CreateProduct(string name)
     {
         return Product.Create(
             name,
-            purchasePrice: purchasePrice,
-            retailPrice: retailPrice,
             createdByUserId: 1);
     }
 
@@ -355,7 +353,7 @@ public class InvoicePrintDtoBuilderTests
     [Fact]
     public async Task BuildFromPurchaseAsync_ShouldMapItems()
     {
-        var product = CreateProduct("مادة خام", purchasePrice: 8, retailPrice: 15);
+        var product = CreateProduct("مادة خام");
         var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, invoiceNo: 1);
         var item = PurchaseInvoiceItem.Create(productId: 1, quantity: 10, unitCost: 8.50m, discountAmount: 2);
         SetNavigation(item, nameof(PurchaseInvoiceItem.Product), product);

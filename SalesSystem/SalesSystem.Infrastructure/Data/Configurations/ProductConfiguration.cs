@@ -10,19 +10,13 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
     {
         builder.ToTable("Products");
         builder.HasKey(p => p.Id);
-        builder.Property(p => p.Barcode).HasMaxLength(50);
-        builder.HasIndex(p => p.Barcode).IsUnique();
+
         builder.Property(p => p.Name).IsRequired().HasMaxLength(150);
-        builder.Property(p => p.PurchasePrice).IsRequired().HasPrecision(18, 2);
-        builder.Property(p => p.SalePrice).IsRequired().HasPrecision(18, 2); // Legacy
-        builder.Property(p => p.WholesalePrice).IsRequired().HasPrecision(18, 2).HasDefaultValue(0m);
-        builder.Property(p => p.RetailPrice).IsRequired().HasPrecision(18, 2).HasDefaultValue(0m);
         builder.Property(p => p.MinStock).IsRequired().HasPrecision(18, 3);
         builder.Property(p => p.ReorderLevel).HasPrecision(18, 3);
         builder.Property(p => p.ConversionFactor).IsRequired().HasPrecision(18, 3).HasDefaultValue(1m);
         builder.Property(p => p.Description).HasMaxLength(500);
         builder.Property(p => p.ImagePath).HasMaxLength(500);
-        builder.Property(p => p.ExpirationDate);
 
         builder.HasOne(p => p.Category)
             .WithMany()
@@ -42,6 +36,17 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasOne(p => p.RetailUnit)
             .WithMany()
             .HasForeignKey(p => p.RetailUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // New navigation collections for Phase 25
+        builder.HasMany(p => p.InventoryBatches)
+            .WithOne(x => x.Product)
+            .HasForeignKey(x => x.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasMany(p => p.Images)
+            .WithOne(x => x.Product)
+            .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasQueryFilter(p => p.IsActive);

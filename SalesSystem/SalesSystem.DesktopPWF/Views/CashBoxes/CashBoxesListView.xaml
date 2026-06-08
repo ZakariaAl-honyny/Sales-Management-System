@@ -127,13 +127,13 @@
                                             Width="*" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
 
-                        <DataGridTextColumn Header="الرصيد الحالي" 
-                                            Binding="{Binding CurrentBalance, StringFormat=N2}" 
-                                            Width="120" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                        <DataGridTextColumn Header="الحساب المرتبط" 
+                                            Binding="{Binding AccountName}" 
+                                            Width="140" 
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
 
-                        <DataGridTextColumn Header="الرصيد الافتتاحي" 
-                                            Binding="{Binding OpeningBalance, StringFormat=N2}" 
+                        <DataGridTextColumn Header="رقم الهاتف" 
+                                            Binding="{Binding PhoneNumber}" 
                                             Width="120" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
 

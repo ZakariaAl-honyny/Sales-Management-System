@@ -26,9 +26,6 @@ public class GenericRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailPrice: 100m,
-            wholesalePrice: 900m,
-            purchasePrice: 50m,
             retailUnitId: 1,
             wholesaleUnitId: 2,
             conversionFactor: 10m
@@ -41,7 +38,7 @@ public class GenericRepositoryTests
         // Assert
         var saved = await context.Products.FirstOrDefaultAsync(p => p.Name == "Test Product");
         saved.Should().NotBeNull();
-        saved!.RetailPrice.Should().Be(100m);
+        saved!.Name.Should().Be("Test Product");
     }
 
     [Fact]
@@ -51,7 +48,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb2");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "Product to Find", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 50m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
+        var product = Product.Create(name: "Product to Find", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
@@ -70,9 +67,9 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb3");
         var repository = new GenericRepository<Product>(context);
 
-        var product1 = Product.Create(name: "Product 1", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 50m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
-        var product2 = Product.Create(name: "Product 2", retailPrice: 200m, wholesalePrice: 1800m, purchasePrice: 100m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
-        var product3 = Product.Create(name: "Product 3", retailPrice: 300m, wholesalePrice: 2700m, purchasePrice: 150m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
+        var product1 = Product.Create(name: "Product 1", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
+        var product2 = Product.Create(name: "Product 2", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
+        var product3 = Product.Create(name: "Product 3", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
 
         await repository.AddAsync(product1);
         await repository.AddAsync(product2);
@@ -93,22 +90,18 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb4");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "Original Name", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 80m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m, minStock: 10m);
+        var product = Product.Create(name: "Original Name", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m, minStock: 10m);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
         // Act - use the Update method with all required parameters
         product.Update(
             name: "Updated Name",
-            retailPrice: 150m,
-            wholesalePrice: 1300m,
-            purchasePrice: 90m,
-            retailUnitId: 1,
-            wholesaleUnitId: 2,
             conversionFactor: 10m,
             minStock: 20m,
-            barcode: null,
             categoryId: null,
+            retailUnitId: 1,
+            wholesaleUnitId: 2,
             description: null,
             updatedByUserId: 1
         );
@@ -128,7 +121,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb5");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "To Delete", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 50m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
+        var product = Product.Create(name: "To Delete", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
@@ -148,9 +141,9 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb6");
         var repository = new GenericRepository<Product>(context);
 
-        var product1 = Product.Create(name: "Alpha", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 50m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
-        var product2 = Product.Create(name: "Beta", retailPrice: 200m, wholesalePrice: 1800m, purchasePrice: 100m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
-        var product3 = Product.Create(name: "Gamma", retailPrice: 300m, wholesalePrice: 2700m, purchasePrice: 150m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
+        var product1 = Product.Create(name: "Alpha", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
+        var product2 = Product.Create(name: "Beta", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
+        var product3 = Product.Create(name: "Gamma", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m);
 
         await repository.AddAsync(product1);
         await repository.AddAsync(product2);
@@ -159,7 +152,7 @@ public class GenericRepositoryTests
 
         // Act
         var result = await repository.Query()
-            .Where(p => p.RetailPrice >= 150m)
+            .Where(p => p.Name != "Alpha")
             .ToListAsync();
 
         // Assert
@@ -241,7 +234,7 @@ public class GenericRepositoryTests
         await context.SaveChangesAsync();
 
         // Act
-        warehouse.Update(name: "Updated Warehouse", location: "New Location", isDefault: false, updatedByUserId: 1);
+        warehouse.Update(name: "Updated Warehouse", type: Domain.Enums.WarehouseType.Main, location: "New Location", isDefault: false, updatedByUserId: 1);
         await repository.UpdateAsync(warehouse);
         await context.SaveChangesAsync();
 
@@ -406,7 +399,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("EdgeDb2");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "Original", retailPrice: 100m, wholesalePrice: 900m, purchasePrice: 50m, retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m, minStock: 5m);
+        var product = Product.Create(name: "Original", retailUnitId: 1, wholesaleUnitId: 2, conversionFactor: 10m, minStock: 5m);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
@@ -416,15 +409,11 @@ public class GenericRepositoryTests
         // Act - now update using the Update method
         product.Update(
             name: "Updated",
-            retailPrice: 120m,
-            wholesalePrice: 1100m,
-            purchasePrice: 60m,
-            retailUnitId: 1,
-            wholesaleUnitId: 2,
             conversionFactor: 10m,
             minStock: 10m,
-            barcode: null,
             categoryId: null,
+            retailUnitId: 1,
+            wholesaleUnitId: 2,
             description: null,
             updatedByUserId: 1
         );

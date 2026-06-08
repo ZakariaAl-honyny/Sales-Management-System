@@ -1,3 +1,4 @@
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Exceptions;
 
@@ -14,6 +15,18 @@ public class Supplier : BaseEntity
     public decimal CreditLimit { get; private set; }
     public string? TaxNumber { get; private set; }
 
+    // ─── Phase 32: FK to Account (Chart of Accounts) ─────────────────
+    /// <summary>
+    /// FK to Chart of Accounts. Links this supplier to an Account for financial reporting.
+    /// </summary>
+    public int? AccountId { get; private set; }
+
+    // ─── Navigation Properties ─────────────────────────────────────
+    /// <summary>
+    /// Navigation property to the linked Account (Chart of Accounts).
+    /// </summary>
+    public virtual Account? Account { get; private set; }
+
     private Supplier() { }
 
     public static Supplier Create(
@@ -24,7 +37,8 @@ public class Supplier : BaseEntity
         string? address = null,
         string? taxNumber = null,
         decimal creditLimit = 0,
-        int? createdByUserId = null)
+        int? createdByUserId = null,
+        int? accountId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المورد مطلوب.");
@@ -42,7 +56,8 @@ public class Supplier : BaseEntity
             Email = email,
             Address = address,
             TaxNumber = taxNumber,
-            CreditLimit = creditLimit
+            CreditLimit = creditLimit,
+            AccountId = accountId
         };
         supplier.SetCreatedBy(createdByUserId);
         return supplier;
@@ -62,6 +77,27 @@ public class Supplier : BaseEntity
         CurrentBalance -= amount;
     }
 
+    /// <summary>
+    /// Links the supplier to an Account in the Chart of Accounts.
+    /// </summary>
+    public void LinkToAccount(int accountId)
+    {
+        if (accountId <= 0)
+            throw new DomainException("معرّف الحساب غير صالح.");
+
+        AccountId = accountId;
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Removes the link to the Chart of Accounts.
+    /// </summary>
+    public void UnlinkAccount()
+    {
+        AccountId = null;
+        UpdateTimestamp();
+    }
+
     public void Update(
         string name,
         string? phone,
@@ -69,7 +105,8 @@ public class Supplier : BaseEntity
         string? address,
         string? taxNumber,
         decimal creditLimit,
-        int? updatedByUserId)
+        int? updatedByUserId,
+        int? accountId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المورد مطلوب.");
@@ -81,6 +118,7 @@ public class Supplier : BaseEntity
         Address = address;
         TaxNumber = taxNumber;
         CreditLimit = creditLimit;
+        AccountId = accountId;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }

@@ -24,7 +24,10 @@ public class CashBoxesController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
         var result = await _service.GetAllAsync(ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     [HttpGet("{id:int}")]
@@ -49,12 +52,30 @@ public class CashBoxesController : ControllerBase
         return BadRequest(new { error = result.Error });
     }
 
+    [HttpPut("{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateCashBoxRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized();
+
+        var result = await _service.UpdateAsync(id, request, userId, ct);
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
     [HttpDelete("{id:int}")]
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var result = await _service.DeactivateAsync(id, ct);
-        return result.IsSuccess ? Ok() : NotFound(new { error = result.Error });
+        if (result.IsSuccess) return Ok();
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     [HttpGet("{id:int}/transactions")]
@@ -62,7 +83,10 @@ public class CashBoxesController : ControllerBase
     public async Task<IActionResult> GetTransactions(int id, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken ct)
     {
         var result = await _service.GetTransactionsAsync(id, from, to, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     [HttpPost("{id:int}/transactions")]
@@ -97,7 +121,10 @@ public class CashBoxesController : ControllerBase
     public async Task<IActionResult> GetDailyClosures(int id, CancellationToken ct)
     {
         var result = await _service.GetDailyClosuresAsync(id, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     [HttpPost("{id:int}/daily-closures")]
@@ -109,6 +136,9 @@ public class CashBoxesController : ControllerBase
             return Unauthorized();
 
         var result = await _service.PerformDailyClosureAsync(id, userId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 }

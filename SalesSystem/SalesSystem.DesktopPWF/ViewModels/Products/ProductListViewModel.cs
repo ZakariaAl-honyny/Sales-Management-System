@@ -16,7 +16,7 @@ namespace SalesSystem.DesktopPWF.ViewModels.Products;
 /// <summary>
 /// ViewModel for Products List View
 /// </summary>
-public class ProductListViewModel : ViewModelBase
+public class ProductListViewModel : ViewModelBase, IDisposable
 {
     private readonly IProductApiService _productService;
     private readonly IEventBus _eventBus;
@@ -68,9 +68,9 @@ public class ProductListViewModel : ViewModelBase
         // Initialize commands
         RefreshCommand = new AsyncRelayCommand(LoadProductsAsync);
         AddCommand = new RelayCommand(AddProduct);
-        EditCommand = new RelayCommand(EditProduct, () => SelectedProduct != null);
-        DeleteCommand = new AsyncRelayCommand(DeleteProductAsync, () => SelectedProduct != null && SelectedProduct.IsActive);
-        RestoreCommand = new AsyncRelayCommand(RestoreProductAsync, () => SelectedProduct != null && !SelectedProduct.IsActive);
+        EditCommand = new RelayCommand(EditProduct);
+        DeleteCommand = new AsyncRelayCommand(DeleteProductAsync);
+        RestoreCommand = new AsyncRelayCommand(RestoreProductAsync);
         SearchCommand = new RelayCommand(Search);
 
         // Subscribe to product changes
@@ -93,16 +93,7 @@ public class ProductListViewModel : ViewModelBase
     public ProductDto? SelectedProduct
     {
         get => _selectedProduct;
-        set
-        {
-            if (SetProperty(ref _selectedProduct, value))
-            {
-                // Update command's CanExecute
-                (EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                (DeleteCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-                (RestoreCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-            }
-        }
+        set => SetProperty(ref _selectedProduct, value);
     }
 
     public string SearchText
@@ -137,7 +128,7 @@ public class ProductListViewModel : ViewModelBase
         {
             if (SetProperty(ref _includeInactive, value))
             {
-                _ = LoadProductsAsync();
+                _ = ExecuteAsync(LoadProductsOperationAsync);
             }
         }
     }
@@ -161,40 +152,33 @@ public class ProductListViewModel : ViewModelBase
     #region Methods
     public async Task LoadProductsAsync()
     {
-        IsBusy = true;
+        await ExecuteAsync(LoadProductsOperationAsync);
+    }
+
+    private async Task LoadProductsOperationAsync()
+    {
         ErrorMessage = null;
 
-        try
-        {
-            var result = await _productService.GetAllAsync(IncludeInactive);
+        var result = await _productService.GetAllAsync(IncludeInactive);
 
-            if (result.IsSuccess && result.Value != null)
+        if (result.IsSuccess && result.Value != null)
+        {
+            InvokeOnUIThread(() =>
             {
-                InvokeOnUIThread(() =>
+                Products.Clear();
+                foreach (var item in result.Value.OrderByDescending(x => x.Id))
                 {
-                    Products.Clear();
-                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
-                    {
-                        Products.Add(item);
-                    }
-                    SetupCollectionView();
-                    IsEmpty = Products.Count == 0;
-                    LastUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المنتجات", "ProductListViewModel.LoadProductsAsync", "[ProductListViewModel.LoadProductsAsync] Failed to load products from API.");
+                    Products.Add(item);
+                }
+                SetupCollectionView();
                 IsEmpty = Products.Count == 0;
-            }
+                LastUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            });
         }
-        catch (Exception ex)
+        else
         {
-            ErrorMessage = HandleException(ex, "ProductListViewModel.LoadProductsAsync", "[ProductListViewModel.LoadProductsAsync] Failed to load products from API.");
-        }
-        finally
-        {
-            IsBusy = false;
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المنتجات", "ProductListViewModel.LoadProductsAsync", "[ProductListViewModel.LoadProductsAsync] Failed to load products from API.");
+            IsEmpty = Products.Count == 0;
         }
     }
 
@@ -264,52 +248,42 @@ public async Task DeleteProductAsync()
 
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsBusy = true;
+        await ExecuteAsync(() => DeleteProductOperationAsync(strategy));
+    }
+
+    private async Task DeleteProductOperationAsync(DeleteStrategy strategy)
+    {
         ErrorMessage = null;
 
-        try
+        if (strategy == DeleteStrategy.Deactivate)
         {
-            if (strategy == DeleteStrategy.Deactivate)
+            var deleteResult = await _productService.DeleteAsync(SelectedProduct!.Id);
+            if (deleteResult.IsSuccess)
             {
-                var deleteResult = await _productService.DeleteAsync(SelectedProduct.Id);
-                if (deleteResult.IsSuccess)
-                {
-                    _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
-                    await LoadProductsAsync();
-                    _toastService.ShowSuccess("تم إلغاء تنشيط المنتج بنجاح");
-                }
-                else
-                {
-                    var error = deleteResult.Error ?? "فشل في حذف المنتج";
-                    ErrorMessage = error;
-                    _toastService.ShowError(error);
-                }
+                _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
+                await LoadProductsAsync();
+                _toastService.ShowSuccess("تم إلغاء تنشيط المنتج بنجاح");
             }
-            else if (strategy == DeleteStrategy.Permanent)
+            else
             {
-                var deleteResult = await _productService.DeletePermanentlyAsync(SelectedProduct.Id);
-                if (deleteResult.IsSuccess)
-                {
-                    _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
-                    await LoadProductsAsync();
-                    _toastService.ShowSuccess("تم حذف المنتج نهائياً");
-                }
-                else
-                {
-                    var error = deleteResult.Error ?? "فشل في حذف المنتج";
-                    ErrorMessage = error;
-                    _toastService.ShowError(error);
-                    LogSystemError($"Hard delete failed for Product {SelectedProduct.Id}: {error}", "ProductListViewModel.DeleteProductAsync");
-                }
+                ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في حذف المنتج", "ProductListViewModel.DeleteProductAsync", $"[ProductListViewModel.DeleteProductAsync] Failed to deactivate product with ID {SelectedProduct.Id}.");
             }
         }
-        catch (Exception ex)
+        else if (strategy == DeleteStrategy.Permanent)
         {
-            ErrorMessage = HandleException(ex, "ProductListViewModel.DeleteProductAsync", $"[ProductListViewModel.DeleteProductAsync] Failed to delete product with ID {SelectedProduct.Id}.");
-        }
-        finally
-        {
-            IsBusy = false;
+            var deleteResult = await _productService.DeletePermanentlyAsync(SelectedProduct!.Id);
+            if (deleteResult.IsSuccess)
+            {
+                _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
+                await LoadProductsAsync();
+                _toastService.ShowSuccess("تم حذف المنتج نهائياً");
+            }
+            else
+            {
+                var error = deleteResult.Error ?? "فشل في حذف المنتج";
+                ErrorMessage = HandleFailure(error, "ProductListViewModel.DeleteProductAsync", $"[ProductListViewModel.DeleteProductAsync] Failed to permanently delete product with ID {SelectedProduct.Id}.");
+                LogSystemError($"Hard delete failed for Product {SelectedProduct.Id}: {error}", "ProductListViewModel.DeleteProductAsync");
+            }
         }
     }
 
@@ -317,50 +291,43 @@ public async Task DeleteProductAsync()
     {
         if (SelectedProduct == null) return;
 
-        IsBusy = true;
+        await ExecuteAsync(RestoreProductOperationAsync);
+    }
+
+    private async Task RestoreProductOperationAsync()
+    {
         ErrorMessage = null;
 
-        try
-        {
-            var request = new UpdateProductRequest(
-                Barcode: SelectedProduct.Barcode ?? string.Empty,
-                Name: SelectedProduct.Name,
-                CategoryId: SelectedProduct.CategoryId,
-                UnitId: SelectedProduct.UnitId,
-                RetailUnitId: SelectedProduct.RetailUnitId,
-                WholesaleUnitId: SelectedProduct.WholesaleUnitId,
-                ConversionFactor: SelectedProduct.ConversionFactor,
-                PurchasePrice: SelectedProduct.PurchasePrice,
-                SalePrice: SelectedProduct.SalePrice,
-                RetailPrice: SelectedProduct.RetailPrice,
-                WholesalePrice: SelectedProduct.WholesalePrice,
-                MinStock: SelectedProduct.MinStock,
-                Description: SelectedProduct.Description,
-                ExpirationDate: SelectedProduct.ExpirationDate,
-                ImagePath: SelectedProduct.ImagePath,
-                IsActive: true
-            );
+        var request = new UpdateProductRequest(
+            Barcode: SelectedProduct!.Barcode ?? string.Empty,
+            Name: SelectedProduct.Name,
+            CategoryId: SelectedProduct.CategoryId,
+            UnitId: SelectedProduct.UnitId,
+            RetailUnitId: SelectedProduct.RetailUnitId,
+            WholesaleUnitId: SelectedProduct.WholesaleUnitId,
+            ConversionFactor: SelectedProduct.ConversionFactor,
+            PurchasePrice: SelectedProduct.PurchasePrice,
+            SalePrice: SelectedProduct.SalePrice,
+            RetailPrice: SelectedProduct.RetailPrice,
+            WholesalePrice: SelectedProduct.WholesalePrice,
+            MinStock: SelectedProduct.MinStock,
+            Description: SelectedProduct.Description,
+            ExpirationDate: SelectedProduct.ExpirationDate,
+            ImagePath: SelectedProduct.ImagePath,
+            IsActive: true
+        );
 
-            var result = await _productService.UpdateAsync(SelectedProduct.Id, request);
+        var result = await _productService.UpdateAsync(SelectedProduct.Id, request);
 
-            if (result.IsSuccess)
-            {
-                _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
-                await LoadProductsAsync();
-                await _dialogService.ShowSuccessAsync("نجاح", "تم استعادة المنتج بنجاح");
-            }
-            else
-            {
-                ErrorMessage = result.Error ?? "فشل في استعادة المنتج";
-            }
-        }
-        catch (Exception ex)
+        if (result.IsSuccess)
         {
-            ErrorMessage = HandleException(ex, "ProductListViewModel.RestoreProductAsync", $"[ProductListViewModel.RestoreProductAsync] Failed to restore product with ID {SelectedProduct.Id}.");
+            _eventBus.Publish(new ProductChangedMessage(SelectedProduct.Id));
+            await LoadProductsAsync();
+            _toastService.ShowSuccess("تم استعادة المنتج بنجاح");
         }
-        finally
+        else
         {
-            IsBusy = false;
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة المنتج", "ProductListViewModel.RestoreProductAsync", $"[ProductListViewModel.RestoreProductAsync] Failed to restore product with ID {SelectedProduct.Id}.");
         }
 }
 
@@ -382,6 +349,8 @@ public async Task DeleteProductAsync()
     {
         _eventBus.Unsubscribe<ProductChangedMessage>(OnProductChanged);
     }
+
+    public void Dispose() => Cleanup();
     #endregion
 }
 
