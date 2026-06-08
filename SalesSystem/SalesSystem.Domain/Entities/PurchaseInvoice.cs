@@ -15,7 +15,10 @@ public class PurchaseInvoice : BaseEntity
     public PaymentType PaymentType { get; private set; }
     public decimal SubTotal { get; private set; }
     public decimal DiscountAmount { get; private set; }
+    public DiscountType? DiscountType { get; private set; }
+    public decimal? DiscountRate { get; private set; }
     public decimal TaxAmount { get; private set; }
+    public decimal AdditionalFeesTotal { get; private set; }
     public decimal TotalAmount { get; private set; }
     public decimal PaidAmount { get; private set; }
     public decimal DueAmount { get; private set; }
@@ -24,14 +27,17 @@ public class PurchaseInvoice : BaseEntity
     public int? CurrencyId { get; private set; }
     public decimal? ExchangeRate { get; private set; }
     public string? Notes { get; private set; }
+    public string? AttachmentPath { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
+    // Navigation properties
     public virtual Supplier? Supplier { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual CashBox? CashBox { get; private set; }
     public virtual Currency? Currency { get; private set; }
     public virtual Tax? Tax { get; private set; }
     public virtual List<PurchaseInvoiceItem> Items { get; private set; } = new();
+    public virtual List<AdditionalFee> AdditionalFees { get; private set; } = new();
 
     private PurchaseInvoice() { }
 
@@ -43,6 +49,10 @@ public class PurchaseInvoice : BaseEntity
         DateOnly? dueDate = null,
         PaymentType paymentType = PaymentType.Cash,
         decimal discountAmount = 0,
+        DiscountType? discountType = null,
+        decimal? discountRate = null,
+        decimal additionalFeesTotal = 0,
+        string? attachmentPath = null,
         string? supplierInvoiceNo = null,
         string? notes = null,
         int? cashBoxId = null,
@@ -59,10 +69,16 @@ public class PurchaseInvoice : BaseEntity
             throw new DomainException("رقم الفاتورة غير صحيح.");
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
+        if (additionalFeesTotal < 0)
+            throw new DomainException("إجمالي الرسوم الإضافية لا يمكن أن يكون سالباً.");
         if (dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow.Date))
             throw new DomainException("تاريخ الاستحقاق لا يمكن أن يكون في الماضي.");
         if (currencyId.HasValue && !exchangeRate.HasValue)
             throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
+        if (discountType == Enums.DiscountType.Percentage && (!discountRate.HasValue || discountRate < 0 || discountRate > 100))
+            throw new DomainException("نسبة الخصم يجب أن تكون بين 0 و 100.");
+        if (discountType != Enums.DiscountType.Percentage && discountRate.HasValue)
+            throw new DomainException("نسبة الخصم تستخدم فقط مع خصم النسبة المئوية.");
 
         var invoice = new PurchaseInvoice
         {
@@ -75,6 +91,10 @@ public class PurchaseInvoice : BaseEntity
             DueDate = dueDate,
             PaymentType = paymentType,
             DiscountAmount = discountAmount,
+            DiscountType = discountType,
+            DiscountRate = discountRate,
+            AdditionalFeesTotal = additionalFeesTotal,
+            AttachmentPath = attachmentPath,
             SupplierInvoiceNo = supplierInvoiceNo,
             CurrencyId = currencyId,
             ExchangeRate = exchangeRate,
@@ -110,7 +130,15 @@ public class PurchaseInvoice : BaseEntity
     public void RecalculateTotals()
     {
         SubTotal = Items.Sum(i => i.LineTotal);
-        TotalAmount = SubTotal - DiscountAmount + TaxAmount;
+
+        // Calculate effective discount (amount or percentage)
+        var effectiveDiscount = DiscountAmount;
+        if (DiscountType == Enums.DiscountType.Percentage && DiscountRate.HasValue)
+        {
+            effectiveDiscount = SubTotal * (DiscountRate.Value / 100m);
+        }
+
+        TotalAmount = SubTotal - effectiveDiscount + TaxAmount + AdditionalFeesTotal;
         DueAmount = TotalAmount - PaidAmount;
     }
 
@@ -142,6 +170,47 @@ public class PurchaseInvoice : BaseEntity
         RecalculateTotals();
     }
 
+    /// <summary>
+    /// Sets discount with support for both amount and percentage discount types.
+    /// </summary>
+    public void SetDiscount(decimal discountAmount, DiscountType? discountType = null, decimal? discountRate = null)
+    {
+        if (discountAmount < 0)
+            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
+        if (discountType == Enums.DiscountType.Percentage && (!discountRate.HasValue || discountRate < 0 || discountRate > 100))
+            throw new DomainException("نسبة الخصم يجب أن تكون بين 0 و 100.");
+        if (discountType != Enums.DiscountType.Percentage && discountRate.HasValue)
+            throw new DomainException("نسبة الخصم تستخدم فقط مع خصم النسبة المئوية.");
+
+        DiscountAmount = discountAmount;
+        DiscountType = discountType;
+        DiscountRate = discountRate;
+        RecalculateTotals();
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Sets the attachment file path for this invoice.
+    /// </summary>
+    public void SetAttachment(string? attachmentPath)
+    {
+        AttachmentPath = attachmentPath;
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Sets the currency and exchange rate for multi-currency purchases.
+    /// </summary>
+    public void SetCurrency(int? currencyId, decimal? exchangeRate)
+    {
+        if (currencyId.HasValue && !exchangeRate.HasValue)
+            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
+
+        CurrencyId = currencyId;
+        ExchangeRate = exchangeRate;
+        UpdateTimestamp();
+    }
+
     public void Post()
     {
         if (Status != InvoiceStatus.Draft)
@@ -165,15 +234,22 @@ public class PurchaseInvoice : BaseEntity
         Status = InvoiceStatus.Cancelled;
     }
 
-    public void UpdateTotals(decimal discountAmount, decimal taxAmount)
+    public void UpdateTotals(decimal discountAmount, decimal taxAmount, DiscountType? discountType = null, decimal? discountRate = null)
     {
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
         if (taxAmount < 0)
             throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
+        if (discountType == Enums.DiscountType.Percentage && (!discountRate.HasValue || discountRate < 0 || discountRate > 100))
+            throw new DomainException("نسبة الخصم يجب أن تكون بين 0 و 100.");
+        if (discountType != Enums.DiscountType.Percentage && discountRate.HasValue)
+            throw new DomainException("نسبة الخصم تستخدم فقط مع خصم النسبة المئوية.");
 
         DiscountAmount = discountAmount;
+        DiscountType = discountType;
+        DiscountRate = discountRate;
         TaxAmount = taxAmount;
         RecalculateTotals();
+        UpdateTimestamp();
     }
 }

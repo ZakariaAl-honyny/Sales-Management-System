@@ -163,6 +163,8 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IInventoryBatchService, InventoryBatchService>();
 builder.Services.AddScoped<IProductImageService, ProductImageService>();
+builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
+builder.Services.AddScoped<IAdditionalFeeService, AdditionalFeeService>();
 
 // ─── Accounting Services ────────────────────────────────────
 builder.Services.AddScoped<IJournalEntryService, JournalEntryService>();

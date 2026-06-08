@@ -265,6 +265,47 @@ public class StringListJoinConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts DiscountType (byte?) to bool for RadioButton IsChecked binding.
+/// ConverterParameter: "0" for Amount, "1" for Percentage.
+/// ConvertBack only acts when IsChecked=true (radio selected).
+/// </summary>
+public class DiscountTypeConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is byte discountType && parameter is string paramStr && byte.TryParse(paramStr, out var paramByte))
+            return discountType == paramByte;
+        return false;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool isChecked && isChecked && parameter is string paramStr && byte.TryParse(paramStr, out var paramByte))
+            return paramByte;
+        return Binding.DoNothing;
+    }
+}
+
+/// <summary>
+/// Shows/hides discount amount/rate TextBox based on SelectedDiscountType.
+/// ConverterParameter: "0" = show when Amount, "1" = show when Percentage.
+/// </summary>
+public class DiscountTypeToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is byte discountType && parameter is string paramStr && byte.TryParse(paramStr, out var paramByte))
+            return discountType == paramByte ? Visibility.Visible : Visibility.Collapsed;
+        return Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
 /// Converts SaleMode byte to Arabic string
 /// </summary>
 public class SaleModeToStringConverter : IValueConverter

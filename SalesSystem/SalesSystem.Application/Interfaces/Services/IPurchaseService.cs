@@ -21,4 +21,7 @@ public interface IPurchaseService
         int pageSize = 10, 
         bool includeInactive = false, 
         CancellationToken ct = default);
+    
+    Task<Result<string>> UploadAttachmentAsync(int id, string base64Content, string fileName, CancellationToken ct);
+    Task<Result<byte[]>> DownloadAttachmentAsync(int id, CancellationToken ct);
 }

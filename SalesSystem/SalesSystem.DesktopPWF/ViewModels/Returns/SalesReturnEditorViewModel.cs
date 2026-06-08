@@ -411,6 +411,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
                 Notes: Notes,
                 Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new ReturnItemRequest(
                     ProductId: i.ProductId,
+                    ProductUnitId: 1,
                     Quantity: i.ReturnQuantity,
                     UnitPrice: i.UnitPrice,
                     DiscountAmount: i.DiscountAmount,

@@ -142,7 +142,7 @@ public class PurchaseServiceTests : IDisposable
             discountAmount: 0m,
             notes: null
         );
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, quantity: 10m, unitCost: 100m));
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 100m));
         invoice.SetPaidAmount(1000m);
         invoice.SetTaxAmount(0m);
         _dbContext.PurchaseInvoices.Add(invoice);
@@ -201,7 +201,7 @@ public class PurchaseServiceTests : IDisposable
             discountAmount: 0m,
             notes: null
         );
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, quantity: 10m, unitCost: 100m));
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 100m));
         invoice.Post(); // Already posted
 
         _dbContext.PurchaseInvoices.Add(invoice);
@@ -240,7 +240,7 @@ public class PurchaseServiceTests : IDisposable
             discountAmount: 0m,
             notes: null
         );
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, quantity: 5m, unitCost: 200m));
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 5m, unitCost: 200m));
         invoice.SetPaidAmount(0m); // Unpaid
 
         _dbContext.PurchaseInvoices.Add(invoice);
@@ -278,7 +278,7 @@ public class PurchaseServiceTests : IDisposable
             discountAmount: 0m,
             notes: null
         );
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, quantity: 10m, unitCost: 100m));
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 100m));
 
         _dbContext.PurchaseInvoices.Add(invoice);
         await _dbContext.SaveChangesAsync();
@@ -316,7 +316,7 @@ public class PurchaseServiceTests : IDisposable
             discountAmount: 0m,
             notes: null
         );
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, quantity: 5m, unitCost: 100m));
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 5m, unitCost: 100m));
         invoice.SetPaidAmount(0m);
         invoice.Post(); // Status = Posted
 
@@ -364,7 +364,7 @@ public class PurchaseServiceTests : IDisposable
             discountAmount: 0m,
             notes: null
         );
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, quantity: 10m, unitCost: 100m));
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 100m));
         invoice.Cancel(); // Already cancelled
 
         _dbContext.PurchaseInvoices.Add(invoice);
@@ -397,8 +397,8 @@ public class PurchaseServiceTests : IDisposable
             notes: null
         );
 
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, quantity: 10m, unitCost: 100m, discountAmount: 0m)); // 1000
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 2, quantity: 5m, unitCost: 200m, discountAmount: 50m));   // 950
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 100m, discountAmount: 0m)); // 1000
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 2, productUnitId: 1, quantity: 5m, unitCost: 200m, discountAmount: 50m));   // 950
 
         var subTotal = 1000m + 950m;
         invoice.SubTotal.Should().Be(subTotal, "SubTotal = 1000 + 950 = 1950");

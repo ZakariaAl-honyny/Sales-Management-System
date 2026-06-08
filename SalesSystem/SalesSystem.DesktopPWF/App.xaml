@@ -51,6 +51,8 @@
             <converters:StringListJoinConverter x:Key="StringListJoinConverter"/>
             <converters:SalesViewModeToVisibilityConverter x:Key="SalesViewModeToVisibilityConverter"/>
             <converters:ImagePathConverter x:Key="ImagePathConverter"/>
+            <converters:DiscountTypeConverter x:Key="DiscountTypeConverter"/>
+            <converters:DiscountTypeToVisibilityConverter x:Key="DiscountTypeToVisibilityConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

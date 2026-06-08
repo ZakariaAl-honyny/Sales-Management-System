@@ -33,9 +33,13 @@ public record UpdatePurchaseInvoiceRequest(
     DateOnly? DueDate,
     PaymentType PaymentType,
     decimal DiscountAmount,
+    byte? DiscountType,                          // NEW
+    decimal? DiscountRate,                       // NEW
     decimal TaxAmount,
     decimal PaidAmount,
     int? CashBoxId,
+    int? CurrencyId,                             // NEW
+    decimal? ExchangeRate,                       // NEW
     string? Notes,
     string? SupplierInvoiceNo,
     List<CreatePurchaseInvoiceItemRequest> Items);
