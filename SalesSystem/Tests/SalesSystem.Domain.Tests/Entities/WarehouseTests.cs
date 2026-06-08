@@ -1,5 +1,6 @@
 using FluentAssertions;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
@@ -53,6 +54,7 @@ public class WarehouseTests
 
         warehouse.Update(
             name: "Updated Name",
+            type: WarehouseType.Main,
             location: "New Location",
             isDefault: true,
             updatedByUserId: 1
@@ -92,7 +94,7 @@ public class WarehouseTests
             createdByUserId: 1
         );
 
-        warehouse.Update(name: "Test", location: null, isDefault: false, updatedByUserId: 1);
+        warehouse.Update(name: "Test", type: WarehouseType.Main, location: null, isDefault: false, updatedByUserId: 1);
 
         warehouse.Location.Should().BeNull();
     }

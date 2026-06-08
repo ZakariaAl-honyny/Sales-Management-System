@@ -234,7 +234,7 @@ public class GenericRepositoryTests
         await context.SaveChangesAsync();
 
         // Act
-        warehouse.Update(name: "Updated Warehouse", location: "New Location", isDefault: false, updatedByUserId: 1);
+        warehouse.Update(name: "Updated Warehouse", type: Domain.Enums.WarehouseType.Main, location: "New Location", isDefault: false, updatedByUserId: 1);
         await repository.UpdateAsync(warehouse);
         await context.SaveChangesAsync();
 

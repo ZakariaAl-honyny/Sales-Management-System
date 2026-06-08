@@ -127,9 +127,9 @@ public class WarehouseRequestValidatorTests
         {
             // Arrange
             var request = new CreateWarehouseRequest(
-                "مستودع - Warehouse",
-                "القاهرة - Cairo",
-                false
+                Name: "مستودع - Warehouse",
+                Location: "القاهرة - Cairo",
+                IsDefault: false
             );
 
             // Act

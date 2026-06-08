@@ -608,7 +608,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         };
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Name: "مستودع 1", Location: null, IsDefault: true, IsActive: true)
+            new WarehouseDto(Id: 1, Name: "مستودع 1", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
         };
         var products = SetupProducts();
 

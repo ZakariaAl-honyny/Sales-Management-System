@@ -5,6 +5,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
@@ -59,8 +60,14 @@ public class WarehouseService : IWarehouseService
 
                 var warehouse = Warehouse.Create(
                     name: request.Name,
+                    type: (WarehouseType)request.Type,
                     location: request.Location,
+                    phone: request.Phone,
+                    address: request.Address,
+                    managerName: request.ManagerName,
                     isDefault: request.IsDefault,
+                    accountId: request.AccountId,
+                    notes: request.Notes,
                     createdByUserId: null
                 );
 
@@ -105,8 +112,14 @@ public class WarehouseService : IWarehouseService
 
                 warehouse.Update(
                     name: request.Name,
+                    type: (WarehouseType)request.Type,
                     location: request.Location,
+                    phone: request.Phone,
+                    address: request.Address,
+                    managerName: request.ManagerName,
                     isDefault: request.IsDefault,
+                    accountId: request.AccountId,
+                    notes: request.Notes,
                     updatedByUserId: null
                 );
 
@@ -194,8 +207,14 @@ public class WarehouseService : IWarehouseService
         {
             w.Update(
                 name: w.Name,
+                type: w.Type,
                 location: w.Location,
+                phone: w.Phone,
+                address: w.Address,
+                managerName: w.ManagerName,
                 isDefault: false,
+                accountId: w.AccountId,
+                notes: w.Notes,
                 updatedByUserId: null
             );
             await _uow.Warehouses.UpdateAsync(w, ct);
@@ -207,9 +226,15 @@ public class WarehouseService : IWarehouseService
         return new WarehouseDto(
             w.Id,
             w.Name,
+            (byte)w.Type,
             w.Location,
+            w.Phone,
+            w.Address,
+            w.ManagerName,
             w.IsDefault,
-            w.IsActive
+            w.IsActive,
+            w.AccountId,
+            w.Notes
         );
     }
 }

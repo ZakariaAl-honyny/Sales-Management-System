@@ -25,8 +25,8 @@ public class WarehousesControllerTests
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(1, "المستودع الرئيسي", "الرياض", false, true),
-            new(2, "المستودع الفرعي", "جدة", false, true)
+            new(Id: 1, Name: "المستودع الرئيسي", Type: 1, Location: "الرياض", Phone: null, Address: null, ManagerName: null, IsDefault: false, IsActive: true, AccountId: null, Notes: null),
+            new(Id: 2, Name: "المستودع الفرعي", Type: 1, Location: "جدة", Phone: null, Address: null, ManagerName: null, IsDefault: false, IsActive: true, AccountId: null, Notes: null)
         };
         var pagedResult = PagedResult<WarehouseDto>.Create(warehouses, 2, 1, 10);
 
@@ -55,7 +55,7 @@ public class WarehousesControllerTests
     [Fact]
     public async Task GetById_WhenWarehouseExists_ReturnsOkWithWarehouse()
     {
-        var warehouse = new WarehouseDto(1, "المستودع الرئيسي", "الرياض", false, true);
+        var warehouse = new WarehouseDto(1, "المستودع الرئيسي", 1, "الرياض", null, null, null, false, true, null, null);
 
         _warehouseServiceMock
             .Setup(x => x.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -82,8 +82,8 @@ public class WarehousesControllerTests
     [Fact]
     public async Task Create_WhenValidRequest_ReturnsCreatedAtAction()
     {
-        var request = new CreateWarehouseRequest("المستودع الرئيسي", "الرياض", false);
-        var warehouse = new WarehouseDto(1, request.Name, request.Location, false, true);
+        var request = new CreateWarehouseRequest(Name: "المستودع الرئيسي", Location: "الرياض", IsDefault: false);
+        var warehouse = new WarehouseDto(1, request.Name, 1, request.Location, null, null, null, false, true, null, null);
 
         _warehouseServiceMock
             .Setup(x => x.CreateAsync(It.IsAny<CreateWarehouseRequest>(), It.IsAny<CancellationToken>()))
@@ -98,7 +98,7 @@ public class WarehousesControllerTests
     [Fact]
     public async Task Create_WhenServiceFails_ReturnsBadRequest()
     {
-        var request = new CreateWarehouseRequest("المستودع الرئيسي", "الرياض", false);
+        var request = new CreateWarehouseRequest(Name: "المستودع الرئيسي", Location: "الرياض", IsDefault: false);
 
         _warehouseServiceMock
             .Setup(x => x.CreateAsync(It.IsAny<CreateWarehouseRequest>(), It.IsAny<CancellationToken>()))
@@ -112,8 +112,8 @@ public class WarehousesControllerTests
     [Fact]
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedWarehouse()
     {
-        var request = new UpdateWarehouseRequest("المستودع المحدث", "الرياض", false, true);
-        var warehouse = new WarehouseDto(1, request.Name, request.Location, false, true);
+        var request = new UpdateWarehouseRequest(Name: "المستودع المحدث", Location: "الرياض", IsDefault: false, IsActive: true);
+        var warehouse = new WarehouseDto(1, request.Name, 1, request.Location, null, null, null, false, true, null, null);
 
         _warehouseServiceMock
             .Setup(x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<UpdateWarehouseRequest>(), It.IsAny<CancellationToken>()))
@@ -128,7 +128,7 @@ public class WarehousesControllerTests
     [Fact]
     public async Task Update_WhenWarehouseNotFound_ReturnsBadRequest()
     {
-        var request = new UpdateWarehouseRequest("المستودع", "الرياض", false, true);
+        var request = new UpdateWarehouseRequest(Name: "المستودع", Location: "الرياض", IsDefault: false, IsActive: true);
 
         _warehouseServiceMock
             .Setup(x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<UpdateWarehouseRequest>(), It.IsAny<CancellationToken>()))

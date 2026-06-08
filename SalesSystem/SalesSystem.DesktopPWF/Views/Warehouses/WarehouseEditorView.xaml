@@ -34,7 +34,7 @@
                 <TextBlock Text="🏭" FontSize="28" Margin="0,0,16,0" VerticalAlignment="Center"/>
                 <StackPanel>
                     <TextBlock Text="{Binding Title}" Style="{StaticResource HeaderStyle}" Foreground="White"/>
-                    <TextBlock Text="أدخل بيانات المستودع الرئيسي أو الفرعي" FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"/>
+                    <TextBlock Text="أدخل بيانات المستودع" FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -44,35 +44,90 @@
             <StackPanel>
                 <!-- Name -->
                 <TextBlock Text="اسم المستودع *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-<TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
+                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                          Style="{StaticResource ModernTextBox}"
                          Tag="أدخل اسم المستودع (مثلاً: المستودع الرئيسي)" 
                          TabIndex="1"
                          helpers:FocusHelper.AdvanceOnEnter="True"
                          AutomationProperties.AutomationId="TxtWarehouseName"
-                              ToolTip="أدخل اسماً فريداً للمستودع — هذا الحقل مطلوب ولا يمكن أن يكون فارغاً"/>
+                         ToolTip="أدخل اسماً فريداً للمستودع — هذا الحقل مطلوب ولا يمكن أن يكون فارغاً"/>
                 <TextBlock Text="اسم مميز يساعدك في التعرف على المخزن" Style="{StaticResource HelperTextStyle}"/>
-                
-                <Border Height="24"/>
+
+                <!-- Type -->
+                <TextBlock Text="نوع المستودع *" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
+                <ComboBox ItemsSource="{Binding TypeList}"
+                          SelectedValue="{Binding SelectedType}"
+                          SelectedValuePath="Key"
+                          DisplayMemberPath="Value"
+                          Style="{StaticResource ModernComboBox}"
+                          TabIndex="2"
+                          AutomationProperties.AutomationId="CboWarehouseType"
+                          ToolTip="اختر نوع المستودع — رئيسي، فرعي، صالة عرض، أو تالف"/>
 
                 <!-- Location -->
-                <TextBlock Text="الموقع / العنوان" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+                <TextBlock Text="الموقع / العنوان" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
                 <TextBox Text="{Binding Location, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                          Style="{StaticResource ModernTextBox}"
                          TextWrapping="Wrap" 
                          AcceptsReturn="True" 
                          VerticalContentAlignment="Top" 
                          Tag="مثال: صنعاء - شارع الستين - بجوار بنك التضامن"
-                         TabIndex="2"
+                         TabIndex="3"
                          helpers:FocusHelper.AdvanceOnEnter="True"
-                         AutomationProperties.AutomationId="TxtWarehouseLocation"/>
+                         AutomationProperties.AutomationId="TxtWarehouseLocation"
+                         ToolTip="الموقع الجغرافي للمستودع — اختياري"/>
                 <TextBlock Text="وصف دقيق يساعد السائقين أو عمال التوصيل" Style="{StaticResource HelperTextStyle}"/>
-                
-                <Border Height="24"/>
 
-                <!-- Status -->
-                <Border Padding="16" Background="#F8FAFC" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0">
-                    <CheckBox Content="مستودع نشط (جاهز للعمليات)" IsChecked="{Binding IsActive}" FontWeight="SemiBold" TabIndex="3" AutomationProperties.AutomationId="ChkWarehouseActive"/>
+                <!-- Phone -->
+                <TextBlock Text="رقم الهاتف" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
+                <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                         Style="{StaticResource ModernTextBox}"
+                         TabIndex="4"
+                         AutomationProperties.AutomationId="TxtWarehousePhone"
+                         ToolTip="رقم هاتف المستودع — اختياري، بحد أقصى 20 حرفاً"/>
+
+                <!-- Address -->
+                <TextBlock Text="العنوان التفصيلي" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
+                <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                         Style="{StaticResource ModernTextBox}"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         VerticalContentAlignment="Top"
+                         TabIndex="5"
+                         AutomationProperties.AutomationId="TxtWarehouseAddress"
+                         ToolTip="العنوان الكامل للمستودع — اختياري"/>
+
+                <!-- Manager Name -->
+                <TextBlock Text="مدير المستودع" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
+                <TextBox Text="{Binding ManagerName, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                         Style="{StaticResource ModernTextBox}"
+                         TabIndex="6"
+                         AutomationProperties.AutomationId="TxtWarehouseManager"
+                         ToolTip="اسم مدير المستودع المسؤول — اختياري"/>
+
+                <!-- Notes -->
+                <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
+                <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                         Style="{StaticResource ModernTextBox}"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         VerticalContentAlignment="Top"
+                         MinHeight="60"
+                         TabIndex="7"
+                         AutomationProperties.AutomationId="TxtWarehouseNotes"
+                         ToolTip="ملاحظات إضافية عن المستودع — اختياري"/>
+
+                <!-- Status Section -->
+                <Border Padding="12,8" Background="#F8FAFC" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0" Margin="0,8,0,0">
+                    <StackPanel>
+                        <CheckBox Content="مستودع افتراضي" IsChecked="{Binding IsDefault}" FontWeight="SemiBold" TabIndex="8"
+                                  AutomationProperties.AutomationId="ChkWarehouseDefault"
+                                  ToolTip="تعيين هذا المستودع كمستودع افتراضي للعمليات"/>
+                        <CheckBox Content="مستودع نشط (جاهز للعمليات)" IsChecked="{Binding IsActive}" FontWeight="SemiBold" TabIndex="9"
+                                  Margin="0,6,0,0"
+                                  AutomationProperties.AutomationId="ChkWarehouseActive"
+                                  ToolTip="إلغاء التعطيل إذا كان المستودع غير جاهز للاستخدام"/>
+                    </StackPanel>
                 </Border>
             </StackPanel>
         </ScrollViewer>
@@ -93,7 +148,7 @@
                             TabIndex="4"
                             Margin="0,0,12,0"
                             AutomationProperties.AutomationId="BtnSaveWarehouse"
-                            ToolTip="حفظ البيانات المدخلة">
+                            ToolTip="حفظ بيانات المستودع — سيتم التحقق من صحة البيانات قبل الحفظ">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,10,0" Stretch="Uniform" VerticalAlignment="Center"/>
                             <TextBlock Text="حفظ البيانات" VerticalAlignment="Center"/>
@@ -104,7 +159,7 @@
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
                             TabIndex="5"
-                            ToolTip="إلغاء وإغلاق النافذة"/>
+                            ToolTip="إلغاء التغييرات وإغلاق نافذة التحرير"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" 

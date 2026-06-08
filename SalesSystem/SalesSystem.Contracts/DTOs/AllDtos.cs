@@ -55,7 +55,7 @@ public record ProductDto(
     public string StockStatusLabel => IsOutOfStock ? "نفذ" : IsLowStock ? "محدود" : "";
 }
 
-public record WarehouseDto(int Id, string Name, string? Location, bool IsDefault, bool IsActive);
+public record WarehouseDto(int Id, string Name, byte Type, string? Location, string? Phone, string? Address, string? ManagerName, bool IsDefault, bool IsActive, int? AccountId, string? Notes);
 
 public record WarehouseStockDto(
     int WarehouseId,

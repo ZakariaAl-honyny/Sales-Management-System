@@ -103,7 +103,7 @@ public class LowStockViewModel : ViewModelBase
                 {
                     Warehouses.Clear();
                     // Add "All Warehouses" option
-                    Warehouses.Add(new WarehouseDto(0, "كل المخازن", string.Empty, true, true));
+                    Warehouses.Add(new WarehouseDto(0, "كل المخازن", 1, string.Empty, null, null, null, true, true, null, null));
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
                     
