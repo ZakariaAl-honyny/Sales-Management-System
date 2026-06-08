@@ -258,6 +258,9 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasIndex("TransactionDate");
 
+                    b.HasIndex("ReferenceType", "ReferenceId")
+                        .HasFilter("[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL");
+
                     b.ToTable("JournalEntries", (string)null);
                 });
 
@@ -379,6 +382,10 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
+                    b.Property<int?>("OpeningBalanceEquityAccountId")
+                        .HasColumnType("int")
+                        .HasColumnName("OpeningBalanceEquityAccountId");
+
                     b.Property<int>("SalesReturnAccountId")
                         .HasColumnType("int");
 
@@ -417,6 +424,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("GeneralExpenseAccountId");
 
                     b.HasIndex("InventoryAssetAccountId");
+
+                    b.HasIndex("OpeningBalanceEquityAccountId");
 
                     b.HasIndex("SalesReturnAccountId");
 
@@ -745,6 +754,9 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AccountId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Address")
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
@@ -762,6 +774,9 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<decimal>("CurrentBalance")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("CustomerGroupId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Email")
                         .HasMaxLength(100)
@@ -795,7 +810,50 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("IX_Customers_AccountId");
+
+                    b.HasIndex("CustomerGroupId")
+                        .HasDatabaseName("IX_Customers_CustomerGroupId");
+
                     b.ToTable("Customers", (string)null);
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.CustomerGroup", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CustomerGroups", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CustomerPayment", b =>
@@ -3103,6 +3161,11 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "OpeningBalanceEquityAccount")
+                        .WithMany()
+                        .HasForeignKey("OpeningBalanceEquityAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "SalesReturnAccount")
                         .WithMany()
                         .HasForeignKey("SalesReturnAccountId")
@@ -3148,6 +3211,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("GeneralExpenseAccount");
 
                     b.Navigation("InventoryAssetAccount");
+
+                    b.Navigation("OpeningBalanceEquityAccount");
 
                     b.Navigation("SalesReturnAccount");
 
@@ -3196,6 +3261,23 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("CashBox");
 
                     b.Navigation("Currency");
+                });
+
+            modelBuilder.Entity("SalesSystem.Domain.Entities.Customer", b =>
+                {
+                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SalesSystem.Domain.Entities.CustomerGroup", "CustomerGroup")
+                        .WithMany()
+                        .HasForeignKey("CustomerGroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Account");
+
+                    b.Navigation("CustomerGroup");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CustomerPayment", b =>

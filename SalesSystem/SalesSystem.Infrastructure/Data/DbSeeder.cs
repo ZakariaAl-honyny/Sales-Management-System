@@ -37,20 +37,33 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 2. Default customer — seeded BEFORE SystemSettings so DefaultCashCustomerId = "1"
+        // 2. Default CustomerGroup — seeded BEFORE Customers
+        // ═══════════════════════════════════════════════════
+        if (!await db.Set<CustomerGroup>().AnyAsync())
+        {
+            db.Set<CustomerGroup>().Add(CustomerGroup.Create(
+                name: "عام",
+                description: "مجموعة العملاء الافتراضية"
+            ));
+            logger?.LogInformation("Seeded default customer group.");
+        }
+
+        // ═══════════════════════════════════════════════════
+        // 3. Default customer — seeded BEFORE SystemSettings so DefaultCashCustomerId = "1"
         // ═══════════════════════════════════════════════════
         if (!await db.Customers.AnyAsync())
         {
             db.Customers.Add(Customer.Create(
-                name: "العميل الافتراضي في النظام",
+                name: "عميل نقدي",
                 openingBalance: 0m,
-                createdByUserId: null
+                createdByUserId: null,
+                customerGroupId: 1
             ));
             logger?.LogInformation("Seeded default customer.");
         }
 
         // ═══════════════════════════════════════════════════
-        // 3. Default supplier — seeded BEFORE SystemSettings so DefaultCashSupplierId = "1"
+        // 4. Default supplier — seeded BEFORE SystemSettings so DefaultCashSupplierId = "1"
         // ═══════════════════════════════════════════════════
         if (!await db.Suppliers.AnyAsync())
         {
@@ -63,7 +76,7 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 4. Seed SystemSettings (key-value pairs) — references customer/supplier Id=1
+        // 5. Seed SystemSettings (key-value pairs) — references customer/supplier Id=1
         // ═══════════════════════════════════════════════════
         if (!await db.SystemSettings.AnyAsync())
         {
@@ -264,15 +277,7 @@ public static class DbSeeder
         );
         db.Warehouses.Add(warehouse);
 
-        // 9. Default cash box — main cash drawer for daily operations
-        var defaultCashBox = CashBox.Create(
-            boxName: "الصندوق الرئيسي",
-            initialBalance: 0m,
-            currencyId: null
-        );
-        db.CashBoxes.Add(defaultCashBox);
-
-        // 10. Base units of measure
+        // 9. Base units of measure
         db.Units.Add(Unit.Create("قطعة", "pcs", null));
         db.Units.Add(Unit.Create("كيلو", "kg", null));
         db.Units.Add(Unit.Create("لتر", "ltr", null));

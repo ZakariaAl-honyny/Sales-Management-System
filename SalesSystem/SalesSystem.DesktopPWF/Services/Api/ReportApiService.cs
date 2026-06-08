@@ -47,12 +47,12 @@ public class ReportApiService : ApiServiceBase, IReportApiService
             "ReportApiService.GetStockReportAsync");
     }
 
-    public async Task<Result<List<CustomerBalanceReportDto>>> GetCustomerBalancesReportAsync(int? customerId = null, CancellationToken ct = default)
+    public async Task<Result<List<CustomerFinancialBalanceDto>>> GetCustomerBalancesReportAsync(int? customerId = null, CancellationToken ct = default)
     {
         var url = $"{BasePath}/customers";
         if (customerId.HasValue) url += $"?customerId={customerId}";
         
-        return await ExecuteAsync<List<CustomerBalanceReportDto>>(
+        return await ExecuteAsync<List<CustomerFinancialBalanceDto>>(
             () => _httpClient.GetAsync(url, ct),
             "ReportApiService.GetCustomerBalancesReportAsync");
     }

@@ -24,6 +24,10 @@ public class CreateSupplierRequestValidator : AbstractValidator<CreateSupplierRe
 
         RuleFor(x => x.CreditLimit)
             .GreaterThanOrEqualTo(0).WithMessage("حد الائتمان لا يمكن أن يكون سالباً");
+
+        RuleFor(x => x.AccountId)
+            .GreaterThan(0).WithMessage("رقم الحساب غير صحيح")
+            .When(x => x.AccountId.HasValue);
     }
 }
 
@@ -45,6 +49,10 @@ public class UpdateSupplierRequestValidator : AbstractValidator<UpdateSupplierRe
 
         RuleFor(x => x.CreditLimit)
             .GreaterThanOrEqualTo(0).WithMessage("حد الائتمان لا يمكن أن يكون سالباً");
+
+        RuleFor(x => x.AccountId)
+            .GreaterThan(0).WithMessage("رقم الحساب غير صحيح")
+            .When(x => x.AccountId.HasValue);
     }
 }
 

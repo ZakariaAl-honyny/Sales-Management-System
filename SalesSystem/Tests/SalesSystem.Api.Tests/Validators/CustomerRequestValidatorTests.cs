@@ -34,10 +34,10 @@ public class CreateCustomerRequestValidatorTests
     }
 
     [Fact]
-    public void GivenNameExceeds150Chars_WhenValidating_ThenFailsWithMaxLengthError()
+    public void GivenNameExceeds100Chars_WhenValidating_ThenFailsWithMaxLengthError()
     {
         // Arrange
-        var longName = new string('ا', 151);
+        var longName = new string('ا', 101);
         var request = CreateValidRequest() with { Name = longName };
 
         // Act
@@ -45,7 +45,7 @@ public class CreateCustomerRequestValidatorTests
 
         // Assert
         result.ShouldHaveValidationErrorFor(x => x.Name)
-            .WithErrorMessage("اسم العميل لا يمكن أن يتجاوز 150 حرف");
+            .WithErrorMessage("اسم العميل لا يمكن أن يتجاوز 100 حرف");
     }
 
     #endregion
@@ -55,8 +55,12 @@ public class CreateCustomerRequestValidatorTests
     [Theory]
     [InlineData(null, true)]
     [InlineData("", true)]
-    [InlineData("+201234567890", true)]
-    [InlineData("01234567890", true)]
+    [InlineData("0551234567", true)]
+    [InlineData("0509876543", true)]
+    [InlineData("0560000000", true)]
+    [InlineData("0533333333", true)]
+    [InlineData("01234567890", false)]
+    [InlineData("+966551234567", false)]
     public void GivenPhone_WhenValidating_ThenCorrectResult(string? phone, bool isValid)
     {
         // Arrange
@@ -68,13 +72,16 @@ public class CreateCustomerRequestValidatorTests
         // Assert
         if (isValid)
             result.ShouldNotHaveValidationErrorFor(x => x.Phone);
+        else
+            result.ShouldHaveValidationErrorFor(x => x.Phone)
+                .WithErrorMessage("رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
     }
 
     [Fact]
-    public void GivenPhoneExceeds20Chars_WhenValidating_ThenFailsWithMaxLengthError()
+    public void GivenPhoneExceeds50Chars_WhenValidating_ThenFailsWithMaxLengthError()
     {
         // Arrange
-        var longPhone = new string('1', 21);
+        var longPhone = new string('5', 51);
         var request = CreateValidRequest() with { Phone = longPhone };
 
         // Act
@@ -82,7 +89,7 @@ public class CreateCustomerRequestValidatorTests
 
         // Assert
         result.ShouldHaveValidationErrorFor(x => x.Phone)
-            .WithErrorMessage("رقم الهاتف لا يمكن أن يتجاوز 20 حرف");
+            .WithErrorMessage("رقم الهاتف لا يمكن أن يتجاوز 50 حرف");
     }
 
     #endregion
@@ -152,7 +159,7 @@ public class CreateCustomerRequestValidatorTests
         var request = CreateValidRequest() with
         {
             Name = "Customer Name - اسم",
-            Phone = "+201234567890"
+            Phone = "0551234567"
         };
 
         // Act
@@ -183,7 +190,7 @@ public class CreateCustomerRequestValidatorTests
 
     private static CreateCustomerRequest CreateValidRequest() => new(
         Name: "Valid Customer",
-        Phone: "01234567890",
+        Phone: "0551234567",
         Email: "customer@example.com",
         Address: "Test Address",
         TaxNumber: null,
@@ -221,10 +228,10 @@ public class UpdateCustomerRequestValidatorTests
     }
 
     [Fact]
-    public void GivenNameExceeds150Chars_WhenValidating_ThenFailsWithMaxLengthError()
+    public void GivenNameExceeds100Chars_WhenValidating_ThenFailsWithMaxLengthError()
     {
         // Arrange
-        var longName = new string('ا', 151);
+        var longName = new string('ا', 101);
         var request = CreateValidRequest() with { Name = longName };
 
         // Act
@@ -232,7 +239,7 @@ public class UpdateCustomerRequestValidatorTests
 
         // Assert
         result.ShouldHaveValidationErrorFor(x => x.Name)
-            .WithErrorMessage("اسم العميل لا يمكن أن يتجاوز 150 حرف");
+            .WithErrorMessage("اسم العميل لا يمكن أن يتجاوز 100 حرف");
     }
 
     #endregion
@@ -242,7 +249,10 @@ public class UpdateCustomerRequestValidatorTests
     [Theory]
     [InlineData(null, true)]
     [InlineData("", true)]
-    [InlineData("+201234567891", true)]
+    [InlineData("0551234567", true)]
+    [InlineData("0509876543", true)]
+    [InlineData("+966551234567", false)]
+    [InlineData("01234567890", false)]
     public void GivenPhone_WhenValidating_ThenCorrectResult(string? phone, bool isValid)
     {
         // Arrange
@@ -254,13 +264,16 @@ public class UpdateCustomerRequestValidatorTests
         // Assert
         if (isValid)
             result.ShouldNotHaveValidationErrorFor(x => x.Phone);
+        else
+            result.ShouldHaveValidationErrorFor(x => x.Phone)
+                .WithErrorMessage("رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
     }
 
     [Fact]
-    public void GivenPhoneExceeds20Chars_WhenValidating_ThenFailsWithMaxLengthError()
+    public void GivenPhoneExceeds50Chars_WhenValidating_ThenFailsWithMaxLengthError()
     {
         // Arrange
-        var longPhone = new string('1', 21);
+        var longPhone = new string('5', 51);
         var request = CreateValidRequest() with { Phone = longPhone };
 
         // Act
@@ -268,7 +281,7 @@ public class UpdateCustomerRequestValidatorTests
 
         // Assert
         result.ShouldHaveValidationErrorFor(x => x.Phone)
-            .WithErrorMessage("رقم الهاتف لا يمكن أن يتجاوز 20 حرف");
+            .WithErrorMessage("رقم الهاتف لا يمكن أن يتجاوز 50 حرف");
     }
 
     #endregion
@@ -354,7 +367,7 @@ public class UpdateCustomerRequestValidatorTests
         var request = CreateValidRequest() with
         {
             Name = "Customer Updated - اسم",
-            Phone = "+201234567890"
+            Phone = "0551234567"
         };
 
         // Act
@@ -385,7 +398,7 @@ public class UpdateCustomerRequestValidatorTests
 
     private static UpdateCustomerRequest CreateValidRequest() => new(
         Name: "Updated Customer",
-        Phone: "01234567890",
+        Phone: "0551234567",
         Email: "updated@example.com",
         Address: "Updated Address",
         TaxNumber: null,

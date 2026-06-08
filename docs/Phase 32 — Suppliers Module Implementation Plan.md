@@ -1,4 +1,4 @@
-# Phase 24 — Suppliers Module: Comprehensive Implementation Plan
+# Phase 32 — Suppliers Module: Comprehensive Implementation Plan
 
 > **Version**: 1.0 — Full codebase audit + design analysis (Analysis Parts 2, 3, 4)
 > **Scope**: Complete Suppliers Module enhancement — AccountId FK, SupplierType, CreditLimit validation, UI balance display, reports, and 9 implementation tasks
@@ -697,17 +697,17 @@ Analysis Part 3 (line 952) explicitly states:
 - Can be added later as additive change (nullable FK)
 - No existing screens depend on groups
 
-**Update**: If user explicitly requests SupplierGroup in V1, it becomes a Phase 24.5 addition with estimated +2 hours.
+**Update**: If user explicitly requests SupplierGroup in V1, it becomes a Phase 32.5 addition with estimated +2 hours.
 
 ### 6.2 AccountId — Add NOW (Non-Fatal Blocker)
 
-**Decision**: **Add `int? AccountId` FK NOW** as part of Phase 24. The FK is nullable (existing suppliers have no account link). This enables:
+**Decision**: **Add `int? AccountId` FK NOW** as part of Phase 32. The FK is nullable (existing suppliers have no account link). This enables:
 
 1. Auto-creation of accounting accounts for new suppliers (future Phase 25 integration)
 2. Tracking supplier balance in general ledger
 3. Account statements per supplier
 
-**But**: Full auto-creation logic (`Supplier.Create` → `Account.Create`) is **deferred** to Phase 25 (Accounting Integration). In Phase 24, the FK exists but auto-creation is manual — the API accepts `AccountId` as optional. When null, no account is created.
+**But**: Full auto-creation logic (`Supplier.Create` → `Account.Create`) is **deferred** to Phase 25 (Accounting Integration). In Phase 32, the FK exists but auto-creation is manual — the API accepts `AccountId` as optional. When null, no account is created.
 
 **Why nullable for V1**:
 - Backwards-compatible with existing suppliers
@@ -733,7 +733,7 @@ Analysis Part 3 (line 952) explicitly states:
 3. **API** (FluentValidation) — request-level validation
 4. **Desktop** — show warning before saving
 
-**Note**: Full purchase-time credit limit validation is **Phase 25** (Purchase Invoice Module). Phase 24 creates the `IsCreditLimitExceeded()` method only.
+**Note**: Full purchase-time credit limit validation is **Phase 25** (Purchase Invoice Module). Phase 32 creates the `IsCreditLimitExceeded()` method only.
 
 ### 6.5 SupplierResponse — Enhance vs. Deprecate
 
@@ -1292,7 +1292,7 @@ public async Task<bool> IsCreditLimitExceededAsync(int supplierId, decimal invoi
 }
 ```
 
-**⚠️ Note**: `IsCreditLimitExceededAsync` is created here but **called** from Phase 26 (Purchase Invoice Module). Phase 24 creates the method + wires it into the service.
+**⚠️ Note**: `IsCreditLimitExceededAsync` is created here but **called** from Phase 26 (Purchase Invoice Module). Phase 32 creates the method + wires it into the service.
 
 **DTOs**:
 ```csharp
@@ -2074,7 +2074,7 @@ public async Task<IActionResult> GetAll(
 To be rolled back as group:
 
 ```sql
--- Revert all Phase 24 DB changes
+-- Revert all Phase 32 DB changes
 ALTER TABLE Suppliers DROP CONSTRAINT FK_Suppliers_Accounts_AccountId;
 ALTER TABLE Suppliers DROP COLUMN AccountId;
 ALTER TABLE Suppliers DROP COLUMN SupplierType;

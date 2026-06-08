@@ -44,15 +44,109 @@ public class JournalEntriesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] CreateJournalEntryRequest request, CancellationToken ct)
     {
-        var result = await _journalEntryService.CreateJournalEntryAsync(request, ct);
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _journalEntryService.CreateJournalEntryAsync(request, userId, ct);
         if (result.IsSuccess)
         {
-            return CreatedAtAction(nameof(GetBalanceStub), new { id = result.Value }, new
+            return CreatedAtAction(nameof(GetById), new { id = result.Value }, new
             {
                 id = result.Value,
                 message = "تم إنشاء القيد المحاسبي وترحيله بنجاح"
             });
         }
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Gets a paginated list of journal entries (newest first).
+    /// </summary>
+    /// <param name="page">Page number (default: 1).</param>
+    /// <param name="pageSize">Page size (default: 50, max: 200).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Paginated list of journal entries.</returns>
+    [HttpGet]
+    [Authorize(Policy = "AllStaff")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 50;
+        if (pageSize > 200) pageSize = 200;
+
+        var result = await _journalEntryService.GetAllAsync(page, pageSize, ct);
+        return result.IsSuccess
+            ? Ok(result.Value ?? new List<JournalEntryListDto>())
+            : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Gets a single journal entry with all its lines by ID.
+    /// </summary>
+    /// <param name="id">Journal entry ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Journal entry with line details.</returns>
+    [HttpGet("{id:int:min(1)}")]
+    [Authorize(Policy = "AllStaff")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(int id, CancellationToken ct = default)
+    {
+        var result = await _journalEntryService.GetByIdAsync(id, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Gets the account balance as of an optional date.
+    /// </summary>
+    /// <param name="accountId">Account ID.</param>
+    /// <param name="asOfDate">Optional cutoff date (default: all time).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Account balance summary.</returns>
+    [HttpGet("balance/{accountId:int:min(1)}")]
+    [Authorize(Policy = "AllStaff")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBalance(int accountId, [FromQuery] DateTime? asOfDate, CancellationToken ct = default)
+    {
+        var result = await _journalEntryService.GetAccountBalanceAsync(accountId, asOfDate, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Gets a detailed account ledger (statement) for a date range.
+    /// </summary>
+    /// <param name="accountId">Account ID.</param>
+    /// <param name="startDate">Start date.</param>
+    /// <param name="endDate">End date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Account ledger with running balance.</returns>
+    [HttpGet("ledger/{accountId:int:min(1)}")]
+    [Authorize(Policy = "AllStaff")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetLedger(int accountId, [FromQuery] DateTime startDate, [FromQuery] DateTime endDate, CancellationToken ct = default)
+    {
+        var result = await _journalEntryService.GetAccountLedgerAsync(accountId, startDate, endDate, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
 
         if (result.ErrorCode == ErrorCodes.NotFound)
             return NotFound(new { error = result.Error });
@@ -128,14 +222,4 @@ public class JournalEntriesController : ControllerBase
         return Ok(new { fiscalYear, isClosed = result.Value });
     }
 
-    /// <summary>
-    /// Stub endpoint for CreatedAtAction reference. Not callable directly.
-    /// </summary>
-    [ApiExplorerSettings(IgnoreApi = true)]
-    [HttpGet("{id:int}")]
-    [Authorize(Policy = "ManagerAndAbove")]
-    public IActionResult GetBalanceStub(int id)
-    {
-        return Ok(new { id });
-    }
 }

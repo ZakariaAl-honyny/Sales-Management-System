@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SalesSystem.Api.Controllers;
@@ -11,10 +12,23 @@ namespace SalesSystem.Api.Tests.Controllers.Customers;
 public class CustomersControllerTests : ControllerTestBase
 {
     private readonly CustomersController _controller;
+    private readonly Mock<IValidator<CreateCustomerRequest>> _createValidatorMock;
+    private readonly Mock<IValidator<UpdateCustomerRequest>> _updateValidatorMock;
 
     public CustomersControllerTests()
     {
+        _createValidatorMock = new Mock<IValidator<CreateCustomerRequest>>();
+        _updateValidatorMock = new Mock<IValidator<UpdateCustomerRequest>>();
+
+        _createValidatorMock.Setup(x => x.ValidateAsync(It.IsAny<CreateCustomerRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FluentValidation.Results.ValidationResult());
+        _updateValidatorMock.Setup(x => x.ValidateAsync(It.IsAny<UpdateCustomerRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FluentValidation.Results.ValidationResult());
+
         _controller = new CustomersController(CustomerServiceMock.Object);
+
+        // Setup user claims for authorized requests
+        SetupUserId(_controller, 1);
     }
 
     [Fact]
@@ -73,10 +87,10 @@ public class CustomersControllerTests : ControllerTestBase
     {
         var request = new CreateCustomerRequest("عميل جديد", null, null, null, null, 0.00m);
         var createdCustomer = CreateCustomerDto(1);
-        CustomerServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
+        CustomerServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(createdCustomer));
 
-        var result = await _controller.Create(request, CancellationToken.None);
+        var result = await _controller.Create(request, _createValidatorMock.Object, CancellationToken.None);
 
         result.Result.Should().BeOfType<CreatedAtActionResult>();
     }
@@ -85,10 +99,10 @@ public class CustomersControllerTests : ControllerTestBase
     public async Task Create_WhenServiceFails_ReturnsBadRequest()
     {
         var request = new CreateCustomerRequest("عميل جديد", null, null, null, null, 0.00m);
-        CustomerServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
+        CustomerServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<CustomerDto>("اسم العميل موجود مسبقاً"));
 
-        var result = await _controller.Create(request, CancellationToken.None);
+        var result = await _controller.Create(request, _createValidatorMock.Object, CancellationToken.None);
 
         result.Result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -98,10 +112,10 @@ public class CustomersControllerTests : ControllerTestBase
     {
         var request = new UpdateCustomerRequest("عميل محدث", null, null, null, null, 0.00m, true);
         var updatedCustomer = CreateCustomerDto(1);
-        CustomerServiceMock.Setup(x => x.UpdateAsync(1, request, It.IsAny<CancellationToken>()))
+        CustomerServiceMock.Setup(x => x.UpdateAsync(1, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(updatedCustomer));
 
-        var result = await _controller.Update(1, request, CancellationToken.None);
+        var result = await _controller.Update(1, request, _updateValidatorMock.Object, CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
     }
@@ -110,10 +124,10 @@ public class CustomersControllerTests : ControllerTestBase
     public async Task Update_WhenCustomerNotFound_ReturnsBadRequest()
     {
         var request = new UpdateCustomerRequest("عميل محدث", null, null, null, null, 0.00m, true);
-        CustomerServiceMock.Setup(x => x.UpdateAsync(999, request, It.IsAny<CancellationToken>()))
+        CustomerServiceMock.Setup(x => x.UpdateAsync(999, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<CustomerDto>("العميل غير موجود"));
 
-        var result = await _controller.Update(999, request, CancellationToken.None);
+        var result = await _controller.Update(999, request, _updateValidatorMock.Object, CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -121,7 +135,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Delete_WhenCustomerExists_ReturnsOkWithSuccessMessage()
     {
-        CustomerServiceMock.Setup(x => x.DeleteAsync(1, It.IsAny<CancellationToken>()))
+        CustomerServiceMock.Setup(x => x.DeleteAsync(1, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult());
 
         var result = await _controller.Delete(1, CancellationToken.None);
@@ -132,7 +146,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Delete_WhenCustomerNotFound_ReturnsBadRequest()
     {
-        CustomerServiceMock.Setup(x => x.DeleteAsync(999, It.IsAny<CancellationToken>()))
+        CustomerServiceMock.Setup(x => x.DeleteAsync(999, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult("العميل غير موجود"));
 
         var result = await _controller.Delete(999, CancellationToken.None);
@@ -143,7 +157,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task PermanentDelete_WhenCustomerExists_ReturnsOkWithSuccessMessage()
     {
-        CustomerServiceMock.Setup(x => x.PermanentDeleteAsync(1, It.IsAny<CancellationToken>()))
+        CustomerServiceMock.Setup(x => x.PermanentDeleteAsync(1, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult());
 
         var result = await _controller.PermanentDelete(1, CancellationToken.None);
@@ -154,7 +168,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task PermanentDelete_WhenCustomerNotFound_ReturnsBadRequest()
     {
-        CustomerServiceMock.Setup(x => x.PermanentDeleteAsync(999, It.IsAny<CancellationToken>()))
+        CustomerServiceMock.Setup(x => x.PermanentDeleteAsync(999, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult("العميل غير موجود"));
 
         var result = await _controller.PermanentDelete(999, CancellationToken.None);

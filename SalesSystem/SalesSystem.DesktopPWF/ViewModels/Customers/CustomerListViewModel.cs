@@ -31,6 +31,8 @@ public class CustomerListViewModel : ViewModelBase
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
+    private ObservableCollection<CustomerGroupDto> _availableGroups = new();
+    private CustomerGroupDto? _selectedGroupFilter;
 
     public CustomerListViewModel()
     {
@@ -41,6 +43,7 @@ public class CustomerListViewModel : ViewModelBase
         _screenWindowService = App.GetService<IScreenWindowService>();
 
         InitializeCommands();
+        _ = LoadGroupsAsync();
     }
 
     /// <summary>    
@@ -60,6 +63,7 @@ public class CustomerListViewModel : ViewModelBase
         _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
 
         InitializeCommands();
+        _ = LoadGroupsAsync();
     }
 
     private void InitializeCommands()
@@ -67,9 +71,9 @@ public class CustomerListViewModel : ViewModelBase
         // Initialize commands
         RefreshCommand = new AsyncRelayCommand(LoadCustomersAsync);
         AddCommand = new RelayCommand(AddCustomer);
-        EditCommand = new RelayCommand(EditCustomer, () => SelectedCustomer != null);
-        DeleteCommand = new AsyncRelayCommand(DeleteCustomerAsync, () => SelectedCustomer != null && SelectedCustomer.IsActive);
-        RestoreCommand = new AsyncRelayCommand(RestoreCustomerAsync, () => SelectedCustomer != null && !SelectedCustomer.IsActive);
+        EditCommand = new RelayCommand(EditCustomer);
+        DeleteCommand = new AsyncRelayCommand(DeleteCustomerAsync);
+        RestoreCommand = new AsyncRelayCommand(RestoreCustomerAsync);
         SearchCommand = new RelayCommand(Search);
 
         // Subscribe to customer changes
@@ -94,13 +98,7 @@ public class CustomerListViewModel : ViewModelBase
         get => _selectedCustomer;
         set
         {
-            if (SetProperty(ref _selectedCustomer, value))
-            {
-                // Update command's CanExecute
-                (EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                (DeleteCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-                (RestoreCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-            }
+            SetProperty(ref _selectedCustomer, value);
         }
     }
 
@@ -142,6 +140,24 @@ public class CustomerListViewModel : ViewModelBase
     }
 
     public int CustomersCount => Customers.Count;
+
+    public ObservableCollection<CustomerGroupDto> AvailableGroups
+    {
+        get => _availableGroups;
+        set => SetProperty(ref _availableGroups, value);
+    }
+
+    public CustomerGroupDto? SelectedGroupFilter
+    {
+        get => _selectedGroupFilter;
+        set
+        {
+            if (SetProperty(ref _selectedGroupFilter, value))
+            {
+                CustomersView?.Refresh();
+            }
+        }
+    }
     #endregion
 
     #region Commands
@@ -154,42 +170,57 @@ public class CustomerListViewModel : ViewModelBase
     #endregion
 
     #region Methods
-    public async Task LoadCustomersAsync()
+    private async Task LoadGroupsAsync()
     {
-        IsBusy = true;
-        ErrorMessage = null;
-
         try
         {
-            var result = await _customerService.GetAllAsync(IncludeInactive);
-
+            var result = await _customerService.GetAllGroupsAsync();
             if (result.IsSuccess && result.Value != null)
             {
                 InvokeOnUIThread(() =>
                 {
-                    Customers.Clear();
-                    foreach (var item in result.Value.OrderByDescending(x => x.Id))
+                    AvailableGroups.Clear();
+                    foreach (var group in result.Value)
                     {
-                        Customers.Add(item);
+                        AvailableGroups.Add(group);
                     }
-                    SetupCollectionView();
-                    IsEmpty = Customers.Count == 0;
-                    OnPropertyChanged(nameof(CustomersCount));
                 });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملاء", "CustomerListViewModel.LoadCustomersAsync", "[CustomerListViewModel.LoadCustomersAsync] Failed to load customers list.");
-                IsEmpty = Customers.Count == 0;
             }
         }
         catch (Exception ex)
         {
-            ErrorMessage = HandleException(ex, "CustomerListViewModel.LoadCustomersAsync", "[CustomerListViewModel.LoadCustomersAsync] Failed to load customers list.");
+            LogSystemError("فشل في تحميل مجموعات العملاء", "CustomerListViewModel.LoadGroupsAsync", ex);
         }
-        finally
+    }
+
+    public async Task LoadCustomersAsync()
+    {
+        await ExecuteAsync(LoadCustomersOperationAsync);
+    }
+
+    private async Task LoadCustomersOperationAsync()
+    {
+        ErrorMessage = null;
+        var result = await _customerService.GetAllAsync(IncludeInactive);
+
+        if (result.IsSuccess && result.Value != null)
         {
-            IsBusy = false;
+            InvokeOnUIThread(() =>
+            {
+                Customers.Clear();
+                foreach (var item in result.Value.OrderByDescending(x => x.Id))
+                {
+                    Customers.Add(item);
+                }
+                SetupCollectionView();
+                IsEmpty = Customers.Count == 0;
+                OnPropertyChanged(nameof(CustomersCount));
+            });
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملاء", "CustomerListViewModel.LoadCustomersAsync", "[CustomerListViewModel.LoadCustomersAsync] Failed to load customers list.");
+            IsEmpty = Customers.Count == 0;
         }
     }
 
@@ -203,13 +234,25 @@ public class CustomerListViewModel : ViewModelBase
     {
         if (obj is not CustomerDto customer) return false;
 
-        if (string.IsNullOrWhiteSpace(SearchText)) return true;
+        // Filter by search text
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            var searchLower = SearchText.Trim().ToLower();
+            if (!customer.Name.ToLower().Contains(searchLower) &&
+                (customer.Phone?.ToLower().Contains(searchLower) ?? false) == false &&
+                (customer.Email?.ToLower().Contains(searchLower) ?? false) == false &&
+                (customer.Address?.ToLower().Contains(searchLower) ?? false) == false)
+                return false;
+        }
 
-        var searchLower = SearchText.Trim().ToLower();
-        return customer.Name.ToLower().Contains(searchLower) ||
-               (customer.Phone?.ToLower().Contains(searchLower) ?? false) ||
-               (customer.Email?.ToLower().Contains(searchLower) ?? false) ||
-               (customer.Address?.ToLower().Contains(searchLower) ?? false);
+        // Filter by customer group
+        if (SelectedGroupFilter != null)
+        {
+            if (customer.CustomerGroupId != SelectedGroupFilter.Id)
+                return false;
+        }
+
+        return true;
     }
 
     private void AddCustomer()
@@ -229,7 +272,11 @@ public class CustomerListViewModel : ViewModelBase
 
     private void EditCustomer()
     {
-        if (SelectedCustomer == null) return;
+        if (SelectedCustomer == null)
+        {
+            _ = _dialogService.ShowWarningAsync("تنبيه", "الرجاء اختيار عميل");
+            return;
+        }
 
         var editorVm = new CustomerEditorViewModel(SelectedCustomer);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
@@ -254,97 +301,90 @@ public class CustomerListViewModel : ViewModelBase
 
     public async Task DeleteCustomerAsync()
     {
-        if (SelectedCustomer == null) return;
+        if (SelectedCustomer == null)
+        {
+            await _dialogService.ShowWarningAsync("تنبيه", "الرجاء اختيار عميل");
+            return;
+        }
 
         var strategy = await _dialogService.ShowDeleteConfirmationAsync($"العميل: {SelectedCustomer.Name}");
-
         if (strategy == DeleteStrategy.Cancel) return;
 
-        IsBusy = true;
+        await ExecuteAsync(() => DeleteCustomerOperationAsync(strategy));
+    }
+
+    private async Task DeleteCustomerOperationAsync(DeleteStrategy strategy)
+    {
         ErrorMessage = null;
 
-        try
+        if (strategy == DeleteStrategy.Deactivate)
         {
-            if (strategy == DeleteStrategy.Deactivate)
+            var deleteResult = await _customerService.DeleteAsync(SelectedCustomer!.Id);
+            if (deleteResult.IsSuccess)
             {
-                var deleteResult = await _customerService.DeleteAsync(SelectedCustomer.Id);
-                if (deleteResult.IsSuccess)
-                {
-                    _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
-                    await LoadCustomersAsync();
-                    _toastService.ShowSuccess("تم إلغاء تنشيط العميل بنجاح");
-                }
-                else
-                {
-                    ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط العميل", "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
-                }
+                _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
+                await LoadCustomersAsync();
+                _toastService.ShowSuccess("تم إلغاء تنشيط العميل بنجاح");
             }
-            else if (strategy == DeleteStrategy.Permanent)
+            else
             {
-                var deleteResult = await _customerService.DeletePermanentlyAsync(SelectedCustomer.Id);
-                if (deleteResult.IsSuccess)
-                {
-                    _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
-                    await LoadCustomersAsync();
-                    _toastService.ShowSuccess("تم حذف العميل نهائياً");
-                }
-                else
-                {
-                    var error = deleteResult.Error ?? "فشل في حذف العميل";
-                    ErrorMessage = HandleFailure(error, "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
-                    LogSystemError($"Hard delete failed for Customer {SelectedCustomer.Id}: {error}", "CustomerListViewModel.DeleteCustomerAsync");
-                }
+                ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط العميل", "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
             }
         }
-        catch (Exception ex)
+        else if (strategy == DeleteStrategy.Permanent)
         {
-            ErrorMessage = HandleException(ex, "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer?.Id}.");
-        }
-        finally
-        {
-            IsBusy = false;
+            var deleteResult = await _customerService.DeletePermanentlyAsync(SelectedCustomer!.Id);
+            if (deleteResult.IsSuccess)
+            {
+                _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
+                await LoadCustomersAsync();
+                _toastService.ShowSuccess("تم حذف العميل نهائياً");
+            }
+            else
+            {
+                var error = deleteResult.Error ?? "فشل في حذف العميل";
+                ErrorMessage = HandleFailure(error, "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
+                LogSystemError($"Hard delete failed for Customer {SelectedCustomer.Id}: {error}", "CustomerListViewModel.DeleteCustomerAsync");
+            }
         }
     }
 
     public async Task RestoreCustomerAsync()
     {
-        if (SelectedCustomer == null) return;
+        if (SelectedCustomer == null)
+        {
+            await _dialogService.ShowWarningAsync("تنبيه", "الرجاء اختيار عميل");
+            return;
+        }
 
-        IsBusy = true;
+        await ExecuteAsync(RestoreCustomerOperationAsync);
+    }
+
+    private async Task RestoreCustomerOperationAsync()
+    {
         ErrorMessage = null;
 
-        try
-        {
-            var request = new UpdateCustomerRequest(
-                Name: SelectedCustomer.Name,
-                Phone: SelectedCustomer.Phone,
-                Email: SelectedCustomer.Email,
-                Address: SelectedCustomer.Address,
-                TaxNumber: SelectedCustomer.TaxNumber,
-                CreditLimit: SelectedCustomer.CreditLimit,
-                IsActive: true
-            );
+        var request = new UpdateCustomerRequest(
+            Name: SelectedCustomer!.Name,
+            Phone: SelectedCustomer.Phone,
+            Email: SelectedCustomer.Email,
+            Address: SelectedCustomer.Address,
+            TaxNumber: SelectedCustomer.TaxNumber,
+            CreditLimit: SelectedCustomer.CreditLimit,
+            IsActive: true
+        );
 
-            var result = await _customerService.UpdateAsync(SelectedCustomer.Id, request);
+        var result = await _customerService.UpdateAsync(SelectedCustomer.Id, request);
 
-            if (result.IsSuccess)
-            {
-                _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
-                await LoadCustomersAsync();
-                await _dialogService.ShowSuccessAsync("استعادة العميل", "تم استعادة العميل بنجاح");
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة العميل", "CustomerListViewModel.RestoreCustomerAsync", $"[CustomerListViewModel.RestoreCustomerAsync] Failed to restore customer with ID {SelectedCustomer.Id}.");
-            }
-        }
-        catch (Exception ex)
+        if (result.IsSuccess)
         {
-            ErrorMessage = HandleException(ex, "CustomerListViewModel.RestoreCustomerAsync", $"[CustomerListViewModel.RestoreCustomerAsync] Failed to restore customer with ID {SelectedCustomer.Id}.");
+            _eventBus.Publish(new CustomerChangedMessage(SelectedCustomer.Id));
+            await LoadCustomersAsync();
+            await _dialogService.ShowSuccessAsync("استعادة العميل", "تم استعادة العميل بنجاح");
         }
-        finally
+        else
         {
-            IsBusy = false;
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة العميل", "CustomerListViewModel.RestoreCustomerAsync", $"[CustomerListViewModel.RestoreCustomerAsync] Failed to restore customer with ID {SelectedCustomer.Id}.");
         }
     }
 

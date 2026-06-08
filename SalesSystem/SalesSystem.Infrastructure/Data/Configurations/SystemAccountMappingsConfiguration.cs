@@ -78,6 +78,15 @@ public class SystemAccountMappingsConfiguration : IEntityTypeConfiguration<Syste
             .HasForeignKey(x => x.SpoilageLossAccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // ─── Opening Balance Equity Account ────────────────
+        builder.Property(x => x.OpeningBalanceEquityAccountId)
+            .HasColumnName("OpeningBalanceEquityAccountId")
+            .IsRequired(false);
+        builder.HasOne(x => x.OpeningBalanceEquityAccount)
+            .WithMany()
+            .HasForeignKey(x => x.OpeningBalanceEquityAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(x => x.IsActive).HasDefaultValue(true);
         builder.HasQueryFilter(x => x.IsActive);
     }

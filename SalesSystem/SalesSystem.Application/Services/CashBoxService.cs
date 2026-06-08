@@ -4,6 +4,8 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
+using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
@@ -15,6 +17,8 @@ public class CashBoxService : ICashBoxService
     private readonly IUnitOfWork _uow;
     private readonly ILogger<CashBoxService> _logger;
 
+    private const string CashParentAccountCode = "1110";
+
     public CashBoxService(IUnitOfWork uow, ILogger<CashBoxService> logger)
     {
         _uow = uow;
@@ -25,7 +29,7 @@ public class CashBoxService : ICashBoxService
     {
         try
         {
-            var boxes = await _uow.CashBoxes.ToListAsync(ct);
+            var boxes = await _uow.CashBoxes.ToListAsync(ct, "Account", "Category");
             var dtos = boxes.Select(MapToDto).ToList();
             return Result<List<CashBoxDto>>.Success(dtos);
         }
@@ -57,26 +61,37 @@ public class CashBoxService : ICashBoxService
     {
         try
         {
-            var box = CashBox.Create(
-                request.BoxName,
-                request.BranchId,
-                request.AssignedUserId,
-                null,
-                0);
-
-            box.SetCreatedBy(userId);
-
-            if (request.OpeningBalance > 0)
+            // Step 1: Resolve AccountId (auto-create if not provided)
+            int accountId;
+            if (request.AccountId.HasValue && request.AccountId.Value > 0)
             {
-                box.Deposit(request.OpeningBalance, CashTransactionType.OpeningBalance, createdBy: userId);
+                accountId = request.AccountId.Value;
+            }
+            else
+            {
+                accountId = await AutoCreateCashBoxAccountAsync(request.BoxName, ct);
             }
 
+            // Step 2: Create the CashBox entity
+            var box = CashBox.Create(
+                request.BoxName,
+                accountId,
+                categoryId: request.CategoryId,
+                branchId: request.BranchId,
+                assignedUserId: request.AssignedUserId,
+                currencyId: request.CurrencyId,
+                phoneNumber: request.PhoneNumber,
+                taxNumber: request.TaxNumber,
+                address: request.Address,
+                notes: request.Notes);
+
+            box.SetCreatedBy(userId);
             await _uow.CashBoxes.AddAsync(box, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Cash box created: {BoxName} (ID: {Id}) with opening balance {Balance:N2} by User {UserId}",
-                box.BoxName, box.Id, request.OpeningBalance, userId);
+                "Cash box created: {BoxName} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
+                box.BoxName, box.Id, accountId, userId);
 
             return Result<CashBoxDto>.Success(MapToDto(box));
         }
@@ -90,6 +105,61 @@ public class CashBoxService : ICashBoxService
             _logger.LogError(ex, "Error creating cash box");
             return Result<CashBoxDto>.Failure("حدث خطأ أثناء إنشاء الصندوق");
         }
+    }
+
+    /// <summary>
+    /// Auto-creates a Level-4 detail account under "1110 — النقدية" (Cash &amp; Cash Equivalents).
+    /// Generates the next available account code (e.g., 1113, 1114, ...).
+    /// </summary>
+    private async Task<int> AutoCreateCashBoxAccountAsync(string boxName, CancellationToken ct)
+    {
+        // Find the parent account "1110 — النقدية"
+        var parentAccount = await _uow.Accounts.FirstOrDefaultAsync(
+            a => a.AccountCode == CashParentAccountCode, ct);
+
+        if (parentAccount == null)
+            throw new DomainException(
+                "الحساب المحاسبي للخزنة (1110) غير موجود. يرجى التأكد من ترحيل دليل الحسابات.");
+
+        // Generate next account code for Level 4 under 1110
+        // Fetch existing children and find max code
+        var children = await _uow.Accounts.ToListAsync(
+            a => a.ParentAccountId == parentAccount.Id, q => q.OrderByDescending(a => a.AccountCode), ct);
+
+        string nextCode;
+        if (children.Count == 0)
+        {
+            // No children yet — start from 1111
+            nextCode = "1111";
+        }
+        else
+        {
+            // Increment child code using max AccountCode
+            var maxChildCode = children.First().AccountCode;
+            if (int.TryParse(maxChildCode, out var maxCode))
+                nextCode = (maxCode + 1).ToString();
+            else
+                nextCode = "1111";
+        }
+
+        var account = Account.Create(
+            accountCode: nextCode,
+            nameAr: boxName,
+            nameEn: boxName,
+            accountType: AccountType.Asset,
+            level: 4,
+            parentAccountId: parentAccount.Id,
+            isSystemAccount: false,
+            colorCode: "#2196F3",
+            allowTransactions: true,
+            description: $"خزنة: {boxName}",
+            explanation: $"حساب الخزنة النقدية: {boxName}",
+            openingBalance: 0,
+            notes: null,
+            createdByUserId: 0);
+
+        await _uow.Accounts.AddAsync(account, ct);
+        return account.Id;
     }
 
     public async Task<Result> DeactivateAsync(int id, CancellationToken ct)
@@ -151,8 +221,17 @@ public class CashBoxService : ICashBoxService
             if (box == null)
                 return Result<CashTransactionDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
 
-            var transaction = box.Withdraw(
-                request.Amount, CashTransactionType.Expense, createdBy: userId, notes: request.Notes);
+            // Compute running balance from all existing transactions
+            var runningBalance = await ComputeRunningBalanceAsync(cashBoxId, ct);
+            var amount = -Math.Abs(request.Amount); // expense is always negative
+            var newRunningBalance = runningBalance + amount;
+
+            var transaction = CashTransaction.Create(
+                cashBoxId, CashTransactionType.Expense, amount, newRunningBalance,
+                referenceType: null, referenceId: null, createdBy: userId,
+                notes: request.Notes, currencyId: null);
+
+            await _uow.CashTransactions.AddAsync(transaction, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
@@ -197,10 +276,27 @@ public class CashBoxService : ICashBoxService
                 return Result.Failure("الصندوق الوجهة غير موجود", ErrorCodes.NotFound);
             }
 
-            sourceBox.Withdraw(
-                request.Amount, CashTransactionType.TransferOut, "CashTransfer", destBox.Id, userId, request.Notes);
-            destBox.Deposit(
-                request.Amount, CashTransactionType.TransferIn, "CashTransfer", sourceBox.Id, userId, request.Notes);
+            // Compute running balances
+            var sourceRunningBalance = await ComputeRunningBalanceAsync(request.SourceCashBoxId, ct);
+            var destRunningBalance = await ComputeRunningBalanceAsync(request.DestinationCashBoxId, ct);
+
+            // Create withdrawal from source
+            var sourceNewBalance = sourceRunningBalance - request.Amount;
+            var withdrawalTx = CashTransaction.Create(
+                request.SourceCashBoxId, CashTransactionType.TransferOut,
+                -request.Amount, sourceNewBalance,
+                "CashTransfer", request.DestinationCashBoxId,
+                userId, request.Notes, null);
+            await _uow.CashTransactions.AddAsync(withdrawalTx, ct);
+
+            // Create deposit to destination
+            var destNewBalance = destRunningBalance + request.Amount;
+            var depositTx = CashTransaction.Create(
+                request.DestinationCashBoxId, CashTransactionType.TransferIn,
+                request.Amount, destNewBalance,
+                "CashTransfer", request.SourceCashBoxId,
+                userId, request.Notes, null);
+            await _uow.CashTransactions.AddAsync(depositTx, ct);
 
             await _uow.SaveChangesAsync(ct);
             await dbTransaction.CommitAsync(ct);
@@ -263,8 +359,9 @@ public class CashBoxService : ICashBoxService
             var beforeTodayTransactions = allTransactions.Where(t => t.CreatedAt < todayStart).ToList();
             var todayTransactions = allTransactions.Where(t => t.CreatedAt >= todayStart).ToList();
 
+            // Opening balance = running balance of last transaction before today
             var openingBalance = beforeTodayTransactions.Count > 0
-                ? beforeTodayTransactions.Last().BalanceAfter
+                ? beforeTodayTransactions.Last().RunningBalance
                 : 0m;
 
             var totalIncome = todayTransactions.Where(t => t.Amount > 0).Sum(t => t.Amount);
@@ -331,16 +428,15 @@ public class CashBoxService : ICashBoxService
                 return Result<CashTransactionDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
             }
 
-            CashTransaction transaction;
-            if (IsIncomeType(type))
-            {
-                transaction = box.Deposit(amount, type, referenceType, referenceId, userId);
-            }
-            else
-            {
-                transaction = box.Withdraw(amount, type, referenceType, referenceId, userId);
-            }
+            var runningBalance = await ComputeRunningBalanceAsync(cashBoxId, ct);
+            var signedAmount = IsIncomeType(type) ? amount : -amount;
+            var newRunningBalance = runningBalance + signedAmount;
 
+            var transaction = CashTransaction.Create(
+                cashBoxId, type, signedAmount, newRunningBalance,
+                referenceType, referenceId, userId, null, null);
+
+            await _uow.CashTransactions.AddAsync(transaction, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
@@ -372,16 +468,31 @@ public class CashBoxService : ICashBoxService
         _ => false
     };
 
+    /// <summary>
+    /// Computes the running balance of a cash box by summing all transaction amounts.
+    /// </summary>
+    private async Task<decimal> ComputeRunningBalanceAsync(int cashBoxId, CancellationToken ct)
+    {
+        var allTransactions = await _uow.CashTransactions.ToListAsync(
+            t => t.CashBoxId == cashBoxId, null, ct);
+        return allTransactions.Sum(t => t.Amount);
+    }
+
     private static CashBoxDto MapToDto(CashBox box) => new(
         box.Id,
         box.BoxName,
-        box.OpeningBalance,
-        box.CurrentBalance,
+        box.AccountId,
+        box.Account?.NameAr ?? box.Account?.NameEn,
+        box.CategoryId,
+        box.Category?.Name,
         box.BranchId,
         box.CurrencyId,
         box.Currency?.Name,
         box.Currency?.Code,
         box.AssignedUserId,
+        box.PhoneNumber,
+        box.TaxNumber,
+        box.Address,
         box.Notes,
         box.IsActive);
 
@@ -390,8 +501,7 @@ public class CashBoxService : ICashBoxService
         t.CashBoxId,
         (byte)t.TransactionType,
         t.Amount,
-        t.BalanceBefore,
-        t.BalanceAfter,
+        t.RunningBalance,
         t.ReferenceType,
         t.ReferenceId,
         t.CurrencyId,

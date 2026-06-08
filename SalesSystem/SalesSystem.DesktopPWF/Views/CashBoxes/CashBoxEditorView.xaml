@@ -11,8 +11,7 @@
     <Grid Style="{StaticResource PageRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="19*"/>
-            <RowDefinition Height="102*"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -25,53 +24,100 @@
                    Style="{StaticResource HeaderStyle}"
                    Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,12"/>
 
-        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="16,16,16,16" Grid.RowSpan="2">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="20">
+        <!-- Main Content Card -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="16,0,16,16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                    <!-- Box Name -->
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="اسم الصندوق *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding BoxName, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 ToolTip="اسم الصندوق — هذا الحقل إلزامي"/>
+                <!-- Error Message (inside card, above scroll) -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource ErrorLightBrush}"
+                        BorderBrush="{StaticResource ErrorBrush}"
+                        BorderThickness="1"
+                        Padding="12,8"
+                        Margin="0,0,0,8"
+                        CornerRadius="6"
+                        Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
+                        <TextBlock Text="{Binding ErrorMessage}"
+                                   Foreground="{StaticResource ErrorTextBrush}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"/>
                     </StackPanel>
+                </Border>
 
-                    <!-- Opening Balance -->
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="الرصيد الافتتاحي *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding OpeningBalance, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 ToolTip="الرصيد الافتتاحي للصندوق — يستخدم لحساب الرصيد الحالي"/>
+                <!-- Scrollable Form Fields -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,0,6">
+
+                        <!-- Box Name -->
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="اسم الصندوق *" Style="{StaticResource LabelStyle}"/>
+                            <TextBox Text="{Binding BoxName, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="اسم الصندوق النقدي — هذا الحقل إلزامي"/>
+                        </StackPanel>
+
+                        <!-- Account Info (Auto-creation notice) -->
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="الحساب المرتبط" Style="{StaticResource LabelStyle}"/>
+                            <Border Background="{StaticResource InfoLightBrush}"
+                                    BorderBrush="{StaticResource InfoBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="8,6">
+                                <TextBlock Text="{Binding AccountInfo, FallbackValue='سيتم إنشاء حساب تلقائي ضمن مجموعة النقد وما في حكمه'}"
+                                           FontSize="11" Foreground="{StaticResource InfoTextBrush}"
+                                           ToolTip="سيتم إنشاء حساب دفتر أستاذ تلقائي لهذا الصندوق ضمن مجموعة النقد — لا حاجة لاختيار حساب يدوي"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Category -->
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="الفئة" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox ItemsSource="{Binding Categories}"
+                                      SelectedItem="{Binding SelectedCategory}"
+                                      DisplayMemberPath="Name"
+                                      Style="{StaticResource ModernComboBox}"
+                                      ToolTip="اختيار فئة للصندوق (اختياري)"/>
+                        </StackPanel>
+
+                        <!-- Phone Number -->
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="رقم الهاتف" Style="{StaticResource LabelStyle}"/>
+                            <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="رقم الهاتف المسؤول عن الصندوق (اختياري)"/>
+                        </StackPanel>
+
+                        <!-- Tax Number -->
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="الرقم الضريبي" Style="{StaticResource LabelStyle}"/>
+                            <TextBox Text="{Binding TaxNumber, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="الرقم الضريبي للصندوق (اختياري)"/>
+                        </StackPanel>
+
+                        <!-- Address -->
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="العنوان" Style="{StaticResource LabelStyle}"/>
+                            <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="60"
+                                     ToolTip="عنوان موقع الصندوق (اختياري)"/>
+                        </StackPanel>
+
                     </StackPanel>
-
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
-
-        <!-- Error Message -->
-        <Border Grid.Row="2"
-                Background="{StaticResource ErrorLightBrush}"
-                BorderBrush="{StaticResource ErrorBrush}"
-                BorderThickness="1"
-                Padding="12,8"
-                Margin="16,149,16,0"
-                CornerRadius="6"
-                VerticalAlignment="Top"
-                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
-                <TextBlock Text="{Binding ErrorMessage}"
-                           Foreground="{StaticResource ErrorTextBrush}"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center"
-                           FontSize="12"
-                           TextWrapping="Wrap"/>
-            </StackPanel>
+                </ScrollViewer>
+            </Grid>
         </Border>
 
         <!-- Footer Buttons -->
-        <Border Grid.Row="2" Background="White" Padding="16,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}" Margin="0,204,0,0" Grid.RowSpan="2">
+        <Border Grid.Row="2" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                 <Button Command="{Binding SaveCommand}"
                         Style="{StaticResource PrimaryButton}"
@@ -95,7 +141,7 @@
         </Border>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="4"
+        <Border Grid.Row="0" Grid.RowSpan="3"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

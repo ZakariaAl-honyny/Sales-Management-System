@@ -7,7 +7,9 @@ public record CreateCustomerRequest(
     string? Address,
     string? TaxNumber,
     decimal OpeningBalance,
-    decimal CreditLimit = 0
+    decimal CreditLimit = 0,
+    int? AccountId = null,
+    int? CustomerGroupId = null
 );
 
 public record UpdateCustomerRequest(
@@ -17,5 +19,18 @@ public record UpdateCustomerRequest(
     string? Address,
     string? TaxNumber,
     decimal CreditLimit,
-    bool IsActive
+    bool IsActive,
+    int? AccountId = null,
+    int? CustomerGroupId = null
+);
+
+public record CreateCustomerGroupRequest(
+    string Name,
+    string? Description = null
+);
+
+public record UpdateCustomerGroupRequest(
+    string Name,
+    string? Description = null,
+    bool IsActive = true
 );

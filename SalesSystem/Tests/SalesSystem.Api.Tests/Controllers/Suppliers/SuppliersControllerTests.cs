@@ -15,6 +15,9 @@ public class SuppliersControllerTests : ControllerTestBase
     public SuppliersControllerTests()
     {
         _controller = new SuppliersController(SupplierServiceMock.Object);
+
+        // Setup user claims for authorized requests
+        SetupUserId(_controller, 1);
     }
 
     [Fact]
@@ -73,7 +76,7 @@ public class SuppliersControllerTests : ControllerTestBase
     {
         var request = new CreateSupplierRequest("مورد جديد", null, null, null, null, 0.00m);
         var createdSupplier = CreateSupplierDto(1);
-        SupplierServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
+        SupplierServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(createdSupplier));
 
         var result = await _controller.Create(request, CancellationToken.None);
@@ -86,7 +89,7 @@ public class SuppliersControllerTests : ControllerTestBase
     public async Task Create_WhenServiceFails_ReturnsBadRequest()
     {
         var request = new CreateSupplierRequest("مورد جديد", null, null, null, null, 0.00m);
-        SupplierServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
+        SupplierServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<SupplierDto>("اسم المورد موجود مسبقاً"));
 
         var result = await _controller.Create(request, CancellationToken.None);
@@ -99,7 +102,7 @@ public class SuppliersControllerTests : ControllerTestBase
     {
         var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, 0.00m, true);
         var updatedSupplier = CreateSupplierDto(1);
-        SupplierServiceMock.Setup(x => x.UpdateAsync(1, request, It.IsAny<CancellationToken>()))
+        SupplierServiceMock.Setup(x => x.UpdateAsync(1, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(updatedSupplier));
 
         var result = await _controller.Update(1, request, CancellationToken.None);
@@ -111,7 +114,7 @@ public class SuppliersControllerTests : ControllerTestBase
     public async Task Update_WhenSupplierNotFound_ReturnsBadRequest()
     {
         var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, 0.00m, true);
-        SupplierServiceMock.Setup(x => x.UpdateAsync(999, request, It.IsAny<CancellationToken>()))
+        SupplierServiceMock.Setup(x => x.UpdateAsync(999, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<SupplierDto>("المورد غير موجود"));
 
         var result = await _controller.Update(999, request, CancellationToken.None);
@@ -122,7 +125,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task Delete_WhenSupplierExists_ReturnsOkWithSuccessMessage()
     {
-        SupplierServiceMock.Setup(x => x.DeleteAsync(1, It.IsAny<CancellationToken>()))
+        SupplierServiceMock.Setup(x => x.DeleteAsync(1, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult());
 
         var result = await _controller.Delete(1, CancellationToken.None);
@@ -133,7 +136,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task Delete_WhenSupplierNotFound_ReturnsBadRequest()
     {
-        SupplierServiceMock.Setup(x => x.DeleteAsync(999, It.IsAny<CancellationToken>()))
+        SupplierServiceMock.Setup(x => x.DeleteAsync(999, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult("المورد غير موجود"));
 
         var result = await _controller.Delete(999, CancellationToken.None);
@@ -144,7 +147,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task PermanentDelete_WhenSupplierExists_ReturnsOkWithSuccessMessage()
     {
-        SupplierServiceMock.Setup(x => x.PermanentDeleteAsync(1, It.IsAny<CancellationToken>()))
+        SupplierServiceMock.Setup(x => x.PermanentDeleteAsync(1, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult());
 
         var result = await _controller.PermanentDelete(1, CancellationToken.None);
@@ -155,7 +158,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task PermanentDelete_WhenSupplierNotFound_ReturnsBadRequest()
     {
-        SupplierServiceMock.Setup(x => x.PermanentDeleteAsync(999, It.IsAny<CancellationToken>()))
+        SupplierServiceMock.Setup(x => x.PermanentDeleteAsync(999, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult("المورد غير موجود"));
 
         var result = await _controller.PermanentDelete(999, CancellationToken.None);

@@ -28,6 +28,7 @@ using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.ViewModels.Accounts;
+using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
 using SalesSystem.DesktopPWF.Views.Accounts;
@@ -182,6 +183,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IProductApiService, ProductApiService>();
         services.AddSingleton<ICategoryApiService, CategoryApiService>();
         services.AddSingleton<IUnitApiService, UnitApiService>();
+        services.AddSingleton<ICustomerGroupApiService, CustomerGroupApiService>();
         services.AddSingleton<ICustomerApiService, CustomerApiService>();
         services.AddSingleton<ISupplierApiService, SupplierApiService>();
         services.AddSingleton<IWarehouseApiService, WarehouseApiService>();
@@ -208,6 +210,9 @@ public partial class App : System.Windows.Application
 
         // Account API Service
         services.AddSingleton<IAccountApiService, AccountApiService>();
+
+        // Journal Entry API Service
+        services.AddSingleton<IJournalEntryApiService, JournalEntryApiService>();
 
         // Audit & Permission Services
         services.AddSingleton<IAuditLogApiService, AuditLogApiService>();
@@ -269,6 +274,9 @@ public partial class App : System.Windows.Application
         services.AddTransient<ProductUnitEditorViewModel>();
         services.AddTransient<ProductUnitsListViewModel>();
 
+        // Customer Group ViewModels
+        services.AddTransient<CustomerGroupListViewModel>();
+
         // Tax ViewModels
         services.AddTransient<TaxesListViewModel>();
         services.AddTransient<TaxEditorViewModel>();
@@ -288,6 +296,9 @@ public partial class App : System.Windows.Application
         services.AddTransient<CashTransferViewModel>();
         services.AddTransient<DailyClosureViewModel>();
         services.AddTransient<ExpiredProductsReportViewModel>();
+
+        // Journal Entry ViewModels
+        services.AddTransient<JournalEntriesListViewModel>();
 
         // Audit & Permission ViewModels
         services.AddTransient<AuditLogListViewModel>();

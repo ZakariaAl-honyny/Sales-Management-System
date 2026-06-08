@@ -1875,3 +1875,414 @@ catch (DbUpdateException ex)
 [HttpGet("by-type/{type:int:min(1):max(5)}")]
 public async Task<IActionResult> GetByType(AccountType type, CancellationToken ct)
 ```
+
+### Phase 23 — Customers Module Implementation Patterns
+
+#### CustomerGroup Entity Pattern
+```csharp
+public class CustomerGroup : BaseEntity
+{
+    public string Name { get; private set; }
+    public string? Description { get; private set; }
+
+    public static CustomerGroup Create(string name, string? description = null, int? createdByUserId = null)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم المجموعة مطلوب.");
+        // ...
+    }
+
+    public void Update(string name, string? description = null, int? updatedByUserId = null)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم المجموعة مطلوب.");
+        // ...
+    }
+}
+```
+
+#### CustomerService GetAllAsync with Include Pattern
+```csharp
+var (items, total) = await _uow.Customers.GetPagedAsync(
+    predicate, q => q.OrderByDescending(c => c.Id), page, pageSize, ct, includeInactive,
+    "Account", "CustomerGroup");  // Include navigation properties
+```
+
+#### CustomerGroupsController Route Pattern
+```csharp
+[Route("api/v1/customer-groups")]  // kebab-case per RULE-361
+[Authorize(Policy = "ManagerAndAbove")]
+public class CustomerGroupsController : ControllerBase
+{
+    // GET with AllStaff, POST/PUT/DELETE with ManagerAndAbove
+    // Route params use :int:min(1) — NEVER :byte
+}
+```
+
+#### CustomerEditorViewModel Lookup Loading Pattern
+```csharp
+private async Task LoadLookupDataAsync()
+{
+    // Load groups
+    var groupsResult = await _customerService.GetAllGroupsAsync();
+    if (groupsResult.IsSuccess && groupsResult.Value != null)
+    {
+        AvailableGroups = new ObservableCollection<CustomerGroupDto>(groupsResult.Value);
+    }
+
+    // Load accounts
+    var accountsResult = await _accountService.GetAllAsync();
+    if (accountsResult.IsSuccess && accountsResult.Value != null)
+    {
+        AvailableAccounts = new ObservableCollection<AccountDto>(accountsResult.Value);
+    }
+}
+```
+
+#### CustomerType Storage Pattern
+```csharp
+// Domain entity
+public byte? CustomerType { get; private set; }
+public bool CheckCreditLimit() => CustomerType.HasValue && (Domain.Enums.CustomerType)CustomerType.Value == Domain.Enums.CustomerType.Credit;
+
+// EF Configuration
+builder.Property(c => c.CustomerType)
+    .HasColumnType("tinyint");
+```
+
+#### Customer Validator Enhancement Pattern
+```csharp
+RuleFor(x => x.CustomerType)
+    .Must(v => v == null || v == 1 || v == 2)
+    .WithMessage("نوع العميل يجب أن يكون نقدي (1) أو آجل (2)");
+RuleFor(x => x.AccountId)
+    .GreaterThan(0).When(x => x.AccountId.HasValue)
+    .WithMessage("رقم الحساب يجب أن يكون أكبر من صفر");
+```
+
+#### Desktop Group Filter Pattern
+```csharp
+public CustomerGroupDto? SelectedGroupFilter
+{
+    get => _selectedGroupFilter;
+    set
+    {
+        _selectedGroupFilter = value;
+        OnPropertyChanged();
+        CustomersView?.Refresh();  // Apply filter
+    }
+}
+
+private bool FilterCustomers(object obj)
+{
+    if (obj is not CustomerDto c) return false;
+    if (SelectedGroupFilter != null && c.CustomerGroupId != SelectedGroupFilter.Id)
+        return false;
+    // ... text search filter continues
+}
+```
+
+#### API Endpoint Pattern for Customer Groups
+```csharp
+[HttpGet]
+[Authorize(Policy = "AllStaff")]
+public async Task<IActionResult> GetAll(CancellationToken ct)
+{
+    var result = await _service.GetAllAsync(ct);
+    if (result.IsSuccess) return Ok(result.Value);
+    return BadRequest(new { error = result.Error });
+}
+```
+
+#### XAML Pitfalls — Critical WPF Patterns
+```xml
+<!-- CORRECT: ComboBox uses ModernComboBox style -->
+<ComboBox ItemsSource="{Binding CustomerTypeOptions}"
+          SelectedValue="{Binding CustomerType}"
+          Style="{StaticResource ModernComboBox}"
+          TabIndex="8"
+          ToolTip="اختر نوع العميل"/>
+
+<!-- WRONG: ModernTextBox has TargetType=TextBox, throws XamlParseException on ComboBox -->
+<ComboBox Style="{StaticResource ModernTextBox}"/>  <!-- ❌ CRASHES -->
+
+<!-- CORRECT: Use ItemTemplate (no DisplayMemberPath) -->
+<ComboBox ItemsSource="{Binding AvailableGroups}"
+          SelectedItem="{Binding SelectedGroup}"
+          Style="{StaticResource ModernComboBox}">
+    <ComboBox.ItemTemplate>
+        <DataTemplate>
+            <TextBlock Text="{Binding Name}"/>
+        </DataTemplate>
+    </ComboBox.ItemTemplate>
+</ComboBox>
+
+<!-- WRONG: DisplayMemberPath + ItemTemplate together throws InvalidOperationException -->
+<ComboBox DisplayMemberPath="Name" ...>     <!-- ❌ Remove this -->
+    <ComboBox.ItemTemplate>...              <!-- ❌ CRASHES if both present -->
+</ComboBox>
+```
+
+#### CustomerType — Informational Only Pattern
+```csharp
+// CustomerType on Customer entity is INFORMATIONAL ONLY
+// The actual Cash/Credit decision is on SalesInvoice.PaymentType
+// Credit limit enforcement checks CreditLimit > 0, NOT CustomerType
+
+// Domain: CheckCreditLimit returns bool, never throws
+public bool CheckCreditLimit(decimal additionalAmount)
+{
+    if (CreditLimit <= 0) return true;          // No limit = no restriction
+    return (CurrentBalance + additionalAmount) <= CreditLimit;
+}
+
+// SalesService.PostAsync: Enforce credit limit
+if (customer.CreditLimit > 0 && invoice.DueAmount > 0)
+{
+    if (!customer.CheckCreditLimit(invoice.DueAmount))
+    {
+        await transaction.RollbackAsync(ct);
+        _logger.LogWarning("Customer {Id} credit limit exceeded", customer.Id);
+        return Result<SalesInvoiceDto>.Failure("تجاوز الحد الائتماني للعميل");
+    }
+}
+```
+
+#### Phone & Email Validation Pattern
+```csharp
+// CreateCustomerRequestValidator + UpdateCustomerRequestValidator
+RuleFor(x => x.Phone)
+    .Matches(@"^05\d{8}$").WithMessage("رقم الهاتف يجب أن يبدأ بـ 05 ويتكون من 10 أرقام")
+    .When(x => !string.IsNullOrEmpty(x.Phone));
+
+RuleFor(x => x.Email)
+    .EmailAddress().WithMessage("البريد الإلكتروني غير صحيح")
+    .When(x => !string.IsNullOrEmpty(x.Email));
+```
+
+#### Report Endpoint Pattern
+```csharp
+// ICustomerService
+Task<Result<List<CustomerDto>>> GetByGroupAsync(int groupId, CancellationToken ct = default);
+Task<Result<PagedResult<CustomerBalanceReportDto>>> GetCustomerBalanceReportAsync(int page, int pageSize, string? search = null, CancellationToken ct = default);
+Task<Result<PagedResult<CustomerAgingReportDto>>> GetCustomerAgingReportAsync(int page, int pageSize, CancellationToken ct = default);
+
+// Controller
+[HttpGet("by-group/{groupId:int:min(1)}")]
+[Authorize(Policy = "AllStaff")]
+public async Task<IActionResult> GetByGroup(int groupId, CancellationToken ct) { ... }
+```
+
+#### DTO Pattern for Reports
+```csharp
+public record CustomerBalanceReportDto(int Id, string Name, string? Phone, string? GroupName,
+    decimal CurrentBalance, decimal CreditLimit, string BalanceStatus);
+
+public record CustomerAgingReportDto(int Id, string Name, string? Phone,
+    decimal CurrentBalance, string AgingBucket, DateTime CalculationDate);
+```
+
+## Phase 24 — Accounting Integration Implementation Patterns
+
+Read `AGENTS.md` §2.76 (RULE-371 to RULE-388) before implementing accounting automation.
+
+### AccountingIntegrationService Pattern:
+```csharp
+public async Task<Result<int>> CreateXxxEntryAsync(...)
+{
+    var mappings = await _systemAccountService.GetMappingsAsync(ct);
+    if (mappings == null) return Result<int>.Failure("لم يتم تهيئة الحسابات النظامية");
+    if (mappings.SomeAccountId <= 0)
+        return Result<int>.Failure("الحساب النظامي غير مهيأ: [name]");
+    
+    var request = new CreateJournalEntryRequest(
+        TransactionDate: DateTime.UtcNow,
+        Description: "...",
+        EntryType: JournalEntryType.Xxx,
+        ReferenceType: "EntityType",
+        ReferenceNumber: refNumber,
+        ReferenceId: entityId,
+        Lines: new List<JournalEntryLineRequest>
+        {
+            new(AccountCode: code1, AccountNameAr: name1, Debit: amount, Credit: 0, Description: "..."),
+            new(AccountCode: code2, AccountNameAr: name2, Debit: 0, Credit: amount, Description: "..."),
+        });
+    return await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+}
+```
+
+### Service Integration Pattern (inside existing transaction, before CommitAsync):
+```csharp
+var entryResult = await _accountingService.CreateXxxEntryAsync(..., userId, ct);
+if (!entryResult.IsSuccess)
+{
+    await transaction.RollbackAsync(ct);
+    return Result<...>.Failure(entryResult.Error!);
+}
+```
+
+### Key DO NOTs:
+- NEVER hardcode `createdByUserId: 1` — accept userId from controller
+- NEVER use `lastId + 1` for InvoiceNo — use `IDocumentSequenceService.GetNextIntAsync()`
+- NEVER use `PurchaseCost` for COGS — use `AverageCost ?? PurchaseCost`
+- NEVER clamp negative netRevenue to zero — return Result.Failure
+- NEVER use string-based ReferenceNumber alone for reverse lookups — use ReferenceId (int FK) first
+- NEVER let AccountingIntegrationService own transactions — caller is responsible
+```
+
+---
+
+## 📋 Phase Awareness (Phases 23-31)
+
+The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
+| 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
+| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
+| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
+| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
+| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
+| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
+| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
+
+### Key Architecture Rules for Subagents
+
+When implementing or reviewing code, ALWAYS enforce these rules:
+
+1. **Multi-Currency First**: All pricing MUST support multi-currency via ProductPrices table — NEVER store single-currency prices on Product entity
+2. **FIFO/FEFO Batches**: Inventory MUST use InventoryBatches for cost allocation — NEVER use weighted-average only
+3. **Landed Cost**: Purchase costs MUST include AdditionalCharge distribution — NEVER record purchase cost without transport/customs allocation
+4. **Auto Journal Entries**: Every money-affecting operation MUST create journal entries via AccountingIntegrationService — NEVER leave the general ledger out of sync
+5. **Chart of Accounts Links**: CashBox, Warehouse, Customer, Supplier MUST link to Account via AccountId FK — NEVER operate without COA integration
+6. **Payment Allocation**: Payments MUST use PaymentAllocation for multi-invoice settlement — NEVER leave partial payments untracked
+7. **Report Excellence**: ALL reports MUST support Excel export via ClosedXML — NEVER limit to on-screen display only
+8. **Passwordless Users**: User.Create() NEVER accepts a password — MustChangePassword=true is the default
+9. **ReferenceId over ReferenceNumber**: Journal entry lookups use int FK (ReferenceId), not string matching
+10. **AvgCost for COGS**: COGS uses ProductUnit.AverageCost (weighted average), never PurchaseCost
+
+### 💡 Bug Prevention Checklist
+
+When writing or reviewing code in ANY layer, check these:
+- [ ] Does the code handle multi-currency correctly? (CurrencyId + ExchangeRate on all financial entities)
+- [ ] Are all prices stored per ProductUnit (not per Product)?
+- [ ] Does costing use the configured CostingMethod from SystemSettings?
+- [ ] Are all FK relationships `DeleteBehavior.Restrict`?
+- [ ] Does the service return `Result<T>` (not throw exceptions)?
+- [ ] Is the controller free of business logic (delegates to service)?
+- [ ] Do all ViewModels use `ExecuteAsync()` wrapper (no manual try/catch)?
+- [ ] Are all buttons ALWAYS enabled (no CanExecute predicates)?
+- [ ] Does the validation use `INotifyDataErrorInfo` (not `HasXxxError` booleans)?
+- [ ] Does every editor call `ValidateAllAsync()` on save?
+- [ ] Is the connection string DPAPI-encrypted or from env var?
+- [ ] Are Arabic messages properly UTF-8 encoded?
+- [ ] Does the list display newest-first (OrderByDescending)?
+- [ ] Are EventBus subscriptions disposed in `Cleanup()`?
+
+### CashBox Entity Pattern (v4.9 — No Balance Fields)
+
+```csharp
+// CashBox — lightweight register entity, NO balance fields
+public class CashBox : BaseEntity
+{
+    public string Name { get; private set; }
+    public int AccountId { get; private set; }          // FK to Account — balance lives here
+    public Account? Account { get; private set; }
+    public int? CategoryId { get; private set; }         // FK to Categories
+    public Category? Category { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string? TaxNumber { get; private set; }
+    public string? Address { get; private set; }
+    public int CurrencyId { get; private set; }
+    public ICollection<CashTransaction> Transactions { get; private set; }
+
+    // NO OpeningBalance, NO CurrentBalance, NO Deposit(), NO Withdraw()
+
+    public static CashBox Create(string name, int accountId, int currencyId,
+        int? categoryId = null, string? phoneNumber = null,
+        string? taxNumber = null, string? address = null, int createdByUserId = 0)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم الصندوق مطلوب");
+        return new CashBox
+        {
+            Name = name.Trim(), AccountId = accountId, CurrencyId = currencyId,
+            CategoryId = categoryId, PhoneNumber = phoneNumber, TaxNumber = taxNumber,
+            Address = address, IsActive = true,
+            CreatedByUserId = createdByUserId, CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    public void SetAccountId(int accountId) { AccountId = accountId; UpdateTimestamp(); }
+}
+
+// CashTransaction — uses RunningBalance instead of BalanceBefore/BalanceAfter
+public class CashTransaction : BaseEntity
+{
+    public int CashBoxId { get; private set; }
+    public CashTransactionType Type { get; private set; }
+    public decimal Amount { get; private set; }
+    public decimal RunningBalance { get; private set; }   // Cumulative sum
+    public string? Description { get; private set; }
+    public int? ReferenceId { get; private set; }
+    public string? ReferenceType { get; private set; }
+
+    public static CashTransaction Create(int cashBoxId, CashTransactionType type,
+        decimal amount, decimal runningBalance, string? description = null,
+        int? referenceId = null, string? referenceType = null, int createdByUserId = 0)
+    {
+        if (amount <= 0)
+            throw new DomainException("المبلغ يجب أن يكون أكبر من صفر");
+        return new CashTransaction
+        {
+            CashBoxId = cashBoxId, Type = type, Amount = amount,
+            RunningBalance = runningBalance, Description = description,
+            ReferenceId = referenceId, ReferenceType = referenceType,
+            CreatedByUserId = createdByUserId, CreatedAt = DateTime.UtcNow
+        };
+    }
+}
+```
+
+### CashBox Service Pattern — Auto-Account Creation
+When `AccountId` is null in `CashBoxService.CreateAsync()`, auto-create a Level-4 detail account under parent `"1110 — النقدية"`:
+```csharp
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1110", ct);
+var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
+var newCode = (int.Parse(maxCode ?? "1110") + 1).ToString();
+var account = Account.Create(newCode, $"صندوق {box.Name}", $"Cash Box {box.Name}",
+    AccountType.Asset, 4, parentAccount!.Id, false);
+await _uow.Accounts.AddAsync(account, ct);
+box.SetAccountId(account.Id);
+```
+
+CashTransfer MUST NOT validate balance on client side — server validates via Account:
+```csharp
+// CORRECT — NO client-side balance check
+private async Task TransferAsync() { /* validate fields only, not balance */ }
+// WRONG — if (sourceBox.CurrentBalance < Amount) return; // ❌ REMOVED
+```
+
+### Features to Fix By Default
+
+When you encounter any code related to these areas, apply fixes automatically:
+
+1. CashBox with OpeningBalance/CurrentBalance → REMOVE both fields, add AccountId FK
+2. CashTransaction with BalanceBefore/BalanceAfter → REPLACE with RunningBalance
+3. CashTransaction.Create() internal → CHANGE to public
+4. Deposit()/Withdraw() methods on CashBox → REMOVE (service creates CashTransaction directly)
+5. Client-side balance validation in CashTransfer → REMOVE (server validates via Account)
+6. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1110 — النقدية"
+7. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
+3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
+4. Missing `CurrencyId` on financial entities → Add multi-currency support
+5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
+6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
+7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
+8. Missing journal entry on cash operations → Call AccountingIntegrationService
+9. Missing Excel export on report → Add ClosedXML worksheet generation
+10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
+11. Payment without allocation → Add PaymentAllocation tracking
+12. Missing reversal entries on payment update/delete → Add reversal journal entries

@@ -180,7 +180,7 @@ public class ReportServiceTests
     {
         _output.WriteLine("[TEST] GetCustomerBalancesReportAsync_ValidCustomerId_ReturnsReport");
 
-        var reportItems = new List<SalesSystem.Contracts.DTOs.CustomerBalanceReportDto>
+        var reportItems = new List<SalesSystem.Contracts.DTOs.CustomerFinancialBalanceDto>
         {
             new(1, "Customer 1", 1000m, 500m, 0m, 500m, 0m, 1000m)
         };
@@ -201,7 +201,7 @@ public class ReportServiceTests
     {
         _output.WriteLine("[TEST] GetCustomerBalancesReportAsync_NullCustomerId_ReturnsAllBalances");
 
-        var reportItems = new List<SalesSystem.Contracts.DTOs.CustomerBalanceReportDto>
+        var reportItems = new List<SalesSystem.Contracts.DTOs.CustomerFinancialBalanceDto>
         {
             new(1, "Customer 1", 1000m, 500m, 0m, 500m, 0m, 1000m),
             new(2, "Customer 2", 2000m, 800m, 0m, 1200m, 0m, 1600m)

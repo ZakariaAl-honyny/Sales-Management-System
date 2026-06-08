@@ -131,7 +131,7 @@ public class ReportRepository : IReportRepository
         });
     }
 
-    public async Task<IEnumerable<CustomerBalanceReportDto>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct)
+    public async Task<IEnumerable<CustomerFinancialBalanceDto>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct)
     {
         var query = _context.Customers.AsQueryable();
 
@@ -140,7 +140,7 @@ public class ReportRepository : IReportRepository
 
         return await query
             .OrderBy(c => c.Name)
-            .Select(c => new CustomerBalanceReportDto(
+            .Select(c => new CustomerFinancialBalanceDto(
                 c.Id,
                 c.Name,
                 c.OpeningBalance,

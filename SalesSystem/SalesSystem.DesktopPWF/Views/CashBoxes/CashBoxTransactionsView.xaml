@@ -161,13 +161,8 @@
                                             Width="100" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
 
-                        <DataGridTextColumn Header="الرصيد قبل" 
-                                            Binding="{Binding BalanceBefore, StringFormat=N2}" 
-                                            Width="100" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-
-                        <DataGridTextColumn Header="الرصيد بعد" 
-                                            Binding="{Binding BalanceAfter, StringFormat=N2}" 
+                        <DataGridTextColumn Header="الرصيد الجاري" 
+                                            Binding="{Binding RunningBalance, StringFormat=N2}" 
                                             Width="100" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
 

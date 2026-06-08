@@ -87,37 +87,35 @@ public class FinancialReportService : IFinancialReportService
                 ct: ct);
 
             // Determine opening balance:
-            // 1. Find the last transaction BEFORE the from date for the same cash box(es)
-            // 2. If none, use CashBox.OpeningBalance if a specific cash box is selected, otherwise 0
+            // 1. Find the last transaction BEFORE the from date for the same cash box(es) and use its RunningBalance
+            // 2. If none, derive from the net transaction amount in the period
+            // 3. For all-boxes mode, compute from the first transaction's RunningBalance minus its Amount
             decimal openingBalance = 0;
 
             if (cashBoxId.HasValue)
             {
-                var box = await _uow.CashBoxes.GetByIdAsync(cashBoxId.Value, ct);
-                if (box != null)
-                {
-                    // Get the last transaction before the from date for this box
-                    var lastTxList = await _uow.CashTransactions.ToListAsync(
-                        tx => tx.CashBoxId == cashBoxId.Value && tx.CreatedAt < from,
-                        q => q.OrderByDescending(tx => tx.CreatedAt),
-                        ct: ct);
-                    var lastTxBefore = lastTxList.FirstOrDefault();
+                // Get the last transaction before the from date for this box
+                var lastTxList = await _uow.CashTransactions.ToListAsync(
+                    tx => tx.CashBoxId == cashBoxId.Value && tx.CreatedAt < from,
+                    q => q.OrderByDescending(tx => tx.CreatedAt),
+                    ct: ct);
+                var lastTxBefore = lastTxList.FirstOrDefault();
 
-                    if (lastTxBefore != null)
-                    {
-                        openingBalance = lastTxBefore.BalanceAfter;
-                    }
-                    else
-                    {
-                        // No transactions before the period — use the box's current balance
-                        // minus all transactions in the period to derive opening
-                        var netInPeriod = transactions
-                            .Where(tx => tx.CashBoxId == cashBoxId.Value)
-                            .Sum(tx => tx.Amount);
-                        openingBalance = box.CurrentBalance - netInPeriod;
-                        if (openingBalance < 0)
-                            openingBalance = box.OpeningBalance;
-                    }
+                if (lastTxBefore != null)
+                {
+                    openingBalance = lastTxBefore.RunningBalance;
+                }
+                else
+                {
+                    // No transactions before the period — derive from transactions in period
+                    var netInPeriod = transactions
+                        .Where(tx => tx.CashBoxId == cashBoxId.Value)
+                        .Sum(tx => tx.Amount);
+                    // Opening = total income - total expense for the period with sign reversed
+                    // If all transactions are captured correctly, the running balance starts at 0
+                    openingBalance = -netInPeriod;
+                    if (openingBalance < 0)
+                        openingBalance = 0m;
                 }
             }
             else
@@ -126,7 +124,7 @@ public class FinancialReportService : IFinancialReportService
                 var firstTx = transactions.FirstOrDefault();
                 if (firstTx != null)
                 {
-                    openingBalance = firstTx.BalanceBefore;
+                    openingBalance = firstTx.RunningBalance - firstTx.Amount;
                 }
             }
 

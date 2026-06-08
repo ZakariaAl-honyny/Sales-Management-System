@@ -169,6 +169,10 @@ public static class AccountingSeeder
             parentAccountId: l2["1420"].Id, colorCode: ColorEquity, allowTransactions: true,
             description: "أرباح الفترات السابقة المدورة — يسمح بحركات مباشرة",
             explanation: "أرباح الفترات السابقة المدورة"));
+        level3.Add(Account.Create("1422", "أرصدة افتتاحية", "Opening Balance Equity", AccountType.Equity, 3,
+            parentAccountId: l2["1420"].Id, isSystemAccount: true, colorCode: ColorEquity, allowTransactions: true,
+            description: "أرصدة افتتاحية للعملاء والموردين — يسمح بحركات مباشرة",
+            explanation: "حساب يقابل أرصدة العملاء والموردين الافتتاحية عند بدء استخدام النظام — يتم ترحيل الرصيد الافتتاحي للعملاء مدينة لهذا الحساب والرصيد الافتتاحي للموردين دائنة"));
 
         // Under 1510 Operating Revenue
         level3.Add(Account.Create("1520", "إيرادات المبيعات", "Sales Revenue", AccountType.Revenue, 3,
@@ -350,7 +354,7 @@ public static class AccountingSeeder
         db.Set<Account>().AddRange(level4);
         await db.SaveChangesAsync();
 
-        var totalCount = 5 + 8 + 20 + 27; // 60
+        var totalCount = 5 + 8 + 21 + 27; // 61
         logger?.LogInformation("Chart of accounts seeded: {Count} accounts created across 4 levels.", totalCount);
 
         // ─── Query IDs by AccountCode for System Account Mappings ──
@@ -369,6 +373,7 @@ public static class AccountingSeeder
         var cogsAccount = allAccounts["1621"];
         var generalExpenseAccount = allAccounts["1681"];
         var spoilageAccount = allAccounts["1691"];
+        var openingBalanceEquityAccount = allAccounts["1422"];
 
         // ─── Seed global SystemAccountMappings ────────────────────
         var mappings = SystemAccountMappings.Create(
@@ -384,7 +389,8 @@ public static class AccountingSeeder
             salesReturnAccountId: salesReturnAccount.Id,
             cogsAccountId: cogsAccount.Id,
             generalExpenseAccountId: generalExpenseAccount.Id,
-            spoilageLossAccountId: spoilageAccount.Id
+            spoilageLossAccountId: spoilageAccount.Id,
+            openingBalanceEquityAccountId: openingBalanceEquityAccount.Id
         );
         db.Set<SystemAccountMappings>().Add(mappings);
 

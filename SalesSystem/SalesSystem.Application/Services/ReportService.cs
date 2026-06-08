@@ -74,18 +74,18 @@ public class ReportService : IReportService
         }
     }
 
-    public async Task<Result<IEnumerable<CustomerBalanceReportDto>>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct)
+    public async Task<Result<IEnumerable<CustomerFinancialBalanceDto>>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct)
     {
         try
         {
             _logger.LogInformation("Generating customer balances report for customer: {CustomerId}", customerId ?? 0);
             var report = await _reportRepository.GetCustomerBalancesReportAsync(customerId, ct);
-            return Result<IEnumerable<CustomerBalanceReportDto>>.Success(report);
+            return Result<IEnumerable<CustomerFinancialBalanceDto>>.Success(report);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating customer balances report");
-            return Result<IEnumerable<CustomerBalanceReportDto>>.Failure("حدث خطأ أثناء إنشاء تقرير أرصدة العملاء");
+            return Result<IEnumerable<CustomerFinancialBalanceDto>>.Failure("حدث خطأ أثناء إنشاء تقرير أرصدة العملاء");
         }
     }
 

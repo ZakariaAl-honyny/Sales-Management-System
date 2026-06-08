@@ -4,8 +4,11 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
+using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -22,6 +25,7 @@ public class SupplierServiceTests : IDisposable
     private readonly TestDbContext _dbContext;
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<ILogger<SupplierService>> _mockLogger;
+    private readonly Mock<IAccountingIntegrationService> _mockAccountingService = new();
 
     private readonly SupplierService _sut;
 
@@ -41,6 +45,31 @@ public class SupplierServiceTests : IDisposable
 
         _mockUow.Setup(u => u.Suppliers).Returns(new InMemoryEfCoreRepository<Supplier>(_dbContext));
 
+        // Seed AP parent account (1320 - الموردون) and a detail account under it (1321)
+        var apParent = Account.Create("1320", "الموردون", "Accounts Payable", AccountType.Liability, 3,
+            colorCode: "#F44336", description: "المبالغ المستحقة للموردين");
+        _dbContext.Accounts.Add(apParent);
+        _dbContext.SaveChanges();
+
+        var apChild = Account.Create("1321", "المورد النقدي", "Cash Supplier", AccountType.Liability, 4,
+            parentAccountId: apParent.Id, colorCode: "#F44336", allowTransactions: true,
+            description: "موردي الدفع النقدي");
+        _dbContext.Accounts.Add(apChild);
+        _dbContext.SaveChanges();
+
+        var mappings = SystemAccountMappings.Create(
+            defaultCashAccountId: 1, defaultBankAccountId: 1, inventoryAssetAccountId: 1,
+            accountsReceivableAccountId: 1,
+            accountsPayableAccountId: apChild.Id,
+            vatOutputAccountId: 1, vatInputAccountId: 1, capitalAccountId: 1,
+            salesRevenueAccountId: 1, salesReturnAccountId: 1, cogsAccountId: 1,
+            generalExpenseAccountId: 1, spoilageLossAccountId: 1);
+        _dbContext.SystemAccountMappings.Add(mappings);
+        _dbContext.SaveChanges();
+
+        _mockUow.Setup(u => u.Accounts).Returns(new InMemoryEfCoreRepository<Account>(_dbContext));
+        _mockUow.Setup(u => u.SystemAccountMappings).Returns(new InMemoryEfCoreRepository<SystemAccountMappings>(_dbContext));
+
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
@@ -48,7 +77,7 @@ public class SupplierServiceTests : IDisposable
                 return 1;
             });
 
-        _sut = new SupplierService(_mockUow.Object, _mockLogger.Object);
+        _sut = new SupplierService(_mockUow.Object, _mockLogger.Object, _mockAccountingService.Object);
     }
 
     public void Dispose()
@@ -99,7 +128,7 @@ public class SupplierServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.CreateSupplierRequest("New Supplier", "1234567890", "test@supplier.com", "Test Address", null, 2000m);
 
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
+        var result = await _sut.CreateAsync(request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("New Supplier");
@@ -124,7 +153,7 @@ public class SupplierServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.UpdateSupplierRequest("Updated Supplier", "0987654321", "updated@supplier.com", "New Address", null, 0, true);
 
-        var result = await _sut.UpdateAsync(supplier.Id, request, CancellationToken.None);
+        var result = await _sut.UpdateAsync(supplier.Id, request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("Updated Supplier");
@@ -140,7 +169,7 @@ public class SupplierServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.UpdateSupplierRequest("Updated Supplier", null, null, null, null, 0, true);
 
-        var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
+        var result = await _sut.UpdateAsync(999, request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("المورد غير موجود");
@@ -161,7 +190,7 @@ public class SupplierServiceTests : IDisposable
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
-        var result = await _sut.DeleteAsync(supplier.Id, CancellationToken.None);
+        var result = await _sut.DeleteAsync(supplier.Id, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
 
@@ -173,7 +202,7 @@ public class SupplierServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_NonExistentSupplier_ReturnsNotFound");
 
-        var result = await _sut.DeleteAsync(999, CancellationToken.None);
+        var result = await _sut.DeleteAsync(999, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Contain("المورد غير موجود");
@@ -192,7 +221,7 @@ public class SupplierServiceTests : IDisposable
 
         var request = new SalesSystem.Contracts.Requests.CreateSupplierRequest("New Supplier", null, null, null, null, 3000m); // We owe them 3000
 
-        var result = await _sut.CreateAsync(request, CancellationToken.None);
+        var result = await _sut.CreateAsync(request, 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value!.OpeningBalance.Should().Be(3000m);
@@ -234,6 +263,8 @@ public class SupplierServiceTests : IDisposable
         public TestDbContext(DbContextOptions<TestDbContext> options) : base(options) { }
 
         public DbSet<Supplier> Suppliers => Set<Supplier>();
+        public DbSet<Account> Accounts => Set<Account>();
+        public DbSet<SystemAccountMappings> SystemAccountMappings => Set<SystemAccountMappings>();
     }
 
     private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity

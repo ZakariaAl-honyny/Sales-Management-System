@@ -146,6 +146,53 @@ public async Task<IActionResult> GetById(int id, CancellationToken ct)
 ### Service Interface
 - `IStoreSettingsService` must expose `GetAllSystemSettingsAsync()` and `UpdateSystemSettingsAsync()` for system settings bulk operations.
 
+## CashBox Service Pattern (v4.9 — No Balance Fields)
+
+### CashBox Entity Architecture
+- CashBox is a **lightweight register entity** — NO `OpeningBalance` or `CurrentBalance` fields
+- Balance tracked on linked `Account` entity via `AccountId` FK (required)
+- CashBox stores metadata only: Name, CategoryId, PhoneNumber, TaxNumber, Address, CurrencyId
+
+### Auto-Account Creation
+When `CashBoxService.CreateAsync()` receives `AccountId = null`, auto-create a Level-4 account:
+```csharp
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1110", ct); // Cash & Cash Equivalents
+var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
+var newCode = (int.Parse(maxCode ?? "1110") + 1).ToString();
+var account = Account.Create(newCode, $"صندوق {box.Name}", $"Cash Box {box.Name}",
+    AccountType.Asset, 4, parentAccount!.Id, false);
+await _uow.Accounts.AddAsync(account, ct);
+box.SetAccountId(account.Id);
+```
+
+### CashTransaction Pattern (RunningBalance)
+- `CashTransaction` uses `RunningBalance` (cumulative sum) — NOT `BalanceBefore`/`BalanceAfter`
+- `CashTransaction.Create()` is PUBLIC — callable from service layer directly
+- Service computes running balance by summing all previous transactions:
+```csharp
+var previousTotal = await _uow.CashTransactions.GetTotalAmountAsync(cashBoxId, ct);
+var runningBalance = previousTotal + (type == CashTransactionType.Expense || type == CashTransactionType.TransferOut || type == CashTransactionType.RefundOut ? -amount : amount);
+var tx = CashTransaction.Create(cashBoxId, type, amount, runningBalance, description, referenceId, referenceType, userId);
+```
+
+### No Client-Side Balance Validation
+- Cash transfers validate on SERVER side via running balance computation from CashTransaction records
+- NEVER check `sourceBox.CurrentBalance >= amount` on client side
+
+### Service Methods
+```csharp
+public interface ICashBoxService
+{
+    Task<Result<CashBoxDto>> CreateAsync(CreateCashBoxRequest request, int userId, CancellationToken ct);
+    Task<Result<CashBoxDto>> GetByIdAsync(int id, CancellationToken ct);
+    Task<Result<List<CashBoxDto>>> GetAllAsync(CancellationToken ct);
+    Task<Result> DeleteAsync(int id, int userId, CancellationToken ct);
+    Task<Result<CashTransactionDto>> CreateTransactionAsync(int cashBoxId, CreateCashTransactionRequest request, int userId, CancellationToken ct);
+    Task<Result<CashTransferResult>> TransferAsync(CashTransferRequest request, int userId, CancellationToken ct);
+    // NO UpdateBalanceAsync, NO Deposit, NO Withdraw
+}
+```
+
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
 Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User management with 4 roles, 33 permission codes, lockout, and audit logging.
@@ -223,3 +270,173 @@ Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User
 - RULE-318: Desktop permission filtering via API-based checks
 - RULE-319: DbSeeder seeds all 33 permissions
 - RULE-320: Default admin user seeded passwordless
+
+### Phase 23 — Customers Module
+
+#### Rules to Enforce
+- RULE-353: CustomerType stored as byte (Cash=1, Credit=2) — never int or string
+- RULE-354: AccountId optional FK for financial reporting
+- RULE-355: CustomerGroupId optional FK for categorization
+- RULE-356: CustomerGroup soft-deletable with child reference guard
+- RULE-357: CustomerType INFORMATIONAL ONLY — credit limit enforcement uses `CreditLimit > 0`, NOT CustomerType
+- RULE-361: Kebab-case API route: api/v1/customer-groups
+- RULE-362: AllStaff READ, ManagerAndAbove WRITE for groups
+
+#### API Endpoints
+```
+GET    /api/v1/customer-groups              → List all groups (AllStaff)
+GET    /api/v1/customer-groups/{id}         → Get group by ID (AllStaff)
+POST   /api/v1/customer-groups              → Create group (ManagerAndAbove)
+PUT    /api/v1/customer-groups/{id}         → Update group (ManagerAndAbove)
+DELETE /api/v1/customer-groups/{id}         → Soft-delete group (ManagerAndAbove)
+GET    /api/v1/customers/groups             → Customer group lookup (AllStaff)
+```
+
+#### Validation Rules
+- CreateCustomerRequest: Name required (max 100), Phone max 50, Email max 100, TaxNumber max 20, OpeningBalance >= 0, CreditLimit >= 0, CustomerType 1-2, AccountId >0, CustomerGroupId >0
+- UpdateCustomerRequest: same as Create + IsActive not null
+- Phone: regex `^05\d{8}$` with Arabic message + `.When(x => !string.IsNullOrEmpty(x.Phone))`
+- Email: `.EmailAddress()` with Arabic message + `.When(x => !string.IsNullOrEmpty(x.Email))`
+- CreateCustomerGroupRequest: Name required (max 100), Description max 250
+- UpdateCustomerGroupRequest: same as Create + IsActive not null
+
+#### Route Constraint Rule
+NEVER use `:byte` — use `:int:min(1):max(N)` per RULE-345.
+
+#### XAML Integration Rules (Enforce During API Review)
+- RULE-367: NEVER apply `ModernTextBox` style to `ComboBox` (crashes at runtime)
+- RULE-368: NEVER set both `DisplayMemberPath` and `ItemTemplate` on the same `ComboBox`
+
+## Phase 24 — Accounting Integration Patterns (v4.6.9+)
+
+### When creating AccountingIntegrationService methods:
+1. ALL methods return `Result<int>` — NEVER throw
+2. Use `_systemAccountService.GetMappingsAsync()` to resolve account IDs
+3. Validate ALL required accounts exist before creating any lines
+4. Use `_journalEntryService.CreateJournalEntryAsync(request, userId, ct)` for entry creation — NEVER build JournalEntry directly
+5. Do NOT own transactions — the caller wraps in `ExecuteTransactionAsync`
+
+### Journal Entry Structure:
+```csharp
+ReferenceType: "Customer" / "Supplier" / "SalesInvoice" / "PurchaseInvoice" / "CustomerPayment" / "SupplierPayment"
+ReferenceId: entity.Id (int FK) — primary lookup key
+ReferenceNumber: entity.InvoiceNo.ToString() / entity.Id.ToString() — fallback lookup
+EntryType: OpeningBalance=9 / CustomerReceipt=10 / SupplierPayment=11
+Lines: List of (AccountCode, Description, Debit, Credit) — balanced
+```
+
+### Critical Business Rules:
+- **Customer Opening**: Dr AR, Cr OpeningBalanceEquity (1422) — only if OB > 0
+- **Supplier Opening**: Dr OpeningBalanceEquity (1422), Cr AP — only if OB > 0
+- **Sales Post Revenue**: Dr Cash/AR (depends on PaymentType), Cr SalesRevenue, Cr VAT Output
+- **Sales Post COGS**: Dr COGS (AverageCost from ProductUnit), Cr Inventory
+- **Sales Cancel**: Full reversal — lookup by ReferenceId, mirror Dr↔Cr. Fallback: compute COGS from items
+- **Purchase Post**: Dr Inventory, Dr VAT Input, Cr Cash/AP
+- **Purchase Cancel**: Full reversal — use `CashTransactionType.RefundOut` NOT `SupplierPayment`
+- **Customer Payment**: Dr Cash, Cr AR
+- **Supplier Payment**: Dr AP, Cr Cash
+- **Payment Update**: Reverse old (Dr AR / Cr Cash), create new (Dr Cash / Cr AR)
+- **Payment Delete**: Reverse (Dr AR / Cr Cash)
+
+### Security Rules:
+- `JournalEntriesController.Create()` MUST extract userId from JWT `ClaimTypes.NameIdentifier` — NEVER from request body
+- CustomerService/SupplierService MUST accept `int userId` parameter — NEVER hardcode `createdByUserId: 1`
+- All entity Update/Delete methods MUST accept `int userId` for audit trail
+
+### COGS Calculation:
+```csharp
+var effectiveCost = baseUnit?.AverageCost ?? baseUnit?.PurchaseCost ?? 0;
+// NOT: baseUnit?.PurchaseCost  (would ignore WeightedAverage costing)
+```
+
+### NetRevenue Validation:
+```csharp
+if (invoice.DiscountAmount > invoice.SubTotal)
+    return Result<int>.Failure("لا يمكن أن يكون الخصم أكبر من إجمالي الفاتورة");
+// NOT: if (netRevenue < 0) netRevenue = 0;  (causes unbalanced entries)
+```
+
+### InvoiceNo Generation:
+```csharp
+if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
+{
+    var existing = await _uow.SalesInvoices.AnyAsync(i => i.InvoiceNo == request.InvoiceNo.Value, ct);
+    if (existing) return Result<...>.Failure("رقم الفاتورة موجود بالفعل");
+    invoiceNo = request.InvoiceNo.Value;
+}
+else
+{
+    var seqResult = await _documentSequenceService.GetNextIntAsync("SalesInvoice", ct);
+    if (!seqResult.IsSuccess) return Result<...>.Failure("فشل في توليد رقم الفاتورة");
+    invoiceNo = seqResult.Value;
+}
+// NEVER: lastId + 1 (not thread-safe)
+```
+
+---
+
+## 📋 Phase Awareness (Phases 23-31)
+
+The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
+| 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
+| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
+| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
+| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
+| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
+| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
+| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
+
+### Key Architecture Rules for Subagents
+
+When implementing or reviewing code, ALWAYS enforce these rules:
+
+1. **Multi-Currency First**: All pricing MUST support multi-currency via ProductPrices table — NEVER store single-currency prices on Product entity
+2. **FIFO/FEFO Batches**: Inventory MUST use InventoryBatches for cost allocation — NEVER use weighted-average only
+3. **Landed Cost**: Purchase costs MUST include AdditionalCharge distribution — NEVER record purchase cost without transport/customs allocation
+4. **Auto Journal Entries**: Every money-affecting operation MUST create journal entries via AccountingIntegrationService — NEVER leave the general ledger out of sync
+5. **Chart of Accounts Links**: CashBox, Warehouse, Customer, Supplier MUST link to Account via AccountId FK — NEVER operate without COA integration
+6. **Payment Allocation**: Payments MUST use PaymentAllocation for multi-invoice settlement — NEVER leave partial payments untracked
+7. **Report Excellence**: ALL reports MUST support Excel export via ClosedXML — NEVER limit to on-screen display only
+8. **Passwordless Users**: User.Create() NEVER accepts a password — MustChangePassword=true is the default
+9. **ReferenceId over ReferenceNumber**: Journal entry lookups use int FK (ReferenceId), not string matching
+10. **AvgCost for COGS**: COGS uses ProductUnit.AverageCost (weighted average), never PurchaseCost
+
+### 💡 Bug Prevention Checklist
+
+When writing or reviewing code in ANY layer, check these:
+- [ ] Does the code handle multi-currency correctly? (CurrencyId + ExchangeRate on all financial entities)
+- [ ] Are all prices stored per ProductUnit (not per Product)?
+- [ ] Does costing use the configured CostingMethod from SystemSettings?
+- [ ] Are all FK relationships `DeleteBehavior.Restrict`?
+- [ ] Does the service return `Result<T>` (not throw exceptions)?
+- [ ] Is the controller free of business logic (delegates to service)?
+- [ ] Do all ViewModels use `ExecuteAsync()` wrapper (no manual try/catch)?
+- [ ] Are all buttons ALWAYS enabled (no CanExecute predicates)?
+- [ ] Does the validation use `INotifyDataErrorInfo` (not `HasXxxError` booleans)?
+- [ ] Does every editor call `ValidateAllAsync()` on save?
+- [ ] Is the connection string DPAPI-encrypted or from env var?
+- [ ] Are Arabic messages properly UTF-8 encoded?
+- [ ] Does the list display newest-first (OrderByDescending)?
+- [ ] Are EventBus subscriptions disposed in `Cleanup()`?
+
+### Features to Fix By Default
+
+When you encounter any code related to these areas, apply fixes automatically:
+
+1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
+2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
+3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
+4. Missing `CurrencyId` on financial entities → Add multi-currency support
+5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
+6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
+7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
+8. Missing journal entry on cash operations → Call AccountingIntegrationService
+9. Missing Excel export on report → Add ClosedXML worksheet generation
+10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
+11. Payment without allocation → Add PaymentAllocation tracking
+12. Missing reversal entries on payment update/delete → Add reversal journal entries

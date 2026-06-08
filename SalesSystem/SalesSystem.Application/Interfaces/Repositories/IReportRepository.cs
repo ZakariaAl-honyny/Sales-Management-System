@@ -13,7 +13,7 @@ public interface IReportRepository
     Task<IEnumerable<StockReportDto>> GetStockReportAsync(int? warehouseId, CancellationToken ct);
     Task<IEnumerable<LowStockReportDto>> GetLowStockReportAsync(int? warehouseId, CancellationToken ct);
     // Customer Balances
-    Task<IEnumerable<CustomerBalanceReportDto>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct);
+    Task<IEnumerable<CustomerFinancialBalanceDto>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct);
     // Supplier Balances
     Task<IEnumerable<SupplierBalanceReportDto>> GetSupplierBalancesReportAsync(int? supplierId, CancellationToken ct);
     // Product Movements

@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.6.9+ — Phases 21-22 Complete + Bug Fixes)
+# AGENTS.md — Sales Management System (v4.9+ — Phases 18-24 Complete, CashBox COA Integration Done, Phases 25-31 Planned)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -557,17 +557,94 @@ var newAvgCost = (totalOldValue + totalNewValue) / (oldStock + newQty);
 // Result: decimal with precision (18,2)
 ```
 
-### 2.26 Cash Boxes (v4.3)
+### 2.26 Cash Boxes (v4.9 — Refactored for Chart of Accounts Integration)
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-077 | CashBox has `OpeningBalance`, `CurrentBalance` — computed from `CashTransaction` sum |
-| RULE-078 | `CashTransaction` records: OpeningBalance, Income, Expense, Transfer, Refund, Payment |
-| RULE-079 | Every invoice payment references `CashBoxId` — link between invoice and cash box |
-| RULE-080 | `CashBox.CurrentBalance` NEVER goes negative — validate before dispensing |
-| RULE-081 | Cash transfer between boxes requires TWO transactions (Out from source, In to destination) |
+| RULE-077 | CashBox is a **lightweight register entity** with `AccountId` (required FK to Account) — balance is tracked on the linked Chart of Accounts Account, NOT on CashBox. CashBox has NO `OpeningBalance` or `CurrentBalance` fields. |
+| RULE-078 | `CashBox` has metadata fields: `CategoryId` (FK to Categories), `PhoneNumber`, `TaxNumber`, `Address` — these are optional for classifying and identifying cash registers by type (cashier desk, bank account, fund, representative custody). |
+| RULE-079 | `CashTransaction` records: OpeningBalance, Income, Expense, Transfer, Refund, Payment — uses `RunningBalance` (computed cumulative sum) instead of `BalanceBefore`/`BalanceAfter`. `CashTransaction.Create()` is public (not restricted to CashBox domain methods). |
+| RULE-080 | Account balance (NOT CashBox) NEVER goes negative — the `Account` entity on the Chart of Accounts validates balance before dispensing. CashBox service computes running balance as sum of all CashTransaction amounts. |
+| RULE-081 | Cash transfer between boxes requires TWO transactions (Out from source, In to destination) — no balance validation on client side. Server validates via running balance computation from CashTransaction records. |
 | RULE-082 | Cash transactions are immutable once created — no editing, cancellation via offsetting entry |
-| RULE-083 | `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance |
+| RULE-083 | `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance (OpeningBalance sourced from Account's opening balance via Chart of Accounts) |
+
+**Auto-Account Creation Pattern:**
+When creating a CashBox without an `AccountId`, the service auto-creates a Level-4 detail account under parent `"1110 — النقدية"` (Cash & Cash Equivalents — a Level 3 account under Current Assets 1100). Account codes auto-increment (1111, 1112, 1113...).
+
+```csharp
+// CashBoxService auto-account creation (when AccountId is null):
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1110", ct);
+var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
+var newCode = (int.Parse(maxCode ?? "1110") + 1).ToString();
+var account = Account.Create(newCode, $"صندوق {box.Name}", $"Cash Box {box.Name}",
+    AccountType.Asset, 4, parentAccount!.Id, false);
+await _uow.Accounts.AddAsync(account, ct);
+box.SetAccountId(account.Id);
+```
+
+**CashBox Entity Pattern:**
+```csharp
+public class CashBox : BaseEntity
+{
+    public string Name { get; private set; }
+    public int AccountId { get; private set; }          // FK to Account — balance lives here
+    public Account? Account { get; private set; }        // Navigation property
+    public int? CategoryId { get; private set; }         // FK to Categories (optional)
+    public Category? Category { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string? TaxNumber { get; private set; }
+    public string? Address { get; private set; }
+    public int CurrencyId { get; private set; }          // Per-box currency
+    public ICollection<CashTransaction> Transactions { get; private set; }
+
+    // NO OpeningBalance, NO CurrentBalance, NO Deposit(), NO Withdraw()
+
+    public static CashBox Create(string name, int accountId, int currencyId,
+        int? categoryId = null, string? phoneNumber = null,
+        string? taxNumber = null, string? address = null, int createdByUserId = 0)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم الصندوق مطلوب");
+        return new CashBox
+        {
+            Name = name.Trim(), AccountId = accountId, CurrencyId = currencyId,
+            CategoryId = categoryId, PhoneNumber = phoneNumber, TaxNumber = taxNumber,
+            Address = address, IsActive = true,
+            CreatedByUserId = createdByUserId, CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    public void SetAccountId(int accountId) { AccountId = accountId; UpdateTimestamp(); }
+}
+
+// CashTransaction — RunningBalance replaces BalanceBefore/BalanceAfter
+public class CashTransaction : BaseEntity
+{
+    public int CashBoxId { get; private set; }
+    public CashTransactionType Type { get; private set; }
+    public decimal Amount { get; private set; }
+    public decimal RunningBalance { get; private set; }   // Computed cumulative sum
+    public string? Description { get; private set; }
+    public int? ReferenceId { get; private set; }
+    public string? ReferenceType { get; private set; }
+
+    public static CashTransaction Create(int cashBoxId, CashTransactionType type,
+        decimal amount, decimal runningBalance, string? description = null,
+        int? referenceId = null, string? referenceType = null, int createdByUserId = 0)
+    {
+        if (amount <= 0)
+            throw new DomainException("المبلغ يجب أن يكون أكبر من صفر");
+        return new CashTransaction
+        {
+            CashBoxId = cashBoxId, Type = type, Amount = amount,
+            RunningBalance = runningBalance, Description = description,
+            ReferenceId = referenceId, ReferenceType = referenceType,
+            CreatedByUserId = createdByUserId, CreatedAt = DateTime.UtcNow
+        };
+    }
+}
+```
 
 **CashTransactionType enum:**
 ```csharp
@@ -1376,6 +1453,121 @@ The following rules codify the bugs found and fixed during Phase 22 code review.
 | RULE-351 | `nameof` operator MUST be used for validator property names instead of string literals — e.g., `RuleFor(x => x.NameAr)` NOT `RuleFor("NameAr")`. String literals for property names cause silent validator failures when properties are renamed. |
 | RULE-352 | Desktop health check MUST use `SecureDbContextFactory.GetDecryptedConnectionString()` as the single source of truth for connection strings — NEVER inject raw `IConfiguration` into health check services. The health check bypass must still go through DPAPI decryption to avoid false "connection refused" errors. |
 
+### 2.75 Phase 23 — Customers Module Rules (v4.6.9+)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-353 | ~~REMOVED (CustomerType removed from Customer entity — Cash/Credit decision is per-invoice via `SalesInvoice.PaymentType`)~~ |
+| RULE-354 | `Customer` entity MUST have optional `AccountId` (int? FK to `Account`) for financial reporting integration — link is optional for legacy customer migration. |
+| RULE-355 | `Customer` entity MUST have optional `CustomerGroupId` (int? FK to `CustomerGroup`) for customer categorization — group is optional. |
+| RULE-356 | `CustomerGroup` is a soft-deletable entity (IsActive) — deletion is blocked if any customer references the group. |
+| RULE-357 | ~~REMOVED (CustomerType removed — credit limit enforcement uses `CreditLimit > 0` only, per `Customer.CheckCreditLimit()`)~~ |
+| RULE-358 | `Customer.CheckCreditLimit(decimal additionalAmount)` is a NON-THROWING domain method returning `bool` — computes `(CurrentBalance + additionalAmount) <= CreditLimit`. The caller decides whether to block or warn. |
+| RULE-359 | `Customer.Create()` MUST accept `accountId`, `customerGroupId` as optional parameters. |
+| RULE-360 | `Customer.Update()` must accept `accountId`, `customerGroupId` as optional parameters. |
+| RULE-361 | `CustomerDto` MUST include `AccountId`, `AccountName`, `CustomerGroupId`, `CustomerGroupName` for Desktop UI binding. |
+| RULE-362 | `CustomerGroup` API controller route MUST be `api/v1/customer-groups` — NOT `api/v1/customergroups` (kebab-case convention). |
+| RULE-363 | Customer groups READ endpoints use `AllStaff` policy — WRITE endpoints use `ManagerAndAbove` policy. |
+| RULE-364 | Desktop Customer Editor MUST load `AvailableGroups` and `AvailableAccounts` as lookup data on init — show dropdowns for group and linked account. |
+| RULE-365 | `CustomerGroupDto` MUST include `Id`, `Name`, `Description`, `IsActive` — groups are viewable by all staff (AllStaff). |
+| RULE-366 | Seeder MUST seed at least one default CustomerGroup ("عام") before seeding customers — the default customer "عميل نقدي" must reference the seeded group. |
+| RULE-367 | ~~REMOVED (CustomerType removed from system entirely)~~ |
+| RULE-368 | `ModernTextBox` style MUST NOT be used on `ComboBox` elements — `ModernTextBox` has `TargetType="TextBox"` and causes `XamlParseException`. Use `ModernComboBox` style instead. |
+| RULE-369 | `ComboBox` elements MUST NOT have both `DisplayMemberPath` and `ItemTemplate` set simultaneously — WPF throws `InvalidOperationException`. Use one or the other exclusively. |
+| RULE-370 | Phone number validation in customer FluentValidators MUST use regex `^05\d{8}$` with Arabic error message — NEVER only `MaxLength` check. Email MUST use `.EmailAddress()` validation. |
+
+Phase 24: Accounting Engine Automation → Automatic journal entries for all money operations
+Phase 25: Payment Update/Delete Reversal Entries → Fix C-2/C-3: Reversal entries for payment update/delete
+Phase 26: Code Review Remediations (C-1 through C-8) → Fix COGS, netRevenue, CashTransactionType, ReferenceId lookup, InvoiceNo generation
+
+### 2.76 Phase 24 — Accounting Integration Rules (v4.6.9+)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-371 | AccountingIntegrationService MUST create balanced double-entry journal entries for EVERY money-affecting operation — NEVER skip journal entry creation. |
+| RULE-372 | Customer/Supplier opening balance MUST create a journal entry: Dr AccountsReceivable / Cr OpeningBalanceEquity (customer) OR Dr OpeningBalanceEquity / Cr AccountsPayable (supplier). |
+| RULE-373 | Sales invoice posting MUST create TWO sets of journal entries: Revenue side (Dr Cash/AR, Cr Sales Revenue, Cr VAT Output) AND COGS side (Dr COGS, Cr Inventory). |
+| RULE-374 | Purchase invoice posting MUST create a journal entry: Dr Inventory, Dr VAT Input, Cr Cash/AP. |
+| RULE-375 | All cancellation/reversal operations MUST create reversal journal entries mirroring the original with Dr↔Cr swapped. |
+| RULE-376 | Payment creation MUST create a journal entry: Dr Cash, Cr AR (customer payment) OR Dr AP, Cr Cash (supplier payment). |
+| RULE-377 | Payment UPDATE/DELETE MUST create reversal journal entries for the original amount before applying changes — NEVER leave orphan journal entries in the general ledger. |
+| RULE-378 | COGS in sales journal entries MUST use AverageCost (weighted average cost from ProductUnit), NOT PurchaseCost — the costing method set in SystemSettings determines the actual cost value. |
+| RULE-379 | NetRevenue (SubTotal - Discount) MUST be validated: if Discount > SubTotal, return Result.Failure — NEVER clamp to zero (causes unbalanced entries). |
+| RULE-380 | Journal entry reference lookup MUST use ReferenceId (int FK) as primary key, with ReferenceNumber (string) as fallback — NEVER rely on string matching alone. |
+| RULE-381 | Reverse journal entry queries MUST have a computation fallback: if original entry not found, compute estimated amounts from source document items and log a warning. |
+| RULE-382 | JournalEntriesController.Create() MUST extract CreatedBy userId from JWT claims — NEVER accept client-supplied CreatedBy field (prevents user ID spoofing). |
+| RULE-383 | CustomerService/SupplierService Create/Update/Delete MUST accept int userId parameter from controller — NEVER hardcode userId (e.g., `createdByUserId: 1`). |
+| RULE-384 | InvoiceNo MUST be generated via IDocumentSequenceService.GetNextIntAsync() (thread-safe with SemaphoreSlim) — NEVER use `lastId + 1` (causes duplicates under concurrency). |
+| RULE-385 | OpeningBalanceEquityAccount (1422) MUST be seeded with isSystemAccount=true (protected from deletion) even though it's Level 3 — this is a deliberate exception to RULE-327. |
+| RULE-386 | JournalEntryConfiguration MUST have a composite index on (ReferenceType, ReferenceId) with filter `[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL` for reference-based lookups. |
+| RULE-387 | CashTransactionType on purchase cancel MUST use RefundOut (reversal), NOT SupplierPayment (forward payment type). |
+| RULE-388 | All AccountingIntegrationService methods MUST return Result<int> (never throw) and MUST NOT own transactions — the caller is responsible for wrapping in ExecuteTransactionAsync. |
+
+### 2.77 Phase 25 — Products Module Rules (v4.6.9+)
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-389 | Product entity MUST be restructured: remove PurchasePrice, SalePrice, WholesalePrice, RetailPrice, ExpirationDate, Barcode — store pricing in ProductPrices table, batches in InventoryBatches, barcodes in UnitBarcodes. |
+| RULE-390 | `ProductPrices` entity: ProductUnitId FK, CurrencyId FK, Price decimal(18,2), EffectiveFrom datetime2, EffectiveTo datetime2 (nullable) — supports multi-currency pricing with effective date ranges. |
+| RULE-391 | `InventoryBatches` entity: ProductId FK, PurchaseInvoiceItemId FK, Quantity decimal(18,3), UnitCost decimal(18,2), ManufactureDate, ExpiryDate, BatchNo — enables FIFO/FEFO cost allocation. |
+| RULE-392 | `PriceLevel` enum: Retail=1, Wholesale=2, VIP=3, Distributor=4 — replaces binary Retail/Wholesale with multi-level pricing. |
+| RULE-393 | `PriceLevelService` returns `Result<decimal>` for price calculations — NEVER compute prices outside this service. |
+| RULE-394 | Product images stored in `ProductImages` table (multiple images per product) — ImagePath on Product entity is the primary/main image. |
+| RULE-395 | Opening stock on product creation: optional `OpeningQuantity`, `OpeningUnitCost`, `ExpiryDate` per warehouse — creates initial InventoryBatch + WarehouseStock + InventoryMovement entry. |
+
+### 2.78 Phase 26 — Warehouses Module Rules (v4.6.9+)
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-396 | Warehouse entity MUST have: `Type` (Main=1, Store=2, Showroom=3), `ManagerName` (nullable string), `AccountId` (int? FK to Account), `Address` (nullable string), `Phone` (nullable string). |
+| RULE-397 | `StockAdjustmentType` enum: Addition=1, Deduction=2, Correction=3 — for inventory adjustment operations. |
+| RULE-398 | `StockIssueReason` enum: SalesReturn=1, Damage=2, Expiry=3, InternalUse=4, Other=5. |
+| RULE-399 | Physical Count deferred to V2 — initial stock on product creation covers opening stock needs. |
+| RULE-400 | Each inventory operation (Receipt, Issue, Transfer, Adjustment) MUST create an `InventoryMovement` record with full audit trail. |
+
+### 2.79 Phase 27 — Purchases Module Rules (v4.6.9+)
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-401 | Purchase invoice MUST support: multi-currency (CurrencyId + ExchangeRate), additional charges (AdditionalCharge entity with AccountId FK), partial PO receipt, attachments (single AttachmentPath). |
+| RULE-402 | `AdditionalCharge` entity: PurchaseInvoiceId FK, Description, Amount decimal(18,2), AccountId FK (int) — distributes extra costs (transport, customs, etc.) across invoice items for true landed cost. |
+| RULE-403 | Purchase Order (PO) entity: separate table with its own sequence, can be partially received via PurchaseInvoice. PO has Draft/Approved/Received/Cancelled statuses. |
+| RULE-404 | Purchase return MUST be standalone (not linked to original invoice) — supports returning items purchased outside the system. |
+| RULE-405 | PurchaseCost distribution: `AllocateAdditionalCharges()` service distributes AdditionalCharge amounts across invoice items by quantity or value weighting. |
+
+### 2.80 Phase 28 — Sales Module Rules (v4.6.9+)
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-406 | Sales invoice MUST support: multi-currency (CurrencyId + ExchangeRate), profit display per line (SalePrice - AverageCost), price override with permission check, barcode POS mode. |
+| RULE-407 | `SalesQuotation` entity: separate table with expiry date, convertible to SalesInvoice. Quotation has Draft/Confirmed/Expired/Converted statuses. |
+| RULE-408 | Continuous barcode scanning POS mode: keyboard wedge scanner support — auto-adds product by barcode without manual focus/button click. |
+| RULE-409 | Credit limit check: `Customer.CheckCreditLimit(additionalAmount)` returns bool — must be checked BEFORE posting a credit sale. |
+| RULE-410 | Sales return MUST generate automatic refund: CashTransaction with RefundOut type, reverse journal entry for the return amount. |
+
+### 2.81 Phase 29 — Receipts & Payments Module Rules (v4.6.9+)
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-411 | CustomerPayment/SupplierPayment MUST support: multi-invoice distribution, cheque management (Cheque entity), cash/ bank/ cheque payment methods. |
+| RULE-412 | `Cheque` entity: ChequeNumber, BankName, IssueDate, MaturityDate, Status (Pending=1, Cleared=2, Bounced=3, Cancelled=4), Amount, PaymentId FK. |
+| RULE-413 | Payment distribution: one payment can settle multiple invoices — `PaymentAllocation` entity tracks (PaymentId, InvoiceId, InvoiceType, AllocatedAmount). |
+| RULE-414 | CashBox MUST have AccountId FK linking to Chart of Accounts — cash transactions MUST create automatic journal entries. |
+| RULE-415 | DailyClosure MUST compute: ActualCashCount, ExpectedBalance, Difference (actual - expected), DifferenceReconciled flag. |
+
+### 2.82 Phase 30 — Journal Entries Module Rules (v4.6.9+)
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-416 | JournalEntry MUST support 3-state lifecycle: Draft (1) → Posted (2) → Cancelled (3) — identical to invoice lifecycle. |
+| RULE-417 | JournalEntry MUST support multi-currency: CurrencyId FK, ExchangeRate decimal(18,2), display both original and base currency amounts per line. |
+| RULE-418 | JournalEntry MUST support attachments: `AttachmentPath` (single) or `JournalEntryAttachments` table (multiple for V2). |
+| RULE-419 | `FiscalYear` entity: Year int, StartDate, EndDate, IsOpen bool, OpenedAt, ClosedAt, ClosedByUserId FK. |
+| RULE-420 | Annual Closing: Transfer revenue/expense balances to RetainedEarnings, close all income statement accounts, lock fiscal year. Opening entry for new fiscal year. |
+
+### 2.83 Phase 31 — Reports Module Rules (v4.6.9+)
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-421 | Reports MUST use dedicated DTOs with computed display properties (e.g., `BalanceStatus`, `AgingBucket`) — NEVER require ViewModel to translate raw data. |
+| RULE-422 | Hierarchical Income Statement DTO: Revenue - COGS = GrossProfit - OperatingExpenses = NetIncome with subtotals at each level. |
+| RULE-423 | Hierarchical Balance Sheet DTO: Assets = Liabilities + Equity with section subtotals, computed from Account balances. |
+| RULE-424 | Excel export via ClosedXML — ALL report DTOs must support `ToDataTable()` or equivalent for worksheet generation. |
+| RULE-425 | 35+ report DTOs across 7 categories: Financial (6), Inventory (5), Sales (6), Purchases (4), Cash/Box (4), Transactions (5), Users (5). |
+
 ## 3. Enums (Use These EXACT Values)
 
 ```csharp
@@ -1401,6 +1593,13 @@ public enum InvoiceTypePrint : byte
 {
     Sales = 1, Purchase = 2, SalesReturn = 3, PurchaseReturn = 4, Test = 5
 }
+public enum PriceLevel : byte { Retail = 1, Wholesale = 2, VIP = 3, Distributor = 4 }
+public enum WarehouseType : byte { Main = 1, Store = 2, Showroom = 3 }
+public enum StockAdjustmentType : byte { Addition = 1, Deduction = 2, Correction = 3 }
+public enum StockIssueReason : byte { SalesReturn = 1, Damage = 2, Expiry = 3, InternalUse = 4, Other = 5 }
+public enum QuotationStatus : byte { Draft = 1, Confirmed = 2, Expired = 3, Converted = 4 }
+public enum POStatus : byte { Draft = 1, Approved = 2, Received = 3, Cancelled = 4 }
+public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancelled = 4 }
 ```
 
 ---
@@ -1534,6 +1733,39 @@ public enum InvoiceTypePrint : byte
 ❌ `string` (non-nullable) for `Explanation` field (must be `string?` nullable)
 ❌ `nameof` operator NOT used in validator `RuleFor` calls (string literals break on rename)
 ❌ Health check injecting raw `IConfiguration` instead of `SecureDbContextFactory`
+❌ `CheckCreditLimit()` throwing exceptions (return bool instead)
+❌ Hard-deleting CustomerGroup when customers reference it
+❌ CustomerGroup route without kebab-case (`customergroups` instead of `customer-groups`)
+❌ CustomerGroup Editor/List without proper group management UI
+❌ `ModernTextBox` style on `ComboBox` elements — `ModernTextBox` has `TargetType="TextBox"`, causes `XamlParseException`
+❌ `DisplayMemberPath` and `ItemTemplate` on same `ComboBox` — WPF throws `InvalidOperationException`
+❌ client-supplied CreatedBy in journal entry requests (always extract from JWT)
+❌ Hardcoded userId (createdByUserId: 1) in Customer/Supplier services
+❌ lastId + 1 for InvoiceNo generation (use DocumentSequenceService)
+❌ PurchaseCost for COGS calculation (use AverageCost)
+❌ Clamping negative netRevenue to 0 (return validation error instead)
+❌ SupplierPayment CashTransactionType on purchase cancel (use RefundOut)
+❌ String-based ReferenceNumber lookup alone (use ReferenceId with fallback)
+❌ Missing composite index on JournalEntry(ReferenceType, ReferenceId)
+❌ Payment update/delete without reversal journal entries
+❌ PurchasePrice/SalePrice on Product entity (use ProductPrices table instead)
+❌ Single-currency pricing (must support multi-currency via ProductPrices)
+❌ No batch tracking for inventory (must use InventoryBatches for FIFO/FEFO)
+❌ Purchase invoice without landed cost distribution (must use AdditionalCharge entity)
+❌ Sales quotation without expiry date (quotations must expire)
+❌ Payment without allocation tracking (must use PaymentAllocation entity)
+❌ CashBox without AccountId FK (must link to Chart of Accounts)
+❌ OpeningBalance/CurrentBalance on CashBox entity (balance lives on linked Account only)
+❌ BalanceBefore/BalanceAfter on CashTransaction (use RunningBalance instead)
+❌ Deposit()/Withdraw() methods on CashBox (removed — service creates CashTransaction records directly)
+❌ Client-side balance validation for CashBox transfers (server validates via Account)
+❌ CashTransaction.Create() being internal (must be public — callable from service layer)
+❌ Journal entry without multi-currency support (must store CurrencyId + ExchangeRate)
+❌ Report without Excel export (ALL report DTOs must support ClosedXML export)
+❌ Hard-coded price levels (use PriceLevel enum + ProductPrices table)
+❌ Missing AccountId on Customer/Supplier (required for journal entry integration)
+❌ Deleting fiscal year (must use open/close lifecycle, not delete)
+❌ Physical count in V1 (deferred to V2 — use opening stock instead)
 ```
 
 ---
@@ -1566,20 +1798,25 @@ public enum InvoiceTypePrint : byte
 
 ## 6. Permissions Matrix
 
-| Feature | Admin (1) | Manager (2) | Cashier (3) | API Policy |
-|---------|-----------|-------------|-------------|------------|
-| Sales Invoice | ✅ | ✅ | ✅ | AllStaff |
-| Sales Return | ✅ | ✅ | ✅ | AllStaff |
-| Purchase Invoice | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Purchase Return | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Products CRUD | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Customers CRUD | ✅ | ✅ | View Only | AllStaff |
-| Suppliers CRUD | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Warehouses CRUD | ✅ | ❌ | ❌ | AdminOnly |
-| Stock Transfer | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Reports | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Settings | ✅ | ❌ | ❌ | AdminOnly |
-| User Management | ✅ | ❌ | ❌ | AdminOnly |
+| Feature | Admin (1) | Accountant (2) | Cashier (3) | Observer (4) | API Policy |
+|---------|-----------|----------------|-------------|--------------|------------|
+| Sales Invoice | ✅ | ✅ | ✅ | View Only | AllStaff |
+| Sales Return | ✅ | ✅ | ✅ | View Only | AllStaff |
+| Purchase Invoice | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
+| Purchase Return | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
+| Products CRUD | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
+| Customers CRUD | ✅ | ✅ | View Only | View Only | AllStaff |
+| Suppliers CRUD | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
+| Warehouses CRUD | ✅ | ❌ | ❌ | ❌ | AdminOnly |
+| Stock Transfer | ✅ | ✅ | ❌ | ❌ | ManagerAndAbove |
+| Reports | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
+| Settings | ✅ | ❌ | ❌ | ❌ | AdminOnly |
+| User Management | ✅ | ❌ | ❌ | ❌ | AdminOnly |
+| Chart of Accounts | ✅ | ✅ | ❌ | ❌ | ManagerAndAbove |
+| Journal Entries | ✅ | ✅ | ❌ | ❌ | ManagerAndAbove |
+| Fiscal Year | ✅ | ❌ | ❌ | ❌ | AdminOnly |
+| Cash Boxes | ✅ | ✅ | ✅ | ❌ | AllStaff |
+| Currencies | ✅ | ✅ | View Only | View Only | AllStaff |
 
 ---
 
@@ -1644,7 +1881,13 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Unit conversions computed in Domain (not UI or Service)?
 - [ ] Barcodes stored in UnitBarcode table (not embedded in Unit)?
 - [ ] Costing update uses UpdateProductPricingService (not custom logic)?
-- [ ] CashBox.CurrentBalance validated before dispensing?
+- [ ] CashBox has AccountId FK linking to Chart of Accounts (balance lives on Account)?
+- [ ] CashBox has NO OpeningBalance/CurrentBalance fields (removed)?
+- [ ] CashTransaction uses RunningBalance (not BalanceBefore/BalanceAfter)?
+- [ ] CashTransaction.Create() is public (not internal)?
+- [ ] CashBox auto-creates sub-account under "1110 — النقدية" when AccountId is null?
+- [ ] Deposit()/Withdraw() methods removed from CashBox domain entity?
+- [ ] Cash transfer has NO client-side balance validation (server validates via Account)?
 - [ ] CashTransaction entries immutable (no direct editing)?
 - [ ] ProductPriceHistory recorded on EVERY price/cost change?
 - [ ] At least one ProductUnit per product enforced in Domain?
@@ -1789,3 +2032,36 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Search/filter works in BOTH TreeView and DataGrid modes?
 - [ ] `nameof` operator used in validator `RuleFor` calls (no string literals)?
 - [ ] Health check uses `SecureDbContextFactory.GetDecryptedConnectionString()` (not raw `IConfiguration`)?
+- [ ] CustomerGroup soft-deletable with child reference guard?
+- [ ] Customer.CheckCreditLimit() returns bool (never throws)?
+- [ ] AccountId/CustomerGroupId optional on Customer entity?
+- [ ] CustomerGroupsController uses `:int:min(1)` (not `:byte`) route constraint?
+- [ ] CustomerGroups read = AllStaff, write = ManagerAndAbove?
+- [ ] Desktop Editor loads AvailableGroups/AvailableAccounts lookup data?
+- [ ] Seeder seeds "عام" group + "عميل نقدي"?
+- [ ] CustomerGroup DTO includes Id, Name, Description, IsActive?
+- [ ] `ModernTextBox` style NOT used on `ComboBox` elements (use `ModernComboBox`)?
+- [ ] `DisplayMemberPath` and `ItemTemplate` NOT both set on same `ComboBox`?
+- [ ] Customer/Supplier opening balance creates journal entry (Dr/Cr)?
+- [ ] Sales/Purchase post creates journal entries?
+- [ ] Cancellation creates reversal entries?
+- [ ] Payment Update/Delete creates reversal entries?
+- [ ] COGS uses AverageCost (not PurchaseCost)?
+- [ ] netRevenue validated (not clamped to zero)?
+- [ ] JournalEntriesController extracts userId from JWT?
+- [ ] Customer/Supplier services use userId from controller (not hardcoded)?
+- [ ] InvoiceNo uses DocumentSequenceService (not lastId+1)?
+- [ ] Composite index on JournalEntry(ReferenceType, ReferenceId) exists?
+- [ ] CashTransactionType on purchase cancel = RefundOut?
+- [ ] All AccountingIntegrationService methods return Result<int>?
+- [ ] CashBox.AccountId FK exists with DeleteBehavior.Restrict?
+- [ ] CashBox auto-creates Level-4 sub-account under parent "1110 — النقدية"?
+- [ ] CashBoxService computes running balance from CashTransaction sum (no Deposit/Withdraw)?
+- [ ] CashBoxDto/CashTransactionDto reflect new architecture (no balance fields)?
+- [ ] CashBoxEditorView has Category dropdown, Phone/TaxNumber/Address fields?
+- [ ] CashTransferViewModel has NO client-side balance validation?
+- [ ] ReportsViewModel uses Account balance (not CashBox OpeningBalance/CurrentBalance)?
+- [ ] FinancialReportService uses RunningBalance (not BalanceAfter)?
+- [ ] DbSeeder does NOT create default cash box (accounts not yet seeded)?
+- [ ] Build: 0 errors, 0 warnings?
+- [ ] All 2,083+ tests pass?

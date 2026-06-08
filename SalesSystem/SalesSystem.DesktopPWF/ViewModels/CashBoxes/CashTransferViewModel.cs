@@ -159,10 +159,6 @@ public class CashTransferViewModel : ViewModelBase
         if (Amount <= 0)
             AddError(nameof(Amount), "مبلغ التحويل يجب أن يكون أكبر من صفر");
 
-        if (SelectedSourceCashBox != null && Amount > 0 &&
-            SelectedSourceCashBox.CurrentBalance < Amount)
-            AddError(nameof(Amount), "الرصيد غير كافٍ لإتمام التحويل");
-
         return await ValidateAllAsync();
     }
 

@@ -1,0 +1,178 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.JournalEntries.JournalEntriesListView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.JournalEntries"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance vm:JournalEntriesListViewModel, IsDesignTimeCreatable=False}"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <UserControl.Resources>
+        <!-- Inline converters for status display -->
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </UserControl.Resources>
+
+    <Grid Margin="24,24,24,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="📒  القيود اليومية"
+                   Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="JournalEntriesPageTitle"/>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Actions Group -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding ViewDetailsCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnViewEntryDetails"
+                            ToolTip="عرض تفاصيل القيد المحدد — يشمل الحسابات المدينة والدائنة">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="عرض التفاصيل" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.AutomationId="BtnRefreshJournalEntries"
+                            ToolTip="تحديث القائمة — إعادة تحميل أحدث القيود اليومية من الخادم">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <!-- Grid -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <DataGrid ItemsSource="{Binding Entries}"
+                          SelectedItem="{Binding SelectedEntry}"
+                          Style="{StaticResource ModernDataGrid}"
+                          IsReadOnly="True"
+                          AutoGenerateColumns="False"
+                          AutomationProperties.AutomationId="DgJournalEntries"
+                          ToolTip="قائمة القيود اليومية — انقر على قيد لعرض التفاصيل">
+                    <DataGrid.Columns>
+                        <!-- Entry Number -->
+                        <DataGridTextColumn Header="رقم القيد"
+                                            Binding="{Binding EntryNumber}"
+                                            Width="140"
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
+
+                        <!-- Transaction Date -->
+                        <DataGridTextColumn Header="التاريخ"
+                                            Binding="{Binding TransactionDateFormatted}"
+                                            Width="100"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
+                        <!-- Description -->
+                        <DataGridTextColumn Header="البيان"
+                                            Binding="{Binding Description}"
+                                            Width="*"
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
+
+                        <!-- Entry Type -->
+                        <DataGridTextColumn Header="النوع"
+                                            Binding="{Binding EntryTypeDisplay}"
+                                            Width="110"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
+                        <!-- Total Debit -->
+                        <DataGridTextColumn Header="مدين"
+                                            Binding="{Binding TotalDebitFormatted}"
+                                            Width="120"
+                                            CellStyle="{StaticResource DataGridCellNumberStyle}"/>
+
+                        <!-- Total Credit -->
+                        <DataGridTextColumn Header="دائن"
+                                            Binding="{Binding TotalCreditFormatted}"
+                                            Width="120"
+                                            CellStyle="{StaticResource DataGridCellNumberStyle}"/>
+
+                        <!-- Status -->
+                        <DataGridTemplateColumn Header="الحالة" Width="130" CellStyle="{StaticResource DataGridCellCenterStyle}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate DataType="vm:JournalEntryItemViewModel">
+                                    <Border>
+                                        <Border.Style>
+                                            <Style TargetType="Border" BasedOn="{StaticResource StatusBadgeStyle}">
+                                                <Setter Property="Background" Value="{StaticResource WarningLightBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPosted}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource SuccessLightBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsReversed}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock>
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource StatusBadgeTextStyle}">
+                                                    <Setter Property="Text" Value="مسودة"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource WarningTextBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPosted}" Value="True">
+                                                            <Setter Property="Text" Value="✅ مرحل"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsReversed}" Value="True">
+                                                            <Setter Property="Text" Value="🔄 ملغي"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource ErrorTextBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="عرض التفاصيل" Command="{Binding ViewDetailsCommand}"
+                                      ToolTip="عرض تفاصيل القيد المحدد — الحسابات والمبالغ">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="🔍"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
+
+                <!-- Empty State -->
+                <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="📒" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
+                        <TextBlock Text="لا توجد قيود يومية" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="القيود اليومية تسجل تلقائياً عند ترحيل الفواتير والعمليات المالية"
+                                   Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#80FFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4" Background="#E3E8EE" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="جاري تحميل القيود اليومية..." FontSize="14" Margin="0,12,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

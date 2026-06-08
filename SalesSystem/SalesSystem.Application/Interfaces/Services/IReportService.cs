@@ -15,7 +15,7 @@ public interface IReportService
     /// Get stock report for a specific warehouse or all warehouses
     Task<Result<IEnumerable<StockReportDto>>> GetStockReportAsync(int? warehouseId, CancellationToken ct);
     /// Get customer balances report
-    Task<Result<IEnumerable<CustomerBalanceReportDto>>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct);
+    Task<Result<IEnumerable<CustomerFinancialBalanceDto>>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct);
     /// Get supplier balances report
     Task<Result<IEnumerable<SupplierBalanceReportDto>>> GetSupplierBalancesReportAsync(int? supplierId, CancellationToken ct);
     /// Get product movements report for a specific product

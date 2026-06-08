@@ -28,6 +28,14 @@ public class ProductUnit : BaseEntity
     public decimal LastPurchasePrice { get; private set; }
     public int SortOrder { get; private set; }
 
+    /// <summary>
+    /// Current average cost — the authoritative cost used for COGS calculations.
+    /// Delegates to <see cref="PurchaseCost"/> which is updated by
+    /// <see cref="SalesSystem.Application.Services.UpdateProductPricingService"/>
+    /// using WeightedAverage, LastPurchasePrice, or SupplierPrice method.
+    /// </summary>
+    public decimal AverageCost => PurchaseCost;
+
     // Navigation
     public Product Product { get; private set; } = null!;
 

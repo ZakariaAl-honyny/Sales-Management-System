@@ -63,7 +63,7 @@
                                   DisplayMemberPath="BoxName"
                                   Style="{StaticResource ComboBoxStyle}"
                                   ToolTip="اختر الخزنة التي سيتم التحويل منها"/>
-                        <TextBlock Text="{Binding SelectedSourceCashBox.CurrentBalance, StringFormat='الرصيد المتوفر للخزنة: {0:N2}'}"
+                        <TextBlock Text="{Binding SelectedSourceCashBox.AccountName, StringFormat='الحساب المرتبط: {0}'}"
                                    Style="{StaticResource HelperTextStyle}"
                                    Visibility="{Binding SelectedSourceCashBox, Converter={StaticResource NullToVisibility}}"/>
                     </StackPanel>

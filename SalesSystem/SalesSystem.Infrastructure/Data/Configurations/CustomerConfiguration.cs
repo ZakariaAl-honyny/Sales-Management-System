@@ -18,6 +18,16 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         builder.Property(s => s.CurrentBalance).HasPrecision(18, 2);
         builder.Property(s => s.CreditLimit).HasPrecision(18, 2);
         builder.Property(s => s.TaxNumber).HasMaxLength(30);
+
+        // ─── Phase 32: FK to Account (Chart of Accounts) ───
+        builder.HasOne(s => s.Account)
+            .WithMany()
+            .HasForeignKey(s => s.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(s => s.AccountId)
+            .HasDatabaseName("IX_Suppliers_AccountId");
+
         builder.HasQueryFilter(s => s.IsActive);
     }
 }
@@ -36,6 +46,25 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(c => c.CurrentBalance).HasPrecision(18, 2);
         builder.Property(c => c.CreditLimit).HasPrecision(18, 2);
         builder.Property(c => c.TaxNumber).HasMaxLength(30);
+
+        // ─── Phase 23: FK to Account (Chart of Accounts) ───
+        builder.HasOne(c => c.Account)
+            .WithMany()
+            .HasForeignKey(c => c.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(c => c.AccountId)
+            .HasDatabaseName("IX_Customers_AccountId");
+
+        // ─── Phase 23: FK to CustomerGroup ───
+        builder.HasOne(c => c.CustomerGroup)
+            .WithMany()
+            .HasForeignKey(c => c.CustomerGroupId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(c => c.CustomerGroupId)
+            .HasDatabaseName("IX_Customers_CustomerGroupId");
+
         builder.HasQueryFilter(c => c.IsActive);
     }
 }

@@ -119,10 +119,21 @@
                             <Border Height="12"/>
                         </StackPanel>
 
+                        <!-- Account - Auto-created by system -->
+                        <Border Height="12"/>
+                        <Border Background="#FFEBEE" CornerRadius="6" Padding="12,8">
+                            <StackPanel>
+                                <TextBlock Text="الحساب المحاسبي" FontWeight="SemiBold" FontSize="13" Foreground="#C62828"/>
+                                <TextBlock Text="سيتم إنشاء حساب محاسبي تلقائياً تحت حساب الموردون في دليل الحسابات" 
+                                           FontSize="11" Foreground="#C62828" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Status -->
+                        <Border Height="12"/>
                         <CheckBox Content="مورد نشط" IsChecked="{Binding IsActive}" FontSize="14" 
                                   Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}" 
-                                  TabIndex="8"
+                                  TabIndex="9"
                                   AutomationProperties.AutomationId="ChkSupplierActive"/>
                     </StackPanel>
                 </Border>
@@ -143,7 +154,7 @@
                             Width="140"
                             Margin="0,0,12,0"
                             IsDefault="True"
-                            TabIndex="9"
+                            TabIndex="10"
                             AutomationProperties.AutomationId="BtnSaveSupplier"
                             ToolTip="حفظ البيانات المدخلة">
                         <StackPanel Orientation="Horizontal">
@@ -155,7 +166,7 @@
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
-                            TabIndex="10"
+                            TabIndex="11"
                             AutomationProperties.AutomationId="BtnCancelSupplier"
                             ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>

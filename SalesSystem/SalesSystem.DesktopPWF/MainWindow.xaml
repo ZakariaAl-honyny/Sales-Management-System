@@ -40,6 +40,8 @@
              xmlns:vmCurrencies="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Currencies"
              xmlns:viewsCurrencies="clr-namespace:SalesSystem.DesktopPWF.Views.Currencies"
              xmlns:vmAccounts="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Accounts"
+             xmlns:vmJournalEntries="clr-namespace:SalesSystem.DesktopPWF.ViewModels.JournalEntries"
+             xmlns:viewsJournalEntries="clr-namespace:SalesSystem.DesktopPWF.Views.JournalEntries"
              xmlns:viewsAccounts="clr-namespace:SalesSystem.DesktopPWF.Views.Accounts"
          xmlns:vmTransfers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Transfers"
          xmlns:audit="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Audit"
@@ -115,6 +117,9 @@
             <DataTemplate DataType="{x:Type vmCustomers:CustomerListViewModel}">
                 <viewsCustomers:CustomersListView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmCustomers:CustomerGroupListViewModel}">
+                <viewsCustomers:CustomerGroupsListView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmSuppliers:SupplierListViewModel}">
                 <viewsSuppliers:SuppliersListView />
             </DataTemplate>
@@ -156,6 +161,9 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type vmAccounts:AccountsListViewModel}">
                 <viewsAccounts:AccountsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmJournalEntries:JournalEntriesListViewModel}">
+                <viewsJournalEntries:JournalEntriesListView />
             </DataTemplate>
             <DataTemplate DataType="{x:Type vmAccounts:AccountEditorViewModel}">
                 <viewsAccounts:AccountEditorView />
@@ -224,6 +232,7 @@
             <MenuItem Header="الإعدادات" ToolTip="قائمة الإعدادات" x:Name="SettingsMenuItem">
                 <MenuItem Header="إدارة المنتجات" ToolTip="إدارة قائمة المنتجات والأسعار" Click="ProductsMenuItem_Click"/>
                 <MenuItem Header="إدارة العملاء" ToolTip="إدارة بيانات العملاء" Click="CustomersMenuItem_Click"/>
+                <MenuItem Header="مجموعات العملاء" Command="{Binding NavigateToCustomerGroupsCommand}" ToolTip="تصنيف وترتيب العملاء في مجموعات للتقرير والتحليل"/>
                 <MenuItem Header="إدارة الموردين" ToolTip="إدارة بيانات الموردين" Click="SuppliersMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="إدارة المستخدمين" ToolTip="إدارة حسابات المستخدمين والصلاحيات" Click="UsersMenuItem_Click"/>
@@ -231,6 +240,7 @@
                 <MenuItem Header="الضرائب" ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة" Click="TaxesMenuItem_Click"/>
                 <MenuItem Header="العملات" Command="{Binding NavigateToCurrenciesCommand}" ToolTip="إدارة العملات وأسعار الصرف"/>
                 <MenuItem Header="دليل الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}" ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
+                <MenuItem Header="القيود اليومية" Command="{Binding NavigateToJournalEntriesCommand}" ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"/>
                 <MenuItem Header="النسخ الاحتياطي" 
                           Command="{Binding NavigateToBackupCommand}"
                           ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
@@ -322,6 +332,10 @@
                                             Command="{Binding NavigateToCashBoxesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             ToolTip="إدارة الصناديق النقدية ومتابعة الأرصدة والحركات"/>
+                                    <Button Content="القيود اليومية" 
+                                            Command="{Binding NavigateToJournalEntriesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"/>
                                 </StackPanel>
                             </Expander>
 
@@ -373,6 +387,10 @@
                                             Command="{Binding NavigateToCustomersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             ToolTip="إدارة بيانات العملاء والحسابات وتاريخ المعاملات"/>
+                                    <Button Content="مجموعات العملاء" 
+                                            Command="{Binding NavigateToCustomerGroupsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            ToolTip="إدارة مجموعات العملاء — تصنيف العملاء في مجموعات للتقارير والتحليلات"/>
                                     <Button Content="الموردين" 
                                             Command="{Binding NavigateToSuppliersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

@@ -25,9 +25,6 @@ public class CreateJournalEntryRequestValidator : AbstractValidator<CreateJourna
             .Must(t => Enum.IsDefined(typeof(JournalEntryType), t))
             .WithMessage("نوع القيد المحاسبي غير صالح");
 
-        RuleFor(x => x.CreatedBy)
-            .GreaterThan(0).WithMessage("منشئ القيد المحاسبي مطلوب");
-
         RuleFor(x => x.ReferenceType)
             .MaximumLength(50).WithMessage("نوع المرجع لا يمكن أن يتجاوز 50 حرف");
 

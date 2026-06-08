@@ -160,7 +160,7 @@ public class CashBoxTransactionsViewModel : ViewModelBase
                     Transactions.Add(item);
                 }
                 IsEmpty = Transactions.Count == 0;
-                CurrentBalance = Transactions.Count > 0 ? Transactions[0].BalanceAfter : 0m;
+                CurrentBalance = Transactions.Count > 0 ? Transactions[0].RunningBalance : 0m;
             });
         }
         else

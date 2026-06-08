@@ -66,15 +66,22 @@ public record WarehouseStockDto(
     decimal Quantity,
     decimal ReorderLevel);
 
-public record SupplierDto(int Id, string Name, string? Phone, string? Email, string? Address, string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive);
-
-public record CustomerDto(int Id, string Name, string? Phone, string? Email, string? Address, string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive)
+public record SupplierDto(int Id, string Name, string? Phone, string? Email, string? Address, 
+    string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive,
+    int? AccountId = null, string? AccountName = null);
+public record CustomerDto(int Id, string Name, string? Phone, string? Email, string? Address, 
+    string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive,
+    int? AccountId = null, string? AccountName = null,
+    int? CustomerGroupId = null, string? CustomerGroupName = null)
 {
     public bool IsBalanceNegative 
     { 
         get => CurrentBalance > 0; 
     }
 }
+
+public record CustomerGroupDto(int Id, string Name, string? Description, bool IsActive);
+
 
 public record SalesInvoiceDto(
     int Id,
@@ -414,7 +421,7 @@ public record StockReportDto(
     decimal TotalValue
 );
 
-public record CustomerBalanceReportDto(
+public record CustomerFinancialBalanceDto(
     int CustomerId,
     string CustomerName,
     decimal OpeningBalance,
@@ -618,6 +625,52 @@ public record AccountLedgerLineDto(
     decimal RunningBalance
 );
 
+// ─── Journal Entry List/Detail DTOs ──────────────────
+
+public record JournalEntryListDto(
+    int Id,
+    string EntryNumber,
+    DateTime TransactionDate,
+    string Description,
+    string EntryType,
+    string? ReferenceType,
+    int? ReferenceId,
+    string? ReferenceNumber,
+    decimal TotalDebit,
+    decimal TotalCredit,
+    bool IsPosted,
+    bool IsReversed,
+    DateTime CreatedAt,
+    int? CreatedByUserId
+);
+
+public record JournalEntryDetailDto(
+    int Id,
+    string EntryNumber,
+    DateTime TransactionDate,
+    string Description,
+    string EntryType,
+    string? ReferenceType,
+    int? ReferenceId,
+    string? ReferenceNumber,
+    bool IsPosted,
+    bool IsReversed,
+    int? ReversedByEntryId,
+    DateTime CreatedAt,
+    int? CreatedByUserId,
+    List<JournalEntryLineDetailDto> Lines
+);
+
+public record JournalEntryLineDetailDto(
+    int Id,
+    int AccountId,
+    string AccountCode,
+    string AccountNameAr,
+    decimal Debit,
+    decimal Credit,
+    string? Description
+);
+
 public record AccountStatementDto(
     DateTime Date,
     string Description,
@@ -668,6 +721,9 @@ public record SystemAccountMappingsDto(
     int SpoilageLossAccountId,
     string? SpoilageLossAccountName,
     string? SpoilageLossAccountCode,
+    int? OpeningBalanceEquityAccountId,
+    string? OpeningBalanceEquityAccountName,
+    string? OpeningBalanceEquityAccountCode,
     int? BranchId
 );
 
@@ -688,4 +744,27 @@ public record PaginatedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Pag
 {
     public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
 }
+
+// ═══════════════════════════════════════════════════════
+// Phase 23 — Customer Reports DTOs
+// ═══════════════════════════════════════════════════════
+
+public record CustomerBalanceReportDto(
+    int Id,
+    string Name,
+    string? Phone,
+    string? GroupName,
+    decimal CurrentBalance,
+    decimal CreditLimit,
+    string BalanceStatus
+);
+
+public record CustomerAgingReportDto(
+    int Id,
+    string Name,
+    string? Phone,
+    decimal CurrentBalance,
+    string AgingBucket,
+    DateTime CalculationDate
+);
 

@@ -26,6 +26,7 @@ public class PaymentServiceTests : IDisposable
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IDocumentSequenceService> _mockSequenceService;
     private readonly Mock<ILogger<PaymentService>> _mockLogger;
+    private readonly Mock<IAccountingIntegrationService> _mockAccountingService = new();
 
     private readonly PaymentService _sut;
 
@@ -57,20 +58,17 @@ public class PaymentServiceTests : IDisposable
                 return 1;
             });
 
-        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MockDbContextTransaction());
-
-        _mockUow.Setup(u => u.ExecuteAsync<Result<CustomerPaymentDto>>(
+        _mockUow.Setup(u => u.ExecuteTransactionAsync<Result<CustomerPaymentDto>>(
             It.IsAny<Func<Task<Result<CustomerPaymentDto>>>>(),
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result<CustomerPaymentDto>>> func, CancellationToken ct) => func());
 
-        _mockUow.Setup(u => u.ExecuteAsync<Result<SupplierPaymentDto>>(
+        _mockUow.Setup(u => u.ExecuteTransactionAsync<Result<SupplierPaymentDto>>(
             It.IsAny<Func<Task<Result<SupplierPaymentDto>>>>(),
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result<SupplierPaymentDto>>> func, CancellationToken ct) => func());
 
-        _mockUow.Setup(u => u.ExecuteAsync<Result>(
+        _mockUow.Setup(u => u.ExecuteTransactionAsync<Result>(
             It.IsAny<Func<Task<Result>>>(),
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result>> func, CancellationToken ct) => func());
@@ -78,10 +76,24 @@ public class PaymentServiceTests : IDisposable
         _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("CP-2026-000001"));
 
+        _mockAccountingService.Setup(a => a.CreateCustomerPaymentEntryAsync(
+            It.IsAny<CustomerPayment>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+        _mockAccountingService.Setup(a => a.CreateSupplierPaymentEntryAsync(
+            It.IsAny<SupplierPayment>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+        _mockAccountingService.Setup(a => a.ReverseCustomerPaymentEntryAsync(
+            It.IsAny<int>(), It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+        _mockAccountingService.Setup(a => a.ReverseSupplierPaymentEntryAsync(
+            It.IsAny<int>(), It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<int>.Success(1));
+
         _sut = new PaymentService(
             _mockUow.Object,
             _mockSequenceService.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _mockAccountingService.Object);
     }
 
     public void Dispose()

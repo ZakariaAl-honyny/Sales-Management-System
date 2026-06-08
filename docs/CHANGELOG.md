@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.6.9 — Phase 23: Customers Module (2026-06-08)
+
+### ✨ New Features
+- **CustomerType enum** (Cash/Credit) — stored as `byte` in DB, **informational only**; actual Cash/Credit decision is per-invoice via `SalesInvoice.PaymentType`
+- **CustomerGroup entity** — new categorization entity with soft-delete and child reference guard
+- **Account linking** — optional FK from Customer to Account for journal entry integration
+- **Credit Limit Enforcement** — `SalesService.PostAsync()` checks `customer.CheckCreditLimit(invoice.DueAmount)` before allowing credit sales; rolls back transaction with Arabic error if exceeded. Enforces based on `CreditLimit > 0` (not CustomerType).
+- **API: CustomerGroupsController** — full CRUD with kebab-case routes and ManagerAndAbove write policy
+- **API: GET /api/v1/customers/groups** — group lookup endpoint with AllStaff policy
+- **API: GET /api/v1/customers/by-group/{groupId}** — customers filtered by group
+- **API: GET /api/v1/customers/reports/balance** — customer balance report with balance status (مدين/دائن/متوازن)
+- **API: GET /api/v1/customers/reports/aging** — customer aging report with aging buckets
+- **Desktop: Customer Editor** — CustomerType (info only), CustomerGroup dropdown, Account lookup with AvailableGroups/AvailableAccounts data loading
+- **Desktop: Customer List** — group filter ComboBox for filtering customers by group
+- **Report DTOs** — `CustomerBalanceReportDto` + `CustomerAgingReportDto` with balance status and aging buckets
+
+### 🛠️ Enhancements
+- CustomerDto extended with AccountId, AccountName, CustomerType, CustomerGroupId, CustomerGroupName
+- CustomerService GetAllAsync now includes Account/CustomerGroup navigation properties via Include
+- CustomerService.GetAllGroupsAsync() added for group lookup
+- CustomerService.GetByGroupAsync(), GetCustomerBalanceReportAsync(), GetCustomerAgingReportAsync() added
+- CreateCustomerRequest/UpdateCustomerRequest enhanced with AccountId, CustomerType, CustomerGroupId
+- CustomerValidators enhanced with Phone regex `^05\d{8}$`, Email `.EmailAddress()`, CustomerType range validation
+- DbSeeder: seeds "عام" group, enhanced default customer with Cash type + GroupId
+- CustomerEditorView: removed redundant emoji + FontSize=20 violation (RULE-266)
+- CustomerListViewModel: removed all CanExecute predicates (RULE-059), added null-check guards with warning dialog
+- All async operations in CustomerListViewModel refactored to ExecuteAsync wrapper pattern (RULE-141)
+
+### 🔧 Infrastructure
+- New EF migration `Phase23_CustomersModule` — adds CustomerGroups table, AccountId/CustomerType/CustomerGroupId columns to Customers
+- All FKs use DeleteBehavior.Restrict — no cascade
+- CustomerGroups registered in UnitOfWork
+- 370 total architecture rules enforced (AGENTS.md)
+
+### 🧪 Tests
+- CustomerEditorViewModelTests updated with IAccountApiService mock (25 test methods)
+- CustomersControllerTests updated with FluentValidation mocks (4 test methods)
+- Build verification: 0 errors, 0 warnings across all 12 projects
+
+### 🐛 Bug Fixes
+- **XAML-001 [FIXED]**: `Style="{StaticResource ModernTextBox}"` used on 3 `ComboBox` elements (CustomerType, CustomerGroup, Account dropdowns) — `ModernTextBox` has `TargetType="TextBox"`, causing `XamlParseException`. Changed to `Style="{StaticResource ModernComboBox}"`.
+- **XAML-002 [FIXED]**: `DisplayMemberPath="Name"` and `<ComboBox.ItemTemplate>` both set on the same `ComboBox` — WPF throws `InvalidOperationException` (`Cannot set both DisplayMemberPath and ItemTemplate`). Removed `DisplayMemberPath`.
+
 ## v4.6.9 — Phase 22 Bug Fixes + Chart of Accounts Complete (2026-06-08)
 
 ### Phase 22 — Chart of Accounts Module (v4.6.9+)

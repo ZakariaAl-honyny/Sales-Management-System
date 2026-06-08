@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
@@ -29,6 +30,10 @@ public class CustomerEditorViewModel : ViewModelBase
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
+    private int? _customerGroupId;
+    private int? _accountId;
+    private CustomerGroupDto? _selectedGroup;
+    private ObservableCollection<CustomerGroupDto> _availableGroups = new();
 
 
     public CustomerEditorViewModel()
@@ -45,6 +50,8 @@ public class CustomerEditorViewModel : ViewModelBase
 
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ العميل...")));
         CancelCommand = new RelayCommand(Cancel);
+
+        _ = LoadLookupDataAsync();
     }
 
     public CustomerEditorViewModel(CustomerDto customer)
@@ -65,6 +72,8 @@ public class CustomerEditorViewModel : ViewModelBase
         _openingBalance = customer.OpeningBalance;
         _isActive = customer.IsActive;
         _isEditMode = true;
+        _customerGroupId = customer.CustomerGroupId;
+        _accountId = customer.AccountId;
     }
 
     #region Properties
@@ -94,13 +103,31 @@ public class CustomerEditorViewModel : ViewModelBase
     public string Phone
     {
         get => _phone;
-        set => SetProperty(ref _phone, value);
+        set
+        {
+            if (SetProperty(ref _phone, value))
+            {
+                if (!string.IsNullOrWhiteSpace(value) && !System.Text.RegularExpressions.Regex.IsMatch(value.Trim(), @"^05\d{8}$"))
+                    AddError(nameof(Phone), "رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
+                else
+                    ClearErrors(nameof(Phone));
+            }
+        }
     }
 
     public string Email
     {
         get => _email;
-        set => SetProperty(ref _email, value);
+        set
+        {
+            if (SetProperty(ref _email, value))
+            {
+                if (!string.IsNullOrWhiteSpace(value) && !value.Contains('@'))
+                    AddError(nameof(Email), "البريد الإلكتروني يجب أن يحتوي على @");
+                else
+                    ClearErrors(nameof(Email));
+            }
+        }
     }
 
     public string Address
@@ -163,6 +190,45 @@ public class CustomerEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
+    public ObservableCollection<CustomerGroupDto> AvailableGroups
+    {
+        get => _availableGroups;
+        set => SetProperty(ref _availableGroups, value);
+    }
+
+    public CustomerGroupDto? SelectedGroup
+    {
+        get => _selectedGroup;
+        set
+        {
+            if (SetProperty(ref _selectedGroup, value))
+            {
+                CustomerGroupId = value?.Id;
+            }
+        }
+    }
+
+    public int? CustomerGroupId
+    {
+        get => _customerGroupId;
+        set
+        {
+            if (SetProperty(ref _customerGroupId, value))
+            {
+                if (value.HasValue && value.Value <= 0)
+                    AddError(nameof(CustomerGroupId), "مجموعة العملاء غير صالحة");
+                else
+                    ClearErrors(nameof(CustomerGroupId));
+            }
+        }
+    }
+
+    public int? AccountId
+    {
+        get => _accountId;
+        set => SetProperty(ref _accountId, value);
+    }
+
     #endregion
 
     #region Commands
@@ -171,6 +237,22 @@ public class CustomerEditorViewModel : ViewModelBase
     #endregion
 
     #region Methods
+    private async Task LoadLookupDataAsync()
+    {
+        // Load customer groups
+        var groupsResult = await _customerService.GetAllGroupsAsync();
+        if (groupsResult.IsSuccess && groupsResult.Value != null)
+        {
+            AvailableGroups = new ObservableCollection<CustomerGroupDto>(groupsResult.Value);
+        }
+
+        // If in edit mode, set selected group from loaded data
+        if (_isEditMode && _customerGroupId.HasValue)
+        {
+            SelectedGroup = AvailableGroups.FirstOrDefault(g => g.Id == _customerGroupId.Value);
+        }
+    }
+
     private async Task<bool> ValidateAsync()
     {
         ClearAllErrors();
@@ -181,6 +263,8 @@ public class CustomerEditorViewModel : ViewModelBase
             AddError(nameof(CreditLimit), "الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر");
         if (OpeningBalance < 0)
             AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
+        if (CustomerGroupId.HasValue && CustomerGroupId.Value <= 0)
+            AddError(nameof(CustomerGroupId), "مجموعة العملاء غير صالحة");
 
         return await ValidateAllAsync();
     }
@@ -202,7 +286,9 @@ public class CustomerEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
                 CreditLimit,
-                IsActive);
+                IsActive,
+                AccountId: AccountId,
+                CustomerGroupId: CustomerGroupId);
 
             result = await _customerService.UpdateAsync(_customerId, updateRequest);
         }
@@ -215,7 +301,9 @@ public class CustomerEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
                 OpeningBalance,
-                CreditLimit);
+                CreditLimit,
+                AccountId: AccountId,
+                CustomerGroupId: CustomerGroupId);
 
             result = await _customerService.CreateAsync(createRequest);
         }

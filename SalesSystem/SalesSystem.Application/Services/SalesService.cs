@@ -19,6 +19,8 @@ public class SalesService : ISalesService
     private readonly ICashBoxService _cashBoxService;
     private readonly IPrintDataService _printDataService;
     private readonly IPrintService _printService;
+    private readonly IAccountingIntegrationService _accountingService;
+    private readonly IDocumentSequenceService _documentSequenceService;
     private readonly ILogger<SalesService> _logger;
 
     public SalesService(
@@ -27,6 +29,8 @@ public class SalesService : ISalesService
         ICashBoxService cashBoxService,
         IPrintDataService printDataService,
         IPrintService printService,
+        IAccountingIntegrationService accountingService,
+        IDocumentSequenceService documentSequenceService,
         ILogger<SalesService> logger)
     {
         _uow = uow;
@@ -34,6 +38,8 @@ public class SalesService : ISalesService
         _cashBoxService = cashBoxService;
         _printDataService = printDataService;
         _printService = printService;
+        _accountingService = accountingService;
+        _documentSequenceService = documentSequenceService;
         _logger = logger;
     }
 
@@ -92,21 +98,31 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, int userId, CancellationToken ct)
     {
-        // Compute default InvoiceNo if not provided: last Id + 1
-        var invoiceNo = request.InvoiceNo ?? 0;
-        if (invoiceNo <= 0)
-        {
-            var lastInvoices = await _uow.SalesInvoices.ToListAsync(
-                predicate: null,
-                queryConfig: q => q.OrderByDescending(i => i.Id).Take(1),
-                ct: ct);
-            var lastId = lastInvoices.FirstOrDefault()?.Id ?? 0;
-            invoiceNo = lastId + 1;
-        }
-
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
+            // Resolve InvoiceNo INSIDE transaction — prevents TOCTOU race (RULE-384 fix)
+            int invoiceNo;
+            if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
+            {
+                var existing = await _uow.SalesInvoices.AnyAsync(i => i.InvoiceNo == request.InvoiceNo.Value, ct);
+                if (existing)
+                {
+                    await transaction.RollbackAsync(ct);
+                    return Result<SalesInvoiceDto>.Failure("رقم الفاتورة موجود بالفعل");
+                }
+                invoiceNo = request.InvoiceNo.Value;
+            }
+            else
+            {
+                var seqResult = await _documentSequenceService.GetNextIntAsync("SalesInvoice", ct);
+                if (!seqResult.IsSuccess)
+                {
+                    await transaction.RollbackAsync(ct);
+                    return Result<SalesInvoiceDto>.Failure("فشل في توليد رقم الفاتورة");
+                }
+                invoiceNo = seqResult.Value;
+            }
             var invoice = SalesInvoice.Create(
                 request.WarehouseId,
                 invoiceNo,
@@ -218,7 +234,7 @@ public class SalesService : ISalesService
     public async Task<Result<SalesInvoiceDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
-            i => i.Id == id, ct, "Items.Product");
+            i => i.Id == id, ct, "Items.Product", "Items.Product.Units");
 
         if (invoice == null)
             return Result<SalesInvoiceDto>.Failure("الفاتورة غير موجودة", ErrorCodes.NotFound);
@@ -289,6 +305,20 @@ public class SalesService : ISalesService
                         _logger.LogWarning("Customer {CustomerId} not found for credit sales invoice {Id} post", invoice.CustomerId, invoice.Id);
                         return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
                     }
+
+                    // Credit limit enforcement — check if customer has a credit limit set
+                    if (customer.CreditLimit > 0 && invoice.DueAmount > 0)
+                    {
+                        if (!customer.CheckCreditLimit(invoice.DueAmount))
+                        {
+                            await transaction.RollbackAsync(ct);
+                            _logger.LogWarning(
+                                "Customer {CustomerId} credit limit exceeded. Balance: {Balance}, Limit: {Limit}, Due: {Due}",
+                                customer.Id, customer.CurrentBalance, customer.CreditLimit, invoice.DueAmount);
+                            return Result<SalesInvoiceDto>.Failure("تجاوز الحد الائتماني للعميل");
+                        }
+                    }
+
                     customer.IncreaseBalance(invoice.DueAmount);
                 }
 
@@ -312,6 +342,23 @@ public class SalesService : ISalesService
                 }
 
                 await _uow.SaveChangesAsync(ct);
+
+                // 6. Create journal entry for sales posting (revenue + COGS)
+                var totalCost = invoice.Items.Sum(item =>
+                {
+                    var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+                    var baseUnit = item.Product!.Units?.FirstOrDefault(u => u.IsBaseUnit);
+                    var effectiveCost = baseUnit?.AverageCost ?? baseUnit?.PurchaseCost ?? 0;
+                    return retailQty * effectiveCost;
+                });
+                var entryResult = await _accountingService.CreateSalesPostEntryAsync(invoice, userId, totalCost, ct);
+                if (!entryResult.IsSuccess)
+                {
+                    await transaction.RollbackAsync(ct);
+                    _logger.LogWarning("Journal entry creation failed for sales invoice post {Id}: {Error}", invoice.Id, entryResult.Error);
+                    return Result<SalesInvoiceDto>.Failure(entryResult.Error!);
+                }
+
                 await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("Sales Invoice posted: ID {Id} by User {UserId}", invoice.Id, userId);
@@ -431,6 +478,15 @@ public class SalesService : ISalesService
                             _logger.LogWarning("Cash transaction recording failed during cancellation of invoice {Id}: {Error}",
                                 invoice.Id, cashResult.Error);
                         }
+                    }
+
+                    // Create reversal journal entry for accounting
+                    var reversalResult = await _accountingService.ReverseSalesPostEntryAsync(invoice, userId, ct);
+                    if (!reversalResult.IsSuccess)
+                    {
+                        await transaction.RollbackAsync(ct);
+                        _logger.LogWarning("Journal entry reversal failed for sales invoice cancel {Id}: {Error}", invoice.Id, reversalResult.Error);
+                        return Result<SalesInvoiceDto>.Failure(reversalResult.Error!);
                     }
                 }
 

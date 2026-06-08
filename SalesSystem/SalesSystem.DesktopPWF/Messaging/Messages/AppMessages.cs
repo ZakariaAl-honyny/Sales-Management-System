@@ -33,3 +33,9 @@ public record ApplicationShutdownMessage;
 
 public record AccountChangedMessage(int AccountId);
 
+/// <summary>
+/// Published when a journal entry is created, posted, reversed, or modified.
+/// Carries the entry ID only — NO data payload (RULE-034).
+/// </summary>
+public record JournalEntryChangedMessage(int EntryId);
+

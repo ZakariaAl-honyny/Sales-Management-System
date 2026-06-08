@@ -341,7 +341,7 @@ public class ReportsViewModelTests
     [Fact]
     public async Task GenerateReportCommand_Customers_LoadsCustomerBalances()
     {
-        var customerBalances = new List<CustomerBalanceReportDto>
+        var customerBalances = new List<CustomerFinancialBalanceDto>
         {
             new(1, "عميل 1", 0m, 1000m, 0m, 500m, 0m, 500m),
             new(2, "عميل 2", 0m, 2000m, 0m, 1000m, 0m, 1000m)
@@ -349,7 +349,7 @@ public class ReportsViewModelTests
 
         _mockReportService
             .Setup(s => s.GetCustomerBalancesReportAsync())
-            .ReturnsAsync(Result<List<CustomerBalanceReportDto>>.Success(customerBalances));
+            .ReturnsAsync(Result<List<CustomerFinancialBalanceDto>>.Success(customerBalances));
 
         _viewModel.SelectedReportType = ReportType.Customers;
         _viewModel.GenerateReportCommand.Execute(null);

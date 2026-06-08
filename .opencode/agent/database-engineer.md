@@ -80,8 +80,23 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - Entity configurations for Product, Customer, Supplier, Warehouse must NOT include Code property, HasMaxLength, or HasIndex for Code
 - `SystemSettings` table key-value configuration: Seed `CostingMethod` (Key = "CostingMethod", Value = "1" [WeightedAverage]) and ensure the API settings client correctly maps update requests.
 
+### CashBox Entity — Refactored (v4.9 — No Balance Fields)
+- `CashBox` entity: NO `OpeningBalance` or `CurrentBalance` fields — balance tracked on linked Account via `AccountId` FK
+- `CashBox.Create()` requires `int accountId` (FK to Account), `int currencyId` — no balance params
+- `CashBoxConfiguration`:
+  - `builder.Property(x => x.Name).HasMaxLength(200).IsRequired()`
+  - `builder.Property(x => x.PhoneNumber).HasMaxLength(20)`
+  - `builder.Property(x => x.TaxNumber).HasMaxLength(50)`
+  - `builder.Property(x => x.Address).HasMaxLength(500)`
+  - `builder.HasOne(x => x.Account).WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict)`
+  - `builder.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict).IsRequired(false)`
+  - NO configuration for OpeningBalance/CurrentBalance — they don't exist
+- `CashTransaction` entity: Uses `RunningBalance` (decimal(18,2)) instead of `BalanceBefore`/`BalanceAfter`
+- `CashTransaction.Create()` is PUBLIC (not internal) — callable from service layer
+- CashBox auto-creates Level-4 sub-account under parent "1110 — النقدية" when AccountId is null
+  - AccountCode auto-increments: 1111, 1112, 1113...
+
 ### Future Fixes Needed (Audit Findings v4.6.1)
-- `CashBox` entity: MUST add `OpeningBalance` property and configure it in `CashBoxConfiguration.cs`
 - ALL entity types that extend BaseEntity MUST have `.HasQueryFilter(x => x.IsActive)` in their configuration
 - `ProductUnit.BaseConversionFactor`: MUST use `.HasPrecision(18, 3)` — NOT `(18, 6)`
 - `StoreSettings.DefaultTaxRate`: SHOULD use `.HasPrecision(18, 2)` — currently uses `(5, 2)`
@@ -92,7 +107,7 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - New entities added for batch tracking: `PurchaseLots`
 - New entities added for multi-currency: `Currencies`, `Taxes`
 - New entity for fiscal year management: `FiscalYears`
-- New FK columns: `Customers.AccountId` (FK to Accounts), `Suppliers.AccountId`, `CashBoxes.AccountId`, `Products.AvgCost` (decimal(18,2))
+- New FK columns: `Customers.AccountId` (FK to Accounts), `Suppliers.AccountId`, `CashBoxes.AccountId` (required — balance lives on linked Account), `Products.AvgCost` (decimal(18,2))
 - `Users.Status` column for user status tracking
 - `InvoiceNo` = int, UNIQUE per document type in SalesInvoices and PurchaseInvoices tables
 - `DocumentSequence` entity supports both `GetNextNumber()` (string) and `GetNextInt()` (int) methods
@@ -486,4 +501,94 @@ NEVER use `:byte` route constraint — ASP.NET Core has no built-in `:byte` cons
 
 // CORRECT:
 [HttpGet("by-type/{type:int:min(1):max(5)}")]
+public async Task<IActionResult> GetByType(AccountType type, CancellationToken ct)
 ```
+
+### Phase 23 — Customers Module
+
+#### New Entities
+- CustomerGroup: Id (PK), Name (nvarchar(100)), Description (nvarchar(250) nullable), CreatedAt, UpdatedAt, IsActive
+
+#### Enhanced Entities
+- Customer: +AccountId (int?, FK → Account), +CustomerType (byte?, Cash=1/Credit=2), +CustomerGroupId (int?, FK → CustomerGroup)
+
+#### Constraints
+- FK Customer.AccountId → Account.Id (Restrict)
+- FK Customer.CustomerGroupId → CustomerGroup.Id (Restrict)
+- CustomerGroup is soft-deletable — deletion blocked if any customer references the group
+- CustomerType stored as byte (tinyint) — not int or string
+- All FKs use DeleteBehavior.Restrict — no cascade
+
+#### Migration
+- Name: Phase23_CustomersModule
+- Creates CustomerGroups table
+- Adds AccountId, CustomerType, CustomerGroupId columns to Customers
+- Creates indexes on new FK columns
+
+---
+
+## 📋 Phase Awareness (Phases 23-31)
+
+The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
+| 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
+| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
+| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
+| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
+| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
+| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
+| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
+
+### Key Architecture Rules for Subagents
+
+When implementing or reviewing code, ALWAYS enforce these rules:
+
+1. **Multi-Currency First**: All pricing MUST support multi-currency via ProductPrices table — NEVER store single-currency prices on Product entity
+2. **FIFO/FEFO Batches**: Inventory MUST use InventoryBatches for cost allocation — NEVER use weighted-average only
+3. **Landed Cost**: Purchase costs MUST include AdditionalCharge distribution — NEVER record purchase cost without transport/customs allocation
+4. **Auto Journal Entries**: Every money-affecting operation MUST create journal entries via AccountingIntegrationService — NEVER leave the general ledger out of sync
+5. **Chart of Accounts Links**: CashBox, Warehouse, Customer, Supplier MUST link to Account via AccountId FK — NEVER operate without COA integration
+6. **Payment Allocation**: Payments MUST use PaymentAllocation for multi-invoice settlement — NEVER leave partial payments untracked
+7. **Report Excellence**: ALL reports MUST support Excel export via ClosedXML — NEVER limit to on-screen display only
+8. **Passwordless Users**: User.Create() NEVER accepts a password — MustChangePassword=true is the default
+9. **ReferenceId over ReferenceNumber**: Journal entry lookups use int FK (ReferenceId), not string matching
+10. **AvgCost for COGS**: COGS uses ProductUnit.AverageCost (weighted average), never PurchaseCost
+
+### 💡 Bug Prevention Checklist
+
+When writing or reviewing code in ANY layer, check these:
+- [ ] Does the code handle multi-currency correctly? (CurrencyId + ExchangeRate on all financial entities)
+- [ ] Are all prices stored per ProductUnit (not per Product)?
+- [ ] Does costing use the configured CostingMethod from SystemSettings?
+- [ ] Are all FK relationships `DeleteBehavior.Restrict`?
+- [ ] Does the service return `Result<T>` (not throw exceptions)?
+- [ ] Is the controller free of business logic (delegates to service)?
+- [ ] Do all ViewModels use `ExecuteAsync()` wrapper (no manual try/catch)?
+- [ ] Are all buttons ALWAYS enabled (no CanExecute predicates)?
+- [ ] Does the validation use `INotifyDataErrorInfo` (not `HasXxxError` booleans)?
+- [ ] Does every editor call `ValidateAllAsync()` on save?
+- [ ] Is the connection string DPAPI-encrypted or from env var?
+- [ ] Are Arabic messages properly UTF-8 encoded?
+- [ ] Does the list display newest-first (OrderByDescending)?
+- [ ] Are EventBus subscriptions disposed in `Cleanup()`?
+
+### Features to Fix By Default
+
+When you encounter any code related to these areas, apply fixes automatically:
+
+1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
+2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
+3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
+4. Missing `CurrencyId` on financial entities → Add multi-currency support
+5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
+6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
+7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
+8. Missing journal entry on cash operations → Call AccountingIntegrationService
+9. Missing Excel export on report → Add ClosedXML worksheet generation
+10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
+11. Payment without allocation → Add PaymentAllocation tracking
+12. Missing reversal entries on payment update/delete → Add reversal journal entries

@@ -1,6 +1,5 @@
 using Xunit;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
@@ -8,87 +7,82 @@ namespace SalesSystem.Domain.Tests.Entities;
 public class CashBoxTests
 {
     [Fact]
+    public void Create_ValidInput_SetsProperties()
+    {
+        var box = CashBox.Create("Test Box", accountId: 1, phoneNumber: "0501234567");
+        Assert.Equal("Test Box", box.BoxName);
+        Assert.Equal(1, box.AccountId);
+        Assert.Equal("0501234567", box.PhoneNumber);
+        Assert.True(box.IsActive);
+    }
+
+    [Fact]
     public void Create_EmptyName_ShouldThrow()
     {
-        Assert.Throws<DomainException>(() => CashBox.Create(""));
+        Assert.Throws<DomainException>(() => CashBox.Create("", accountId: 1));
     }
 
     [Fact]
-    public void Create_WithInitialBalance_ShouldSetBalance()
+    public void Create_InvalidAccountId_ShouldThrow()
     {
-        var box = CashBox.Create("الصندوق الرئيسي", initialBalance: 1000);
-        Assert.Equal(1000, box.CurrentBalance);
+        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", accountId: 0));
+        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", accountId: -1));
     }
 
     [Fact]
-    public void Deposit_PositiveAmount_ShouldIncreaseBalance()
+    public void Create_WithOptionalParameters_SetsCorrectly()
     {
-        var box = CashBox.Create("صندوق", initialBalance: 500);
-        box.Deposit(200, CashTransactionType.CustomerPayment, createdBy: 1);
-        Assert.Equal(700, box.CurrentBalance);
-    }
+        var box = CashBox.Create(
+            "Box Name",
+            accountId: 1,
+            categoryId: 5,
+            branchId: 2,
+            assignedUserId: 3,
+            currencyId: 1,
+            phoneNumber: "0555000111",
+            taxNumber: "TX12345",
+            address: "Riyadh",
+            notes: "Main cash box");
 
-    [Fact]
-    public void Deposit_ZeroOrNegative_ShouldThrow()
-    {
-        var box = CashBox.Create("صندوق");
-        Assert.Throws<DomainException>(() => 
-            box.Deposit(0, CashTransactionType.CustomerPayment));
-        Assert.Throws<DomainException>(() => 
-            box.Deposit(-100, CashTransactionType.CustomerPayment));
-    }
-
-    [Fact]
-    public void Withdraw_SufficientBalance_ShouldDecreaseBalance()
-    {
-        var box = CashBox.Create("صندوق", initialBalance: 1000);
-        box.Withdraw(300, CashTransactionType.Expense, createdBy: 1);
-        Assert.Equal(700, box.CurrentBalance);
-    }
-
-    [Fact]
-    public void Withdraw_InsufficientBalance_ShouldThrow()
-    {
-        var box = CashBox.Create("صندوق", initialBalance: 100);
-        Assert.Throws<DomainException>(() => 
-            box.Withdraw(200, CashTransactionType.Expense));
-    }
-
-    [Fact]
-    public void Deposit_ShouldCreateTransactionWithCorrectSnapshots()
-    {
-        var box = CashBox.Create("صندوق", initialBalance: 500);
-        var tx = box.Deposit(200, CashTransactionType.CustomerPayment, createdBy: 1);
-
-        Assert.Equal(500, tx.BalanceBefore);
-        Assert.Equal(700, tx.BalanceAfter);
-        Assert.Equal(200, tx.Amount);
-        Assert.Equal(CashTransactionType.CustomerPayment, tx.TransactionType);
-    }
-
-    [Fact]
-    public void Withdraw_ShouldCreateTransactionWithCorrectSnapshots()
-    {
-        var box = CashBox.Create("صندوق", initialBalance: 500);
-        var tx = box.Withdraw(200, CashTransactionType.Expense, createdBy: 1);
-
-        Assert.Equal(500, tx.BalanceBefore);
-        Assert.Equal(300, tx.BalanceAfter);
-        Assert.Equal(-200, tx.Amount); // Negative for withdrawals
+        Assert.Equal("Box Name", box.BoxName);
+        Assert.Equal(1, box.AccountId);
+        Assert.Equal(5, box.CategoryId);
+        Assert.Equal(2, box.BranchId);
+        Assert.Equal(3, box.AssignedUserId);
+        Assert.Equal(1, box.CurrencyId);
+        Assert.Equal("0555000111", box.PhoneNumber);
+        Assert.Equal("TX12345", box.TaxNumber);
+        Assert.Equal("Riyadh", box.Address);
+        Assert.Equal("Main cash box", box.Notes);
     }
 
     [Fact]
     public void ValidateUserAccess_AssignedToDifferentUser_ShouldThrow()
     {
-        var box = CashBox.Create("صندوق المدير", assignedUserId: 1);
+        var box = CashBox.Create("صندوق المدير", accountId: 1, assignedUserId: 1);
         Assert.Throws<DomainException>(() => box.ValidateUserAccess(2));
     }
 
     [Fact]
     public void ValidateUserAccess_SharedBox_ShouldAllowAnyone()
     {
-        var box = CashBox.Create("صندوق مشترك"); // No assigned user
+        var box = CashBox.Create("صندوق مشترك", accountId: 1);
         box.ValidateUserAccess(99); // Should not throw
         Assert.True(true);
+    }
+
+    [Fact]
+    public void UpdateName_ValidInput_UpdatesName()
+    {
+        var box = CashBox.Create("Old Name", accountId: 1);
+        box.UpdateName("New Name");
+        Assert.Equal("New Name", box.BoxName);
+    }
+
+    [Fact]
+    public void UpdateName_EmptyName_ShouldThrow()
+    {
+        var box = CashBox.Create("Old Name", accountId: 1);
+        Assert.Throws<DomainException>(() => box.UpdateName(""));
     }
 }

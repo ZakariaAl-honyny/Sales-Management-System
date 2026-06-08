@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
@@ -39,27 +40,42 @@ public class SuppliersController : ControllerBase
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Create([FromBody] CreateSupplierRequest request, CancellationToken ct)
     {
-        var result = await _supplierService.CreateAsync(request, ct);
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _supplierService.CreateAsync(request, userId, ct);
         return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
     [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateSupplierRequest request, CancellationToken ct)
     {
-        var result = await _supplierService.UpdateAsync(id, request, ct);
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _supplierService.UpdateAsync(id, request, userId, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
-        var result = await _supplierService.DeleteAsync(id, ct);
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _supplierService.DeleteAsync(id, userId, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم الحذف بنجاح", id });
         return BadRequest(new { error = result.Error });
@@ -68,9 +84,14 @@ public class SuppliersController : ControllerBase
     [HttpDelete("permanent/{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)
     {
-        var result = await _supplierService.PermanentDeleteAsync(id, ct);
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _supplierService.PermanentDeleteAsync(id, userId, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم الحذف النهائي بنجاح", id });
         return BadRequest(new { error = result.Error });

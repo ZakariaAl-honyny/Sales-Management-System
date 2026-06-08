@@ -20,6 +20,7 @@ using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Accounts;
+using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
@@ -103,6 +104,7 @@ public class MainViewModel : ViewModelBase
         // Settings section
         NavigateToProductsCommand = new RelayCommand(() => NavigateTo<ProductListViewModel>());
         NavigateToCustomersCommand = new RelayCommand(() => NavigateTo<CustomerListViewModel>());
+        NavigateToCustomerGroupsCommand = new RelayCommand(() => NavigateTo<CustomerGroupListViewModel>());
         NavigateToSuppliersCommand = new RelayCommand(() => NavigateTo<SupplierListViewModel>());
         NavigateToWarehousesCommand = new RelayCommand(() => NavigateTo<WarehouseListViewModel>());
         NavigateToCategoriesCommand = new RelayCommand(() => NavigateTo<CategoryListViewModel>());
@@ -118,6 +120,7 @@ public class MainViewModel : ViewModelBase
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
         NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
+        NavigateToJournalEntriesCommand = new RelayCommand(() => NavigateTo<JournalEntriesListViewModel>());
 
         ChangePasswordCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadChangePasswordAsync)));
     }
@@ -247,6 +250,9 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة العملاء</summary>
     public ICommand NavigateToCustomersCommand { get; }
 
+    /// <summary>نقل إلى إدارة مجموعات العملاء — تصنيف وترتيب العملاء في مجموعات</summary>
+    public ICommand NavigateToCustomerGroupsCommand { get; }
+
     /// <summary>نقل إلى إدارة الموردين</summary>
     public ICommand NavigateToSuppliersCommand { get; }
 
@@ -294,6 +300,9 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى دليل الحسابات — عرض وتعديل الحسابات المحاسبية</summary>
     public ICommand NavigateToChartOfAccountsCommand { get; }
+
+    /// <summary>نقل إلى القيود اليومية — عرض جميع قيود اليومية المحاسبية</summary>
+    public ICommand NavigateToJournalEntriesCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
@@ -436,6 +445,7 @@ public class MainViewModel : ViewModelBase
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
             nameof(AccountsListViewModel)           => "Settings",
+            nameof(JournalEntriesListViewModel)     => "Settings",
             _                                        => viewModelType.Name
         };
     }

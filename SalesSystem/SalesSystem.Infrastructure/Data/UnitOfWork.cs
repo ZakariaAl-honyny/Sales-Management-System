@@ -60,6 +60,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IAuditLogRepository? _auditLogs;
     private IGenericRepository<UserSession>? _userSessions;
     private IGenericRepository<ExchangeRateHistory>? _exchangeRateHistories;
+    private IGenericRepository<CustomerGroup>? _customerGroups;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -109,6 +110,7 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IAuditLogRepository AuditLogs => _auditLogs ??= new AuditLogRepository(_context);
     public IGenericRepository<UserSession> UserSessions => _userSessions ??= new GenericRepository<UserSession>(_context);
     public IGenericRepository<ExchangeRateHistory> ExchangeRateHistories => _exchangeRateHistories ??= new GenericRepository<ExchangeRateHistory>(_context);
+    public IGenericRepository<CustomerGroup> CustomerGroups => _customerGroups ??= new GenericRepository<CustomerGroup>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {
@@ -140,6 +142,30 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
                     await op();
                     await transaction.CommitAsync(token);
                     return null;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(token);
+                    throw;
+                }
+            },
+            null,
+            ct).ConfigureAwait(false);
+    }
+
+    public async Task<TResult> ExecuteTransactionAsync<TResult>(Func<Task<TResult>> operation, CancellationToken ct = default)
+    {
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<Func<Task<TResult>>, TResult>(
+            operation,
+            async (ctx, op, token) =>
+            {
+                await using var transaction = await ctx.Database.BeginTransactionAsync(token);
+                try
+                {
+                    var result = await op();
+                    await transaction.CommitAsync(token);
+                    return result;
                 }
                 catch
                 {
