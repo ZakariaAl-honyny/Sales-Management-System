@@ -472,6 +472,16 @@ public interface IFinancialReportApiService
     Task<Result<List<AccountStatementDto>>> GetSupplierAccountStatementAsync(int supplierId, DateTime from, DateTime to, CancellationToken ct = default);
 }
 
+public interface IFiscalYearApiService
+{
+    Task<Result<List<FiscalYearDto>>> GetAllAsync(CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> GetByYearAsync(int year, CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> CreateAsync(CreateFiscalYearRequest request, CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> OpenAsync(int id, CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> CloseAsync(int id, CancellationToken ct = default);
+}
+
 public interface IAuditLogApiService
 {
     Task<Result<PagedResult<AuditLogDto>>> QueryAsync(AuditLogQuery query);

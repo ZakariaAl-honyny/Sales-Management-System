@@ -1,0 +1,252 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.JournalEntries.JournalEntryEditorView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.JournalEntries"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance vm:JournalEntryEditorViewModel, IsDesignTimeCreatable=False}"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
+            <TextBlock Text="📒  إدخال قيد يومي يدوي"
+                       FontSize="14" FontWeight="Bold" Foreground="White"/>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12">
+
+                <!-- Transaction Date + Description -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="التاريخ *" Style="{StaticResource LabelStyle}"/>
+                    <DatePicker SelectedDate="{Binding TransactionDate, Mode=TwoWay}"
+                                Style="{StaticResource ModernDatePicker}"
+                                ToolTip="تاريخ القيد — يتم تعيينه تلقائياً لتاريخ اليوم"
+                                Grid.Column="1"/>
+                    <TextBlock Text="البيان *" Grid.Column="3" Style="{StaticResource LabelStyle}"/>
+                    <TextBox Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBox}"
+                             ToolTip="وصف القيد — شرح الغرض من القيد"
+                             Grid.Column="4"/>
+                </Grid>
+
+                <!-- Lines Header + Add Line button -->
+                <Grid Margin="0,12,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="بنود القيد" FontSize="14" FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <Button Command="{Binding AddLineCommand}" Style="{StaticResource PrimaryButton}"
+                            Grid.Column="1" Padding="8,2"
+                            ToolTip="إضافة بند جديد للقيد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="➕" Margin="0,0,4,0"/>
+                            <TextBlock Text="إضافة بند"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- Lines DataGrid -->
+                <Border Style="{StaticResource CardStyle}" Padding="0" Margin="0,0,0,8">
+                    <DataGrid ItemsSource="{Binding Lines}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              Style="{StaticResource ModernDataGrid}"
+                              MaxHeight="300"
+                              ToolTip="بنود القيد — أدخل الحساب والمبلغ (مدين أو دائن)">
+                        <DataGrid.Columns>
+                            <!-- Account combo -->
+                            <DataGridTemplateColumn Header="الحساب *" Width="220">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate DataType="vm:JournalEntryLineViewModel">
+                                        <ComboBox ItemsSource="{Binding DataContext.AvailableAccounts,
+                                            RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type UserControl}}}"
+                                                  SelectedValuePath="Id"
+                                                  Style="{StaticResource ModernComboBox}"
+                                                  ToolTip="اختر الحساب من القائمة">
+                                            <ComboBox.SelectedValue>
+                                                <Binding Path="AccountId" Mode="TwoWay"/>
+                                            </ComboBox.SelectedValue>
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding AccountCode}" FontWeight="SemiBold"
+                                                                   Margin="0,0,4,0"/>
+                                                        <TextBlock Text="{Binding NameAr}"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Debit -->
+                            <DataGridTemplateColumn Header="مدين" Width="120">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate DataType="vm:JournalEntryLineViewModel">
+                                        <TextBox Text="{Binding Debit, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 ToolTip="المبلغ المدين — أدخل صفر إذا كان البند دائناً"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Credit -->
+                            <DataGridTemplateColumn Header="دائن" Width="120">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate DataType="vm:JournalEntryLineViewModel">
+                                        <TextBox Text="{Binding Credit, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 ToolTip="المبلغ الدائن — أدخل صفر إذا كان البند مديناً"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Description -->
+                            <DataGridTemplateColumn Header="ملاحظات" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate DataType="vm:JournalEntryLineViewModel">
+                                        <TextBox Text="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 ToolTip="ملاحظة اختيارية للبند"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Remove button -->
+                            <DataGridTemplateColumn Header="" Width="40">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate DataType="vm:JournalEntryLineViewModel">
+                                        <Button Command="{Binding RemoveCommand}"
+                                                Style="{StaticResource DangerButton}"
+                                                Padding="4,0" MinWidth="28"
+                                                ToolTip="حذف هذا البند">
+                                            <TextBlock Text="✕" FontSize="12"/>
+                                        </Button>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+
+                <!-- Totals Section -->
+                <Border Style="{StaticResource CardStyle}" Padding="10,6" Margin="0,0,0,8"
+                        Background="{StaticResource SurfaceBrush}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="المجموع:" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Run Text="مدين: " FontWeight="SemiBold"/>
+                            <Run Text="{Binding TotalDebitFormatted}" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Run Text="دائن: " FontWeight="SemiBold"/>
+                            <Run Text="{Binding TotalCreditFormatted}" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock Grid.Column="3" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <Run Text="الفرق: " FontWeight="SemiBold"/>
+                            <Run Text="{Binding DifferenceFormatted}" FontWeight="Bold"/>
+                        </TextBlock>
+                        <Border Grid.Column="4" Margin="12,0,0,0" Padding="8,2"
+                                CornerRadius="4"
+                                Visibility="{Binding IsBalanced, Converter={StaticResource BoolToVisibility}}"
+                                Background="{StaticResource SuccessLightBrush}">
+                            <TextBlock Text="✅  متوازن" FontWeight="Bold"
+                                       Foreground="{StaticResource SuccessTextBrush}"/>
+                        </Border>
+                        <Border Grid.Column="4" Margin="12,0,0,0" Padding="8,2"
+                                CornerRadius="4"
+                                Visibility="{Binding IsBalanced, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsBalanced}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="⚠️  غير متوازن" FontWeight="Bold"
+                                       Foreground="{StaticResource ErrorTextBrush}"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Error Message -->
+                <Border Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}"
+                        Background="{StaticResource ErrorLightBrush}" Padding="8,4" CornerRadius="4"
+                        Margin="0,0,0,8">
+                    <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}"/>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="White" Padding="12,8"
+                BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}"
+                        ToolTip="حفظ القيد — سيتم التحقق من توازن القيد وصلاحية البيانات قبل الحفظ">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="💾" Margin="0,0,6,0"/>
+                        <TextBlock Text="حفظ القيد"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding CloseCommand}" Style="{StaticResource SecondaryButton}"
+                        Margin="8,0,0,0"
+                        ToolTip="إلغاء وإغلاق نافذة إدخال القيد">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="✖" Margin="0,0,6,0"/>
+                        <TextBlock Text="إلغاء"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#80FFFFFF" Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"
+                             Background="#E3E8EE" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="جاري الحفظ..." FontSize="14" Margin="0,12,0,0"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

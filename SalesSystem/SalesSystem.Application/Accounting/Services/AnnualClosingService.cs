@@ -56,7 +56,7 @@ public class AnnualClosingService : IAnnualClosingService
 
             // ─── Step 3: Verify ALL journal entries for the year are posted ──
             var unpostedEntries = await _uow.JournalEntries.CountAsync(
-                je => je.TransactionDate.Year == fiscalYear && !je.IsPosted, ct);
+                je => je.TransactionDate.Year == fiscalYear && je.Status == Domain.Accounting.Enums.JournalEntryStatus.Draft, ct);
 
             if (unpostedEntries > 0)
                 return Result<FiscalYearClosureDto>.Failure(
@@ -65,7 +65,7 @@ public class AnnualClosingService : IAnnualClosingService
             // ─── Step 4: Get all posted JE lines for this fiscal year ──────
             var allLines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.JournalEntry != null
-                    && jel.JournalEntry.IsPosted
+                    && jel.JournalEntry.Status == Domain.Accounting.Enums.JournalEntryStatus.Posted
                     && jel.JournalEntry.TransactionDate.Year == fiscalYear,
                 null, ct, false, "JournalEntry");
 
@@ -190,8 +190,8 @@ public class AnnualClosingService : IAnnualClosingService
                     $"صافي الخسارة للسنة المالية {fiscalYear}");
             }
 
-            // ─── Step 10: Validate and Post ──────────────────────────────
-            closingEntry.ValidateAndPost(closedByUserId);
+            // ─── Step 10: Post the closing entry ──────────────────────────
+            closingEntry.Post(closedByUserId);
 
             // ─── Step 11: Save atomically via execution strategy ──────────────────────
             // Uses ExecuteTransactionAsync which wraps the operation in an execution strategy

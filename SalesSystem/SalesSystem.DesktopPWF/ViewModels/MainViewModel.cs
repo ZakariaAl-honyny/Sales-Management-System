@@ -19,6 +19,7 @@ using SalesSystem.DesktopPWF.ViewModels.Units;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Settings;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
+using SalesSystem.DesktopPWF.ViewModels.Accounting;
 using SalesSystem.DesktopPWF.ViewModels.Accounts;
 using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
@@ -133,6 +134,7 @@ public class MainViewModel : ViewModelBase
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
         NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
         NavigateToJournalEntriesCommand = new RelayCommand(() => NavigateTo<JournalEntriesListViewModel>());
+        NavigateToFiscalYearsCommand = new RelayCommand(() => NavigateTo<FiscalYearListViewModel>());
 
         ChangePasswordCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadChangePasswordAsync)));
     }
@@ -343,6 +345,9 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى القيود اليومية — عرض جميع قيود اليومية المحاسبية</summary>
     public ICommand NavigateToJournalEntriesCommand { get; }
 
+    /// <summary>نقل إلى السنوات المالية — إنشاء وفتح وإغلاق السنوات المالية</summary>
+    public ICommand NavigateToFiscalYearsCommand { get; }
+
     // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
     // ═══════════════════════════════════════════════════════════════
@@ -493,6 +498,7 @@ public class MainViewModel : ViewModelBase
             nameof(CurrenciesListViewModel)         => "Currencies",
             nameof(AccountsListViewModel)           => "Settings",
             nameof(JournalEntriesListViewModel)     => "Settings",
+            nameof(FiscalYearListViewModel)         => "Settings",
             _                                        => viewModelType.Name
         };
     }

@@ -1,6 +1,8 @@
 using System.Net.Http;
+using System.Net.Http.Json;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.DesktopPWF.Services.Api;
 
@@ -46,5 +48,26 @@ public class JournalEntryApiService : ApiServiceBase, IJournalEntryApiService
         return await ExecuteAsync<AccountLedgerDto>(
             () => _httpClient.GetAsync($"{BasePath}/ledger/{accountId}?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}"),
             "JournalEntryApiService.GetLedgerAsync");
+    }
+
+    public async Task<Result<int>> CreateAsync(CreateJournalEntryRequest request)
+    {
+        return await ExecuteAsync<int>(
+            () => _httpClient.PostAsJsonAsync(BasePath, request),
+            "JournalEntryApiService.CreateAsync");
+    }
+
+    public async Task<Result<JournalEntryDetailDto>> PostAsync(int id)
+    {
+        return await ExecuteAsync<JournalEntryDetailDto>(
+            () => _httpClient.PutAsJsonAsync($"{BasePath}/{id}/post", new { }),
+            "JournalEntryApiService.PostAsync");
+    }
+
+    public async Task<Result<JournalEntryDetailDto>> CancelAsync(int id)
+    {
+        return await ExecuteAsync<JournalEntryDetailDto>(
+            () => _httpClient.PutAsJsonAsync($"{BasePath}/{id}/cancel", new { }),
+            "JournalEntryApiService.CancelAsync");
     }
 }

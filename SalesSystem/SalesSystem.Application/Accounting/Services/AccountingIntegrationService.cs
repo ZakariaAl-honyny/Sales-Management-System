@@ -76,7 +76,14 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 }
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            // Post the entry (transition from Draft to Posted)
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -127,7 +134,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 }
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -250,7 +263,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 Lines: lines
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -422,7 +441,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 Lines: lines
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -524,7 +549,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 Lines: lines
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -625,7 +656,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 Lines: lines
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -671,7 +708,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 }
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -717,7 +760,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 }
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -765,7 +814,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 }
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {
@@ -813,7 +868,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 }
             );
 
-            return await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
         }
         catch (Exception ex)
         {

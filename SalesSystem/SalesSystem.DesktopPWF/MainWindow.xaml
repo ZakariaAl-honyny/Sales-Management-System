@@ -276,6 +276,7 @@
                 <MenuItem Header="العملات" Command="{Binding NavigateToCurrenciesCommand}" ToolTip="إدارة العملات وأسعار الصرف"/>
                 <MenuItem Header="دليل الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}" ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
                 <MenuItem Header="القيود اليومية" Command="{Binding NavigateToJournalEntriesCommand}" ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"/>
+                <MenuItem Header="السنوات المالية" Command="{Binding NavigateToFiscalYearsCommand}" ToolTip="إدارة السنوات المالية — إنشاء وفتح وإغلاق السنوات"/>
                 <MenuItem Header="النسخ الاحتياطي" 
                           Command="{Binding NavigateToBackupCommand}"
                           ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
@@ -390,6 +391,11 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavJournalEntries"
                                             ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"/>
+                                    <Button Content="السنوات المالية"
+                                            Command="{Binding NavigateToFiscalYearsCommand}"
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavFiscalYears"
+                                            ToolTip="إدارة السنوات المالية — إنشاء وفتح وإغلاق السنوات"/>
                                 </StackPanel>
                             </Expander>
 

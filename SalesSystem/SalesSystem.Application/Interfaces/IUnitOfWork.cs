@@ -44,6 +44,7 @@ public interface IUnitOfWork
     IGenericRepository<JournalEntryLine> JournalEntryLines { get; }
     IGenericRepository<SystemAccountMappings> SystemAccountMappings { get; }
     IGenericRepository<FiscalYearClosure> FiscalYearClosures { get; }
+    IGenericRepository<FiscalYear> FiscalYears { get; }
     IGenericRepository<Currency> Currencies { get; }
     IGenericRepository<ExchangeRateHistory> ExchangeRateHistories { get; }
     IGenericRepository<Permission> Permissions { get; }

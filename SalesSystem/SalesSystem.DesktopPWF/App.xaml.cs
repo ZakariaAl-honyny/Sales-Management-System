@@ -30,6 +30,7 @@ using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.ViewModels.Accounts;
+using SalesSystem.DesktopPWF.ViewModels.Accounting;
 using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
@@ -231,6 +232,9 @@ public partial class App : System.Windows.Application
         // Journal Entry API Service
         services.AddSingleton<IJournalEntryApiService, JournalEntryApiService>();
 
+        // Fiscal Year API Service
+        services.AddSingleton<IFiscalYearApiService, FiscalYearApiService>();
+
         // Audit & Permission Services
         services.AddSingleton<IAuditLogApiService, AuditLogApiService>();
         services.AddSingleton<IPermissionApiService, PermissionApiService>();
@@ -332,6 +336,10 @@ public partial class App : System.Windows.Application
 
         // Journal Entry ViewModels
         services.AddTransient<JournalEntriesListViewModel>();
+        services.AddTransient<JournalEntryEditorViewModel>();
+
+        // Fiscal Year ViewModels
+        services.AddTransient<FiscalYearListViewModel>();
 
         // Audit & Permission ViewModels
         services.AddTransient<AuditLogListViewModel>();

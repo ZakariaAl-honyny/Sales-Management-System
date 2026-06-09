@@ -54,6 +54,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<JournalEntryLine>? _journalEntryLines;
     private IGenericRepository<SystemAccountMappings>? _systemAccountMappings;
     private IGenericRepository<FiscalYearClosure>? _fiscalYearClosures;
+    private IGenericRepository<FiscalYear>? _fiscalYears;
     private IGenericRepository<Currency>? _currencies;
     private IGenericRepository<Permission>? _permissions;
     private IGenericRepository<RolePermission>? _rolePermissions;
@@ -118,6 +119,7 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<JournalEntryLine> JournalEntryLines => _journalEntryLines ??= new GenericRepository<JournalEntryLine>(_context);
     public IGenericRepository<SystemAccountMappings> SystemAccountMappings => _systemAccountMappings ??= new GenericRepository<SystemAccountMappings>(_context);
     public IGenericRepository<FiscalYearClosure> FiscalYearClosures => _fiscalYearClosures ??= new GenericRepository<FiscalYearClosure>(_context);
+    public IGenericRepository<FiscalYear> FiscalYears => _fiscalYears ??= new GenericRepository<FiscalYear>(_context);
     public IGenericRepository<Currency> Currencies => _currencies ??= new GenericRepository<Currency>(_context);
     public IGenericRepository<Permission> Permissions => _permissions ??= new GenericRepository<Permission>(_context);
     public IGenericRepository<RolePermission> RolePermissions => _rolePermissions ??= new GenericRepository<RolePermission>(_context);

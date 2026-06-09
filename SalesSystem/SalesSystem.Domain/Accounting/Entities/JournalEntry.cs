@@ -5,7 +5,8 @@ using SalesSystem.Domain.Exceptions;
 namespace SalesSystem.Domain.Accounting.Entities;
 
 /// <summary>
-/// Represents a journal entry (double-entry accounting record).
+/// Represents a journal entry (double-entry accounting record) with 3-state lifecycle:
+/// Draft (1) → Posted (2) → Cancelled (3).
 /// Lines must be added via AddDebitLine / AddCreditLine methods
 /// to ensure the entry remains internally consistent.
 /// </summary>
@@ -15,13 +16,13 @@ public class JournalEntry : BaseEntity
     public DateTime TransactionDate { get; private set; }
     public string Description { get; private set; } = string.Empty;
     public JournalEntryType EntryType { get; private set; }
+    public JournalEntryStatus Status { get; private set; }
     public string? ReferenceType { get; private set; }
     public int? ReferenceId { get; private set; }
     public string? ReferenceNumber { get; private set; }
-    public bool IsPosted { get; private set; }
-    public bool IsReversed { get; private set; }
-    public int? PostedBy { get; private set; }
-    public DateTime? PostedAt { get; private set; }
+    public int? CurrencyId { get; private set; }
+    public decimal? ExchangeRate { get; private set; }
+    public string? AttachmentPath { get; private set; }
     public int? BranchId { get; private set; }
     public int? ReversedByEntryId { get; private set; }
     public JournalEntry? ReversedByEntry { get; private set; }
@@ -44,7 +45,10 @@ public class JournalEntry : BaseEntity
         int createdBy,
         string? referenceType = null,
         int? referenceId = null,
-        string? referenceNumber = null)
+        string? referenceNumber = null,
+        int? currencyId = null,
+        decimal? exchangeRate = null,
+        string? attachmentPath = null)
     {
         if (string.IsNullOrWhiteSpace(entryNumber))
             throw new DomainException("رقم القيد المحاسبي مطلوب");
@@ -67,11 +71,13 @@ public class JournalEntry : BaseEntity
             TransactionDate = transactionDate,
             Description = description.Trim(),
             EntryType = entryType,
+            Status = JournalEntryStatus.Draft,
             ReferenceType = referenceType?.Trim(),
             ReferenceId = referenceId,
             ReferenceNumber = referenceNumber?.Trim(),
-            IsPosted = false,
-            IsReversed = false
+            CurrencyId = currencyId,
+            ExchangeRate = exchangeRate,
+            AttachmentPath = attachmentPath?.Trim()
         };
         entry.SetCreatedBy(createdBy);
         return entry;
@@ -86,11 +92,8 @@ public class JournalEntry : BaseEntity
         decimal amount,
         string? description = null)
     {
-        if (IsReversed)
-            throw new DomainException("لا يمكن تعديل قيد محاسبي تم عكسه");
-
-        if (IsPosted)
-            throw new DomainException("لا يمكن إضافة قيد إلى قيد تم ترحيله");
+        if (Status != JournalEntryStatus.Draft)
+            throw new DomainException("لا يمكن تعديل قيد محاسبي تم ترحيله أو إلغاؤه");
 
         var line = JournalEntryLine.CreateDebit(
             accountId, accountCode, accountNameAr, amount, description);
@@ -105,11 +108,8 @@ public class JournalEntry : BaseEntity
         decimal amount,
         string? description = null)
     {
-        if (IsReversed)
-            throw new DomainException("لا يمكن تعديل قيد محاسبي تم عكسه");
-
-        if (IsPosted)
-            throw new DomainException("لا يمكن إضافة قيد إلى قيد تم ترحيله");
+        if (Status != JournalEntryStatus.Draft)
+            throw new DomainException("لا يمكن تعديل قيد محاسبي تم ترحيله أو إلغاؤه");
 
         var line = JournalEntryLine.CreateCredit(
             accountId, accountCode, accountNameAr, amount, description);
@@ -117,7 +117,7 @@ public class JournalEntry : BaseEntity
         UpdateTimestamp();
     }
 
-    // ─── Balance & Posting ───────────────────────────
+    // ─── Balance & Lifecycle ─────────────────────────
 
     /// <summary>
     /// Returns true if total debits equal total credits (within 0.001 tolerance).
@@ -125,13 +125,15 @@ public class JournalEntry : BaseEntity
     public bool IsBalanced() => Math.Abs(TotalDebit - TotalCredit) < 0.001m;
 
     /// <summary>
-    /// Validates and posts this journal entry.
-    /// Throws DomainException with Arabic details if validation fails.
+    /// Posts this journal entry. Validates Draft status, balanced, and has lines.
     /// </summary>
-    public void ValidateAndPost(int postedBy)
+    public void Post(int postedByUserId)
     {
-        if (postedBy <= 0)
+        if (postedByUserId <= 0)
             throw new DomainException("مرحل القيد المحاسبي مطلوب");
+
+        if (Status != JournalEntryStatus.Draft)
+            throw new DomainException("لا يمكن ترحيل إلا القيود المحاسبية في حالة مسودة");
 
         if (_lines.Count == 0)
             throw new DomainException("لا يمكن ترحيل قيد محاسبي بدون بنود");
@@ -140,9 +142,23 @@ public class JournalEntry : BaseEntity
             throw new DomainException(
                 $"القيد المحاسبي غير متوازن — مجموع المدين ({TotalDebit:N2}) لا يساوي مجموع الدائن ({TotalCredit:N2})");
 
-        IsPosted = true;
-        PostedBy = postedBy;
-        PostedAt = DateTime.UtcNow;
+        Status = JournalEntryStatus.Posted;
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Cancels this posted journal entry. Optionally links to a reversal entry.
+    /// </summary>
+    public void Cancel(int cancelledByUserId, int? reversedByEntryId = null)
+    {
+        if (cancelledByUserId <= 0)
+            throw new DomainException("ملغي القيد المحاسبي مطلوب");
+
+        if (Status != JournalEntryStatus.Posted)
+            throw new DomainException("لا يمكن إلغاء إلا القيود المحاسبية المرحلة");
+
+        Status = JournalEntryStatus.Cancelled;
+        ReversedByEntryId = reversedByEntryId;
         UpdateTimestamp();
     }
 }

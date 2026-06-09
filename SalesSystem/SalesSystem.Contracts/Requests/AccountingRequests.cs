@@ -9,7 +9,10 @@ public record CreateJournalEntryRequest(
     string? ReferenceType,
     int? ReferenceId,
     string? ReferenceNumber,
-    List<JournalEntryLineRequest> Lines
+    List<JournalEntryLineRequest> Lines,
+    int? CurrencyId = null,
+    decimal? ExchangeRate = null,
+    string? AttachmentPath = null
 );
 
 public record JournalEntryLineRequest(

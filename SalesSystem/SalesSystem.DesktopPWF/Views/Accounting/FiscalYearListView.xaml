@@ -1,0 +1,193 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Accounting.FiscalYearListView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Accounting"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance vm:FiscalYearListViewModel, IsDesignTimeCreatable=False}"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </UserControl.Resources>
+
+    <Grid Margin="24,24,24,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0"
+                   Text="السنوات المالية"
+                   Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="FiscalYearsPageTitle"/>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <!-- Create Year -->
+                    <Button Command="{Binding CreateYearCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnCreateFiscalYear"
+                            ToolTip="إنشاء سنة مالية جديدة — يتم تحديد السنة التالية تلقائياً">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="➕" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="إنشاء سنة" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Open Year -->
+                    <Button Command="{Binding OpenYearCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnOpenFiscalYear"
+                            ToolTip="فتح السنة المالية المحددة — يسمح بإضافة قيود جديدة">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔓" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="فتح السنة" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Close Year -->
+                    <Button Command="{Binding CloseYearCommand}" Style="{StaticResource WarningButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnCloseFiscalYear"
+                            ToolTip="إغلاق السنة المالية المحددة — يمنع إضافة قيود جديدة بعد الإغلاق">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔒" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="إغلاق السنة" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Refresh -->
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                            AutomationProperties.AutomationId="BtnRefreshFiscalYears"
+                            ToolTip="تحديث القائمة — إعادة تحميل السنوات المالية من الخادم">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <!-- Grid -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <DataGrid ItemsSource="{Binding Years}"
+                          SelectedItem="{Binding SelectedYear}"
+                          Style="{StaticResource ModernDataGrid}"
+                          IsReadOnly="True"
+                          AutoGenerateColumns="False"
+                          AutomationProperties.AutomationId="DgFiscalYears"
+                          ToolTip="قائمة السنوات المالية — اختر سنة للفتح أو الإغلاق">
+                    <DataGrid.Columns>
+                        <!-- Year -->
+                        <DataGridTextColumn Header="السنة"
+                                            Binding="{Binding Year}"
+                                            Width="100"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
+                        <!-- Date Range -->
+                        <DataGridTextColumn Header="الفترة"
+                                            Binding="{Binding DateRangeDisplay}"
+                                            Width="200"
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
+
+                        <!-- Status -->
+                        <DataGridTemplateColumn Header="الحالة" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate DataType="vm:FiscalYearItemViewModel">
+                                    <Border>
+                                        <Border.Style>
+                                            <Style TargetType="Border" BasedOn="{StaticResource StatusBadgeStyle}">
+                                                <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource SuccessLightBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding StatusDisplay}" FontWeight="Bold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource ErrorTextBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- Opened At -->
+                        <DataGridTextColumn Header="تاريخ الفتح"
+                                            Binding="{Binding OpenedAt, StringFormat='{}{0:yyyy/MM/dd}'}"
+                                            Width="110"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
+                        <!-- Closed At -->
+                        <DataGridTextColumn Header="تاريخ الإغلاق"
+                                            Binding="{Binding ClosedAt, StringFormat='{}{0:yyyy/MM/dd}'}"
+                                            Width="110"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                    </DataGrid.Columns>
+
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="فتح السنة" Command="{Binding OpenYearCommand}"
+                                      ToolTip="فتح السنة المالية المحددة">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="🔓"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="إغلاق السنة" Command="{Binding CloseYearCommand}"
+                                      ToolTip="إغلاق السنة المالية المحددة">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="🔒"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
+
+                <!-- Empty State -->
+                <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="📅" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
+                        <TextBlock Text="لا توجد سنوات مالية" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="اضغط على 'إنشاء سنة' لإضافة السنة المالية الأولى"
+                                   Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                        <Button Command="{Binding CreateYearCommand}" Style="{StaticResource PrimaryButton}"
+                                Margin="0,12,0,0" Width="140"
+                                ToolTip="إنشاء أول سنة مالية للنظام">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="➕" Margin="0,0,6,0"/>
+                                <TextBlock Text="إنشاء أول سنة"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#80FFFFFF" Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"
+                             Background="#E3E8EE" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="جاري تحميل السنوات المالية..." FontSize="14" Margin="0,12,0,0"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

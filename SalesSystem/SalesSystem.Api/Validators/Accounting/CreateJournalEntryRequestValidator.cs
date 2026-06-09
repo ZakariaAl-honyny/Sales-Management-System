@@ -31,6 +31,19 @@ public class CreateJournalEntryRequestValidator : AbstractValidator<CreateJourna
         RuleFor(x => x.ReferenceNumber)
             .MaximumLength(100).WithMessage("رقم المرجع لا يمكن أن يتجاوز 100 حرف");
 
+        RuleFor(x => x.CurrencyId)
+            .GreaterThan(0).When(x => x.CurrencyId.HasValue)
+            .WithMessage("معرف العملة يجب أن يكون أكبر من صفر");
+
+        RuleFor(x => x.ExchangeRate)
+            .GreaterThan(0).When(x => x.ExchangeRate.HasValue)
+            .WithMessage("سعر الصرف يجب أن يكون أكبر من صفر")
+            .LessThanOrEqualTo(1000000).When(x => x.ExchangeRate.HasValue)
+            .WithMessage("سعر الصرف كبير جداً");
+
+        RuleFor(x => x.AttachmentPath)
+            .MaximumLength(500).WithMessage("مسار المرفق لا يمكن أن يتجاوز 500 حرف");
+
         RuleFor(x => x.Lines)
             .NotNull().WithMessage("بنود القيد المحاسبي مطلوبة")
             .Must(lines => lines != null && lines.Count >= 2)

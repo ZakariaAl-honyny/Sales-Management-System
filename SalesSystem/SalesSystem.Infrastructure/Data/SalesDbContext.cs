@@ -51,6 +51,7 @@ public class SalesDbContext : DbContext
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<ExchangeRateHistory> ExchangeRateHistories => Set<ExchangeRateHistory>();
     public DbSet<FiscalYearClosure> FiscalYearClosures => Set<FiscalYearClosure>();
+    public DbSet<FiscalYear> FiscalYears => Set<FiscalYear>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();

@@ -34,6 +34,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Api.Validators;
+using SalesSystem.Api.Validators.Accounting;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -186,6 +187,7 @@ builder.Services.AddScoped<IJournalEntryNumberGenerator, JournalEntryNumberGener
 builder.Services.AddScoped<IAnnualClosingService, AnnualClosingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationService>();
+builder.Services.AddScoped<IFiscalYearService, FiscalYearService>();
 
 builder.Services.AddSingleton(jwtSettings);
 
@@ -300,6 +302,7 @@ builder.Services.AddScoped<IValidator<UpdateChequeStatusRequest>, UpdateChequeSt
 builder.Services.AddScoped<IValidator<UpdateAllocationsRequest>, UpdateAllocationsRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateDailyClosureRequest>, CreateDailyClosureRequestValidator>();
 builder.Services.AddScoped<IValidator<ReconcileDailyClosureRequest>, ReconcileDailyClosureRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateFiscalYearRequest>, CreateFiscalYearRequestValidator>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>

@@ -122,6 +122,19 @@ public class AccountingIntegrationServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<int>.Success(1));
 
+        // Default: post journal entry returns success
+        _mockJournalEntryService.Setup(s => s.PostJournalEntryAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<JournalEntryDetailDto>.Success(new JournalEntryDetailDto(
+                Id: 1, EntryNumber: "JE-20260609-0001", TransactionDate: DateTime.Today,
+                Description: "Test", EntryType: "Manual", ReferenceType: null,
+                ReferenceId: null, ReferenceNumber: null, Status: 2, StatusDisplay: "مرحّل",
+                ReversedByEntryId: null, CreatedAt: DateTime.UtcNow, CreatedByUserId: 1,
+                Lines: new List<JournalEntryLineDetailDto>(),
+                CurrencyId: null, ExchangeRate: null, AttachmentPath: null)));
+
         _sut = new AccountingIntegrationService(
             _mockJournalEntryService.Object,
             _mockSystemAccountService.Object,
