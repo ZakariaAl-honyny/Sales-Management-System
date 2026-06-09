@@ -215,6 +215,16 @@
                                             Width="*" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
                         
+                        <DataGridTextColumn Header="العملة" 
+                                            Binding="{Binding CurrencyName}" 
+                                            Width="80" 
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
+                        <DataGridTextColumn Header="سعر الصرف" 
+                                            Binding="{Binding ExchangeRate, StringFormat=N2}" 
+                                            Width="80" 
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
                         <DataGridTextColumn Header="رقم فاتورة المورد" 
                                             Binding="{Binding SupplierInvoiceNo}" 
                                             Width="150" 

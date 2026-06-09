@@ -116,7 +116,7 @@ public class SalesReturnServiceTests : IDisposable
             Notes: "Return for defective item",
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 2m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 2m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
             }
         );
 
@@ -172,7 +172,7 @@ public class SalesReturnServiceTests : IDisposable
             Notes: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 10m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null) // Exceeds original quantity
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 10m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null) // Exceeds original quantity
             }
         );
 
@@ -205,7 +205,7 @@ public class SalesReturnServiceTests : IDisposable
             Notes: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 2m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 2m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
             }
         );
 
@@ -239,7 +239,7 @@ public class SalesReturnServiceTests : IDisposable
             Notes: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 1m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 1m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
             }
         );
 
@@ -280,7 +280,7 @@ public class SalesReturnServiceTests : IDisposable
             Notes: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 2, Quantity: 1m, UnitPrice: 200m, DiscountAmount: 0m, Notes: null) // Product 2 not in invoice
+                new(ProductId: 2, ProductUnitId: 2, Quantity: 1m, UnitPrice: 200m, DiscountAmount: 0m, Notes: null) // Product 2 not in invoice
             }
         );
 

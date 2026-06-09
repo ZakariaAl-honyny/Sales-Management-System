@@ -120,7 +120,7 @@ public class ReturnValidatorsTests
             Notes: "Return note",
             Items: new List<ReturnItemRequest>
             {
-                new(1, 5, 100, 0)
+                new(1, 1, 5, 100, 0)
             }
         );
     }
@@ -245,10 +245,15 @@ public class ReturnValidatorsTests
             SupplierId: 1,
             WarehouseId: 1,
             ReturnDate: DateTime.UtcNow.AddDays(-1),
+            CurrencyId: null,
+            ExchangeRate: null,
+            DiscountAmount: 0,
+            DiscountType: null,
+            DiscountRate: null,
             Notes: "Purchase return note",
             Items: new List<ReturnItemRequest>
             {
-                new(1, 5, 100, 0)
+                new(1, 1, 5, 100, 0)
             }
         );
     }
@@ -276,7 +281,7 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(productId, 5, 100, 0)
+                    new(productId, 1, 5, 100, 0)
                 }
             };
 
@@ -308,7 +313,7 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(1, quantity, 100, 0)
+                    new(1, 1, quantity, 100, 0)
                 }
             };
 
@@ -340,7 +345,7 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(1, 5, unitPrice, 0)
+                    new(1, 1, 5, unitPrice, 0)
                 }
             };
 
@@ -367,9 +372,9 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(1, 5, 100, 0),
-                    new(2, 10, 50, 5),
-                    new(3, 1, 200, 0)
+                    new(1, 1, 5, 100, 0),
+                    new(2, 1, 10, 50, 5),
+                    new(3, 1, 1, 200, 0)
                 }
             };
 
@@ -388,8 +393,8 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(1, 5, 100, 0),
-                    new(0, 5, 100, 0) // Invalid ProductId
+                    new(1, 1, 5, 100, 0),
+                    new(0, 1, 5, 100, 0) // Invalid ProductId
                 }
             };
 
@@ -411,7 +416,7 @@ public class ReturnValidatorsTests
             Notes: "Return note",
             Items: new List<ReturnItemRequest>
             {
-                new(1, 5, 100, 0)
+                new(1, 1, 5, 100, 0)
             }
         );
     }

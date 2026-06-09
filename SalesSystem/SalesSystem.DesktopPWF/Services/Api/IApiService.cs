@@ -349,6 +349,8 @@ public interface IPurchaseInvoiceApiService
     Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> CancelAsync(int id, CancellationToken ct = default);
+    Task<Result> UploadAttachmentAsync(int id, byte[] fileData, string fileName, CancellationToken ct = default);
+    Task<Result<byte[]>> DownloadAttachmentAsync(int id, CancellationToken ct = default);
 }
 
 public interface ISalesReturnApiService
@@ -493,6 +495,25 @@ public interface IInventoryOperationApiService
     Task<Result<InventoryOperationDto>> CreateAsync(CreateInventoryOperationRequest request);
     Task<Result<InventoryOperationDto>> PostAsync(int id);
     Task<Result<InventoryOperationDto>> CancelAsync(int id);
+}
+
+public interface IPurchaseOrderApiService
+{
+    Task<Result<List<PurchaseOrderDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<PurchaseOrderDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<PurchaseOrderDto>> CreateAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default);
+    Task<Result<PurchaseOrderDto>> UpdateAsync(int id, CreatePurchaseOrderRequest request, CancellationToken ct = default);
+    Task<Result<PurchaseOrderDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<PurchaseOrderDto>> CancelAsync(int id, CancellationToken ct = default);
+}
+
+public interface IAdditionalFeeApiService
+{
+    Task<Result<List<AdditionalFeeDto>>> GetByInvoiceAsync(int purchaseInvoiceId, CancellationToken ct = default);
+    Task<Result<AdditionalFeeDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<AdditionalFeeDto>> CreateAsync(CreateAdditionalFeeRequest request, CancellationToken ct = default);
+    Task<Result<AdditionalFeeDto>> UpdateAsync(int id, CreateAdditionalFeeRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
 }
 
 

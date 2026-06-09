@@ -67,7 +67,7 @@ public class PurchaseReturnTests
             userId: 1
         );
 
-        pr.AddItem(productId: 1, quantity: 2, unitCost: 100m, discountAmount: 10m);
+        pr.AddItem(productId: 1, quantity: 2, unitCost: 100m, productUnitId: 1, discountAmount: 10m);
 
         pr.Items.Should().HaveCount(1);
         pr.SubTotal.Should().Be(190m); // (2 * 100) - 10
@@ -84,8 +84,8 @@ public class PurchaseReturnTests
             userId: 1
         );
 
-        pr.AddItem(productId: 1, quantity: 1, unitCost: 100m);
-        pr.AddItem(productId: 2, quantity: 2, unitCost: 50m, discountAmount: 5m);
+        pr.AddItem(productId: 1, quantity: 1, unitCost: 100m, productUnitId: 1);
+        pr.AddItem(productId: 2, quantity: 2, unitCost: 50m, productUnitId: 1, discountAmount: 5m);
 
         pr.Items.Should().HaveCount(2);
         pr.SubTotal.Should().Be(195m); // 100 + (2*50-5)
@@ -117,7 +117,7 @@ public class PurchaseReturnTests
             userId: 1
         );
 
-        pr.AddItem(productId: 1, quantity: 1, unitCost: 100m);
+        pr.AddItem(productId: 1, quantity: 1, unitCost: 100m, productUnitId: 1);
         pr.Post();
 
         pr.Status.Should().Be(InvoiceStatus.Posted);
@@ -149,7 +149,7 @@ public class PurchaseReturnTests
             userId: 1
         );
 
-        pr.AddItem(productId: 1, quantity: 1, unitCost: 100m);
+        pr.AddItem(productId: 1, quantity: 1, unitCost: 100m, productUnitId: 1);
         pr.Post();
 
         var action = () => pr.Post();
@@ -183,7 +183,7 @@ public class PurchaseReturnTests
             userId: 1
         );
 
-        pr.AddItem(productId: 1, quantity: 1, unitCost: 100m);
+        pr.AddItem(productId: 1, quantity: 1, unitCost: 100m, productUnitId: 1);
         pr.Post();
         pr.Cancel();
 
@@ -232,6 +232,7 @@ public class PurchaseReturnItemTests
             productId: 1,
             quantity: 2,
             unitCost: 100m,
+            productUnitId: 1,
             discountAmount: 10m
         );
 
@@ -248,7 +249,8 @@ public class PurchaseReturnItemTests
         var action = () => PurchaseReturnItem.Create(
             productId: 0,
             quantity: 1,
-            unitCost: 100m
+            unitCost: 100m,
+            productUnitId: 1
         );
 
         action.Should().Throw<DomainException>()
@@ -264,7 +266,8 @@ public class PurchaseReturnItemTests
         var action = () => PurchaseReturnItem.Create(
             productId: 1,
             quantity: invalidQuantity,
-            unitCost: 100m
+            unitCost: 100m,
+            productUnitId: 1
         );
 
         action.Should().Throw<DomainException>()
@@ -279,7 +282,8 @@ public class PurchaseReturnItemTests
         var action = () => PurchaseReturnItem.Create(
             productId: 1,
             quantity: 1,
-            unitCost: negativeCost
+            unitCost: negativeCost,
+            productUnitId: 1
         );
 
         action.Should().Throw<DomainException>()
@@ -292,7 +296,8 @@ public class PurchaseReturnItemTests
         var item = PurchaseReturnItem.Create(
             productId: 1,
             quantity: 1,
-            unitCost: 0m
+            unitCost: 0m,
+            productUnitId: 1
         );
 
         item.UnitCost.Should().Be(0m);
@@ -306,6 +311,7 @@ public class PurchaseReturnItemTests
             productId: 1,
             quantity: 3,
             unitCost: 50m,
+            productUnitId: 1,
             discountAmount: 25m
         );
 

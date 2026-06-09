@@ -209,10 +209,17 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         TaxRate: null,
         CurrencyId: null,
         ExchangeRate: null,
+        CostInBaseCurrency: null,
+        AdditionalFeesTotal: 0,
+        AttachmentPath: null,
+        DiscountType: null,
+        DiscountRate: null,
+        CurrencyName: null,
         Items: new List<PurchaseInvoiceItemDto>
         {
-            new(id * 10, 1, "منتج اختبار", 5.000m, 40.00m, 0.00m, 200.00m, 1)
-        });
+            new(Id: id * 10, ProductId: 1, ProductName: "منتج اختبار", ProductUnitId: 1, ProductUnitName: "وحدة", Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, DiscountType: null, DiscountRate: null, LineTotal: 200.00m, CostInBaseCurrency: null, AdditionalFeesAmount: 0, Mode: 1, Notes: null)
+        },
+        AdditionalFees: new List<AdditionalFeeDto>());
 
     private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
@@ -223,12 +230,18 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         PaymentType: PaymentType.Cash,
         CashBoxId: null,
         DiscountAmount: 10.00m,
+        DiscountType: null,
+        DiscountRate: null,
         TaxAmount: 28.50m,
         PaidAmount: 100.00m,
+        CurrencyId: null,
+        ExchangeRate: null,
         Notes: null,
         SupplierInvoiceNo: null,
+        AttachmentBase64: null,
+        AttachmentFileName: null,
         Items: new List<CreatePurchaseInvoiceItemRequest>
         {
-            new(ProductId: 1, Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, Mode: SaleMode.Retail, Notes: null)
+            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, DiscountType: null, DiscountRate: null, Mode: SaleMode.Retail, Notes: null)
         });
 }

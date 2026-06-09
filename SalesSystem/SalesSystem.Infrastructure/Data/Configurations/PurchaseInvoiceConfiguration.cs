@@ -21,6 +21,12 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
         builder.Property(pi => pi.PaymentType).HasConversion<byte>();
         builder.Property(pi => pi.Status).HasConversion<byte>();
 
+        // Phase 27 — Additional purchase invoice properties
+        builder.Property(pi => pi.AdditionalFeesTotal).HasPrecision(18, 2).HasDefaultValue(0);
+        builder.Property(pi => pi.AttachmentPath).HasMaxLength(255).IsRequired(false);
+        builder.Property(pi => pi.DiscountType).HasConversion<byte?>().IsRequired(false);
+        builder.Property(pi => pi.DiscountRate).HasPrecision(18, 2).IsRequired(false);
+
         builder.HasOne(pi => pi.Supplier)
             .WithMany()
             .HasForeignKey(pi => pi.SupplierId)
@@ -71,10 +77,24 @@ public class PurchaseInvoiceItemConfiguration : IEntityTypeConfiguration<Purchas
         builder.Property(pii => pii.LineTotal).HasPrecision(18, 2);
         builder.Property(pii => pii.Notes).HasMaxLength(250);
 
+        // Phase 27 — Additional purchase invoice item properties
+        builder.Property(pii => pii.ProductUnitId).IsRequired();
+        builder.Property(pii => pii.DiscountType).HasConversion<byte?>().IsRequired(false);
+        builder.Property(pii => pii.DiscountRate).HasPrecision(18, 2).IsRequired(false);
+        builder.Property(pii => pii.CostInBaseCurrency).HasPrecision(18, 2).IsRequired(false);
+        builder.Property(pii => pii.AdditionalFeesAmount).HasPrecision(18, 2).HasDefaultValue(0);
+
         builder.HasOne(pii => pii.Product)
             .WithMany()
             .HasForeignKey(pii => pii.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(pii => pii.ProductUnit)
+            .WithMany()
+            .HasForeignKey(pii => pii.ProductUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(pii => pii.ProductUnitId).HasDatabaseName("IX_PurchaseInvoiceItems_ProductUnitId");
 
         builder.HasQueryFilter(pii => pii.IsActive);
     }

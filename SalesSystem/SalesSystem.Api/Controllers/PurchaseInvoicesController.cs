@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
@@ -141,5 +141,49 @@ public class PurchaseInvoicesController : ControllerBase
 
         var result = await _purchaseService.CancelAsync(id, userId, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Uploads an attachment for a purchase invoice
+    /// </summary>
+    /// <param name="id">Invoice ID</param>
+    /// <param name="request">Upload request with base64 content and file name</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Saved file path</returns>
+    [HttpPost("{id:int}/upload-attachment")]
+    [ProducesResponseType(typeof(string), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> UploadAttachment(int id, [FromBody] UploadAttachmentRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _purchaseService.UploadAttachmentAsync(id, request.Base64Content, request.FileName, ct);
+
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { error = result.Error })
+            : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Downloads the attachment for a purchase invoice
+    /// </summary>
+    /// <param name="id">Invoice ID</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>File content</returns>
+    [HttpGet("{id:int}/attachment")]
+    [ProducesResponseType(typeof(FileResult), 200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> DownloadAttachment(int id, CancellationToken ct)
+    {
+        var result = await _purchaseService.DownloadAttachmentAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        return File(result.Value!, "application/octet-stream", $"attachment_{id}");
     }
 }

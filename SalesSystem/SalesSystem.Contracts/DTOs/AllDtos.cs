@@ -156,7 +156,14 @@ public record PurchaseInvoiceDto(
     decimal? TaxRate,
     int? CurrencyId,
     decimal? ExchangeRate,
-    IReadOnlyList<PurchaseInvoiceItemDto> Items)
+    decimal? CostInBaseCurrency,         // NEW
+    decimal AdditionalFeesTotal,          // NEW
+    string? AttachmentPath,               // NEW
+    byte? DiscountType,                   // NEW (0=Amount, 1=Percentage)
+    decimal? DiscountRate,                // NEW
+    string? CurrencyName,                  // NEW - display name for the invoice's currency
+    IReadOnlyList<PurchaseInvoiceItemDto> Items,
+    IReadOnlyList<AdditionalFeeDto> AdditionalFees)   // NEW
 {
     public string PaymentTypeDisplay => PaymentType switch
     {
@@ -176,11 +183,16 @@ public record PurchaseInvoiceDto(
 }
 
 public record PurchaseInvoiceItemDto(int Id, int ProductId, string ProductName,
+    int ProductUnitId, string ProductUnitName,                    // NEW
     decimal Quantity,
     decimal UnitCost,
     decimal DiscountAmount,
+    byte? DiscountType, decimal? DiscountRate,                    // NEW
     decimal LineTotal,
-    byte Mode);
+    decimal? CostInBaseCurrency,                                  // NEW
+    decimal AdditionalFeesAmount,                                 // NEW
+    byte Mode,
+    string? Notes);                                               // NEW
 
 public record SalesReturnDto(
     int Id,
@@ -224,10 +236,13 @@ public record PurchaseReturnDto(
     int SupplierId,
     string SupplierName,
     int? PurchaseInvoiceId,
+    bool LinkToInvoice,                   // NEW
     DateTime ReturnDate,
     decimal SubTotal,
     decimal TaxAmount,
     decimal DiscountAmount,
+    byte? DiscountType,                   // NEW
+    decimal? DiscountRate,                // NEW
     decimal TotalAmount,
     int? CurrencyId,
     decimal? ExchangeRate,
@@ -244,10 +259,12 @@ public record PurchaseReturnDto(
 }
 
 public record PurchaseReturnItemDto(int Id, int ProductId, string ProductName,
+    int ProductUnitId, string ProductUnitName,                    // NEW
     decimal Quantity,
     decimal UnitCost,
     decimal DiscountAmount,
     decimal LineTotal,
+    decimal? CostInBaseCurrency,                                  // NEW
     byte Mode);
 
 public record StockTransferDto(
@@ -838,4 +855,65 @@ public record InventoryOperationItemDto(
     decimal? UnitCost,
     byte? StockIssueReason,
     string? Notes);
+
+// ═══════════════════════════════════════════════════════
+// Phase 27 — Purchase Orders + Additional Fees DTOs
+// ═══════════════════════════════════════════════════════
+
+public record PurchaseOrderDto(
+    int Id,
+    int OrderNo,
+    int SupplierId,
+    string SupplierName,
+    int WarehouseId,
+    string WarehouseName,
+    DateTime OrderDate,
+    DateOnly? ExpectedDate,
+    byte Status,
+    decimal SubTotal,
+    decimal DiscountAmount,
+    decimal TaxAmount,
+    decimal TotalAmount,
+    int? CurrencyId,
+    decimal? ExchangeRate,
+    string? Notes,
+    IReadOnlyList<PurchaseOrderItemDto> Items)
+{
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "معتمد",
+        3 => "مستلم جزئياً",
+        4 => "مستلم بالكامل",
+        5 => "ملغي",
+        _ => "غير معروف"
+    };
+}
+
+public record PurchaseOrderItemDto(
+    int Id,
+    int ProductId,
+    string ProductName,
+    int ProductUnitId,
+    string ProductUnitName,
+    decimal Quantity,
+    decimal ReceivedQuantity,
+    decimal PendingReceiveQuantity,
+    decimal UnitCost,
+    decimal LineTotal,
+    string? Notes);
+
+public record AdditionalFeeDto(
+    int Id,
+    int PurchaseInvoiceId,
+    string FeeName,
+    decimal FeeAmount,
+    byte DistributionMethod,
+    int? AccountId);
+
+public record AdditionalFeeAllocationDto(
+    int Id,
+    int AdditionalFeeId,
+    int PurchaseInvoiceItemId,
+    decimal AllocatedAmount);
 

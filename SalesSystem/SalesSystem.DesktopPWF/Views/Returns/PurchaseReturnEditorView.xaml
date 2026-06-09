@@ -6,7 +6,7 @@
         xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
         mc:Ignorable="d"
         Title="{Binding Title}"
-        Height="680" Width="950"
+        Height="720" Width="1024"
         MinHeight="550" MinWidth="900"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterScreen"
@@ -41,10 +41,10 @@
         <Grid Grid.Row="1" Margin="16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>      <!-- Main: Items Grid -->
-                <ColumnDefinition Width="320"/>    <!-- Side: Info, Impact, Notes -->
+                <ColumnDefinition Width="340"/>    <!-- Side: Info, Impact, Notes -->
             </Grid.ColumnDefinitions>
 
-            <!-- Main Panel (Right side in RTL) -->
+            <!-- Main Panel -->
             <Grid Grid.Column="0" Margin="0,0,16,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>    <!-- DataGrid -->
@@ -64,7 +64,7 @@
                                   BorderThickness="0">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="اسم المنتج" Binding="{Binding ProductName}" Width="*" IsReadOnly="True"/>
-                                <DataGridTemplateColumn Header="نظام الشراء" Width="100">
+                                <DataGridTemplateColumn Header="نظام الشراء" Width="90">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border Background="{Binding Mode, Converter={StaticResource SaleModeToBrushConverter}}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
@@ -73,8 +73,8 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="الكمية المشتراة" Binding="{Binding OriginalQuantity}" Width="110" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                                <DataGridTemplateColumn Header="كمية المرتجع" Width="120">
+                                <DataGridTextColumn Header="الكمية المشتراة" Binding="{Binding OriginalQuantity}" Width="100" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                                <DataGridTemplateColumn Header="كمية المرتجع" Width="110">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBox Text="{Binding ReturnQuantity, UpdateSourceTrigger=PropertyChanged}" 
@@ -85,52 +85,146 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="التكلفة" Binding="{Binding UnitPrice, StringFormat=N2}" Width="100" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                                <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotal, StringFormat=N2}" Width="110" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                                <DataGridTextColumn Header="التكلفة" Binding="{Binding UnitPrice, StringFormat=N2}" Width="90" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                                <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotal, StringFormat=N2}" Width="100" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>
                 </Border>
             </Grid>
 
-            <!-- Side Panel (Left side in RTL) -->
+            <!-- Side Panel -->
             <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <!-- Info Card -->
-                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                    <!-- Mode Toggle Card -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8"
+                            Visibility="{Binding IsEditMode, Converter={StaticResource InverseBoolToVisibility}}">
                         <StackPanel>
-                            <TextBlock Text="ℹ️ معلومات الفاتورة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
-                            
-                            <TextBlock Text="بحث عن فاتورة" Style="{StaticResource LabelStyle}"/>
-                            <Grid Margin="0,0,0,12">
+                            <TextBlock Text="🔄 نوع المرتجع" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                 <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
-                                          Style="{StaticResource ModernTextBox}">
-                                    <TextBox.InputBindings>
-                                        <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
-                                    </TextBox.InputBindings>
-                                </TextBox>
-                                <Button Grid.Column="1" Content="🔍" 
-                                        Command="{Binding SearchInvoiceCommand}"
-                                        Style="{StaticResource SecondaryButton}" 
-                                        Width="36" Margin="4,0,0,0" ToolTip="البحث عن فاتورة"/>
+                                <TextBlock VerticalAlignment="Center" FontWeight="SemiBold">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="مرتجع من فاتورة"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsStandaloneMode}" Value="True">
+                                                    <Setter Property="Text" Value="مرتجع مستقل"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <ToggleButton Grid.Column="1" 
+                                              IsChecked="{Binding IsStandaloneMode}"
+                                              Command="{Binding ToggleStandaloneModeCommand}"
+                                              Content="تبديل" 
+                                              Style="{StaticResource SecondaryButton}"
+                                              FontSize="12" Padding="8,4"/>
                             </Grid>
+                        </StackPanel>
+                    </Border>
 
-                            <TextBlock Text="رقم الفاتورة" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding SelectedInvoice.Id}" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,0,12" Background="#F8FAFC"/>
+                    <!-- Info Card -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="ℹ️ معلومات" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
 
-                            <TextBlock Text="المورد" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding SelectedInvoice.SupplierName}" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,0,12" Background="#F8FAFC"/>
+                            <!-- Invoice-linked mode: search invoice -->
+                            <StackPanel Visibility="{Binding IsInvoiceLinked, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="بحث عن فاتورة" Style="{StaticResource LabelStyle}"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
+                                             Style="{StaticResource ModernTextBox}">
+                                        <TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
+                                        </TextBox.InputBindings>
+                                    </TextBox>
+                                    <Button Grid.Column="1" Content="🔍" 
+                                            Command="{Binding SearchInvoiceCommand}"
+                                            Style="{StaticResource SecondaryButton}" 
+                                            Width="36" Margin="4,0,0,0" ToolTip="البحث عن فاتورة"/>
+                                </Grid>
+
+                                <TextBlock Text="رقم الفاتورة" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding SelectedInvoice.Id}" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,0,8" Background="#F8FAFC"/>
+
+                                <TextBlock Text="المورد" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding SelectedInvoice.SupplierName}" IsReadOnly="True" Style="{StaticResource ModernTextBox}" Margin="0,0,0,8" Background="#F8FAFC"/>
+                            </StackPanel>
+
+                            <!-- Standalone mode: supplier selector -->
+                            <StackPanel Visibility="{Binding IsStandaloneMode, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="المورد *" Style="{StaticResource LabelStyle}"/>
+                                <ComboBox ItemsSource="{Binding Suppliers}"
+                                          SelectedValue="{Binding StandaloneSupplierId}"
+                                          SelectedValuePath="Id"
+                                          DisplayMemberPath="Name"
+                                          Style="{StaticResource ModernComboBox}"
+                                          Margin="0,0,0,8"
+                                          ToolTip="اختر المورد لهذا المرتجع المستقل"/>
+                            </StackPanel>
 
                             <TextBlock Text="المستودع" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding Warehouses}"
                                       SelectedValue="{Binding SelectedWarehouseId}"
                                       SelectedValuePath="Id"
                                       DisplayMemberPath="Name"
-                                      Style="{StaticResource ModernComboBox}"/>
+                                      Style="{StaticResource ModernComboBox}"
+                                      Margin="0,0,0,8"/>
+
+                            <!-- Currency -->
+                            <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox ItemsSource="{Binding Currencies}"
+                                          SelectedValue="{Binding SelectedCurrencyId}"
+                                          SelectedValuePath="Id"
+                                          DisplayMemberPath="Name"
+                                          Style="{StaticResource ModernComboBox}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrencyName}" 
+                                           VerticalAlignment="Center" Margin="8,0,0,0"
+                                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                            </Grid>
+
+                            <!-- Exchange Rate -->
+                            <TextBlock Text="سعر الصرف" Style="{StaticResource LabelStyle}"/>
+                            <TextBox Text="{Binding ExchangeRate, StringFormat=N4, UpdateSourceTrigger=PropertyChanged}" 
+                                     Style="{StaticResource ModernTextBox}" 
+                                     Margin="0,0,0,8"
+                                     ToolTip="سعر صرف العملة مقابل العملة الأساسية"
+                                     IsReadOnly="{Binding IsBaseCurrency}"/>
+
+                            <!-- Discount Type -->
+                            <TextBlock Text="نوع الخصم" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox ItemsSource="{Binding DiscountTypeOptions}"
+                                      SelectedValue="{Binding SelectedDiscountType}"
+                                      SelectedValuePath="Value"
+                                      DisplayMemberPath="Display"
+                                      Style="{StaticResource ModernComboBox}"
+                                      Margin="0,0,0,8"/>
+
+                            <!-- Discount Rate (visible when percentage) -->
+                            <StackPanel Visibility="{Binding SelectedDiscountType, Converter={StaticResource DiscountTypeToVisibilityConverter}}">
+                                <TextBlock Text="نسبة الخصم" Style="{StaticResource LabelStyle}"/>
+                                <TextBox Text="{Binding DiscountRate, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" 
+                                         Style="{StaticResource ModernTextBox}" 
+                                         Margin="0,0,0,8"
+                                         ToolTip="نسبة الخصم (مثلاً 10 = 10%)"/>
+                            </StackPanel>
+
+                            <TextBlock Text="تاريخ المرتجع" Style="{StaticResource LabelStyle}"/>
+                            <DatePicker SelectedDate="{Binding ReturnDate}" Style="{StaticResource ModernDatePicker}" Margin="0,0,0,8"/>
                         </StackPanel>
                     </Border>
 
@@ -139,7 +233,7 @@
                             Visibility="{Binding Impact.HasImpact, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
                             <TextBlock Text="📊 تحليل الأثر" FontWeight="Bold" Foreground="#BE123C" Margin="0,0,0,12"/>
-                            
+
                             <Border Background="White" CornerRadius="6" Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="📦 المخزون" Style="{StaticResource LabelStyle}" FontSize="11"/>
@@ -186,7 +280,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                
+
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button Content="🚢 ترحيل المرتجع"
                             Command="{Binding PostCommand}"
@@ -224,7 +318,7 @@
                             Margin="0,0,12,0"
                             Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"
                             ToolTip="إلغاء العملية (للحالات غير المرحلة)"/>
-                            
+
                     <Button Content="إغلاق"
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"

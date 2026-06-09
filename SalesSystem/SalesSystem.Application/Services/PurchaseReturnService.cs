@@ -61,7 +61,7 @@ public class PurchaseReturnService : IPurchaseReturnService
 
     public async Task<Result<PurchaseReturnDto>> CreateAsync(CreatePurchaseReturnRequest request, int userId, CancellationToken ct)
     {
-        // 1. Validation
+        // 1. Validation — if linked to invoice
         if (request.PurchaseInvoiceId.HasValue)
         {
             var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
@@ -71,7 +71,7 @@ public class PurchaseReturnService : IPurchaseReturnService
 
             foreach (var item in request.Items)
             {
-                var originalLine = invoice.Items.FirstOrDefault(it => it.ProductId == item.ProductId);
+                var originalLine = invoice.Items.FirstOrDefault(it => it.ProductId == item.ProductId && it.ProductUnitId == item.ProductUnitId);
                 if (originalLine == null)
                     return Result<PurchaseReturnDto>.Failure($"المنتج {item.ProductId} غير موجود في الفاتورة الأصلية");
 
@@ -105,19 +105,56 @@ public class PurchaseReturnService : IPurchaseReturnService
                 var returnNoResult = await _sequenceService.GetNextNumberAsync("PR", ct);
                 if (!returnNoResult.IsSuccess) return Result<PurchaseReturnDto>.Failure(returnNoResult.Error!);
 
-                var purchaseReturn = PurchaseReturn.Create(
-                    returnNoResult.Value!,
-                    request.WarehouseId,
-                    request.SupplierId,
-                    request.PurchaseInvoiceId,
-                    request.ReturnDate,
-                    request.Notes,
-                    userId: userId
-                );
+                // Choose Create or CreateStandalone based on PurchaseInvoiceId presence
+                PurchaseReturn purchaseReturn;
+                if (request.PurchaseInvoiceId.HasValue)
+                {
+                    purchaseReturn = PurchaseReturn.Create(
+                        returnNoResult.Value!,
+                        request.WarehouseId,
+                        request.SupplierId,
+                        request.PurchaseInvoiceId,
+                        request.ReturnDate,
+                        request.Notes,
+                        currencyId: request.CurrencyId,
+                        exchangeRate: request.ExchangeRate,
+                        userId: userId
+                    );
+                }
+                else
+                {
+                    purchaseReturn = PurchaseReturn.CreateStandalone(
+                        returnNoResult.Value!,
+                        request.WarehouseId,
+                        request.SupplierId,
+                        request.ReturnDate,
+                        request.Notes,
+                        currencyId: request.CurrencyId,
+                        exchangeRate: request.ExchangeRate,
+                        userId: userId
+                    );
+                }
+
+                // Set discount
+                if (request.DiscountAmount > 0)
+                {
+                    Domain.Enums.DiscountType? discountType = request.DiscountType.HasValue
+                        ? (Domain.Enums.DiscountType)request.DiscountType.Value
+                        : null;
+                    purchaseReturn.SetDiscount(request.DiscountAmount, discountType, request.DiscountRate);
+                }
 
                 foreach (var item in request.Items)
                 {
-                    purchaseReturn.AddItem(item.ProductId, item.Quantity, item.UnitPrice, item.DiscountAmount, (SaleMode)item.Mode, item.Notes);
+                    purchaseReturn.AddItem(
+                        productId: item.ProductId,
+                        quantity: item.Quantity,
+                        unitCost: item.UnitPrice,
+                        productUnitId: item.ProductUnitId,
+                        discountAmount: item.DiscountAmount,
+                        costInBaseCurrency: null,
+                        mode: (SaleMode)item.Mode,
+                        notes: item.Notes);
                 }
 
                 await _uow.PurchaseReturns.AddAsync(purchaseReturn, ct);
@@ -294,23 +331,29 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.SupplierId,
             r.Supplier?.Name ?? "غير معروف",
             r.PurchaseInvoiceId,
+            r.LinkToInvoice,
             r.ReturnDate,
             r.SubTotal,
-            0, // TaxAmount
-            0, // DiscountAmount
+            0, // TaxAmount — PurchaseReturn entity doesn't have TaxAmount yet
+            r.DiscountAmount,
+            (byte?)r.DiscountType,
+            r.DiscountRate,
             r.TotalAmount,
-            null, // CurrencyId — system setting
-            null, // ExchangeRate — system setting
+            r.CurrencyId,
+            r.ExchangeRate,
             r.Notes,
             (byte)r.Status,
             r.Items.Select(it => new PurchaseReturnItemDto(
                 it.Id,
                 it.ProductId,
                 it.Product?.Name ?? "غير معروف",
+                it.ProductUnitId,
+                it.ProductUnit?.UnitName ?? "غير معروف",
                 it.Quantity,
                 it.UnitCost,
                 it.DiscountAmount,
                 it.LineTotal,
+                it.CostInBaseCurrency,
                 (byte)it.Mode
             )).ToList()
         );

@@ -143,7 +143,7 @@ public class SalesReturnsControllerTests : ControllerTestBase
         Notes: "ملاحظات إرجاع",
         Items: new List<ReturnItemRequest>
         {
-            new(ProductId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m)
+            new(ProductId: 1, ProductUnitId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m)
         });
 }
 
@@ -258,10 +258,13 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         SupplierId: 1,
         SupplierName: "مورد اختبار",
         PurchaseInvoiceId: 10 + id,
+        LinkToInvoice: true,
         ReturnDate: DateTime.UtcNow,
         SubTotal: 200.00m,
         TaxAmount: 0.00m,
         DiscountAmount: 0.00m,
+        DiscountType: null,
+        DiscountRate: null,
         TotalAmount: 200.00m,
         CurrencyId: null,
         ExchangeRate: null,
@@ -269,7 +272,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         Status: 1,
         Items: new List<PurchaseReturnItemDto>
         {
-            new(id * 10, 1, "منتج اختبار", 5.000m, 40.00m, 0.00m, 200.00m, 1)
+            new(Id: id * 10, ProductId: 1, ProductName: "منتج اختبار", ProductUnitId: 1, ProductUnitName: "وحدة", Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, LineTotal: 200.00m, CostInBaseCurrency: null, Mode: 1)
         });
 
     private static CreatePurchaseReturnRequest CreateValidRequest() => new(
@@ -277,9 +280,14 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         SupplierId: 1,
         WarehouseId: 1,
         ReturnDate: null,
+        CurrencyId: null,
+        ExchangeRate: null,
+        DiscountAmount: 0,
+        DiscountType: null,
+        DiscountRate: null,
         Notes: "ملاحظات إرجاع",
         Items: new List<ReturnItemRequest>
         {
-            new(ProductId: 1, Quantity: 5.000m, UnitPrice: 40.00m, DiscountAmount: 0.00m)
+            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitPrice: 40.00m, DiscountAmount: 0.00m)
         });
 }
