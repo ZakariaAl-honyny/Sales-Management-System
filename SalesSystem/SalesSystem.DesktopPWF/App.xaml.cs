@@ -216,6 +216,9 @@ public partial class App : System.Windows.Application
         // Inventory Operation API Service
         services.AddSingleton<IInventoryOperationApiService, InventoryOperationApiService>();
 
+        // Bill of Materials / Assembly API Service
+        services.AddSingleton<IBillOfMaterialApiService, BillOfMaterialApiService>();
+
         // Account API Service
         services.AddSingleton<IAccountApiService, AccountApiService>();
 
@@ -339,6 +342,11 @@ public partial class App : System.Windows.Application
         services.AddTransient<PermissionManagementViewModel>();
         services.AddTransient<PasswordChangeViewModel>();
         services.AddTransient<SetPasswordViewModel>();
+
+        // Bill of Materials / Assembly ViewModels
+        services.AddTransient<BillOfMaterialsListViewModel>();
+        services.AddTransient<BillOfMaterialEditorViewModel>();
+        services.AddTransient<AssemblyProductionViewModel>();
 
         // Financial Report ViewModels
         services.AddTransient<ViewModels.Reports.IncomeStatementViewModel>();

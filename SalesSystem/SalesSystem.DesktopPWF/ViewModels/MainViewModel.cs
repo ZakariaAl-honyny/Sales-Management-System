@@ -125,6 +125,7 @@ public class MainViewModel : ViewModelBase
         NavigateToInventoryCommand = new RelayCommand(() => NavigateTo<InventoryViewModel>());
         NavigateToProductPricesCommand = new RelayCommand(() => NavigateTo<ProductPricesListViewModel>());
         NavigateToProductImagesCommand = new RelayCommand(() => NavigateTo<ProductImagesViewModel>());
+        NavigateToBillOfMaterialsCommand = new RelayCommand(() => NavigateTo<BillOfMaterialsListViewModel>());
         NavigateToInventoryBatchesCommand = new RelayCommand(() => NavigateTo<InventoryBatchesViewModel>());
         NavigateToInventoryOperationsCommand = new RelayCommand(() => NavigateTo<InventoryOperationListViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
@@ -317,6 +318,9 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى صور المنتجات — إدارة صور متعددة لكل منتج</summary>
     public ICommand NavigateToProductImagesCommand { get; }
 
+    /// <summary>نقل إلى قائمة المكونات (BOM) — إدارة المكونات اللازمة لتصنيع المنتجات المُجمَّعة</summary>
+    public ICommand NavigateToBillOfMaterialsCommand { get; }
+
     /// <summary>نقل إلى إدارة الدفعات المخزنية — تتبع الكميات حسب تاريخ انتهاء الصلاحية</summary>
     public ICommand NavigateToInventoryBatchesCommand { get; }
 
@@ -479,6 +483,7 @@ public class MainViewModel : ViewModelBase
             nameof(InventoryViewModel)              => "Inventory",
             nameof(ProductPricesListViewModel)      => "Products",
             nameof(ProductImagesViewModel)          => "Products",
+            nameof(BillOfMaterialsListViewModel)   => "Products",
             nameof(InventoryBatchesViewModel)       => "Products",
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",

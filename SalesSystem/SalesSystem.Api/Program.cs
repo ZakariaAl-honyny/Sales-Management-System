@@ -116,6 +116,7 @@ builder.Services.AddSingleton<SecureDbContextFactory>();
 builder.Services.Configure<BackupSettings>(builder.Configuration.GetSection(BackupSettings.SectionName));
 builder.Services.AddScoped<IBackupService, BackupService>();
 builder.Services.AddHostedService<ScheduledBackupWorker>();
+builder.Services.AddHostedService<MinStockAlertWorker>();
 builder.Services.AddUpdateServices(builder.Configuration);
 
 // ============================================
@@ -162,6 +163,7 @@ builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IInventoryBatchService, InventoryBatchService>();
+builder.Services.AddScoped<IFifoAllocationService, FifoAllocationService>();
 builder.Services.AddScoped<IProductImageService, ProductImageService>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IAdditionalFeeService, AdditionalFeeService>();
@@ -279,6 +281,9 @@ builder.Services.AddScoped<IValidator<CreateCustomerRequest>, CreateCustomerRequ
 builder.Services.AddScoped<IValidator<UpdateCustomerRequest>, UpdateCustomerRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateCustomerGroupRequest>, CreateCustomerGroupRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateCustomerGroupRequest>, UpdateCustomerGroupRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateBillOfMaterialRequest>, CreateBillOfMaterialRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateBillOfMaterialRequest>, UpdateBillOfMaterialRequestValidator>();
+builder.Services.AddScoped<IValidator<ProduceAssemblyRequest>, ProduceAssemblyRequestValidator>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>
 {
