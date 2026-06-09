@@ -64,66 +64,6 @@ public class SalesReturnItemConfiguration : IEntityTypeConfiguration<SalesReturn
     }
 }
 
-public class PurchaseReturnConfiguration : IEntityTypeConfiguration<PurchaseReturn>
-{
-    public void Configure(EntityTypeBuilder<PurchaseReturn> builder)
-    {
-        builder.ToTable("PurchaseReturns");
-        builder.HasKey(pr => pr.Id);
-        builder.Property(pr => pr.ReturnNo).IsRequired().HasMaxLength(30);
-        builder.HasIndex(pr => pr.ReturnNo).IsUnique();
-        builder.Property(pr => pr.SubTotal).HasPrecision(18, 2);
-        builder.Property(pr => pr.TotalAmount).HasPrecision(18, 2);
-        builder.Property(pr => pr.Notes).HasColumnName("Reason").HasMaxLength(250);
-        builder.Property(pr => pr.Status).HasConversion<byte>();
-
-        builder.HasOne(pr => pr.Supplier)
-            .WithMany()
-            .HasForeignKey(pr => pr.SupplierId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(pr => pr.Warehouse)
-            .WithMany()
-            .HasForeignKey(pr => pr.WarehouseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(pr => pr.Currency)
-            .WithMany()
-            .HasForeignKey(pr => pr.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.Property(pr => pr.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
-
-        builder.HasMany(pr => pr.Items)
-            .WithOne(i => i.PurchaseReturn)
-            .HasForeignKey(i => i.PurchaseReturnId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(pr => pr.IsActive);
-    }
-}
-
-public class PurchaseReturnItemConfiguration : IEntityTypeConfiguration<PurchaseReturnItem>
-{
-    public void Configure(EntityTypeBuilder<PurchaseReturnItem> builder)
-    {
-        builder.ToTable("PurchaseReturnItems");
-        builder.HasKey(pri => pri.Id);
-        builder.Property(pri => pri.Quantity).HasPrecision(18, 3);
-        builder.Property(pri => pri.UnitCost).HasPrecision(18, 2);
-        builder.Property(pri => pri.DiscountAmount).HasPrecision(18, 2);
-        builder.Property(pri => pri.LineTotal).HasPrecision(18, 2);
-        builder.Ignore(pri => pri.Notes); // DB Schema doesn't have Notes for return items
-
-        builder.HasOne(pri => pri.Product)
-            .WithMany()
-            .HasForeignKey(pri => pri.ProductId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(pri => pri.IsActive);
-    }
-}
-
 public class StockTransferConfiguration : IEntityTypeConfiguration<StockTransfer>
 {
     public void Configure(EntityTypeBuilder<StockTransfer> builder)

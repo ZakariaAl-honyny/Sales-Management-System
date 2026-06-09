@@ -63,3 +63,9 @@ public record ProductImageChangedMessage(int ImageId);
 /// </summary>
 public record InventoryOperationChangedMessage(int Id);
 
+/// <summary>
+/// Published when a purchase order is created, updated, or cancelled.
+/// Carries the order ID only — NO data payload (RULE-034).
+/// </summary>
+public record PurchaseOrderChangedMessage(int OrderId);
+

@@ -82,6 +82,9 @@
             <DataTemplate DataType="{x:Type vmPurchases:PurchaseInvoiceListViewModel}">
                 <viewsPurchases:PurchaseInvoicesListView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmPurchases:PurchaseOrderListViewModel}">
+                <viewsPurchases:PurchaseOrdersListView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmReturns:PurchaseReturnListViewModel}">
                 <viewsReturns:PurchaseReturnsListView />
             </DataTemplate>
@@ -228,11 +231,13 @@
             </MenuItem>
             <MenuItem Header="المشتريات" ToolTip="قائمة المشتريات">
                 <MenuItem Header="فواتير الشراء" ToolTip="عرض وإدارة فواتير الشراء" Click="PurchaseInvoicesMenuItem_Click"/>
+                <MenuItem Header="أوامر الشراء" ToolTip="عرض وإدارة أوامر الشراء" Click="PurchaseOrdersMenuItem_Click"/>
                 <MenuItem Header="إرجاع المشتريات" ToolTip="إدارة مرتجعات المشتريات" Click="PurchaseReturnsMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="تسديد ديون الموردين" ToolTip="تسجيل المبالغ المدفوعة للموردين" Click="SupplierPaymentsMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="فتح نافذة مشتريات جديدة" ToolTip="فتح نافذة مشتريات مستقلة في نافذة منفصلة" Click="OpenNewPurchasesWindow_Click"/>
+                <MenuItem Header="فتح نافذة أوامر شراء جديدة" ToolTip="فتح نافذة أوامر شراء مستقلة في نافذة منفصلة" Click="OpenNewPurchaseOrdersWindow_Click"/>
             </MenuItem>
             <MenuItem Header="المستودعات" ToolTip="قائمة المستودعات">
                 <MenuItem Header="إدارة المستودعات" ToolTip="إدارة الفروع والمستودعات" Click="WarehousesMenuItem_Click"/>
@@ -342,6 +347,11 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavPurchaseInvoices"
                                             ToolTip="عرض وإدارة فواتير الشراء من الموردين"/>
+                                    <Button Content="أوامر الشراء"
+                                            Command="{Binding NavigateToPurchaseOrdersCommand}"
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavPurchaseOrders"
+                                            ToolTip="عرض وإدارة أوامر الشراء — قيد الانتظار والمستلمة والملغية"/>
                                     <Button Content="مرتجعات المشتريات" 
                                             Command="{Binding NavigateToPurchaseReturnsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

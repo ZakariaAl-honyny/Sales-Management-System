@@ -186,7 +186,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
         await _viewModel.LoadInvoicesAsync();
-        _viewModel.SearchText = "ط؛ظٹط± ظ…ظˆط¬ظˆط¯";
+        _viewModel.SearchText = "غير موجود";
 
         var count = 0;
         if (_viewModel.InvoicesView != null)
@@ -239,7 +239,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.SearchText = "ط¨ط­ط«";
+        _viewModel.SearchText = "بحث";
 
         propertyChangedEvents.Should().Contain("SearchText");
     }
@@ -470,6 +470,12 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
+            CostInBaseCurrency: null,
+            AdditionalFeesTotal: 0m,
+            AttachmentPath: null,
+            DiscountType: null,
+            DiscountRate: null,
+            AdditionalFees: null,
             Items: new List<PurchaseInvoiceItemDto>());
     }
 

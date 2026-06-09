@@ -164,6 +164,59 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Currency & Discount Card -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="💰 العملة والخصم" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
+
+                            <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox ItemsSource="{Binding Currencies}"
+                                      SelectedValue="{Binding SelectedCurrencyId}"
+                                      SelectedValuePath="Id"
+                                      DisplayMemberPath="Name"
+                                      Style="{StaticResource ModernComboBox}"
+                                      Margin="0,0,0,6"
+                                      ToolTip="اختر عملة المرتجع — إذا كانت غير العملة الأساسية سيظهر حقل سعر الصرف"/>
+                            <Grid Margin="0,0,0,8"
+                                  Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="سعر الصرف:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11"/>
+                                <TextBox Grid.Column="1" Text="{Binding ExchangeRate, StringFormat=N2}"
+                                         Style="{StaticResource ModernTextBox}"
+                                         ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية"/>
+                            </Grid>
+
+                            <Border Background="#F8FAFC" CornerRadius="4" Padding="6,4" Margin="0,0,0,6"
+                                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="نوع الخصم" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <RadioButton Content="مبلغ" IsChecked="{Binding IsAmountDiscount}" GroupName="ReturnDiscountType"
+                                                 Margin="0,0,0,2" FontSize="11" ToolTip="خصم بقيمة مالية ثابتة"/>
+                                    <RadioButton Content="نسبة %" IsChecked="{Binding IsPercentageDiscount}" GroupName="ReturnDiscountType"
+                                                 FontSize="11" ToolTip="خصم بنسبة مئوية من إجمالي المرتجع"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Grid Margin="0,0,0,4"
+                                  Visibility="{Binding IsPercentageDiscount, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="نسبة الخصم (%)" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding DiscountRate, StringFormat=N2}"
+                                         Width="80" HorizontalAlignment="Right" TextAlignment="Center"
+                                         ToolTip="نسبة الخصم من إجمالي المرتجع"/>
+                            </Grid>
+                            <Grid Margin="0,0,0,4"
+                                  Visibility="{Binding IsAmountDiscount, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="قيمة الخصم" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding DiscountAmount, StringFormat=N2}"
+                                         Width="100" HorizontalAlignment="Right" TextAlignment="Left"
+                                         ToolTip="قيمة الخصم على المرتجع"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Notes -->
                     <Border Style="{StaticResource CardStyle}">
                         <StackPanel>

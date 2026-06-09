@@ -48,14 +48,28 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
 
         builder.Property(pi => pi.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
 
+        // ─── New Fields (Phase 27) ──────────────────────────────────
+        builder.Property(pi => pi.CostInBaseCurrency).HasPrecision(18, 2).IsRequired(false);
+        builder.Property(pi => pi.AdditionalFeesTotal).HasPrecision(18, 2);
+        builder.Property(pi => pi.DiscountType).HasConversion<byte?>().IsRequired(false);
+        builder.Property(pi => pi.DiscountRate).HasPrecision(18, 2).IsRequired(false);
+        builder.Property(pi => pi.AttachmentPath).HasMaxLength(255).IsRequired(false);
+
         builder.HasMany(pi => pi.Items)
             .WithOne(i => i.PurchaseInvoice)
             .HasForeignKey(i => i.PurchaseInvoiceId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasMany(pi => pi.AdditionalFees)
+            .WithOne(af => af.PurchaseInvoice)
+            .HasForeignKey(af => af.PurchaseInvoiceId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasQueryFilter(pi => pi.IsActive);
 
         builder.ToTable(t => t.HasCheckConstraint("CHK_PurchaseInvoices_PaidAmount", "[PaidAmount] >= 0 AND [PaidAmount] <= [TotalAmount]"));
+
+        builder.ToTable(t => t.HasCheckConstraint("CHK_PurchaseInvoices_DiscountRate", "[DiscountRate] IS NULL OR ([DiscountRate] >= 0 AND [DiscountRate] <= 100)"));
     }
 }
 
@@ -71,11 +85,26 @@ public class PurchaseInvoiceItemConfiguration : IEntityTypeConfiguration<Purchas
         builder.Property(pii => pii.LineTotal).HasPrecision(18, 2);
         builder.Property(pii => pii.Notes).HasMaxLength(250);
 
+        // ─── New Fields (Phase 27) ──────────────────────────────────
+        builder.Property(pii => pii.ProductUnitId).IsRequired();
+        builder.Property(pii => pii.DiscountType).HasConversion<byte?>().IsRequired(false);
+        builder.Property(pii => pii.DiscountRate).HasPrecision(18, 2).IsRequired(false);
+        builder.Property(pii => pii.CostInBaseCurrency).HasPrecision(18, 2).IsRequired(false);
+        builder.Property(pii => pii.AdditionalFeesAmount).HasPrecision(18, 2);
+        builder.Property(pii => pii.Mode).HasConversion<byte>();
+
         builder.HasOne(pii => pii.Product)
             .WithMany()
             .HasForeignKey(pii => pii.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(pii => pii.ProductUnit)
+            .WithMany()
+            .HasForeignKey(pii => pii.ProductUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasQueryFilter(pii => pii.IsActive);
+
+        builder.ToTable(t => t.HasCheckConstraint("CHK_PurchaseInvoiceItems_DiscountRate", "[DiscountRate] IS NULL OR ([DiscountRate] >= 0 AND [DiscountRate] <= 100)"));
     }
 }

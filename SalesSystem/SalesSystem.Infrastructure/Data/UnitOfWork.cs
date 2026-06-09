@@ -67,6 +67,10 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<InventoryOperation>? _inventoryOperations;
     private IGenericRepository<InventoryOperationItem>? _inventoryOperationItems;
     private IGenericRepository<BillOfMaterials>? _billOfMaterials;
+    private IGenericRepository<PurchaseOrder>? _purchaseOrders;
+    private IGenericRepository<PurchaseOrderItem>? _purchaseOrderItems;
+    private IGenericRepository<AdditionalFee>? _additionalFees;
+    private IGenericRepository<AdditionalFeeAllocation>? _additionalFeeAllocations;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -123,6 +127,10 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<InventoryOperation> InventoryOperations => _inventoryOperations ??= new GenericRepository<InventoryOperation>(_context);
     public IGenericRepository<InventoryOperationItem> InventoryOperationItems => _inventoryOperationItems ??= new GenericRepository<InventoryOperationItem>(_context);
     public IGenericRepository<BillOfMaterials> BillOfMaterials => _billOfMaterials ??= new GenericRepository<BillOfMaterials>(_context);
+    public IGenericRepository<PurchaseOrder> PurchaseOrders => _purchaseOrders ??= new GenericRepository<PurchaseOrder>(_context);
+    public IGenericRepository<PurchaseOrderItem> PurchaseOrderItems => _purchaseOrderItems ??= new GenericRepository<PurchaseOrderItem>(_context);
+    public IGenericRepository<AdditionalFee> AdditionalFees => _additionalFees ??= new GenericRepository<AdditionalFee>(_context);
+    public IGenericRepository<AdditionalFeeAllocation> AdditionalFeeAllocations => _additionalFeeAllocations ??= new GenericRepository<AdditionalFeeAllocation>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {

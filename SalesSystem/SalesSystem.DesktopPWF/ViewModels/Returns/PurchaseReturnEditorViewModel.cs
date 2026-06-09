@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models;
 using SalesSystem.DesktopPWF.ViewModels.Invoices;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Returns;
 
@@ -26,6 +27,8 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private readonly Microsoft.Extensions.Logging.ILogger<PurchaseReturnEditorViewModel> _logger;
     private readonly ISoundService _soundService;
     private readonly IDialogService _dialogService;
+    private readonly ICurrencyApiService _currencyService;
+    private readonly IToastNotificationService _toastService;
 
     private DateTime _returnDate = DateTime.Now;
     private string _notes = string.Empty;
@@ -40,6 +43,16 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private int? _returnId;
     private ReturnImpactSummary _impact = new();
 
+    // Currency & Discount fields
+    private int? _selectedCurrencyId;
+    private decimal? _exchangeRate;
+    private bool _isForeignCurrency;
+    private decimal _discountAmount;
+    private bool _isAmountDiscount = true;
+    private bool _isPercentageDiscount;
+    private decimal _discountRate;
+    private ObservableCollection<CurrencyDto> _currencies = new();
+
 
     public PurchaseReturnEditorViewModel()
     {
@@ -52,6 +65,8 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         _soundService = App.GetService<ISoundService>();
         _logger = App.GetService<Microsoft.Extensions.Logging.ILogger<PurchaseReturnEditorViewModel>>();
         _dialogService = App.GetService<IDialogService>();
+        _currencyService = App.GetService<ICurrencyApiService>();
+        _toastService = App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
 
         InitializeCommands();
@@ -181,6 +196,90 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     {
         get => _impact;
         set => SetProperty(ref _impact, value);
+    }
+
+    // Currency properties
+    public ObservableCollection<CurrencyDto> Currencies
+    {
+        get => _currencies;
+        set => SetProperty(ref _currencies, value);
+    }
+
+    public int? SelectedCurrencyId
+    {
+        get => _selectedCurrencyId;
+        set
+        {
+            if (SetProperty(ref _selectedCurrencyId, value))
+            {
+                IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
+                OnPropertyChanged(nameof(IsForeignCurrency));
+            }
+        }
+    }
+
+    public decimal? ExchangeRate
+    {
+        get => _exchangeRate;
+        set => SetProperty(ref _exchangeRate, value);
+    }
+
+    public bool IsForeignCurrency
+    {
+        get => _isForeignCurrency;
+        set => SetProperty(ref _isForeignCurrency, value);
+    }
+
+    // Discount properties
+    public decimal DiscountAmount
+    {
+        get => _discountAmount;
+        set => SetProperty(ref _discountAmount, value);
+    }
+
+    public bool IsAmountDiscount
+    {
+        get => _isAmountDiscount;
+        set
+        {
+            if (SetProperty(ref _isAmountDiscount, value) && value)
+            {
+                IsPercentageDiscount = false;
+                DiscountRate = DiscountAmount;
+                OnPropertyChanged(nameof(IsPercentageDiscount));
+            }
+        }
+    }
+
+    public bool IsPercentageDiscount
+    {
+        get => _isPercentageDiscount;
+        set
+        {
+            if (SetProperty(ref _isPercentageDiscount, value) && value)
+            {
+                IsAmountDiscount = false;
+                DiscountRate = DiscountAmount > 0 && TotalAmount > 0
+                    ? Math.Round(DiscountAmount / TotalAmount * 100, 2)
+                    : 0;
+                OnPropertyChanged(nameof(IsAmountDiscount));
+            }
+        }
+    }
+
+    public decimal DiscountRate
+    {
+        get => _discountRate;
+        set
+        {
+            if (SetProperty(ref _discountRate, value))
+            {
+                if (IsPercentageDiscount)
+                    DiscountAmount = TotalAmount * value / 100;
+                else
+                    DiscountAmount = value;
+            }
+        }
     }
     #endregion
 
@@ -325,6 +424,15 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 Warehouses = new ObservableCollection<WarehouseDto>(warehouseResult.Value);
                 if (Warehouses.Any()) SelectedWarehouseId = Warehouses.First().Id;
             }
+
+            var currenciesResult = await _currencyService.GetAllAsync();
+            if (currenciesResult.IsSuccess && currenciesResult.Value != null)
+            {
+                Currencies = new ObservableCollection<CurrencyDto>(currenciesResult.Value);
+                var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+                if (baseCurrency != null)
+                    SelectedCurrencyId = baseCurrency.Id;
+            }
         });
     }
 
@@ -407,19 +515,29 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             ErrorMessage = null;
+            var returnItems = Items.Where(i => i.ReturnQuantity > 0).Select(i => new CreatePurchaseReturnItemRequest(
+                ProductId: i.ProductId,
+                ProductUnitId: 1,
+                Quantity: i.ReturnQuantity,
+                UnitCost: i.UnitPrice,
+                DiscountAmount: i.DiscountAmount,
+                Mode: (byte)(i.Mode > 0 ? i.Mode : 1),
+                Notes: null
+            )).ToList();
+
             var request = new CreatePurchaseReturnRequest(
                 PurchaseInvoiceId: SelectedInvoice?.Id,
                 SupplierId: SelectedInvoice?.SupplierId ?? 0,
                 WarehouseId: SelectedWarehouseId,
+                LinkToInvoice: SelectedInvoice?.Id != null,
                 ReturnDate: ReturnDate,
+                DiscountAmount: DiscountAmount,
+                DiscountType: IsPercentageDiscount ? (byte?)1 : null,
+                DiscountRate: IsPercentageDiscount ? DiscountRate : null,
+                CurrencyId: SelectedCurrencyId,
+                ExchangeRate: ExchangeRate,
                 Notes: Notes,
-                Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new ReturnItemRequest(
-                    ProductId: i.ProductId,
-                    Quantity: i.ReturnQuantity,
-                    UnitPrice: i.UnitPrice,
-                    DiscountAmount: i.DiscountAmount,
-                    Mode: i.Mode
-                )).ToList()
+                Items: returnItems
             );
 
             var result = await _returnService.CreateAsync(request);
@@ -427,7 +545,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             if (result.IsSuccess)
             {
                 _eventBus.Publish(new PurchaseReturnChangedMessage(result.Value!.Id));
-                await _dialogService.ShowSuccessAsync("نجاح", "تم إنشاء مرتجع المشتريات بنجاح");
+                _toastService.ShowSuccess("تم إنشاء مرتجع المشتريات بنجاح");
                 RequestClose();
             }
             else
@@ -565,6 +683,12 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         }
 
         return false;
+    }
+
+    private int GetBaseCurrencyId()
+    {
+        var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+        return baseCurrency?.Id ?? 0;
     }
     #endregion
 }

@@ -26,6 +26,9 @@ public record UpdateStockTransferRequest(
     List<CreateStockTransferItemRequest> Items
 );
 
+/// <summary>
+/// طلب تحديث فاتورة شراء — مع دعم العملات المتعددة والخصم والمرفقات والمصاريف الإضافية.
+/// </summary>
 public record UpdatePurchaseInvoiceRequest(
     int WarehouseId,
     int SupplierId,
@@ -36,9 +39,16 @@ public record UpdatePurchaseInvoiceRequest(
     decimal TaxAmount,
     decimal PaidAmount,
     int? CashBoxId,
+    int? CurrencyId,
+    decimal? ExchangeRate,
+    byte? DiscountType,
+    decimal? DiscountRate,
+    string? AttachmentBase64,
+    string? AttachmentFileName,
     string? Notes,
     string? SupplierInvoiceNo,
-    List<CreatePurchaseInvoiceItemRequest> Items);
+    List<CreatePurchaseInvoiceItemRequest> Items,
+    List<CreateAdditionalFeeRequest>? AdditionalFees = null);
 
 public record UpdateSalesInvoiceRequest(
     int WarehouseId,

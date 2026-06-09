@@ -167,6 +167,11 @@ builder.Services.AddScoped<IFifoAllocationService, FifoAllocationService>();
 builder.Services.AddScoped<IProductImageService, ProductImageService>();
 builder.Services.AddScoped<IAssemblyService, AssemblyService>();
 
+// ─── Purchase Module Services (Phase 27) ────────────────────
+builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
+builder.Services.AddScoped<IAdditionalFeeService, AdditionalFeeService>();
+builder.Services.AddScoped<IFeeDistributionService, FeeDistributionService>();
+
 // ─── Accounting Services ────────────────────────────────────
 builder.Services.AddScoped<IJournalEntryService, JournalEntryService>();
 builder.Services.AddScoped<ISystemAccountService, SystemAccountService>();

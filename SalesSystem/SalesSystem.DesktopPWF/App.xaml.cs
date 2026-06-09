@@ -222,6 +222,9 @@ public partial class App : System.Windows.Application
         // Account API Service
         services.AddSingleton<IAccountApiService, AccountApiService>();
 
+        // Purchase Order API Service
+        services.AddSingleton<IPurchaseOrderApiService, PurchaseOrderApiService>();
+
         // Journal Entry API Service
         services.AddSingleton<IJournalEntryApiService, JournalEntryApiService>();
 
@@ -251,6 +254,8 @@ public partial class App : System.Windows.Application
         services.AddTransient<TouchPosViewModel>();
         services.AddTransient<PurchaseInvoiceListViewModel>();
         services.AddTransient<PurchaseInvoiceEditorViewModel>();
+        services.AddTransient<PurchaseOrderListViewModel>();
+        services.AddTransient<PurchaseOrderEditorViewModel>();
         services.AddTransient<ProductListViewModel>();
         services.AddTransient<ProductEditorViewModel>();
         services.AddTransient<ProductPricesListViewModel>();

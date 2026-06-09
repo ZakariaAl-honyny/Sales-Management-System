@@ -12,6 +12,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitCost: 15.50m,
             discountAmount: 5m,
@@ -31,6 +32,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 5m,
             unitCost: 20m
         );
@@ -43,6 +45,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 100m,
             unitCost: 12m,
             mode: SaleMode.Wholesale
@@ -56,6 +59,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1m,
             unitCost: 10m
         );
@@ -68,6 +72,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 0.500m,
             unitCost: 10.00m
         );
@@ -81,6 +86,7 @@ public class PurchaseInvoiceItemTests
     {
         var action = () => PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: -1m,
             unitCost: 10m
         );
@@ -94,6 +100,7 @@ public class PurchaseInvoiceItemTests
     {
         var action = () => PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 0m,
             unitCost: 10m
         );
@@ -107,6 +114,7 @@ public class PurchaseInvoiceItemTests
     {
         var action = () => PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 5m,
             unitCost: -3m
         );
@@ -120,6 +128,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 5m,
             unitCost: 0m
         );
@@ -133,6 +142,7 @@ public class PurchaseInvoiceItemTests
     {
         var action = () => PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 5m,
             unitCost: 10m,
             discountAmount: -2m
@@ -147,6 +157,7 @@ public class PurchaseInvoiceItemTests
     {
         var action = () => PurchaseInvoiceItem.Create(
             productId: 0,
+            productUnitId: 1,
             quantity: 5m,
             unitCost: 10m
         );
@@ -161,6 +172,7 @@ public class PurchaseInvoiceItemTests
         // No guard clause exists — discount may exceed calculated line total
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 2m,
             unitCost: 10m,
             discountAmount: 50m
@@ -178,6 +190,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: productId,
+            productUnitId: 1,
             quantity: 1m,
             unitCost: 10m
         );
@@ -190,6 +203,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 5m,
             unitCost: 20m,
             discountAmount: 10m
@@ -200,6 +214,7 @@ public class PurchaseInvoiceItemTests
         // Reflect the Quantity change by using a new instance pattern
         var recalculated = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitCost: 20m,
             discountAmount: 10m
@@ -213,6 +228,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1m,
             unitCost: 10m,
             notes: "Special order"
@@ -226,6 +242,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1m,
             unitCost: 10m,
             notes: null
@@ -242,6 +259,7 @@ public class PurchaseInvoiceItemTests
     {
         var item = PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: quantity,
             unitCost: 10.50m
         );

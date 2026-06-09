@@ -13,6 +13,7 @@ using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models.Printing;
+using Microsoft.Win32;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Purchases;
 
@@ -30,6 +31,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private readonly ICashBoxApiService _cashBoxService;
     private readonly IPrintApiService _printApiService;
     private readonly IToastNotificationService _toastService;
+    private readonly ICurrencyApiService _currencyService;
 
     private int? _invoiceId;
     private int _invoiceNo;
@@ -50,12 +52,30 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private byte _status = (byte)InvoiceStatus.Draft;
     public bool IsReadOnly { get; private set; }
 
+    // Currency fields
+    private int? _selectedCurrencyId;
+    private decimal? _exchangeRate;
+    private bool _isForeignCurrency;
+
+    // Discount type fields
+    private bool _isAmountDiscount = true;
+    private bool _isPercentageDiscount;
+    private decimal _discountRate;
+
+    // Attachment fields
+    private string? _attachmentPath;
+    private string? _attachmentFileName;
+    private bool _hasAttachment;
+    private string? _attachmentBase64;
+
     private ObservableCollection<PurchaseInvoiceLineViewModel> _items = new();
     private ObservableCollection<SupplierDto> _suppliers = new();
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ObservableCollection<ProductDto> _products = new();
     private ObservableCollection<CashBoxDto> _cashBoxes = new();
     private CashBoxDto? _selectedCashBox;
+    private ObservableCollection<CurrencyDto> _currencies = new();
+    private ObservableCollection<AdditionalFeeLineViewModel> _additionalFees = new();
 
     public PurchaseInvoiceEditorViewModel(
         IPurchaseInvoiceApiService invoiceService,
@@ -70,6 +90,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         ICashBoxApiService cashBoxService,
         IPrintApiService printApiService,
         IToastNotificationService toastService,
+        ICurrencyApiService currencyService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -86,6 +107,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         _cashBoxService = cashBoxService;
         _printApiService = printApiService;
         _toastService = toastService;
+        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
         IsReadOnly = isReadOnly;
@@ -114,6 +136,10 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             }
         });
         PrintThermalCommand = new AsyncRelayCommand(PrintThermalAsync);
+        AddFeeCommand = new RelayCommand(AddFee);
+        RemoveFeeCommand = new RelayCommand(RemoveFee);
+        BrowseAttachmentCommand = new RelayCommand(BrowseAttachment);
+        RemoveAttachmentCommand = new RelayCommand(RemoveAttachment);
 
         _ = InitializeAsync();
     }
@@ -178,6 +204,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             App.GetService<ICashBoxApiService>(),
             App.GetService<IPrintApiService>(),
             App.GetService<IToastNotificationService>(),
+            App.GetService<ICurrencyApiService>(),
             invoiceId,
             isReadOnly)
     {
@@ -413,6 +440,120 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         new EnumDisplayItem { Value = (byte)SaleMode.Retail, Display = "تجزئة" },
         new EnumDisplayItem { Value = (byte)SaleMode.Wholesale, Display = "جملة" }
     };
+
+    // Currency properties
+    public ObservableCollection<CurrencyDto> Currencies
+    {
+        get => _currencies;
+        set => SetProperty(ref _currencies, value);
+    }
+
+    public int? SelectedCurrencyId
+    {
+        get => _selectedCurrencyId;
+        set
+        {
+            if (SetProperty(ref _selectedCurrencyId, value))
+            {
+                IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
+                OnPropertyChanged(nameof(IsForeignCurrency));
+            }
+        }
+    }
+
+    public decimal? ExchangeRate
+    {
+        get => _exchangeRate;
+        set
+        {
+            if (SetProperty(ref _exchangeRate, value))
+                RecalculateTotals();
+        }
+    }
+
+    public bool IsForeignCurrency
+    {
+        get => _isForeignCurrency;
+        set => SetProperty(ref _isForeignCurrency, value);
+    }
+
+    // Discount type properties
+    public bool IsAmountDiscount
+    {
+        get => _isAmountDiscount;
+        set
+        {
+            if (SetProperty(ref _isAmountDiscount, value) && value)
+            {
+                IsPercentageDiscount = false;
+                DiscountRate = InvoiceDiscount;
+                OnPropertyChanged(nameof(IsPercentageDiscount));
+            }
+        }
+    }
+
+    public bool IsPercentageDiscount
+    {
+        get => _isPercentageDiscount;
+        set
+        {
+            if (SetProperty(ref _isPercentageDiscount, value) && value)
+            {
+                IsAmountDiscount = false;
+                DiscountRate = InvoiceDiscount > 0 && SubTotal > 0
+                    ? Math.Round(InvoiceDiscount / SubTotal * 100, 2)
+                    : 0;
+                OnPropertyChanged(nameof(IsAmountDiscount));
+            }
+        }
+    }
+
+    public decimal DiscountRate
+    {
+        get => _discountRate;
+        set
+        {
+            if (SetProperty(ref _discountRate, value))
+            {
+                if (IsPercentageDiscount)
+                    InvoiceDiscount = SubTotal * value / 100;
+                else
+                    InvoiceDiscount = value;
+            }
+        }
+    }
+
+    // Additional fees
+    public ObservableCollection<AdditionalFeeLineViewModel> AdditionalFees
+    {
+        get => _additionalFees;
+        set => SetProperty(ref _additionalFees, value);
+    }
+
+    // Attachment properties
+    public string? AttachmentPath
+    {
+        get => _attachmentPath;
+        set => SetProperty(ref _attachmentPath, value);
+    }
+
+    public string? AttachmentFileName
+    {
+        get => _attachmentFileName;
+        set => SetProperty(ref _attachmentFileName, value);
+    }
+
+    public bool HasAttachment
+    {
+        get => _hasAttachment;
+        set => SetProperty(ref _hasAttachment, value);
+    }
+
+    public string? AttachmentBase64
+    {
+        get => _attachmentBase64;
+        set => SetProperty(ref _attachmentBase64, value);
+    }
     #endregion
 
     #region Commands
@@ -427,6 +568,10 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     public ICommand SearchSupplierCommand { get; }
     public ICommand ProcessBarcodeCommand { get; }
     public ICommand PrintThermalCommand { get; }
+    public ICommand AddFeeCommand { get; }
+    public ICommand RemoveFeeCommand { get; }
+    public ICommand BrowseAttachmentCommand { get; }
+    public ICommand RemoveAttachmentCommand { get; }
     #endregion
 
     #region Methods
@@ -478,6 +623,18 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                     TaxRate = settingsResult.Value.DefaultTaxRate;
                 }
             }
+
+            var currenciesResult = await _currencyService.GetAllAsync();
+            if (currenciesResult.IsSuccess && currenciesResult.Value != null)
+            {
+                Currencies = new ObservableCollection<CurrencyDto>(currenciesResult.Value);
+                if (!_isEditMode)
+                {
+                    var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+                    if (baseCurrency != null)
+                        SelectedCurrencyId = baseCurrency.Id;
+                }
+            }
         });
     }
 
@@ -502,6 +659,22 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 SupplierInvoiceNo = invoice.SupplierInvoiceNo;
                 Notes = invoice.Notes;
                 Status = invoice.Status;
+
+                // Restore currency
+                SelectedCurrencyId = invoice.CurrencyId;
+                ExchangeRate = invoice.ExchangeRate;
+
+                // Restore discount type
+                if (invoice.DiscountType == 1) // Percentage
+                {
+                    IsPercentageDiscount = true;
+                    DiscountRate = invoice.DiscountRate ?? 0;
+                }
+                else
+                {
+                    IsAmountDiscount = true;
+                    InvoiceDiscount = invoice.DiscountAmount;
+                }
 
                 if (invoice.Status != (byte)InvoiceStatus.Draft)
                 {
@@ -743,12 +916,24 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             .Where(i => i.SelectedProduct != null && i.Quantity > 0)
             .Select(i => new CreatePurchaseInvoiceItemRequest(
                 i.SelectedProduct!.Id,
+                i.ProductUnitId > 0 ? i.ProductUnitId : 1,
                 i.Quantity,
                 i.UnitCost,
                 i.DiscountAmount,
+                null,
+                null,
                 (SaleMode)i.Mode,
                 null))
             .ToList();
+
+        List<CreateAdditionalFeeRequest>? additionalFees = null;
+        if (AdditionalFees.Any(f => !string.IsNullOrWhiteSpace(f.FeeName) && f.FeeAmount > 0))
+        {
+            additionalFees = AdditionalFees
+                .Where(f => !string.IsNullOrWhiteSpace(f.FeeName) && f.FeeAmount > 0)
+                .Select(f => new CreateAdditionalFeeRequest(f.FeeName, f.FeeAmount, f.DistributionMethod, f.AccountId))
+                .ToList();
+        }
 
         return new CreatePurchaseInvoiceRequest(
             SelectedWarehouseId,
@@ -761,9 +946,16 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             InvoiceDiscount,
             TaxAmount,
             PaidAmount,
+            SelectedCurrencyId,
+            ExchangeRate,
+            IsPercentageDiscount ? (byte)1 : null,
+            IsPercentageDiscount ? DiscountRate : null,
+            AttachmentBase64,
+            AttachmentFileName,
             Notes,
             SupplierInvoiceNo,
-            items);
+            items,
+            additionalFees);
     }
 
     private void RecalculateTotals()
@@ -773,14 +965,21 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
         decimal netAmount = SubTotal - InvoiceDiscount;
 
+        // Apply discount type conversion
+        if (IsPercentageDiscount && DiscountRate > 0)
+        {
+            InvoiceDiscount = Math.Round(SubTotal * DiscountRate / 100, 2);
+            netAmount = SubTotal - InvoiceDiscount;
+        }
+
         if (IsTaxInclusive)
         {
-            TaxAmount = (netAmount * TaxRate) / (100 + TaxRate);
+            TaxAmount = netAmount > 0 ? Math.Round((netAmount * TaxRate) / (100 + TaxRate), 2) : 0;
             TotalAmount = netAmount;
         }
         else
         {
-            TaxAmount = netAmount * (TaxRate / 100);
+            TaxAmount = netAmount > 0 ? Math.Round(netAmount * (TaxRate / 100), 2) : 0;
             TotalAmount = netAmount + TaxAmount;
         }
 
@@ -983,12 +1182,78 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     {
         // No-op: buttons remain enabled per interactive validation pattern (RULE-059)
     }
+
+    // Additional fees methods
+    private void AddFee()
+    {
+        var fee = new AdditionalFeeLineViewModel();
+        fee.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(AdditionalFeeLineViewModel.FeeAmount))
+                RecalculateTotals();
+        };
+        AdditionalFees.Add(fee);
+    }
+
+    private void RemoveFee(object? parameter)
+    {
+        if (parameter is AdditionalFeeLineViewModel fee)
+        {
+            AdditionalFees.Remove(fee);
+            RecalculateTotals();
+        }
+    }
+
+    // Attachment methods
+    private void BrowseAttachment()
+    {
+        var openFileDialog = new OpenFileDialog
+        {
+            Title = "اختر ملف المرفق",
+            Filter = "PDF Files (*.pdf)|*.pdf|Image Files (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|All Files (*.*)|*.*",
+            CheckFileExists = true
+        };
+
+        if (openFileDialog.ShowDialog() == true)
+        {
+            AttachmentPath = openFileDialog.FileName;
+            AttachmentFileName = System.IO.Path.GetFileName(openFileDialog.FileName);
+            HasAttachment = true;
+
+            try
+            {
+                var fileBytes = System.IO.File.ReadAllBytes(openFileDialog.FileName);
+                AttachmentBase64 = Convert.ToBase64String(fileBytes);
+            }
+            catch (Exception ex)
+            {
+                LogSystemError("فشل في قراءة الملف المرفق", "PurchaseInvoiceEditorViewModel.BrowseAttachment", ex);
+                AttachmentBase64 = null;
+                HasAttachment = false;
+            }
+        }
+    }
+
+    private void RemoveAttachment()
+    {
+        AttachmentPath = null;
+        AttachmentFileName = null;
+        AttachmentBase64 = null;
+        HasAttachment = false;
+    }
+
+    private int GetBaseCurrencyId()
+    {
+        var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+        return baseCurrency?.Id ?? 0;
+    }
     #endregion
 }
 
 public class PurchaseInvoiceLineViewModel : ViewModelBase
 {
     private int _productId;
+    private int _productUnitId;
     private ProductDto? _selectedProduct;
     private decimal _quantity = 1;
     private decimal _unitCost;
@@ -1025,6 +1290,12 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
         set => SetProperty(ref _productId, value);
     }
 
+    public int ProductUnitId
+    {
+        get => _productUnitId;
+        set => SetProperty(ref _productUnitId, value);
+    }
+
     public ProductDto? SelectedProduct
     {
         get => _selectedProduct;
@@ -1035,6 +1306,9 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
                 ProductId = value.Id;
                 ClearErrors(nameof(ProductName));
                 _oldCostInDatabase = value.PurchasePrice;
+                ProductUnitId = Mode == (byte)SaleMode.Wholesale
+                    ? value.WholesaleUnitId ?? value.UnitId ?? 1
+                    : value.RetailUnitId ?? value.UnitId ?? 1;
                 OnPropertyChanged(nameof(CostChangedFromDatabase));
                 OnPropertyChanged(nameof(PriceDifferenceIndicator));
                 if (UnitCost == 0)

@@ -21,4 +21,10 @@ public interface IPurchaseService
         int pageSize = 10, 
         bool includeInactive = false, 
         CancellationToken ct = default);
+
+    /// <summary>رفع مرفق لفاتورة الشراء.</summary>
+    Task<Result<string>> UploadAttachmentAsync(int id, string base64Content, string? fileName, CancellationToken ct);
+
+    /// <summary>حذف مرفق فاتورة الشراء.</summary>
+    Task<Result> DeleteAttachmentAsync(int id, CancellationToken ct);
 }

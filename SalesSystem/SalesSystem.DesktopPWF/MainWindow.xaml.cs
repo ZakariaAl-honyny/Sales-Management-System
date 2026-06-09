@@ -123,6 +123,7 @@ public partial class MainWindow : Window
     private void UsersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<UserListViewModel>();
     private void SalesInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesInvoiceListViewModel>();
     private void PurchaseInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseInvoiceListViewModel>();
+    private void PurchaseOrdersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseOrderListViewModel>();
     private void SalesReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesReturnListViewModel>();
     private void PurchaseReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseReturnListViewModel>();
     private void WarehousesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<WarehouseListViewModel>();
@@ -220,6 +221,7 @@ public partial class MainWindow : Window
         {
             "Sales" => new Views.Sales.SalesInvoicesListView(),
             "Purchases" => new Views.Purchases.PurchaseInvoicesListView(),
+            "PurchaseOrders" => new Views.Purchases.PurchaseOrdersListView(),
             "Products" => new Views.Products.ProductsListView(),
             "Customers" => new Views.Customers.CustomersListView(),
             "Suppliers" => new Views.Suppliers.SuppliersListView(),
@@ -243,6 +245,7 @@ public partial class MainWindow : Window
 
     private void OpenNewSalesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المبيعات", "Sales");
     private void OpenNewPurchasesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المشتريات", "Purchases");
+    private void OpenNewPurchaseOrdersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("أوامر الشراء", "PurchaseOrders");
     private void OpenNewWarehousesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المستودعات", "Warehouses");
     private void OpenNewProductsWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المنتجات", "Products");
     private void OpenNewCustomersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("العملاء", "Customers");

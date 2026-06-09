@@ -156,6 +156,12 @@ public record PurchaseInvoiceDto(
     decimal? TaxRate,
     int? CurrencyId,
     decimal? ExchangeRate,
+    decimal? CostInBaseCurrency,
+    decimal AdditionalFeesTotal,
+    string? AttachmentPath,
+    byte? DiscountType,
+    decimal? DiscountRate,
+    IReadOnlyList<AdditionalFeeDto>? AdditionalFees,
     IReadOnlyList<PurchaseInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -176,10 +182,16 @@ public record PurchaseInvoiceDto(
 }
 
 public record PurchaseInvoiceItemDto(int Id, int ProductId, string ProductName,
+    int ProductUnitId,
+    string? ProductUnitName,
     decimal Quantity,
     decimal UnitCost,
     decimal DiscountAmount,
     decimal LineTotal,
+    byte? DiscountType,
+    decimal? DiscountRate,
+    decimal? CostInBaseCurrency,
+    decimal AdditionalFeesAmount,
     byte Mode);
 
 public record SalesReturnDto(
@@ -224,10 +236,13 @@ public record PurchaseReturnDto(
     int SupplierId,
     string SupplierName,
     int? PurchaseInvoiceId,
+    bool? LinkToInvoice,
     DateTime ReturnDate,
     decimal SubTotal,
     decimal TaxAmount,
     decimal DiscountAmount,
+    byte? DiscountType,
+    decimal? DiscountRate,
     decimal TotalAmount,
     int? CurrencyId,
     decimal? ExchangeRate,
@@ -244,10 +259,13 @@ public record PurchaseReturnDto(
 }
 
 public record PurchaseReturnItemDto(int Id, int ProductId, string ProductName,
+    int ProductUnitId,
+    string? ProductUnitName,
     decimal Quantity,
     decimal UnitCost,
     decimal DiscountAmount,
     decimal LineTotal,
+    decimal? CostInBaseCurrency,
     byte Mode);
 
 public record StockTransferDto(

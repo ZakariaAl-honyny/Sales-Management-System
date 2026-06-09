@@ -7,9 +7,13 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Application.Services;
 
+/// <summary>
+/// خدمة مرتجعات المشتريات — تدعم الربط بالفاتورة والمرتجعات المستقلة والخصم متعدد الأنواع والعملات.
+/// </summary>
 public class PurchaseReturnService : IPurchaseReturnService
 {
     private readonly IUnitOfWork _uow;
@@ -32,7 +36,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     public async Task<Result<PurchaseReturnDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Supplier", "Warehouse", "Items.Product");
+            r => r.Id == id, ct, "Supplier", "Warehouse", "Items.Product", "Items.ProductUnit", "Currency");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود", ErrorCodes.NotFound);
@@ -40,7 +44,8 @@ public class PurchaseReturnService : IPurchaseReturnService
         return Result<PurchaseReturnDto>.Success(MapToDto(pr));
     }
 
-    public async Task<Result<PagedResult<PurchaseReturnDto>>> GetAllAsync(int? supplierId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
+    public async Task<Result<PagedResult<PurchaseReturnDto>>> GetAllAsync(
+        int? supplierId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
     {
         Expression<Func<PurchaseReturn, bool>> predicate = r =>
             (includeInactive || r.Status != InvoiceStatus.Cancelled) &&
@@ -52,7 +57,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             q => q.OrderByDescending(r => r.ReturnDate).Skip((page - 1) * pageSize).Take(pageSize),
             ct,
             false,
-            "Supplier", "Warehouse");
+            "Supplier", "Warehouse", "Items.Product", "Items.ProductUnit");
 
         var dtos = items.Select(MapToDto).ToList();
 
@@ -61,13 +66,19 @@ public class PurchaseReturnService : IPurchaseReturnService
 
     public async Task<Result<PurchaseReturnDto>> CreateAsync(CreatePurchaseReturnRequest request, int userId, CancellationToken ct)
     {
-        // 1. Validation
-        if (request.PurchaseInvoiceId.HasValue)
+        // ─── Validation ─────────────────────────────────────────────────────────
+        if (request.PurchaseInvoiceId.HasValue && !request.LinkToInvoice.GetValueOrDefault(true))
+        {
+            // Standalone return with invoice reference but LinkToInvoice=false — allowed
+        }
+
+        if (request.PurchaseInvoiceId.HasValue && request.LinkToInvoice.GetValueOrDefault(true))
         {
             var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
                 i => i.Id == request.PurchaseInvoiceId.Value, ct, "Items");
 
-            if (invoice == null) return Result<PurchaseReturnDto>.Failure("الفاتورة الأصلية غير موجودة");
+            if (invoice == null)
+                return Result<PurchaseReturnDto>.Failure("الفاتورة الأصلية غير موجودة");
 
             foreach (var item in request.Items)
             {
@@ -76,48 +87,86 @@ public class PurchaseReturnService : IPurchaseReturnService
                     return Result<PurchaseReturnDto>.Failure($"المنتج {item.ProductId} غير موجود في الفاتورة الأصلية");
 
                 if (item.Quantity > originalLine.Quantity)
-                    return Result<PurchaseReturnDto>.Failure($"الكمية المرتجعة للمنتج {item.ProductId} أكبر من الكمية المشتراة ({originalLine.Quantity})");
+                    return Result<PurchaseReturnDto>.Failure(
+                        $"الكمية المرتجعة للمنتج {item.ProductId} أكبر من الكمية المشتراة ({originalLine.Quantity})");
             }
         }
 
-        // 1b. Stock Validation BEFORE transaction
+        // Stock validation before transaction
         var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
         bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
 
         foreach (var item in request.Items)
         {
-            // Load product for conversion factor
             var product = await _uow.Products.GetByIdAsync(item.ProductId, ct);
             if (product == null) return Result<PurchaseReturnDto>.Failure("المنتج غير موجود");
             
             var retailQty = product.GetRetailQuantityEquivalent(item.Quantity, (SaleMode)item.Mode);
-            var stockValidation = await _inventoryService.ValidateStockAsync(item.ProductId, request.WarehouseId, retailQty, allowNegativeStock, ct);
+            var stockValidation = await _inventoryService.ValidateStockAsync(
+                item.ProductId, request.WarehouseId, retailQty, allowNegativeStock, ct);
             if (!stockValidation.IsSuccess)
                 return Result<PurchaseReturnDto>.Failure(stockValidation.Error!);
         }
 
-        // 2. Transaction
+        // ─── Transaction ────────────────────────────────────────────────────────
         return await _uow.ExecuteAsync(async () =>
         {
             await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 var returnNoResult = await _sequenceService.GetNextNumberAsync("PR", ct);
-                if (!returnNoResult.IsSuccess) return Result<PurchaseReturnDto>.Failure(returnNoResult.Error!);
+                if (!returnNoResult.IsSuccess)
+                    return Result<PurchaseReturnDto>.Failure(returnNoResult.Error!);
 
-                var purchaseReturn = PurchaseReturn.Create(
-                    returnNoResult.Value!,
-                    request.WarehouseId,
-                    request.SupplierId,
-                    request.PurchaseInvoiceId,
-                    request.ReturnDate,
-                    request.Notes,
-                    userId: userId
-                );
+                PurchaseReturn purchaseReturn;
+
+                if (request.LinkToInvoice.GetValueOrDefault(true) && request.PurchaseInvoiceId.HasValue)
+                {
+                    // Linked return
+                    purchaseReturn = PurchaseReturn.Create(
+                        returnNoResult.Value!,
+                        request.WarehouseId,
+                        request.SupplierId,
+                        request.PurchaseInvoiceId,
+                        request.ReturnDate,
+                        request.Notes,
+                        request.CurrencyId,
+                        request.ExchangeRate,
+                        userId);
+                }
+                else
+                {
+                    // Standalone return
+                    purchaseReturn = PurchaseReturn.CreateStandalone(
+                        returnNoResult.Value!,
+                        request.WarehouseId,
+                        request.SupplierId,
+                        request.ReturnDate,
+                        request.Notes,
+                        request.CurrencyId,
+                        request.ExchangeRate,
+                        userId);
+                }
+
+                // Set discount type/rate if provided
+                if (request.DiscountType.HasValue)
+                {
+                    purchaseReturn.SetDiscount(
+                        request.DiscountAmount,
+                        (Domain.Enums.DiscountType)request.DiscountType.Value,
+                        request.DiscountRate);
+                }
 
                 foreach (var item in request.Items)
                 {
-                    purchaseReturn.AddItem(item.ProductId, item.Quantity, item.UnitPrice, item.DiscountAmount, (SaleMode)item.Mode, item.Notes);
+                    purchaseReturn.AddItem(
+                        item.ProductId,
+                        item.ProductUnitId,
+                        item.Quantity,
+                        item.UnitCost,
+                        item.DiscountAmount,
+                        (SaleMode)item.Mode,
+                        item.Notes);
                 }
 
                 await _uow.PurchaseReturns.AddAsync(purchaseReturn, ct);
@@ -125,20 +174,21 @@ public class PurchaseReturnService : IPurchaseReturnService
 
                 await transaction.CommitAsync(ct);
 
-                _logger.LogInformation("Purchase Return created as Draft: {ReturnNo} (ID: {Id})", purchaseReturn.ReturnNo, purchaseReturn.Id);
+                _logger.LogInformation("تم إنشاء مرتجع مشتريات كمسودة: {ReturnNo} (المعرف {Id})",
+                    purchaseReturn.ReturnNo, purchaseReturn.Id);
 
                 return await GetByIdAsync(purchaseReturn.Id, ct);
             }
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
-                _logger.LogWarning(ex, "Domain exception creating purchase return: {Message}", ex.Message);
+                _logger.LogWarning(ex, "خطأ في المجال أثناء إنشاء مرتجع المشتريات: {Message}", ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "Error creating purchase return");
+                _logger.LogError(ex, "خطأ أثناء إنشاء مرتجع المشتريات");
                 return Result<PurchaseReturnDto>.Failure("حدث خطأ أثناء حفظ المرتجع");
             }
         }, ct);
@@ -149,17 +199,20 @@ public class PurchaseReturnService : IPurchaseReturnService
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
             r => r.Id == id, ct, "Items.Product");
 
-        if (pr == null) return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
-        if (pr.Status != InvoiceStatus.Draft) return Result<PurchaseReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
+        if (pr == null)
+            return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
+        if (pr.Status != InvoiceStatus.Draft)
+            return Result<PurchaseReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
 
         var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
         bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
 
-        // Stock Validation BEFORE transaction
+        // Stock validation before transaction
         foreach (var item in pr.Items)
         {
             var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
-            var stockValidation = await _inventoryService.ValidateStockAsync(item.ProductId, pr.WarehouseId, retailQty, allowNegativeStock, ct);
+            var stockValidation = await _inventoryService.ValidateStockAsync(
+                item.ProductId, pr.WarehouseId, retailQty, allowNegativeStock, ct);
             if (!stockValidation.IsSuccess)
                 return Result<PurchaseReturnDto>.Failure(stockValidation.Error!);
         }
@@ -172,7 +225,7 @@ public class PurchaseReturnService : IPurchaseReturnService
                 pr.Post();
                 await _uow.SaveChangesAsync(ct);
 
-                // Update Stock
+                // Update Stock — decrease from warehouse
                 foreach (var item in pr.Items)
                 {
                     var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
@@ -188,7 +241,7 @@ public class PurchaseReturnService : IPurchaseReturnService
                         ct);
                 }
 
-                // Update Supplier Balance
+                // Update Supplier Balance — decrease what we owe them
                 if (pr.TotalAmount > 0)
                 {
                     var supplier = await _uow.Suppliers.GetByIdAsync(pr.SupplierId, ct);
@@ -201,19 +254,19 @@ public class PurchaseReturnService : IPurchaseReturnService
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                _logger.LogInformation("Purchase Return posted: {ReturnNo} (ID: {Id})", pr.ReturnNo, pr.Id);
+                _logger.LogInformation("تم ترحيل مرتجع المشتريات: {ReturnNo} (المعرف {Id})", pr.ReturnNo, pr.Id);
                 return await GetByIdAsync(pr.Id, ct);
             }
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
-                _logger.LogWarning(ex, "Domain exception posting purchase return {Id}: {Message}", id, ex.Message);
+                _logger.LogWarning(ex, "خطأ في المجال أثناء ترحيل مرتجع المشتريات {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "Error posting purchase return {Id}", id);
+                _logger.LogError(ex, "خطأ أثناء ترحيل مرتجع المشتريات {Id}", id);
                 return Result<PurchaseReturnDto>.Failure("حدث خطأ أثناء ترحيل المرتجع");
             }
         }, ct);
@@ -224,9 +277,10 @@ public class PurchaseReturnService : IPurchaseReturnService
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
             r => r.Id == id, ct, "Items.Product");
 
-        if (pr == null) return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
+        if (pr == null)
+            return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
         if (pr.Status == InvoiceStatus.Cancelled)
-            return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات ملغى بالفعل", ErrorCodes.InvalidOperation);
+            return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات ملغي بالفعل", ErrorCodes.InvalidOperation);
 
         return await _uow.ExecuteAsync(async () =>
         {
@@ -235,7 +289,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             {
                 if (pr.Status == InvoiceStatus.Posted)
                 {
-                    // Reverse Stock
+                    // Reverse Stock — increase back
                     foreach (var item in pr.Items)
                     {
                         var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
@@ -243,7 +297,7 @@ public class PurchaseReturnService : IPurchaseReturnService
                             item.ProductId,
                             pr.WarehouseId,
                             retailQty,
-                            MovementType.PurchaseIn, // Opposite of PurchaseReturnOut
+                            MovementType.PurchaseIn,
                             "PurchaseReturnCancel",
                             pr.Id,
                             item.UnitCost,
@@ -266,19 +320,19 @@ public class PurchaseReturnService : IPurchaseReturnService
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                _logger.LogInformation("Purchase Return cancelled: {ReturnNo} (ID: {Id})", pr.ReturnNo, pr.Id);
+                _logger.LogInformation("تم إلغاء مرتجع المشتريات: {ReturnNo} (المعرف {Id})", pr.ReturnNo, pr.Id);
                 return await GetByIdAsync(pr.Id, ct);
             }
             catch (DomainException ex)
             {
                 await transaction.RollbackAsync(ct);
-                _logger.LogWarning(ex, "Domain exception cancelling purchase return {Id}: {Message}", id, ex.Message);
+                _logger.LogWarning(ex, "خطأ في المجال أثناء إلغاء مرتجع المشتريات {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "Error cancelling purchase return {Id}", id);
+                _logger.LogError(ex, "خطأ أثناء إلغاء مرتجع المشتريات {Id}", id);
                 return Result<PurchaseReturnDto>.Failure("حدث خطأ أثناء إلغاء المرتجع");
             }
         }, ct);
@@ -294,27 +348,31 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.SupplierId,
             r.Supplier?.Name ?? "غير معروف",
             r.PurchaseInvoiceId,
+            r.LinkToInvoice,
             r.ReturnDate,
             r.SubTotal,
-            0, // TaxAmount
-            0, // DiscountAmount
+            0, // TaxAmount — not tracked separately on returns
+            r.DiscountAmount,
+            r.DiscountType.HasValue ? (byte?)r.DiscountType.Value : null,
+            r.DiscountRate,
             r.TotalAmount,
-            null, // CurrencyId — system setting
-            null, // ExchangeRate — system setting
+            r.CurrencyId,
+            r.ExchangeRate,
             r.Notes,
             (byte)r.Status,
             r.Items.Select(it => new PurchaseReturnItemDto(
                 it.Id,
                 it.ProductId,
                 it.Product?.Name ?? "غير معروف",
+                it.ProductUnitId,
+                it.ProductUnit?.UnitName,
                 it.Quantity,
                 it.UnitCost,
                 it.DiscountAmount,
                 it.LineTotal,
+                it.CostInBaseCurrency,
                 (byte)it.Mode
             )).ToList()
         );
     }
 }
-
-

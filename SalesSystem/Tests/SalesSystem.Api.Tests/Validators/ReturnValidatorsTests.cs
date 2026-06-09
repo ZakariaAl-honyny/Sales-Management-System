@@ -188,7 +188,7 @@ public class ReturnValidatorsTests
         public void GivenEmptyItems_WhenValidating_ThenFails()
         {
             // Arrange
-            var request = CreateValidRequest() with { Items = new List<ReturnItemRequest>() };
+            var request = CreateValidRequest() with { Items = new List<CreatePurchaseReturnItemRequest>() };
 
             // Act
             var result = _validator.TestValidate(request);
@@ -244,11 +244,17 @@ public class ReturnValidatorsTests
             PurchaseInvoiceId: 1,
             SupplierId: 1,
             WarehouseId: 1,
+            LinkToInvoice: null,
             ReturnDate: DateTime.UtcNow.AddDays(-1),
+            DiscountAmount: 0m,
+            DiscountType: null,
+            DiscountRate: null,
+            CurrencyId: null,
+            ExchangeRate: null,
             Notes: "Purchase return note",
-            Items: new List<ReturnItemRequest>
+            Items: new List<CreatePurchaseReturnItemRequest>
             {
-                new(1, 5, 100, 0)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 5, UnitCost: 100, DiscountAmount: 0)
             }
         );
     }

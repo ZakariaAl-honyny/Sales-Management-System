@@ -18,3 +18,18 @@ public enum MovementType : byte
 }
 
 public enum SaleMode : byte { Retail = 1, Wholesale = 2 }
+
+/// <summary>
+/// حالة أمر الشراء: مسودة، معتمد، مستلم جزئياً، مستلم بالكامل، ملغي
+/// </summary>
+public enum PurchaseOrderStatus : byte { Draft = 1, Approved = 2, PartiallyReceived = 3, Received = 4, Cancelled = 5 }
+
+/// <summary>
+/// نوع الخصم: مبلغ أو نسبة مئوية
+/// </summary>
+public enum DiscountType : byte { Amount = 0, Percentage = 1 }
+
+/// <summary>
+/// طريقة توزيع المصاريف الإضافية: حسب التكلفة أو حسب الكمية
+/// </summary>
+public enum DistributionMethod : byte { ByCost = 0, ByQuantity = 1 }
