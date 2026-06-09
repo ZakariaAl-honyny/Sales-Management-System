@@ -17,5 +17,16 @@ public interface ICashBoxService
     Task<Result> TransferAsync(CashTransferRequest request, int userId, CancellationToken ct);
     Task<Result<DailyClosureDto>> PerformDailyClosureAsync(int cashBoxId, int userId, CancellationToken ct);
     Task<Result<List<DailyClosureDto>>> GetDailyClosuresAsync(int cashBoxId, CancellationToken ct);
+
+    /// <summary>
+    /// Creates a daily closure by cash box ID with computed totals from CashTransactions.
+    /// </summary>
+    Task<Result<DailyClosureDto>> CreateClosureByCashBoxAsync(CreateDailyClosureRequest request, int userId, CancellationToken ct);
+
+    /// <summary>
+    /// Reconciles a daily closure by recording the actual cash count.
+    /// </summary>
+    Task<Result<DailyClosureDto>> ReconcileClosureAsync(int closureId, ReconcileDailyClosureRequest request, int userId, CancellationToken ct);
+
     Task<Result<CashTransactionDto>> RecordInvoicePaymentAsync(int cashBoxId, decimal amount, CashTransactionType type, string referenceType, int referenceId, int userId, CancellationToken ct);
 }

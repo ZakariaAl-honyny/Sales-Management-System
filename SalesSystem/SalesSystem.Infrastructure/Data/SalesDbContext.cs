@@ -64,6 +64,8 @@ public class SalesDbContext : DbContext
     public DbSet<AdditionalFeeAllocation> AdditionalFeeAllocations => Set<AdditionalFeeAllocation>();
     public DbSet<SalesQuotation> SalesQuotations => Set<SalesQuotation>();
     public DbSet<SalesQuotationItem> SalesQuotationItems => Set<SalesQuotationItem>();
+    public DbSet<Cheque> Cheques => Set<Cheque>();
+    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.Requests;
-using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
@@ -17,10 +17,14 @@ namespace SalesSystem.Api.Controllers;
 public class CustomerPaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
+    private readonly IChequeService _chequeService;
 
-    public CustomerPaymentsController(IPaymentService paymentService)
+    public CustomerPaymentsController(
+        IPaymentService paymentService,
+        IChequeService chequeService)
     {
         _paymentService = paymentService;
+        _chequeService = chequeService;
     }
 
     /// <summary>
@@ -106,6 +110,32 @@ public class CustomerPaymentsController : ControllerBase
         var result = await _paymentService.DeleteCustomerPaymentAsync(id, userId, ct);
         if (result.IsSuccess) return NoContent();
         if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Creates a cheque linked to a customer payment (e.g., when PaymentMethod = Cheque).
+    /// </summary>
+    [HttpPost("{id:int}/cheque")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(typeof(ChequeDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateCheque(int id, [FromBody] CreateChequeRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        // Ensure the cheque is linked to this customer payment
+        var chequeRequest = request with { CustomerPaymentId = id };
+
+        var result = await _chequeService.CreateAsync(chequeRequest, userId, ct);
+        if (result.IsSuccess)
+            return CreatedAtAction(nameof(GetById), new { id }, new { chequeId = result.Value!.Id, cheque = result.Value });
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+
         return BadRequest(new { error = result.Error });
     }
 }

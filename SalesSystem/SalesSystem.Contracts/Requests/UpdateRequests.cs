@@ -5,7 +5,7 @@ namespace SalesSystem.Contracts.Requests;
 public record UpdateCustomerPaymentRequest(
     int CustomerId,
     decimal Amount,
-    PaymentType PaymentMethod,
+    PaymentMethod PaymentMethod,
     DateTime? PaymentDate,
     string? Notes = null
 );
@@ -13,7 +13,7 @@ public record UpdateCustomerPaymentRequest(
 public record UpdateSupplierPaymentRequest(
     int SupplierId,
     decimal Amount,
-    PaymentType PaymentMethod,
+    PaymentMethod PaymentMethod,
     DateTime? PaymentDate,
     string? Notes = null
 );

@@ -1,4 +1,5 @@
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
@@ -10,15 +11,38 @@ public class SupplierPayment : BaseEntity
     public int? PurchaseInvoiceId { get; private set; }
     public DateTime PaymentDate { get; private set; }
     public decimal Amount { get; private set; }
-    public byte PaymentMethod { get; private set; }
+
+    /// <summary>
+    /// Payment method: Cash, Cheque, BankTransfer, or CreditCard.
+    /// </summary>
+    public PaymentMethod PaymentMethod { get; private set; }
+
+    /// <summary>
+    /// FK to CashBox when payment is made from a cash register.
+    /// </summary>
+    public int? CashBoxId { get; private set; }
+
     public int? CurrencyId { get; private set; }
     public decimal? ExchangeRate { get; private set; }
     public Currency? Currency { get; private set; }
     public string? ReferenceNo { get; private set; }
     public string? Notes { get; private set; }
 
+    // Navigation
     public virtual Supplier? Supplier { get; private set; }
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
+    public virtual CashBox? CashBox { get; private set; }
+
+    /// <summary>
+    /// The cheque associated with this payment (when PaymentMethod = Cheque).
+    /// </summary>
+    public virtual Cheque? Cheque { get; private set; }
+
+    /// <summary>
+    /// Allocations of this payment across multiple invoices.
+    /// </summary>
+    private readonly List<PaymentAllocation> _allocations = new();
+    public IReadOnlyCollection<PaymentAllocation> Allocations => _allocations.AsReadOnly();
 
     private SupplierPayment() { }
 
@@ -26,12 +50,13 @@ public class SupplierPayment : BaseEntity
         string paymentNo,
         int supplierId,
         decimal amount,
-        byte paymentMethod,
+        PaymentMethod paymentMethod,
         int? purchaseInvoiceId = null,
         string? referenceNo = null,
         string? notes = null,
         int? currencyId = null,
         decimal? exchangeRate = null,
+        int? cashBoxId = null,
         int? createdByUserId = null,
         DateTime? paymentDate = null)
     {
@@ -55,23 +80,41 @@ public class SupplierPayment : BaseEntity
             ExchangeRate = exchangeRate,
             ReferenceNo = referenceNo,
             Notes = notes,
+            CashBoxId = cashBoxId,
             PaymentDate = paymentDate ?? DateTime.UtcNow
         };
         payment.SetCreatedBy(createdByUserId);
         return payment;
     }
 
-    public void Update(decimal amount, byte paymentMethod, DateTime? paymentDate, string? notes, int? updatedByUserId = null)
+    public void Update(
+        decimal amount,
+        PaymentMethod paymentMethod,
+        DateTime? paymentDate,
+        string? notes,
+        int? cashBoxId = null,
+        int? updatedByUserId = null)
     {
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
-        
+
         Amount = amount;
         PaymentMethod = paymentMethod;
+        CashBoxId = cashBoxId;
         if (paymentDate.HasValue)
             PaymentDate = paymentDate.Value.Kind == DateTimeKind.Utc ? paymentDate.Value : paymentDate.Value.ToUniversalTime();
         if (notes != null) Notes = notes;
         SetUpdatedBy(updatedByUserId);
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Replaces the current allocations with the given set.
+    /// </summary>
+    public void UpdateAllocations(IEnumerable<PaymentAllocation> newAllocations)
+    {
+        _allocations.Clear();
+        _allocations.AddRange(newAllocations);
         UpdateTimestamp();
     }
 }

@@ -112,7 +112,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment received");
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, "Payment received");
 
         var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -131,7 +131,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 0m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, null);
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 0m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, null);
 
         var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -150,7 +150,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, -100m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, null);
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, -100m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, null);
 
         var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -165,7 +165,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateCustomerPaymentAsync_NonExistentCustomer_ReturnsNotFound");
 
-        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(999, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, null);
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(999, 500m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, null);
 
         var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -188,7 +188,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment made");
+        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, "Payment made");
 
         var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -207,7 +207,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 0m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, null);
+        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 0m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, null);
 
         var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -222,7 +222,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateSupplierPaymentAsync_NonExistentSupplier_ReturnsNotFound");
 
-        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(999, 1000m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, null);
+        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(999, 1000m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, null);
 
         var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -245,7 +245,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment received");
+        var request = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, "Payment received");
 
         var result = await _sut.CreateCustomerPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -267,7 +267,7 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment made");
+        var request = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, "Payment made");
 
         var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
 
@@ -295,8 +295,8 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Customers.Add(customer2);
         await _dbContext.SaveChangesAsync();
 
-        var payment1 = CustomerPayment.Create("CP-2026-000001", customerId: 1, amount: 100m, paymentMethod: (byte)SalesSystem.Contracts.Enums.PaymentType.Cash, salesInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
-        var payment2 = CustomerPayment.Create("CP-2026-000002", customerId: 2, amount: 200m, paymentMethod: (byte)SalesSystem.Contracts.Enums.PaymentType.Cash, salesInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
+        var payment1 = CustomerPayment.Create("CP-2026-000001", customerId: 1, amount: 100m, paymentMethod: SalesSystem.Domain.Enums.PaymentMethod.Cash, salesInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
+        var payment2 = CustomerPayment.Create("CP-2026-000002", customerId: 2, amount: 200m, paymentMethod: SalesSystem.Domain.Enums.PaymentMethod.Cash, salesInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
         _dbContext.CustomerPayments.Add(payment1);
         _dbContext.CustomerPayments.Add(payment2);
         await _dbContext.SaveChangesAsync();
@@ -325,8 +325,8 @@ public class PaymentServiceTests : IDisposable
         _dbContext.Suppliers.Add(supplier2);
         await _dbContext.SaveChangesAsync();
 
-        var payment1 = SupplierPayment.Create("SP-2026-000001", supplierId: 1, amount: 500m, paymentMethod: (byte)SalesSystem.Contracts.Enums.PaymentType.Cash, purchaseInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
-        var payment2 = SupplierPayment.Create("SP-2026-000002", supplierId: 2, amount: 600m, paymentMethod: (byte)SalesSystem.Contracts.Enums.PaymentType.Cash, purchaseInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
+        var payment1 = SupplierPayment.Create("SP-2026-000001", supplierId: 1, amount: 500m, paymentMethod: SalesSystem.Domain.Enums.PaymentMethod.Cash, purchaseInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
+        var payment2 = SupplierPayment.Create("SP-2026-000002", supplierId: 2, amount: 600m, paymentMethod: SalesSystem.Domain.Enums.PaymentMethod.Cash, purchaseInvoiceId: null, referenceNo: null, notes: null, createdByUserId: 1, paymentDate: DateTime.Now);
         _dbContext.SupplierPayments.Add(payment1);
         _dbContext.SupplierPayments.Add(payment2);
         await _dbContext.SaveChangesAsync();
@@ -354,14 +354,14 @@ public class PaymentServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Create initial payment of 500
-        var createRequest = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Initial payment");
+        var createRequest = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, "Initial payment");
         var createResult = await _sut.CreateCustomerPaymentAsync(createRequest, userId: 1, CancellationToken.None);
 
         createResult.IsSuccess.Should().BeTrue();
         customer.CurrentBalance.Should().Be(500m, "After payment of 500, balance should decrease from 1000 to 500");
 
         // Update payment amount from 500 to 200
-        var updateRequest = new SalesSystem.Contracts.Requests.UpdateCustomerPaymentRequest(1, 200m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, "Updated payment");
+        var updateRequest = new SalesSystem.Contracts.Requests.UpdateCustomerPaymentRequest(1, 200m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, "Updated payment");
         var updateResult = await _sut.UpdateCustomerPaymentAsync(createResult.Value!.Id, updateRequest, userId: 1, CancellationToken.None);
 
         updateResult.IsSuccess.Should().BeTrue();
@@ -381,14 +381,14 @@ public class PaymentServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Create initial payment of 1000
-        var createRequest = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Initial payment");
+        var createRequest = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, "Initial payment");
         var createResult = await _sut.CreateSupplierPaymentAsync(createRequest, userId: 1, CancellationToken.None);
 
         createResult.IsSuccess.Should().BeTrue();
         supplier.CurrentBalance.Should().Be(4000m, "After payment of 1000, balance should decrease from 5000 to 4000");
 
         // Update payment amount from 1000 to 500
-        var updateRequest = new SalesSystem.Contracts.Requests.UpdateSupplierPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, "Updated payment");
+        var updateRequest = new SalesSystem.Contracts.Requests.UpdateSupplierPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, "Updated payment");
         var updateResult = await _sut.UpdateSupplierPaymentAsync(createResult.Value!.Id, updateRequest, userId: 1, CancellationToken.None);
 
         updateResult.IsSuccess.Should().BeTrue();
@@ -408,7 +408,7 @@ public class PaymentServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Create payment of 500
-        var createRequest = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment to delete");
+        var createRequest = new SalesSystem.Contracts.Requests.CreateCustomerPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, "Payment to delete");
         var createResult = await _sut.CreateCustomerPaymentAsync(createRequest, userId: 1, CancellationToken.None);
 
         createResult.IsSuccess.Should().BeTrue();
@@ -433,7 +433,7 @@ public class PaymentServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         // Create payment of 1000
-        var createRequest = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, null, "Payment to delete");
+        var createRequest = new SalesSystem.Contracts.Requests.CreateSupplierPaymentRequest(1, 1000m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, null, "Payment to delete");
         var createResult = await _sut.CreateSupplierPaymentAsync(createRequest, userId: 1, CancellationToken.None);
 
         createResult.IsSuccess.Should().BeTrue();
@@ -453,7 +453,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateCustomerPaymentAsync_NonExistent_ReturnsNotFound");
 
-        var updateRequest = new SalesSystem.Contracts.Requests.UpdateCustomerPaymentRequest(1, 200m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, "Updated");
+        var updateRequest = new SalesSystem.Contracts.Requests.UpdateCustomerPaymentRequest(1, 200m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, "Updated");
         var result = await _sut.UpdateCustomerPaymentAsync(999, updateRequest, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -480,7 +480,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateSupplierPaymentAsync_NonExistent_ReturnsNotFound");
 
-        var updateRequest = new SalesSystem.Contracts.Requests.UpdateSupplierPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentType.Cash, DateTime.Now, "Updated");
+        var updateRequest = new SalesSystem.Contracts.Requests.UpdateSupplierPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, "Updated");
         var result = await _sut.UpdateSupplierPaymentAsync(999, updateRequest, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();

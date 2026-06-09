@@ -6,6 +6,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
+using PaymentMethod = SalesSystem.Domain.Enums.PaymentMethod;
 
 namespace SalesSystem.Application.Services;
 
@@ -50,12 +51,13 @@ public class PaymentService : IPaymentService
                     paymentNoResult.Value!,
                     request.CustomerId,
                     request.Amount,
-                    (byte)request.PaymentMethod,
+                    (PaymentMethod)request.PaymentMethod,
                     request.SalesInvoiceId,
                     null, // ReferenceNo
                     request.Notes,
                     null, // CurrencyId
                     null, // ExchangeRate
+                    null, // CashBoxId
                     userId,
                     request.PaymentDate
                 );
@@ -113,12 +115,13 @@ public class PaymentService : IPaymentService
                     paymentNoResult.Value!,
                     request.SupplierId,
                     request.Amount,
-                    (byte)request.PaymentMethod,
+                    (PaymentMethod)request.PaymentMethod,
                     request.PurchaseInvoiceId,
                     null, // ReferenceNo
                     request.Notes,
                     null, // CurrencyId
                     null, // ExchangeRate
+                    null, // CashBoxId
                     userId,
                     request.PaymentDate
                 );
@@ -201,9 +204,10 @@ public class PaymentService : IPaymentService
                 // Apply new values
                 payment.Update(
                     request.Amount,
-                    (byte)request.PaymentMethod,
+                    (PaymentMethod)request.PaymentMethod,
                     request.PaymentDate,
                     request.Notes,
+                    null, // CashBoxId
                     userId
                 );
 
@@ -330,9 +334,10 @@ public class PaymentService : IPaymentService
                 // Apply new values
                 payment.Update(
                     request.Amount,
-                    (byte)request.PaymentMethod,
+                    (PaymentMethod)request.PaymentMethod,
                     request.PaymentDate,
                     request.Notes,
+                    null, // CashBoxId
                     userId
                 );
 
@@ -416,7 +421,7 @@ public class PaymentService : IPaymentService
             p.CustomerId,
             p.Customer?.Name ?? "غير معروف",
             p.Amount,
-            p.PaymentMethod,
+            (byte)p.PaymentMethod,
             p.CurrencyId,
             p.ExchangeRate,
             p.PaymentDate,
@@ -433,7 +438,7 @@ public class PaymentService : IPaymentService
             p.SupplierId,
             p.Supplier?.Name ?? "غير معروف",
             p.Amount,
-            p.PaymentMethod,
+            (byte)p.PaymentMethod,
             p.CurrencyId,
             p.ExchangeRate,
             p.PaymentDate,

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
@@ -13,7 +14,7 @@ public class CustomerPaymentTests
             paymentNo: "CP-2026-000001",
             customerId: 1,
             amount: 500m,
-            paymentMethod: 1, // Cash
+            paymentMethod: PaymentMethod.Cash,
             salesInvoiceId: 10,
             referenceNo: "REF001",
             notes: "Payment for invoice",
@@ -24,7 +25,7 @@ public class CustomerPaymentTests
         payment.PaymentNo.Should().Be("CP-2026-000001");
         payment.CustomerId.Should().Be(1);
         payment.Amount.Should().Be(500m);
-        payment.PaymentMethod.Should().Be(1);
+        payment.PaymentMethod.Should().Be(PaymentMethod.Cash);
         payment.SalesInvoiceId.Should().Be(10);
         payment.ReferenceNo.Should().Be("REF001");
         payment.Notes.Should().Be("Payment for invoice");
@@ -40,7 +41,7 @@ public class CustomerPaymentTests
             paymentNo: invalidPaymentNo!,
             customerId: 1,
             amount: 100m,
-            paymentMethod: 1
+            paymentMethod: PaymentMethod.Cash
         );
 
         action.Should().Throw<DomainException>()
@@ -54,7 +55,7 @@ public class CustomerPaymentTests
             paymentNo: "CP-001",
             customerId: 0,
             amount: 100m,
-            paymentMethod: 1
+            paymentMethod: PaymentMethod.Cash
         );
 
         action.Should().Throw<DomainException>()
@@ -71,7 +72,7 @@ public class CustomerPaymentTests
             paymentNo: "CP-001",
             customerId: 1,
             amount: invalidAmount,
-            paymentMethod: 1
+            paymentMethod: PaymentMethod.Cash
         );
 
         action.Should().Throw<DomainException>()
@@ -85,7 +86,7 @@ public class CustomerPaymentTests
             paymentNo: "CP-2026-000001",
             customerId: 1,
             amount: 100m,
-            paymentMethod: 1,
+            paymentMethod: PaymentMethod.Cash,
             salesInvoiceId: null
         );
 
@@ -99,7 +100,7 @@ public class CustomerPaymentTests
             paymentNo: "CP-2026-000001",
             customerId: 1,
             amount: 100m,
-            paymentMethod: 1,
+            paymentMethod: PaymentMethod.Cash,
             referenceNo: null
         );
 
@@ -109,10 +110,10 @@ public class CustomerPaymentTests
     [Fact]
     public void Create_GivenAllPaymentMethods_ShouldSucceed()
     {
-        foreach (byte method in new[] { 1, 2, 3 })
+        foreach (PaymentMethod method in Enum.GetValues<PaymentMethod>())
         {
             var payment = CustomerPayment.Create(
-                paymentNo: $"CP-{method}",
+                paymentNo: $"CP-{(byte)method}",
                 customerId: 1,
                 amount: 100m,
                 paymentMethod: method
@@ -132,7 +133,7 @@ public class CustomerPaymentTests
             paymentNo: "CP-2026-000001",
             customerId: 1,
             amount: amount,
-            paymentMethod: 1
+            paymentMethod: PaymentMethod.Cash
         );
 
         payment.Amount.Should().Be(amount);

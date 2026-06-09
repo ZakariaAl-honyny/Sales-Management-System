@@ -595,7 +595,7 @@ public class AccountingIntegrationServiceTests : IDisposable
             paymentNo: "CP-20260601-0001",
             customerId: 1,
             amount: 500m,
-            paymentMethod: 1); // Cash
+            paymentMethod: SalesSystem.Domain.Enums.PaymentMethod.Cash);
 
         var result = await _sut.CreateCustomerPaymentEntryAsync(
             payment,
@@ -640,7 +640,7 @@ public class AccountingIntegrationServiceTests : IDisposable
             paymentNo: "SP-20260601-0001",
             supplierId: 1,
             amount: 800m,
-            paymentMethod: 1); // Cash
+            paymentMethod: SalesSystem.Domain.Enums.PaymentMethod.Cash);
 
         var result = await _sut.CreateSupplierPaymentEntryAsync(
             payment,

@@ -61,6 +61,8 @@ public interface IUnitOfWork
     IGenericRepository<AdditionalFeeAllocation> AdditionalFeeAllocations { get; }
     IGenericRepository<SalesQuotation> SalesQuotations { get; }
     IGenericRepository<SalesQuotationItem> SalesQuotationItems { get; }
+    IGenericRepository<Cheque> Cheques { get; }
+    IGenericRepository<PaymentAllocation> PaymentAllocations { get; }
     IAuditLogRepository AuditLogs { get; }
     IGenericRepository<UserSession> UserSessions { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);

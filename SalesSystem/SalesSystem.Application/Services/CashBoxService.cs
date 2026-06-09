@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Accounting.Entities;
@@ -404,17 +405,16 @@ public class CashBoxService : ICashBoxService
 
             var totalIncome = todayTransactions.Where(t => t.Amount > 0).Sum(t => t.Amount);
             var totalExpense = todayTransactions.Where(t => t.Amount < 0).Sum(t => Math.Abs(t.Amount));
-            var closingBalance = openingBalance + totalIncome - totalExpense;
 
             var dailyClosure = DailyClosure.Create(
-                cashBoxId, today, openingBalance, totalIncome, totalExpense, closingBalance, userId);
+                cashBoxId, today, openingBalance, totalIncome, totalExpense, userId);
 
             await _uow.DailyClosures.AddAsync(dailyClosure, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Daily closure for cash box {CashBoxId}: Opening={Opening:N2}, Income={Income:N2}, Expense={Expense:N2}, Closing={Closing:N2}",
-                cashBoxId, openingBalance, totalIncome, totalExpense, closingBalance);
+                "Daily closure for cash box {CashBoxId}: Opening={Opening:N2}, Income={Income:N2}, Expense={Expense:N2}, ExpectedClosing={ExpectedClosing:N2}",
+                cashBoxId, openingBalance, totalIncome, totalExpense, dailyClosure.ExpectedClosingBalance);
 
             return Result<DailyClosureDto>.Success(MapToClosureDto(dailyClosure));
         }
@@ -450,6 +450,100 @@ public class CashBoxService : ICashBoxService
         {
             _logger.LogError(ex, "Error retrieving daily closures for cash box {CashBoxId}", cashBoxId);
             return Result<List<DailyClosureDto>>.Failure("حدث خطأ أثناء استرجاع الإغلاقات اليومية");
+        }
+    }
+
+    public async Task<Result<DailyClosureDto>> CreateClosureByCashBoxAsync(
+        CreateDailyClosureRequest request, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var box = await _uow.CashBoxes.GetByIdAsync(request.CashBoxId, ct);
+            if (box == null)
+                return Result<DailyClosureDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
+
+            var closureDate = DateOnly.FromDateTime(request.ClosureDate.Kind == DateTimeKind.Utc
+                ? request.ClosureDate
+                : request.ClosureDate.ToUniversalTime());
+
+            var hasExistingClosure = await _uow.DailyClosures.AnyAsync(
+                dc => dc.CashBoxId == request.CashBoxId && dc.ClosureDate == closureDate, ct);
+            if (hasExistingClosure)
+                return Result<DailyClosureDto>.Failure("تم إغلاق الصندوق بالفعل في هذا التاريخ");
+
+            var dayStart = closureDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var dayEnd = closureDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+            var allTransactions = await _uow.CashTransactions.ToListAsync(
+                t => t.CashBoxId == request.CashBoxId,
+                q => q.OrderBy(t => t.CreatedAt),
+                ct);
+
+            // Opening balance = running balance of last transaction before today
+            var beforeToday = allTransactions.Where(t => t.CreatedAt < dayStart).ToList();
+            var todayTransactions = allTransactions.Where(t => t.CreatedAt >= dayStart && t.CreatedAt <= dayEnd).ToList();
+
+            var openingBalance = beforeToday.Count > 0
+                ? beforeToday.Last().RunningBalance
+                : 0m;
+
+            var totalIncome = todayTransactions.Where(t => t.Amount > 0).Sum(t => t.Amount);
+            var totalExpense = todayTransactions.Where(t => t.Amount < 0).Sum(t => Math.Abs(t.Amount));
+
+            var dailyClosure = DailyClosure.Create(
+                request.CashBoxId, closureDate, openingBalance, totalIncome, totalExpense, userId);
+
+            await _uow.DailyClosures.AddAsync(dailyClosure, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Daily closure created for cash box {CashBoxId} on {Date}: Opening={Opening:N2}, Income={Income:N2}, Expense={Expense:N2}",
+                request.CashBoxId, closureDate, openingBalance, totalIncome, totalExpense);
+
+            return Result<DailyClosureDto>.Success(MapToClosureDto(dailyClosure));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation creating daily closure: {Message}", ex.Message);
+            return Result<DailyClosureDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating daily closure for cash box {CashBoxId}", request.CashBoxId);
+            return Result<DailyClosureDto>.Failure("حدث خطأ أثناء إنشاء الإغلاق اليومي");
+        }
+    }
+
+    public async Task<Result<DailyClosureDto>> ReconcileClosureAsync(
+        int closureId, ReconcileDailyClosureRequest request, int userId, CancellationToken ct)
+    {
+        try
+        {
+            if (request.ActualCashCount < 0)
+                return Result<DailyClosureDto>.Failure("العدد الفعلي للنقدية لا يمكن أن يكون سالباً");
+
+            var closure = await _uow.DailyClosures.GetByIdAsync(closureId, ct);
+            if (closure == null)
+                return Result<DailyClosureDto>.Failure("الإغلاق اليومي غير موجود", ErrorCodes.NotFound);
+
+            closure.Reconcile(request.ActualCashCount, request.Notes);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Daily closure {ClosureId} reconciled: Actual={Actual:N2}, Expected={Expected:N2}, Diff={Diff:N2} by User {UserId}",
+                closureId, request.ActualCashCount, closure.ExpectedClosingBalance, closure.Difference, userId);
+
+            return Result<DailyClosureDto>.Success(MapToClosureDto(closure));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation reconciling daily closure {ClosureId}: {Message}", closureId, ex.Message);
+            return Result<DailyClosureDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reconciling daily closure {ClosureId}", closureId);
+            return Result<DailyClosureDto>.Failure("حدث خطأ أثناء تسوية الإغلاق اليومي");
         }
     }
 
@@ -554,7 +648,11 @@ public class CashBoxService : ICashBoxService
         c.OpeningBalance,
         c.TotalIncome,
         c.TotalExpense,
-        c.ClosingBalance,
+        c.ExpectedClosingBalance,
+        c.ActualCashCount,
+        c.Difference,
+        c.IsReconciled,
         c.ClosedByUserId,
+        c.Notes,
         c.CreatedAt);
 }

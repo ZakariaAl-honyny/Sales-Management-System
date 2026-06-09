@@ -26,9 +26,30 @@ public class DailyClosureConfiguration : IEntityTypeConfiguration<DailyClosure>
             .IsRequired()
             .HasPrecision(18, 2);
 
-        builder.Property(x => x.ClosingBalance)
+        builder.Property(x => x.ExpectedClosingBalance)
             .IsRequired()
             .HasPrecision(18, 2);
+
+        builder.Property(x => x.ActualCashCount)
+            .IsRequired()
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0m);
+
+        builder.Property(x => x.Difference)
+            .IsRequired()
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0m);
+
+        builder.Property(x => x.IsReconciled)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(x => x.ClosedByUserId)
+            .IsRequired();
+
+        builder.Property(x => x.Notes)
+            .HasMaxLength(500)
+            .IsRequired(false);
 
         builder.Property(x => x.IsActive)
             .HasDefaultValue(true);

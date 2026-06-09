@@ -7,6 +7,10 @@ using System.Windows.Input;
 
 namespace SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 
+/// <summary>
+/// ViewModel for Daily Closure management — shows summary cards, past closures,
+/// and supports reconciliation with actual cash count (Phase 29).
+/// </summary>
 public class DailyClosureViewModel : ViewModelBase
 {
     private readonly ICashBoxApiService _cashBoxService;
@@ -19,6 +23,7 @@ public class DailyClosureViewModel : ViewModelBase
     private decimal _totalExpense;
     private decimal _openingBalance;
     private decimal _projectedClosingBalance;
+    private decimal _actualCashCount;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _isClosedToday;
@@ -49,6 +54,7 @@ public class DailyClosureViewModel : ViewModelBase
     {
         RefreshCommand = new AsyncRelayCommand(LoadDataAsync);
         PerformClosureCommand = new AsyncRelayCommand(PerformClosureAsync);
+        ReconcileCommand = new AsyncRelayCommand(ReconcileAsync);
     }
 
     #region Properties
@@ -89,6 +95,48 @@ public class DailyClosureViewModel : ViewModelBase
         private set => SetProperty(ref _projectedClosingBalance, value);
     }
 
+    /// <summary>
+    /// Actual cash counted by the user during daily closure reconciliation.
+    /// </summary>
+    public decimal ActualCashCount
+    {
+        get => _actualCashCount;
+        set
+        {
+            if (SetProperty(ref _actualCashCount, value))
+            {
+                OnPropertyChanged(nameof(Difference));
+                OnPropertyChanged(nameof(DifferenceDisplay));
+                OnPropertyChanged(nameof(IsBalanced));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Difference between actual cash count and projected closing balance.
+    /// </summary>
+    public decimal Difference => ActualCashCount - ProjectedClosingBalance;
+
+    /// <summary>
+    /// Formatted difference string with color indicator (green when balanced, red when unbalanced).
+    /// </summary>
+    public string DifferenceDisplay
+    {
+        get
+        {
+            if (Math.Abs(Difference) < 0.01m)
+                return "مطابق ✅";
+            return Difference > 0
+                ? $"زيادة قدرها {Difference:N2} ⚠️"
+                : $"عجز قدره {Math.Abs(Difference):N2} ⚠️";
+        }
+    }
+
+    /// <summary>
+    /// True when the actual cash count matches (within rounding) the projected closing balance.
+    /// </summary>
+    public bool IsBalanced => Math.Abs(Difference) < 0.01m;
+
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -107,6 +155,19 @@ public class DailyClosureViewModel : ViewModelBase
         private set => SetProperty(ref _isClosedToday, value);
     }
 
+    /// <summary>
+    /// Returns a brief status string for the closure state.
+    /// </summary>
+    public string ReconciliationStatus
+    {
+        get
+        {
+            if (IsClosedToday && IsBalanced) return "مقفل ومطابق";
+            if (IsClosedToday && !IsBalanced) return "مقفل مع فروقات";
+            return "غير مقفل";
+        }
+    }
+
     public DailyClosureDto? SelectedClosure
     {
         get => _selectedClosure;
@@ -121,6 +182,7 @@ public class DailyClosureViewModel : ViewModelBase
 
     public ICommand RefreshCommand { get; private set; } = null!;
     public ICommand PerformClosureCommand { get; private set; } = null!;
+    public ICommand ReconcileCommand { get; private set; } = null!;
 
     #endregion
 
@@ -171,7 +233,7 @@ public class DailyClosureViewModel : ViewModelBase
                 .OrderByDescending(c => c.ClosureDate)
                 .FirstOrDefault();
 
-            OpeningBalance = lastClosure?.ClosingBalance ?? 0m;
+            OpeningBalance = lastClosure?.ExpectedClosingBalance ?? 0m;
 
             var incomeTypes = new HashSet<byte> { 1, 2, 5, 8 };
             var expenseTypes = new HashSet<byte> { 3, 4, 6, 7 };
@@ -180,6 +242,10 @@ public class DailyClosureViewModel : ViewModelBase
             TotalIncome = todayTxs.Where(t => incomeTypes.Contains(t.TransactionType)).Sum(t => t.Amount);
             TotalExpense = todayTxs.Where(t => expenseTypes.Contains(t.TransactionType)).Sum(t => t.Amount);
             ProjectedClosingBalance = OpeningBalance + TotalIncome - TotalExpense;
+
+            // Reset reconciliation fields
+            ActualCashCount = ProjectedClosingBalance;
+            OnPropertyChanged(nameof(ReconciliationStatus));
         });
     }
 
@@ -197,7 +263,9 @@ public class DailyClosureViewModel : ViewModelBase
             $"الرصيد الافتتاحي: {OpeningBalance:N2}\n" +
             $"إجمالي الإيرادات: {TotalIncome:N2}\n" +
             $"إجمالي المصروفات: {TotalExpense:N2}\n" +
-            $"الرصيد المتوقع بعد الإغلاق: {ProjectedClosingBalance:N2}");
+            $"الرصيد المتوقع بعد الإغلاق: {ProjectedClosingBalance:N2}\n" +
+            $"العد الفعلي: {ActualCashCount:N2}\n" +
+            $"الفارق: {Difference:N2}");
 
         if (!confirmed) return;
 
@@ -221,6 +289,32 @@ public class DailyClosureViewModel : ViewModelBase
                 "DailyClosureViewModel.PerformClosureOperationAsync",
                 $"[DailyClosureViewModel.PerformClosureOperationAsync] Failed to perform daily closure.");
             _toastService.ShowError(ErrorMessage);
+        }
+    }
+
+    /// <summary>
+    /// Reconciles the daily closure by comparing actual cash count with projected balance.
+    /// Shows a toast with the result.
+    /// </summary>
+    public async Task ReconcileAsync()
+    {
+        if (!IsClosedToday)
+        {
+            await _dialogService.ShowWarningAsync("تسوية الإغلاق",
+                "يرجى إغلاق اليوم أولاً قبل إجراء التسوية");
+            return;
+        }
+
+        if (IsBalanced)
+        {
+            _toastService.ShowSuccess($"التسوية مطابقة ✅ — الرصيد الختامي: {ActualCashCount:N2}");
+        }
+        else
+        {
+            _toastService.ShowInfo(
+                Difference > 0
+                    ? $"الرصيد الفعلي يزيد بمقدار {Difference:N2} عن الرصيد المتوقع ⚠️"
+                    : $"الرصيد الفعلي أقل بمقدار {Math.Abs(Difference):N2} عن الرصيد المتوقع ⚠️");
         }
     }
 

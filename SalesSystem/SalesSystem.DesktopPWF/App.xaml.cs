@@ -235,6 +235,10 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IAuditLogApiService, AuditLogApiService>();
         services.AddSingleton<IPermissionApiService, PermissionApiService>();
 
+        // Cheque & Payment Allocation Services (Phase 29)
+        services.AddSingleton<IChequeApiService, ChequeApiService>();
+        services.AddSingleton<IPaymentAllocationApiService, PaymentAllocationApiService>();
+
         // Printing
         services.AddSingleton<Services.App.IInvoicePrinter, Services.Printing.InvoicePrinter>();
         services.AddSingleton<Services.App.IReceiptPrinter, Services.Printing.ReceiptPrinter>();

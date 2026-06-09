@@ -6,7 +6,7 @@
         xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
         mc:Ignorable="d"
         Title="{Binding WindowTitle}"
-        Height="550" Width="500"
+        Height="600" Width="520"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -28,9 +28,9 @@
         </Border>
 
         <!-- Main Form -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="16">
             <StackPanel>
-                <Border Style="{StaticResource CardStyle}" Padding="20">
+                <Border Style="{StaticResource CardStyle}" Padding="16">
                     <StackPanel>
                         <!-- Customer -->
                         <TextBlock Text="العميل *" Style="{StaticResource LabelStyle}"/>
@@ -47,16 +47,17 @@
                                       IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
                                       TabIndex="1"
                                       helpers:FocusHelper.AdvanceOnEnter="True"
-                                      AutomationProperties.AutomationId="CbPaymentCustomer"/>
+                                      AutomationProperties.AutomationId="CbPaymentCustomer"
+                                      ToolTip="اختر العميل المستحق عليه الدفع"/>
                             <Button Grid.Column="1" Content="🔍" 
                                     Command="{Binding SearchCustomerCommand}"
                                     Style="{StaticResource SecondaryButton}" 
                                     Padding="4,0" Height="28" Width="30"
                                     Margin="4,0,0,0"
                                     IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
-                                    ToolTip="البحث عن فاتورة"/>
+                                    ToolTip="البحث عن عميل واستعراض القائمة"/>
                         </Grid>
-                        <Border Height="20"/>
+                        <Border Height="8"/>
 
                         <!-- Date -->
                         <TextBlock Text="تاريخ السداد" Style="{StaticResource LabelStyle}"/>
@@ -65,8 +66,9 @@
                                     IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
                                     TabIndex="2"
                                     helpers:FocusHelper.AdvanceOnEnter="True"
-                                    AutomationProperties.AutomationId="DpPaymentDate"/>
-                        <Border Height="20"/>
+                                    AutomationProperties.AutomationId="DpPaymentDate"
+                                    ToolTip="تاريخ تسجيل سند الدفع"/>
+                        <Border Height="8"/>
 
                         <!-- Amount -->
                         <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}"/>
@@ -79,35 +81,96 @@
                                  Foreground="{StaticResource PrimaryBrush}"
                                  TabIndex="3"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtPaymentAmount"/>
+                                 AutomationProperties.AutomationId="TxtPaymentAmount"
+                                 ToolTip="أدخل المبلغ الذي سيدفعه العميل — يجب أن يكون أكبر من صفر"/>
                         <TextBlock Text="المبلغ الذي سخصم من مديونية العميل" Style="{StaticResource HelperTextStyle}"/>
-                        <Border Height="20"/>
+                        <Border Height="8"/>
 
-                        <!-- Payment Type -->
+                        <!-- Payment Method -->
                         <TextBlock Text="طريقة الدفع" Style="{StaticResource LabelStyle}"/>
-                        <ComboBox ItemsSource="{Binding PaymentTypeOptions}"
-                                  SelectedValue="{Binding PaymentType, ValidatesOnDataErrors=True}"
+                        <ComboBox ItemsSource="{Binding PaymentMethodOptions}"
+                                  SelectedValue="{Binding PaymentMethod, ValidatesOnDataErrors=True}"
                                   SelectedValuePath="Value"
                                   DisplayMemberPath="Display"
                                   Style="{StaticResource ModernComboBox}"
                                   IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
                                   TabIndex="4"
                                   helpers:FocusHelper.AdvanceOnEnter="True"
-                                  AutomationProperties.AutomationId="CbPaymentType"/>
-                        <Border Height="20"/>
+                                  AutomationProperties.AutomationId="CbPaymentMethod"
+                                  ToolTip="اختر طريقة الدفع — شيك يتطلب إدخال بيانات إضافية"/>
+
+                        <!-- Cheque Fields (visible only when PaymentMethod == Cheque) -->
+                        <Border Style="{StaticResource CardStyle}" Margin="0,8,0,0" Padding="12"
+                                Visibility="{Binding ShowChequeFields, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="بيانات الشيك" FontSize="14" FontWeight="SemiBold" 
+                                           Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                        <TextBlock Text="رقم الشيك *" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding ChequeNumber, ValidatesOnDataErrors=True}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 IsReadOnly="{Binding IsReadOnly}"
+                                                 TabIndex="5"
+                                                 ToolTip="رقم الشيك كما هو مدون على الشيك — هذا الحقل إلزامي للدفع بشيك"
+                                                 AutomationProperties.AutomationId="TxtChequeNumber"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                        <TextBlock Text="اسم البنك *" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding ChequeBankName, ValidatesOnDataErrors=True}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 IsReadOnly="{Binding IsReadOnly}"
+                                                 TabIndex="6"
+                                                 ToolTip="اسم البنك المصدر للشيك — هذا الحقل إلزامي"
+                                                 AutomationProperties.AutomationId="TxtChequeBankName"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                        <TextBlock Text="تاريخ الإصدار" Style="{StaticResource LabelStyle}"/>
+                                        <DatePicker SelectedDate="{Binding ChequeIssueDate, ValidatesOnDataErrors=True}"
+                                                    Style="{StaticResource ModernDatePicker}"
+                                                    IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
+                                                    TabIndex="7"
+                                                    ToolTip="تاريخ إصدار الشيك"
+                                                    AutomationProperties.AutomationId="DpChequeIssueDate"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                        <TextBlock Text="تاريخ الاستحقاق *" Style="{StaticResource LabelStyle}"/>
+                                        <DatePicker SelectedDate="{Binding ChequeMaturityDate, ValidatesOnDataErrors=True}"
+                                                    Style="{StaticResource ModernDatePicker}"
+                                                    IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
+                                                    TabIndex="8"
+                                                    ToolTip="تاريخ استحقاق صرف الشيك — يجب أن يكون بعد تاريخ الإصدار"
+                                                    AutomationProperties.AutomationId="DpChequeMaturityDate"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Height="8"/>
 
                         <!-- Notes -->
                         <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}"/>
                         <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                  Style="{StaticResource ModernTextBox}"
-                                 Height="80"
+                                 Height="60"
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"
                                  VerticalContentAlignment="Top"
                                  IsReadOnly="{Binding IsReadOnly}"
-                                 TabIndex="5"
+                                 TabIndex="9"
                                  helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtPaymentNotes"/>
+                                 AutomationProperties.AutomationId="TxtPaymentNotes"
+                                 ToolTip="ملاحظات إضافية حول سند الدفع (اختياري)"/>
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -125,26 +188,26 @@
                     <Button Content="💾 حفظ السند"
                             Command="{Binding SaveCommand}"
                             Style="{StaticResource PrimaryButton}"
-                            Width="140"
-                            Margin="0,0,12,0"
+                            MinWidth="100"
+                            Margin="0,0,8,0"
                             Visibility="{Binding IsReadOnly, Converter={StaticResource InverseBoolToVisibility}}"
                             IsDefault="True"
-                            TabIndex="6"
+                            TabIndex="10"
                             AutomationProperties.AutomationId="BtnSavePayment"
-                            ToolTip="حفظ سند الدفع"/>
+                            ToolTip="حفظ سند الدفع — سيتم التحقق من صحة البيانات قبل الحفظ"/>
                     <Button Content="🖨️ طباعة السند"
                             Command="{Binding PrintCommand}"
                             Style="{StaticResource SecondaryButton}"
-                            Width="140"
-                            Margin="0,0,12,0"
+                            MinWidth="100"
+                            Margin="0,0,8,0"
                             Visibility="{Binding IsEdit, Converter={StaticResource BoolToVisibility}}"
                             AutomationProperties.AutomationId="BtnPrintPayment"
                             ToolTip="طباعة سند الدفع"/>
                     <Button Content="🚫 إغلاق"
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
-                            Width="100"
-                            TabIndex="7"
+                            MinWidth="80"
+                            TabIndex="11"
                             AutomationProperties.AutomationId="BtnCancelPayment"
                             ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>
@@ -170,4 +233,3 @@
         </Border>
     </Grid>
 </Window>
-

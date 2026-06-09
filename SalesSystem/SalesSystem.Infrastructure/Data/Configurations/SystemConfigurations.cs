@@ -4,52 +4,6 @@ using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
-public class CustomerPaymentConfiguration : IEntityTypeConfiguration<CustomerPayment>
-{
-    public void Configure(EntityTypeBuilder<CustomerPayment> builder)
-    {
-        builder.ToTable("CustomerPayments");
-        builder.HasKey(cp => cp.Id);
-        builder.Property(cp => cp.PaymentNo).IsRequired().HasMaxLength(30);
-        builder.HasIndex(cp => cp.PaymentNo).IsUnique();
-        builder.Property(cp => cp.Amount).IsRequired().HasPrecision(18, 2);
-        builder.Property(cp => cp.PaymentMethod).IsRequired();
-        builder.Property(cp => cp.ExchangeRate).HasPrecision(18, 2);
-        builder.Property(cp => cp.ReferenceNo).HasMaxLength(50);
-        builder.Property(cp => cp.Notes).HasMaxLength(500);
-
-        builder.HasOne(cp => cp.Customer)
-            .WithMany()
-            .HasForeignKey(cp => cp.CustomerId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(cp => cp.IsActive);
-    }
-}
-
-public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPayment>
-{
-    public void Configure(EntityTypeBuilder<SupplierPayment> builder)
-    {
-        builder.ToTable("SupplierPayments");
-        builder.HasKey(sp => sp.Id);
-        builder.Property(sp => sp.PaymentNo).IsRequired().HasMaxLength(30);
-        builder.HasIndex(sp => sp.PaymentNo).IsUnique();
-        builder.Property(sp => sp.Amount).IsRequired().HasPrecision(18, 2);
-        builder.Property(sp => sp.PaymentMethod).IsRequired();
-        builder.Property(sp => sp.ExchangeRate).HasPrecision(18, 2);
-        builder.Property(sp => sp.ReferenceNo).HasMaxLength(50);
-        builder.Property(sp => sp.Notes).HasMaxLength(500);
-
-        builder.HasOne(sp => sp.Supplier)
-            .WithMany()
-            .HasForeignKey(sp => sp.SupplierId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(sp => sp.IsActive);
-    }
-}
-
 public class InventoryMovementConfiguration : IEntityTypeConfiguration<InventoryMovement>
 {
     public void Configure(EntityTypeBuilder<InventoryMovement> builder)

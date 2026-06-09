@@ -175,6 +175,10 @@ builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IAdditionalFeeService, AdditionalFeeService>();
 builder.Services.AddScoped<IFeeDistributionService, FeeDistributionService>();
 
+// ─── Receipts & Payments Services (Phase 29) ────────────────
+builder.Services.AddScoped<IChequeService, ChequeService>();
+builder.Services.AddScoped<IPaymentAllocationService, PaymentAllocationService>();
+
 // ─── Accounting Services ────────────────────────────────────
 builder.Services.AddScoped<IJournalEntryService, JournalEntryService>();
 builder.Services.AddScoped<ISystemAccountService, SystemAccountService>();
@@ -291,6 +295,11 @@ builder.Services.AddScoped<IValidator<UpdateCustomerGroupRequest>, UpdateCustome
 builder.Services.AddScoped<IValidator<CreateBillOfMaterialRequest>, CreateBillOfMaterialRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateBillOfMaterialRequest>, UpdateBillOfMaterialRequestValidator>();
 builder.Services.AddScoped<IValidator<ProduceAssemblyRequest>, ProduceAssemblyRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateChequeRequest>, CreateChequeRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateChequeStatusRequest>, UpdateChequeStatusRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateAllocationsRequest>, UpdateAllocationsRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateDailyClosureRequest>, CreateDailyClosureRequestValidator>();
+builder.Services.AddScoped<IValidator<ReconcileDailyClosureRequest>, ReconcileDailyClosureRequestValidator>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>

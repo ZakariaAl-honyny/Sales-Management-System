@@ -10,8 +10,35 @@ public class DailyClosure : BaseEntity
     public decimal OpeningBalance { get; private set; }
     public decimal TotalIncome { get; private set; }
     public decimal TotalExpense { get; private set; }
-    public decimal ClosingBalance { get; private set; }
+
+    /// <summary>
+    /// Computed: OpeningBalance + TotalIncome - TotalExpense.
+    /// Represents the balance that should be in the cash box at closing.
+    /// </summary>
+    public decimal ExpectedClosingBalance { get; private set; }
+
+    /// <summary>
+    /// The actual physical cash count entered by the user during reconciliation.
+    /// </summary>
+    public decimal ActualCashCount { get; private set; }
+
+    /// <summary>
+    /// Computed: ActualCashCount - ExpectedClosingBalance.
+    /// Zero when the actual count matches the expected balance.
+    /// </summary>
+    public decimal Difference { get; private set; }
+
+    /// <summary>
+    /// Whether the closure has been reconciled by comparing actual count with expected balance.
+    /// </summary>
+    public bool IsReconciled { get; private set; }
+
+    /// <summary>
+    /// The ID of the user who performed the closure.
+    /// </summary>
     public int ClosedByUserId { get; private set; }
+
+    public string? Notes { get; private set; }
 
     public CashBox CashBox { get; private set; } = null!;
 
@@ -23,8 +50,8 @@ public class DailyClosure : BaseEntity
         decimal openingBalance,
         decimal totalIncome,
         decimal totalExpense,
-        decimal closingBalance,
-        int closedByUserId)
+        int closedByUserId,
+        int? createdByUserId = null)
     {
         if (cashBoxId <= 0)
             throw new DomainException("معرف الصندوق غير صالح");
@@ -38,10 +65,7 @@ public class DailyClosure : BaseEntity
         if (closedByUserId <= 0)
             throw new DomainException("معرف المستخدم الذي أغلق الصندوق غير صالح");
 
-        var computedClosing = openingBalance + totalIncome - totalExpense;
-        if (computedClosing != closingBalance)
-            throw new DomainException(
-                "المبالغ غير متطابقة: الرصيد الختامي لا يساوي الرصيد الافتتاحي + الإيرادات - المصروفات");
+        var expectedClosingBalance = openingBalance + totalIncome - totalExpense;
 
         var entity = new DailyClosure
         {
@@ -50,11 +74,37 @@ public class DailyClosure : BaseEntity
             OpeningBalance = openingBalance,
             TotalIncome = totalIncome,
             TotalExpense = totalExpense,
-            ClosingBalance = closingBalance,
+            ExpectedClosingBalance = expectedClosingBalance,
+            ActualCashCount = 0,
+            Difference = 0,
+            IsReconciled = false,
             ClosedByUserId = closedByUserId,
+            Notes = null,
             IsActive = true
         };
-        entity.SetCreatedBy(closedByUserId);
+        entity.SetCreatedBy(createdByUserId ?? closedByUserId);
         return entity;
+    }
+
+    /// <summary>
+    /// Reconciles the closure by recording the actual cash count.
+    /// Sets IsReconciled = true and computes the Difference.
+    /// </summary>
+    public void Reconcile(decimal actualCashCount, string? notes = null)
+    {
+        if (actualCashCount < 0)
+            throw new DomainException("العدد الفعلي للنقدية لا يمكن أن يكون سالباً");
+
+        if (IsReconciled)
+            throw new DomainException("تمت تسوية هذه الجردية بالفعل");
+
+        ActualCashCount = actualCashCount;
+        Difference = actualCashCount - ExpectedClosingBalance;
+        IsReconciled = true;
+
+        if (notes != null)
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+
+        UpdateTimestamp();
     }
 }

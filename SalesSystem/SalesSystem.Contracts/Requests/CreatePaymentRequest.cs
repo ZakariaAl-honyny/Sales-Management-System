@@ -5,7 +5,7 @@ namespace SalesSystem.Contracts.Requests;
 public record CreateCustomerPaymentRequest(
     int CustomerId,
     decimal Amount,
-    PaymentType PaymentMethod,
+    PaymentMethod PaymentMethod,
     DateTime? PaymentDate,
     int? SalesInvoiceId = null,
     string? Notes = null
@@ -14,7 +14,7 @@ public record CreateCustomerPaymentRequest(
 public record CreateSupplierPaymentRequest(
     int SupplierId,
     decimal Amount,
-    PaymentType PaymentMethod,
+    PaymentMethod PaymentMethod,
     DateTime? PaymentDate,
     int? PurchaseInvoiceId = null,
     string? Notes = null
