@@ -77,6 +77,12 @@ public class PurchaseReturnConfiguration : IEntityTypeConfiguration<PurchaseRetu
         builder.Property(pr => pr.Notes).HasColumnName("Reason").HasMaxLength(250);
         builder.Property(pr => pr.Status).HasConversion<byte>();
 
+        // Phase 27 — Additional purchase return properties
+        builder.Property(pr => pr.LinkToInvoice).HasDefaultValue(true);
+        builder.Property(pr => pr.DiscountAmount).HasPrecision(18, 2).HasDefaultValue(0);
+        builder.Property(pr => pr.DiscountType).HasConversion<byte?>().IsRequired(false);
+        builder.Property(pr => pr.DiscountRate).HasPrecision(18, 2).IsRequired(false);
+
         builder.HasOne(pr => pr.Supplier)
             .WithMany()
             .HasForeignKey(pr => pr.SupplierId)
@@ -115,9 +121,18 @@ public class PurchaseReturnItemConfiguration : IEntityTypeConfiguration<Purchase
         builder.Property(pri => pri.LineTotal).HasPrecision(18, 2);
         builder.Ignore(pri => pri.Notes); // DB Schema doesn't have Notes for return items
 
+        // Phase 27 — Additional purchase return item properties
+        builder.Property(pri => pri.ProductUnitId).IsRequired();
+        builder.Property(pri => pri.CostInBaseCurrency).HasPrecision(18, 2).IsRequired(false);
+
         builder.HasOne(pri => pri.Product)
             .WithMany()
             .HasForeignKey(pri => pri.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(pri => pri.ProductUnit)
+            .WithMany()
+            .HasForeignKey(pri => pri.ProductUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasQueryFilter(pri => pri.IsActive);

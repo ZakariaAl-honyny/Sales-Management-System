@@ -86,6 +86,7 @@ public class MainViewModel : ViewModelBase
 
         // Purchases section
         NavigateToPurchasesCommand = new RelayCommand(() => NavigateTo<PurchaseInvoiceListViewModel>());
+        NavigateToPurchaseOrdersCommand = new RelayCommand(() => NavigateTo<PurchaseOrderListViewModel>());
         NavigateToPurchaseReturnsCommand = new RelayCommand(() => NavigateTo<PurchaseReturnListViewModel>());
 
         // Finance section
@@ -204,6 +205,9 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى فواتير المشتريات</summary>
     public ICommand NavigateToPurchasesCommand { get; }
+
+    /// <summary>نقل إلى أوامر الشراء — عرض وإدارة أوامر التوريد للموردين</summary>
+    public ICommand NavigateToPurchaseOrdersCommand { get; }
 
     /// <summary>نقل إلى مرتجعات المشتريات</summary>
     public ICommand NavigateToPurchaseReturnsCommand { get; }
@@ -405,6 +409,7 @@ public class MainViewModel : ViewModelBase
         return tag switch
         {
             "Purchases"        => _sessionService.CanAccess(Permission.PurchaseInvoice),
+            "PurchaseOrders"   => _sessionService.CanAccess(Permission.PurchaseInvoice),
             "PurchaseReturns"  => _sessionService.CanAccess(Permission.PurchaseReturn),
             "Products"         => _sessionService.CanAccess(Permission.ProductManagement),
             "Suppliers"        => _sessionService.CanAccess(Permission.SupplierManagement),
@@ -448,6 +453,7 @@ public class MainViewModel : ViewModelBase
             nameof(SalesInvoiceListViewModel)       => "Sales",
             nameof(SalesReturnListViewModel)        => "SalesReturns",
             nameof(PurchaseInvoiceListViewModel)    => "Purchases",
+            nameof(PurchaseOrderListViewModel)      => "PurchaseOrders",
             nameof(PurchaseReturnListViewModel)     => "PurchaseReturns",
             nameof(CustomerPaymentsListViewModel)   => "CustomerPayments",
             nameof(SupplierPaymentsListViewModel)   => "SupplierPayments",

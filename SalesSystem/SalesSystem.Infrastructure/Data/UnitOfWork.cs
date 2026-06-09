@@ -40,7 +40,7 @@ public class UnitOfWork : IUnitOfWork
     private IGenericRepository<StockTransferItem>? _stockTransferItems;
     private IGenericRepository<SalesInvoiceItem>? _salesInvoiceItems;
     private IGenericRepository<PurchaseInvoiceItem>? _purchaseInvoiceItems;
-private IGenericRepository<ProductBarcode>? _productBarcodes;
+    private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<ProductUnit>? _productUnits;
     private IGenericRepository<CashBox>? _cashBoxes;
     private IGenericRepository<CashTransaction>? _cashTransactions;
@@ -66,7 +66,10 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<ProductImage>? _productImages;
     private IGenericRepository<InventoryOperation>? _inventoryOperations;
     private IGenericRepository<InventoryOperationItem>? _inventoryOperationItems;
-    private IGenericRepository<BillOfMaterials>? _billOfMaterials;
+    private IGenericRepository<AdditionalFee>? _additionalFees;
+    private IGenericRepository<AdditionalFeeAllocation>? _additionalFeeAllocations;
+    private IGenericRepository<PurchaseOrder>? _purchaseOrders;
+    private IGenericRepository<PurchaseOrderItem>? _purchaseOrderItems;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -96,7 +99,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     public IGenericRepository<StockTransferItem> StockTransferItems => _stockTransferItems ??= new GenericRepository<StockTransferItem>(_context);
     public IGenericRepository<SalesInvoiceItem> SalesInvoiceItems => _salesInvoiceItems ??= new GenericRepository<SalesInvoiceItem>(_context);
     public IGenericRepository<PurchaseInvoiceItem> PurchaseInvoiceItems => _purchaseInvoiceItems ??= new GenericRepository<PurchaseInvoiceItem>(_context);
-public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??= new GenericRepository<ProductBarcode>(_context);
+    public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??= new GenericRepository<ProductBarcode>(_context);
     public IGenericRepository<ProductUnit> ProductUnits => _productUnits ??= new GenericRepository<ProductUnit>(_context);
     public IGenericRepository<CashBox> CashBoxes => _cashBoxes ??= new GenericRepository<CashBox>(_context);
     public IGenericRepository<CashTransaction> CashTransactions => _cashTransactions ??= new GenericRepository<CashTransaction>(_context);
@@ -122,7 +125,10 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<ProductImage> ProductImages => _productImages ??= new GenericRepository<ProductImage>(_context);
     public IGenericRepository<InventoryOperation> InventoryOperations => _inventoryOperations ??= new GenericRepository<InventoryOperation>(_context);
     public IGenericRepository<InventoryOperationItem> InventoryOperationItems => _inventoryOperationItems ??= new GenericRepository<InventoryOperationItem>(_context);
-    public IGenericRepository<BillOfMaterials> BillOfMaterials => _billOfMaterials ??= new GenericRepository<BillOfMaterials>(_context);
+    public IGenericRepository<AdditionalFee> AdditionalFees => _additionalFees ??= new GenericRepository<AdditionalFee>(_context);
+    public IGenericRepository<AdditionalFeeAllocation> AdditionalFeeAllocations => _additionalFeeAllocations ??= new GenericRepository<AdditionalFeeAllocation>(_context);
+    public IGenericRepository<PurchaseOrder> PurchaseOrders => _purchaseOrders ??= new GenericRepository<PurchaseOrder>(_context);
+    public IGenericRepository<PurchaseOrderItem> PurchaseOrderItems => _purchaseOrderItems ??= new GenericRepository<PurchaseOrderItem>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {

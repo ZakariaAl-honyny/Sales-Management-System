@@ -355,7 +355,7 @@ public class InvoicePrintDtoBuilderTests
     {
         var product = CreateProduct("مادة خام");
         var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, invoiceNo: 1);
-        var item = PurchaseInvoiceItem.Create(productId: 1, quantity: 10, unitCost: 8.50m, discountAmount: 2);
+        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10, unitCost: 8.50m, discountAmount: 2);
         SetNavigation(item, nameof(PurchaseInvoiceItem.Product), product);
         invoice.AddItem(item);
 
@@ -375,7 +375,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromPurchaseAsync_ShouldMapFinancialTotals()
     {
         var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, invoiceNo: 1, discountAmount: 20);
-        var item = PurchaseInvoiceItem.Create(productId: 1, quantity: 100, unitCost: 5);
+        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 100, unitCost: 5);
         invoice.AddItem(item);
         invoice.SetTaxAmount(30);
         invoice.SetPaidAmount(500);
@@ -498,7 +498,7 @@ public class InvoicePrintDtoBuilderTests
     {
         var product = CreateProduct("مادة مرتجعة");
         var returnEntity = PurchaseReturn.Create("PR-001", warehouseId: 1, supplierId: 1);
-        returnEntity.AddItem(productId: 1, quantity: 5, unitCost: 12, discountAmount: 3);
+        returnEntity.AddItem(productId: 1, quantity: 5, unitCost: 12, productUnitId: 1, discountAmount: 3);
         SetNavigation(returnEntity.Items[0], nameof(PurchaseReturnItem.Product), product);
 
         var result = await _sut.BuildFromPurchaseReturnAsync(
@@ -517,7 +517,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromPurchaseReturnAsync_ShouldHaveFixedFinancials()
     {
         var returnEntity = PurchaseReturn.Create("PR-001", warehouseId: 1, supplierId: 1);
-        returnEntity.AddItem(productId: 1, quantity: 1, unitCost: 50);
+        returnEntity.AddItem(productId: 1, quantity: 1, unitCost: 50, productUnitId: 1);
 
         var result = await _sut.BuildFromPurchaseReturnAsync(
             returnEntity, StoreName, StorePhone, StoreAddress, StoreTaxNumber, LogoBytes, TaxRate);

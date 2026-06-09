@@ -625,10 +625,16 @@ public class CreatePurchaseInvoiceValidatorTests
         PaymentType: PaymentType.Cash,
         CashBoxId: 1,
         DiscountAmount: 0,
+        DiscountType: null,
+        DiscountRate: null,
         TaxAmount: 0,
         PaidAmount: 100m,
+        CurrencyId: null,
+        ExchangeRate: null,
         Notes: "Test purchase invoice",
         SupplierInvoiceNo: null,
+        AttachmentBase64: null,
+        AttachmentFileName: null,
         Items: new List<CreatePurchaseInvoiceItemRequest>
         {
             CreateValidItem()
@@ -637,14 +643,18 @@ public class CreatePurchaseInvoiceValidatorTests
 
     private static CreatePurchaseInvoiceItemRequest CreateValidItem(
         int productId = 1,
+        int productUnitId = 1,
         decimal quantity = 1,
         decimal unitCost = 100m,
         decimal discountAmount = 0
     ) => new(
         ProductId: productId,
+        ProductUnitId: productUnitId,
         Quantity: quantity,
         UnitCost: unitCost,
         DiscountAmount: discountAmount,
+        DiscountType: null,
+        DiscountRate: null,
         Mode: SaleMode.Retail,
         Notes: null
     );

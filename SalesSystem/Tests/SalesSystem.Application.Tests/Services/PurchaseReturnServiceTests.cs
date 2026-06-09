@@ -124,10 +124,15 @@ public class PurchaseReturnServiceTests : IDisposable
             SupplierId: 1,
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
+            CurrencyId: null,
+            ExchangeRate: null,
+            DiscountAmount: 0,
+            DiscountType: null,
+            DiscountRate: null,
             Notes: "Return for defective item",
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 2m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 2m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
             }
         );
 
@@ -172,10 +177,15 @@ public class PurchaseReturnServiceTests : IDisposable
             SupplierId: 1,
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
+            CurrencyId: null,
+            ExchangeRate: null,
+            DiscountAmount: 0,
+            DiscountType: null,
+            DiscountRate: null,
             Notes: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 5m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 5m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
             }
         );
 
@@ -212,7 +222,7 @@ public class PurchaseReturnServiceTests : IDisposable
             discountAmount: 0m,
             notes: null
         );
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, quantity: 5m, unitCost: 50m));
+        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 5m, unitCost: 50m));
         invoice.SetPaidAmount(250m);
         invoice.Post();
         _dbContext.PurchaseInvoices.Add(invoice);
@@ -223,10 +233,15 @@ public class PurchaseReturnServiceTests : IDisposable
             SupplierId: 1,
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
+            CurrencyId: null,
+            ExchangeRate: null,
+            DiscountAmount: 0,
+            DiscountType: null,
+            DiscountRate: null,
             Notes: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 10m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null) // Exceeds original
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 10m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null) // Exceeds original
             }
         );
 
@@ -254,10 +269,15 @@ public class PurchaseReturnServiceTests : IDisposable
             SupplierId: 1,
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
+            CurrencyId: null,
+            ExchangeRate: null,
+            DiscountAmount: 0,
+            DiscountType: null,
+            DiscountRate: null,
             Notes: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 1m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 1m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
             }
         );
 
@@ -295,10 +315,15 @@ public class PurchaseReturnServiceTests : IDisposable
             SupplierId: 1,
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
+            CurrencyId: null,
+            ExchangeRate: null,
+            DiscountAmount: 0,
+            DiscountType: null,
+            DiscountRate: null,
             Notes: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
-                new(ProductId: 1, Quantity: 10m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 10m, UnitPrice: 50m, DiscountAmount: 0m, Notes: null)
             }
         );
 
@@ -336,7 +361,7 @@ public class PurchaseReturnServiceTests : IDisposable
             notes: "Test return",
             userId: 1
         );
-        returnEntity.AddItem(productId: 1, quantity: 1m, unitCost: 50m, discountAmount: 0m, notes: null);
+        returnEntity.AddItem(productId: 1, quantity: 1m, unitCost: 50m, productUnitId: 1, discountAmount: 0m, notes: null);
         _dbContext.PurchaseReturns.Add(returnEntity);
         await _dbContext.SaveChangesAsync();
 

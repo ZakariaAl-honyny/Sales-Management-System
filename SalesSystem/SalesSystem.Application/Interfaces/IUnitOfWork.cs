@@ -54,7 +54,10 @@ public interface IUnitOfWork
     IGenericRepository<ProductImage> ProductImages { get; }
     IGenericRepository<InventoryOperation> InventoryOperations { get; }
     IGenericRepository<InventoryOperationItem> InventoryOperationItems { get; }
-    IGenericRepository<BillOfMaterials> BillOfMaterials { get; }
+    IGenericRepository<AdditionalFee> AdditionalFees { get; }
+    IGenericRepository<AdditionalFeeAllocation> AdditionalFeeAllocations { get; }
+    IGenericRepository<PurchaseOrder> PurchaseOrders { get; }
+    IGenericRepository<PurchaseOrderItem> PurchaseOrderItems { get; }
     IAuditLogRepository AuditLogs { get; }
     IGenericRepository<UserSession> UserSessions { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);

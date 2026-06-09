@@ -484,6 +484,7 @@ public class AccountingIntegrationServiceTests : IDisposable
             paymentType: PaymentType.Cash);
         invoice.AddItem(PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 20m,
             unitCost: 50m)); // LineTotal = 1000
         invoice.RecalculateTotals();
@@ -541,6 +542,7 @@ public class AccountingIntegrationServiceTests : IDisposable
             paymentType: PaymentType.Cash);
         invoice.AddItem(PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitCost: 100m)); // LineTotal = 1000
         invoice.RecalculateTotals();
@@ -805,6 +807,7 @@ public class AccountingIntegrationServiceTests : IDisposable
             discountAmount: 200m);
         invoice.AddItem(PurchaseInvoiceItem.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 50m,
             unitCost: 20m)); // LineTotal = 1000
         invoice.RecalculateTotals();

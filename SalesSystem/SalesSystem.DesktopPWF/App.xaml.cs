@@ -239,6 +239,20 @@ public partial class App : System.Windows.Application
         // Health check
         services.AddSingleton<IDatabaseHealthCheckService, DatabaseHealthCheckService>();
 
+        // Purchase Order API Service
+        services.AddHttpClient<IPurchaseOrderApiService, PurchaseOrderApiService>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+
+        // Additional Fee API Service
+        services.AddHttpClient<IAdditionalFeeApiService, AdditionalFeeApiService>(client =>
+        {
+            client.BaseAddress = new Uri(apiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+
         // Financial Reports API
         services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
 
@@ -251,6 +265,8 @@ public partial class App : System.Windows.Application
         services.AddTransient<TouchPosViewModel>();
         services.AddTransient<PurchaseInvoiceListViewModel>();
         services.AddTransient<PurchaseInvoiceEditorViewModel>();
+        services.AddTransient<PurchaseOrderListViewModel>();
+        services.AddTransient<PurchaseOrderEditorViewModel>();
         services.AddTransient<ProductListViewModel>();
         services.AddTransient<ProductEditorViewModel>();
         services.AddTransient<ProductPricesListViewModel>();

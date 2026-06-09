@@ -470,7 +470,14 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
-            Items: new List<PurchaseInvoiceItemDto>());
+            CostInBaseCurrency: null,
+            AdditionalFeesTotal: 0,
+            AttachmentPath: null,
+            DiscountType: null,
+            DiscountRate: null,
+            CurrencyName: null,
+            Items: new List<PurchaseInvoiceItemDto>(),
+            AdditionalFees: new List<AdditionalFeeDto>());
     }
 
     #endregion
