@@ -111,25 +111,10 @@ public class CurrencyService : ICurrencyService
                 request.Symbol,
                 request.ExchangeRateToBase,
                 request.IsBaseCurrency,
-                request.FractionName);
+                request.FractionName,
+                decimalPlaces: request.DecimalPlaces);
 
             currency.SetCreatedBy(userId);
-
-            // If setting as base currency, unset any existing base currency
-            if (request.IsBaseCurrency)
-            {
-                var existingBase = await _uow.Currencies.FirstOrDefaultAsync(c => c.IsBaseCurrency && c.IsActive, ct);
-                if (existingBase != null)
-                {
-                    // Use Update to reflect that it's no longer base
-                    existingBase.Update(
-                        existingBase.Name,
-                        existingBase.Symbol,
-                        existingBase.ExchangeRateToBase,
-                        false,
-                        existingBase.FractionName);
-                }
-            }
 
             await _uow.Currencies.AddAsync(currency, ct);
             await _uow.SaveChangesAsync(ct);
@@ -159,29 +144,13 @@ public class CurrencyService : ICurrencyService
             // Track if exchange rate changed for history
             var rateChanged = currency.ExchangeRateToBase != request.ExchangeRateToBase;
 
-            // If setting as base currency, unset existing base currency
-            if (request.IsBaseCurrency && !currency.IsBaseCurrency)
-            {
-                var existingBase = await _uow.Currencies.FirstOrDefaultAsync(
-                    c => c.IsBaseCurrency && c.IsActive && c.Id != id, ct);
-                if (existingBase != null)
-                {
-                    existingBase.Update(
-                        existingBase.Name,
-                        existingBase.Symbol,
-                        existingBase.ExchangeRateToBase,
-                        false,
-                        existingBase.FractionName);
-                }
-            }
-
             var oldRate = currency.ExchangeRateToBase;
             currency.Update(
                 request.Name,
                 request.Symbol,
                 request.ExchangeRateToBase,
-                request.IsBaseCurrency,
-                request.FractionName);
+                request.FractionName,
+                decimalPlaces: request.DecimalPlaces);
             currency.SetUpdatedBy(userId);
 
             // Record exchange rate change history
@@ -338,6 +307,7 @@ public class CurrencyService : ICurrencyService
         c.ExchangeRateToBase,
         c.IsBaseCurrency,
         c.FractionName,
+        c.DecimalPlaces,
         c.IsSystem,
         c.IsActive
     );

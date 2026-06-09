@@ -279,9 +279,8 @@ public class CurrenciesListViewModel : ViewModelBase, IDisposable
             currency.Name,
             currency.Symbol,
             currency.ExchangeRateToBase,
-            currency.IsBaseCurrency,
-            currency.FractionName
-        );
+            currency.FractionName,
+            currency.DecimalPlaces);
 
         var result = await _currencyService.UpdateAsync(currency.Id, request);
 

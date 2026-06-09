@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SalesSystem.Api.Middleware;
+using SalesSystem.Api.Validators.Reports;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
@@ -153,6 +154,12 @@ builder.Services.AddScoped<IStoreSettingsService, StoreSettingsService>();
 builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFinancialReportService, FinancialReportService>();
+builder.Services.AddScoped<ISalesReportService, SalesReportService>();
+builder.Services.AddScoped<IPurchaseReportService, PurchaseReportService>();
+builder.Services.AddScoped<ICashBoxReportService, CashBoxReportService>();
+builder.Services.AddScoped<IUserReportService, UserReportService>();
+// ReportExportService is in Infrastructure (uses QuestPDF + ClosedXML)
+builder.Services.AddScoped<IReportExportService, SalesSystem.Infrastructure.Services.ReportExportService>();
 builder.Services.AddScoped<ISystemSettingsRepository, SystemSettingsRepository>();
 builder.Services.AddScoped<IUpdateProductPricingService, UpdateProductPricingService>();
 builder.Services.AddScoped<IProductUnitService, ProductUnitService>();
@@ -303,6 +310,7 @@ builder.Services.AddScoped<IValidator<UpdateAllocationsRequest>, UpdateAllocatio
 builder.Services.AddScoped<IValidator<CreateDailyClosureRequest>, CreateDailyClosureRequestValidator>();
 builder.Services.AddScoped<IValidator<ReconcileDailyClosureRequest>, ReconcileDailyClosureRequestValidator>();
 builder.Services.AddScoped<IValidator<CreateFiscalYearRequest>, CreateFiscalYearRequestValidator>();
+builder.Services.AddScoped<IValidator<ReportDateRangeRequest>, ReportDateRangeValidator>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>

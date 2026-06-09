@@ -80,12 +80,22 @@
                     <TextBlock Text="أدخل سعر الصرف — مثال: 550 يعني أن 1 دولار = 550 ريال يمني (العملة الأساسية)"
                                Style="{StaticResource HelperTextStyle}"/>
 
-                    <!-- IsBaseCurrency -->
-                    <CheckBox Content="عملة أساسية"
-                              IsChecked="{Binding IsBaseCurrency}"
-                              Margin="0,12,0,0"
-                              TabIndex="5"
-                              ToolTip="تعيين كعملة أساسية للنظام — عملة أساسية واحدة فقط يمكن أن تكون نشطة في نفس الوقت"/>
+                    <!-- Base Currency Indicator (Read-Only) -->
+                    <Border Margin="0,12,0,0"
+                            Padding="12,8"
+                            Background="#E8F5E9"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="#C8E6C9"
+                            Visibility="{Binding IsBaseCurrency, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⭐" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="عملة أساسية — هذه العملة هي العملة الأساسية للنظام ولا يمكن تغييرها"
+                                       FontSize="12"
+                                       Foreground="#2E7D32"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Fraction Name -->
                     <TextBlock Text="اسم الجزء" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
@@ -95,6 +105,16 @@
                              TabIndex="6"
                              ToolTip="أدخل اسم الجزء من العملة — اختياري (مثال: فلس, سنت, قرش)"/>
                     <TextBlock Text="اسم الجزء الصغير من العملة — اختياري (مثال: فلس, سنت)"
+                               Style="{StaticResource HelperTextStyle}"/>
+
+                    <!-- Decimal Places -->
+                    <TextBlock Text="عدد المنازل العشرية *" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
+                    <TextBox Text="{Binding DecimalPlaces, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                             Style="{StaticResource ModernTextBox}"
+                             Width="120"
+                             TabIndex="5"
+                             ToolTip="أدخل عدد المنازل العشرية للعملة — مثال: 2 للدولار (0.01), 3 للدينار (0.001)"/>
+                    <TextBlock Text="عدد المنازل العشرية — مثال: 2 للدولار, 3 للدينار الكويتي"
                                Style="{StaticResource HelperTextStyle}"/>
 
                     <Border Margin="0,16,0,0" Padding="16" Background="#F8FAFC" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0">
@@ -109,27 +129,6 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Rate History (if editing) -->
-                    <Border Margin="0,16,0,0" Padding="0" CornerRadius="8" BorderThickness="1" BorderBrush="#E2E8F0"
-                            Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
-                        <StackPanel>
-                            <Border Padding="12,8" Background="#F8FAFC" CornerRadius="8,8,0,0" BorderThickness="0,0,0,1" BorderBrush="#E2E8F0">
-                                <TextBlock Text="سجل تغييرات سعر الصرف" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            </Border>
-                            <DataGrid ItemsSource="{Binding RateHistory}"
-                                      Style="{StaticResource ModernDataGrid}"
-                                      IsReadOnly="True"
-                                      MaxHeight="200"
-                                      Margin="8">
-                                <DataGrid.Columns>
-<DataGridTextColumn Header="السعر القديم" Binding="{Binding OldRate, StringFormat='{}{0:N6}'}" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-<DataGridTextColumn Header="السعر الجديد" Binding="{Binding NewRate, StringFormat='{}{0:N6}'}" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                                    <DataGridTextColumn Header="التاريخ" Binding="{Binding EffectiveDate, StringFormat='{}{0:yyyy-MM-dd}'}" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                                    <DataGridTextColumn Header="ملاحظات" Binding="{Binding Notes}" Width="*" CellStyle="{StaticResource DataGridCellStyle}"/>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </StackPanel>
-                    </Border>
                 </StackPanel>
             </Border>
         </ScrollViewer>

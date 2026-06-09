@@ -20,10 +20,7 @@ public class ProductPrice : BaseEntity
     /// </summary>
     public int CurrencyId { get; private set; }
 
-    /// <summary>
-    /// The pricing tier (Retail, Wholesale, VIP, Distributor).
-    /// </summary>
-    public PriceLevel PriceLevel { get; private set; }
+
 
     /// <summary>
     /// The actual price amount. Stored as decimal(18,2).
@@ -56,7 +53,6 @@ public class ProductPrice : BaseEntity
     public static ProductPrice Create(
         int productUnitId,
         int currencyId,
-        PriceLevel priceLevel,
         decimal price,
         DateTime effectiveFrom,
         DateTime? effectiveTo = null,
@@ -77,7 +73,6 @@ public class ProductPrice : BaseEntity
         {
             ProductUnitId = productUnitId,
             CurrencyId = currencyId,
-            PriceLevel = priceLevel,
             Price = Math.Round(price, 2),
             EffectiveFrom = effectiveFrom,
             EffectiveTo = effectiveTo,
@@ -89,12 +84,8 @@ public class ProductPrice : BaseEntity
 
     // ─── Domain Methods ───────────────────────────
 
-    /// <summary>
-    /// Updates the price amount, price level, effective from date, and optionally extends the effective date range.
-    /// </summary>
     public void UpdatePrice(
         decimal newPrice,
-        PriceLevel priceLevel,
         DateTime? effectiveFrom = null,
         DateTime? effectiveTo = null,
         int? updatedByUserId = null)
@@ -109,7 +100,6 @@ public class ProductPrice : BaseEntity
             throw new DomainException("تاريخ انتهاء السعر يجب أن يكون بعد تاريخ البداية.");
 
         Price = Math.Round(newPrice, 2);
-        PriceLevel = priceLevel;
         if (effectiveFrom.HasValue)
             EffectiveFrom = effectiveFrom.Value;
         if (effectiveTo.HasValue)

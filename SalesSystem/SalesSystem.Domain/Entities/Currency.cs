@@ -11,6 +11,7 @@ public class Currency : BaseEntity
     public decimal ExchangeRateToBase { get; private set; }
     public bool IsBaseCurrency { get; private set; }
     public string? FractionName { get; private set; }
+    public int DecimalPlaces { get; private set; }
     public bool IsSystem { get; private set; }
 
     private Currency() { }
@@ -22,6 +23,7 @@ public class Currency : BaseEntity
         decimal exchangeRateToBase,
         bool isBaseCurrency = false,
         string? fractionName = null,
+        int decimalPlaces = 2,
         bool isSystem = false)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -40,6 +42,8 @@ public class Currency : BaseEntity
             throw new DomainException("سعر الصرف يجب أن يكون أكبر من صفر.");
         if (fractionName != null && fractionName.Length > 20)
             throw new DomainException("اسم الجزء الكسري لا يمكن أن يتجاوز 20 حرفاً.");
+        if (decimalPlaces < 0 || decimalPlaces > 4)
+            throw new DomainException("عدد المنازل العشرية يجب أن يكون بين 0 و 4.");
 
         return new Currency
         {
@@ -49,6 +53,7 @@ public class Currency : BaseEntity
             ExchangeRateToBase = exchangeRateToBase,
             IsBaseCurrency = isBaseCurrency,
             FractionName = fractionName?.Trim(),
+            DecimalPlaces = decimalPlaces,
             IsSystem = isSystem,
             IsActive = true
         };
@@ -58,8 +63,8 @@ public class Currency : BaseEntity
         string name,
         string symbol,
         decimal exchangeRateToBase,
-        bool isBaseCurrency,
-        string? fractionName = null)
+        string? fractionName = null,
+        int decimalPlaces = 2)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم العملة مطلوب.");
@@ -73,26 +78,18 @@ public class Currency : BaseEntity
             throw new DomainException("سعر الصرف يجب أن يكون أكبر من صفر.");
         if (fractionName != null && fractionName.Length > 20)
             throw new DomainException("اسم الجزء الكسري لا يمكن أن يتجاوز 20 حرفاً.");
+        if (decimalPlaces < 0 || decimalPlaces > 4)
+            throw new DomainException("عدد المنازل العشرية يجب أن يكون بين 0 و 4.");
 
         Name = name.Trim();
         Symbol = symbol.Trim();
         ExchangeRateToBase = exchangeRateToBase;
-        IsBaseCurrency = isBaseCurrency;
         FractionName = fractionName?.Trim();
+        DecimalPlaces = decimalPlaces;
         UpdateTimestamp();
     }
 
-    public void SetAsBaseCurrency()
-    {
-        IsBaseCurrency = true;
-        UpdateTimestamp();
-    }
 
-    public void UnsetBaseCurrency()
-    {
-        IsBaseCurrency = false;
-        UpdateTimestamp();
-    }
 
     public void UpdateExchangeRate(decimal newRate)
     {

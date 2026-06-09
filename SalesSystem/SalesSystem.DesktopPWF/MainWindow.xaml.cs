@@ -209,6 +209,50 @@ public partial class MainWindow : Window
                 case "ExpiredProducts":
                     _mainViewModel.NavigateTo<ExpiredProductsReportViewModel>();
                     break;
+                // Phase 31 — Financial Reports
+                case "BalanceSheet":
+                    _mainViewModel.NavigateTo<BalanceSheetViewModel>();
+                    break;
+                case "TrialBalance":
+                    _mainViewModel.NavigateTo<TrialBalanceViewModel>();
+                    break;
+                case "GeneralLedger":
+                    _mainViewModel.NavigateTo<GeneralLedgerViewModel>();
+                    break;
+                // Phase 31 — Sales Reports
+                case "SalesByCustomer":
+                    _mainViewModel.NavigateTo<SalesByCustomerViewModel>();
+                    break;
+                case "SalesByProduct":
+                    _mainViewModel.NavigateTo<SalesByProductViewModel>();
+                    break;
+                case "SalesByCategory":
+                    _mainViewModel.NavigateTo<SalesByCategoryViewModel>();
+                    break;
+                case "DailySales":
+                    _mainViewModel.NavigateTo<DailySalesViewModel>();
+                    break;
+                // Phase 31 — Purchase Reports
+                case "PurchasesBySupplier":
+                    _mainViewModel.NavigateTo<PurchasesBySupplierViewModel>();
+                    break;
+                case "PurchasesByProduct":
+                    _mainViewModel.NavigateTo<PurchasesByProductViewModel>();
+                    break;
+                // Phase 31 — Cash Box Reports
+                case "CashBoxSummary":
+                    _mainViewModel.NavigateTo<CashBoxSummaryViewModel>();
+                    break;
+                case "DailyClosure":
+                    _mainViewModel.NavigateTo<DailyClosureReportViewModel>();
+                    break;
+                // Phase 31 — Activity Reports
+                case "UserActivity":
+                    _mainViewModel.NavigateTo<UserActivityViewModel>();
+                    break;
+                case "LoginHistory":
+                    _mainViewModel.NavigateTo<LoginHistoryViewModel>();
+                    break;
                 default:
                     _mainViewModel.NavigateTo<ReportsViewModel>();
                     break;

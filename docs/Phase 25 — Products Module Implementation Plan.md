@@ -1,7 +1,7 @@
 # Phase 25 — Products Module: Comprehensive Enhancement & Implementation Plan
 
 > **Version**: 1.0 — Full rewrite based on Analysis Parts 1–5, Global Analysis, and codebase audit
-> **Scope**: Complete Products module overhaul — Pricing per currency, Multiple price levels, FIFO batch tracking, Assembly/BOM, Product images, Min stock alerts, Enhanced barcode management, Default seeds
+> **Scope**: Complete Products module overhaul — Pricing per unit and currency (no retail/wholesale levels), FIFO batch tracking, Assembly/BOM, Product images, Min stock alerts, Enhanced barcode management, Default seeds
 
 ---
 
@@ -29,8 +29,8 @@ Based on full codebase audit + user requirements from Analysis Parts 1–5, the 
 |---|------------|--------------|--------------|
 | 🏗️ | **Products CRUD** | Create, edit, list, search, soft-delete products | Categories, Units |
 | 📐 | **Units (UOM)** | Multi-unit with conversion factors, base unit enforcement | Products |
-| 💰 | **Pricing** | Per-unit + per-currency pricing with history | Units, Currencies (Phase 20) |
-| 🏷️ | **Barcodes** | Per-unit barcodes, auto-generation, scanning | Units |
+| 💰 | **Pricing** | Per-unit + per-currency pricing with history (no retail/wholesale) | Units, Currencies (Phase 20) |
+| 🏷️ | **Barcodes** | One barcode per product (stored on Product entity) | (none) |
 | 📦 | **Batches/FIFO** | Purchase lots, FIFO/FEFO allocation, costing | Products, Purchases |
 | 🗂️ | **Categories** | Product grouping, default "عام" seed | (standalone) |
 | 📜 | **Price History** | Audit trail for all cost/price changes | ProductUnits |
@@ -63,7 +63,7 @@ SaleInvoice    → Deduct from PurchaseLots (FIFO/FEFO) → Update WarehouseStoc
 |-------|------|--------|-----------------|
 | `Id` | `int PK` | ✅ | Keep |
 | `Name` | `string(150)` | ✅ | Keep |
-| `Barcode` | `string(50)?` | ✅ | **DEPRECATE** — move to UnitBarcode |
+| `Barcode` | `string(50)?` | ❌ Missing | **ADD** — one barcode per product |
 | `CategoryId` | `int?` FK | ✅ | Keep |
 | `UnitId` (Legacy) | `int?` FK | ⚠️ Legacy | **DEPRECATE** — remove |
 | `WholesaleUnitId` (Legacy) | `int?` FK | ⚠️ Legacy | **DEPRECATE** — remove |
@@ -121,27 +121,21 @@ SaleInvoice    → Deduct from PurchaseLots (FIFO/FEFO) → Update WarehouseStoc
 - `CalculateCostFromBaseUnitCost()` — keep
 - `ToBaseUnitQuantity()` — keep
 
-### 2.3 UnitBarcode Entity ✅ (Exists)
+### 2.3 UnitBarcode Entity ⚠️ (Deferred)
 
 **File**: `Domain/Entities/UnitBarcode.cs`
 
-| Field | Type | Status |
-|-------|------|--------|
-| `Id` | `int PK` | ✅ |
-| `ProductUnitId` | `int FK` | ✅ |
-| `BarcodeValue` | `string(50)` | ✅ |
-| `IsDefault` | `bool` | ✅ |
-| `SupplierCode` | `string(50)?` | ✅ |
+Per Analysis Part 3 final revisions: separate unit barcodes are NOT supported in V1. The barcode belongs to the **product** and there is only ONE main barcode per product.
 
-**Note**: This is the correct structure per analysis. The `ProductBarcode` entity (per-product barcode) is legacy and should be deprecated.
+**Decision**: **DEFER** — hide from UI, do not use in V1.
 
 ### 2.4 ProductBarcode Entity ⚠️ (Legacy — Deprecate)
 
 **File**: `Domain/Entities/ProductBarcode.cs` (36 lines)
 
-Per Analysis Part 3: barcode must follow the **unit**, not the product. This entity is redundant with `UnitBarcode`.
+Per Analysis: one barcode per product, so a separate table `ProductBarcode` is redundant.
 
-**Decision**: **DEPRECATE** — hide from UI, keep in DB for backwards compat. All new barcode creation goes through `UnitBarcode`.
+**Decision**: **DEPRECATE** — hide from UI, keep in DB for backwards compat. Add `Barcode` string directly to `Product` entity.
 
 ### 2.5 Category Entity ✅ (Exists — needs seed)
 
@@ -218,7 +212,6 @@ Per Analysis Part 3: barcode must follow the **unit**, not the product. This ent
 | `BillOfMaterialsItem` entity | ❌ NOT EXIST — must create |
 | `ProductImage` entity + config | ❌ NOT EXIST — must create |
 | `ProductUnitPrice` entity + config | ❌ NOT EXIST — must create (pricing per currency) |
-| `PriceLevel` enum (VIP, Distributor) | ❌ NOT EXIST — must create |
 | `IFifoAllocationService` + implementation | ❌ NOT EXIST — must create |
 | `IMinStockAlertService` | ❌ NOT EXIST — must create |
 | `IProductImageService` | ❌ NOT EXIST — must create |
@@ -268,12 +261,12 @@ Sale → Deduct from PurchaseLots (earliest lot first)
 - Add `EnableFefo` SystemSetting (already planned in Phase 19)
 - Update `UpdateProductPricingService` to handle FIFO method
 
-### 3.2 Blocker 2: Pricing Model — Per-Unit + Per-Currency + Price Levels
+### 3.2 Blocker 2: Pricing Model — Per-Unit + Per-Currency Only
 
-**Problem**: Current pricing stores `SalesPrice` and `WholesalePrice` directly on `ProductUnit`. Analysis requires:
-1. Price = f(ProductUnit, Currency) — per-currency pricing
-2. Multiple price levels: Retail, Wholesale, VIP, Distributor
-3. Price history per change
+**Problem**: Current pricing stores `SalesPrice` and `WholesalePrice` directly on `ProductUnit`. Analysis requires a simplified but more powerful model:
+1. Price = f(ProductUnit, Currency) — per-currency pricing per unit.
+2. NO MORE Retail/Wholesale/VIP price levels. The unit itself determines the price (e.g., Piece price, Carton price).
+3. Price history per change.
 
 **Current**:
 ```csharp
@@ -289,8 +282,9 @@ public class ProductUnitPrice : BaseEntity
 {
     public int ProductUnitId { get; private set; }
     public int CurrencyId { get; private set; }
-    public PriceLevel PriceLevel { get; private set; } // Retail=1, Wholesale=2, VIP=3, Distributor=4
     public decimal Price { get; private set; }
+    public DateTime EffectiveFrom { get; private set; }
+    public DateTime? EffectiveTo { get; private set; }
     public bool IsActive { get; private set; }
 }
 ```
@@ -339,7 +333,7 @@ These must be system-wide seeds, not per-user data. No seed data exists for eith
 |---|-------|------|---------|----------|-------------|--------|
 | 1 | `Id` | `int PK` | Auto-Increment | ✅ | — | ✅ Exists |
 | 2 | `Name` | `nvarchar(150)` | — | ✅ | — | ✅ Exists |
-| 3 | `Barcode` (Legacy) | `nvarchar(50)` | `null` | ❌ | **UNIQUE** | ⚠️ Deprecate |
+| 3 | `Barcode` | `nvarchar(50)` | `null` | ❌ | **UNIQUE** | **NEW** (Moved from external tables) |
 | 4 | `CategoryId` | `int FK` | `1` (عام) | ❌ | FK→Categories, Restrict | ✅ Exists |
 | 5 | `MinStockLevel` | `decimal(18,3)` | `0` | ❌ | `CHECK >= 0` | ✏️ Rename from MinStock |
 | 6 | `ReorderLevel` | `decimal(18,3)` | `0` | ❌ | `CHECK >= 0` | ✅ Exists |
@@ -397,15 +391,14 @@ Stores price per unit + currency + price level combination.
 | 1 | `Id` | `int PK` | Auto-Increment | ✅ | — |
 | 2 | `ProductUnitId` | `int FK` | — | ✅ | FK→ProductUnits, Restrict |
 | 3 | `CurrencyId` | `int FK` | — | ✅ | FK→Currencies, Restrict |
-| 4 | `PriceLevel` | `tinyint` | `1` (Retail) | ✅ | 1=Retail, 2=Wholesale, 3=VIP, 4=Distributor |
-| 5 | `Price` | `decimal(18,2)` | `0` | ✅ | `CHECK >= 0` |
-| 6 | `EffectiveFrom` | `datetime2` | `GETUTCDATE()` | ✅ | — |
-| 7 | `EffectiveTo` | `datetime2?` | `null` | ❌ | Null = currently active |
-| 8 | `IsActive` | `bit` | `true` | ❌ | Global QF |
+| 4 | `Price` | `decimal(18,2)` | `0` | ✅ | `CHECK >= 0` |
+| 5 | `EffectiveFrom` | `datetime2` | `GETUTCDATE()` | ✅ | — |
+| 6 | `EffectiveTo` | `datetime2?` | `null` | ❌ | Null = currently active |
+| 7 | `IsActive` | `bit` | `true` | ❌ | Global QF |
 
-**Unique Index**: `(ProductUnitId, CurrencyId, PriceLevel)` — one active price per combination.
+**Unique Index**: `(ProductUnitId, CurrencyId)` — one active price per combination.
 
-**Seed data**: Each product's base unit gets a default Retail + Wholesale price entry for the base currency (Phase 20 dependency).
+**Seed data**: Each product's base unit gets a default price entry for the base currency (Phase 20 dependency).
 
 ### 4.4 PurchaseLot Entity — NEW (FIFO Foundation)
 
@@ -476,21 +469,7 @@ For products made from other products (بضائع تامة — assemblies).
 
 **Storage**: Images stored on disk (App_Data/ProductImages/), path saved in DB.
 
-### 4.8 PriceLevel Enum — NEW
-
-```csharp
-public enum PriceLevel : byte
-{
-    Retail = 1,        // سعر التجزئة
-    Wholesale = 2,     // سعر الجملة
-    VIP = 3,           // سعر VIP
-    Distributor = 4    // سعر الموزع
-}
-```
-
-**Note**: Analysis Part 5 initially recommended against multiple price levels in V1, but the reference images from محاسب سوفت clearly show this feature. Decision: **Include in V1** with 4 levels. Users can ignore unused levels.
-
-### 4.9 CostingMethod Enum — EXTENDED
+### 4.8 CostingMethod Enum — EXTENDED
 
 ```csharp
 public enum CostingMethod : byte
@@ -502,14 +481,13 @@ public enum CostingMethod : byte
 }
 ```
 
-### 4.10 ProductPriceHistory Entity — Enhanced
+### 4.9 ProductPriceHistory Entity — Enhanced
 
 Add these fields to support multi-currency pricing history + price validity periods:
 
 | # | Field | Type | Required | Status |
 |---|-------|------|----------|--------|
 | `CurrencyId` | `int` FK? | ❌ | **NEW** |
-| `PriceLevel` | `tinyint`? | ❌ | **NEW** |
 | `OldPrice` | `decimal(18,2)` | ❌ | **NEW** (to complement OldAvgCost) |
 | `NewPrice` | `decimal(18,2)` | ❌ | **NEW** |
 | `FromDate` | `datetime2` | ✅ | **NEW** — When this price becomes effective |
@@ -545,17 +523,16 @@ public bool IsCurrentPrice => ToDate == null || ToDate >= DateTime.UtcNow;
 
 | Field | Status | Action |
 |-------|--------|--------|
-| `SalesPrice` | ⚠️ Deprecate | Move to ProductUnitPrice.Price with PriceLevel=Retail |
-| `WholesalePrice` | ⚠️ Deprecate | Move to ProductUnitPrice.Price with PriceLevel=Wholesale |
+| `SalesPrice` | ⚠️ Deprecate | Move to ProductUnitPrice.Price |
+| `WholesalePrice` | ⚠️ Deprecate | Move to ProductUnitPrice.Price (if appropriate unit exists, else drop) |
 
 ### 5.3 Pricing
 
 | Component | Status | Action |
 |-----------|--------|--------|
 | Per-currency pricing | ❌ Missing | Create ProductUnitPrice entity |
-| Multiple price levels | ❌ Missing | Create PriceLevel enum + ProductUnitPrice.PriceLevel |
 | ProductUnitPrice entity + config | ❌ Missing | Full build |
-| Price history for per-currency changes | ❌ Missing | Extend ProductPriceHistory with CurrencyId + PriceLevel |
+| Price history for per-currency changes | ❌ Missing | Extend ProductPriceHistory with CurrencyId |
 
 ### 5.4 Batches / FIFO
 
@@ -660,38 +637,25 @@ Input: ProductId, WarehouseId, QuantityNeeded
 
 **Costing integration**: When `CostingMethod = FIFO`, `UpdateProductPricingService` computes cost as the weighted average of all active PurchaseLots (for display). The actual COGS for each sale is the specific lot's UnitCost.
 
-### 6.2 Pricing Model — Per-Unit + Per-Currency + Price Level
+### 6.2 Pricing Model — Per-Unit + Per-Currency ONLY
 
 **Decision**: Create `ProductUnitPrice` entity as the single source of truth for all pricing.
 
 ```csharp
 // Price lookup algorithm:
-// 1. Find ProductUnitPrice WHERE ProductUnitId = X AND CurrencyId = Y AND PriceLevel = Z
-// 2. If not found and Z > 1 (Wholesale/VIP/Distributor): fallback to Retail price for that currency
-// 3. If not found for currency: fallback to base currency price with exchange rate conversion
-// 4. If still not found: price = 0 (user must enter manually in invoice)
+// 1. Find ProductUnitPrice WHERE ProductUnitId = X AND CurrencyId = Y
+// 2. If not found for currency: fallback to base currency price with exchange rate conversion
+// 3. If still not found: price = 0 (user must enter manually in invoice)
 
 public async Task<Result<decimal>> GetEffectivePriceAsync(
-    int productUnitId, int currencyId, PriceLevel priceLevel, CancellationToken ct)
+    int productUnitId, int currencyId, CancellationToken ct)
 {
     // Exact match first
     var exact = await _repo.FindAsync(pup => 
         pup.ProductUnitId == productUnitId && 
         pup.CurrencyId == currencyId && 
-        pup.PriceLevel == priceLevel &&
         pup.IsActive);
     if (exact != null) return Result<decimal>.Success(exact.Price);
-
-    // Fallback to Retail price for this currency
-    if (priceLevel != PriceLevel.Retail)
-    {
-        var retail = await _repo.FindAsync(pup =>
-            pup.ProductUnitId == productUnitId &&
-            pup.CurrencyId == currencyId &&
-            pup.PriceLevel == PriceLevel.Retail &&
-            pup.IsActive);
-        if (retail != null) return Result<decimal>.Success(retail.Price);
-    }
 
     // Fallback: convert from base currency
     // ... exchange rate conversion logic ...
@@ -699,7 +663,7 @@ public async Task<Result<decimal>> GetEffectivePriceAsync(
 }
 ```
 
-**Price history**: Every create/update/delete of `ProductUnitPrice` records a `ProductPriceHistory` entry with CurrencyId + PriceLevel.
+**Price history**: Every create/update/delete of `ProductUnitPrice` records a `ProductPriceHistory` entry with CurrencyId.
 
 ### 6.3 Batch Allocation Algorithm — FIFO vs FEFO
 
@@ -770,14 +734,14 @@ public async Task<Result<List<PurchaseLotAllocation>>> DeductFromBatchesAsync(
 
 This is enforced in `Product.ValidateUnits()` and checked at save time.
 
-### 6.6 Barcode Strategy — Unit-Level Only
+### 6.6 Barcode Strategy — One Barcode Per Product
 
-**Decision**: Per Analysis Part 3, barcode belongs to the **unit**, not the product. The existing `ProductBarcode` entity is deprecated. All new barcode creation uses `UnitBarcode`.
+**Decision**: Per final revisions in Analysis Part 3, the barcode belongs to the **product**, not the unit. There is exactly ONE main barcode per product in V1. When scanning the barcode, the POS selects the product, and the user selects the specific unit from a dropdown.
 
-**Auto-generation**: When creating a unit without a barcode, generate one:
-- Format: `29` + `ProductUnitId.ToString("D10")` (e.g., `290000000125`)
-- Starting at `290000000001`
-- Adding a check digit is deferred to V2 unless specifically requested
+**Implementation**: 
+- Add `public string? Barcode { get; private set; }` to the `Product` entity.
+- Deprecate `ProductBarcode` and `UnitBarcode` entities.
+- Ensure the `Barcode` column has a unique index in the database.
 
 ### 6.7 Min Stock Alert — Background Service
 

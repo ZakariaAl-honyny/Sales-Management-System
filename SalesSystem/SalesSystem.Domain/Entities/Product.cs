@@ -9,19 +9,27 @@ public class Product : BaseEntity
     public string Name { get; private set; } = string.Empty;
     public int? CategoryId { get; private set; }
     public int? UnitId { get; private set; } // Legacy - Keep for now
-    public int? WholesaleUnitId { get; private set; }
-    public int? RetailUnitId { get; private set; }
-    public decimal ConversionFactor { get; private set; } = 1m;
-    public decimal MinStock { get; private set; }
+    public int? WholesaleUnitId { get; private set; } // Legacy
+    public int? RetailUnitId { get; private set; } // Legacy
+    public decimal ConversionFactor { get; private set; } = 1m; // Legacy
+    public decimal MinStockLevel { get; private set; }
     public decimal ReorderLevel { get; private set; }
     public string? Description { get; private set; }
-    public string? ImagePath { get; private set; }
+    public string? ImagePath { get; private set; } // Legacy - Use ProductImage entity
+    
+    public string? Barcode { get; private set; } // One barcode per product in V1
+    
+    // Phase 25 Additions
+    public decimal AvgCost { get; private set; }
+    public bool HasExpiry { get; private set; }
+    public bool TrackBatches { get; private set; }
 
     // Navigation properties
     public virtual Category? Category { get; private set; }
     public virtual Unit? Unit { get; private set; } // Legacy
     public virtual Unit? WholesaleUnit { get; private set; }
     public virtual Unit? RetailUnit { get; private set; }
+    [Obsolete("Use Barcode property directly. V1 enforces one barcode per product.")]
     public virtual ICollection<ProductBarcode> Barcodes { get; private set; } = new List<ProductBarcode>();
     public virtual ICollection<WarehouseStock> WarehouseStocks { get; private set; } = new List<WarehouseStock>();
 
@@ -164,38 +172,47 @@ public class Product : BaseEntity
         _inventoryBatches.Add(batch);
     }
 
+    /// <summary>
+    /// Updates the average cost of the product based on inventory batches.
+    /// </summary>
+    public void UpdateAvgCost(decimal newAvgCost)
+    {
+        if (newAvgCost < 0)
+            throw new DomainException("متوسط التكلفة لا يمكن أن يكون سالباً.");
+        AvgCost = newAvgCost;
+        UpdateTimestamp();
+    }
+
     // ─── Factory ───────────────────────────────────────────────────────
 
     public static Product Create(
         string name,
-        decimal conversionFactor = 1,
-        decimal minStock = 0,
         int? categoryId = null,
-        int? retailUnitId = null,
-        int? wholesaleUnitId = null,
+        decimal minStockLevel = 0,
+        decimal reorderLevel = 0,
+        bool hasExpiry = false,
+        string? barcode = null,
         string? description = null,
-        string? imagePath = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
-        if (conversionFactor <= 0)
-            throw new DomainException("معامل التحويل يجب أن يكون أكبر من الصفر.");
-        if (minStock < 0)
+        if (minStockLevel < 0)
             throw new DomainException("الحد الأدنى للمخزون لا يمكن أن يكون سالباً.");
+        if (reorderLevel < 0)
+            throw new DomainException("مستوى إعادة الطلب لا يمكن أن يكون سالباً.");
 
         var product = new Product
         {
             Name = name,
-            ConversionFactor = conversionFactor,
-            MinStock = minStock,
             CategoryId = categoryId,
-            RetailUnitId = retailUnitId,
-            WholesaleUnitId = wholesaleUnitId,
+            MinStockLevel = minStockLevel,
+            ReorderLevel = reorderLevel,
+            HasExpiry = hasExpiry,
+            TrackBatches = true, // Always true per analysis
+            Barcode = barcode,
             Description = description,
-            ImagePath = imagePath,
-            // Sync legacy fields
-            UnitId = retailUnitId
+            ConversionFactor = 1m // Legacy default
         };
         product.SetCreatedBy(createdByUserId);
         return product;
@@ -203,31 +220,28 @@ public class Product : BaseEntity
 
     public void Update(
         string name,
-        decimal conversionFactor,
-        decimal minStock,
         int? categoryId,
-        int? retailUnitId,
-        int? wholesaleUnitId,
+        decimal minStockLevel,
+        decimal reorderLevel,
+        bool hasExpiry,
+        string? barcode,
         string? description,
-        int? updatedByUserId,
-        string? imagePath = null)
+        int? updatedByUserId)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
-        if (conversionFactor <= 0)
-            throw new DomainException("معامل التحويل يجب أن يكون أكبر من الصفر.");
-        if (minStock < 0)
+        if (minStockLevel < 0)
             throw new DomainException("الحد الأدنى للمخزون لا يمكن أن يكون سالباً.");
+        if (reorderLevel < 0)
+            throw new DomainException("مستوى إعادة الطلب لا يمكن أن يكون سالباً.");
 
         Name = name;
-        ConversionFactor = conversionFactor;
-        MinStock = minStock;
         CategoryId = categoryId;
-        RetailUnitId = retailUnitId;
-        WholesaleUnitId = wholesaleUnitId;
+        MinStockLevel = minStockLevel;
+        ReorderLevel = reorderLevel;
+        HasExpiry = hasExpiry;
+        Barcode = barcode;
         Description = description;
-        ImagePath = imagePath;
-        UnitId = retailUnitId;
 
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

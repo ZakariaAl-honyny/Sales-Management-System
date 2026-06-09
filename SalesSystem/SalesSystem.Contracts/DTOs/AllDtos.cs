@@ -583,6 +583,7 @@ public record CurrencyDto(
     decimal ExchangeRateToBase,
     bool IsBaseCurrency,
     string? FractionName,
+    int DecimalPlaces,
     bool IsSystem,
     bool IsActive);
 

@@ -21,8 +21,12 @@ public class ProductUnit : BaseEntity
     public decimal BaseConversionFactor { get; private set; }
 
     public bool IsBaseUnit { get; private set; }
+    
+    [Obsolete("Pricing moved to ProductUnitPrice. Use ProductUnitPrice instead.")]
     public decimal SalesPrice { get; private set; }
+    [Obsolete("Pricing moved to ProductUnitPrice. Use ProductUnitPrice instead.")]
     public decimal WholesalePrice { get; private set; }
+    
     public decimal PurchaseCost { get; private set; }
     public decimal SupplierPrice { get; private set; }
     public decimal LastPurchasePrice { get; private set; }
@@ -53,7 +57,6 @@ public class ProductUnit : BaseEntity
     public static ProductUnit CreateBaseUnit(
         int productId,
         string unitName,
-        decimal salesPrice = 0,
         decimal purchaseCost = 0)
     {
         if (string.IsNullOrWhiteSpace(unitName))
@@ -65,8 +68,6 @@ public class ProductUnit : BaseEntity
             UnitName = unitName.Trim(),
             BaseConversionFactor = 1,
             IsBaseUnit = true,
-            SalesPrice = salesPrice,
-            WholesalePrice = salesPrice,
             PurchaseCost = purchaseCost,
             SupplierPrice = 0,
             LastPurchasePrice = purchaseCost,
@@ -82,9 +83,7 @@ public class ProductUnit : BaseEntity
         int productId,
         string unitName,
         decimal baseConversionFactor,
-        decimal salesPrice = 0,
         decimal purchaseCost = 0,
-        decimal wholesalePrice = 0,
         int sortOrder = 1)
     {
         if (string.IsNullOrWhiteSpace(unitName))
@@ -101,8 +100,6 @@ public class ProductUnit : BaseEntity
             UnitName = unitName.Trim(),
             BaseConversionFactor = baseConversionFactor,
             IsBaseUnit = false,
-            SalesPrice = salesPrice,
-            WholesalePrice = wholesalePrice,
             PurchaseCost = purchaseCost,
             SupplierPrice = 0,
             LastPurchasePrice = purchaseCost,
@@ -135,8 +132,9 @@ public class ProductUnit : BaseEntity
     }
 
     /// <summary>
-    /// Updates sales price. Returns OLD price for history logging.
+    /// Obsolete: Updates sales price. Returns OLD price for history logging.
     /// </summary>
+    [Obsolete("Pricing moved to ProductUnitPrice. Use ProductUnitPrice instead.")]
     public decimal UpdateSalesPrice(decimal newPrice)
     {
         if (newPrice < 0)
@@ -159,20 +157,14 @@ public class ProductUnit : BaseEntity
     }
 
     /// <summary>
-    /// Updates unit name and sales price. Does NOT change ConversionFactor or IsBaseUnit.
+    /// Updates unit name. Does NOT change ConversionFactor or IsBaseUnit.
     /// </summary>
-    public void Update(string unitName, decimal retailPrice, decimal wholesalePrice)
+    public void Update(string unitName)
     {
         if (string.IsNullOrWhiteSpace(unitName))
             throw new DomainException("اسم الوحدة لا يمكن أن يكون فارغاً");
-        if (retailPrice < 0)
-            throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
-        if (wholesalePrice < 0)
-            throw new DomainException("سعر الجملة لا يمكن أن يكون سالباً");
 
         UnitName = unitName.Trim();
-        SalesPrice = Math.Round(retailPrice, 2);
-        WholesalePrice = Math.Round(wholesalePrice, 2);
         UpdateTimestamp();
     }
 
@@ -210,8 +202,9 @@ public class ProductUnit : BaseEntity
         => baseUnitPrice * BaseConversionFactor;
 
     /// <summary>
-    /// Gets the appropriate price based on sale mode (Retail or Wholesale).
+    /// Obsolete: Gets the appropriate price based on sale mode (Retail or Wholesale).
     /// </summary>
+    [Obsolete("Pricing moved to ProductUnitPrice. Use ProductUnitPrice instead.")]
     public decimal GetPriceByUnit(SaleMode mode)
         => mode == SaleMode.Wholesale ? WholesalePrice : SalesPrice;
 

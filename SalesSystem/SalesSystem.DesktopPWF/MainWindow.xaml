@@ -187,6 +187,9 @@
             <DataTemplate DataType="{x:Type vmCurrencies:CurrencyEditorViewModel}">
                 <viewsCurrencies:CurrencyEditorView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmCurrencies:CurrencyRatesViewModel}">
+                <viewsCurrencies:CurrencyRatesView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmAccounts:AccountsListViewModel}">
                 <viewsAccounts:AccountsListView />
             </DataTemplate>
@@ -201,6 +204,47 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type perms:PermissionManagementViewModel}">
                 <viewsPerms:PermissionManagementView />
+            </DataTemplate>
+
+            <!-- Phase 31 — Report View DataTemplates -->
+            <DataTemplate DataType="{x:Type vmReports:BalanceSheetViewModel}">
+                <viewsReports:BalanceSheetView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:TrialBalanceViewModel}">
+                <viewsReports:TrialBalanceView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:GeneralLedgerViewModel}">
+                <viewsReports:GeneralLedgerView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:SalesByCustomerViewModel}">
+                <viewsReports:SalesByCustomerView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:SalesByProductViewModel}">
+                <viewsReports:SalesByProductView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:SalesByCategoryViewModel}">
+                <viewsReports:SalesByCategoryView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:DailySalesViewModel}">
+                <viewsReports:DailySalesView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:PurchasesBySupplierViewModel}">
+                <viewsReports:PurchasesBySupplierView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:PurchasesByProductViewModel}">
+                <viewsReports:PurchasesByProductView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:CashBoxSummaryViewModel}">
+                <viewsReports:CashBoxSummaryView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:DailyClosureReportViewModel}">
+                <viewsReports:DailyClosureReportView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:UserActivityViewModel}">
+                <viewsReports:UserActivityView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmReports:LoginHistoryViewModel}">
+                <viewsReports:LoginHistoryView />
             </DataTemplate>
         </ResourceDictionary>
     </Window.Resources>
@@ -262,6 +306,30 @@
                 <Separator/>
                 <MenuItem Header="كشف رصيد المخازن" Command="{Binding NavigateToStockBalanceReportCommand}" ToolTip="عرض المخزون الحالي والقيمة الإجمالية لكل منتج في المستودعات"/>
                 <MenuItem Header="حركة المخازن" Command="{Binding NavigateToWarehouseMovementReportCommand}" ToolTip="عرض تاريخ حركات المخزون مع التصفية حسب المستودع والفترة"/>
+                <Separator/>
+                <MenuItem Header="التقارير المالية" ToolTip="التقارير المالية — الميزانية وميزان المراجعة وكشف الحساب">
+                    <MenuItem Header="الميزانية العمومية" ToolTip="عرض الميزانية العمومية — الأصول والخصوم وحقوق الملكية" Tag="BalanceSheet" Click="ReportMenuItem_Click"/>
+                    <MenuItem Header="ميزان المراجعة" ToolTip="عرض ميزان المراجعة — أرصدة الحسابات مدينة/دائنة" Tag="TrialBalance" Click="ReportMenuItem_Click"/>
+                    <MenuItem Header="كشف حساب عام" ToolTip="عرض كشف حساب عام معاملات قيد يومية تفصيلية" Tag="GeneralLedger" Click="ReportMenuItem_Click"/>
+                </MenuItem>
+                <MenuItem Header="تقارير المبيعات" ToolTip="تقارير المبيعات — حسب العميل والمنتج والفئة واليومي">
+                    <MenuItem Header="المبيعات حسب العميل" ToolTip="عرض تقرير المبيعات مُجمَّع حسب العميل" Tag="SalesByCustomer" Click="ReportMenuItem_Click"/>
+                    <MenuItem Header="المبيعات حسب المنتج" ToolTip="عرض تقرير المبيعات مع تحليل الربح حسب المنتج" Tag="SalesByProduct" Click="ReportMenuItem_Click"/>
+                    <MenuItem Header="المبيعات حسب الفئة" ToolTip="عرض تقرير المبيعات مُجمَّع حسب فئة المنتج" Tag="SalesByCategory" Click="ReportMenuItem_Click"/>
+                    <MenuItem Header="ملخص المبيعات اليومي" ToolTip="عرض ملخص المبيعات اليومي — الإجمالي والخصم والصافي" Tag="DailySales" Click="ReportMenuItem_Click"/>
+                </MenuItem>
+                <MenuItem Header="تقارير المشتريات" ToolTip="تقارير المشتريات — حسب المورد والمنتج">
+                    <MenuItem Header="المشتريات حسب المورد" ToolTip="عرض تقرير المشتريات مُجمَّع حسب المورد" Tag="PurchasesBySupplier" Click="ReportMenuItem_Click"/>
+                    <MenuItem Header="المشتريات حسب المنتج" ToolTip="عرض تقرير المشتريات مُجمَّع حسب المنتج" Tag="PurchasesByProduct" Click="ReportMenuItem_Click"/>
+                </MenuItem>
+                <MenuItem Header="تقارير الخزينة" ToolTip="تقارير الخزينة — ملخص الصندوق والإغلاق اليومي">
+                    <MenuItem Header="ملخص الخزينة" ToolTip="عرض ملخص أرصدة الخزينة — الإيرادات والمصروفات" Tag="CashBoxSummary" Click="ReportMenuItem_Click"/>
+                    <MenuItem Header="الإغلاق اليومي" ToolTip="عرض تقارير الإغلاق اليومي للخزينة" Tag="DailyClosure" Click="ReportMenuItem_Click"/>
+                </MenuItem>
+                <MenuItem Header="تقارير النشاط" ToolTip="تقارير النشاط — سجل المستخدمين وسجل الدخول">
+                    <MenuItem Header="نشاط المستخدمين" ToolTip="عرض سجل نشاط المستخدمين — الإجراءات والوقت" Tag="UserActivity" Click="ReportMenuItem_Click"/>
+                    <MenuItem Header="سجل الدخول" ToolTip="عرض سجل تسجيل الدخول — وقت الدخول والنجاح/الفشل" Tag="LoginHistory" Click="ReportMenuItem_Click"/>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="الإعدادات" ToolTip="قائمة الإعدادات" x:Name="SettingsMenuItem">
                 <MenuItem Header="إدارة المنتجات" ToolTip="إدارة قائمة المنتجات والأسعار" Click="ProductsMenuItem_Click"/>
@@ -537,11 +605,6 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavTaxes"
                                             ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة"/>
-                                    <Button Content="العملات" 
-                                            Command="{Binding NavigateToCurrenciesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavCurrencies"
-                                            ToolTip="إدارة العملات وأسعار الصرف — إضافة وتعديل العملات"/>
                                     <Button Content="دليل الحسابات" 
                                             Command="{Binding NavigateToChartOfAccountsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
@@ -562,6 +625,23 @@
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavInventory"
                                              ToolTip="عرض حركة المخزون وإدارة الأصناف في المستودعات"/>
+                                </StackPanel>
+                            </Expander>
+
+                            <!-- Currencies Expander -->
+                            <Expander Header="العملات" Style="{StaticResource SidebarExpanderStyle}"
+                                      AutomationProperties.AutomationId="SidebarExpanderCurrencies">
+                                <StackPanel>
+                                    <Button Content="العملات" 
+                                            Command="{Binding NavigateToCurrenciesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCurrencies"
+                                            ToolTip="إدارة العملات — إضافة وتعديل العملات وتعيين العملة الأساسية"/>
+                                    <Button Content="أسعار العملات" 
+                                            Command="{Binding NavigateToCurrencyRatesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCurrencyRates"
+                                            ToolTip="إدارة أسعار صرف العملات — عرض وتحديث أسعار الصرف اليومية"/>
                                 </StackPanel>
                             </Expander>
 

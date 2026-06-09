@@ -1,0 +1,200 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Currencies.CurrencyRatesView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Background="{StaticResource BackgroundBrush}"
+        FlowDirection="RightToLeft">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="12,6">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0F172A" Offset="0"/>
+                    <GradientStop Color="#1E293B" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.2"/>
+            </Border.Effect>
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⭐" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBlock Text="{Binding WindowTitle}" Style="{StaticResource HeaderStyle}" Foreground="White"/>
+                </StackPanel>
+                <TextBlock Text="إدارة أسعار صرف العملات وإضافة أسعار جديدة" FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Border Padding="16">
+                <StackPanel>
+
+                    <!-- Currency ComboBox -->
+                    <TextBlock Text="اختيار العملة *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+                    <ComboBox ItemsSource="{Binding Currencies}"
+                              SelectedItem="{Binding SelectedCurrency, UpdateSourceTrigger=PropertyChanged}"
+                              DisplayMemberPath="Name"
+                              Style="{StaticResource ModernComboBox}"
+                              ToolTip="اختر العملة لعرض سجل أسعار الصرف وإضافة سعر صرف جديد"/>
+                    <TextBlock Text="اختر العملة لعرض سجل أسعار الصرف"
+                               Style="{StaticResource HelperTextStyle}"/>
+
+                    <!-- NewRate -->
+                    <TextBlock Text="سعر الصرف الجديد *" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
+                    <TextBox Text="{Binding NewRate, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                             Style="{StaticResource ModernTextBox}"
+                             Width="200"
+                             ToolTip="أدخل سعر الصرف الجديد — مثال: 550 يعني أن الدولار = 550 ريال يمني"/>
+                    <TextBlock Text="أدخل سعر الصرف الجديد — مثال: 550 يعني أن 1 دولار = 550 ريال يمني"
+                               Style="{StaticResource HelperTextStyle}"/>
+
+                    <!-- EffectiveFromDate -->
+                    <TextBlock Text="تاريخ السريان" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
+                    <DatePicker SelectedDate="{Binding EffectiveFromDate}"
+                                Style="{StaticResource ModernDatePicker}"
+                                Width="200"
+                                ToolTip="تاريخ بدء سريان سعر الصرف — سيتم تسجيل السعر في النظام بتاريخ اليوم"/>
+                    <TextBlock Text="سيتم تسجيل سعر الصرف في النظام بتاريخ اليوم"
+                               Style="{StaticResource HelperTextStyle}"/>
+
+                    <!-- Add Rate Button -->
+                    <Button Command="{Binding AddRateCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            Width="150"
+                            Margin="0,12,0,0"
+                            ToolTip="إضافة سعر صرف جديد للعملة المحددة — سيتم تحديث سعر الصرف وإضافته إلى سجل الأسعار">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="إضافة سعر" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Rate History Section -->
+                    <TextBlock Text="سجل أسعار الصرف"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Margin="0,20,0,8"
+                               Foreground="{StaticResource PrimaryBrush}"/>
+
+                    <DataGrid ItemsSource="{Binding RateHistory}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              Style="{StaticResource ModernDataGrid}"
+                              Visibility="{Binding IsCurrencySelected, Converter={StaticResource BoolToVisibility}}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="السعر القديم"
+                                                Binding="{Binding OldRate, StringFormat='{}{0:N6}'}"
+                                                Width="120"/>
+                            <DataGridTextColumn Header="السعر الجديد"
+                                                Binding="{Binding NewRate, StringFormat='{}{0:N6}'}"
+                                                Width="120"/>
+                            <DataGridTextColumn Header="التاريخ"
+                                                Binding="{Binding EffectiveDate, StringFormat='{}{0:yyyy-MM-dd}'}"
+                                                Width="100"/>
+                            <DataGridTextColumn Header="ملاحظات"
+                                                Binding="{Binding Notes}"
+                                                Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Empty state: No currency selected -->
+                    <Border Padding="16"
+                            Background="#F8FAFC"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="#E2E8F0"
+                            Margin="0,8,0,0"
+                            Visibility="{Binding IsCurrencySelected, Converter={StaticResource InverseBoolToVisibility}}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="💰" FontSize="32" HorizontalAlignment="Center"/>
+                            <TextBlock Text="اختر العملة لعرض سجل أسعار الصرف"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="13"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Empty state: Currency selected but no history -->
+                    <Border Padding="16"
+                            Background="#F8FAFC"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="#E2E8F0"
+                            Margin="0,8,0,0"
+                            Visibility="{Binding HasRateHistory, Converter={StaticResource InverseBoolToVisibility}}">
+                        <StackPanel HorizontalAlignment="Center"
+                                    Visibility="{Binding IsCurrencySelected, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="📊" FontSize="32" HorizontalAlignment="Center"/>
+                            <TextBlock Text="لا توجد سجلات أسعار صرف سابقة لهذه العملة"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="13"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2"
+                Background="#F8FAFC"
+                Padding="12,8"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{StaticResource BorderBrush}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Content="إغلاق"
+                            Command="{Binding CancelCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="100"
+                            ToolTip="إغلاق نافذة أسعار العملات"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="1"
+                           Text="{Binding ErrorMessage}"
+                           Foreground="{StaticResource ErrorBrush}"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"
+                           Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}"/>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#CCFFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+                CornerRadius="0">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="180" Height="4"
+                             Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Text="جاري المعالجة..."
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Margin="0,16,0,0"
+                           Foreground="{StaticResource PrimaryBrush}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

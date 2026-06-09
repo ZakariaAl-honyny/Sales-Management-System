@@ -1,8 +1,11 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 
@@ -19,6 +22,8 @@ public class FinancialReportService : IFinancialReportService
         _logger = logger;
     }
 
+    // ─── Income Statement (existing) ──────────────────────────────────────────
+
     public async Task<Result<List<IncomeStatementDto>>> GetIncomeStatementAsync(DateTime from, DateTime to, CancellationToken ct)
     {
         try
@@ -28,20 +33,14 @@ public class FinancialReportService : IFinancialReportService
 
             _logger.LogInformation("Generating income statement from {From} to {To}", from, to);
 
-            // Get posted sales invoices in date range
             var salesInvoices = await _uow.SalesInvoices.ToListAsync(
-                si => si.Status == InvoiceStatus.Posted
-                   && si.InvoiceDate >= from
-                   && si.InvoiceDate <= to,
+                si => si.Status == InvoiceStatus.Posted && si.InvoiceDate >= from && si.InvoiceDate <= to,
                 ct: ct);
 
             var totalSales = salesInvoices.Sum(si => si.TotalAmount);
 
-            // Get posted purchase invoices in date range
             var purchaseInvoices = await _uow.PurchaseInvoices.ToListAsync(
-                pi => pi.Status == InvoiceStatus.Posted
-                   && pi.InvoiceDate >= from
-                   && pi.InvoiceDate <= to,
+                pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
                 ct: ct);
 
             var totalPurchases = purchaseInvoices.Sum(pi => pi.TotalAmount);
@@ -69,6 +68,420 @@ public class FinancialReportService : IFinancialReportService
         }
     }
 
+    // ─── Hierarchical Income Statement (Phase 31 — RULE-422) ──────────────────
+
+    public async Task<Result<IncomeStatementHierarchyDto>> GetIncomeStatementHierarchyAsync(DateTime from, DateTime to, CancellationToken ct)
+    {
+        try
+        {
+            if (from > to)
+                return Result<IncomeStatementHierarchyDto>.Failure("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
+
+            _logger.LogInformation("Generating hierarchical income statement from {From} to {To}", from, to);
+
+            var entries = await _uow.JournalEntries.ToListAsync(
+                je => je.Status == JournalEntryStatus.Posted
+                   && je.TransactionDate >= from
+                   && je.TransactionDate <= to,
+                q => q.Include(je => je.Lines),
+                ct);
+
+            var mappingsList = await _uow.SystemAccountMappings.ToListAsync(null, ct: ct);
+            var mappings = mappingsList.FirstOrDefault();
+
+            var accountBalances = new Dictionary<int, (decimal TotalDebit, decimal TotalCredit)>();
+            foreach (var entry in entries)
+            {
+                foreach (var line in entry.Lines)
+                {
+                    if (!accountBalances.ContainsKey(line.AccountId))
+                        accountBalances[line.AccountId] = (0, 0);
+                    var current = accountBalances[line.AccountId];
+                    accountBalances[line.AccountId] = (current.TotalDebit + line.Debit, current.TotalCredit + line.Credit);
+                }
+            }
+
+            if (accountBalances.Count == 0)
+            {
+                var emptyResult = new IncomeStatementHierarchyDto("قائمة الدخل", "Header", 0, "0.00", 0, new List<IncomeStatementHierarchyDto>
+                {
+                    new("لا توجد بيانات", "Total", 0, "0.00", 1)
+                });
+                return Result<IncomeStatementHierarchyDto>.Success(emptyResult);
+            }
+
+            var accountIds = accountBalances.Keys.ToList();
+            var accounts = await _uow.Accounts.ToListAsync(a => accountIds.Contains(a.Id), ct: ct);
+            var revenueAccounts = accounts.Where(a => a.AccountType == AccountType.Revenue).ToList();
+            var expenseAccounts = accounts.Where(a => a.AccountType == AccountType.Expense).ToList();
+
+            int? cogsAccountId = mappings?.CogsAccountId;
+
+            decimal totalRevenue = 0;
+            decimal totalCogs = 0;
+            decimal totalOperatingExpenses = 0;
+
+            var revenueChildren = new List<IncomeStatementHierarchyDto>();
+            var cogsChildren = new List<IncomeStatementHierarchyDto>();
+            var expenseChildren = new List<IncomeStatementHierarchyDto>();
+
+            foreach (var acc in revenueAccounts)
+            {
+                if (!accountBalances.TryGetValue(acc.Id, out var bal)) continue;
+                var amount = bal.TotalCredit - bal.TotalDebit;
+                if (amount <= 0) continue;
+
+                if (cogsAccountId.HasValue && acc.Id == cogsAccountId.Value)
+                {
+                    totalCogs += amount;
+                    cogsChildren.Add(new IncomeStatementHierarchyDto(acc.NameAr, "SubTotal", amount, amount.ToString("N2"), revenueChildren.Count + 1));
+                }
+                else
+                {
+                    totalRevenue += amount;
+                    revenueChildren.Add(new IncomeStatementHierarchyDto(acc.NameAr, "SubTotal", amount, amount.ToString("N2"), revenueChildren.Count + 1));
+                }
+            }
+
+            foreach (var acc in expenseAccounts)
+            {
+                if (!accountBalances.TryGetValue(acc.Id, out var bal)) continue;
+                var amount = bal.TotalDebit - bal.TotalCredit;
+                if (amount <= 0) continue;
+
+                if (cogsAccountId.HasValue && acc.Id == cogsAccountId.Value)
+                {
+                    totalCogs += amount;
+                    cogsChildren.Add(new IncomeStatementHierarchyDto(acc.NameAr, "SubTotal", amount, amount.ToString("N2"), cogsChildren.Count + 1));
+                }
+                else
+                {
+                    totalOperatingExpenses += amount;
+                    expenseChildren.Add(new IncomeStatementHierarchyDto(acc.NameAr, "SubTotal", amount, amount.ToString("N2"), expenseChildren.Count + 1));
+                }
+            }
+
+            var grossProfit = totalRevenue - totalCogs;
+            var netIncome = grossProfit - totalOperatingExpenses;
+
+            var hierarchy = new IncomeStatementHierarchyDto("قائمة الدخل", "Header", 0, null, 0, new List<IncomeStatementHierarchyDto>
+            {
+                new("الإيرادات", "Header", totalRevenue, totalRevenue.ToString("N2"), 1,
+                    revenueChildren.Count > 0 ? revenueChildren : new List<IncomeStatementHierarchyDto>
+                    {
+                        new("إيرادات المبيعات", "Total", totalRevenue, totalRevenue.ToString("N2"), 1)
+                    }),
+                new("تكلفة المبيعات", "Header", totalCogs, totalCogs.ToString("N2"), 2,
+                    cogsChildren.Count > 0 ? cogsChildren : new List<IncomeStatementHierarchyDto>
+                    {
+                        new("تكلفة المبيعات", "Total", totalCogs, totalCogs.ToString("N2"), 1)
+                    }),
+                new("مجمل الربح", "SubTotal", grossProfit, grossProfit.ToString("N2"), 3),
+                new("المصروفات التشغيلية", "Header", totalOperatingExpenses, totalOperatingExpenses.ToString("N2"), 4,
+                    expenseChildren.Count > 0 ? expenseChildren : new List<IncomeStatementHierarchyDto>
+                    {
+                        new("مصروفات تشغيلية", "Total", totalOperatingExpenses, totalOperatingExpenses.ToString("N2"), 1)
+                    }),
+                new("صافي الربح / الخسارة", "Total", netIncome, netIncome.ToString("N2"), 5)
+            });
+
+            return Result<IncomeStatementHierarchyDto>.Success(hierarchy);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating hierarchical income statement");
+            return Result<IncomeStatementHierarchyDto>.Failure("حدث خطأ أثناء إنشاء قائمة الدخل الهرمية");
+        }
+    }
+
+    // ─── Balance Sheet (Phase 31 — RULE-423) ──────────────────────────────────
+
+    public async Task<Result<BalanceSheetDto>> GetBalanceSheetAsync(DateTime asOfDate, CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating balance sheet as of {AsOfDate}", asOfDate);
+
+            var entries = await _uow.JournalEntries.ToListAsync(
+                je => je.Status == JournalEntryStatus.Posted && je.TransactionDate <= asOfDate,
+                q => q.Include(je => je.Lines),
+                ct);
+
+            var accountBalances = new Dictionary<int, (decimal TotalDebit, decimal TotalCredit)>();
+            foreach (var entry in entries)
+            {
+                foreach (var line in entry.Lines)
+                {
+                    if (!accountBalances.ContainsKey(line.AccountId))
+                        accountBalances[line.AccountId] = (0, 0);
+                    var current = accountBalances[line.AccountId];
+                    accountBalances[line.AccountId] = (current.TotalDebit + line.Debit, current.TotalCredit + line.Credit);
+                }
+            }
+
+            var allAccounts = await _uow.Accounts.ToListAsync(a => a.IsActive, ct: ct);
+
+            var assetLines = new List<BalanceSheetLineDto>();
+            var liabilityLines = new List<BalanceSheetLineDto>();
+            var equityLines = new List<BalanceSheetLineDto>();
+
+            decimal totalAssets = 0;
+            decimal totalLiabilities = 0;
+            decimal totalEquity = 0;
+
+            foreach (var acc in allAccounts.Where(a => a.AllowTransactions))
+            {
+                var bal = accountBalances.GetValueOrDefault(acc.Id, (0, 0));
+                decimal balance;
+
+                switch (acc.AccountType)
+                {
+                    case AccountType.Asset:
+                        balance = bal.TotalDebit - bal.TotalCredit + (acc.OpeningBalance ?? 0);
+                        if (balance != 0)
+                        {
+                            assetLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, balance, balance.ToString("N2")));
+                            totalAssets += balance;
+                        }
+                        break;
+
+                    case AccountType.Liability:
+                        balance = bal.TotalCredit - bal.TotalDebit + (acc.OpeningBalance ?? 0);
+                        if (balance != 0)
+                        {
+                            liabilityLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, balance, balance.ToString("N2")));
+                            totalLiabilities += balance;
+                        }
+                        break;
+
+                    case AccountType.Equity:
+                        balance = bal.TotalCredit - bal.TotalDebit + (acc.OpeningBalance ?? 0);
+                        if (balance != 0)
+                        {
+                            equityLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, balance, balance.ToString("N2")));
+                            totalEquity += balance;
+                        }
+                        break;
+                }
+            }
+
+            // Fallback: use OpeningBalance from accounts if no journal entries
+            if (assetLines.Count == 0 && liabilityLines.Count == 0 && equityLines.Count == 0)
+            {
+                foreach (var acc in allAccounts.Where(a => a.OpeningBalance.HasValue && a.OpeningBalance.Value != 0))
+                {
+                    switch (acc.AccountType)
+                    {
+                        case AccountType.Asset:
+                            assetLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, acc.OpeningBalance!.Value, acc.OpeningBalance!.Value.ToString("N2")));
+                            totalAssets += acc.OpeningBalance!.Value;
+                            break;
+                        case AccountType.Liability:
+                            liabilityLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, acc.OpeningBalance!.Value, acc.OpeningBalance!.Value.ToString("N2")));
+                            totalLiabilities += acc.OpeningBalance!.Value;
+                            break;
+                        case AccountType.Equity:
+                            equityLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, acc.OpeningBalance!.Value, acc.OpeningBalance!.Value.ToString("N2")));
+                            totalEquity += acc.OpeningBalance!.Value;
+                            break;
+                    }
+                }
+            }
+
+            var totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
+            var isBalanced = Math.Abs(totalAssets - totalLiabilitiesAndEquity) < 0.01m;
+
+            var sections = new List<BalanceSheetSectionDto>
+            {
+                new("الأصول", totalAssets, totalAssets.ToString("N2"), assetLines),
+                new("الخصوم", totalLiabilities, totalLiabilities.ToString("N2"), liabilityLines),
+                new("حقوق الملكية", totalEquity, totalEquity.ToString("N2"), equityLines)
+            };
+
+            var dto = new BalanceSheetDto(totalAssets, totalLiabilities, totalEquity,
+                totalLiabilitiesAndEquity, isBalanced, sections);
+
+            _logger.LogInformation("Balance sheet as of {AsOfDate}: Assets={TotalAssets}, Liabilities={TotalLiabilities}, Equity={TotalEquity}, Balanced={IsBalanced}",
+                asOfDate, totalAssets, totalLiabilities, totalEquity, isBalanced);
+
+            return Result<BalanceSheetDto>.Success(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating balance sheet");
+            return Result<BalanceSheetDto>.Failure("حدث خطأ أثناء إنشاء الميزانية العمومية");
+        }
+    }
+
+    // ─── Trial Balance (Phase 31) ─────────────────────────────────────────────
+
+    public async Task<Result<List<TrialBalanceDto>>> GetTrialBalanceAsync(DateTime asOfDate, CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating trial balance as of {AsOfDate}", asOfDate);
+
+            var entries = await _uow.JournalEntries.ToListAsync(
+                je => je.Status == JournalEntryStatus.Posted && je.TransactionDate <= asOfDate,
+                q => q.Include(je => je.Lines),
+                ct);
+
+            var accountBalances = new Dictionary<int, (decimal TotalDebit, decimal TotalCredit)>();
+            foreach (var entry in entries)
+            {
+                foreach (var line in entry.Lines)
+                {
+                    if (!accountBalances.ContainsKey(line.AccountId))
+                        accountBalances[line.AccountId] = (0, 0);
+                    var current = accountBalances[line.AccountId];
+                    accountBalances[line.AccountId] = (current.TotalDebit + line.Debit, current.TotalCredit + line.Credit);
+                }
+            }
+
+            var accounts = await _uow.Accounts.ToListAsync(
+                a => a.IsActive && a.AllowTransactions,
+                q => q.OrderBy(a => a.AccountCode),
+                ct);
+
+            var result = new List<TrialBalanceDto>();
+            foreach (var acc in accounts)
+            {
+                var bal = accountBalances.GetValueOrDefault(acc.Id, (0, 0));
+                var openingBal = acc.OpeningBalance ?? 0;
+
+                decimal openingDebit = acc.IsDebitNormal() ? openingBal : 0;
+                decimal openingCredit = acc.IsDebitNormal() ? 0 : openingBal;
+
+                decimal closingDebit, closingCredit;
+                if (acc.IsDebitNormal())
+                {
+                    var netBalance = openingBal + bal.TotalDebit - bal.TotalCredit;
+                    closingDebit = netBalance >= 0 ? netBalance : 0;
+                    closingCredit = netBalance < 0 ? Math.Abs(netBalance) : 0;
+                }
+                else
+                {
+                    var netBalance = openingBal + bal.TotalCredit - bal.TotalDebit;
+                    closingCredit = netBalance >= 0 ? netBalance : 0;
+                    closingDebit = netBalance < 0 ? Math.Abs(netBalance) : 0;
+                }
+
+                if (bal.TotalDebit == 0 && bal.TotalCredit == 0 && openingBal == 0)
+                    continue;
+
+                result.Add(new TrialBalanceDto(
+                    acc.AccountCode, acc.NameAr,
+                    openingDebit, openingCredit,
+                    bal.TotalDebit, bal.TotalCredit,
+                    closingDebit, closingCredit,
+                    acc.AccountType switch
+                    {
+                        AccountType.Asset => "أصل",
+                        AccountType.Liability => "خصم",
+                        AccountType.Equity => "حق ملكية",
+                        AccountType.Revenue => "إيراد",
+                        AccountType.Expense => "مصروف",
+                        _ => null
+                    }
+                ));
+            }
+
+            _logger.LogInformation("Trial balance generated with {Count} accounts", result.Count);
+            return Result<List<TrialBalanceDto>>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating trial balance");
+            return Result<List<TrialBalanceDto>>.Failure("حدث خطأ أثناء إنشاء ميزان المراجعة");
+        }
+    }
+
+    // ─── General Ledger (Phase 31) ────────────────────────────────────────────
+
+    public async Task<Result<GeneralLedgerDto>> GetGeneralLedgerAsync(int accountId, DateTime from, DateTime to, CancellationToken ct)
+    {
+        try
+        {
+            if (accountId <= 0)
+                return Result<GeneralLedgerDto>.Failure("معرف الحساب غير صالح");
+            if (from > to)
+                return Result<GeneralLedgerDto>.Failure("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
+
+            _logger.LogInformation("Generating general ledger for account {AccountId} from {From} to {To}", accountId, from, to);
+
+            var account = await _uow.Accounts.GetByIdAsync(accountId, ct);
+            if (account == null)
+                return Result<GeneralLedgerDto>.Failure("الحساب غير موجود");
+
+            var priorLines = await _uow.JournalEntryLines.ToListAsync(
+                jel => jel.AccountId == accountId
+                    && jel.JournalEntry.Status == JournalEntryStatus.Posted
+                    && jel.JournalEntry.TransactionDate < from,
+                q => q.Include(jel => jel.JournalEntry),
+                ct);
+
+            var priorDebit = priorLines.Sum(jel => jel.Debit);
+            var priorCredit = priorLines.Sum(jel => jel.Credit);
+
+            decimal openingBalance;
+            if (account.IsDebitNormal())
+                openingBalance = (account.OpeningBalance ?? 0) + priorDebit - priorCredit;
+            else
+                openingBalance = (account.OpeningBalance ?? 0) + priorCredit - priorDebit;
+
+            var periodLines = await _uow.JournalEntryLines.ToListAsync(
+                jel => jel.AccountId == accountId
+                    && jel.JournalEntry.Status == JournalEntryStatus.Posted
+                    && jel.JournalEntry.TransactionDate >= from
+                    && jel.JournalEntry.TransactionDate <= to,
+                q => q.OrderBy(jel => jel.JournalEntry.TransactionDate)
+                      .ThenBy(jel => jel.Id)
+                      .Include(jel => jel.JournalEntry),
+                ct);
+
+            var lines = new List<GeneralLedgerLineDto>();
+            var runningBalance = openingBalance;
+
+            foreach (var line in periodLines)
+            {
+                if (account.IsDebitNormal())
+                    runningBalance += line.Debit - line.Credit;
+                else
+                    runningBalance += line.Credit - line.Debit;
+
+                lines.Add(new GeneralLedgerLineDto(
+                    line.JournalEntry.TransactionDate,
+                    line.JournalEntry.EntryNumber,
+                    line.JournalEntry.Description,
+                    line.Debit, line.Credit,
+                    runningBalance
+                ));
+            }
+
+            var totalDebit = periodLines.Sum(l => l.Debit);
+            var totalCredit = periodLines.Sum(l => l.Credit);
+            var closingBalance = lines.Count > 0 ? lines.Last().RunningBalance : openingBalance;
+
+            var dto = new GeneralLedgerDto(
+                account.AccountCode, account.NameAr,
+                from, to, openingBalance,
+                lines, totalDebit, totalCredit, closingBalance
+            );
+
+            _logger.LogInformation("General ledger for account {AccountId}: {Count} lines, closing={ClosingBalance}",
+                accountId, lines.Count, closingBalance);
+
+            return Result<GeneralLedgerDto>.Success(dto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating general ledger for account {AccountId}", accountId);
+            return Result<GeneralLedgerDto>.Failure("حدث خطأ أثناء إنشاء دفتر الأستاذ العام");
+        }
+    }
+
+    // ─── Cash Flow (existing) ─────────────────────────────────────────────────
+
     public async Task<Result<CashFlowReportDto>> GetCashFlowReportAsync(DateTime from, DateTime to, int? cashBoxId, CancellationToken ct)
     {
         try
@@ -78,7 +491,6 @@ public class FinancialReportService : IFinancialReportService
 
             _logger.LogInformation("Generating cash flow report from {From} to {To} for cash box {CashBoxId}", from, to, cashBoxId);
 
-            // Get transactions in date range, optionally filtered by cash box
             var transactions = await _uow.CashTransactions.ToListAsync(
                 tx => tx.CreatedAt >= from
                    && tx.CreatedAt <= to
@@ -86,15 +498,10 @@ public class FinancialReportService : IFinancialReportService
                 q => q.OrderBy(tx => tx.CreatedAt),
                 ct: ct);
 
-            // Determine opening balance:
-            // 1. Find the last transaction BEFORE the from date for the same cash box(es) and use its RunningBalance
-            // 2. If none, derive from the net transaction amount in the period
-            // 3. For all-boxes mode, compute from the first transaction's RunningBalance minus its Amount
             decimal openingBalance = 0;
 
             if (cashBoxId.HasValue)
             {
-                // Get the last transaction before the from date for this box
                 var lastTxList = await _uow.CashTransactions.ToListAsync(
                     tx => tx.CashBoxId == cashBoxId.Value && tx.CreatedAt < from,
                     q => q.OrderByDescending(tx => tx.CreatedAt),
@@ -107,12 +514,9 @@ public class FinancialReportService : IFinancialReportService
                 }
                 else
                 {
-                    // No transactions before the period — derive from transactions in period
                     var netInPeriod = transactions
                         .Where(tx => tx.CashBoxId == cashBoxId.Value)
                         .Sum(tx => tx.Amount);
-                    // Opening = total income - total expense for the period with sign reversed
-                    // If all transactions are captured correctly, the running balance starts at 0
                     openingBalance = -netInPeriod;
                     if (openingBalance < 0)
                         openingBalance = 0m;
@@ -120,7 +524,6 @@ public class FinancialReportService : IFinancialReportService
             }
             else
             {
-                // For all cash boxes, estimate opening balance from earliest transaction balance
                 var firstTx = transactions.FirstOrDefault();
                 if (firstTx != null)
                 {
@@ -128,14 +531,12 @@ public class FinancialReportService : IFinancialReportService
                 }
             }
 
-            // Categorize transactions
             var incomeItems = new List<CashFlowItemDto>();
             var expenseItems = new List<CashFlowItemDto>();
 
             decimal totalIncome = 0;
             decimal totalExpense = 0;
 
-            // Income types: SalesIncome(2), CustomerPayment(8), TransferIn(5)
             var incomeTransactions = transactions
                 .Where(tx => tx.TransactionType == CashTransactionType.SalesIncome
                           || tx.TransactionType == CashTransactionType.CustomerPayment
@@ -169,7 +570,6 @@ public class FinancialReportService : IFinancialReportService
                 totalIncome += transfersIn;
             }
 
-            // Expense types: Expense(3), SupplierPayment(7), RefundOut(6), TransferOut(4)
             var expenseTransactions = transactions
                 .Where(tx => tx.TransactionType == CashTransactionType.Expense
                           || tx.TransactionType == CashTransactionType.SupplierPayment
@@ -217,13 +617,8 @@ public class FinancialReportService : IFinancialReportService
             var closingBalance = openingBalance + netCashFlow;
 
             var report = new CashFlowReportDto(
-                openingBalance,
-                totalIncome,
-                totalExpense,
-                netCashFlow,
-                closingBalance,
-                incomeItems,
-                expenseItems);
+                openingBalance, totalIncome, totalExpense, netCashFlow, closingBalance,
+                incomeItems, expenseItems);
 
             _logger.LogInformation(
                 "Cash flow report generated: Opening={Opening}, Income={Income}, Expense={Expense}, Closing={Closing}",
@@ -238,6 +633,8 @@ public class FinancialReportService : IFinancialReportService
         }
     }
 
+    // ─── VAT Report (existing) ────────────────────────────────────────────────
+
     public async Task<Result<List<VatReportDto>>> GetVatReportAsync(DateTime from, DateTime to, CancellationToken ct)
     {
         try
@@ -249,7 +646,6 @@ public class FinancialReportService : IFinancialReportService
 
             var vatItems = new List<VatReportDto>();
 
-            // Get posted sales invoices with tax
             var salesInvoices = await _uow.SalesInvoices.ToListAsync(
                 si => si.Status == InvoiceStatus.Posted
                    && si.TaxAmount > 0
@@ -261,22 +657,16 @@ public class FinancialReportService : IFinancialReportService
 
             foreach (var invoice in salesInvoices)
             {
-                // Calculate taxable amount (SubTotal - DiscountAmount)
                 var taxableAmount = invoice.SubTotal - invoice.DiscountAmount;
                 var taxRate = taxableAmount > 0
                     ? Math.Round(invoice.TaxAmount / taxableAmount * 100, 2)
                     : 0;
 
                 vatItems.Add(new VatReportDto(
-                    invoice.Id.ToString(),
-                    invoice.InvoiceDate,
-                    invoice.Customer?.Name,
-                    taxableAmount,
-                    taxRate,
-                    invoice.TaxAmount));
+                    invoice.Id.ToString(), invoice.InvoiceDate,
+                    invoice.Customer?.Name, taxableAmount, taxRate, invoice.TaxAmount));
             }
 
-            // Get posted purchase invoices with tax
             var purchaseInvoices = await _uow.PurchaseInvoices.ToListAsync(
                 pi => pi.Status == InvoiceStatus.Posted
                    && pi.TaxAmount > 0
@@ -294,15 +684,10 @@ public class FinancialReportService : IFinancialReportService
                     : 0;
 
                 vatItems.Add(new VatReportDto(
-                    invoice.Id.ToString(),
-                    invoice.InvoiceDate,
-                    invoice.Supplier?.Name,
-                    taxableAmount,
-                    taxRate,
-                    invoice.TaxAmount));
+                    invoice.Id.ToString(), invoice.InvoiceDate,
+                    invoice.Supplier?.Name, taxableAmount, taxRate, invoice.TaxAmount));
             }
 
-            // Sort combined list by date
             vatItems = vatItems.OrderBy(v => v.InvoiceDate).ToList();
 
             _logger.LogInformation("VAT report generated with {Count} entries", vatItems.Count);
@@ -316,13 +701,14 @@ public class FinancialReportService : IFinancialReportService
         }
     }
 
+    // ─── Account Statements (existing) ────────────────────────────────────────
+
     public async Task<Result<List<AccountStatementDto>>> GetAccountStatementAsync(int customerId, DateTime from, DateTime to, CancellationToken ct)
     {
         try
         {
             if (from > to)
                 return Result<List<AccountStatementDto>>.Failure("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
-
             if (customerId <= 0)
                 return Result<List<AccountStatementDto>>.Failure("معرف العميل غير صالح");
 
@@ -330,52 +716,29 @@ public class FinancialReportService : IFinancialReportService
 
             var entries = new List<AccountStatementDto>();
 
-            // Get posted sales invoices for this customer in date range
             var invoices = await _uow.SalesInvoices.ToListAsync(
-                si => si.CustomerId == customerId
-                   && si.Status == InvoiceStatus.Posted
-                   && si.InvoiceDate >= from
-                   && si.InvoiceDate <= to,
-                q => q.OrderBy(si => si.InvoiceDate),
-                ct: ct);
+                si => si.CustomerId == customerId && si.Status == InvoiceStatus.Posted
+                   && si.InvoiceDate >= from && si.InvoiceDate <= to,
+                q => q.OrderBy(si => si.InvoiceDate), ct: ct);
 
             foreach (var invoice in invoices)
             {
-                entries.Add(new AccountStatementDto(
-                    invoice.InvoiceDate,
-                    "فاتورة بيع",
-                    invoice.Id.ToString(),
-                    invoice.TotalAmount,   // Debit — customer owes
-                    0,                      // Credit
-                    0));                    // Balance — will compute later
+                entries.Add(new AccountStatementDto(invoice.InvoiceDate, "فاتورة بيع",
+                    invoice.Id.ToString(), invoice.TotalAmount, 0, 0));
             }
 
-            // Get customer payments in date range
             var payments = await _uow.CustomerPayments.ToListAsync(
-                cp => cp.CustomerId == customerId
-                   && cp.PaymentDate >= from
-                   && cp.PaymentDate <= to,
-                q => q.OrderBy(cp => cp.PaymentDate),
-                ct: ct);
+                cp => cp.CustomerId == customerId && cp.PaymentDate >= from && cp.PaymentDate <= to,
+                q => q.OrderBy(cp => cp.PaymentDate), ct: ct);
 
             foreach (var payment in payments)
             {
-                entries.Add(new AccountStatementDto(
-                    payment.PaymentDate,
-                    "دفعة عميل",
-                    payment.PaymentNo,
-                    0,                      // Debit
-                    payment.Amount,          // Credit — payment reduces debt
-                    0));                    // Balance — will compute later
+                entries.Add(new AccountStatementDto(payment.PaymentDate, "دفعة عميل",
+                    payment.PaymentNo, 0, payment.Amount, 0));
             }
 
-            // Sort all entries by date, then by type (invoices before payments on same day)
-            entries = entries
-                .OrderBy(e => e.Date)
-                .ThenByDescending(e => e.Debit > 0 ? 0 : 1) // Invoices first
-                .ToList();
+            entries = entries.OrderBy(e => e.Date).ThenByDescending(e => e.Debit > 0 ? 0 : 1).ToList();
 
-            // Compute running balance
             decimal runningBalance = 0;
             for (int i = 0; i < entries.Count; i++)
             {
@@ -401,7 +764,6 @@ public class FinancialReportService : IFinancialReportService
         {
             if (from > to)
                 return Result<List<AccountStatementDto>>.Failure("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
-
             if (supplierId <= 0)
                 return Result<List<AccountStatementDto>>.Failure("معرف المورد غير صالح");
 
@@ -409,52 +771,29 @@ public class FinancialReportService : IFinancialReportService
 
             var entries = new List<AccountStatementDto>();
 
-            // Get posted purchase invoices for this supplier in date range
             var invoices = await _uow.PurchaseInvoices.ToListAsync(
-                pi => pi.SupplierId == supplierId
-                   && pi.Status == InvoiceStatus.Posted
-                   && pi.InvoiceDate >= from
-                   && pi.InvoiceDate <= to,
-                q => q.OrderBy(pi => pi.InvoiceDate),
-                ct: ct);
+                pi => pi.SupplierId == supplierId && pi.Status == InvoiceStatus.Posted
+                   && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
+                q => q.OrderBy(pi => pi.InvoiceDate), ct: ct);
 
             foreach (var invoice in invoices)
             {
-                entries.Add(new AccountStatementDto(
-                    invoice.InvoiceDate,
-                    "فاتورة شراء",
-                    invoice.Id.ToString(),
-                    0,                          // Debit
-                    invoice.TotalAmount,         // Credit — we owe the supplier
-                    0));                         // Balance — will compute later
+                entries.Add(new AccountStatementDto(invoice.InvoiceDate, "فاتورة شراء",
+                    invoice.Id.ToString(), 0, invoice.TotalAmount, 0));
             }
 
-            // Get supplier payments in date range
             var payments = await _uow.SupplierPayments.ToListAsync(
-                sp => sp.SupplierId == supplierId
-                   && sp.PaymentDate >= from
-                   && sp.PaymentDate <= to,
-                q => q.OrderBy(sp => sp.PaymentDate),
-                ct: ct);
+                sp => sp.SupplierId == supplierId && sp.PaymentDate >= from && sp.PaymentDate <= to,
+                q => q.OrderBy(sp => sp.PaymentDate), ct: ct);
 
             foreach (var payment in payments)
             {
-                entries.Add(new AccountStatementDto(
-                    payment.PaymentDate,
-                    "دفعة مورد",
-                    payment.PaymentNo,
-                    payment.Amount,              // Debit — payment reduces our debt
-                    0,                           // Credit
-                    0));                         // Balance — will compute later
+                entries.Add(new AccountStatementDto(payment.PaymentDate, "دفعة مورد",
+                    payment.PaymentNo, payment.Amount, 0, 0));
             }
 
-            // Sort all entries by date, then by type
-            entries = entries
-                .OrderBy(e => e.Date)
-                .ThenByDescending(e => e.Credit > 0 ? 0 : 1) // Invoices first
-                .ToList();
+            entries = entries.OrderBy(e => e.Date).ThenByDescending(e => e.Credit > 0 ? 0 : 1).ToList();
 
-            // Compute running balance (positive = we owe the supplier)
             decimal runningBalance = 0;
             for (int i = 0; i < entries.Count; i++)
             {

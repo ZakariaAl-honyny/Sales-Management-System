@@ -3,6 +3,7 @@ using System.IO;
 using ClosedXML.Excel;
 using Microsoft.Win32;
 using Serilog;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.DesktopPWF.Services.Export;
 
@@ -186,6 +187,134 @@ public class FinancialReportExportService : IFinancialReportExportService
         {
             Log.Error(ex, "Failed to export report to PDF: {FileName}", dialog.FileName);
             throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<byte[]>> GenerateExcelBytesAsync<T>(string reportName, List<T> data, Dictionary<string, string>? columnHeaders = null)
+    {
+        try
+        {
+            return await Task.Run(() =>
+            {
+                using var workbook = new XLWorkbook();
+                var worksheet = workbook.Worksheets.Add(reportName);
+
+                // Get properties from T
+                var properties = typeof(T).GetProperties();
+                var headers = columnHeaders ?? new Dictionary<string, string>();
+
+                // Header row
+                var headerRow = worksheet.Row(1);
+                headerRow.Style.Font.Bold = true;
+                headerRow.Style.Fill.BackgroundColor = XLColor.FromHtml("#4472C4");
+                headerRow.Style.Font.FontColor = XLColor.White;
+                headerRow.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+                for (int col = 0; col < properties.Length; col++)
+                {
+                    var propName = properties[col].Name;
+                    worksheet.Cell(1, col + 1).Value = headers.TryGetValue(propName, out var header) ? header : propName;
+                }
+
+                // Data rows
+                for (int row = 0; row < data.Count; row++)
+                {
+                    for (int col = 0; col < properties.Length; col++)
+                    {
+                        var cell = worksheet.Cell(row + 2, col + 1);
+                        var value = properties[col].GetValue(data[row]);
+
+                        if (value is decimal decimalValue)
+                        {
+                            cell.Value = decimalValue;
+                            cell.Style.NumberFormat.Format = "#,##0.00";
+                        }
+                        else if (value is DateTime dateValue)
+                        {
+                            cell.Value = dateValue;
+                            cell.Style.DateFormat.Format = "yyyy/MM/dd";
+                        }
+                        else
+                        {
+                            cell.Value = value?.ToString() ?? "";
+                        }
+                    }
+                }
+
+                worksheet.Columns().AdjustToContents();
+
+                using var stream = new MemoryStream();
+                workbook.SaveAs(stream);
+                return Result<byte[]>.Success(stream.ToArray());
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to generate Excel bytes for report: {ReportName}", reportName);
+            return Result<byte[]>.Failure("فشل في تصدير التقرير إلى Excel");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<byte[]>> GeneratePdfBytesAsync(string reportName, DataTable data, string title)
+    {
+        try
+        {
+            return await Task.Run(() =>
+            {
+                using var stream = new MemoryStream();
+                using var writer = new StreamWriter(stream, System.Text.Encoding.UTF8);
+
+                writer.WriteLine("<!DOCTYPE html>");
+                writer.WriteLine("<html dir='rtl'>");
+                writer.WriteLine("<head><meta charset='UTF-8'><title>" + reportName + "</title>");
+                writer.WriteLine("<style>");
+                writer.WriteLine("body { font-family: 'Traditional Arabic', Arial, sans-serif; margin: 20px; }");
+                writer.WriteLine("h1 { text-align: center; color: #333; }");
+                writer.WriteLine("table { width: 100%; border-collapse: collapse; margin-top: 20px; }");
+                writer.WriteLine("th { background-color: #4472C4; color: white; padding: 8px; text-align: center; }");
+                writer.WriteLine("td { padding: 6px; border: 1px solid #ddd; text-align: center; }");
+                writer.WriteLine("tr:nth-child(even) { background-color: #f9f9f9; }");
+                writer.WriteLine("</style></head><body>");
+                writer.WriteLine($"<h1>{title}</h1>");
+                writer.WriteLine("<table>");
+                writer.WriteLine("<thead><tr>");
+
+                for (int col = 0; col < data.Columns.Count; col++)
+                    writer.WriteLine($"<th>{data.Columns[col].ColumnName}</th>");
+
+                writer.WriteLine("</tr></thead>");
+                writer.WriteLine("<tbody>");
+
+                for (int row = 0; row < data.Rows.Count; row++)
+                {
+                    writer.WriteLine("<tr>");
+                    for (int col = 0; col < data.Columns.Count; col++)
+                    {
+                        var value = data.Rows[row][col];
+                        string displayValue = value switch
+                        {
+                            decimal d => d.ToString("N2"),
+                            DateTime dt => dt.ToString("yyyy/MM/dd"),
+                            _ => value?.ToString() ?? ""
+                        };
+                        writer.WriteLine($"<td>{displayValue}</td>");
+                    }
+                    writer.WriteLine("</tr>");
+                }
+
+                writer.WriteLine("</tbody></table>");
+                writer.WriteLine("</body></html>");
+                writer.Flush();
+
+                return Result<byte[]>.Success(stream.ToArray());
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to generate PDF bytes for report: {ReportName}", reportName);
+            return Result<byte[]>.Failure("فشل في تصدير التقرير إلى PDF");
         }
     }
 }

@@ -35,8 +35,10 @@ using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
 using SalesSystem.DesktopPWF.Views.Accounts;
+using SalesSystem.DesktopPWF.Views.Currencies;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
+using SalesSystem.DesktopPWF.Services.Export;
 
 namespace SalesSystem.DesktopPWF;
 
@@ -256,6 +258,15 @@ public partial class App : System.Windows.Application
         // Financial Reports API
         services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
 
+        // Phase 31 — Sales, Purchase, CashBox, and User Report API Services
+        services.AddSingleton<ISalesReportApiService, SalesReportApiService>();
+        services.AddSingleton<IPurchaseReportApiService, PurchaseReportApiService>();
+        services.AddSingleton<ICashBoxReportApiService, CashBoxReportApiService>();
+        services.AddSingleton<IUserReportApiService, UserReportApiService>();
+
+        // Phase 31 — Report Export Dialog Service
+        services.AddSingleton<IReportExportDialogService, ReportExportDialogService>();
+
         // ViewModels
         services.AddTransient<LoginWindowViewModel>();
         services.AddTransient<MainViewModel>();
@@ -315,6 +326,8 @@ public partial class App : System.Windows.Application
         // Currency ViewModels
         services.AddTransient<CurrenciesListViewModel>();
         services.AddTransient<CurrencyEditorViewModel>();
+        services.AddTransient<CurrencyRatesViewModel>();
+        services.AddTransient<CurrencyRatesView>();
 
         // Inventory Operation ViewModels
         services.AddTransient<InventoryOperationListViewModel>();
@@ -365,6 +378,29 @@ public partial class App : System.Windows.Application
         services.AddTransient<CashFlowReportViewModel>();
         services.AddTransient<VatReportViewModel>();
         services.AddTransient<AccountStatementViewModel>();
+
+        // Phase 31 — Financial Report ViewModels
+        services.AddTransient<BalanceSheetViewModel>();
+        services.AddTransient<TrialBalanceViewModel>();
+        services.AddTransient<GeneralLedgerViewModel>();
+
+        // Phase 31 — Sales Report ViewModels
+        services.AddTransient<SalesByCustomerViewModel>();
+        services.AddTransient<SalesByProductViewModel>();
+        services.AddTransient<SalesByCategoryViewModel>();
+        services.AddTransient<DailySalesViewModel>();
+
+        // Phase 31 — Purchase Report ViewModels
+        services.AddTransient<PurchasesBySupplierViewModel>();
+        services.AddTransient<PurchasesByProductViewModel>();
+
+        // Phase 31 — Cash Box Report ViewModels
+        services.AddTransient<CashBoxSummaryViewModel>();
+        services.AddTransient<DailyClosureReportViewModel>();
+
+        // Phase 31 — User & Login Report ViewModels
+        services.AddTransient<UserActivityViewModel>();
+        services.AddTransient<LoginHistoryViewModel>();
     }
 
     private static Dictionary<string, string>? LoadAppSettings()

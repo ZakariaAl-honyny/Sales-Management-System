@@ -1,0 +1,131 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Reports.UserActivityView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
+      mc:Ignorable="d"
+      d:DesignHeight="700" d:DesignWidth="1000"
+     
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Style="{StaticResource PageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="👤  تقرير نشاط المستخدمين" Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="UserActivityPageTitle"/>
+
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="المستخدم" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox ItemsSource="{Binding Users}"
+                              SelectedValue="{Binding SelectedUserId}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="FullName"
+                              Width="180" TabIndex="1"
+                              ToolTip="اختر مستخدماً محدداً أو اترك الكل لعرض جميع المستخدمين"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="من تاريخ" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <DatePicker SelectedDate="{Binding FromDate}" Style="{StaticResource ModernDatePicker}" Width="140" TabIndex="2"
+                                ToolTip="اختر تاريخ بداية الفترة"/>
+                    <TextBlock Text="إلى تاريخ" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="12,0,12,0"/>
+                    <DatePicker SelectedDate="{Binding ToDate}" Style="{StaticResource ModernDatePicker}" Width="140" TabIndex="3"
+                                ToolTip="اختر تاريخ نهاية الفترة"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding GenerateReportCommand}" Style="{StaticResource PrimaryButton}" TabIndex="4"
+                            ToolTip="توليد تقرير نشاط المستخدمين حسب الفترة والمستخدم المحدد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="👤" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="عرض التقرير" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <Border Background="{StaticResource ErrorLightBrush}" Padding="10,6" Margin="0,0,0,0"
+                        VerticalAlignment="Top" Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <Button Grid.Column="2" Command="{Binding GenerateReportCommand}" Style="{StaticResource SecondaryButton}" Height="28" Padding="12,0" FontSize="11"
+                                ToolTip="إعادة المحاولة">
+                            <TextBlock Text="إعادة المحاولة"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <DataGrid ItemsSource="{Binding Entries}" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
+                    <DataGrid.Style>
+                        <Style TargetType="DataGrid" BasedOn="{StaticResource ModernDataGrid}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Style>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="الوقت" Binding="{Binding Timestamp, StringFormat={}{0:yyyy/MM/dd HH:mm}}" Width="1.5*"
+                                            ToolTipService.ToolTip="تاريخ ووقت النشاط"/>
+                        <DataGridTextColumn Header="المستخدم" Binding="{Binding UserName}" Width="1.5*"
+                                            ToolTipService.ToolTip="اسم المستخدم"/>
+                        <DataGridTextColumn Header="الإجراء" Binding="{Binding Action}" Width="2*"
+                                            ToolTipService.ToolTip="نوع الإجراء الذي تم تنفيذه"/>
+                        <DataGridTextColumn Header="الكيان" Binding="{Binding EntityType}" Width="1.5*"
+                                            ToolTipService.ToolTip="نوع الكيان المتأثر (فاتورة، منتج، عميل...)"/>
+                        <DataGridTextColumn Header="رقم المرجع" Binding="{Binding EntityId}" Width="1*"
+                                            ToolTipService.ToolTip="الرقم المرجعي للكيان"/>
+                        <DataGridTextColumn Header="التفاصيل" Binding="{Binding Details}" Width="3*"
+                                            ToolTipService.ToolTip="تفاصيل إضافية عن الإجراء"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,0">
+                        <TextBlock Text="👤" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
+                        <TextBlock Text="تقرير نشاط المستخدمين" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="اختر الفترة والمستخدم ثم اضغط على 'عرض التقرير'"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border Background="#CCFFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="240" Height="6" Background="#E2E8F0" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="جاري تحميل تقرير النشاط..." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- No summary footer for user activity -->
+    </Grid>
+</UserControl>

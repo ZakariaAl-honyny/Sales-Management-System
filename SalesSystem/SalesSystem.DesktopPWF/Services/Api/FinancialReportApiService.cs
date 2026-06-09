@@ -61,4 +61,28 @@ public class FinancialReportApiService : ApiServiceBase, IFinancialReportApiServ
             () => _httpClient.GetAsync($"{BasePath}/account-statement/supplier/{supplierId}?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", ct),
             "FinancialReportApiService.GetSupplierAccountStatementAsync");
     }
+
+    /// <inheritdoc />
+    public async Task<Result<BalanceSheetDto>> GetBalanceSheetAsync(DateTime asOfDate, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<BalanceSheetDto>(
+            () => _httpClient.GetAsync($"{BasePath}/balance-sheet?asOfDate={asOfDate:yyyy-MM-dd}", ct),
+            "FinancialReportApiService.GetBalanceSheetAsync");
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<List<TrialBalanceDto>>> GetTrialBalanceAsync(DateTime asOfDate, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<List<TrialBalanceDto>>(
+            () => _httpClient.GetAsync($"{BasePath}/trial-balance?asOfDate={asOfDate:yyyy-MM-dd}", ct),
+            "FinancialReportApiService.GetTrialBalanceAsync");
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<AccountLedgerDto>> GetGeneralLedgerAsync(int accountId, DateTime from, DateTime to, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<AccountLedgerDto>(
+            () => _httpClient.GetAsync($"{BasePath}/general-ledger/{accountId}?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", ct),
+            "FinancialReportApiService.GetGeneralLedgerAsync");
+    }
 }

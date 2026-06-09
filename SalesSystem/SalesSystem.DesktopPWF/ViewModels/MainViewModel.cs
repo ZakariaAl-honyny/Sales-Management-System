@@ -132,6 +132,7 @@ public class MainViewModel : ViewModelBase
         NavigateToInventoryOperationsCommand = new RelayCommand(() => NavigateTo<InventoryOperationListViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
+        NavigateToCurrencyRatesCommand = new RelayCommand(() => NavigateTo<CurrencyRatesViewModel>());
         NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
         NavigateToJournalEntriesCommand = new RelayCommand(() => NavigateTo<JournalEntriesListViewModel>());
         NavigateToFiscalYearsCommand = new RelayCommand(() => NavigateTo<FiscalYearListViewModel>());
@@ -339,6 +340,9 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة العملات — إضافة وتعديل العملات وأسعار الصرف</summary>
     public ICommand NavigateToCurrenciesCommand { get; }
 
+    /// <summary>نقل إلى إدارة أسعار العملات — عرض وتحديث أسعار صرف العملات</summary>
+    public ICommand NavigateToCurrencyRatesCommand { get; }
+
     /// <summary>نقل إلى دليل الحسابات — عرض وتعديل الحسابات المحاسبية</summary>
     public ICommand NavigateToChartOfAccountsCommand { get; }
 
@@ -496,9 +500,24 @@ public class MainViewModel : ViewModelBase
             nameof(InventoryBatchesViewModel)       => "Products",
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
+            nameof(CurrencyRatesViewModel)          => "Currencies",
             nameof(AccountsListViewModel)           => "Settings",
             nameof(JournalEntriesListViewModel)     => "Settings",
             nameof(FiscalYearListViewModel)         => "Settings",
+            // Phase 31 — Reports
+            nameof(BalanceSheetViewModel)           => "Reports",
+            nameof(TrialBalanceViewModel)           => "Reports",
+            nameof(GeneralLedgerViewModel)          => "Reports",
+            nameof(SalesByCustomerViewModel)        => "Reports",
+            nameof(SalesByProductViewModel)         => "Reports",
+            nameof(SalesByCategoryViewModel)        => "Reports",
+            nameof(DailySalesViewModel)             => "Reports",
+            nameof(PurchasesBySupplierViewModel)    => "Reports",
+            nameof(PurchasesByProductViewModel)     => "Reports",
+            nameof(CashBoxSummaryViewModel)         => "Reports",
+            nameof(DailyClosureReportViewModel)     => "Reports",
+            nameof(UserActivityViewModel)           => "Reports",
+            nameof(LoginHistoryViewModel)           => "Reports",
             _                                        => viewModelType.Name
         };
     }
