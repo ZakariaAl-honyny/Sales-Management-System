@@ -6,6 +6,8 @@ public record CreateSalesReturnRequest(
     int WarehouseId,
     DateTime? ReturnDate,
     string? Notes,
+    int? CashBoxId,
+    decimal? RefundAmount,
     List<ReturnItemRequest> Items
 );
 

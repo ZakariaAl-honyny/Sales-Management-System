@@ -62,6 +62,8 @@ public class SalesDbContext : DbContext
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
     public DbSet<AdditionalFee> AdditionalFees => Set<AdditionalFee>();
     public DbSet<AdditionalFeeAllocation> AdditionalFeeAllocations => Set<AdditionalFeeAllocation>();
+    public DbSet<SalesQuotation> SalesQuotations => Set<SalesQuotation>();
+    public DbSet<SalesQuotationItem> SalesQuotationItems => Set<SalesQuotationItem>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 

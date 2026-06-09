@@ -46,6 +46,8 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(si => si.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
+        builder.Property(si => si.TotalCost).HasPrecision(18, 2);
+        builder.Property(si => si.QuotationId);
 
         builder.HasMany(si => si.Items)
             .WithOne(i => i.SalesInvoice)
@@ -70,6 +72,9 @@ public class SalesInvoiceItemConfiguration : IEntityTypeConfiguration<SalesInvoi
         builder.Property(sii => sii.LineTotal).HasPrecision(18, 2);
         builder.Property(sii => sii.Mode).HasConversion<byte>();
         builder.Property(sii => sii.Notes).HasMaxLength(250);
+        builder.Property(sii => sii.CostInBaseCurrency).HasPrecision(18, 2);
+        builder.Property(sii => sii.IsPriceOverridden);
+        builder.Property(sii => sii.ProductUnitId);
 
         builder.HasOne(sii => sii.Product)
             .WithMany()

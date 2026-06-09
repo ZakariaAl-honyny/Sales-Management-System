@@ -617,6 +617,10 @@ public class CreateSalesInvoiceValidatorTests
         TaxAmount: 0,
         PaidAmount: 100m,
         Notes: "Test invoice",
+        QuotationId: null,
+        CurrencyId: null,
+        ExchangeRate: null,
+        TaxId: null,
         Items: new List<CreateSalesInvoiceItemRequest>
         {
             CreateValidItem()

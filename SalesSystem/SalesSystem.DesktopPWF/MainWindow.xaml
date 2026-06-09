@@ -223,6 +223,7 @@
             </MenuItem>
             <MenuItem Header="المبيعات" ToolTip="قائمة المبيعات">
                 <MenuItem Header="فواتير البيع" ToolTip="عرض وإدارة فواتير البيع" Click="SalesInvoicesMenuItem_Click"/>
+                <MenuItem Header="عروض الأسعار" ToolTip="إدارة عروض الأسعار وتحويلها إلى فواتير" Click="SalesQuotationsMenuItem_Click"/>
                 <MenuItem Header="إرجاع المبيعات" ToolTip="إدارة مرتجعات المبيعات" Click="SalesReturnsMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="تسديد ديون العملاء" ToolTip="تسجيل المبالغ المستلمة من العملاء" Click="CustomerPaymentsMenuItem_Click"/>
@@ -330,6 +331,11 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavSalesInvoices"
                                             ToolTip="عرض وإدارة فواتير البيع بجميع حالاتها"/>
+                                    <Button Content="عروض الأسعار" 
+                                            Command="{Binding NavigateToSalesQuotationsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavSalesQuotations"
+                                            ToolTip="إدارة عروض الأسعار وتحويلها إلى فواتير"/>
                                     <Button Content="مرتجعات المبيعات" 
                                             Command="{Binding NavigateToSalesReturnsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

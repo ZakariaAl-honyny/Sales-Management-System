@@ -14,6 +14,10 @@ public record CreateSalesInvoiceRequest(
     decimal TaxAmount,
     decimal PaidAmount,
     string? Notes,
+    int? QuotationId,
+    int? CurrencyId,
+    decimal? ExchangeRate,
+    int? TaxId,
     List<CreateSalesInvoiceItemRequest> Items);
 public record CreateSalesInvoiceItemRequest(
     int ProductId,
@@ -21,4 +25,6 @@ public record CreateSalesInvoiceItemRequest(
     decimal UnitPrice,
     decimal DiscountAmount,
     SaleMode Mode,
-    string? Notes);
+    string? Notes,
+    int? ProductUnitId = null,
+    bool IsPriceOverridden = false);

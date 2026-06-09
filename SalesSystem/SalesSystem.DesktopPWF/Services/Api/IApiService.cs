@@ -337,7 +337,7 @@ public interface ISalesInvoiceApiService
     Task<Result<SalesInvoiceDto>> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> UpdateAsync(int id, CreateSalesInvoiceRequest request, CancellationToken ct = default);
-    Task<Result<SalesInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> PostAsync(int id, PostSalesInvoiceRequest? request = null, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> CancelAsync(int id, CancellationToken ct = default);
 }
 
@@ -356,7 +356,7 @@ public interface ISalesReturnApiService
     Task<Result<List<SalesReturnDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
     Task<Result<SalesReturnDto>> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Result<SalesReturnDto>> CreateAsync(CreateSalesReturnRequest request, CancellationToken ct = default);
-    Task<Result<SalesReturnDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesReturnDto>> PostAsync(int id, PostSalesReturnRequest? request = null, CancellationToken ct = default);
     Task<Result<SalesReturnDto>> CancelAsync(int id, CancellationToken ct = default);
 }
 

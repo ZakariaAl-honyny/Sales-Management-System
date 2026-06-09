@@ -6,6 +6,7 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Accounting.Enums;
 
 namespace SalesSystem.Application.Services;
 
@@ -14,17 +15,20 @@ public class SalesReturnService : ISalesReturnService
     private readonly IUnitOfWork _uow;
     private readonly IInventoryService _inventoryService;
     private readonly IDocumentSequenceService _sequenceService;
+    private readonly ICashBoxService _cashBoxService;
     private readonly ILogger<SalesReturnService> _logger;
 
     public SalesReturnService(
         IUnitOfWork uow,
         IInventoryService inventoryService,
         IDocumentSequenceService sequenceService,
+        ICashBoxService cashBoxService,
         ILogger<SalesReturnService> logger)
     {
         _uow = uow;
         _inventoryService = inventoryService;
         _sequenceService = sequenceService;
+        _cashBoxService = cashBoxService;
         _logger = logger;
     }
 
@@ -91,7 +95,9 @@ public class SalesReturnService : ISalesReturnService
                     request.SalesInvoiceId,
                     request.ReturnDate,
                     request.Notes,
-                    userId: userId
+                    userId: userId,
+                    cashBoxId: request.CashBoxId,
+                    refundAmount: request.RefundAmount ?? 0
                 );
 
                 foreach (var item in request.Items)
@@ -121,6 +127,11 @@ public class SalesReturnService : ISalesReturnService
                 return Result<SalesReturnDto>.Failure("حدث خطأ أثناء حفظ المرتجع");
             }
         }, ct);
+    }
+
+    public async Task<Result<SalesReturnDto>> PostAsync(int id, PostSalesReturnRequest request, int userId, CancellationToken ct)
+    {
+        return await PostAsync(id, userId, ct);
     }
 
     public async Task<Result<SalesReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
@@ -163,6 +174,25 @@ public class SalesReturnService : ISalesReturnService
                     if (customer != null)
                     {
                         customer.DecreaseBalance(sr.TotalAmount);
+                    }
+                }
+
+                // Create CashTransaction for refund if CashBoxId is set
+                if (sr.CashBoxId.HasValue && sr.RefundAmount > 0)
+                {
+                    var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
+                        sr.CashBoxId.Value,
+                        sr.RefundAmount,
+                        CashTransactionType.RefundOut,
+                        "SalesReturn",
+                        sr.Id,
+                        userId,
+                        ct);
+
+                    if (!cashResult.IsSuccess)
+                    {
+                        _logger.LogWarning("Cash transaction recording failed for sales return {Id}: {Error}",
+                            sr.Id, cashResult.Error);
                     }
                 }
 
@@ -267,10 +297,13 @@ public class SalesReturnService : ISalesReturnService
             0, // TaxAmount (not in entity yet)
             0, // DiscountAmount (not in entity yet)
             r.TotalAmount,
-            null, // CurrencyId — system setting
-            null, // ExchangeRate — system setting
+            r.CurrencyId,
+            r.ExchangeRate,
             r.Notes,
             (byte)r.Status,
+            r.CashBoxId,
+            null, // CashBoxName — not loaded via navigation
+            r.RefundAmount,
             r.Items.Select(it => new SalesReturnItemDto(
                 it.Id,
                 it.ProductId,

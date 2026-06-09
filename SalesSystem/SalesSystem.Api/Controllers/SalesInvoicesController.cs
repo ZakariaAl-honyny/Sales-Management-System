@@ -109,18 +109,19 @@ public class SalesInvoicesController : ControllerBase
     /// Posts a sales invoice (validates stock and updates balances)
     /// </summary>
     /// <param name="id">Invoice ID</param>
+    /// <param name="request">Post options (cash box, notes)</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Posted invoice</returns>
     [HttpPost("{id:int}/post")]
     [ProducesResponseType(typeof(SalesInvoiceDto), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> Post(int id, CancellationToken ct)
+    public async Task<IActionResult> Post(int id, [FromBody] PostSalesInvoiceRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
-        var result = await _salesService.PostAsync(id, userId, ct);
+        var result = await _salesService.PostAsync(id, request, userId, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 

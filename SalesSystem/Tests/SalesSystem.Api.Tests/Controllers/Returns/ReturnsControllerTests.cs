@@ -130,6 +130,9 @@ public class SalesReturnsControllerTests : ControllerTestBase
         ExchangeRate: null,
         Notes: "ملاحظات",
         Status: 1,
+        CashBoxId: null,
+        CashBoxName: null,
+        RefundAmount: 0m,
         Items: new List<SalesReturnItemDto>
         {
             new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
@@ -141,6 +144,8 @@ public class SalesReturnsControllerTests : ControllerTestBase
         WarehouseId: 1,
         ReturnDate: null,
         Notes: "ملاحظات إرجاع",
+        CashBoxId: null,
+        RefundAmount: null,
         Items: new List<ReturnItemRequest>
         {
             new(ProductId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m)

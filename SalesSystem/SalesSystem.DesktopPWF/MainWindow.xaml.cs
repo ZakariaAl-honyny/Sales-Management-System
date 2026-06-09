@@ -122,6 +122,7 @@ public partial class MainWindow : Window
     private void SuppliersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SupplierListViewModel>();
     private void UsersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<UserListViewModel>();
     private void SalesInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesInvoiceListViewModel>();
+    private void SalesQuotationsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesQuotationListViewModel>();
     private void PurchaseInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseInvoiceListViewModel>();
     private void PurchaseOrdersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseOrderListViewModel>();
     private void SalesReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesReturnListViewModel>();

@@ -167,6 +167,9 @@ builder.Services.AddScoped<IFifoAllocationService, FifoAllocationService>();
 builder.Services.AddScoped<IProductImageService, ProductImageService>();
 builder.Services.AddScoped<IAssemblyService, AssemblyService>();
 
+// ─── Sales Module Services (Phase 28) ──────────────────────
+builder.Services.AddScoped<ISalesQuotationService, SalesQuotationService>();
+
 // ─── Purchase Module Services (Phase 27) ────────────────────
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IAdditionalFeeService, AdditionalFeeService>();
@@ -288,6 +291,7 @@ builder.Services.AddScoped<IValidator<UpdateCustomerGroupRequest>, UpdateCustome
 builder.Services.AddScoped<IValidator<CreateBillOfMaterialRequest>, CreateBillOfMaterialRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateBillOfMaterialRequest>, UpdateBillOfMaterialRequestValidator>();
 builder.Services.AddScoped<IValidator<ProduceAssemblyRequest>, ProduceAssemblyRequestValidator>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>
 {

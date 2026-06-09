@@ -82,6 +82,7 @@ public class MainViewModel : ViewModelBase
             });
         });
         NavigateToSalesInvoicesCommand = new RelayCommand(() => NavigateTo<SalesInvoiceListViewModel>());
+        NavigateToSalesQuotationsCommand = new RelayCommand(() => NavigateTo<SalesQuotationListViewModel>());
         NavigateToSalesReturnsCommand = new RelayCommand(() => NavigateTo<SalesReturnListViewModel>());
 
         // Purchases section
@@ -195,6 +196,9 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى فواتير البيع — عرض وإدارة جميع فواتير البيع (مسودات ومرحلة وملغية)</summary>
     public ICommand NavigateToSalesInvoicesCommand { get; }
+
+    /// <summary>نقل إلى عروض الأسعار — عرض وإدارة عروض الأسعار وتحويلها إلى فواتير</summary>
+    public ICommand NavigateToSalesQuotationsCommand { get; }
 
     /// <summary>نقل إلى مرتجعات المبيعات</summary>
     public ICommand NavigateToSalesReturnsCommand { get; }

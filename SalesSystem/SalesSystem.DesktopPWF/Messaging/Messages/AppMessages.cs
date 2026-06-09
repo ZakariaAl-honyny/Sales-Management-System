@@ -69,3 +69,9 @@ public record InventoryOperationChangedMessage(int Id);
 /// </summary>
 public record PurchaseOrderChangedMessage(int OrderId);
 
+/// <summary>
+/// Published when a sales quotation is created, updated, confirmed, expired, converted, or deleted.
+/// Carries the quotation ID only — NO data payload (RULE-034).
+/// </summary>
+public record SalesQuotationChangedMessage(int QuotationId);
+

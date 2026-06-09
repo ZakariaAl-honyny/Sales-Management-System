@@ -106,6 +106,9 @@ public record SalesInvoiceDto(
     decimal? TaxRate,
     int? CurrencyId,
     decimal? ExchangeRate,
+    decimal? TotalCost,
+    decimal? TotalProfit,
+    int? QuotationId,
     IReadOnlyList<SalesInvoiceItemDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -130,7 +133,11 @@ public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName,
     decimal UnitPrice,
     decimal DiscountAmount,
     decimal LineTotal,
-    byte Mode);
+    byte Mode,
+    decimal? CostInBaseCurrency = null,
+    decimal? Profit = null,
+    bool IsPriceOverridden = false,
+    int? ProductUnitId = null);
 
 public record PurchaseInvoiceDto(
     int Id,
@@ -210,7 +217,11 @@ public record SalesReturnDto(
     int? CurrencyId,
     decimal? ExchangeRate,
     string? Notes,
-    byte Status, IReadOnlyList<SalesReturnItemDto> Items)
+    byte Status,
+    int? CashBoxId,
+    string? CashBoxName,
+    decimal RefundAmount,
+    IReadOnlyList<SalesReturnItemDto> Items)
 {
     public string StatusDisplay => Status switch
     {

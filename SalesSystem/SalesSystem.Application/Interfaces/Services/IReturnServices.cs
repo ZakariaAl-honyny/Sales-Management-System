@@ -10,6 +10,7 @@ public interface ISalesReturnService
     Task<Result<SalesReturnDto>> GetByIdAsync(int id, CancellationToken ct);
     Task<Result<PagedResult<SalesReturnDto>>> GetAllAsync(int? customerId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default);
     Task<Result<SalesReturnDto>> PostAsync(int id, int userId, CancellationToken ct);
+    Task<Result<SalesReturnDto>> PostAsync(int id, PostSalesReturnRequest request, int userId, CancellationToken ct);
     Task<Result<SalesReturnDto>> CancelAsync(int id, int userId, CancellationToken ct);
 }
 

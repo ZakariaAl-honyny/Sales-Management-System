@@ -25,6 +25,23 @@ public class SalesInvoice : BaseEntity
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
+    // ─── Phase 28: Profit Tracking & Quotation Reference ─────────────────
+    /// <summary>
+    /// إجمالي التكلفة لكل الأصناف — يستخدم لحساب صافي الربح
+    /// </summary>
+    public decimal? TotalCost { get; private set; }
+
+    /// <summary>
+    /// معرف عرض السعر المرتبط (إن وجد)
+    /// </summary>
+    public int? QuotationId { get; private set; }
+
+    // ─── Computed Properties ─────────────────────────────────────────────
+    /// <summary>
+    /// صافي الربح: إجمالي الفاتورة - إجمالي التكلفة
+    /// </summary>
+    public decimal? TotalProfit => TotalAmount - (TotalCost ?? 0);
+
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual CashBox? CashBox { get; private set; }
@@ -107,6 +124,7 @@ public class SalesInvoice : BaseEntity
         SubTotal = Items.Sum(i => i.LineTotal);
         TotalAmount = SubTotal - DiscountAmount + TaxAmount;
         DueAmount = TotalAmount - PaidAmount;
+        TotalCost = Items.Sum(i => (i.CostInBaseCurrency ?? 0) * i.Quantity);
     }
 
     public void SetPaidAmount(decimal amount)
@@ -158,6 +176,17 @@ public class SalesInvoice : BaseEntity
             throw new DomainException("لا يمكن إلغاء فاتورة مدفوعة مباشرة.");
 
         Status = InvoiceStatus.Cancelled;
+    }
+
+    /// <summary>
+    /// ربط عرض سعر بالفاتورة (اختياري)
+    /// </summary>
+    public void SetQuotationReference(int quotationId)
+    {
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("لا يمكن ربط عرض سعر بفاتورة غير مسودة.");
+        QuotationId = quotationId;
+        UpdateTimestamp();
     }
 
     public void UpdateTotals(decimal discountAmount, decimal taxAmount)

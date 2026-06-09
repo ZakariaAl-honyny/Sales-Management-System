@@ -480,6 +480,9 @@ public class SalesInvoiceListViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
+            TotalCost: null,
+            TotalProfit: null,
+            QuotationId: null,
             Items: new List<SalesInvoiceItemDto>());
     }
 

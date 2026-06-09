@@ -17,6 +17,7 @@ namespace SalesSystem.Application.Tests.Services;
 
 using DomainPaymentType = SalesSystem.Domain.Enums.PaymentType;
 using MovementType = SalesSystem.Domain.Enums.MovementType;
+using CashTransactionType = SalesSystem.Domain.Enums.CashTransactionType;
 
 /// <summary>
 /// Unit tests for SalesReturnService business logic.
@@ -28,6 +29,7 @@ public class SalesReturnServiceTests : IDisposable
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<IInventoryService> _mockInventoryService;
     private readonly Mock<IDocumentSequenceService> _mockSequenceService;
+    private readonly Mock<ICashBoxService> _mockCashBoxService;
     private readonly Mock<ILogger<SalesReturnService>> _mockLogger;
 
     private readonly SalesReturnService _sut;
@@ -46,6 +48,7 @@ public class SalesReturnServiceTests : IDisposable
         _mockUow = new Mock<IUnitOfWork>();
         _mockInventoryService = new Mock<IInventoryService>();
         _mockSequenceService = new Mock<IDocumentSequenceService>();
+        _mockCashBoxService = new Mock<ICashBoxService>();
         _mockLogger = new Mock<ILogger<SalesReturnService>>();
 
         _mockUow.Setup(u => u.SalesReturns).Returns(new InMemoryEfCoreRepository<SalesReturn>(_dbContext));
@@ -85,6 +88,7 @@ public class SalesReturnServiceTests : IDisposable
             _mockUow.Object,
             _mockInventoryService.Object,
             _mockSequenceService.Object,
+            _mockCashBoxService.Object,
             _mockLogger.Object);
     }
 
@@ -114,6 +118,8 @@ public class SalesReturnServiceTests : IDisposable
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
             Notes: "Return for defective item",
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
                 new(ProductId: 1, Quantity: 2m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
@@ -170,6 +176,8 @@ public class SalesReturnServiceTests : IDisposable
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
             Notes: null,
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
                 new(ProductId: 1, Quantity: 10m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null) // Exceeds original quantity
@@ -203,6 +211,8 @@ public class SalesReturnServiceTests : IDisposable
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
             Notes: null,
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
                 new(ProductId: 1, Quantity: 2m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
@@ -237,6 +247,8 @@ public class SalesReturnServiceTests : IDisposable
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
             Notes: null,
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
                 new(ProductId: 1, Quantity: 1m, UnitPrice: 100m, DiscountAmount: 0m, Notes: null)
@@ -278,6 +290,8 @@ public class SalesReturnServiceTests : IDisposable
             WarehouseId: 1,
             ReturnDate: DateTime.Now,
             Notes: null,
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<SalesSystem.Contracts.Requests.ReturnItemRequest>
             {
                 new(ProductId: 2, Quantity: 1m, UnitPrice: 200m, DiscountAmount: 0m, Notes: null) // Product 2 not in invoice

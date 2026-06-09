@@ -71,10 +71,11 @@ public class SalesInvoiceApiService : ApiServiceBase, ISalesInvoiceApiService
             "SalesInvoiceApiService.UpdateAsync");
     }
 
-    public async Task<Result<SalesInvoiceDto>> PostAsync(int id, CancellationToken ct = default)
+    public async Task<Result<SalesInvoiceDto>> PostAsync(int id, PostSalesInvoiceRequest? request = null, CancellationToken ct = default)
     {
+        request ??= new PostSalesInvoiceRequest();
         return await ExecuteAsync<SalesInvoiceDto>(
-            () => _httpClient.PostAsync($"{BasePath}/{id}/post", null, ct),
+            () => _httpClient.PostAsJsonAsync($"{BasePath}/{id}/post", request, ct),
             "SalesInvoiceApiService.PostAsync");
     }
 

@@ -225,6 +225,9 @@ public partial class App : System.Windows.Application
         // Purchase Order API Service
         services.AddSingleton<IPurchaseOrderApiService, PurchaseOrderApiService>();
 
+        // Sales Quotation API Service
+        services.AddSingleton<ISalesQuotationApiService, SalesQuotationApiService>();
+
         // Journal Entry API Service
         services.AddSingleton<IJournalEntryApiService, JournalEntryApiService>();
 
@@ -336,6 +339,10 @@ public partial class App : System.Windows.Application
         services.AddTransient<BillOfMaterialsListViewModel>();
         services.AddTransient<BillOfMaterialEditorViewModel>();
         services.AddTransient<AssemblyProductionViewModel>();
+
+        // Sales Quotation ViewModels
+        services.AddTransient<SalesQuotationListViewModel>();
+        services.AddTransient<SalesQuotationEditorViewModel>();
 
         // Financial Report ViewModels
         services.AddTransient<ViewModels.Reports.IncomeStatementViewModel>();

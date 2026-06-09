@@ -987,6 +987,10 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             TaxAmount,
             PaidAmount,
             Notes,
+            QuotationId: null,
+            CurrencyId: null,
+            ExchangeRate: null,
+            TaxId: null,
             items);
     }
 

@@ -61,6 +61,17 @@ public class SalesReturn : BaseEntity
     public decimal? ExchangeRate { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
+    // ─── Phase 28: Refund Tracking ───────────────────────────────────────
+    /// <summary>
+    /// معرف الصندوق النقدي المستخدم لرد المبلغ
+    /// </summary>
+    public int? CashBoxId { get; private set; }
+
+    /// <summary>
+    /// المبلغ المسترد للعميل
+    /// </summary>
+    public decimal RefundAmount { get; private set; }
+
     public virtual SalesInvoice? SalesInvoice { get; private set; }
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
@@ -78,7 +89,9 @@ public class SalesReturn : BaseEntity
         string? notes = null,
         int? currencyId = null,
         decimal? exchangeRate = null,
-        int? userId = null)
+        int? userId = null,
+        int? cashBoxId = null,
+        decimal refundAmount = 0)
     {
         if (string.IsNullOrWhiteSpace(returnNo))
             throw new DomainException("رقم الإرجاع مطلوب.");
@@ -86,6 +99,8 @@ public class SalesReturn : BaseEntity
             throw new DomainException("المستودع مطلوب.");
         if (currencyId.HasValue && !exchangeRate.HasValue)
             throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
+        if (refundAmount < 0)
+            throw new DomainException("المبلغ المسترد لا يمكن أن يكون سالباً.");
 
         var sr = new SalesReturn
         {
@@ -97,6 +112,8 @@ public class SalesReturn : BaseEntity
             CurrencyId = currencyId,
             ExchangeRate = exchangeRate,
             Notes = notes,
+            CashBoxId = cashBoxId,
+            RefundAmount = refundAmount,
             Status = InvoiceStatus.Draft
         };
         sr.SetCreatedBy(userId);

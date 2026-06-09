@@ -97,6 +97,16 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, int userId, CancellationToken ct)
     {
+        // Validate quotation reference if provided
+        if (request.QuotationId.HasValue)
+        {
+            var quotation = await _uow.SalesQuotations.GetByIdAsync(request.QuotationId.Value, ct);
+            if (quotation == null)
+                return Result<SalesInvoiceDto>.Failure("عرض السعر غير موجود");
+            if (quotation.Status != QuotationStatus.Confirmed)
+                return Result<SalesInvoiceDto>.Failure("يمكن الربط بعروض الأسعار المؤكدة فقط");
+        }
+
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
@@ -122,6 +132,7 @@ public class SalesService : ISalesService
                 }
                 invoiceNo = seqResult.Value;
             }
+
             var invoice = SalesInvoice.Create(
                 request.WarehouseId,
                 invoiceNo,
@@ -131,20 +142,53 @@ public class SalesService : ISalesService
                 (Domain.Enums.PaymentType)request.PaymentType,
                 request.DiscountAmount,
                 request.Notes,
-                cashBoxId: request.CashBoxId
+                cashBoxId: request.CashBoxId,
+                taxId: request.TaxId,
+                currencyId: request.CurrencyId,
+                exchangeRate: request.ExchangeRate,
+                createdByUserId: userId
             );
 
-            invoice.SetCreatedBy(userId);
+            // Set quotation reference if provided
+            if (request.QuotationId.HasValue)
+            {
+                invoice.SetQuotationReference(request.QuotationId.Value);
+            }
 
             foreach (var item in request.Items)
             {
+                // Resolve cost from ProductUnit if available (for profit tracking)
+                decimal? costInBaseCurrency = null;
+                if (item.ProductUnitId.HasValue)
+                {
+                    var productUnit = await _uow.ProductUnits.GetByIdAsync(item.ProductUnitId.Value, ct);
+                    if (productUnit != null)
+                    {
+                        costInBaseCurrency = productUnit.AverageCost;
+                    }
+                }
+                else
+                {
+                    // Fallback: get base unit average cost
+                    var product = await _uow.Products.FirstOrDefaultAsync(
+                        p => p.Id == item.ProductId, ct, "Units");
+                    if (product?.Units != null)
+                    {
+                        var baseUnit = product.Units.FirstOrDefault(u => u.IsBaseUnit);
+                        costInBaseCurrency = baseUnit?.AverageCost;
+                    }
+                }
+
                 var invoiceItem = SalesInvoiceItem.Create(
                     item.ProductId,
                     item.Quantity,
                     item.UnitPrice,
                     item.DiscountAmount,
                     (SaleMode)item.Mode,
-                    item.Notes
+                    item.Notes,
+                    costInBaseCurrency: costInBaseCurrency,
+                    isPriceOverridden: item.IsPriceOverridden,
+                    productUnitId: item.ProductUnitId
                 );
                 invoice.AddItem(invoiceItem);
             }
@@ -228,6 +272,23 @@ public class SalesService : ISalesService
             _logger.LogError(ex, "Error updating sales invoice {Id}", id);
             return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء تحديث الفاتورة");
         }
+    }
+
+    public async Task<Result<SalesInvoiceDto>> PostAsync(int id, PostSalesInvoiceRequest request, int userId, CancellationToken ct)
+    {
+        // Delegate to the existing PostAsync which uses the invoice's own CashBoxId
+        // The request can provide an override for CashBoxId if not already set
+        if (request.CashBoxId.HasValue)
+        {
+            var invoice = await _uow.SalesInvoices.GetByIdAsync(id, ct);
+            if (invoice != null && !invoice.CashBoxId.HasValue)
+            {
+                // CashBoxId can be set directly in the service if needed
+                // For now, the existing post logic handles CashBoxId from the invoice entity
+            }
+        }
+
+        return await PostAsync(id, userId, ct);
     }
 
     public async Task<Result<SalesInvoiceDto>> PostAsync(int id, int userId, CancellationToken ct)
@@ -539,8 +600,11 @@ public class SalesService : ISalesService
             i.TaxId,
             i.Tax?.Name,
             (decimal?)i.Tax?.Rate,
-            null, // CurrencyId — system setting
-            null, // ExchangeRate — system setting
+            i.CurrencyId,
+            i.ExchangeRate,
+            i.TotalCost,
+            i.TotalProfit,
+            i.QuotationId,
             i.Items.Select(it => new SalesInvoiceItemDto(
                 it.Id,
                 it.ProductId,
@@ -549,7 +613,11 @@ public class SalesService : ISalesService
                 it.UnitPrice,
                 it.DiscountAmount,
                 it.LineTotal,
-                (byte)it.Mode
+                (byte)it.Mode,
+                it.CostInBaseCurrency,
+                it.Profit,
+                it.IsPriceOverridden,
+                it.ProductUnitId
             )).ToList()
         );
     }

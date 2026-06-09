@@ -61,4 +61,8 @@ public record UpdateSalesInvoiceRequest(
     decimal PaidAmount,
     int? CashBoxId,
     string? Notes,
+    int? QuotationId,
+    int? CurrencyId,
+    decimal? ExchangeRate,
+    int? TaxId,
     List<CreateSalesInvoiceItemRequest> Items);

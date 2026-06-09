@@ -71,6 +71,8 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<PurchaseOrderItem>? _purchaseOrderItems;
     private IGenericRepository<AdditionalFee>? _additionalFees;
     private IGenericRepository<AdditionalFeeAllocation>? _additionalFeeAllocations;
+    private IGenericRepository<SalesQuotation>? _salesQuotations;
+    private IGenericRepository<SalesQuotationItem>? _salesQuotationItems;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -131,6 +133,8 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<PurchaseOrderItem> PurchaseOrderItems => _purchaseOrderItems ??= new GenericRepository<PurchaseOrderItem>(_context);
     public IGenericRepository<AdditionalFee> AdditionalFees => _additionalFees ??= new GenericRepository<AdditionalFee>(_context);
     public IGenericRepository<AdditionalFeeAllocation> AdditionalFeeAllocations => _additionalFeeAllocations ??= new GenericRepository<AdditionalFeeAllocation>(_context);
+    public IGenericRepository<SalesQuotation> SalesQuotations => _salesQuotations ??= new GenericRepository<SalesQuotation>(_context);
+    public IGenericRepository<SalesQuotationItem> SalesQuotationItems => _salesQuotationItems ??= new GenericRepository<SalesQuotationItem>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {

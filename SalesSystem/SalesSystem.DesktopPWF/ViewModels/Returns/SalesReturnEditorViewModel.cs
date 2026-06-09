@@ -409,6 +409,8 @@ public class SalesReturnEditorViewModel : ViewModelBase
                 WarehouseId: SelectedWarehouseId,
                 ReturnDate: ReturnDate,
                 Notes: Notes,
+                CashBoxId: null,
+                RefundAmount: null,
                 Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new ReturnItemRequest(
                     ProductId: i.ProductId,
                     Quantity: i.ReturnQuantity,

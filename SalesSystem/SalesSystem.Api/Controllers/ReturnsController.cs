@@ -95,14 +95,31 @@ public class SalesReturnsController : ControllerBase
     }
 
     /// <summary>
-    /// Posts a draft sales return (increases stock, decreases customer balance)
+    /// Posts a draft sales return (increases stock, decreases customer balance, records refund)
     /// </summary>
     [HttpPost("{id:int}/post")]
     [ProducesResponseType(typeof(SalesReturnDto), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Post(int id, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Post(int id, [FromBody] PostSalesReturnRequest request, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        int.TryParse(userIdStr, out var userId);
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _returnService.PostAsync(id, request, userId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Simple post without body (backwards compatible).</summary>
+    [HttpPost("{id:int}/post-simple")]
+    [ProducesResponseType(typeof(SalesReturnDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PostSimple(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
         var result = await _returnService.PostAsync(id, userId, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }

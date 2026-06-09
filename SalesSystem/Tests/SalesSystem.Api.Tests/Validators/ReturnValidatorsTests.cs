@@ -118,6 +118,8 @@ public class ReturnValidatorsTests
             WarehouseId: 1,
             ReturnDate: DateTime.UtcNow.AddDays(-1),
             Notes: "Return note",
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<ReturnItemRequest>
             {
                 new(1, 5, 100, 0)
@@ -415,6 +417,8 @@ public class ReturnValidatorsTests
             WarehouseId: 1,
             ReturnDate: DateTime.UtcNow.AddDays(-1),
             Notes: "Return note",
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<ReturnItemRequest>
             {
                 new(1, 5, 100, 0)
