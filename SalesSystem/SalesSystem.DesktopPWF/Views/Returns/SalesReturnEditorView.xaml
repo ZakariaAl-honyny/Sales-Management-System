@@ -164,6 +164,36 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Refund Section -->
+                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8"
+                            Visibility="{Binding IsDraft, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="💰 استرداد المبلغ" FontSize="14" FontWeight="SemiBold" 
+                                       Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
+                            <CheckBox Content="تفعيل الاسترداد النقدي" IsChecked="{Binding EnableRefund}" 
+                                      Margin="0,0,0,8"
+                                      ToolTip="عند تفعيل الاسترداد، سيتم صرف المبلغ إلى الصندوق المحدد عند ترحيل المرتجع"/>
+                            
+                            <StackPanel Orientation="Horizontal" 
+                                        Visibility="{Binding EnableRefund, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="الصندوق" Style="{StaticResource LabelStyle}"/>
+                                    <ComboBox ItemsSource="{Binding CashBoxes}" 
+                                              SelectedItem="{Binding SelectedCashBox}"
+                                              DisplayMemberPath="BoxName"
+                                              Width="140"
+                                              ToolTip="اختر الصندوق النقدي الذي سيتم صرف المبلغ إليه"/>
+                                </StackPanel>
+                                <StackPanel>
+                                    <TextBlock Text="مبلغ الاسترداد" Style="{StaticResource LabelStyle}"/>
+                                    <TextBox Text="{Binding RefundAmount, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                             Width="110"
+                                             ToolTip="المبلغ الذي سيتم استرداده — لا يمكن أن يتجاوز إجمالي قيمة المرتجع"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Notes -->
                     <Border Style="{StaticResource CardStyle}">
                         <StackPanel>

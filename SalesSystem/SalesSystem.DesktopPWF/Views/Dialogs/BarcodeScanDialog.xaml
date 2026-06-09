@@ -1,0 +1,105 @@
+<Window x:Class="SalesSystem.DesktopPWF.Views.Dialogs.BarcodeScanDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        FlowDirection="RightToLeft"
+        Topmost="True">
+
+    <Window.Resources>
+        <Style x:Key="ScanInputStyle" TargetType="TextBox">
+            <Setter Property="FontSize" Value="28"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="BorderBrush" Value="#2196F3"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#333"/>
+            <Setter Property="AcceptsReturn" Value="False"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Rectangle Fill="#80000000"/>
+
+        <Border VerticalAlignment="Center" HorizontalAlignment="Center"
+                Background="White" CornerRadius="16"
+                Width="500" MinHeight="280" Padding="24"
+                Effect="{StaticResource DeepShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Title and Status -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                    <Border Background="#E3F2FD" CornerRadius="22" Width="44" Height="44">
+                        <TextBlock Text="📷" FontSize="20"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="المسح المستمر للباركود" FontSize="16" FontWeight="Bold" Foreground="#1565C0"/>
+                        <TextBlock x:Name="StatusText" Text="بانتظار المسح..." FontSize="11" Foreground="#666" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Scanner Icon / Animation area -->
+                <Border Grid.Row="1" Background="#F5F5F5" CornerRadius="12" Padding="16" Margin="0,0,0,16">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="📸" FontSize="48" HorizontalAlignment="Center"/>
+                        <TextBlock Text="قم بتوجيه الماسح نحو الباركود" FontSize="13" Foreground="#555" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Text="سيتم إضافة المنتجات تلقائياً" FontSize="11" Foreground="#888" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Barcode Input -->
+                <TextBox x:Name="BarcodeInput" Grid.Row="2"
+                         Style="{StaticResource ScanInputStyle}"
+                         ToolTip="أدخل الباركود يدوياً أو استخدم الماسح — سيتم إضافة المنتج تلقائياً"
+                         Margin="0,0,0,16">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"
+                                    CommandParameter="{Binding Text, RelativeSource={RelativeSource AncestorType=TextBox}}"/>
+                    </TextBox.InputBindings>
+                </TextBox>
+
+                <!-- Close button -->
+                <Button Grid.Row="3" x:Name="CloseButton"
+                        Content="✕ إغلاق المسح المستمر"
+                        MinWidth="120"
+                        HorizontalAlignment="Center"
+                        Background="#EF5350" Foreground="White"
+                        FontWeight="SemiBold" FontSize="11"
+                        BorderThickness="0" Cursor="Hand"
+                        Click="CloseButton_Click"
+                        ToolTip="إغلاق نافذة المسح المستمر">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Border" Background="{TemplateBinding Background}"
+                                    CornerRadius="6" Padding="12,4">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="#E53935"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="#C62828"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
