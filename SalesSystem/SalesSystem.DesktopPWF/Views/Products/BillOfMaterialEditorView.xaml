@@ -1,0 +1,132 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Products.BillOfMaterialEditorView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      mc:Ignorable="d"
+     
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Background="{StaticResource PrimaryBrush}" Padding="12,6" CornerRadius="6,6,0,0">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="🧩" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding IsEditMode, Converter={StaticResource InverseBoolToVisibility}}">
+                    <TextBlock.Visibility>
+                        <Binding Path="IsEditMode" Converter="{StaticResource InverseBoolToVisibility}"/>
+                    </TextBlock.Visibility>
+                </TextBlock>
+                <TextBlock FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="إضافة مكون جديد"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEditMode}" Value="True">
+                                    <Setter Property="Text" Value="تعديل المكون"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
+        <!-- Form -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,12,0,0">
+
+                <!-- Assembly Product -->
+                <TextBlock Text="المنتج المُجمَّع *" Style="{StaticResource LabelStyle}"/>
+                <ComboBox ItemsSource="{Binding AvailableProducts}"
+                          SelectedItem="{Binding SelectedAssemblyProduct}"
+                          DisplayMemberPath="Name"
+                          Style="{StaticResource ModernComboBox}"
+                          ToolTip="اختر المنتج الذي سيتم تصنيعه — هذا هو المنتج النهائي المُجمَّع من المكونات"/>
+                <TextBlock Text="اختر المنتج الذي يتم تجميعه (المنتج النهائي)" 
+                           Style="{StaticResource HelperTextStyle}" Margin="0,0,0,8"/>
+
+                <!-- Component Product -->
+                <TextBlock Text="المكوّن *" Style="{StaticResource LabelStyle}"/>
+                <ComboBox ItemsSource="{Binding AvailableProducts}"
+                          SelectedItem="{Binding SelectedComponentProduct}"
+                          DisplayMemberPath="Name"
+                          Style="{StaticResource ModernComboBox}"
+                          ToolTip="اختر المنتج المكوّن الذي سيكون جزءاً من المنتج المُجمَّع"/>
+                <TextBlock Text="اختر المنتج الذي سيكون مكوّناً من مكونات المُجمَّع" 
+                           Style="{StaticResource HelperTextStyle}" Margin="0,0,0,8"/>
+
+                <!-- Component Unit -->
+                <TextBlock Text="وحدة المكوّن *" Style="{StaticResource LabelStyle}"/>
+                <ComboBox ItemsSource="{Binding AvailableUnits}"
+                          SelectedItem="{Binding SelectedComponentUnit}"
+                          DisplayMemberPath="UnitName"
+                          Style="{StaticResource ModernComboBox}"
+                          ToolTip="اختر وحدة قياس المكوّن (حبة، كرتون، كيلو...)"/>
+                <TextBlock Text="الوحدة التي يقاس بها المكوّن — تظهر بعد اختيار المكوّن" 
+                           Style="{StaticResource HelperTextStyle}" Margin="0,0,0,8"/>
+
+                <!-- Quantity Required -->
+                <TextBlock Text="الكمية المطلوبة *" Style="{StaticResource LabelStyle}"/>
+                <TextBox Text="{Binding QuantityRequired, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource ModernTextBox}"
+                         ToolTip="أدخل الكمية المطلوبة من المكوّن لتصنيع وحدة واحدة من المنتج المُجمَّع"/>
+                <TextBlock Text="الكمية المطلوب صرفها من المكوّن لتصنيع وحدة واحدة من المُجمَّع" 
+                           Style="{StaticResource HelperTextStyle}" Margin="0,0,0,8"/>
+
+                <!-- Waste Percentage -->
+                <TextBlock Text="نسبة الهالك (%)" Style="{StaticResource LabelStyle}"/>
+                <TextBox Text="{Binding WastePercentage, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource ModernTextBox}"
+                         ToolTip="نسبة الهالك المتوقعة — الكمية الفعلية = الكمية × (1 + النسبة)"/>
+                <TextBlock Text="نسبة إضافية للهالك والفاقد (اختياري)" 
+                           Style="{StaticResource HelperTextStyle}" Margin="0,0,0,8"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Error Message -->
+        <Border Grid.Row="2"
+                Background="{StaticResource ErrorLightBrush}" 
+                BorderBrush="{StaticResource ErrorBrush}"
+                BorderThickness="1"
+                Padding="12,8"
+                Margin="0,8,0,0"
+                CornerRadius="6"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="14"/>
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" FontSize="12" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Footer Buttons -->
+        <Border Grid.Row="3" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}"
+                Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}"
+                        ToolTip="حفظ بيانات المكوّن — سيتم التحقق من صحة البيانات قبل الحفظ">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="💾" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="حفظ" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                        ToolTip="إلغاء وإغلاق نافذة التحرير">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🚫" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="إلغاء" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

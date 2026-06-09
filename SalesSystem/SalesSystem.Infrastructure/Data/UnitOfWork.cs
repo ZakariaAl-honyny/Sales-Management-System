@@ -66,6 +66,7 @@ private IGenericRepository<ProductBarcode>? _productBarcodes;
     private IGenericRepository<ProductImage>? _productImages;
     private IGenericRepository<InventoryOperation>? _inventoryOperations;
     private IGenericRepository<InventoryOperationItem>? _inventoryOperationItems;
+    private IGenericRepository<BillOfMaterials>? _billOfMaterials;
 
     public UnitOfWork(SalesDbContext context)
     {
@@ -121,6 +122,7 @@ public IGenericRepository<ProductBarcode> ProductBarcodes => _productBarcodes ??
     public IGenericRepository<ProductImage> ProductImages => _productImages ??= new GenericRepository<ProductImage>(_context);
     public IGenericRepository<InventoryOperation> InventoryOperations => _inventoryOperations ??= new GenericRepository<InventoryOperation>(_context);
     public IGenericRepository<InventoryOperationItem> InventoryOperationItems => _inventoryOperationItems ??= new GenericRepository<InventoryOperationItem>(_context);
+    public IGenericRepository<BillOfMaterials> BillOfMaterials => _billOfMaterials ??= new GenericRepository<BillOfMaterials>(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken ct = default)
     {

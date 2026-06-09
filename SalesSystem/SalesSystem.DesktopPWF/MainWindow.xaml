@@ -130,6 +130,9 @@
             <DataTemplate DataType="{x:Type vmProducts:ProductImagesViewModel}">
                 <viewsProducts:ProductImagesView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmProducts:BillOfMaterialsListViewModel}">
+                <viewsProducts:BillOfMaterialsListView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmWarehouses:InventoryBatchesViewModel}">
                 <viewsWarehouses:InventoryBatchesView />
             </DataTemplate>
@@ -256,6 +259,7 @@
             </MenuItem>
             <MenuItem Header="الإعدادات" ToolTip="قائمة الإعدادات" x:Name="SettingsMenuItem">
                 <MenuItem Header="إدارة المنتجات" ToolTip="إدارة قائمة المنتجات والأسعار" Click="ProductsMenuItem_Click"/>
+                <MenuItem Header="المكونات (BOM)" Command="{Binding NavigateToBillOfMaterialsCommand}" ToolTip="إدارة قائمة المكونات للمنتجات المُجمَّعة — تحديد المكونات والكميات والوحدات"/>
                 <MenuItem Header="إدارة العملاء" ToolTip="إدارة بيانات العملاء" Click="CustomersMenuItem_Click"/>
                 <MenuItem Header="مجموعات العملاء" Command="{Binding NavigateToCustomerGroupsCommand}" ToolTip="تصنيف وترتيب العملاء في مجموعات للتقرير والتحليل"/>
                 <MenuItem Header="إدارة الموردين" ToolTip="إدارة بيانات الموردين" Click="SuppliersMenuItem_Click"/>
@@ -446,6 +450,11 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavProductImages"
                                             ToolTip="إدارة صور المنتجات — إضافة وعرض صور متعددة لكل منتج"/>
+                                    <Button Content="المكونات (BOM)" 
+                                            Command="{Binding NavigateToBillOfMaterialsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavBillOfMaterials"
+                                            ToolTip="إدارة قائمة المكونات — تحديد المكونات اللازمة لتصنيع المنتجات المُجمَّعة"/>
                                     <Button Content="الدفعات المخزنية" 
                                             Command="{Binding NavigateToInventoryBatchesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

@@ -57,6 +57,7 @@ public class SalesDbContext : DbContext
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<InventoryOperation> InventoryOperations => Set<InventoryOperation>();
     public DbSet<InventoryOperationItem> InventoryOperationItems => Set<InventoryOperationItem>();
+    public DbSet<BillOfMaterials> BillOfMaterials => Set<BillOfMaterials>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 

@@ -21,5 +21,12 @@ public enum CostingMethod : byte
     /// سعر المورد — Supplier Catalog Price
     /// Uses the supplier's catalog price (not the actual invoice price).
     /// </summary>
-    SupplierPrice = 3
+    SupplierPrice = 3,
+
+    /// <summary>
+    /// الوارد أولاً صادر أولاً — First In, First Out (FIFO)
+    /// Cost is assigned based on the oldest purchase batch first.
+    /// Requires batch-level tracking (InventoryBatches) for accurate costing.
+    /// </summary>
+    FIFO = 4
 }

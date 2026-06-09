@@ -839,3 +839,37 @@ public record InventoryOperationItemDto(
     byte? StockIssueReason,
     string? Notes);
 
+// ═══════════════════════════════════════════════════════
+// Phase — Assembly / Bill of Materials DTOs
+// ═══════════════════════════════════════════════════════
+
+public record BillOfMaterialDto(
+    int Id,
+    int AssemblyProductId,
+    string AssemblyProductName,
+    int ComponentProductId,
+    string ComponentProductName,
+    int ComponentUnitId,
+    string ComponentUnitName,
+    decimal QuantityRequired,
+    decimal WastePercentage,
+    decimal EffectiveQuantityRequired,
+    bool IsActive
+);
+
+public record ProduceAssemblyResultDto(
+    int AssemblyProductId,
+    string AssemblyProductName,
+    decimal QuantityProduced,
+    decimal TotalCost,
+    IReadOnlyList<ComponentConsumedDto> Components
+);
+
+public record ComponentConsumedDto(
+    int ComponentProductId,
+    string ComponentProductName,
+    decimal QuantityConsumed,
+    decimal UnitCost,
+    decimal TotalCost
+);
+
