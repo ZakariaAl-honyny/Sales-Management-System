@@ -114,7 +114,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
         if (!invoiceId.HasValue)
         {
-            InvoiceNo = 0; // Service will compute lastId + 1
+            InvoiceNo = 0; // 0 = auto-generate via DocumentSequenceService (thread-safe)
         }
 
         SaveCommand = new AsyncRelayCommand(SaveAsync);
@@ -723,7 +723,8 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             Result<PurchaseInvoiceDto> result;
             if (_isEditMode)
             {
-                result = await _invoiceService.UpdateAsync(_invoiceId!.Value, request);
+                var updateRequest = BuildUpdateRequest();
+                result = await _invoiceService.UpdateAsync(_invoiceId!.Value, updateRequest);
             }
             else
             {
@@ -908,6 +909,53 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         }
 
         return true;
+    }
+
+    private UpdatePurchaseInvoiceRequest BuildUpdateRequest()
+    {
+        var items = Items
+            .Where(i => i.SelectedProduct != null && i.Quantity > 0)
+            .Select(i => new CreatePurchaseInvoiceItemRequest(
+                i.SelectedProduct!.Id,
+                i.ProductUnitId > 0 ? i.ProductUnitId : 1,
+                i.Quantity,
+                i.UnitCost,
+                i.DiscountAmount,
+                null,
+                null,
+                (SaleMode)i.Mode,
+                null))
+            .ToList();
+
+        List<CreateAdditionalFeeRequest>? additionalFees = null;
+        if (AdditionalFees.Any(f => !string.IsNullOrWhiteSpace(f.FeeName) && f.FeeAmount > 0))
+        {
+            additionalFees = AdditionalFees
+                .Where(f => !string.IsNullOrWhiteSpace(f.FeeName) && f.FeeAmount > 0)
+                .Select(f => new CreateAdditionalFeeRequest(f.FeeName, f.FeeAmount, f.DistributionMethod, f.AccountId))
+                .ToList();
+        }
+
+        return new UpdatePurchaseInvoiceRequest(
+            SelectedWarehouseId,
+            SelectedSupplierId ?? 0,
+            InvoiceDate,
+            null, // DueDate
+            (PaymentType)SelectedPaymentType,
+            InvoiceDiscount,
+            TaxAmount,
+            PaidAmount,
+            SelectedCashBox?.Id,
+            SelectedCurrencyId,
+            ExchangeRate,
+            IsPercentageDiscount ? (byte)1 : null,
+            IsPercentageDiscount ? DiscountRate : null,
+            AttachmentBase64,
+            AttachmentFileName,
+            Notes,
+            SupplierInvoiceNo,
+            items,
+            additionalFees);
     }
 
     private CreatePurchaseInvoiceRequest BuildRequest()

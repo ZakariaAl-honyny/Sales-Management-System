@@ -156,27 +156,24 @@
                                                 <ComboBox ItemsSource="{Binding AvailableProducts}"
                                                           SelectedItem="{Binding SelectedProduct}"
                                                           DisplayMemberPath="Name"
-                                                          Style="{StaticResource ModernComboBox}"
-                                                          Height="24"
-                                                          ToolTip="اختر المنتج لهذا البند — اكتب للبحث"/>
+                                                           Style="{StaticResource ModernComboBox}"
+                                                           ToolTip="اختر المنتج لهذا البند — اكتب للبحث"/>
                                             </StackPanel>
 
                                             <!-- Quantity -->
                                             <StackPanel Grid.Column="1" Margin="0,0,4,0">
                                                 <TextBlock Text="الكمية *" Style="{StaticResource LabelStyle}" FontSize="10"/>
-                                                <TextBox Text="{Binding Quantity, StringFormat=N3}"
-                                                         Style="{StaticResource ModernTextBox}"
-                                                         Height="24"
-                                                         ToolTip="أدخل الكمية — يجب أن تكون أكبر من صفر"/>
+                                                        <TextBox Text="{Binding Quantity, StringFormat=N3}"
+                                                          Style="{StaticResource ModernTextBox}"
+                                                          ToolTip="أدخل الكمية — يجب أن تكون أكبر من صفر"/>
                                             </StackPanel>
 
                                             <!-- Unit Cost -->
                                             <StackPanel Grid.Column="2" Margin="0,0,4,0">
                                                 <TextBlock Text="التكلفة" Style="{StaticResource LabelStyle}" FontSize="10"/>
                                                 <TextBox Text="{Binding UnitCost, StringFormat=N2}"
-                                                         Style="{StaticResource ModernTextBox}"
-                                                         Height="24"
-                                                         ToolTip="تكلفة الوحدة من المنتج"/>
+                                                          Style="{StaticResource ModernTextBox}"
+                                                          ToolTip="تكلفة الوحدة من المنتج"/>
                                             </StackPanel>
 
                                             <!-- Line Total -->
@@ -193,8 +190,7 @@
                                                     Command="{Binding DataContext.RemoveItemCommand, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
                                                     CommandParameter="{Binding}"
                                                     Content="✕"
-                                                    Width="24" Height="24"
-                                                    FontSize="11"
+                                                     FontSize="11"
                                                     Margin="2,8,0,0"
                                                     VerticalAlignment="Top"
                                                     ToolTip="حذف هذا الصنف من الأمر">

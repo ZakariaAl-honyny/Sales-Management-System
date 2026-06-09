@@ -15,7 +15,7 @@ public interface IFeeDistributionService
     /// <param name="fee">المصروف الإضافي المراد توزيعه.</param>
     /// <param name="items">بنود الفاتورة المستهدفة.</param>
     /// <returns>قائمة بالتخصيصات (Allocation) لكل بند.</returns>
-    Task<List<AdditionalFeeAllocation>> DistributeFeeAsync(
+    Task<Result<List<AdditionalFeeAllocation>>> DistributeFeeAsync(
         AdditionalFee fee,
         List<PurchaseInvoiceItem> items,
         CancellationToken ct);
@@ -23,5 +23,5 @@ public interface IFeeDistributionService
     /// <summary>
     /// حساب إجمالي الرسوم الموزعة على جميع بنود الفاتورة.
     /// </summary>
-    Task<decimal> CalculateTotalAllocatedFeesAsync(List<PurchaseInvoiceItem> items);
+    Task<Result<decimal>> CalculateTotalAllocatedFeesAsync(List<PurchaseInvoiceItem> items);
 }

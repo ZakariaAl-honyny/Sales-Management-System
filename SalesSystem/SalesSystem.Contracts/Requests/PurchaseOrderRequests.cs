@@ -28,6 +28,7 @@ public record CreatePurchaseOrderItemRequest(
 /// طلب تحديث أمر شراء موجود.
 /// </summary>
 public record UpdatePurchaseOrderRequest(
+    int? OrderNo,
     int SupplierId,
     int WarehouseId,
     DateTime? OrderDate,

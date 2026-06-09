@@ -68,10 +68,7 @@ public class PurchaseServiceTests : IDisposable
                 return 1;
             });
 
-        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MockDbContextTransaction());
-
-        _mockUow.Setup(u => u.ExecuteAsync<Result<PurchaseInvoiceDto>>(
+        _mockUow.Setup(u => u.ExecuteTransactionAsync<Result<PurchaseInvoiceDto>>(
             It.IsAny<Func<Task<Result<PurchaseInvoiceDto>>>>(),
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result<PurchaseInvoiceDto>>> func, CancellationToken ct) => func());

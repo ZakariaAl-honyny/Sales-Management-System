@@ -346,7 +346,7 @@ public interface IPurchaseInvoiceApiService
     Task<Result<List<PurchaseInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
-    Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
+    Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> CancelAsync(int id, CancellationToken ct = default);
 }

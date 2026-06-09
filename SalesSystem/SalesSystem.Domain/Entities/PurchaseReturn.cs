@@ -183,6 +183,7 @@ public class PurchaseReturn : BaseEntity
         DiscountType = discountType;
         DiscountRate = discountRate;
         RecalculateTotals();
+        UpdateTimestamp();
     }
 
     public void Post()

@@ -131,6 +131,17 @@ public class PurchaseOrder : BaseEntity
         Status = PurchaseOrderStatus.Cancelled;
     }
 
+    public void SetOrderNo(int orderNo)
+    {
+        if (orderNo <= 0)
+            throw new DomainException("رقم الأمر يجب أن يكون أكبر من الصفر.");
+        if (Status != PurchaseOrderStatus.Draft)
+            throw new DomainException("لا يمكن تغيير رقم الأمر بعد اعتماده.");
+
+        OrderNo = orderNo;
+        UpdateTimestamp();
+    }
+
     public void UpdateReceivedQuantity(int productId, int productUnitId, decimal qty)
     {
         var item = Items.SingleOrDefault(i => i.ProductId == productId && i.ProductUnitId == productUnitId);

@@ -239,7 +239,6 @@ public record PurchaseReturnDto(
     bool? LinkToInvoice,
     DateTime ReturnDate,
     decimal SubTotal,
-    decimal TaxAmount,
     decimal DiscountAmount,
     byte? DiscountType,
     decimal? DiscountRate,

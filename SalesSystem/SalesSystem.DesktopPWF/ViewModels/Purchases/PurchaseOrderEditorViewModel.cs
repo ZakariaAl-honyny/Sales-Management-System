@@ -360,6 +360,7 @@ public class PurchaseOrderEditorViewModel : ViewModelBase
             if (_isEditMode && _orderId.HasValue)
             {
                 var updateRequest = new UpdatePurchaseOrderRequest(
+                    OrderNo,
                     SelectedSupplierId,
                     SelectedWarehouseId,
                     OrderDate,

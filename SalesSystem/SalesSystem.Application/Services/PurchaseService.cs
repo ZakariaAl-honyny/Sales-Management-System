@@ -106,106 +106,97 @@ public class PurchaseService : IPurchaseService
 
     public async Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, int userId, CancellationToken ct)
     {
-        await using var transaction = await _uow.BeginTransactionAsync(ct);
-        try
+        return await _uow.ExecuteTransactionAsync<Result<PurchaseInvoiceDto>>(async () =>
         {
-            // Resolve InvoiceNo inside transaction
-            int invoiceNo;
-            if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
+            try
             {
-                var existing = await _uow.PurchaseInvoices.AnyAsync(i => i.InvoiceNo == request.InvoiceNo.Value, ct);
-                if (existing)
+                // Resolve InvoiceNo inside transaction
+                int invoiceNo;
+                if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
                 {
-                    await transaction.RollbackAsync(ct);
-                    return Result<PurchaseInvoiceDto>.Failure("رقم الفاتورة موجود بالفعل");
+                    var existing = await _uow.PurchaseInvoices.AnyAsync(i => i.InvoiceNo == request.InvoiceNo.Value, ct);
+                    if (existing)
+                    {
+                        return Result<PurchaseInvoiceDto>.Failure("رقم الفاتورة موجود بالفعل");
+                    }
+                    invoiceNo = request.InvoiceNo.Value;
                 }
-                invoiceNo = request.InvoiceNo.Value;
-            }
-            else
-            {
-                var seqResult = await _documentSequenceService.GetNextIntAsync("PurchaseInvoice", ct);
-                if (!seqResult.IsSuccess)
+                else
                 {
-                    await transaction.RollbackAsync(ct);
-                    return Result<PurchaseInvoiceDto>.Failure("فشل في توليد رقم الفاتورة");
+                    var seqResult = await _documentSequenceService.GetNextIntAsync("PurchaseInvoice", ct);
+                    if (!seqResult.IsSuccess)
+                    {
+                        return Result<PurchaseInvoiceDto>.Failure("فشل في توليد رقم الفاتورة");
+                    }
+                    invoiceNo = seqResult.Value;
                 }
-                invoiceNo = seqResult.Value;
-            }
 
-            var invoice = PurchaseInvoice.Create(
-                request.SupplierId,
-                request.WarehouseId,
-                invoiceNo,
-                request.InvoiceDate,
-                request.DueDate,
-                (Domain.Enums.PaymentType)request.PaymentType,
-                request.DiscountAmount,
-                request.SupplierInvoiceNo,
-                request.Notes,
-                cashBoxId: request.CashBoxId,
-                taxId: null,
-                currencyId: request.CurrencyId,
-                exchangeRate: request.ExchangeRate,
-                createdByUserId: userId
-            );
-
-            // Set discount type/rate if provided
-            if (request.DiscountType.HasValue)
-            {
-                invoice.SetDiscount(
+                var invoice = PurchaseInvoice.Create(
+                    request.SupplierId,
+                    request.WarehouseId,
+                    invoiceNo,
+                    request.InvoiceDate,
+                    request.DueDate,
+                    (Domain.Enums.PaymentType)request.PaymentType,
                     request.DiscountAmount,
-                    (Domain.Enums.DiscountType)request.DiscountType.Value,
-                    request.DiscountRate);
-            }
-
-            foreach (var item in request.Items)
-            {
-                var invoiceItem = PurchaseInvoiceItem.Create(
-                    item.ProductId,
-                    item.ProductUnitId,
-                    item.Quantity,
-                    item.UnitCost,
-                    item.DiscountAmount,
-                    (Domain.Enums.DiscountType)(item.DiscountType ?? 0),
-                    item.DiscountRate,
-                    (SaleMode)item.Mode,
-                    item.Notes
+                    request.SupplierInvoiceNo,
+                    request.Notes,
+                    cashBoxId: request.CashBoxId,
+                    taxId: null,
+                    currencyId: request.CurrencyId,
+                    exchangeRate: request.ExchangeRate,
+                    createdByUserId: userId
                 );
-                invoice.AddItem(invoiceItem);
+
+                // Set discount type/rate if provided
+                if (request.DiscountType.HasValue)
+                {
+                    invoice.SetDiscount(
+                        request.DiscountAmount,
+                        (Domain.Enums.DiscountType)request.DiscountType.Value,
+                        request.DiscountRate);
+                }
+
+                foreach (var item in request.Items)
+                {
+                    var invoiceItem = PurchaseInvoiceItem.Create(
+                        item.ProductId,
+                        item.ProductUnitId,
+                        item.Quantity,
+                        item.UnitCost,
+                        item.DiscountAmount,
+                        (Domain.Enums.DiscountType)(item.DiscountType ?? 0),
+                        item.DiscountRate,
+                        (SaleMode)item.Mode,
+                        item.Notes
+                    );
+                    invoice.AddItem(invoiceItem);
+                }
+
+                invoice.SetTaxAmount(request.TaxAmount);
+                invoice.SetPaidAmount(request.PaidAmount);
+
+                // Handle attachment if provided
+                if (!string.IsNullOrEmpty(request.AttachmentBase64))
+                {
+                    var attachmentPath = await SaveAttachmentAsync(invoice.Id, request.AttachmentBase64, request.AttachmentFileName, ct);
+                    if (attachmentPath != null)
+                        invoice.SetAttachment(attachmentPath);
+                }
+
+                await _uow.PurchaseInvoices.AddAsync(invoice, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("تم إنشاء فاتورة شراء كمسودة: المعرف {Id} بواسطة المستخدم {UserId}", invoice.Id, userId);
+
+                return await GetByIdAsync(invoice.Id, ct);
             }
-
-            invoice.SetTaxAmount(request.TaxAmount);
-            invoice.SetPaidAmount(request.PaidAmount);
-
-            // Handle attachment if provided
-            if (!string.IsNullOrEmpty(request.AttachmentBase64))
+            catch (DomainException ex)
             {
-                var attachmentPath = await SaveAttachmentAsync(invoice.Id, request.AttachmentBase64, request.AttachmentFileName, ct);
-                if (attachmentPath != null)
-                    invoice.SetAttachment(attachmentPath);
+                _logger.LogWarning(ex, "خطأ في المجال أثناء إنشاء فاتورة الشراء: {Message}", ex.Message);
+                return Result<PurchaseInvoiceDto>.Failure(ex.Message);
             }
-
-            await _uow.PurchaseInvoices.AddAsync(invoice, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            await transaction.CommitAsync(ct);
-
-            _logger.LogInformation("تم إنشاء فاتورة شراء كمسودة: المعرف {Id} بواسطة المستخدم {UserId}", invoice.Id, userId);
-
-            return await GetByIdAsync(invoice.Id, ct);
-        }
-        catch (DomainException ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogWarning(ex, "خطأ في المجال أثناء إنشاء فاتورة الشراء: {Message}", ex.Message);
-            return Result<PurchaseInvoiceDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogError(ex, "خطأ أثناء إنشاء مسودة فاتورة الشراء");
-            return Result<PurchaseInvoiceDto>.Failure("حدث خطأ أثناء حفظ مسودة الفاتورة");
-        }
+        }, ct);
     }
 
     public async Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request, int userId, CancellationToken ct)
@@ -289,9 +280,8 @@ public class PurchaseService : IPurchaseService
             return Result<PurchaseInvoiceDto>.Failure("يمكن فقط ترحيل الفواتير المسودة");
         }
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<PurchaseInvoiceDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 invoice.Post();
@@ -305,8 +295,10 @@ public class PurchaseService : IPurchaseService
 
                     foreach (var fee in invoice.AdditionalFees.Where(f => f.IsActive))
                     {
-                        var allocations = await _feeDistributionService.DistributeFeeAsync(fee, itemList, ct);
-                        allAllocations.AddRange(allocations);
+                        var distResult = await _feeDistributionService.DistributeFeeAsync(fee, itemList, ct);
+                        if (!distResult.IsSuccess)
+                            return Result<PurchaseInvoiceDto>.Failure(distResult.Error!);
+                        allAllocations.AddRange(distResult.Value!);
                     }
 
                     // Save allocations and update invoice AdditionalFeesTotal
@@ -323,7 +315,8 @@ public class PurchaseService : IPurchaseService
                         await _uow.AdditionalFeeAllocations.AddAsync(allocation, ct);
                     }
 
-                    var totalAllocated = await _feeDistributionService.CalculateTotalAllocatedFeesAsync(itemList);
+                    var totalResult = await _feeDistributionService.CalculateTotalAllocatedFeesAsync(itemList);
+                    var totalAllocated = totalResult.IsSuccess ? totalResult.Value : 0;
                     invoice.SetAdditionalFeesTotal(totalAllocated);
                     await _uow.SaveChangesAsync(ct);
                 }
@@ -345,7 +338,6 @@ public class PurchaseService : IPurchaseService
 
                     if (!stockResult.IsSuccess)
                     {
-                        await transaction.RollbackAsync(ct);
                         _logger.LogWarning("فشل زيادة المخزون لفاتورة الشراء: {Error}", stockResult.Error);
                         return Result<PurchaseInvoiceDto>.Failure(stockResult.Error!);
                     }
@@ -393,7 +385,6 @@ public class PurchaseService : IPurchaseService
                     var supplier = await _uow.Suppliers.GetByIdAsync(invoice.SupplierId, ct);
                     if (supplier == null)
                     {
-                        await transaction.RollbackAsync(ct);
                         _logger.LogWarning("المورد {SupplierId} غير موجود أثناء ترحيل الفاتورة {Id}", invoice.SupplierId, invoice.Id);
                         return Result<PurchaseInvoiceDto>.Failure("المورد غير موجود");
                     }
@@ -425,11 +416,8 @@ public class PurchaseService : IPurchaseService
                 var entryResult = await _accountingService.CreatePurchasePostEntryAsync(invoice, userId, ct);
                 if (!entryResult.IsSuccess)
                 {
-                    await transaction.RollbackAsync(ct);
                     return Result<PurchaseInvoiceDto>.Failure(entryResult.Error!);
                 }
-
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("تم ترحيل فاتورة الشراء: المعرف {Id} بواسطة المستخدم {UserId}", invoice.Id, userId);
 
@@ -437,15 +425,8 @@ public class PurchaseService : IPurchaseService
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "خطأ في المجال أثناء ترحيل فاتورة الشراء {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseInvoiceDto>.Failure(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "خطأ أثناء ترحيل فاتورة الشراء {Id}", id);
-                return Result<PurchaseInvoiceDto>.Failure("حدث خطأ أثناء ترحيل الفاتورة");
             }
         }, ct);
     }
@@ -461,9 +442,8 @@ public class PurchaseService : IPurchaseService
         if (invoice.Status == InvoiceStatus.Cancelled)
             return Result<PurchaseInvoiceDto>.Failure("الفاتورة ملغاة بالفعل", ErrorCodes.InvalidOperation);
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<PurchaseInvoiceDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 if (invoice.Status == InvoiceStatus.Posted)
@@ -472,7 +452,6 @@ public class PurchaseService : IPurchaseService
                     var entryResult = await _accountingService.ReversePurchasePostEntryAsync(invoice, userId, ct);
                     if (!entryResult.IsSuccess)
                     {
-                        await transaction.RollbackAsync(ct);
                         return Result<PurchaseInvoiceDto>.Failure(entryResult.Error!);
                     }
 
@@ -493,7 +472,6 @@ public class PurchaseService : IPurchaseService
 
                         if (!stockResult.IsSuccess)
                         {
-                            await transaction.RollbackAsync(ct);
                             _logger.LogWarning("فشل عكس المخزون لإلغاء فاتورة الشراء: {Error}", stockResult.Error);
                             return Result<PurchaseInvoiceDto>.Failure(stockResult.Error!);
                         }
@@ -523,7 +501,6 @@ public class PurchaseService : IPurchaseService
 
                         if (!cashResult.IsSuccess)
                         {
-                            await transaction.RollbackAsync(ct);
                             _logger.LogWarning("فشل عكس الحركة النقدية لإلغاء فاتورة الشراء: {Error}", cashResult.Error);
                             return Result<PurchaseInvoiceDto>.Failure(cashResult.Error ?? "فشل في تسجيل الحركة النقدية العكسية");
                         }
@@ -536,7 +513,6 @@ public class PurchaseService : IPurchaseService
 
                 invoice.Cancel();
                 await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("تم إلغاء فاتورة الشراء: المعرف {Id} بواسطة المستخدم {UserId}", invoice.Id, userId);
 
@@ -544,15 +520,8 @@ public class PurchaseService : IPurchaseService
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "خطأ في المجال أثناء إلغاء فاتورة الشراء {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseInvoiceDto>.Failure(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "خطأ أثناء إلغاء فاتورة الشراء {Id}", id);
-                return Result<PurchaseInvoiceDto>.Failure("حدث خطأ أثناء إلغاء الفاتورة");
             }
         }, ct);
     }

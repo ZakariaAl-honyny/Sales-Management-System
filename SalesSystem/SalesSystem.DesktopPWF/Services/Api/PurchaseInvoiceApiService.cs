@@ -65,7 +65,7 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
             "PurchaseInvoiceApiService.CreateAsync");
     }
 
-    public async Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, CreatePurchaseInvoiceRequest request, CancellationToken ct = default)
+    public async Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request, CancellationToken ct = default)
     {
         return await ExecuteAsync<PurchaseInvoiceDto>(
             () => _httpClient.PutAsJsonAsync($"{BasePath}/{id}", request, ct),

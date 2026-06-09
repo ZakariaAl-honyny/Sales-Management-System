@@ -170,7 +170,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         PurchaseReturnServiceMock.Setup(x => x.GetAllAsync(null, 1, 10, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(expectedResult));
 
-        var result = await _controller.GetAll(null, false, 1, 10, CancellationToken.None);
+        var result = await _controller.GetAll(null, 1, 10, false, CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
     }
@@ -181,7 +181,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         PurchaseReturnServiceMock.Setup(x => x.GetAllAsync(null, 1, 10, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<PagedResult<PurchaseReturnDto>>("حدث خطأ"));
 
-        var result = await _controller.GetAll(null, false, 1, 10, CancellationToken.None);
+        var result = await _controller.GetAll(null, 1, 10, false, CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -261,7 +261,6 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         LinkToInvoice: null,
         ReturnDate: DateTime.UtcNow,
         SubTotal: 200.00m,
-        TaxAmount: 0.00m,
         DiscountAmount: 0.00m,
         DiscountType: null,
         DiscountRate: null,

@@ -55,12 +55,12 @@ public class PurchaseReturnServiceTests : IDisposable
         _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
         _mockUow.Setup(u => u.Warehouses).Returns(new InMemoryEfCoreRepository<Warehouse>(_dbContext));
 
-        _mockUow.Setup(u => u.ExecuteAsync<Result<PurchaseReturnDto>>(
+        _mockUow.Setup(u => u.ExecuteTransactionAsync<Result<PurchaseReturnDto>>(
             It.IsAny<Func<Task<Result<PurchaseReturnDto>>>>(),
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result<PurchaseReturnDto>>> func, CancellationToken ct) => func());
 
-        _mockUow.Setup(u => u.ExecuteAsync<Result>(
+        _mockUow.Setup(u => u.ExecuteTransactionAsync<Result>(
             It.IsAny<Func<Task<Result>>>(),
             It.IsAny<CancellationToken>()))
             .Returns((Func<Task<Result>> func, CancellationToken ct) => func());
@@ -76,9 +76,6 @@ public class PurchaseReturnServiceTests : IDisposable
         storeSettingsMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<StoreSettings, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((StoreSettings)null!);
         _mockUow.Setup(u => u.StoreSettings).Returns(storeSettingsMock.Object);
-
-        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new MockDbContextTransaction());
 
         _mockSequenceService.Setup(s => s.GetNextNumberAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<string>.Success("PR-2026-000001"));

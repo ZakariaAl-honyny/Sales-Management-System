@@ -169,6 +169,15 @@ public class PurchaseOrderService : IPurchaseOrderService
 
         try
         {
+            // Update OrderNo if provided
+            if (request.OrderNo.HasValue && request.OrderNo.Value > 0 && request.OrderNo.Value != order.OrderNo)
+            {
+                var existing = await _uow.PurchaseOrders.AnyAsync(o => o.OrderNo == request.OrderNo.Value && o.Id != id, ct);
+                if (existing)
+                    return Result<PurchaseOrderDto>.Failure("رقم الأمر موجود بالفعل");
+                order.SetOrderNo(request.OrderNo.Value);
+            }
+
             // Remove existing items
             foreach (var existingItem in order.Items.ToList())
             {

@@ -109,9 +109,8 @@ public class PurchaseReturnService : IPurchaseReturnService
         }
 
         // ─── Transaction ────────────────────────────────────────────────────────
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<PurchaseReturnDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 var returnNoResult = await _sequenceService.GetNextNumberAsync("PR", ct);
@@ -172,8 +171,6 @@ public class PurchaseReturnService : IPurchaseReturnService
                 await _uow.PurchaseReturns.AddAsync(purchaseReturn, ct);
                 await _uow.SaveChangesAsync(ct);
 
-                await transaction.CommitAsync(ct);
-
                 _logger.LogInformation("تم إنشاء مرتجع مشتريات كمسودة: {ReturnNo} (المعرف {Id})",
                     purchaseReturn.ReturnNo, purchaseReturn.Id);
 
@@ -181,15 +178,8 @@ public class PurchaseReturnService : IPurchaseReturnService
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "خطأ في المجال أثناء إنشاء مرتجع المشتريات: {Message}", ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "خطأ أثناء إنشاء مرتجع المشتريات");
-                return Result<PurchaseReturnDto>.Failure("حدث خطأ أثناء حفظ المرتجع");
             }
         }, ct);
     }
@@ -217,9 +207,8 @@ public class PurchaseReturnService : IPurchaseReturnService
                 return Result<PurchaseReturnDto>.Failure(stockValidation.Error!);
         }
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<PurchaseReturnDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 pr.Post();
@@ -252,22 +241,14 @@ public class PurchaseReturnService : IPurchaseReturnService
                 }
 
                 await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("تم ترحيل مرتجع المشتريات: {ReturnNo} (المعرف {Id})", pr.ReturnNo, pr.Id);
                 return await GetByIdAsync(pr.Id, ct);
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "خطأ في المجال أثناء ترحيل مرتجع المشتريات {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "خطأ أثناء ترحيل مرتجع المشتريات {Id}", id);
-                return Result<PurchaseReturnDto>.Failure("حدث خطأ أثناء ترحيل المرتجع");
             }
         }, ct);
     }
@@ -282,9 +263,8 @@ public class PurchaseReturnService : IPurchaseReturnService
         if (pr.Status == InvoiceStatus.Cancelled)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات ملغي بالفعل", ErrorCodes.InvalidOperation);
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<PurchaseReturnDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 if (pr.Status == InvoiceStatus.Posted)
@@ -318,22 +298,14 @@ public class PurchaseReturnService : IPurchaseReturnService
 
                 pr.Cancel();
                 await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("تم إلغاء مرتجع المشتريات: {ReturnNo} (المعرف {Id})", pr.ReturnNo, pr.Id);
                 return await GetByIdAsync(pr.Id, ct);
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "خطأ في المجال أثناء إلغاء مرتجع المشتريات {Id}: {Message}", id, ex.Message);
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync(ct);
-                _logger.LogError(ex, "خطأ أثناء إلغاء مرتجع المشتريات {Id}", id);
-                return Result<PurchaseReturnDto>.Failure("حدث خطأ أثناء إلغاء المرتجع");
             }
         }, ct);
     }
@@ -351,7 +323,6 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.LinkToInvoice,
             r.ReturnDate,
             r.SubTotal,
-            0, // TaxAmount — not tracked separately on returns
             r.DiscountAmount,
             r.DiscountType.HasValue ? (byte?)r.DiscountType.Value : null,
             r.DiscountRate,
