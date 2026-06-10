@@ -106,7 +106,7 @@ public class SalesReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var customer = Customer.Create("Test Customer", 0m);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);
         _dbContext.Products.Add(product);
@@ -156,7 +156,7 @@ public class SalesReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var customer = Customer.Create("Test Customer", 0m);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);
         _dbContext.Products.Add(product);
@@ -199,7 +199,7 @@ public class SalesReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var customer = Customer.Create("Test Customer", openingBalance: 1000m, phone: null, email: null, address: null, createdByUserId: null);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);
         _dbContext.Products.Add(product);
@@ -236,7 +236,7 @@ public class SalesReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_NonExistentOriginalInvoice_ReturnsFailure");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -269,8 +269,8 @@ public class SalesReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_ProductNotInOriginalInvoice_ReturnsFailure");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product1 = Product.Create("Product 1", 10m, 100m);
-        var product2 = Product.Create("Product 2", 20m, 200m);
+        var product1 = Product.Create("Product 1");
+        var product2 = Product.Create("Product 2");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product1);
         _dbContext.Products.Add(product2);
@@ -317,7 +317,7 @@ public class SalesReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var customer = Customer.Create("Test Customer", 0m);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);
         _dbContext.Products.Add(product);

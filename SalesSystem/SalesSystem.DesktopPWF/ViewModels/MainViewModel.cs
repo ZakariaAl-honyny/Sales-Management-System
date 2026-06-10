@@ -137,6 +137,10 @@ public class MainViewModel : ViewModelBase
         NavigateToJournalEntriesCommand = new RelayCommand(() => NavigateTo<JournalEntriesListViewModel>());
         NavigateToFiscalYearsCommand = new RelayCommand(() => NavigateTo<FiscalYearListViewModel>());
 
+        // Products section commands
+        NavigateToProductUnitsCommand = new RelayCommand(() => NavigateTo<ProductUnitsListViewModel>());
+        NavigateToProductImportCommand = new RelayCommand(() => NavigateTo<ProductImportViewModel>());
+
         ChangePasswordCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadChangePasswordAsync)));
     }
 
@@ -353,6 +357,16 @@ public class MainViewModel : ViewModelBase
     public ICommand NavigateToFiscalYearsCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
+    // Products Section Commands
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>نقل إلى إدارة وحدات الصنف — عرض وتعديل وحدات القياس لكل صنف</summary>
+    public ICommand NavigateToProductUnitsCommand { get; }
+
+    /// <summary>نقل إلى شاشة استيراد الأصناف من Excel</summary>
+    public ICommand NavigateToProductImportCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
     // ═══════════════════════════════════════════════════════════════
 
@@ -436,6 +450,8 @@ public class MainViewModel : ViewModelBase
             "Settings"         => _sessionService.CanAccess(Permission.Settings),
             "Categories"       => _sessionService.CanAccess(Permission.ProductManagement),
             "Units"            => _sessionService.CanAccess(Permission.ProductManagement),
+            "ProductUnits"     => _sessionService.CanAccess(Permission.ProductManagement),
+            "ProductImport"    => _sessionService.CanAccess(Permission.ProductManagement),
             "Taxes"            => _sessionService.CanAccess(Permission.Settings),
             "Currencies"       => _sessionService.CanAccess(Permission.Settings),
             _ => true // Dashboard, Sales, SalesReturns, Customers, CustomerPayments, POS, CashBoxes, Inventory
@@ -498,6 +514,8 @@ public class MainViewModel : ViewModelBase
             nameof(ProductImagesViewModel)          => "Products",
             nameof(BillOfMaterialsListViewModel)   => "Products",
             nameof(InventoryBatchesViewModel)       => "Products",
+            nameof(ProductUnitsListViewModel)       => "ProductUnits",
+            nameof(ProductImportViewModel)          => "ProductImport",
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
             nameof(CurrencyRatesViewModel)          => "Currencies",

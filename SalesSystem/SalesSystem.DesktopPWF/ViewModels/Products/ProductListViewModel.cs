@@ -299,21 +299,11 @@ public async Task DeleteProductAsync()
         ErrorMessage = null;
 
         var request = new UpdateProductRequest(
-            Barcode: SelectedProduct!.Barcode ?? string.Empty,
-            Name: SelectedProduct.Name,
+            Name: SelectedProduct!.Name,
+            Barcode: SelectedProduct.Barcode,
             CategoryId: SelectedProduct.CategoryId,
-            UnitId: SelectedProduct.UnitId,
-            RetailUnitId: SelectedProduct.RetailUnitId,
-            WholesaleUnitId: SelectedProduct.WholesaleUnitId,
-            ConversionFactor: SelectedProduct.ConversionFactor,
-            PurchasePrice: SelectedProduct.PurchasePrice,
-            SalePrice: SelectedProduct.SalePrice,
-            RetailPrice: SelectedProduct.RetailPrice,
-            WholesalePrice: SelectedProduct.WholesalePrice,
             MinStock: SelectedProduct.MinStock,
             Description: SelectedProduct.Description,
-            ExpirationDate: SelectedProduct.ExpirationDate,
-            ImagePath: SelectedProduct.ImagePath,
             IsActive: true
         );
 

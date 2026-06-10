@@ -67,7 +67,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingProduct_ReturnsDto");
 
-        var product = Product.Create("Test Product", minStock: 5);
+        var product = Product.Create("Test Product", minStockLevel: 5);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -101,7 +101,12 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesProduct");
 
-        var request = new SalesSystem.Contracts.Requests.CreateProductRequest("1234567890123", "New Product", null, null, null, null, 1m, 50m, 100m, 100m, 0m, 10m, null, null, null);
+        var request = new SalesSystem.Contracts.Requests.CreateProductRequest(
+            Name: "New Product",
+            Barcode: "1234567890123",
+            CategoryId: null,
+            MinStock: 1m,
+            Description: null);
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -120,11 +125,17 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesProduct");
 
-        var product = Product.Create("Original", minStock: 5);
+        var product = Product.Create("Original", minStockLevel: 5);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
-        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null!, "Updated Product", null, null, null, null, 1m, 20m, 200m, 200m, 0m, 10m, null, null, null, true);
+        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(
+            Name: "Updated Product",
+            Barcode: null,
+            CategoryId: null,
+            MinStock: 1m,
+            Description: null,
+            IsActive: true);
 
         var result = await _sut.UpdateAsync(product.Id, request, CancellationToken.None);
 
@@ -139,7 +150,13 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_NonExistentProduct_ReturnsNotFound");
 
-        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(null!, "Updated", null, null, null, null, 1m, 0m, 0m, 0m, 0m, 0m, null, null, null, true);
+        var request = new SalesSystem.Contracts.Requests.UpdateProductRequest(
+            Name: "Updated",
+            Barcode: null,
+            CategoryId: null,
+            MinStock: 1m,
+            Description: null,
+            IsActive: true);
 
         var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
 
@@ -158,7 +175,7 @@ public class ProductServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_ExistingProduct_SoftDeletes");
 
-        var product = Product.Create("Test Product", minStock: 0);
+        var product = Product.Create("Test Product", minStockLevel: 0);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 

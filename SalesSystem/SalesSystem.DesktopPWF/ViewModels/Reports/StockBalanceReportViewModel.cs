@@ -252,7 +252,7 @@ public class StockBalanceReportViewModel : ViewModelBase
                         worksheet.Cell(i + 2, 3).Value = item.WarehouseName;
                         worksheet.Cell(i + 2, 4).Value = item.CurrentStock;
                         worksheet.Cell(i + 2, 5).Value = item.ReorderLevel;
-                        worksheet.Cell(i + 2, 6).Value = item.AverageCost;
+                        worksheet.Cell(i + 2, 6).Value = item.Cost;
                         worksheet.Cell(i + 2, 7).Value = item.TotalValue;
                         worksheet.Cell(i + 2, 8).Value = item.BalanceStatus;
                     }

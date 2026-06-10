@@ -42,7 +42,7 @@ public class PurchaseOrderItemLineViewModel : ViewModelBase
                 ClearErrors(nameof(ProductName));
                 if (UnitCost == 0)
                 {
-                    UnitCost = value.PurchasePrice;
+                    UnitCost = value.Cost;
                 }
                 OnPropertyChanged(nameof(ProductName));
                 RecalculateLineTotal();

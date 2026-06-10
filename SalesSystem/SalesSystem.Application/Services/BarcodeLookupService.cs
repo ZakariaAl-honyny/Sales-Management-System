@@ -25,27 +25,35 @@ public class BarcodeLookupService : IBarcodeLookupService
 
         var normalized = barcode.Trim().ToUpperInvariant();
 
-        var result = await _uow.UnitBarcodes.FirstOrDefaultAsync(
-            b => b.BarcodeValue == normalized,
+        var product = await _uow.Products.FirstOrDefaultAsync(
+            p => p.Barcode == normalized,
             ct,
-            "ProductUnit", "ProductUnit.Product");
+            "Units", "Category");
 
-        if (result == null)
+        if (product == null)
         {
             _logger.LogWarning("Barcode not found: {Barcode}", normalized);
             return Result<BarcodeSearchResult>.Failure("الباركود غير موجود", ErrorCodes.NotFound);
         }
 
-        var productUnit = result.ProductUnit;
+        var baseUnit = product.Units.FirstOrDefault(u => u.IsBaseUnit);
+        if (baseUnit == null)
+        {
+            _logger.LogWarning("Product {ProductId} has no base unit", product.Id);
+            return Result<BarcodeSearchResult>.Failure("المنتج لا يحتوي على وحدة أساسية", ErrorCodes.NotFound);
+        }
+
+        // Phase 25: UnitName replaced by UnitId+Unit navigation property;
+        // SalesPrice and PurchaseCost removed from ProductUnit (pricing in ProductPrices table).
         return Result<BarcodeSearchResult>.Success(new BarcodeSearchResult(
-            productUnit.ProductId,
-            productUnit.Product?.Name ?? "",
-            result.ProductUnitId,
-            productUnit.UnitName,
-            productUnit.BaseConversionFactor,
-            productUnit.IsBaseUnit,
-            productUnit.SalesPrice,
-            productUnit.PurchaseCost,
+            product.Id,
+            product.Name,
+            baseUnit.Id,
+            baseUnit.Unit?.Name ?? "غير معروف",
+            baseUnit.BaseConversionFactor,
+            baseUnit.IsBaseUnit,
+            product.Cost,
+            product.Cost,
             0m
         ));
     }

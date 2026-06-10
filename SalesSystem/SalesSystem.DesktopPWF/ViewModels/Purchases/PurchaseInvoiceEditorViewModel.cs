@@ -1083,7 +1083,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             {
                 SelectedProduct = product,
                 Quantity = 1,
-                UnitCost = product.PurchasePrice
+                UnitCost = product.Cost
             };
             
             line.PropertyChanged += (s, e) =>
@@ -1127,7 +1127,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 {
                     SelectedProduct = product,
                     Quantity = 1,
-                    UnitCost = product.PurchasePrice
+                    UnitCost = product.Cost
                 };
                 
                 line.PropertyChanged += (s, e) =>
@@ -1176,7 +1176,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             {
                 targetLine.SelectedProduct = product;
                 targetLine.Quantity = 1;
-                targetLine.UnitCost = product.PurchasePrice;
+                targetLine.UnitCost = product.Cost;
                 RecalculateTotals();
                 _soundService.PlaySuccess();
             }
@@ -1194,7 +1194,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                     {
                         SelectedProduct = product,
                         Quantity = 1,
-                        UnitCost = product.PurchasePrice
+                        UnitCost = product.Cost
                     };
                     line.PropertyChanged += (s, e) =>
                     {
@@ -1353,17 +1353,13 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
             {
                 ProductId = value.Id;
                 ClearErrors(nameof(ProductName));
-                _oldCostInDatabase = value.PurchasePrice;
-                ProductUnitId = Mode == (byte)SaleMode.Wholesale
-                    ? value.WholesaleUnitId ?? value.UnitId ?? 1
-                    : value.RetailUnitId ?? value.UnitId ?? 1;
+                _oldCostInDatabase = value.Cost;
+                ProductUnitId = 1; // TODO: Phase 25 — derive from ProductUnits or ProductPrices
                 OnPropertyChanged(nameof(CostChangedFromDatabase));
                 OnPropertyChanged(nameof(PriceDifferenceIndicator));
                 if (UnitCost == 0)
                 {
-                    UnitCost = Mode == (byte)SaleMode.Wholesale
-                        ? value.PurchasePrice * value.ConversionFactor
-                        : value.PurchasePrice;
+                    UnitCost = value.Cost;
                 }
             }
         }
@@ -1422,9 +1418,7 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
             {
                 if (SelectedProduct != null)
                 {
-                    UnitCost = value == (byte)SaleMode.Wholesale
-                        ? SelectedProduct.PurchasePrice * SelectedProduct.ConversionFactor
-                        : SelectedProduct.PurchasePrice;
+                    UnitCost = SelectedProduct.Cost;
                 }
                 OnPropertyChanged(nameof(LineTotal));
             }

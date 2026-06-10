@@ -406,7 +406,7 @@ public class InventoryOperationEditorViewModel : ViewModelBase
                     ProductId = product.Id,
                     ProductName = product.Name,
                     Quantity = 1,
-                    UnitCost = _operationType == 2 ? product.PurchasePrice : null,
+                    UnitCost = _operationType == 2 ? product.Cost : null,
                     StockIssueReason = _operationType == 1 ? (byte?)4 : null // Default "أخرى" for issue
                 });
             }
@@ -447,7 +447,7 @@ public class InventoryOperationEditorViewModel : ViewModelBase
                     ProductId = product.Id,
                     ProductName = product.Name,
                     Quantity = 1,
-                    UnitCost = _operationType == 2 ? product.PurchasePrice : null,
+                    UnitCost = _operationType == 2 ? product.Cost : null,
                     StockIssueReason = _operationType == 1 ? (byte?)4 : null
                 });
             }
@@ -650,7 +650,7 @@ public class OperationItemViewModel : ViewModelBase
                 // Set default UnitCost from PurchasePrice for receipt
                 if (UnitCost == null || UnitCost == 0)
                 {
-                    UnitCost = product.PurchasePrice;
+                    UnitCost = product.Cost;
                 }
             }
         }

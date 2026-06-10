@@ -53,8 +53,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "1234567890123", "منتج أول", 1, "فئة أولى", 1, "قطعة", 1, "قطعة", 2, "كرتون", 10, 10m, 20m, 20m, 200m, 5m, null, null, null, true),
-            new(2, null, "منتج ثاني", 1, "فئة أولى", 1, "قطعة", 1, "قطعة", 2, "كرتون", 10, 15m, 30m, 30m, 300m, 3m, null, null, null, true)
+            new(Id: 1, Barcode: "1234567890123", Name: "منتج أول", CategoryId: 1, CategoryName: "فئة أولى", MinStock: 5m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true),
+            new(Id: 2, Barcode: null, Name: "منتج ثاني", CategoryId: 1, CategoryName: "فئة أولى", MinStock: 3m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true)
         };
 
         _mockProductService
@@ -93,7 +93,7 @@ public class ProductListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<ProductDto>>.Success(new List<ProductDto>
             {
-                new(1, null, "منتج تجريبي", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true)
+                new(Id: 1, Barcode: null, Name: "منتج تجريبي", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true)
             }));
 
         await _viewModel.LoadProductsAsync();
@@ -109,7 +109,8 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
         var productToDelete = new ProductDto(
-            5, null, "منتج للحذف", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true);
+            Id: 5, Barcode: null, Name: "منتج للحذف", CategoryId: null, CategoryName: null,
+            MinStock: 5m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true);
 
         _mockProductService
             .Setup(s => s.GetAllAsync())
@@ -141,7 +142,8 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenDeleteFails_ShowsErrorMessage()
     {
         var productToDelete = new ProductDto(
-            5, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true);
+            Id: 5, Barcode: null, Name: "منتج", CategoryId: null, CategoryName: null,
+            MinStock: 5m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true);
 
         _mockProductService
             .Setup(s => s.GetAllAsync())
@@ -167,7 +169,8 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenProductSelected_PublishesEvent()
     {
         var productToDelete = new ProductDto(
-            5, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true);
+            Id: 5, Barcode: null, Name: "منتج", CategoryId: null, CategoryName: null,
+            MinStock: 5m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true);
 
         _mockProductService
             .Setup(s => s.GetAllAsync())
@@ -200,9 +203,9 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true),
-            new(2, null, "منتج خالد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, null, null, true),
-            new(3, null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 20m, 40m, 40m, 40m, 2m, null, null, null, true)
+            new(Id: 1, Barcode: null, Name: "منتج أحمد", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 10m, IsActive: true),
+            new(Id: 2, Barcode: null, Name: "منتج خالد", CategoryId: null, CategoryName: null, MinStock: 3m, Description: null, HasExpiry: false, Cost: 15m, IsActive: true),
+            new(Id: 3, Barcode: null, Name: "منتج أحمد", CategoryId: null, CategoryName: null, MinStock: 2m, Description: null, HasExpiry: false, Cost: 20m, IsActive: true)
         };
 
         _mockProductService
@@ -233,8 +236,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, null, "منتج أحمد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true),
-            new(2, null, "منتج خالد", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, null, null, true)
+            new(Id: 1, Barcode: null, Name: "منتج أحمد", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 10m, IsActive: true),
+            new(Id: 2, Barcode: null, Name: "منتج خالد", CategoryId: null, CategoryName: null, MinStock: 3m, Description: null, HasExpiry: false, Cost: 15m, IsActive: true)
         };
 
         _mockProductService
@@ -262,8 +265,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "1234567890123", "منتج بالباركود", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true),
-            new(2, null, "منتج بدون باركود", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, null, null, true)
+            new(Id: 1, Barcode: "1234567890123", Name: "منتج بالباركود", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 10m, IsActive: true),
+            new(Id: 2, Barcode: null, Name: "منتج بدون باركود", CategoryId: null, CategoryName: null, MinStock: 3m, Description: null, HasExpiry: false, Cost: 15m, IsActive: true)
         };
 
         _mockProductService
@@ -314,7 +317,7 @@ public class ProductListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var product = new ProductDto(1, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true);
+        var product = new ProductDto(Id: 1, Barcode: null, Name: "منتج", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true);
         _viewModel.SelectedProduct = product;
 
         propertyChangedEvents.Should().Contain("SelectedProduct");
@@ -345,7 +348,7 @@ public class ProductListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_CanExecute_WhenProductSelected()
     {
-        var product = new ProductDto(1, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true);
+        var product = new ProductDto(Id: 1, Barcode: null, Name: "منتج", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true);
         _viewModel.SelectedProduct = product;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -360,7 +363,7 @@ public class ProductListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CanExecute_WhenProductSelected()
     {
-        var product = new ProductDto(1, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true);
+        var product = new ProductDto(Id: 1, Barcode: null, Name: "منتج", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 0m, IsActive: true);
         _viewModel.SelectedProduct = product;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -412,7 +415,7 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, null, "منتج", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true)
+            new(Id: 1, Barcode: null, Name: "منتج", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 10m, IsActive: true)
         };
 
         _mockProductService
@@ -434,8 +437,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, "1234567890123", "منتج أ", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true),
-            new(2, null, "منتج ب", null, null, null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, null, null, true)
+            new(Id: 1, Barcode: "1234567890123", Name: "منتج أ", CategoryId: null, CategoryName: null, MinStock: 5m, Description: null, HasExpiry: false, Cost: 10m, IsActive: true),
+            new(Id: 2, Barcode: null, Name: "منتج ب", CategoryId: null, CategoryName: null, MinStock: 3m, Description: null, HasExpiry: false, Cost: 15m, IsActive: true)
         };
 
         _mockProductService
@@ -463,9 +466,9 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(1, null, "منتج أ", 1, "إلكترونيات", null, null, 1, "وحدة", 1, "وحدة", 1, 10m, 20m, 20m, 20m, 5m, null, null, null, true),
-            new(2, null, "منتج ب", 2, "ملابس", null, null, 1, "وحدة", 1, "وحدة", 1, 15m, 30m, 30m, 30m, 3m, null, null, null, true),
-            new(3, null, "منتج ج", 1, "إلكترونيات", null, null, 1, "وحدة", 1, "وحدة", 1, 20m, 40m, 40m, 40m, 2m, null, null, null, true)
+            new(Id: 1, Barcode: null, Name: "منتج أ", CategoryId: 1, CategoryName: "إلكترونيات", MinStock: 5m, Description: null, HasExpiry: false, Cost: 10m, IsActive: true),
+            new(Id: 2, Barcode: null, Name: "منتج ب", CategoryId: 2, CategoryName: "ملابس", MinStock: 3m, Description: null, HasExpiry: false, Cost: 15m, IsActive: true),
+            new(Id: 3, Barcode: null, Name: "منتج ج", CategoryId: 1, CategoryName: "إلكترونيات", MinStock: 2m, Description: null, HasExpiry: false, Cost: 20m, IsActive: true)
         };
 
         _mockProductService

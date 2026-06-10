@@ -83,7 +83,7 @@ public class AssemblyService : IAssemblyService
                 "BOM created: AssemblyProduct {AssemblyProductId}, Component {ComponentProductId}, Qty {QuantityRequired}",
                 request.AssemblyProductId, request.ComponentProductId, request.QuantityRequired);
 
-            return Result<BillOfMaterialDto>.Success(MapToDto(bom, assemblyProduct.Name, componentProduct.Name, componentUnit.UnitName));
+            return Result<BillOfMaterialDto>.Success(MapToDto(bom, assemblyProduct.Name, componentProduct.Name, componentUnit.Unit?.Name ?? "غير معروف"));
         }
         catch (DomainException ex)
         {
@@ -117,7 +117,7 @@ public class AssemblyService : IAssemblyService
                 id, request.ComponentUnitId, request.QuantityRequired, request.WastePercentage);
 
             return Result<BillOfMaterialDto>.Success(MapToDto(
-                bom, bom.AssemblyProduct.Name, bom.ComponentProduct.Name, bom.ComponentUnit.UnitName));
+                bom, bom.AssemblyProduct.Name, bom.ComponentProduct.Name, bom.ComponentUnit.Unit?.Name ?? "غير معروف"));
         }
         catch (DomainException ex)
         {
@@ -162,7 +162,7 @@ public class AssemblyService : IAssemblyService
                 return Result<BillOfMaterialDto>.Failure("فاتورة المواد غير موجودة", ErrorCodes.NotFound);
 
             return Result<BillOfMaterialDto>.Success(MapToDto(
-                bom, bom.AssemblyProduct.Name, bom.ComponentProduct.Name, bom.ComponentUnit.UnitName));
+                bom, bom.AssemblyProduct.Name, bom.ComponentProduct.Name, bom.ComponentUnit.Unit?.Name ?? "غير معروف"));
         }
         catch (Exception ex)
         {
@@ -187,7 +187,7 @@ public class AssemblyService : IAssemblyService
                 includePaths: new[] { "AssemblyProduct", "ComponentProduct", "ComponentUnit" });
 
             var dtos = boms.Select(b => MapToDto(
-                b, b.AssemblyProduct.Name, b.ComponentProduct.Name, b.ComponentUnit.UnitName)).ToList();
+                b, b.AssemblyProduct.Name, b.ComponentProduct.Name, b.ComponentUnit.Unit?.Name ?? "غير معروف")).ToList();
 
             return Result<List<BillOfMaterialDto>>.Success(dtos);
         }
@@ -209,7 +209,7 @@ public class AssemblyService : IAssemblyService
                 includePaths: new[] { "AssemblyProduct", "ComponentProduct", "ComponentUnit" });
 
             var dtos = boms.Select(b => MapToDto(
-                b, b.AssemblyProduct.Name, b.ComponentProduct.Name, b.ComponentUnit.UnitName)).ToList();
+                b, b.AssemblyProduct.Name, b.ComponentProduct.Name, b.ComponentUnit.Unit?.Name ?? "غير معروف")).ToList();
 
             return Result<List<BillOfMaterialDto>>.Success(dtos);
         }

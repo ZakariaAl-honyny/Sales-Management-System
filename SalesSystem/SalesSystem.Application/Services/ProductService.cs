@@ -24,7 +24,7 @@ public class ProductService : IProductService
     public async Task<Result<ProductDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var product = await _uow.Products.FirstOrDefaultAsync(
-            p => p.Id == id, ct, "Category", "RetailUnit", "WholesaleUnit");
+            p => p.Id == id, ct, "Category");
 
         if (product == null)
             return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
@@ -40,7 +40,7 @@ public class ProductService : IProductService
             (string.IsNullOrWhiteSpace(searchVal) || p.Name.Contains(searchVal)) &&
             (!categoryId.HasValue || p.CategoryId == categoryId.Value);
 
-        var includes = new[] { "Category", "RetailUnit", "WholesaleUnit" };
+        var includes = new[] { "Category" };
 
         var (items, total) = await _uow.Products.GetPagedAsync(
             predicate, q => q.OrderBy(p => p.Name), page, pageSize, ct, includeInactive, includes);
@@ -53,26 +53,18 @@ public class ProductService : IProductService
     {
         try
         {
-            // Sanitize ImagePath: reject path traversal sequences only
-            // (Forward/backward slashes are valid in relative DB paths like "product_42/abc.jpg")
-            if (request.ImagePath != null && request.ImagePath.Contains("..", StringComparison.Ordinal))
-            {
-                _logger.LogWarning("Product creation failed: ImagePath contains path traversal '..'");
-                return Result<ProductDto>.Failure("مسار الصورة غير صالح");
-            }
-
-            // TODO: Create ProductUnit + UnitBarcode + ProductPrice from request
-            // Barcode, PurchasePrice, RetailPrice, WholesalePrice, ExpirationDate moved to sub-entities
+            // Phase 25: Barcode is on Product.Barcode (single source of truth)
+            // TODO: Create ProductUnit + ProductPrice from request (via separate service calls)
 
             var product = Product.Create(
                 request.Name,
-                request.ConversionFactor,
-                request.MinStock,
                 request.CategoryId,
-                request.RetailUnitId,
-                request.WholesaleUnitId,
+                request.MinStock,
+                0,                              // reorderLevel (default 0)
+                false,                          // hasExpiry (expiry tracked per InventoryBatch)
+                request.Barcode,
                 request.Description,
-                request.ImagePath
+                null                            // createdByUserId
             );
 
             await _uow.Products.AddAsync(product, ct);
@@ -107,27 +99,17 @@ public class ProductService : IProductService
             if (product == null)
                 return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
-            // TODO: Validate barcode uniqueness via UnitBarcode entity when barcode is provided
-            // Barcode validation moved to UnitBarcode entity (Phase 25)
-
-            // Sanitize ImagePath: reject path traversal sequences only
-            // (Forward/backward slashes are valid in relative DB paths like "product_42/abc.jpg")
-            if (request.ImagePath != null && request.ImagePath.Contains("..", StringComparison.Ordinal))
-            {
-                _logger.LogWarning("Product update failed: ImagePath contains path traversal '..'");
-                return Result<ProductDto>.Failure("مسار الصورة غير صالح");
-            }
+            // Barcode uniqueness validated by Product.Barcode unique constraint in DB
 
             product.Update(
                 request.Name,
-                request.ConversionFactor,
-                request.MinStock,
                 request.CategoryId,
-                request.RetailUnitId,
-                request.WholesaleUnitId,
+                request.MinStock,
+                0,                              // reorderLevel (default 0)
+                product.HasExpiry,              // keep existing value
+                request.Barcode,
                 request.Description,
-                null,               // updatedByUserId (stays null for now)
-                request.ImagePath
+                null                            // updatedByUserId
             );
 
             if (request.IsActive != product.IsActive)
@@ -207,21 +189,9 @@ public class ProductService : IProductService
         if (string.IsNullOrWhiteSpace(barcode))
             return Result<ProductDto>.Failure("الباركود مطلوب");
 
-        // Search via UnitBarcode → ProductUnit → Product (Phase 25 restructuring)
-        var barcodeEntry = await _uow.UnitBarcodes.FirstOrDefaultAsync(
-            b => b.BarcodeValue == barcode, ct);
-
-        if (barcodeEntry == null)
-            return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
-
-        var productUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
-            u => u.Id == barcodeEntry.ProductUnitId, ct);
-
-        if (productUnit == null)
-            return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
-
+        // Search Products by Barcode directly (single source of truth)
         var product = await _uow.Products.FirstOrDefaultAsync(
-            p => p.Id == productUnit.ProductId, ct, "Category", "RetailUnit", "WholesaleUnit");
+            p => p.Barcode == barcode, ct, "Category");
 
         if (product == null)
             return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
@@ -243,24 +213,14 @@ public class ProductService : IProductService
             if (!saveResult.IsSuccess)
                 return Result<ProductDto>.Failure(saveResult.Error!);
 
-            // Step 3: Update product's ImagePath
-            var imagePath = saveResult.Value!;
-            product.Update(
-                product.Name,
-                product.ConversionFactor,
-                product.MinStock,
-                product.CategoryId,
-                product.RetailUnitId,
-                product.WholesaleUnitId,
-                product.Description,
-                null,               // updatedByUserId
-                imagePath
-            );
+            // Step 3: Update product timestamp only — ImagePath is removed,
+            // images are managed via ProductImage entity collection
+            product.UpdateTimestamp();
 
             await _uow.Products.UpdateAsync(product, ct);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Image uploaded for product {ProductId}: {ImagePath}", id, imagePath);
+            _logger.LogInformation("Image uploaded for product {ProductId}", id);
             return await GetByIdAsync(id, ct);
         }
         catch (DomainException ex)
@@ -306,7 +266,7 @@ public class ProductService : IProductService
                 p => productIds.Contains(p.Id),
                 q => q.OrderBy(p => p.Name),
                 ct,
-                includePaths: new[] { "Category", "RetailUnit", "WholesaleUnit" });
+                includePaths: new[] { "Category" });
 
             var dtos = products.Select(MapToDto).ToList();
 
@@ -324,30 +284,22 @@ public class ProductService : IProductService
 
     private static ProductDto MapToDto(Product p)
     {
-        // Phase 25: Barcode, PurchasePrice, SalePrice, WholesalePrice, RetailPrice, ExpirationDate
-        // moved to sub-entities (UnitBarcode, ProductPrices, InventoryBatches).
-        // TODO: Load from UnitBarcode, ProductPrices, and InventoryBatches for full data.
+        // Phase 25 restructured data:
+        //   - Barcode     → Product.Barcode (single source of truth)
+        //   - Prices      → ProductPrices table (ProductUnitId + CurrencyId → Price, no PriceLevel)
+        //   - ExpiryDate  → InventoryBatches entity
+        //   - Cost     → computed from InventoryBatches via product.UpdateCost()
+        // TODO: Load full data from ProductPrices and InventoryBatches for richer DTO.
         return new ProductDto(
             p.Id,
-            null, // TODO: Resolve from UnitBarcode entity
+            p.Barcode,
             p.Name,
             p.CategoryId,
             p.Category?.Name,
-            p.UnitId, // Legacy
-            p.Unit?.Name, // Legacy
-            p.WholesaleUnitId,
-            p.WholesaleUnit?.Name,
-            p.RetailUnitId,
-            p.RetailUnit?.Name,
-            p.ConversionFactor,
-            0, // TODO: from ProductPrices (PriceLevel not mapped yet)
-            0, // TODO: from ProductPrices
-            0, // TODO: from ProductPrices
-            0, // TODO: from ProductPrices
-            p.MinStock,
+            p.MinStockLevel,
             p.Description,
-            null, // TODO: earliest ExpiryDate from InventoryBatches
-            p.ImagePath,
+            p.HasExpiry,
+            p.Cost,
             p.IsActive
         );
     }

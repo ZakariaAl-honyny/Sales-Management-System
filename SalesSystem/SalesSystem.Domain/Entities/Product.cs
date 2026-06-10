@@ -1,5 +1,4 @@
 using SalesSystem.Domain.Common;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
@@ -8,29 +7,23 @@ public class Product : BaseEntity
 {
     public string Name { get; private set; } = string.Empty;
     public int? CategoryId { get; private set; }
-    public int? UnitId { get; private set; } // Legacy - Keep for now
-    public int? WholesaleUnitId { get; private set; } // Legacy
-    public int? RetailUnitId { get; private set; } // Legacy
-    public decimal ConversionFactor { get; private set; } = 1m; // Legacy
     public decimal MinStockLevel { get; private set; }
     public decimal ReorderLevel { get; private set; }
     public string? Description { get; private set; }
-    public string? ImagePath { get; private set; } // Legacy - Use ProductImage entity
     
-    public string? Barcode { get; private set; } // One barcode per product in V1
+    /// <summary>
+    /// The single source of truth for product barcodes.
+    /// V1 enforces one barcode per product. All barcode-based lookups use this property.
+    /// </summary>
+    public string? Barcode { get; private set; }
     
     // Phase 25 Additions
-    public decimal AvgCost { get; private set; }
+    public decimal Cost { get; private set; }
     public bool HasExpiry { get; private set; }
     public bool TrackBatches { get; private set; }
 
     // Navigation properties
     public virtual Category? Category { get; private set; }
-    public virtual Unit? Unit { get; private set; } // Legacy
-    public virtual Unit? WholesaleUnit { get; private set; }
-    public virtual Unit? RetailUnit { get; private set; }
-    [Obsolete("Use Barcode property directly. V1 enforces one barcode per product.")]
-    public virtual ICollection<ProductBarcode> Barcodes { get; private set; } = new List<ProductBarcode>();
     public virtual ICollection<WarehouseStock> WarehouseStocks { get; private set; } = new List<WarehouseStock>();
 
     // ─── Dynamic UOM (Phase 1) ───────────────────────────────────────────
@@ -49,23 +42,6 @@ public class Product : BaseEntity
     public IReadOnlyCollection<ProductImage> Images => _images.AsReadOnly();
 
     private Product() { }
-
-    // ── Centralized conversion methods (RULE-041) ───────────────────────────
-
-    public decimal ConvertRetailToWholesaleBoxes(decimal retailQty)
-        => ConversionFactor > 0 ? Math.Floor(retailQty / ConversionFactor) : 0;
-
-    public decimal GetRemainingRetailAfterWholesale(decimal retailQty)
-        => ConversionFactor > 0 ? retailQty % ConversionFactor : retailQty;
-
-    public decimal ConvertWholesaleToRetail(decimal wholesaleQty)
-        => wholesaleQty * ConversionFactor;
-
-    public decimal GetRetailQuantityEquivalent(decimal inputQty, SaleMode mode)
-        => mode == SaleMode.Wholesale ? inputQty * ConversionFactor : inputQty;
-
-    public decimal ConvertToSmallestUnit(decimal quantity, UnitType unitType)
-        => unitType == UnitType.Wholesale ? quantity * ConversionFactor : quantity;
 
     // ─── Dynamic UOM Methods (Phase 1) ──────────────────────────────────
 
@@ -93,7 +69,6 @@ public class Product : BaseEntity
 
     /// <summary>
     /// Validates product has exactly ONE base unit before saving.
-    /// Call this in the Command Handler before persisting.
     /// </summary>
     public void ValidateUnits()
     {
@@ -106,8 +81,7 @@ public class Product : BaseEntity
 
         if (baseUnits.Count > 1)
             throw new DomainException(
-                $"لا يمكن تعريف أكثر من وحدة صغرى واحدة للمنتج الواحد.\n" +
-                $"الوحدات المعرّفة كأساسية: {string.Join(", ", baseUnits.Select(u => u.UnitName))}");
+                "لا يمكن تعريف أكثر من وحدة صغرى واحدة للمنتج الواحد.");
 
         var invalidDerived = _units
             .Where(u => !u.IsBaseUnit && u.BaseConversionFactor <= 1)
@@ -115,9 +89,9 @@ public class Product : BaseEntity
 
         if (invalidDerived.Any())
             throw new DomainException(
-                $"الوحدات التالية لها معامل تحويل غير صحيح:\n" +
-                $"{string.Join("\n", invalidDerived.Select(u => $"- {u.UnitName}: يجب أن يكون أكبر من 1"))}\n" +
-                $"أدخل كم وحدة صغرى بداخل كل وحدة أكبر.");
+                "الوحدات التالية لها معامل تحويل غير صحيح:\n" +
+                $"{string.Join("\n", invalidDerived.Select(u => $"- {u.Unit?.Name ?? "?"}: يجب أن يكون أكبر من 1"))}\n" +
+                "أدخل كم وحدة صغرى بداخل كل وحدة أكبر.");
     }
 
     /// <summary>
@@ -175,11 +149,11 @@ public class Product : BaseEntity
     /// <summary>
     /// Updates the average cost of the product based on inventory batches.
     /// </summary>
-    public void UpdateAvgCost(decimal newAvgCost)
+    public void UpdateCost(decimal newCost)
     {
-        if (newAvgCost < 0)
+        if (newCost < 0)
             throw new DomainException("متوسط التكلفة لا يمكن أن يكون سالباً.");
-        AvgCost = newAvgCost;
+        Cost = newCost;
         UpdateTimestamp();
     }
 
@@ -209,10 +183,9 @@ public class Product : BaseEntity
             MinStockLevel = minStockLevel,
             ReorderLevel = reorderLevel,
             HasExpiry = hasExpiry,
-            TrackBatches = true, // Always true per analysis
+            TrackBatches = true,
             Barcode = barcode,
-            Description = description,
-            ConversionFactor = 1m // Legacy default
+            Description = description
         };
         product.SetCreatedBy(createdByUserId);
         return product;

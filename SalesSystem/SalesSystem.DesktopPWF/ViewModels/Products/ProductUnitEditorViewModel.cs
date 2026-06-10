@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
@@ -10,28 +11,32 @@ using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Products;
 
+/// <summary>
+/// ViewModel for ProductUnit Editor — allows adding/editing a unit of measure linked to a product.
+/// Phase 25: Uses UnitId dropdown (from Units table) instead of free-text UnitName.
+/// Pricing is managed separately via ProductPrices entity.
+/// </summary>
 public class ProductUnitEditorViewModel : ViewModelBase
 {
     private readonly IProductUnitApiService _unitService;
+    private readonly IUnitApiService _lookupService;
     private readonly IDialogService _dialogService;
     private readonly IEventBus _eventBus;
     private readonly IToastNotificationService _toastService;
 
     private int _productId;
     private int? _unitId;
-    private string _unitName = string.Empty;
+    private int? _selectedUnitLookupId;
     private decimal _conversionFactor = 1;
-    private decimal _retailPrice;
-    private decimal _wholesalePrice;
     private bool _isBaseUnit;
     private bool _isEditMode;
     private string? _errorMessage;
-    private ObservableCollection<string> _barcodes = new();
-    private string _newBarcode = string.Empty;
+    private ObservableCollection<UnitDto> _availableUnits = new();
 
     public ProductUnitEditorViewModel()
         : this(
             App.GetService<IProductUnitApiService>(),
+            App.GetService<IUnitApiService>(),
             App.GetService<IDialogService>(),
             App.GetService<IEventBus>(),
             App.GetService<IToastNotificationService>())
@@ -40,17 +45,20 @@ public class ProductUnitEditorViewModel : ViewModelBase
 
     public ProductUnitEditorViewModel(
         IProductUnitApiService unitService,
+        IUnitApiService lookupService,
         IDialogService dialogService,
         IEventBus eventBus,
         IToastNotificationService? toastService = null)
     {
         _unitService = unitService ?? throw new ArgumentNullException(nameof(unitService));
+        _lookupService = lookupService ?? throw new ArgumentNullException(nameof(lookupService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _toastService = toastService ?? App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
 
         InitializeCommands();
+        _ = LoadAvailableUnitsAsync();
     }
 
     public ProductUnitEditorViewModel(int productId)
@@ -71,8 +79,6 @@ public class ProductUnitEditorViewModel : ViewModelBase
     {
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ الوحدة...")));
         CancelCommand = new RelayCommand(Cancel);
-        AddBarcodeCommand = new RelayCommand(AddBarcode);
-        RemoveBarcodeCommand = new RelayCommand(RemoveBarcode, () => SelectedBarcode != null);
     }
 
     #region Properties
@@ -89,14 +95,20 @@ public class ProductUnitEditorViewModel : ViewModelBase
         private set => SetProperty(ref _unitId, value);
     }
 
-    public string UnitName
+    /// <summary>
+    /// Selected Unit from the lookup dropdown (Units table).
+    /// </summary>
+    public int? SelectedUnitLookupId
     {
-        get => _unitName;
+        get => _selectedUnitLookupId;
         set
         {
-            if (SetProperty(ref _unitName, value))
+            if (SetProperty(ref _selectedUnitLookupId, value))
             {
-                ValidateField(() => !string.IsNullOrWhiteSpace(value), nameof(UnitName), "اسم الوحدة مطلوب");
+                if (!value.HasValue || value.Value <= 0)
+                    AddError(nameof(SelectedUnitLookupId), "يجب اختيار وحدة قياس");
+                else
+                    ClearErrors(nameof(SelectedUnitLookupId));
             }
         }
     }
@@ -108,31 +120,10 @@ public class ProductUnitEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _conversionFactor, value))
             {
-                ValidateField(() => value > 0, nameof(ConversionFactor), "عامل التحويل يجب أن يكون أكبر من صفر");
-            }
-        }
-    }
-
-    public decimal RetailPrice
-    {
-        get => _retailPrice;
-        set
-        {
-            if (SetProperty(ref _retailPrice, value))
-            {
-                ValidateField(() => value >= 0, nameof(RetailPrice), "السعر لا يمكن أن يكون سالباً");
-            }
-        }
-    }
-
-    public decimal WholesalePrice
-    {
-        get => _wholesalePrice;
-        set
-        {
-            if (SetProperty(ref _wholesalePrice, value))
-            {
-                ValidateField(() => value >= 0, nameof(WholesalePrice), "السعر لا يمكن أن يكون سالباً");
+                if (value <= 0)
+                    AddError(nameof(ConversionFactor), "عامل التحويل يجب أن يكون أكبر من صفر");
+                else
+                    ClearErrors(nameof(ConversionFactor));
             }
         }
     }
@@ -155,29 +146,13 @@ public class ProductUnitEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
-    public ObservableCollection<string> Barcodes
+    /// <summary>
+    /// Available units from the Units table for the UnitId dropdown.
+    /// </summary>
+    public ObservableCollection<UnitDto> AvailableUnits
     {
-        get => _barcodes;
-        set => SetProperty(ref _barcodes, value);
-    }
-
-    public string NewBarcode
-    {
-        get => _newBarcode;
-        set => SetProperty(ref _newBarcode, value);
-    }
-
-    private string? _selectedBarcode;
-    public string? SelectedBarcode
-    {
-        get => _selectedBarcode;
-        set
-        {
-            if (SetProperty(ref _selectedBarcode, value))
-            {
-                (RemoveBarcodeCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            }
-        }
+        get => _availableUnits;
+        set => SetProperty(ref _availableUnits, value);
     }
 
     #endregion
@@ -186,28 +161,43 @@ public class ProductUnitEditorViewModel : ViewModelBase
 
     public ICommand SaveCommand { get; private set; } = null!;
     public ICommand CancelCommand { get; private set; } = null!;
-    public ICommand AddBarcodeCommand { get; private set; } = null!;
-    public ICommand RemoveBarcodeCommand { get; private set; } = null!;
 
     #endregion
 
     #region Methods
 
+    private async Task LoadAvailableUnitsAsync()
+    {
+        try
+        {
+            var result = await _lookupService.GetAllAsync();
+            if (result.IsSuccess && result.Value != null)
+            {
+                await InvokeOnUIThreadAsync(async () =>
+                {
+                    AvailableUnits.Clear();
+                    foreach (var unit in result.Value)
+                    {
+                        AvailableUnits.Add(unit);
+                    }
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تحميل وحدات القياس", "ProductUnitEditorViewModel.LoadAvailableUnitsAsync", ex);
+        }
+    }
+
     private bool Validate()
     {
         ClearAllErrors();
 
-        if (string.IsNullOrWhiteSpace(UnitName))
-            AddError(nameof(UnitName), "اسم الوحدة مطلوب");
+        if (!SelectedUnitLookupId.HasValue || SelectedUnitLookupId.Value <= 0)
+            AddError(nameof(SelectedUnitLookupId), "يجب اختيار وحدة قياس");
 
         if (ConversionFactor <= 0)
             AddError(nameof(ConversionFactor), "عامل التحويل يجب أن يكون أكبر من صفر");
-
-        if (RetailPrice < 0)
-            AddError(nameof(RetailPrice), "السعر لا يمكن أن يكون سالباً");
-
-        if (WholesalePrice < 0)
-            AddError(nameof(WholesalePrice), "السعر لا يمكن أن يكون سالباً");
 
         if (HasErrors)
         {
@@ -225,7 +215,8 @@ public class ProductUnitEditorViewModel : ViewModelBase
 
         if (IsEditMode && UnitId.HasValue)
         {
-            var request = new UpdateProductUnitRequest(UnitName, RetailPrice, WholesalePrice);
+            // Update: only UnitId is updateable per new UpdateProductUnitRequest
+            var request = new UpdateProductUnitRequest(SelectedUnitLookupId!.Value);
             var result = await _unitService.UpdateUnitAsync(ProductId, UnitId.Value, request);
 
             if (result.IsSuccess)
@@ -243,12 +234,9 @@ public class ProductUnitEditorViewModel : ViewModelBase
         else
         {
             var request = new AddProductUnitRequest(
-                UnitName,
-                ConversionFactor,
-                RetailPrice,
-                WholesalePrice,
-                IsBaseUnit,
-                Barcodes.ToList());
+                UnitId: SelectedUnitLookupId!.Value,
+                ConversionFactor: ConversionFactor,
+                IsBaseUnit: IsBaseUnit);
             var result = await _unitService.AddUnitAsync(ProductId, request);
 
             if (result.IsSuccess)
@@ -269,30 +257,6 @@ public class ProductUnitEditorViewModel : ViewModelBase
     private void Cancel()
     {
         RequestClose();
-    }
-
-    private void AddBarcode()
-    {
-        if (string.IsNullOrWhiteSpace(NewBarcode))
-        {
-            _ = _dialogService.ShowWarningAsync("بيانات غير مكتملة", "يرجى إدخال الباركود");
-            return;
-        }
-
-        if (!Barcodes.Contains(NewBarcode.Trim()))
-        {
-            Barcodes.Add(NewBarcode.Trim());
-        }
-
-        NewBarcode = string.Empty;
-    }
-
-    private void RemoveBarcode()
-    {
-        if (SelectedBarcode != null)
-        {
-            Barcodes.Remove(SelectedBarcode);
-        }
     }
 
     #endregion

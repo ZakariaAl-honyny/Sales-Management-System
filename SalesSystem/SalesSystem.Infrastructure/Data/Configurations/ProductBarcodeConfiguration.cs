@@ -27,7 +27,7 @@ public class ProductBarcodeConfiguration : IEntityTypeConfiguration<ProductBarco
             .IsUnique();
 
         builder.HasOne(x => x.Product)
-            .WithMany(x => x.Barcodes)
+            .WithMany()
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 

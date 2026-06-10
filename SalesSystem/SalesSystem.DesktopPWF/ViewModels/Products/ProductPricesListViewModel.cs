@@ -11,6 +11,7 @@ namespace SalesSystem.DesktopPWF.ViewModels.Products;
 public class ProductPricesListViewModel : ViewModelBase, IDisposable
 {
     private readonly IProductPriceApiService _priceService;
+    private readonly IProductUnitApiService _unitService;
     private readonly IDialogService _dialogService;
     private readonly IEventBus _eventBus;
     private readonly IScreenWindowService _screenWindowService;
@@ -20,12 +21,16 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
     private ProductPriceDto? _selectedPrice;
     private string? _errorMessage;
     private bool _isEmpty;
+    private int _productId;
     private int _productUnitId;
     private string _productUnitName = string.Empty;
+    private ObservableCollection<ProductUnitDto> _availableUnits = new();
+    private ProductUnitDto? _selectedAvailableUnit;
 
     public ProductPricesListViewModel()
         : this(
             App.GetService<IProductPriceApiService>(),
+            App.GetService<IProductUnitApiService>(),
             App.GetService<IDialogService>(),
             App.GetService<IEventBus>(),
             App.GetService<IScreenWindowService>(),
@@ -35,12 +40,14 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
 
     public ProductPricesListViewModel(
         IProductPriceApiService priceService,
+        IProductUnitApiService unitService,
         IDialogService dialogService,
         IEventBus eventBus,
         IScreenWindowService screenWindowService,
         IToastNotificationService? toastService = null)
     {
         _priceService = priceService ?? throw new ArgumentNullException(nameof(priceService));
+        _unitService = unitService ?? throw new ArgumentNullException(nameof(unitService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _screenWindowService = screenWindowService ?? throw new ArgumentNullException(nameof(screenWindowService));
@@ -77,6 +84,12 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _selectedPrice, value);
     }
 
+    public int ProductId
+    {
+        get => _productId;
+        set => SetProperty(ref _productId, value);
+    }
+
     public int ProductUnitId
     {
         get => _productUnitId;
@@ -87,6 +100,26 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
     {
         get => _productUnitName;
         set => SetProperty(ref _productUnitName, value);
+    }
+
+    public ObservableCollection<ProductUnitDto> AvailableUnits
+    {
+        get => _availableUnits;
+        set => SetProperty(ref _availableUnits, value);
+    }
+
+    public ProductUnitDto? SelectedAvailableUnit
+    {
+        get => _selectedAvailableUnit;
+        set
+        {
+            if (SetProperty(ref _selectedAvailableUnit, value) && value != null)
+            {
+                ProductUnitId = value.Id;
+                ProductUnitName = value.UnitName ?? string.Empty;
+                _ = LoadPricesAsync();
+            }
+        }
     }
 
     public string? ErrorMessage
@@ -122,6 +155,33 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
     private async Task LoadPricesOperationAsync()
     {
         ErrorMessage = null;
+
+        // Load available units on first load
+        if (AvailableUnits.Count == 0 && ProductId > 0)
+        {
+            var unitsResult = await _unitService.GetByProductIdAsync(ProductId);
+            if (unitsResult.IsSuccess && unitsResult.Value != null)
+            {
+                InvokeOnUIThread(() =>
+                {
+                    AvailableUnits.Clear();
+                    foreach (var u in unitsResult.Value)
+                    {
+                        AvailableUnits.Add(u);
+                        // Select the unit matching current ProductUnitId
+                        if (u.Id == ProductUnitId)
+                        {
+                            _selectedAvailableUnit = u;
+                            OnPropertyChanged(nameof(SelectedAvailableUnit));
+                        }
+                    }
+                });
+            }
+        }
+
+        // Load prices for current unit
+        if (ProductUnitId <= 0) return;
+
         var result = await _priceService.GetByProductUnitAsync(ProductUnitId);
 
         if (result.IsSuccess && result.Value != null)
@@ -184,7 +244,7 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
     {
         if (SelectedPrice == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"السعر: {SelectedPrice.PriceLevelDisplay} - {SelectedPrice.Price:N2}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"السعر: {SelectedPrice.Price:N2}");
         if (strategy == DeleteStrategy.Cancel) return;
 
         var priceId = SelectedPrice.Id;

@@ -20,8 +20,6 @@ public class ProductPrice : BaseEntity
     /// </summary>
     public int CurrencyId { get; private set; }
 
-
-
     /// <summary>
     /// The actual price amount. Stored as decimal(18,2).
     /// </summary>

@@ -76,7 +76,7 @@ public class ReportRepository : IReportRepository
             .Include(s => s.Product)
                 .ThenInclude(p => p!.Category)
             .Include(s => s.Product)
-                .ThenInclude(p => p!.Unit)
+                .ThenInclude(p => p!.Category)
             .Include(s => s.Warehouse)
             .AsQueryable();
 
@@ -92,12 +92,12 @@ public class ReportRepository : IReportRepository
                 s.ProductId,
                 s.Product!.Name,
                 s.Product!.Category != null ? s.Product!.Category.Name : "General",
-                s.Product!.Unit != null ? s.Product!.Unit.Name : "-",
+                "-", // TODO: Phase 25 — UnitName from Product.Units.FirstOrDefault(u=>u.IsBaseUnit)?.Unit?.Name
                 s.Warehouse!.Name,
                 s.Quantity,
                 s.ReorderLevel,
                 0m, // TODO: Phase 25 — PurchasePrice moved to ProductPrices table
-                s.Quantity * 0m // TODO: Phase 25 — total cost needs ProductUnit lookup
+                s.Quantity * 0m // TODO: Phase 25 — total cost from Product.Cost
             ))
             .ToListAsync(ct);
     }
@@ -106,9 +106,7 @@ public class ReportRepository : IReportRepository
     {
         var stocks = await _context.WarehouseStocks
             .Include(s => s.Product)
-                .ThenInclude(p => p!.WholesaleUnit)
-            .Include(s => s.Product)
-                .ThenInclude(p => p!.RetailUnit)
+                .ThenInclude(p => p!.Category)
             .Include(s => s.Warehouse)
             .Where(s => s.Quantity <= s.ReorderLevel && s.ReorderLevel > 0 && (!warehouseId.HasValue || s.WarehouseId == warehouseId.Value))
             .ToListAsync(ct);
@@ -125,11 +123,11 @@ public class ReportRepository : IReportRepository
                 s.Quantity,
                 s.ReorderLevel,
                 deficit,
-                product.ConvertRetailToWholesaleBoxes(deficit),
-                product.GetRemainingRetailAfterWholesale(deficit),
-                product.WholesaleUnit?.Name ?? "-",
-                product.RetailUnit?.Name ?? "-",
-                product.ConversionFactor
+                0m, // TODO: Phase 25 — Wholesale box conversion removed with dual-unit system
+                0m, // TODO: Phase 25 — remaining retail after wholesale removed
+                "-", // TODO: Phase 25 — WholesaleUnit navigation removed
+                "-", // TODO: Phase 25 — RetailUnit navigation removed
+                1m  // TODO: Phase 25 — ConversionFactor removed from Product
             );
         });
     }
@@ -229,8 +227,8 @@ public class ReportRepository : IReportRepository
                 ws.Warehouse!.Name,
                 ws.Quantity,
                 ws.ReorderLevel,
-                ws.Product.Units.Where(pu => pu.IsBaseUnit).Select(pu => pu.AverageCost).FirstOrDefault(),
-                ws.Quantity * ws.Product.Units.Where(pu => pu.IsBaseUnit).Select(pu => pu.AverageCost).FirstOrDefault()
+                ws.Product.Cost,
+                ws.Quantity * ws.Product.Cost
             ))
             .ToListAsync(ct);
     }

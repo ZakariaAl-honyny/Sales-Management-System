@@ -35,37 +35,6 @@ public class UpdateProductRequestValidatorTests
 
     #endregion
 
-    #region Price Validation
-
-    [Fact]
-    public void GivenZeroRetailPrice_WhenValidating_ThenPasses()
-    {
-        // Arrange
-        var request = CreateValidRequest() with { RetailPrice = 0 };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldNotHaveValidationErrorFor(x => x.RetailPrice);
-    }
-
-    [Fact]
-    public void GivenNegativeRetailPrice_WhenValidating_ThenFails()
-    {
-        // Arrange
-        var request = CreateValidRequest() with { RetailPrice = -1 };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.RetailPrice)
-            .WithErrorMessage("سعر التجزئة لا يمكن أن يكون سالباً");
-    }
-
-    #endregion
-
     #region Valid Request
 
     [Fact]
@@ -87,18 +56,8 @@ public class UpdateProductRequestValidatorTests
         Barcode: "123456789",
         Name: "Valid Product",
         CategoryId: 1,
-        UnitId: 1,
-        RetailUnitId: 1,
-        WholesaleUnitId: 2,
-        ConversionFactor: 10,
-        PurchasePrice: 100.00m,
-        SalePrice: 150.00m,
-        RetailPrice: 150.00m,
-        WholesalePrice: 1300.00m,
         MinStock: 10,
         Description: "Test description",
-        ExpirationDate: null,
-        ImagePath: null,
         IsActive: true
     );
 }

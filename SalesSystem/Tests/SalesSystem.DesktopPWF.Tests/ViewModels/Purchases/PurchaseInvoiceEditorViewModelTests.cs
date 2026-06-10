@@ -197,6 +197,6 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
     private static ProductDto CreateProductDto(int id, string name, decimal salePrice, decimal purchasePrice)
     {
-        return new ProductDto(id, null, name, null, null, 1, "وحدة", 1, "وحدة", 1, "وحدة", 1, purchasePrice, salePrice, salePrice, salePrice * 10, 0, null, null, null, true);
+        return new ProductDto(Id: id, Barcode: null, Name: name, CategoryId: null, CategoryName: null, MinStock: 0, Description: null, HasExpiry: false, Cost: purchasePrice, IsActive: true);
     }
 }

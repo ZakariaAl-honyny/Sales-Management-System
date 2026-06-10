@@ -227,15 +227,17 @@ public class InventoryService : IInventoryService
             s.WarehouseId == warehouseId &&
             (string.IsNullOrWhiteSpace(search) || s.Product!.Name.Contains(search));
 
+        // Phase 25: Product.Unit removed. Unit info is accessed via ProductUnits collection.
+        // Product.Unit navigation property no longer exists; unit display name sourced from base unit.
         var items = await _uow.WarehouseStocks.ToListAsync(
-            predicate, null, ct, false, "Product.Unit");
+            predicate, null, ct, false);
 
         var dtos = items.Select(s => new WarehouseStockDto(
             s.WarehouseId,
             null,
             s.ProductId,
             s.Product?.Name ?? "غير معروف",
-            s.Product?.Unit?.Name,
+            s.Product?.Units?.FirstOrDefault(u => u.IsBaseUnit)?.Unit?.Name,
             s.Quantity,
             s.ReorderLevel
         ));
@@ -263,7 +265,7 @@ public class InventoryService : IInventoryService
             s.Warehouse?.Name,
             s.ProductId,
             s.Product?.Name ?? "غير معروف",
-            s.Product?.Unit?.Name,
+            s.Product?.Units?.FirstOrDefault(u => u.IsBaseUnit)?.Unit?.Name,
             s.Quantity,
             s.ReorderLevel
         )).ToList();
@@ -368,11 +370,11 @@ public class InventoryService : IInventoryService
         var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
         bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
 
+        // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
         // 1. Validate Stock
         foreach (var item in transfer.Items)
         {
-            var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
-            var validation = await ValidateStockAsync(item.ProductId, transfer.FromWarehouseId, retailQty, allowNegativeStock, ct);
+            var validation = await ValidateStockAsync(item.ProductId, transfer.FromWarehouseId, item.Quantity, allowNegativeStock, ct);
             if (!validation.IsSuccess) return Result<StockTransferDto>.Failure(validation.Error!);
         }
 
@@ -385,9 +387,9 @@ public class InventoryService : IInventoryService
 
                 foreach (var item in transfer.Items)
                 {
-                    var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
-                    await DecreaseStockAsync(item.ProductId, transfer.FromWarehouseId, retailQty, MovementType.TransferOut, "StockTransfer", transfer.Id, null, userId, ct);
-                    await IncreaseStockAsync(item.ProductId, transfer.ToWarehouseId, retailQty, MovementType.TransferIn, "StockTransfer", transfer.Id, null, userId, ct);
+                    // Phase 25: GetRetailQuantityEquivalent removed.
+                    await DecreaseStockAsync(item.ProductId, transfer.FromWarehouseId, item.Quantity, MovementType.TransferOut, "StockTransfer", transfer.Id, null, userId, ct);
+                    await IncreaseStockAsync(item.ProductId, transfer.ToWarehouseId, item.Quantity, MovementType.TransferIn, "StockTransfer", transfer.Id, null, userId, ct);
                 }
 
                 await _uow.SaveChangesAsync(ct);
@@ -435,9 +437,9 @@ public class InventoryService : IInventoryService
                     // Reverse stock movements
                     foreach (var item in transfer.Items)
                     {
-                        var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
-                        await IncreaseStockAsync(item.ProductId, transfer.FromWarehouseId, retailQty, MovementType.TransferIn, "StockTransferCancel", transfer.Id, null, userId, ct);
-                        await DecreaseStockAsync(item.ProductId, transfer.ToWarehouseId, retailQty, MovementType.TransferOut, "StockTransferCancel", transfer.Id, null, userId, ct);
+                        // Phase 25: GetRetailQuantityEquivalent removed.
+                        await IncreaseStockAsync(item.ProductId, transfer.FromWarehouseId, item.Quantity, MovementType.TransferIn, "StockTransferCancel", transfer.Id, null, userId, ct);
+                        await DecreaseStockAsync(item.ProductId, transfer.ToWarehouseId, item.Quantity, MovementType.TransferOut, "StockTransferCancel", transfer.Id, null, userId, ct);
                     }
                 }
 

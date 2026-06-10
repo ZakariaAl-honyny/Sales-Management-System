@@ -1,9 +1,11 @@
+using System;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
+[Obsolete("Use Product.Barcode instead. This entity will be removed in a future version.")]
 public class ProductBarcode : BaseEntity
 {
     public int ProductId { get; private set; }

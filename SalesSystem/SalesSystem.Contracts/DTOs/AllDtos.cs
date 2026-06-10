@@ -32,21 +32,10 @@ public record ProductDto(
     string Name,
     int? CategoryId,
     string? CategoryName,
-    int? UnitId, // Legacy
-    string? UnitName, // Legacy
-    int? WholesaleUnitId,
-    string? WholesaleUnitName,
-    int? RetailUnitId,
-    string? RetailUnitName,
-    decimal ConversionFactor,
-    decimal PurchasePrice,
-    decimal SalePrice, // Legacy
-    decimal WholesalePrice,
-    decimal RetailPrice,
     decimal MinStock,
     string? Description,
-    DateTime? ExpirationDate,
-    string? ImagePath,  // مسار الصورة المحلي (اختياري)
+    bool HasExpiry,
+    decimal Cost,
     bool IsActive,
     decimal CurrentStock = 0)
 {
@@ -510,7 +499,7 @@ public record StockBalanceReportDto(
     string WarehouseName,
     decimal CurrentStock,
     decimal ReorderLevel,
-    decimal AverageCost,
+    decimal Cost,
     decimal TotalValue
 )
 {
@@ -906,5 +895,30 @@ public record ComponentConsumedDto(
     decimal QuantityConsumed,
     decimal UnitCost,
     decimal TotalCost
+);
+
+// ──────────────────────────────────────────────
+// Product Import DTOs
+// ──────────────────────────────────────────────
+public record ProductImportRowDto(
+    string ProductName,
+    string? CategoryName,
+    string? Barcode,
+    int? BaseUnitId,
+    decimal? MinStockLevel,
+    string? Description
+);
+
+public record ProductImportResultDto(
+    int TotalRows,
+    int SuccessCount,
+    int FailureCount,
+    List<ProductImportErrorDto> Errors
+);
+
+public record ProductImportErrorDto(
+    int RowNumber,
+    string ProductName,
+    string ErrorMessage
 );
 

@@ -37,7 +37,17 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 2. Default CustomerGroup — seeded BEFORE Customers
+        // 2. Seed Default Categories — seeded BEFORE Products
+        // ═══════════════════════════════════════════════════
+        if (!await db.Set<Category>().AnyAsync())
+        {
+            var generalCategory = Category.Create("عام", "التصنيف الافتراضي لجميع المنتجات", createdByUserId: 1);
+            db.Set<Category>().Add(generalCategory);
+            logger?.LogInformation("Seeded default category 'عام'.");
+        }
+
+        // ═══════════════════════════════════════════════════
+        // 3. Default CustomerGroup — seeded BEFORE Customers
         // ═══════════════════════════════════════════════════
         if (!await db.Set<CustomerGroup>().AnyAsync())
         {
@@ -49,7 +59,7 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 3. Default customer — seeded BEFORE SystemSettings so DefaultCashCustomerId = "1"
+        // 4. Default customer — seeded BEFORE SystemSettings so DefaultCashCustomerId = "1"
         // ═══════════════════════════════════════════════════
         if (!await db.Customers.AnyAsync())
         {
@@ -63,7 +73,7 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 4. Default supplier — seeded BEFORE SystemSettings so DefaultCashSupplierId = "1"
+        // 5. Default supplier — seeded BEFORE SystemSettings so DefaultCashSupplierId = "1"
         // ═══════════════════════════════════════════════════
         if (!await db.Suppliers.AnyAsync())
         {
@@ -76,7 +86,7 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 5. Seed SystemSettings (key-value pairs) — references customer/supplier Id=1
+        // 6. Seed SystemSettings (key-value pairs) — references customer/supplier Id=1
         // ═══════════════════════════════════════════════════
         if (!await db.SystemSettings.AnyAsync())
         {
@@ -131,7 +141,7 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 5. Seed Taxes - independent guard
+        // 7. Seed Taxes - independent guard
         // ═══════════════════════════════════════════════════
         if (!await db.Set<Tax>().AnyAsync())
         {
@@ -146,7 +156,7 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 6. Seed StoreSettings - independent guard
+        // 8. Seed StoreSettings - independent guard
         // ═══════════════════════════════════════════════════
         if (!await db.StoreSettings.AnyAsync())
         {
@@ -156,7 +166,7 @@ public static class DbSeeder
         }
 
         // ═══════════════════════════════════════════════════
-        // 7. Seed Permissions + RolePermissions
+        // 9. Seed Permissions + RolePermissions
         // ═══════════════════════════════════════════════════
         if (!await db.Set<Permission>().AnyAsync())
         {
@@ -255,7 +265,7 @@ public static class DbSeeder
             return;
         }
 
-        // 7. Admin user — created with default password "12345678" (MustChangePassword=true).
+        // 10. Admin user — created with default password "12345678" (MustChangePassword=true).
         // On first login, the admin must change their password.
         string adminPasswordHash = BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
         var adminUser = User.CreateWithPassword(
@@ -268,7 +278,7 @@ public static class DbSeeder
         );
         db.Users.Add(adminUser);
 
-        // 8. Default warehouse
+        // 11. Default warehouse
         var warehouse = Warehouse.Create(
             name: "المخزن الرئيسي",
             location: null,
@@ -277,14 +287,19 @@ public static class DbSeeder
         );
         db.Warehouses.Add(warehouse);
 
-        // 9. Base units of measure
-        db.Units.Add(Unit.Create("قطعة", "pcs", null));
-        db.Units.Add(Unit.Create("كيلو", "kg", null));
-        db.Units.Add(Unit.Create("لتر", "ltr", null));
-        db.Units.Add(Unit.Create("متر", "m", null));
-        db.Units.Add(Unit.Create("صندوق", "box", null));
+        // 12. Base units of measure — save first so IDs are available for ProductUnit creation
+        var unitPiece = Unit.Create("حبة", "pcs", null);
+        var unitKg = Unit.Create("كيلو", "kg", null);
+        var unitLiter = Unit.Create("لتر", "ltr", null);
+        var unitMeter = Unit.Create("متر", "m", null);
+        var unitCarton = Unit.Create("كرتون", "ctn", null);
+        var unitBox = Unit.Create("علبة", "box", null);
+        var unitGram = Unit.Create("جرام", "g", null);
+        db.Units.AddRange(unitPiece, unitKg, unitLiter, unitMeter, unitCarton, unitBox, unitGram);
+        await db.SaveChangesAsync();
+        logger?.LogInformation("Seeded {Count} base units of measure.", 7);
 
-        // 11. Document sequences for all document types (year 2026)
+        // 13. Document sequences for all document types (year 2026)
         db.DocumentSequences.Add(DocumentSequence.Create("INV", "INV", 2026));
         db.DocumentSequences.Add(DocumentSequence.Create("PUR", "PUR", 2026));
         db.DocumentSequences.Add(DocumentSequence.Create("SR", "SR", 2026));
@@ -293,7 +308,7 @@ public static class DbSeeder
         db.DocumentSequences.Add(DocumentSequence.Create("CP", "CP", 2026));
         db.DocumentSequences.Add(DocumentSequence.Create("SP", "SP", 2026));
 
-        // 12. Product base units for existing products without any ProductUnit
+        // 14. Product base units for existing products without any ProductUnit
         var productsWithoutUnits = await db.Products
             .Where(p => !db.ProductUnits.Any(pu => pu.ProductId == p.Id))
             .ToListAsync();
@@ -302,22 +317,20 @@ public static class DbSeeder
         {
             db.ProductUnits.Add(ProductUnit.CreateBaseUnit(
                 product.Id,
-                "قطعة",
-                0m, // TODO: Phase 25 — RetailPrice moved to ProductPrices table
-                0m  // TODO: Phase 25 — PurchasePrice moved to ProductPrices table
+                unitPiece.Id  // حبة as default base unit
             ));
         }
 
         if (productsWithoutUnits.Any())
             logger?.LogInformation("Seeded base ProductUnits for {Count} products", productsWithoutUnits.Count);
 
-        // 13. Seed accounting foundation (chart of accounts + system mappings)
+        // 15. Seed accounting foundation (chart of accounts + system mappings)
         await AccountingSeeder.SeedAsync(db, logger);
 
         await db.SaveChangesAsync();
 
         // ═══════════════════════════════════════════════════
-        // 14. Seed ProductPrices for each product's base unit
+        // 16. Seed ProductPrices for each product's base unit
         //     (requires ProductUnits to be saved first for IDs)
         // ═══════════════════════════════════════════════════
         if (!await db.Set<ProductPrice>().AnyAsync())
@@ -331,19 +344,11 @@ public static class DbSeeder
                 var productPrices = new List<ProductPrice>();
                 foreach (var pu in baseProductUnits)
                 {
+                    // PriceLevel removed — price is now strictly (ProductUnitId + CurrencyId) → Price
                     productPrices.Add(ProductPrice.Create(
                         productUnitId: pu.Id,
                         currencyId: 1,
-                        priceLevel: PriceLevel.Retail,
                         price: 100m,
-                        effectiveFrom: DateTime.UtcNow,
-                        createdByUserId: 1
-                    ));
-                    productPrices.Add(ProductPrice.Create(
-                        productUnitId: pu.Id,
-                        currencyId: 1,
-                        priceLevel: PriceLevel.Wholesale,
-                        price: 85m,
                         effectiveFrom: DateTime.UtcNow,
                         createdByUserId: 1
                     ));
@@ -351,7 +356,7 @@ public static class DbSeeder
 
                 db.Set<ProductPrice>().AddRange(productPrices);
                 await db.SaveChangesAsync();
-                logger?.LogInformation("Seeded {Count} ProductPrices for {ProductUnitCount} base units.",
+                logger?.LogInformation("Seeded {Count} ProductPrices for {ProductUnitCount} base units (PriceLevel removed).",
                     productPrices.Count, baseProductUnits.Count);
             }
         }

@@ -90,7 +90,7 @@ public class InventoryServiceTests : IDisposable
         _output.WriteLine("[TEST] GetStockAsync_ExistingStock_ReturnsQuantity");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -130,7 +130,7 @@ public class InventoryServiceTests : IDisposable
         _output.WriteLine("[TEST] ValidateStockAsync_SufficientStock_ReturnsSuccess");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -152,7 +152,7 @@ public class InventoryServiceTests : IDisposable
         _output.WriteLine("[TEST] ValidateStockAsync_InsufficientStock_ReturnsFailure");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -179,7 +179,7 @@ public class InventoryServiceTests : IDisposable
         _output.WriteLine("[TEST] IncreaseStockAsync_ExistingStock_IncreasesCorrectly");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -217,7 +217,7 @@ public class InventoryServiceTests : IDisposable
         _output.WriteLine("[TEST] IncreaseStockAsync_NewStock_CreatesStockRecord");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -253,7 +253,7 @@ public class InventoryServiceTests : IDisposable
         _output.WriteLine("[TEST] DecreaseStockAsync_SufficientQuantity_DecreasesCorrectly");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -290,7 +290,7 @@ public class InventoryServiceTests : IDisposable
         _output.WriteLine("[TEST] DecreaseStockAsync_InsufficientQuantity_ThrowsDomainException");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -321,7 +321,7 @@ public class InventoryServiceTests : IDisposable
         _output.WriteLine("[TEST] DecreaseStockAsync_ZeroQuantity_ThrowsDomainException");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -379,7 +379,7 @@ public class InventoryServiceTests : IDisposable
 
         var fromWarehouse = Warehouse.Create("Warehouse A", isDefault: true);
         var toWarehouse = Warehouse.Create("Warehouse B");
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(fromWarehouse);
         _dbContext.Warehouses.Add(toWarehouse);
         _dbContext.Products.Add(product);
@@ -471,7 +471,7 @@ public class InventoryServiceTests : IDisposable
 
         var fromWarehouse = Warehouse.Create("Warehouse A", isDefault: true);
         var toWarehouse = Warehouse.Create("Warehouse B");
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(fromWarehouse);
         _dbContext.Warehouses.Add(toWarehouse);
         _dbContext.Products.Add(product);

@@ -20,8 +20,8 @@ public class ProductPriceHistory : BaseEntity
     public decimal NewRetailPrice { get; private set; }
     public decimal OldWholesalePrice { get; private set; }
     public decimal NewWholesalePrice { get; private set; }
-    public decimal OldAvgCost { get; private set; }
-    public decimal NewAvgCost { get; private set; }
+    public decimal OldCost { get; private set; }
+    public decimal NewCost { get; private set; }
     public string ChangeReason { get; private set; } = string.Empty;
     public int ChangedByUserId { get; private set; }
 
@@ -62,8 +62,8 @@ public class ProductPriceHistory : BaseEntity
         decimal newRetailPrice,
         decimal oldWholesalePrice,
         decimal newWholesalePrice,
-        decimal oldAvgCost,
-        decimal newAvgCost,
+        decimal oldCost,
+        decimal newCost,
         string changeReason,
         int changedByUserId)
     {
@@ -77,13 +77,13 @@ public class ProductPriceHistory : BaseEntity
             NewRetailPrice = newRetailPrice,
             OldWholesalePrice = oldWholesalePrice,
             NewWholesalePrice = newWholesalePrice,
-            OldAvgCost = oldAvgCost,
-            NewAvgCost = newAvgCost,
+            OldCost = oldCost,
+            NewCost = newCost,
             ChangeReason = changeReason,
             ChangedByUserId = changedByUserId,
             ChangeType = "DetailedUpdate",
-            OldValue = oldAvgCost,
-            NewValue = newAvgCost,
+            OldValue = oldCost,
+            NewValue = newCost,
             ChangedBy = changedByUserId,
             ChangedAt = DateTime.UtcNow
         };

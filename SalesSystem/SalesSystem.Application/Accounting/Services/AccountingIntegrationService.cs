@@ -408,13 +408,12 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 _logger.LogWarning(
                     "Original journal entry not found for SalesInvoice {Id} ({InvoiceNo}), computing COGS from items",
                     invoice.Id, invoice.InvoiceNo);
+                // Phase 25: GetRetailQuantityEquivalent, AverageCost, and PurchaseCost removed.
+                // Quantity is now always in base units since UnitType/SaleMode distinction was simplified.
                 var computedCost = invoice.Items.Sum(item =>
                 {
                     if (item.Product == null) return 0m;
-                    var retailQty = item.Product.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
-                    var baseUnit = item.Product.Units?.FirstOrDefault(u => u.IsBaseUnit);
-                    var cost = baseUnit?.AverageCost ?? baseUnit?.PurchaseCost ?? 0;
-                    return retailQty * cost;
+                    return item.Quantity * item.Product.Cost;
                 });
                 if (computedCost > 0)
                 {

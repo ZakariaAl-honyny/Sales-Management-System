@@ -193,21 +193,6 @@
                                             Width="150" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
                         
-                        <DataGridTextColumn Header="الوحدة" 
-                                            Binding="{Binding UnitName}" 
-                                            Width="90" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                        
-                        <DataGridTextColumn Header="سعر التجزئة" 
-                                            Binding="{Binding RetailPrice, StringFormat=N2}" 
-                                            Width="110" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-
-                        <DataGridTextColumn Header="سعر الجملة" 
-                                            Binding="{Binding WholesalePrice, StringFormat=N2}" 
-                                            Width="110" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                        
                         <DataGridTextColumn Header="الباركود" 
                                             Binding="{Binding Barcode}" 
                                             Width="130" 

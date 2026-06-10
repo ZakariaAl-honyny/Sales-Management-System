@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -59,6 +60,7 @@ public class ProductUnitRowViewModel : ViewModelBase
         }
     }
 
+    [Obsolete("Use ProductPrices instead — pricing moved to ProductPrices table.")]
     public decimal SalesPrice
     {
         get => _salesPrice;

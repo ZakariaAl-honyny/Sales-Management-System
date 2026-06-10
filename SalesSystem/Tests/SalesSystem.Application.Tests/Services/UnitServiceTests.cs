@@ -42,6 +42,7 @@ public class UnitServiceTests : IDisposable
 
         _mockUow.Setup(u => u.Units).Returns(new InMemoryEfCoreRepository<Unit>(_dbContext));
         _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
+        _mockUow.Setup(u => u.ProductUnits).Returns(new InMemoryEfCoreRepository<ProductUnit>(_dbContext));
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
@@ -182,8 +183,13 @@ public class UnitServiceTests : IDisposable
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Product", retailUnitId: unit.Id);
+        var product = Product.Create("Product");
         _dbContext.Products.Add(product);
+        await _dbContext.SaveChangesAsync();
+
+        // Link unit to product via ProductUnit (Phase 25: UnitId removed from Product)
+        var productUnit = ProductUnit.CreateBaseUnit(product.Id, unit.Id);
+        _dbContext.ProductUnits.Add(productUnit);
         await _dbContext.SaveChangesAsync();
 
         var result = await _sut.DeleteAsync(unit.Id, CancellationToken.None);
@@ -244,6 +250,7 @@ public class UnitServiceTests : IDisposable
 
         public DbSet<Unit> Units => Set<Unit>();
         public DbSet<Product> Products => Set<Product>();
+        public DbSet<ProductUnit> ProductUnits => Set<ProductUnit>();
     }
 
     private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity

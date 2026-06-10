@@ -110,7 +110,7 @@ public class PurchaseReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var supplier = Supplier.Create("Test Supplier", 0m);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Products.Add(product);
@@ -164,7 +164,7 @@ public class PurchaseReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var supplier = Supplier.Create("Test Supplier", openingBalance: 5000m, phone: null, email: null, address: null, createdByUserId: null);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Products.Add(product);
@@ -206,7 +206,7 @@ public class PurchaseReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var supplier = Supplier.Create("Test Supplier", 0m);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Products.Add(product);
@@ -259,7 +259,7 @@ public class PurchaseReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_NonExistentOriginalInvoice_ReturnsFailure");
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
@@ -297,7 +297,7 @@ public class PurchaseReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var supplier = Supplier.Create("Test Supplier", 0m);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Products.Add(product);
@@ -348,7 +348,7 @@ public class PurchaseReturnServiceTests : IDisposable
 
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
         var supplier = Supplier.Create("Test Supplier", 0m);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
         _dbContext.Products.Add(product);

@@ -101,9 +101,9 @@ public class PurchaseReturnService : IPurchaseReturnService
             var product = await _uow.Products.GetByIdAsync(item.ProductId, ct);
             if (product == null) return Result<PurchaseReturnDto>.Failure("المنتج غير موجود");
             
-            var retailQty = product.GetRetailQuantityEquivalent(item.Quantity, (SaleMode)item.Mode);
+            // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
             var stockValidation = await _inventoryService.ValidateStockAsync(
-                item.ProductId, request.WarehouseId, retailQty, allowNegativeStock, ct);
+                item.ProductId, request.WarehouseId, item.Quantity, allowNegativeStock, ct);
             if (!stockValidation.IsSuccess)
                 return Result<PurchaseReturnDto>.Failure(stockValidation.Error!);
         }
@@ -197,12 +197,12 @@ public class PurchaseReturnService : IPurchaseReturnService
         var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
         bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
 
+        // Phase 25: GetRetailQuantityEquivalent removed; quantity is in base units.
         // Stock validation before transaction
         foreach (var item in pr.Items)
         {
-            var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
             var stockValidation = await _inventoryService.ValidateStockAsync(
-                item.ProductId, pr.WarehouseId, retailQty, allowNegativeStock, ct);
+                item.ProductId, pr.WarehouseId, item.Quantity, allowNegativeStock, ct);
             if (!stockValidation.IsSuccess)
                 return Result<PurchaseReturnDto>.Failure(stockValidation.Error!);
         }
@@ -217,11 +217,10 @@ public class PurchaseReturnService : IPurchaseReturnService
                 // Update Stock — decrease from warehouse
                 foreach (var item in pr.Items)
                 {
-                    var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
                     await _inventoryService.DecreaseStockAsync(
                         item.ProductId,
                         pr.WarehouseId,
-                        retailQty,
+                        item.Quantity,
                         MovementType.PurchaseReturnOut,
                         "PurchaseReturn",
                         pr.Id,
@@ -272,11 +271,11 @@ public class PurchaseReturnService : IPurchaseReturnService
                     // Reverse Stock — increase back
                     foreach (var item in pr.Items)
                     {
-                        var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+                        // Phase 25: GetRetailQuantityEquivalent removed.
                         await _inventoryService.IncreaseStockAsync(
                             item.ProductId,
                             pr.WarehouseId,
-                            retailQty,
+                            item.Quantity,
                             MovementType.PurchaseIn,
                             "PurchaseReturnCancel",
                             pr.Id,
@@ -336,7 +335,7 @@ public class PurchaseReturnService : IPurchaseReturnService
                 it.ProductId,
                 it.Product?.Name ?? "غير معروف",
                 it.ProductUnitId,
-                it.ProductUnit?.UnitName,
+                it.ProductUnit?.Unit?.Name,
                 it.Quantity,
                 it.UnitCost,
                 it.DiscountAmount,

@@ -136,6 +136,12 @@
             <DataTemplate DataType="{x:Type vmProducts:BillOfMaterialsListViewModel}">
                 <viewsProducts:BillOfMaterialsListView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmProducts:ProductUnitsListViewModel}">
+                <viewsProducts:ProductUnitsListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmProducts:ProductImportViewModel}">
+                <viewsProducts:ProductImportView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmWarehouses:InventoryBatchesViewModel}">
                 <viewsWarehouses:InventoryBatchesView />
             </DataTemplate>
@@ -521,35 +527,42 @@
                                 </StackPanel>
                             </Expander>
 
+                            <!-- Products Expander -->
+                            <Expander Header="الأصناف" Style="{StaticResource SidebarExpanderStyle}"
+                                      AutomationProperties.AutomationId="SidebarExpanderProducts">
+                                <StackPanel>
+                                    <Button Content="مجموعات الأصناف" 
+                                            Command="{Binding NavigateToCategoriesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavCategories"
+                                            ToolTip="إدارة مجموعات الأصناف — تصنيف المنتجات في مجموعات للتقرير والتحليل"/>
+                                    <Button Content="الأصناف" 
+                                            Command="{Binding NavigateToProductsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavProducts"
+                                            ToolTip="إدارة قائمة الأصناف والمنتجات والأسعار والباركود"/>
+                                    <Button Content="وحدات الصنف" 
+                                            Command="{Binding NavigateToProductUnitsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavProductUnits"
+                                            ToolTip="إدارة وحدات القياس لكل صنف — إضافة وتعديل وحدات البيع والتخزين"/>
+                                    <Button Content="أسعار البيع" 
+                                            Command="{Binding NavigateToProductPricesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavProductPrices"
+                                            ToolTip="إدارة أسعار البيع متعددة العملات — تحديد سعر التجزئة والجملة لكل وحدة"/>
+                                    <Button Content="استيراد Excel" 
+                                            Command="{Binding NavigateToProductImportCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavProductImport"
+                                            ToolTip="استيراد الأصناف والمنتجات من ملف Excel — إضافة أو تحديث الكميات والأسعار"/>
+                                </StackPanel>
+                            </Expander>
+
                             <!-- Settings Expander -->
                             <Expander Header="الإعدادات" Style="{StaticResource SidebarExpanderStyle}"
                                       AutomationProperties.AutomationId="SidebarExpanderSettings">
                                 <StackPanel>
-                                    <Button Content="المنتجات" 
-                                            Command="{Binding NavigateToProductsCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavProducts"
-                                            ToolTip="إدارة قائمة المنتجات والأسعار والباركود"/>
-                                    <Button Content="أسعار المنتجات" 
-                                            Command="{Binding NavigateToProductPricesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavProductPrices"
-                                            ToolTip="إدارة أسعار المنتجات متعددة العملات — تحديد سعر التجزئة والجملة والمزيد لكل عملة"/>
-                                    <Button Content="صور المنتجات" 
-                                            Command="{Binding NavigateToProductImagesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavProductImages"
-                                            ToolTip="إدارة صور المنتجات — إضافة وعرض صور متعددة لكل منتج"/>
-                                    <Button Content="المكونات (BOM)" 
-                                            Command="{Binding NavigateToBillOfMaterialsCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavBillOfMaterials"
-                                            ToolTip="إدارة قائمة المكونات — تحديد المكونات اللازمة لتصنيع المنتجات المُجمَّعة"/>
-                                    <Button Content="الدفعات المخزنية" 
-                                            Command="{Binding NavigateToInventoryBatchesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavInventoryBatches"
-                                            ToolTip="إدارة دفعات المخزون — تتبع الكميات حسب التاريخ وتاريخ انتهاء الصلاحية"/>
                                     <Button Content="العملاء" 
                                             Command="{Binding NavigateToCustomersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
@@ -570,16 +583,6 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavWarehouses"
                                             ToolTip="إدارة الفروع والمستودعات ومواقع تخزين المنتجات"/>
-                                    <Button Content="التصنيفات" 
-                                            Command="{Binding NavigateToCategoriesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavCategories"
-                                            ToolTip="إدارة التصنيفات الرئيسية والفرعية للأصناف والمنتجات"/>
-                                    <Button Content="الوحدات" 
-                                            Command="{Binding NavigateToUnitsCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavUnits"
-                                            ToolTip="إدارة وحدات القياس المستخدمة في المخزون والفواتير"/>
                                     <Button Content="المستخدمين" 
                                             Command="{Binding NavigateToUsersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

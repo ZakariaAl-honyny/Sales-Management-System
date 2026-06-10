@@ -258,6 +258,9 @@ public partial class App : System.Windows.Application
         // Financial Reports API
         services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
 
+        // Product Import API Service
+        services.AddSingleton<IProductImportApiService, ProductImportApiService>();
+
         // Phase 31 — Sales, Purchase, CashBox, and User Report API Services
         services.AddSingleton<ISalesReportApiService, SalesReportApiService>();
         services.AddSingleton<IPurchaseReportApiService, PurchaseReportApiService>();
@@ -283,6 +286,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<ProductPricesListViewModel>();
         services.AddTransient<ProductPriceEditorViewModel>();
         services.AddTransient<ProductImagesViewModel>();
+        services.AddTransient<ProductImportViewModel>();
         services.AddTransient<InventoryBatchesViewModel>();
         services.AddTransient<CustomerListViewModel>();
         services.AddTransient<CustomerEditorViewModel>();
@@ -315,6 +319,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<BackupViewModel>();
         services.AddTransient<ProductUnitEditorViewModel>();
         services.AddTransient<ProductUnitsListViewModel>();
+        services.AddTransient<ProductImportViewModel>();
 
         // Customer Group ViewModels
         services.AddTransient<CustomerGroupListViewModel>();

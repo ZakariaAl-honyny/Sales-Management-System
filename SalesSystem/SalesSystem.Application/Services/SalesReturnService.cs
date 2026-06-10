@@ -151,14 +151,14 @@ public class SalesReturnService : ISalesReturnService
                 sr.Post();
                 await _uow.SaveChangesAsync(ct);
 
+                // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
                 // Update Stock
                 foreach (var item in sr.Items)
                 {
-                    var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
                     await _inventoryService.IncreaseStockAsync(
                         item.ProductId,
                         sr.WarehouseId,
-                        retailQty,
+                        item.Quantity,
                         MovementType.SaleReturnIn,
                         "SalesReturn",
                         sr.Id,
@@ -236,11 +236,11 @@ public class SalesReturnService : ISalesReturnService
                     // Reverse Stock
                     foreach (var item in sr.Items)
                     {
-                        var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+                        // Phase 25: GetRetailQuantityEquivalent removed.
                         await _inventoryService.DecreaseStockAsync(
                             item.ProductId,
                             sr.WarehouseId,
-                            retailQty,
+                            item.Quantity,
                             MovementType.SaleOut, // Opposite of SaleReturnIn
                             "SalesReturnCancel",
                             sr.Id,

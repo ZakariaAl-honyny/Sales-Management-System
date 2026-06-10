@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/021-users-permissions/plan.md](specs/021-users-permissions/plan.md)
+**Active Feature Plan**: [specs/028-products-module-complete/plan.md](specs/028-products-module-complete/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview

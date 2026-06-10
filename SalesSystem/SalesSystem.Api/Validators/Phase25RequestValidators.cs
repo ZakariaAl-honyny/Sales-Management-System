@@ -1,6 +1,5 @@
 using FluentValidation;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Api.Validators;
 
@@ -17,10 +16,6 @@ public class CreateProductPriceRequestValidator : AbstractValidator<CreateProduc
 
         RuleFor(x => x.CurrencyId)
             .GreaterThan(0).WithMessage("معرف العملة مطلوب");
-
-        RuleFor(x => x.PriceLevel)
-            .IsInEnum().WithMessage("مستوى السعر غير صالح")
-            .NotEmpty().WithMessage("مستوى السعر مطلوب");
 
         RuleFor(x => x.Price)
             .GreaterThan(0).WithMessage("السعر يجب أن يكون أكبر من الصفر");
@@ -44,9 +39,6 @@ public class UpdateProductPriceRequestValidator : AbstractValidator<UpdateProduc
 {
     public UpdateProductPriceRequestValidator()
     {
-        RuleFor(x => x.PriceLevel)
-            .IsInEnum().WithMessage("مستوى السعر غير صالح");
-
         RuleFor(x => x.Price)
             .GreaterThan(0).WithMessage("السعر يجب أن يكون أكبر من الصفر");
 

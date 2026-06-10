@@ -121,18 +121,8 @@ public class ApiIntegrationTests : IAsyncLifetime
             Barcode: "TEST123",
             Name: "Test Product",
             CategoryId: 1,
-            UnitId: 1,
-            RetailUnitId: 1,
-            WholesaleUnitId: 2,
-            ConversionFactor: 10,
-            PurchasePrice: 100,
-            SalePrice: 150,
-            RetailPrice: 150,
-            WholesalePrice: 1300,
             MinStock: 10,
-            Description: "Test Description",
-            ExpirationDate: null,
-            ImagePath: null
+            Description: "Test Description"
         );
         var response = await _httpClient.PostAsJsonAsync("/api/v1/products", request);
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);

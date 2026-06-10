@@ -274,7 +274,7 @@ public class PurchaseOrderService : IPurchaseOrderService
                 it.ProductId,
                 it.Product?.Name ?? "غير معروف",
                 it.ProductUnitId,
-                it.ProductUnit?.UnitName ?? "غير معروف",
+                it.ProductUnit?.Unit?.Name ?? "غير معروف",
                 it.Quantity,
                 it.ReceivedQuantity,
                 it.PendingReceiveQuantity,

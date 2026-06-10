@@ -12,21 +12,15 @@ public class ProductTests
     {
         var product = Product.Create(
             name: "Test Product",
-            conversionFactor: 10,
-            minStock: 10m,
+            minStockLevel: 10m,
             categoryId: 1,
-            retailUnitId: 1,
-            wholesaleUnitId: 2,
             description: "Test description",
             createdByUserId: 1
         );
 
         product.Name.Should().Be("Test Product");
-        product.ConversionFactor.Should().Be(10);
-        product.MinStock.Should().Be(10m);
+        product.MinStockLevel.Should().Be(10m);
         product.CategoryId.Should().Be(1);
-        product.RetailUnitId.Should().Be(1);
-        product.WholesaleUnitId.Should().Be(2);
         product.Description.Should().Be("Test description");
     }
 
@@ -37,8 +31,7 @@ public class ProductTests
     public void Create_GivenInvalidName_ShouldThrowDomainException(string? invalidName)
     {
         var action = () => Product.Create(
-            name: invalidName!,
-            conversionFactor: 1
+            name: invalidName!
         );
 
         action.Should().Throw<DomainException>()
@@ -47,17 +40,16 @@ public class ProductTests
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(0)]
     [InlineData(-100)]
-    public void Create_GivenInvalidConversionFactor_ShouldThrowDomainException(decimal invalidFactor)
+    public void Create_GivenNegativeMinStockLevel_ShouldThrowDomainException(decimal invalidMinStockLevel)
     {
         var action = () => Product.Create(
             name: "Test Product",
-            conversionFactor: invalidFactor
+            minStockLevel: invalidMinStockLevel
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("*معامل التحويل يجب أن يكون أكبر من الصفر*");
+            .WithMessage("*الحد الأدنى للمخزون لا يمكن أن يكون سالباً*");
     }
 
     [Fact]
@@ -65,86 +57,26 @@ public class ProductTests
     {
         var product = Product.Create(
             name: "Original Name",
-            conversionFactor: 10,
-            minStock: 10m,
+            minStockLevel: 10m,
             categoryId: 1,
-            retailUnitId: 1,
             createdByUserId: 1
         );
 
         product.Update(
             name: "Updated Name",
-            conversionFactor: 12,
-            minStock: 20m,
             categoryId: 2,
-            retailUnitId: 2,
-            wholesaleUnitId: 3,
+            minStockLevel: 20m,
+            reorderLevel: 0,
+            hasExpiry: false,
+            barcode: null,
             description: "Updated description",
             updatedByUserId: 1
         );
 
         product.Name.Should().Be("Updated Name");
-        product.ConversionFactor.Should().Be(12);
-        product.MinStock.Should().Be(20m);
+        product.MinStockLevel.Should().Be(20m);
         product.CategoryId.Should().Be(2);
-        product.RetailUnitId.Should().Be(2);
-        product.WholesaleUnitId.Should().Be(3);
         product.Description.Should().Be("Updated description");
-    }
-
-    [Fact]
-    public void GetRetailQuantityEquivalent_GivenWholesaleMode_ShouldMultiplyByFactor()
-    {
-        var product = Product.Create("Test", conversionFactor: 10);
-        
-        var result = product.GetRetailQuantityEquivalent(2, SaleMode.Wholesale);
-        
-        result.Should().Be(20);
-    }
-
-    [Fact]
-    public void GetRetailQuantityEquivalent_GivenRetailMode_ShouldReturnSameQuantity()
-    {
-        var product = Product.Create("Test", conversionFactor: 10);
-        
-        var result = product.GetRetailQuantityEquivalent(5, SaleMode.Retail);
-        
-        result.Should().Be(5);
-    }
-
-    [Fact]
-    public void ConvertRetailToWholesaleBoxes_ShouldReturnFloor()
-    {
-        var product = Product.Create("Test", conversionFactor: 12);
-        
-        product.ConvertRetailToWholesaleBoxes(25).Should().Be(2);
-        product.GetRemainingRetailAfterWholesale(25).Should().Be(1);
-    }
-
-    [Fact]
-    public void ConvertToSmallestUnit_Wholesale_MultipliesByConversionFactor()
-    {
-        var product = Product.Create(
-            name: "Test Product",
-            conversionFactor: 10
-        );
-
-        var result = product.ConvertToSmallestUnit(5, UnitType.Wholesale);
-
-        result.Should().Be(50m);
-    }
-
-    [Fact]
-    public void ConvertToSmallestUnit_Retail_ReturnsSameQuantity()
-    {
-        var product = Product.Create(
-            name: "Test Product",
-            conversionFactor: 10
-        );
-
-        var result = product.ConvertToSmallestUnit(7, UnitType.Retail);
-
-        result.Should().Be(7m);
     }
 
     [Fact]
@@ -155,14 +87,12 @@ public class ProductTests
         var price = ProductPrice.Create(
             productUnitId: 1,
             currencyId: 1,
-            priceLevel: PriceLevel.Retail,
             price: 150m,
             effectiveFrom: new DateTime(2026, 1, 1),
             createdByUserId: 1
         );
 
         price.Should().NotBeNull();
-        price.PriceLevel.Should().Be(PriceLevel.Retail);
         price.Price.Should().Be(150m);
     }
 

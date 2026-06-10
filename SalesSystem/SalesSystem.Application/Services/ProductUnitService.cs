@@ -26,9 +26,9 @@ public class ProductUnitService : IProductUnitService
         {
             var units = await _uow.ProductUnits.ToListAsync(
                 u => u.ProductId == productId,
-                q => q.OrderBy(u => u.IsBaseUnit ? 0 : 1).ThenBy(u => u.SortOrder),
+                q => q.OrderBy(u => u.IsBaseUnit ? 0 : 1),
                 ct,
-                includePaths: new[] { "Barcodes" });
+                includePaths: new[] { "Unit" });
 
             var dtos = units.Select(MapToDto).ToList();
             return Result<List<ProductUnitDto>>.Success(dtos);
@@ -45,55 +45,27 @@ public class ProductUnitService : IProductUnitService
         try
         {
             var product = await _uow.Products.FirstOrDefaultAsync(
-                p => p.Id == productId, ct, "Units", "Units.Barcodes");
+                p => p.Id == productId, ct, "Units");
             if (product == null)
                 return Result<ProductUnitDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
-            if (req.Barcodes?.Count > 0)
-            {
-                foreach (var barcode in req.Barcodes)
-                {
-                    if (!string.IsNullOrWhiteSpace(barcode))
-                    {
-                        var existing = await _uow.UnitBarcodes.FirstOrDefaultAsync(
-                            b => b.BarcodeValue == barcode, ct);
-                        if (existing != null)
-                            return Result<ProductUnitDto>.Failure(
-                                $"الباركود '{barcode}' مستخدم بالفعل", ErrorCodes.DuplicateBarcode);
-                    }
-                }
-            }
-
+            // Phase 25: Prices managed via ProductPrices entity (not on ProductUnit).
+            // Barcodes managed via Product.Barcode (single source of truth) + UnitBarcode table.
             var unit = req.IsBaseUnit
-                ? ProductUnit.CreateBaseUnit(productId, req.UnitName, req.RetailPrice)
-                : ProductUnit.CreateDerivedUnit(productId, req.UnitName, req.ConversionFactor, req.RetailPrice);
-
-            if (req.Barcodes?.Count > 0)
-            {
-                foreach (var barcode in req.Barcodes)
-                {
-                    if (!string.IsNullOrWhiteSpace(barcode))
-                        unit.AddBarcode(barcode);
-                }
-            }
+                ? ProductUnit.CreateBaseUnit(productId, req.UnitId)
+                : ProductUnit.CreateDerivedUnit(productId, req.UnitId, req.ConversionFactor);
 
             product.AddUnit(unit);
             await _uow.ProductUnits.AddAsync(unit, ct);
             await _uow.SaveChangesAsync(ct);
 
-            var history = ProductPriceHistory.CreateWithDetails(
-                unit.Id,
-                0, req.RetailPrice,
-                0, req.WholesalePrice,
-                0, 0,
-                "إنشاء وحدة جديدة",
-                0);
-            await _uow.ProductPriceHistory.AddAsync(history, ct);
-            await _uow.SaveChangesAsync(ct);
+            _logger.LogInformation("Unit (UnitId={UnitId}) added to product {ProductId}", req.UnitId, productId);
 
-            _logger.LogInformation("Unit {UnitName} added to product {ProductId}", unit.UnitName, productId);
+            // Reload with Unit navigation for DTO mapping
+            var savedUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
+                u => u.Id == unit.Id, ct, "Unit");
 
-            return Result<ProductUnitDto>.Success(MapToDto(unit));
+            return Result<ProductUnitDto>.Success(MapToDto(savedUnit ?? unit));
         }
         catch (DomainException ex)
         {
@@ -117,16 +89,16 @@ public class ProductUnitService : IProductUnitService
         try
         {
             var unit = await _uow.ProductUnits.FirstOrDefaultAsync(
-                u => u.Id == unitId && u.ProductId == productId, ct, "Barcodes");
+                u => u.Id == unitId && u.ProductId == productId, ct, "Unit");
             if (unit == null)
                 return Result<ProductUnitDto>.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-            unit.Update(req.UnitName, req.RetailPrice, req.WholesalePrice);
+            unit.ChangeUnit(req.UnitId);
 
             await _uow.ProductUnits.UpdateAsync(unit, ct);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Unit {UnitId} updated for product {ProductId}", unitId, productId);
+            _logger.LogInformation("Unit {UnitId} updated for product {ProductId} -> UnitId={NewUnitId}", unitId, productId, req.UnitId);
 
             return Result<ProductUnitDto>.Success(MapToDto(unit));
         }
@@ -171,7 +143,7 @@ public class ProductUnitService : IProductUnitService
                 unit.MarkAsDeleted();
                 await _uow.SaveChangesAsync(ct);
 
-                _logger.LogInformation("Unit {UnitId} deactivated for product {ProductId}", unitId, productId);
+                _logger.LogInformation("Unit {UnitId} deactivated for product {ProductId} (UnitId={DomainUnitId})", unitId, productId, unit.UnitId);
                 return Result.Success();
             }
 
@@ -222,22 +194,23 @@ public class ProductUnitService : IProductUnitService
 
         try
         {
-            var unitBarcode = await _uow.UnitBarcodes.FirstOrDefaultAsync(
-                b => b.BarcodeValue == barcode, ct, "ProductUnit", "ProductUnit.Product");
-            if (unitBarcode == null)
-                return Result<BarcodeResolutionDto>.Failure("الباركود غير موجود", ErrorCodes.NotFound);
+            // Include Units and Unit navigation to get unit name
+            var product = await _uow.Products.FirstOrDefaultAsync(
+                p => p.Barcode == barcode, ct, "Category", "Units", "Units.Unit");
+            if (product == null)
+                return Result<BarcodeResolutionDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
-            var unit = unitBarcode.ProductUnit;
-            var product = unit.Product;
+            var baseUnit = product.Units.FirstOrDefault(u => u.IsBaseUnit);
+            if (baseUnit == null)
+                return Result<BarcodeResolutionDto>.Failure("المنتج لا يحتوي على وحدة أساسية", ErrorCodes.NotFound);
 
             var dto = new BarcodeResolutionDto(
                 product.Id,
                 product.Name,
-                unit.Id,
-                unit.UnitName,
-                unit.BaseConversionFactor,
-                unit.SalesPrice,
-                unit.WholesalePrice);
+                baseUnit.Id,
+                baseUnit.UnitId,
+                baseUnit.Unit?.Name ?? "",
+                baseUnit.BaseConversionFactor);
 
             return Result<BarcodeResolutionDto>.Success(dto);
         }
@@ -256,7 +229,7 @@ public class ProductUnitService : IProductUnitService
                 h => h.ProductUnit.ProductId == productId,
                 q => q.OrderByDescending(h => h.Id),
                 ct,
-                includePaths: new[] { "ProductUnit" });
+                includePaths: new[] { "ProductUnit", "ProductUnit.Unit" });
 
             if (historyEntries.Count == 0)
                 return Result<List<ProductPriceHistoryDto>>.Success(new List<ProductPriceHistoryDto>());
@@ -265,16 +238,13 @@ public class ProductUnitService : IProductUnitService
             var users = await _uow.Users.ToListAsync(ct);
             var userMap = users.ToDictionary(u => u.Id, u => u.FullName);
 
+            // Phase 25: ProductPriceHistoryDto simplified to 7 params.
+            // RetailPrice, WholesalePrice fields removed from ProductPriceHistory entity.
             var dtos = historyEntries.Select(h => new ProductPriceHistoryDto(
                 h.Id,
                 h.ProductUnitId,
-                h.ProductUnit?.UnitName ?? "",
-                h.OldRetailPrice,
-                h.NewRetailPrice,
-                h.OldWholesalePrice,
-                h.NewWholesalePrice,
-                h.OldAvgCost,
-                h.NewAvgCost,
+                h.OldCost,
+                h.NewCost,
                 h.ChangeReason ?? "",
                 userMap.GetValueOrDefault(h.ChangedByUserId, ""),
                 h.ChangedAt
@@ -291,19 +261,13 @@ public class ProductUnitService : IProductUnitService
 
     private static ProductUnitDto MapToDto(ProductUnit unit)
     {
-        var dto = new ProductUnitDto(
+        return new ProductUnitDto(
             unit.Id,
             unit.ProductId,
-            unit.UnitName,
+            unit.UnitId,
+            unit.Unit?.Name ?? "",
             unit.BaseConversionFactor,
-            unit.SalesPrice,
-            unit.WholesalePrice,
-            unit.PurchaseCost,
             unit.IsBaseUnit,
-            unit.IsActive)
-        {
-            Barcodes = unit.Barcodes.Select(b => b.BarcodeValue).ToList()
-        };
-        return dto;
+            unit.IsActive);
     }
 }

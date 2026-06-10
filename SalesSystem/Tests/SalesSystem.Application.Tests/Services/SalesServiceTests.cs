@@ -144,7 +144,7 @@ public class SalesServiceTests : IDisposable
 
         // Setup warehouse and product for navigation property fixup
         var warehouse = Warehouse.Create("Main Warehouse", isDefault: true);
-        var product = Product.Create("Test Product", 10m, 100m);
+        var product = Product.Create("Test Product");
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();

@@ -63,7 +63,7 @@ public class ProductsController : ControllerBase
     /// <summary>
     /// Creates a new product.
     /// </summary>
-    /// <param name="request">Create product request with Name, Code, Barcode, Prices, UnitId, CategoryId.</param>
+    /// <param name="request">Create product request with Name, Barcode, CategoryId, MinStock, Description.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the created product with ID.</returns>
     [HttpPost]
@@ -80,7 +80,7 @@ public class ProductsController : ControllerBase
     /// Updates an existing product.
     /// </summary>
     /// <param name="id">Product ID to update.</param>
-    /// <param name="request">Update product request with all product fields.</param>
+    /// <param name="request">Update product request with Name, Barcode, CategoryId, MinStock, Description, IsActive.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the updated product.</returns>
     [HttpPut("{id:int}")]

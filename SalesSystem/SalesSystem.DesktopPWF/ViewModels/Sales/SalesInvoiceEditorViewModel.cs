@@ -186,9 +186,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 if (existingLine != null)
                 {
                     existingLine.Quantity += 1m;
-                    if (!existingLine.CostInBaseCurrency.HasValue && product.PurchasePrice > 0)
+                    if (!existingLine.CostInBaseCurrency.HasValue && product.Cost > 0)
                     {
-                        existingLine.CostInBaseCurrency = product.PurchasePrice;
+                        existingLine.CostInBaseCurrency = product.Cost;
                     }
                     _soundService.PlaySuccess();
                 }
@@ -671,11 +671,11 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     lineVm.DiscountAmount = item.DiscountAmount;
                     lineVm.SelectedProduct = Products.FirstOrDefault(p => p.Id == item.ProductId);
                     
-                    // Set cost from product's PurchasePrice for profit display
+                    // Set cost from product's Cost for profit display
                     var product = Products.FirstOrDefault(p => p.Id == item.ProductId);
-                    if (product != null && product.PurchasePrice > 0)
+                    if (product != null && product.Cost > 0)
                     {
-                        lineVm.CostInBaseCurrency = product.PurchasePrice;
+                        lineVm.CostInBaseCurrency = product.Cost;
                     }
                     
                     lineVm.PropertyChanged += (s, e) =>
@@ -1094,9 +1094,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         {
             existingLine.Quantity += 1;
             // Ensure CostInBaseCurrency is set (should have been set on first creation)
-            if (!existingLine.CostInBaseCurrency.HasValue && product.PurchasePrice > 0)
+            if (!existingLine.CostInBaseCurrency.HasValue && product.Cost > 0)
             {
-                existingLine.CostInBaseCurrency = product.PurchasePrice;
+                existingLine.CostInBaseCurrency = product.Cost;
             }
             _soundService.PlaySuccess();
         }
@@ -1441,7 +1441,7 @@ public class InvoiceLineViewModel : ViewModelBase
         : null;
 
     /// <summary>
-    /// Cost per unit in base currency (from PurchasePrice / AverageCost).
+    /// Cost per unit in base currency (from Product.Cost).
     /// Used to compute profit display.
     /// </summary>
     public decimal? CostInBaseCurrency
@@ -1478,13 +1478,11 @@ public class InvoiceLineViewModel : ViewModelBase
                 ProductId = value.Id;
                 ClearErrors(nameof(ProductName));
 
-                // Set cost from product's purchase price (proxy for average cost)
-                CostInBaseCurrency = value.PurchasePrice > 0 ? value.PurchasePrice : null;
+                // Set cost from product's Cost
+                CostInBaseCurrency = value.Cost > 0 ? value.Cost : null;
 
-                // Set ProductUnitId based on current mode
-                ProductUnitId = Mode == (byte)SaleMode.Wholesale
-                    ? value.WholesaleUnitId
-                    : value.RetailUnitId;
+                // Set ProductUnitId — TODO: Phase 25 — derive from ProductPrices table
+                ProductUnitId = 1;
 
                 // Reset price override flag
                 IsPriceOverridden = false;
@@ -1512,9 +1510,7 @@ public class InvoiceLineViewModel : ViewModelBase
                 if (SelectedProduct != null)
                 {
                     UnitPrice = GetDefaultPrice(SelectedProduct);
-                    ProductUnitId = value == (byte)SaleMode.Wholesale
-                        ? SelectedProduct.WholesaleUnitId
-                        : SelectedProduct.RetailUnitId;
+                    ProductUnitId = 1; // TODO: Phase 25 — derive from ProductPrices table
                     IsPriceOverridden = false;
                 }
                 OnPropertyChanged(nameof(LineTotal));
@@ -1581,22 +1577,19 @@ public class InvoiceLineViewModel : ViewModelBase
         if (product != null)
         {
             UnitPrice = GetDefaultPrice(product);
-            ProductUnitId = mode == (byte)SaleMode.Wholesale
-                ? product.WholesaleUnitId
-                : product.RetailUnitId;
-            CostInBaseCurrency = product.PurchasePrice > 0 ? product.PurchasePrice : null;
+            ProductUnitId = 1; // TODO: Phase 25 — derive from ProductPrices table
+            CostInBaseCurrency = product.Cost > 0 ? product.Cost : null;
             IsPriceOverridden = false;
         }
     }
 
     /// <summary>
-    /// Gets the default unit price for a product based on current mode.
+    /// Gets the default unit price for a product.
+    /// TODO: Phase 25 — retrieve price from ProductPrices table based on PriceLevel.
     /// </summary>
     private decimal GetDefaultPrice(ProductDto product)
     {
-        return Mode == (byte)SaleMode.Wholesale
-            ? product.WholesalePrice
-            : product.RetailPrice;
+        return product.Cost; // Temporary: use Cost as default price placeholder
     }
 
     /// <summary>

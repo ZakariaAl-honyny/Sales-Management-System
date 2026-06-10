@@ -985,6 +985,9 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
+                    b.Property<int>("DecimalPlaces")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("ExchangeRateToBase")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(18, 6)
@@ -1807,14 +1810,14 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Barcode")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("ConversionFactor")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)")
-                        .HasDefaultValue(1m);
+                    b.Property<decimal>("Cost")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -1826,14 +1829,13 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("ImagePath")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                    b.Property<bool>("HasExpiry")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<decimal>("MinStock")
+                    b.Property<decimal>("MinStockLevel")
                         .HasPrecision(18, 3)
                         .HasColumnType("decimal(18,3)");
 
@@ -1846,11 +1848,8 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasPrecision(18, 3)
                         .HasColumnType("decimal(18,3)");
 
-                    b.Property<int?>("RetailUnitId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("UnitId")
-                        .HasColumnType("int");
+                    b.Property<bool>("TrackBatches")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1858,18 +1857,9 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("UpdatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("WholesaleUnitId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
-
-                    b.HasIndex("RetailUnitId");
-
-                    b.HasIndex("UnitId");
-
-                    b.HasIndex("WholesaleUnitId");
 
                     b.ToTable("Products", (string)null);
                 });
@@ -2011,12 +2001,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)")
                         .HasComment("السعر");
 
-                    b.Property<int>("PriceLevel")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1)
-                        .HasComment("مستوى السعر: 1=تجزئة, 2=جملة, 3=VIP, 4=موزع");
-
                     b.Property<int>("ProductUnitId")
                         .HasColumnType("int");
 
@@ -2030,9 +2014,9 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasIndex("CurrencyId");
 
-                    b.HasIndex("ProductUnitId", "CurrencyId", "PriceLevel", "EffectiveFrom")
+                    b.HasIndex("ProductUnitId", "CurrencyId", "EffectiveFrom")
                         .IsUnique()
-                        .HasDatabaseName("IX_ProductPrices_ProductUnit_Currency_Level_Date")
+                        .HasDatabaseName("IX_ProductPrices_ProductUnit_Currency_Date")
                         .HasFilter("[IsActive] = 1");
 
                     b.ToTable("ProductPrices", (string)null);
@@ -2081,9 +2065,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<decimal>("NewAvgCost")
+                    b.Property<decimal>("NewCost")
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("NewAvgCost");
 
                     b.Property<decimal>("NewRetailPrice")
                         .HasPrecision(18, 2)
@@ -2097,9 +2082,10 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<decimal>("OldAvgCost")
+                    b.Property<decimal>("OldCost")
                         .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("OldAvgCost");
 
                     b.Property<decimal>("OldRetailPrice")
                         .HasPrecision(18, 2)
@@ -2159,34 +2145,11 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<bool>("IsBaseUnit")
                         .HasColumnType("bit");
 
-                    b.Property<decimal>("LastPurchasePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<int>("ProductId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("PurchaseCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("SalesPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("SortOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
-
-                    b.Property<decimal>("SupplierPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("UnitName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<int>("UnitId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -2194,13 +2157,11 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("UpdatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("WholesalePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("UnitId");
 
                     b.ToTable("ProductUnits", null, t =>
                         {
@@ -3833,56 +3794,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.ToTable("Units", (string)null);
                 });
 
-            modelBuilder.Entity("SalesSystem.Domain.Entities.UnitBarcode", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("BarcodeValue")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDefault")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
-                    b.Property<int>("ProductUnitId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SupplierCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BarcodeValue")
-                        .IsUnique();
-
-                    b.HasIndex("ProductUnitId");
-
-                    b.ToTable("UnitBarcodes", (string)null);
-                });
-
             modelBuilder.Entity("SalesSystem.Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -4627,34 +4538,13 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SalesSystem.Domain.Entities.Unit", "RetailUnit")
-                        .WithMany()
-                        .HasForeignKey("RetailUnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SalesSystem.Domain.Entities.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SalesSystem.Domain.Entities.Unit", "WholesaleUnit")
-                        .WithMany()
-                        .HasForeignKey("WholesaleUnitId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Category");
-
-                    b.Navigation("RetailUnit");
-
-                    b.Navigation("Unit");
-
-                    b.Navigation("WholesaleUnit");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.ProductBarcode", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Entities.Product", "Product")
-                        .WithMany("Barcodes")
+                        .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -4723,7 +4613,15 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SalesSystem.Domain.Entities.Unit", "Unit")
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Product");
+
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.PurchaseInvoice", b =>
@@ -5174,17 +5072,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("Supplier");
                 });
 
-            modelBuilder.Entity("SalesSystem.Domain.Entities.UnitBarcode", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Entities.ProductUnit", "ProductUnit")
-                        .WithMany("Barcodes")
-                        .HasForeignKey("ProductUnitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ProductUnit");
-                });
-
             modelBuilder.Entity("SalesSystem.Domain.Entities.User", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Entities.User", "CreatedByUser")
@@ -5281,8 +5168,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.Product", b =>
                 {
-                    b.Navigation("Barcodes");
-
                     b.Navigation("Images");
 
                     b.Navigation("InventoryBatches");
@@ -5290,11 +5175,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("Units");
 
                     b.Navigation("WarehouseStocks");
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.ProductUnit", b =>
-                {
-                    b.Navigation("Barcodes");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.PurchaseInvoice", b =>

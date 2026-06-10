@@ -33,7 +33,6 @@ public class SalesDbContext : DbContext
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<ProductBarcode> ProductBarcodes => Set<ProductBarcode>();
     public DbSet<ProductUnit> ProductUnits => Set<ProductUnit>();
-    public DbSet<UnitBarcode> UnitBarcodes => Set<UnitBarcode>();
     public DbSet<CashBox> CashBoxes => Set<CashBox>();
     public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
     public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();

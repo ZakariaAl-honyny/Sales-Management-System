@@ -41,7 +41,7 @@ public class SalesQuotationItemLineViewModel : ViewModelBase
                 ClearErrors(nameof(ProductName));
                 if (_unitPrice == 0)
                 {
-                    UnitPrice = value.SalePrice;
+                    UnitPrice = value.Cost;
                 }
                 OnPropertyChanged(nameof(ProductName));
                 RecalculateLineTotal();

@@ -157,25 +157,23 @@ public class SalesService : ISalesService
 
             foreach (var item in request.Items)
             {
-                // Resolve cost from ProductUnit if available (for profit tracking)
+                // Phase 25: Use Product.Cost (calculated from InventoryBatches).
                 decimal? costInBaseCurrency = null;
                 if (item.ProductUnitId.HasValue)
                 {
-                    var productUnit = await _uow.ProductUnits.GetByIdAsync(item.ProductUnitId.Value, ct);
-                    if (productUnit != null)
+                    var productUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
+                        pu => pu.Id == item.ProductUnitId.Value, ct, "Product");
+                    if (productUnit?.Product != null)
                     {
-                        costInBaseCurrency = productUnit.AverageCost;
+                        costInBaseCurrency = productUnit.Product.Cost;
                     }
                 }
                 else
                 {
-                    // Fallback: get base unit average cost
-                    var product = await _uow.Products.FirstOrDefaultAsync(
-                        p => p.Id == item.ProductId, ct, "Units");
-                    if (product?.Units != null)
+                    var product = await _uow.Products.GetByIdAsync(item.ProductId, ct);
+                    if (product != null)
                     {
-                        var baseUnit = product.Units.FirstOrDefault(u => u.IsBaseUnit);
-                        costInBaseCurrency = baseUnit?.AverageCost;
+                        costInBaseCurrency = product.Cost;
                     }
                 }
 
@@ -311,8 +309,8 @@ public class SalesService : ISalesService
         // 1. Validate Stock BEFORE Transaction
         foreach (var item in invoice.Items)
         {
-            var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
-            var stockValidation = await _inventoryService.ValidateStockAsync(item.ProductId, invoice.WarehouseId, retailQty, allowNegativeStock, ct);
+            // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
+            var stockValidation = await _inventoryService.ValidateStockAsync(item.ProductId, invoice.WarehouseId, item.Quantity, allowNegativeStock, ct);
             if (!stockValidation.IsSuccess)
                 return Result<SalesInvoiceDto>.Failure(stockValidation.Error!);
         }
@@ -329,10 +327,11 @@ public class SalesService : ISalesService
                 // 3. Deduct Stock
                 foreach (var item in invoice.Items)
                 {
+                    // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
                     var stockResult = await _inventoryService.DecreaseStockAsync(
                         item.ProductId,
                         invoice.WarehouseId,
-                        item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode),
+                        item.Quantity,
                         MovementType.SaleOut,
                         "SalesInvoice",
                         invoice.Id,
@@ -404,12 +403,11 @@ public class SalesService : ISalesService
                 await _uow.SaveChangesAsync(ct);
 
                 // 6. Create journal entry for sales posting (revenue + COGS)
+                // Phase 25: Unit conversion methods and PurchaseCost removed.
+                // Use Product.Cost directly (quantity is in base units).
                 var totalCost = invoice.Items.Sum(item =>
                 {
-                    var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
-                    var baseUnit = item.Product!.Units?.FirstOrDefault(u => u.IsBaseUnit);
-                    var effectiveCost = baseUnit?.AverageCost ?? baseUnit?.PurchaseCost ?? 0;
-                    return retailQty * effectiveCost;
+                    return item.Quantity * item.Product!.Cost;
                 });
                 var entryResult = await _accountingService.CreateSalesPostEntryAsync(invoice, userId, totalCost, ct);
                 if (!entryResult.IsSuccess)
@@ -492,10 +490,11 @@ public class SalesService : ISalesService
                     // Reverse Stock
                     foreach (var item in invoice.Items)
                     {
+                        // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
                         var stockResult = await _inventoryService.IncreaseStockAsync(
                             item.ProductId,
                             invoice.WarehouseId,
-                            item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode),
+                            item.Quantity,
                             MovementType.SaleReturnIn,
                             "SalesInvoiceCancel",
                             invoice.Id,

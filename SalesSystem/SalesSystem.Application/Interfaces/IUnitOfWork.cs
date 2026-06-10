@@ -31,7 +31,6 @@ public interface IUnitOfWork
     IGenericRepository<SalesInvoiceItem> SalesInvoiceItems { get; }
     IGenericRepository<PurchaseInvoiceItem> PurchaseInvoiceItems { get; }
     IGenericRepository<ProductBarcode> ProductBarcodes { get; }
-    IGenericRepository<UnitBarcode> UnitBarcodes { get; }
     IGenericRepository<ProductUnit> ProductUnits { get; }
     IGenericRepository<CashBox> CashBoxes { get; }
     IGenericRepository<CashTransaction> CashTransactions { get; }

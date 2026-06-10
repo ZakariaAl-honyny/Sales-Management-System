@@ -322,13 +322,13 @@ public class PurchaseService : IPurchaseService
                 }
 
                 // ─── Update Stock ────────────────────────────────────────────────
+                // Phase 25: GetRetailQuantityEquivalent removed; quantity is in base units.
                 foreach (var item in invoice.Items)
                 {
-                    var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
                     var stockResult = await _inventoryService.IncreaseStockAsync(
                         item.ProductId,
                         invoice.WarehouseId,
-                        retailQty,
+                        item.Quantity,
                         MovementType.PurchaseIn,
                         "PurchaseInvoice",
                         invoice.Id,
@@ -351,16 +351,12 @@ public class PurchaseService : IPurchaseService
                     try
                     {
                         var baseUnit = item.Product.GetBaseUnit();
-                        var retailQty = item.Product.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
-                        var retailUnitCost = item.Product.GetRetailQuantityEquivalent(1, item.Mode) > 0
-                            ? item.UnitCost / item.Product.GetRetailQuantityEquivalent(1, item.Mode)
-                            : item.UnitCost;
-
+                        // Phase 25: GetRetailQuantityEquivalent removed; quantity/cost is in base units.
                         var result = await _pricingService.UpdateFromPurchaseAsync(
                             new UpdatePricingRequest(
                                 ProductUnitId: baseUnit.Id,
-                                NewPurchaseCost: retailUnitCost,
-                                NewQuantityPurchased: retailQty,
+                                NewPurchaseCost: item.UnitCost,
+                                NewQuantityPurchased: item.Quantity,
                                 NewSalesPrice: null,
                                 InvoiceId: invoice.Id,
                                 ChangedBy: userId
@@ -458,11 +454,11 @@ public class PurchaseService : IPurchaseService
                     // Reverse Stock
                     foreach (var item in invoice.Items)
                     {
-                        var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+                        // Phase 25: GetRetailQuantityEquivalent removed.
                         var stockResult = await _inventoryService.DecreaseStockAsync(
                             item.ProductId,
                             invoice.WarehouseId,
-                            retailQty,
+                            item.Quantity,
                             MovementType.PurchaseReturnOut,
                             "PurchaseInvoiceCancel",
                             invoice.Id,
@@ -666,7 +662,7 @@ public class PurchaseService : IPurchaseService
                 it.ProductId,
                 it.Product?.Name ?? "غير معروف",
                 it.ProductUnitId,
-                it.ProductUnit?.UnitName ?? "غير معروف",
+                it.ProductUnit?.Unit?.Name ?? "غير معروف",
                 it.Quantity,
                 it.UnitCost,
                 it.DiscountAmount,

@@ -21,11 +21,11 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="16,12">
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
             <StackPanel Orientation="Horizontal">
                 <Path Data="{StaticResource IconProduct}" Fill="White" Width="24" Height="24" Margin="0,0,16,0" Stretch="Uniform"/>
-                <TextBlock Text="📦 " FontSize="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                <TextBlock Text="{Binding Title}" Style="{StaticResource HeaderStyle}" Foreground="White" VerticalAlignment="Center"/>
+                <TextBlock Text="📦 " FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding Title}" Style="{StaticResource HeaderStyle}" Foreground="White" VerticalAlignment="Center" FontSize="14"/>
             </StackPanel>
         </Border>
 
@@ -69,45 +69,7 @@
                                          Height="56"
                                          VerticalContentAlignment="Top" 
                                          TabIndex="4"
-                                         helpers:FocusHelper.AdvanceOnEnter="True"
                                          ToolTip="وصف إضافي للمنتج (اختياري) — يظهر في الفواتير والتقارير"/>
-                                <Border Height="12"/>
-
-                                <!-- Basic Pricing Row -->
-                                <TextBlock Text="الأسعار الأساسية" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                                        <TextBlock Text="سعر التجزئة *" Style="{StaticResource LabelStyle}"/>
-                                        <TextBox Text="{Binding RetailPrice, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
-                                                 Style="{StaticResource ModernTextBox}" 
-                                                 FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"
-                                                 TabIndex="5"
-                                                 ToolTip="سعر البيع للعميل العادي (تجزئة) — هذا الحقل إلزامي ويجب أن يكون أكبر من صفر"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="1" Margin="3,0,3,0">
-                                        <TextBlock Text="سعر الجملة *" Style="{StaticResource LabelStyle}"/>
-                                        <TextBox Text="{Binding WholesalePrice, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
-                                                 Style="{StaticResource ModernTextBox}" 
-                                                 FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"
-                                                 TabIndex="6"
-                                                 ToolTip="سعر البيع لتجار الجملة — هذا الحقل إلزامي ويجب أن يكون أكبر من صفر"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="2" Margin="6,0,0,0">
-                                        <TextBlock Text="سعر التكلفة" Style="{StaticResource LabelStyle}"/>
-                                        <TextBox Text="{Binding PurchasePrice, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
-                                                 Style="{StaticResource ModernTextBox}" 
-                                                 TabIndex="7"
-                                                 ToolTip="سعر شراء المنتج من المورد — يُستخدم لحساب تكلفة المخزون والأرباح"/>
-                                    </StackPanel>
-                                </Grid>
                                 <Border Height="12"/>
 
                                 <Grid>
@@ -120,7 +82,7 @@
                                         <TextBlock Text="الباركود" Style="{StaticResource LabelStyle}"/>
                                         <TextBox Text="{Binding Barcode, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                                  Style="{StaticResource ModernTextBox}" 
-                                                 TabIndex="8"
+                                                 TabIndex="5"
                                                  ToolTip="الباركود (رقم المنتج العالمي) — يجب أن يكون فريداً لكل منتج. إذا كان المنتج ليس له باركود، اتركه فارغاً"/>
                                         <TextBlock Text="الباركود يجب أن يكون فريداً — لا يمكن تكرار نفس الرمز لمنتجين مختلفين" Style="{StaticResource HelperTextStyle}"/>
                                     </StackPanel>
@@ -129,7 +91,7 @@
                                         <TextBlock Text="تنبيه المخزون المنخفض" Style="{StaticResource LabelStyle}"/>
                                         <TextBox Text="{Binding MinStock, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
                                                  Style="{StaticResource ModernTextBox}" 
-                                                 TabIndex="9"
+                                                 TabIndex="6"
                                                  ToolTip="الحد الأدنى للمخزون — سيتم تنبيهك عندما يصل المخزون إلى هذا الحد"/>
                                     </StackPanel>
                                 </Grid>
@@ -137,128 +99,20 @@
 
                                 <!-- Options Section -->
                                 <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="منتج نشط" IsChecked="{Binding IsActive}" Margin="0,0,24,0" TabIndex="10"/>
-                                    </StackPanel>
-                                    <Border Height="10"/>
-                                    
-                                    <!-- Expiration Date Section -->
-                                    <TextBlock Text="تاريخ انتهاء الصلاحية" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
-                                    
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox Content="له تاريخ انتهاء" 
-                                                  IsChecked="{Binding HasExpirationDate}" 
-                                                  VerticalAlignment="Center"
-                                                  Margin="0,0,16,0"
-                                                  TabIndex="11"
-                                                  ToolTip="حدد هذا الخيار إذا كان المنتج له تاريخ صلاحية"/>
-                                        
-                                        <DatePicker SelectedDate="{Binding ExpirationDate, ValidatesOnDataErrors=True, TargetNullValue=''}"
-                                                    IsEnabled="{Binding HasExpirationDate}"
-                                                    Width="200"
-                                                    Style="{StaticResource ModernDatePicker}"
-                                                    TabIndex="12"
-                                                    ToolTip="اختر تاريخ انتهاء صلاحية المنتج — لا يمكن أن يكون في الماضي"/>
-                                    </StackPanel>
-                                    <TextBlock Text="يجب أن يكون تاريخ الانتهاء في المستقبل — سيتم تنبيهك قبل 30 يوماً من انتهاء الصلاحية" 
-                                               Style="{StaticResource HelperTextStyle}" Margin="0,4,0,0"/>
-                                    
-                                    <Border Height="10"/>
-                                    
-                                    <!-- Image Upload Section -->
-                                    <TextBlock Text="صورة المنتج" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
-                                    
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                        <Button Command="{Binding UploadImageCommand}" 
-                                                Style="{StaticResource SecondaryButton}"
-                                                Width="140"
-                                                Margin="0,0,12,0"
-                                                TabIndex="13"
-                                                ToolTip="اختيار صورة للمنتج من جهاز الكمبيوتر — يُسمح بملفات JPG و PNG فقط">
-                                            <StackPanel Orientation="Horizontal">
-                                                <Path Data="{StaticResource IconUpload}" Fill="{StaticResource TextSecondaryBrush}" Width="16" Height="16" Margin="0,0,8,0" Stretch="Uniform"/>
-                                                <TextBlock Text="اختيار صورة"/>
-                                            </StackPanel>
-                                        </Button>
-                                        
-                                        <Border Background="#FFF5F5F5" CornerRadius="4" Padding="8,4" 
-                                                Visibility="{Binding ImagePath, Converter={StaticResource StringToVisibility}}">
-                                            <TextBlock Text="{Binding ImagePath}" 
-                                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                                       VerticalAlignment="Center"/>
-                                        </Border>
-                                    </StackPanel>
-                                    
-                                    <!-- Image Preview -->
-                                    <Border Width="100" Height="100" 
-                                            Background="#FFF5F5F5" 
-                                            CornerRadius="4"
-                                            BorderBrush="{StaticResource BorderBrush}"
-                                            BorderThickness="1"
-                                            Visibility="{Binding ImagePath, Converter={StaticResource StringToVisibility}}">
-                                        <Image Source="{Binding ImagePath, Converter={StaticResource ImagePathConverter}, IsAsync=True}" 
-                                               Width="90" Height="90"
-                                               Stretch="Uniform"
-                                               VerticalAlignment="Center" 
-                                               HorizontalAlignment="Center">
-                                            <Image.Clip>
-                                                <RectangleGeometry Rect="0,0,90,90"/>
-                                            </Image.Clip>
-                                        </Image>
-                                    </Border>
+                                    <CheckBox Content="منتج نشط" IsChecked="{Binding IsActive}" TabIndex="7"
+                                              ToolTip="إلغاء التفعيل يخفي المنتج من قوائم الاختيار"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-            
-            <!-- Tab 2: Units -->
-            <TabItem Header="📐 الوحدات">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,4">
-                    <StackPanel>
-                        <Border Style="{StaticResource CardStyle}">
+                        
+                        <!-- Phase 25: وحدة القياس تُدار عبر شاشة وحدات الصنف -->
+                        <Border Style="{StaticResource CardStyle}" Margin="0,8,0,0">
                             <StackPanel>
-                                <TextBlock Text="إعدادات الوحدات (نظام ثنائي الوحدات)" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
-                                <TextBlock Text="وحدة التجزئة هي الوحدة الأساسية للمخزون" Style="{StaticResource HelperTextStyle}" Margin="0,0,0,8"/>
-                                
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                                        <TextBlock Text="وحدة البيع (تجزئة) *" Style="{StaticResource LabelStyle}"/>
-                                        <ComboBox ItemsSource="{Binding Units}"
-                                                  SelectedValue="{Binding RetailUnitId, ValidatesOnDataErrors=True}"
-                                                  SelectedValuePath="Id"
-                                                  DisplayMemberPath="Name"
-                                                  Style="{StaticResource ModernComboBox}"
-                                                  TabIndex="5"
-                                                  ToolTip="وحدة البيع بالتجزئة (مثل: حبة، كيس) — الوحدة الأساسية للمخزون"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="1" Margin="3,0,3,0">
-                                        <TextBlock Text="وحدة الجملة *" Style="{StaticResource LabelStyle}"/>
-                                        <ComboBox ItemsSource="{Binding Units}"
-                                                  SelectedValue="{Binding WholesaleUnitId, ValidatesOnDataErrors=True}"
-                                                  SelectedValuePath="Id"
-                                                  DisplayMemberPath="Name"
-                                                  Style="{StaticResource ModernComboBox}"
-                                                  TabIndex="6"
-                                                  ToolTip="وحدة البيع بالجملة (مثل: كرتون، صندوق) — تستخدم لمبيعات الجملة"/>
-                                    </StackPanel>
-
-                                    <StackPanel Grid.Column="2" Margin="6,0,0,0">
-                                        <TextBlock Text="معامل التحويل (جملة←تجزئة) *" Style="{StaticResource LabelStyle}"/>
-                                        <TextBox Text="{Binding ConversionFactor, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
-                                                 Style="{StaticResource ModernTextBox}" 
-                                                 TabIndex="7"
-                                                 ToolTip="عدد وحدات التجزئة في وحدة الجملة (مثلاً 12 قطعة في الكرتون) — هذا الحقل إلزامي"/>
-                                    </StackPanel>
-                                </Grid>
+                                <TextBlock Text="وحدات القياس" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
+                                <TextBlock Text="تتم إدارة وحدات القياس من شاشة «وحدات الصنف» عبر زر الوحدات في شريط الأدوات" 
+                                           Style="{StaticResource HelperTextStyle}" TextWrapping="Wrap"/>
+                                <TextBlock Text="بعد حفظ المنتج، يمكنك إضافة وحدات قياس متعددة (مثل: قطعة، علبة، كرتون) مع معامل التحويل المناسب" 
+                                           Style="{StaticResource HelperTextStyle}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -305,7 +159,7 @@
                               Style="{StaticResource ModernDataGrid}"
                               BorderThickness="0">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="مستوى السعر" Binding="{Binding PriceLevelDisplay}" Width="90"/>
+                            <DataGridTextColumn Header="الوحدة" Binding="{Binding ProductUnitName}" Width="100"/>
                             <DataGridTextColumn Header="العملة" Binding="{Binding CurrencyCode}" Width="70"/>
                             <DataGridTextColumn Header="السعر" Binding="{Binding Price, StringFormat=N2}" Width="100"/>
                             <DataGridTextColumn Header="من تاريخ" Binding="{Binding EffectiveFrom, StringFormat=dd/MM/yyyy}" Width="100"/>

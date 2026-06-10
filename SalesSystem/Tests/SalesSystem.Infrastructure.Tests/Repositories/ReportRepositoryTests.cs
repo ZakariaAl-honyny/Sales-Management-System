@@ -172,9 +172,6 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailUnitId: context.Units.First().Id,
-            wholesaleUnitId: context.Units.First().Id,
-            conversionFactor: 10m,
             categoryId: context.Categories.First().Id
         );
         context.Products.Add(product);
@@ -208,10 +205,7 @@ public class ReportRepositoryTests
         context.Warehouses.Add(warehouse2);
 
         var product = Product.Create(
-            name: "Test Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            name: "Test Product"
         );
         context.Products.Add(product);
 
@@ -252,10 +246,7 @@ public class ReportRepositoryTests
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
-            name: "Test Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            name: "Test Product"
         );
         context.Products.Add(product);
 
@@ -285,10 +276,7 @@ public class ReportRepositoryTests
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
-            name: "Normal Stock Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            name: "Normal Stock Product"
         );
         context.Products.Add(product);
 
@@ -400,10 +388,7 @@ public class ReportRepositoryTests
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
-            name: "Test Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            name: "Test Product"
         );
         context.Products.Add(product);
 
@@ -442,10 +427,7 @@ public class ReportRepositoryTests
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var product = Product.Create(
-            name: "Test Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            name: "Test Product"
         );
         context.Products.Add(product);
 

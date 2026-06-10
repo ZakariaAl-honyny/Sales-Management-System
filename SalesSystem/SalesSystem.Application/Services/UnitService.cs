@@ -112,7 +112,7 @@ public class UnitService : IUnitService
         if (unit == null)
             return Result.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-        if (await _uow.Products.AnyAsync(p => p.UnitId == id, ct))
+        if (await _uow.ProductUnits.AnyAsync(pu => pu.UnitId == id, ct))
             return Result.Failure("لا يمكن حذف الوحدة لأنها مرتبطة بمنتجات");
 
         await _uow.Units.SoftDeleteAsync(id, ct);
@@ -128,7 +128,7 @@ public class UnitService : IUnitService
         if (unit == null)
             return Result.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-        if (await _uow.Products.AnyAsync(p => p.UnitId == id || p.RetailUnitId == id || p.WholesaleUnitId == id, ct))
+        if (await _uow.ProductUnits.AnyAsync(pu => pu.UnitId == id, ct))
             return Result.Failure("لا يمكن حذف الوحدة نهائياً لأنها مرتبطة بمنتجات");
 
         try

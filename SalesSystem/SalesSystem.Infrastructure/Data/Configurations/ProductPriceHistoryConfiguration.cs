@@ -41,10 +41,12 @@ public class ProductPriceHistoryConfiguration : IEntityTypeConfiguration<Product
         builder.Property(x => x.NewWholesalePrice)
             .HasPrecision(18, 2);
 
-        builder.Property(x => x.OldAvgCost)
+        builder.Property(x => x.OldCost)
+            .HasColumnName("OldAvgCost")
             .HasPrecision(18, 2);
 
-        builder.Property(x => x.NewAvgCost)
+        builder.Property(x => x.NewCost)
+            .HasColumnName("NewAvgCost")
             .HasPrecision(18, 2);
 
         builder.Property(x => x.ChangeReason)

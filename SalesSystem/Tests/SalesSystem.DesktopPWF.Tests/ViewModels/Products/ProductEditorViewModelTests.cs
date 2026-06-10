@@ -20,7 +20,6 @@ public class ProductEditorViewModelTests : IDisposable
 {
     private readonly Mock<IProductApiService> _mockProductService;
     private readonly Mock<ICategoryApiService> _mockCategoryService;
-    private readonly Mock<IUnitApiService> _mockUnitService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
     private readonly Mock<IProductPriceApiService> _mockPriceService;
@@ -33,7 +32,6 @@ public class ProductEditorViewModelTests : IDisposable
     {
         _mockProductService = new Mock<IProductApiService>();
         _mockCategoryService = new Mock<ICategoryApiService>();
-        _mockUnitService = new Mock<IUnitApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
         _mockPriceService = new Mock<IProductPriceApiService>();
@@ -56,7 +54,6 @@ public class ProductEditorViewModelTests : IDisposable
         return new ProductEditorViewModel(
             _mockProductService.Object,
             _mockCategoryService.Object,
-            _mockUnitService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
             _mockPriceService.Object,
@@ -75,7 +72,6 @@ public class ProductEditorViewModelTests : IDisposable
             product,
             _mockProductService.Object,
             _mockCategoryService.Object,
-            _mockUnitService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
             _mockPriceService.Object,
@@ -96,7 +92,6 @@ public class ProductEditorViewModelTests : IDisposable
         // Assert
         viewModel.SaveCommand.Should().NotBeNull();
         viewModel.CancelCommand.Should().NotBeNull();
-        viewModel.LoadLookupDataCommand.Should().NotBeNull();
     }
 
     [Fact]
@@ -119,21 +114,10 @@ public class ProductEditorViewModelTests : IDisposable
             Name: "منتج تجريبي",
             CategoryId: 1,
             CategoryName: "تصنيف 1",
-            UnitId: 1,
-            UnitName: "وحدة",
-            RetailUnitId: 1,
-            RetailUnitName: "وحدة",
-            WholesaleUnitId: 2,
-            WholesaleUnitName: "كرتون",
-            ConversionFactor: 10,
-            PurchasePrice: 100,
-            SalePrice: 200,
-            RetailPrice: 200,
-            WholesalePrice: 1800,
             MinStock: 10,
             Description: null,
-            ExpirationDate: null,
-            ImagePath: null,
+            HasExpiry: false,
+            Cost: 0m,
             IsActive: true);
 
         // Act - Use the constructor that accepts ProductDto and services
@@ -152,13 +136,10 @@ public class ProductEditorViewModelTests : IDisposable
         // Assert
         viewModel.Name.Should().BeEmpty();
         viewModel.Barcode.Should().BeEmpty();
-        viewModel.PurchasePrice.Should().Be(0);
-        viewModel.RetailPrice.Should().Be(0);
         viewModel.MinStock.Should().Be(0);
         viewModel.IsActive.Should().BeTrue();
         viewModel.IsBusy.Should().BeFalse();
         viewModel.Categories.Should().NotBeNull();
-        viewModel.Units.Should().NotBeNull();
     }
 
     [Fact]
@@ -181,21 +162,10 @@ public class ProductEditorViewModelTests : IDisposable
             Name: "منتج تجريبي",
             CategoryId: 1,
             CategoryName: "تصنيف 1",
-            UnitId: 1,
-            UnitName: "وحدة",
-            RetailUnitId: 1,
-            RetailUnitName: "وحدة",
-            WholesaleUnitId: 2,
-            WholesaleUnitName: "كرتون",
-            ConversionFactor: 10,
-            PurchasePrice: 100,
-            SalePrice: 200,
-            RetailPrice: 200,
-            WholesalePrice: 1800,
             MinStock: 10,
             Description: null,
-            ExpirationDate: null,
-            ImagePath: null,
+            HasExpiry: false,
+            Cost: 0m,
             IsActive: true);
 
         var viewModel = CreateViewModel(product);
@@ -224,7 +194,7 @@ public class ProductEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public void SalePrice_Set_NotifiesPropertyChanged()
+    public void Description_Set_NotifiesPropertyChanged()
     {
         // Arrange
         var viewModel = CreateViewModel();
@@ -232,10 +202,10 @@ public class ProductEditorViewModelTests : IDisposable
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
         // Act
-        viewModel.RetailPrice = 100;
+        viewModel.Description = "وصف جديد";
 
         // Assert
-        propertyChangedEvents.Should().Contain("RetailPrice");
+        propertyChangedEvents.Should().Contain("Description");
     }
 
     [Fact]
@@ -356,38 +326,6 @@ public class ProductEditorViewModelTests : IDisposable
 
     #endregion
 
-    #region Unit Selection Tests
-
-    [Fact]
-    public void SelectedUnit_WhenSet_SetsUnitId()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        var unit = new UnitDto(Id: 1, Name: "وحدة تجريبية", Symbol: "م", IsActive: true);
-
-        // Act
-        viewModel.SelectedUnit = unit;
-
-        // Assert
-        viewModel.UnitId.Should().Be(1);
-    }
-
-    [Fact]
-    public void SelectedUnit_WhenSetToNull_SetsUnitIdToNull()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        viewModel.SelectedUnit = new UnitDto(Id: 1, Name: "وحدة تجريبية", Symbol: "م", IsActive: true);
-
-        // Act
-        viewModel.SelectedUnit = null;
-
-        // Assert
-        viewModel.UnitId.Should().BeNull();
-    }
-
-    #endregion
-
     #region Helper Methods
 
     private static ProductDto CreateTestProductDto(
@@ -400,21 +338,10 @@ public class ProductEditorViewModelTests : IDisposable
             Name: name,
             CategoryId: 1,
             CategoryName: "فئة تجريبية",
-            UnitId: 1,
-            UnitName: "وحدة تجريبية",
-            RetailUnitId: 1,
-            RetailUnitName: "وحدة تجريبية",
-            WholesaleUnitId: 2,
-            WholesaleUnitName: "كرتون",
-            ConversionFactor: 10,
-            PurchasePrice: 50,
-            SalePrice: 100,
-            RetailPrice: 100,
-            WholesalePrice: 900,
             MinStock: 10,
             Description: null,
-            ExpirationDate: null,
-            ImagePath: null,
+            HasExpiry: false,
+            Cost: 0m,
             IsActive: true);
     }
 
