@@ -13,11 +13,16 @@ namespace SalesSystem.Application.Services;
 public class CustomerReceiptService : ICustomerReceiptService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IAccountingIntegrationService _accountingService;
     private readonly ILogger<CustomerReceiptService> _logger;
 
-    public CustomerReceiptService(IUnitOfWork uow, ILogger<CustomerReceiptService> logger)
+    public CustomerReceiptService(
+        IUnitOfWork uow,
+        IAccountingIntegrationService accountingService,
+        ILogger<CustomerReceiptService> logger)
     {
         _uow = uow;
+        _accountingService = accountingService;
         _logger = logger;
     }
 
@@ -90,17 +95,68 @@ public class CustomerReceiptService : ICustomerReceiptService
         }
     }
 
+    public async Task<Result<CustomerReceiptDto>> UpdateAsync(int id, UpdateCustomerReceiptRequest request, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
+                r => r.Id == id, ct, "Customer", "Customer.Party", "CashBox", "Currency", "Applications");
+            if (receipt == null)
+                return Result<CustomerReceiptDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
+
+            // Only drafts can be updated — posted receipts must be cancelled and recreated
+            if (receipt.Status != InvoiceStatus.Draft)
+            {
+                _logger.LogWarning(
+                    "Attempt to update posted/cancelled customer receipt {Id} (Status: {Status}) by User {UserId}",
+                    id, receipt.Status, userId);
+                return Result<CustomerReceiptDto>.Failure(
+                    "لا يمكن تعديل سند قبض مرحّل أو ملغي — قم بإلغاء السند وإنشاء واحد جديد",
+                    ErrorCodes.InvalidOperation);
+            }
+
+            receipt.Update(
+                cashBoxId: request.CashBoxId,
+                currencyId: (short)request.CurrencyId,
+                amount: request.Amount,
+                notes: request.Notes,
+                updatedByUserId: userId);
+
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Customer receipt {Id} updated by User {UserId}", id, userId);
+            return Result<CustomerReceiptDto>.Success(MapToDto(receipt));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation updating customer receipt {Id}: {Message}", id, ex.Message);
+            return Result<CustomerReceiptDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating customer receipt {Id}", id);
+            return Result<CustomerReceiptDto>.Failure("حدث خطأ أثناء تحديث سند القبض");
+        }
+    }
+
     public async Task<Result> PostAsync(int id, int userId, CancellationToken ct)
     {
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Applications");
+                r => r.Id == id, ct, "Applications", "Customer", "Customer.Party");
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
             receipt.Post();
             await _uow.SaveChangesAsync(ct);
+
+            // Create journal entry: Dr Cash / Cr AR
+            var customerName = receipt.Customer?.Party?.Name ?? "";
+            var entryResult = await _accountingService.CreateCustomerPaymentEntryAsync(
+                receipt, customerName, userId, ct);
+            if (!entryResult.IsSuccess)
+                return Result.Failure(entryResult.Error!);
 
             _logger.LogInformation("Customer receipt {Id} posted by User {UserId}", id, userId);
             return Result.Success();
@@ -117,18 +173,30 @@ public class CustomerReceiptService : ICustomerReceiptService
         }
     }
 
-    public async Task<Result> CancelAsync(int id, CancellationToken ct)
+    public async Task<Result> CancelAsync(int id, int userId, CancellationToken ct)
     {
         try
         {
-            var receipt = await _uow.CustomerReceipts.GetByIdAsync(id, ct);
+            var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
+                r => r.Id == id, ct, "Customer", "Customer.Party");
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
+
+            // If already posted, reverse the journal entry first
+            if (receipt.Status == InvoiceStatus.Posted)
+            {
+                var customerAccountId = receipt.Customer?.Party?.AccountId ?? 0;
+                var customerName = receipt.Customer?.Party?.Name ?? "";
+                var reverseResult = await _accountingService.ReverseCustomerPaymentEntryAsync(
+                    receipt.Id, receipt.Amount, customerName, customerAccountId, userId, ct);
+                if (!reverseResult.IsSuccess)
+                    return Result.Failure(reverseResult.Error!);
+            }
 
             receipt.Cancel();
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Customer receipt {Id} cancelled", id);
+            _logger.LogInformation("Customer receipt {Id} cancelled by User {UserId}", id, userId);
             return Result.Success();
         }
         catch (DomainException ex)

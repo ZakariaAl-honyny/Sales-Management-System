@@ -102,6 +102,34 @@ public class CustomerReceipt : DocumentEntity
     }
 
     /// <summary>
+    /// Updates the receipt fields. Only allowed while the receipt is in Draft status.
+    /// Posted receipts must be cancelled and recreated.
+    /// </summary>
+    public void Update(
+        int cashBoxId,
+        short currencyId,
+        decimal amount,
+        string? notes,
+        int? updatedByUserId = null)
+    {
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("فقط السندات المسودة يمكن تعديلها.");
+        if (cashBoxId <= 0)
+            throw new DomainException("الصندوق مطلوب.");
+        if (currencyId <= 0)
+            throw new DomainException("العملة مطلوبة.");
+        if (amount <= 0)
+            throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
+
+        CashBoxId = cashBoxId;
+        CurrencyId = currencyId;
+        Amount = amount;
+        if (notes != null) Notes = notes;
+        SetUpdatedBy(updatedByUserId);
+        UpdateTimestamp();
+    }
+
+    /// <summary>
     /// Adds an application of this receipt amount to a specific sales invoice.
     /// Only allowed while the receipt is in Draft status.
     /// </summary>

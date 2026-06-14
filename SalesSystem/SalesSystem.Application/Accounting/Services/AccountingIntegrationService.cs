@@ -80,6 +80,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
         SystemAccountKey.UndistributedProfits => "حساب الأرباح وفاق",
         SystemAccountKey.InventoryShortage => "حساب عجز المخزون",
         SystemAccountKey.InventorySurplus => "حساب زيادة المخزون",
+        SystemAccountKey.DeliveryChargesRevenue => "حساب إيرادات التوصيل",
         _ => key.ToString()
     };
 
@@ -291,6 +292,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 SystemAccountKey.DefaultCash,
                 SystemAccountKey.AccountsReceivable,
                 SystemAccountKey.SalesRevenue,
+                SystemAccountKey.DeliveryChargesRevenue,
                 SystemAccountKey.VatOutput,
                 SystemAccountKey.CostOfGoodsSold,
                 SystemAccountKey.Inventory
@@ -345,12 +347,22 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                     "الجزء الآجل من فاتورة البيع (مختلط)"));
             }
 
-            // Credit side - Sales Revenue (net after discount)
+            // Credit side - Sales Revenue (net after discount, excluding other charges)
             lines.Add(new JournalEntryLineRequest(
                 m[SystemAccountKey.SalesRevenue],
                 0,
                 netRevenue,
                 "إيراد المبيعات (صافي بعد الخصم)"));
+
+            // Credit side - Delivery Charges Revenue (separate from SalesRevenue)
+            if (invoice.OtherCharges > 0)
+            {
+                lines.Add(new JournalEntryLineRequest(
+                    m[SystemAccountKey.DeliveryChargesRevenue],
+                    0,
+                    invoice.OtherCharges,
+                    "إيرادات التوصيل ورسوم الخدمة"));
+            }
 
             // Credit side - VAT Output
             if (invoice.TaxAmount > 0)
@@ -417,6 +429,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 SystemAccountKey.DefaultCash,
                 SystemAccountKey.AccountsReceivable,
                 SystemAccountKey.SalesRevenue,
+                SystemAccountKey.DeliveryChargesRevenue,
                 SystemAccountKey.VatOutput,
                 SystemAccountKey.CostOfGoodsSold,
                 SystemAccountKey.Inventory
@@ -435,13 +448,23 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var lines = new List<JournalEntryLineRequest>();
 
             // ── Reverse Revenue Side (mirror: swap Dr ↔ Cr) ──────
-            // Original: Cr SalesRevenue, Cr VatOutput
-            // Reverse:  Dr SalesRevenue, Dr VatOutput
+            // Original: Cr SalesRevenue (netRevenue), Cr VatOutput, Cr DeliveryChargesRevenue
+            // Reverse:  Dr SalesRevenue (netRevenue), Dr VatOutput, Dr DeliveryChargesRevenue
             lines.Add(new JournalEntryLineRequest(
                 m[SystemAccountKey.SalesRevenue],
                 netRevenue,
                 0,
                 "عكس إيراد المبيعات"));
+
+            // Reverse: Dr DeliveryChargesRevenue (if applicable)
+            if (invoice.OtherCharges > 0)
+            {
+                lines.Add(new JournalEntryLineRequest(
+                    m[SystemAccountKey.DeliveryChargesRevenue],
+                    invoice.OtherCharges,
+                    0,
+                    "عكس إيرادات التوصيل ورسوم الخدمة"));
+            }
 
             if (invoice.TaxAmount > 0)
             {
@@ -602,8 +625,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (invoice.DiscountAmount > invoice.SubTotal)
                 return Result<int>.Failure("لا يمكن أن يكون الخصم أكبر من إجمالي فاتورة الشراء");
 
-            // Net inventory cost = SubTotal - DiscountAmount
-            var netInventoryCost = invoice.SubTotal - invoice.DiscountAmount;
+            // Net inventory cost = SubTotal - DiscountAmount + OtherCharges (landed cost)
+            var netInventoryCost = invoice.SubTotal - invoice.DiscountAmount + invoice.OtherCharges;
 
             var lines = new List<JournalEntryLineRequest>();
 
@@ -659,7 +682,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
             var request = new CreateJournalEntryRequest(
                 TransactionDate: invoice.InvoiceDate,
-                Description: $"قيد ترحيل فاتورة شراء رقم {invoice.InvoiceNo}",
+                Description: $"قيد ترحيل فاتورة شراء رقم {invoice.InvoiceNo}" +
+                    (invoice.OtherCharges > 0 ? $" (تكلفة شاملة: {invoice.OtherCharges:N2} مصاريف إضافية)" : ""),
                 EntryType: JournalEntryType.Purchase,
                 ReferenceType: "PurchaseInvoice",
                 ReferenceId: invoice.Id,
@@ -707,7 +731,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
             var m = dictResult.Value!;
 
-            var netInventoryCost = invoice.SubTotal - invoice.DiscountAmount;
+            var netInventoryCost = invoice.SubTotal - invoice.DiscountAmount + invoice.OtherCharges;
             if (netInventoryCost < 0)
                 return Result<int>.Failure("لا يمكن أن يكون الخصم أكبر من إجمالي الفاتورة");
 
@@ -791,7 +815,341 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     }
 
     // ────────────────────────────────────────────────────────────────
-    //  G. Supplier Payment Entry
+    //  F4. Sales Return Entry (standalone — partial return, NOT full cancellation)
+    // ────────────────────────────────────────────────────────────────
+    public async Task<Result<int>> CreateSalesReturnEntryAsync(
+        SalesReturn salesReturn,
+        decimal totalCost,
+        int createdByUserId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.SalesReturns,
+                SystemAccountKey.AccountsReceivable,
+                SystemAccountKey.Inventory,
+                SystemAccountKey.CostOfGoodsSold
+            };
+
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
+
+            var m = dictResult.Value!;
+
+            // Get customer account ID (per-entity account routing)
+            var customerAccountId = salesReturn.Customer?.Party?.AccountId > 0
+                ? salesReturn.Customer.Party.AccountId
+                : m[SystemAccountKey.AccountsReceivable];
+
+            var lines = new List<JournalEntryLineRequest>();
+
+            // ── Revenue reversal ────────────────────────────────────
+            // Dr: SalesReturnsAccount (contra revenue) = return amount
+            // Cr: CustomerAccount (reduces AR) = return amount
+            lines.Add(new JournalEntryLineRequest(
+                m[SystemAccountKey.SalesReturns],
+                salesReturn.TotalAmount,
+                0,
+                "مردود مبيعات — إلغاء الإيراد"));
+
+            lines.Add(new JournalEntryLineRequest(
+                customerAccountId,
+                0,
+                salesReturn.TotalAmount,
+                "مردود مبيعات — تخفيض ذمّة العميل"));
+
+            // ── COGS reversal (if the return has cost) ──────────────
+            if (totalCost > 0)
+            {
+                // Dr: InventoryAccount (add stock back)
+                // Cr: COGSAccount (reduce cost of goods sold)
+                lines.Add(new JournalEntryLineRequest(
+                    m[SystemAccountKey.Inventory],
+                    totalCost,
+                    0,
+                    "مردود مبيعات — إعادة المخزون"));
+
+                lines.Add(new JournalEntryLineRequest(
+                    m[SystemAccountKey.CostOfGoodsSold],
+                    0,
+                    totalCost,
+                    "مردود مبيعات — عكس التكلفة"));
+            }
+
+            var request = new CreateJournalEntryRequest(
+                TransactionDate: salesReturn.ReturnDate,
+                Description: $"قيد ترحيل مردود مبيعات رقم {salesReturn.ReturnNo}" +
+                    (salesReturn.SalesInvoiceId.HasValue
+                        ? $" (مرتبط بفاتورة بيع {salesReturn.SalesInvoiceId})"
+                        : " (مرتجع مستقل)"),
+                EntryType: JournalEntryType.SalesReturn,
+                ReferenceType: "SalesReturn",
+                ReferenceId: salesReturn.Id,
+                ReferenceNumber: salesReturn.ReturnNo,
+                Lines: lines
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating sales return entry for return #{ReturnNo}", salesReturn.ReturnNo);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد مردود المبيعات");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  F5. Purchase Return Entry
+    // ────────────────────────────────────────────────────────────────
+    public async Task<Result<int>> CreatePurchaseReturnEntryAsync(
+        PurchaseReturn purchaseReturn,
+        int createdByUserId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.PurchaseReturns,
+                SystemAccountKey.AccountsPayable
+            };
+
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
+
+            var m = dictResult.Value!;
+
+            // Get supplier account ID (per-entity account routing)
+            var supplierAccountId = purchaseReturn.Supplier?.Party?.AccountId > 0
+                ? purchaseReturn.Supplier.Party.AccountId
+                : m[SystemAccountKey.AccountsPayable];
+
+            var lines = new List<JournalEntryLineRequest>();
+
+            // Dr: AccountsPayable (supplier) — decreases the liability
+            lines.Add(new JournalEntryLineRequest(
+                supplierAccountId,
+                purchaseReturn.TotalAmount,
+                0,
+                "مردود مشتريات — تخفيض ذمّة المورد"));
+
+            // Cr: PurchaseReturnAccount — records the return
+            lines.Add(new JournalEntryLineRequest(
+                m[SystemAccountKey.PurchaseReturns],
+                0,
+                purchaseReturn.TotalAmount,
+                "مردود مشتريات"));
+
+            var request = new CreateJournalEntryRequest(
+                TransactionDate: purchaseReturn.ReturnDate,
+                Description: $"قيد ترحيل مردود مشتريات رقم {purchaseReturn.ReturnNo}" +
+                    (purchaseReturn.PurchaseInvoiceId.HasValue
+                        ? $" (مرتبط بفاتورة شراء {purchaseReturn.PurchaseInvoiceId})"
+                        : " (مرتجع مستقل)"),
+                EntryType: JournalEntryType.PurchaseReturn,
+                ReferenceType: "PurchaseReturn",
+                ReferenceId: purchaseReturn.Id,
+                ReferenceNumber: purchaseReturn.ReturnNo.ToString(),
+                Lines: lines
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating purchase return entry for return #{ReturnNo}", purchaseReturn.ReturnNo);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد مردود المشتريات");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  F6. Reverse Purchase Return Entry (cancellation of return)
+    // ────────────────────────────────────────────────────────────────
+    public async Task<Result<int>> ReversePurchaseReturnEntryAsync(
+        PurchaseReturn purchaseReturn,
+        int reversedByUserId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.PurchaseReturns,
+                SystemAccountKey.AccountsPayable
+            };
+
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
+
+            var m = dictResult.Value!;
+
+            // Get supplier account ID (per-entity account routing)
+            var supplierAccountId = purchaseReturn.Supplier?.Party?.AccountId > 0
+                ? purchaseReturn.Supplier.Party.AccountId
+                : m[SystemAccountKey.AccountsPayable];
+
+            var lines = new List<JournalEntryLineRequest>();
+
+            // Reverse of create: swap Dr ↔ Cr
+            // Dr: PurchaseReturnAccount
+            lines.Add(new JournalEntryLineRequest(
+                m[SystemAccountKey.PurchaseReturns],
+                purchaseReturn.TotalAmount,
+                0,
+                "عكس مردود مشتريات"));
+
+            // Cr: AccountsPayable (supplier) — re-instates the liability
+            lines.Add(new JournalEntryLineRequest(
+                supplierAccountId,
+                0,
+                purchaseReturn.TotalAmount,
+                "عكس مردود مشتريات — إعادة ذمّة المورد"));
+
+            var request = new CreateJournalEntryRequest(
+                TransactionDate: DateTime.UtcNow,
+                Description: $"قيد عكس ترحيل مردود مشتريات رقم {purchaseReturn.ReturnNo}",
+                EntryType: JournalEntryType.PurchaseReturn,
+                ReferenceType: "PurchaseReturn",
+                ReferenceId: purchaseReturn.Id,
+                ReferenceNumber: $"{purchaseReturn.ReturnNo}-REV",
+                Lines: lines
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reversing purchase return entry for return #{ReturnNo}", purchaseReturn.ReturnNo);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد عكس مردود المشتريات");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  G. Customer Payment Entry (Receipt)
+    // ────────────────────────────────────────────────────────────────
+    public async Task<Result<int>> CreateCustomerPaymentEntryAsync(
+        CustomerReceipt receipt,
+        string customerName,
+        int createdByUserId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.DefaultCash,
+                SystemAccountKey.AccountsReceivable
+            };
+
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
+
+            var m = dictResult.Value!;
+
+            var request = new CreateJournalEntryRequest(
+                TransactionDate: receipt.ReceiptDate,
+                Description: $"قيد سند قبض من العميل: {customerName}",
+                EntryType: JournalEntryType.CustomerReceipt,
+                ReferenceType: "CustomerReceipt",
+                ReferenceId: receipt.Id,
+                ReferenceNumber: receipt.Id.ToString(),
+                Lines: new List<JournalEntryLineRequest>
+                {
+                    new(m[SystemAccountKey.DefaultCash], receipt.Amount, 0, "سند قبض من العميل"),
+                    new(receipt.Customer?.Party?.AccountId ?? m[SystemAccountKey.AccountsReceivable], 0, receipt.Amount, "سند قبض من العميل")
+                }
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating customer payment entry for receipt {ReceiptId}", receipt.Id);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد سند القبض");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  G. Reverse Customer Payment Entry
+    // ────────────────────────────────────────────────────────────────
+    public async Task<Result<int>> ReverseCustomerPaymentEntryAsync(
+        int receiptId,
+        decimal amount,
+        string customerName,
+        int customerAccountId,
+        int reversedByUserId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var cashResult = await GetAccountIdAsync(SystemAccountKey.DefaultCash, null, ct);
+            if (!cashResult.IsSuccess)
+                return Result<int>.Failure(cashResult.Error!);
+
+            var defaultCashAccountId = cashResult.Value;
+
+            // Reverse: Dr AR / Cr Cash (mirror of original Dr Cash / Cr AR)
+            var request = new CreateJournalEntryRequest(
+                TransactionDate: DateTime.UtcNow,
+                Description: $"قيد عكس سند قبض من العميل: {customerName}",
+                EntryType: JournalEntryType.Manual,
+                ReferenceType: "CustomerReceipt",
+                ReferenceId: receiptId,
+                ReferenceNumber: $"{receiptId}-REV",
+                Lines: new List<JournalEntryLineRequest>
+                {
+                    new(customerAccountId, amount, 0, "عكس سند قبض من العميل"),
+                    new(defaultCashAccountId, 0, amount, "عكس سند قبض من العميل")
+                }
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reversing customer payment entry for receipt {ReceiptId}", receiptId);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد عكس سند القبض");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  H. Supplier Payment Entry
     // ────────────────────────────────────────────────────────────────
     public async Task<Result<int>> CreateSupplierPaymentEntryAsync(
         SupplierPayment payment,
@@ -843,7 +1201,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     }
 
     // ────────────────────────────────────────────────────────────────
-    //  H. Reverse Supplier Payment Entry
+    //  I. Reverse Supplier Payment Entry
     // ────────────────────────────────────────────────────────────────
     public async Task<Result<int>> ReverseSupplierPaymentEntryAsync(
         int paymentId,

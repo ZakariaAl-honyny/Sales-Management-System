@@ -4,6 +4,7 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
@@ -485,9 +486,110 @@ public class FinancialReportService : IFinancialReportService
     {
         try
         {
-            _logger.LogWarning("Cash flow report not available - CashTransaction entity removed. Rewrite using ReceiptVoucher/PaymentVoucher.");
+            if (from > to)
+                return Result<CashFlowReportDto>.Failure("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
 
-            return Result<CashFlowReportDto>.Failure("تقرير التدفق النقدي قيد إعادة البناء باستخدام سندات القبض والصرف الجديدة");
+            _logger.LogInformation("Generating cash flow report from {From} to {To}" +
+                (cashBoxId.HasValue ? " for cash box {CashBoxId}" : ""),
+                from, to, cashBoxId);
+
+            // ─── Opening balance: sum of all ReceiptVoucher minus PaymentVoucher before the period ───
+            decimal openingBalance = 0;
+            if (!cashBoxId.HasValue)
+            {
+                var allReceiptsBefore = await _uow.ReceiptVouchers.ToListAsync(
+                    rv => rv.Status == (byte)InvoiceStatus.Posted && rv.VoucherDate < from, ct: ct);
+                var allPaymentsBefore = await _uow.PaymentVouchers.ToListAsync(
+                    pv => pv.Status == (byte)InvoiceStatus.Posted && pv.VoucherDate < from, ct: ct);
+                openingBalance = allReceiptsBefore.Sum(r => r.TotalAmount)
+                               - allPaymentsBefore.Sum(p => p.TotalAmount);
+            }
+            else
+            {
+                var receiptsBefore = await _uow.ReceiptVouchers.ToListAsync(
+                    rv => rv.Status == (byte)InvoiceStatus.Posted
+                       && rv.CashBoxId == cashBoxId.Value
+                       && rv.VoucherDate < from, ct: ct);
+                var paymentsBefore = await _uow.PaymentVouchers.ToListAsync(
+                    pv => pv.Status == (byte)InvoiceStatus.Posted
+                       && pv.CashBoxId == cashBoxId.Value
+                       && pv.VoucherDate < from, ct: ct);
+                openingBalance = receiptsBefore.Sum(r => r.TotalAmount)
+                               - paymentsBefore.Sum(p => p.TotalAmount);
+            }
+
+            // ─── Period inflows (ReceiptVouchers) ───────────────────────────────
+            List<ReceiptVoucher> periodReceipts;
+            if (cashBoxId.HasValue)
+            {
+                periodReceipts = await _uow.ReceiptVouchers.ToListAsync(
+                    rv => rv.Status == (byte)InvoiceStatus.Posted
+                       && rv.CashBoxId == cashBoxId.Value
+                       && rv.VoucherDate >= from
+                       && rv.VoucherDate <= to,
+                    ct: ct);
+            }
+            else
+            {
+                periodReceipts = await _uow.ReceiptVouchers.ToListAsync(
+                    rv => rv.Status == (byte)InvoiceStatus.Posted
+                       && rv.VoucherDate >= from
+                       && rv.VoucherDate <= to,
+                    ct: ct);
+            }
+
+            // ─── Period outflows (PaymentVouchers) ──────────────────────────────
+            List<PaymentVoucher> periodPayments;
+            if (cashBoxId.HasValue)
+            {
+                periodPayments = await _uow.PaymentVouchers.ToListAsync(
+                    pv => pv.Status == (byte)InvoiceStatus.Posted
+                       && pv.CashBoxId == cashBoxId.Value
+                       && pv.VoucherDate >= from
+                       && pv.VoucherDate <= to,
+                    ct: ct);
+            }
+            else
+            {
+                periodPayments = await _uow.PaymentVouchers.ToListAsync(
+                    pv => pv.Status == (byte)InvoiceStatus.Posted
+                       && pv.VoucherDate >= from
+                       && pv.VoucherDate <= to,
+                    ct: ct);
+            }
+
+            var totalIncome = periodReceipts.Sum(r => r.TotalAmount);
+            var totalExpense = periodPayments.Sum(p => p.TotalAmount);
+            var netCashFlow = totalIncome - totalExpense;
+            var closingBalance = openingBalance + netCashFlow;
+
+            // ─── Build categorized income items ─────────────────────────────────
+            var incomeItems = new List<CashFlowItemDto>
+            {
+                new("إيرادات سندات القبض", totalIncome)
+            };
+
+            // ─── Build categorized expense items ────────────────────────────────
+            var expenseItems = new List<CashFlowItemDto>
+            {
+                new("مصروفات سندات الصرف", totalExpense)
+            };
+
+            var dto = new CashFlowReportDto(
+                OpeningBalance: openingBalance,
+                TotalIncome: totalIncome,
+                TotalExpense: totalExpense,
+                NetCashFlow: netCashFlow,
+                ClosingBalance: closingBalance,
+                IncomeItems: incomeItems,
+                ExpenseItems: expenseItems
+            );
+
+            _logger.LogInformation(
+                "Cash flow report generated: Opening={OpeningBalance}, Income={TotalIncome}, Expense={TotalExpense}, Net={NetCashFlow}, Closing={ClosingBalance}",
+                openingBalance, totalIncome, totalExpense, netCashFlow, closingBalance);
+
+            return Result<CashFlowReportDto>.Success(dto);
         }
         catch (Exception ex)
         {

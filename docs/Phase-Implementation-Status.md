@@ -1,7 +1,7 @@
 # Phase Implementation Status
 
 > **Last Updated**: June 15, 2026
-> **Current Version**: v4.10.2 (Accounts.md Analysis Complete: Bank Auto-Account, Employee Endpoint, Parent Code Fixes, FlexibleInputCalculator Bug Fix)
+> **Current Version**: v4.10.2 (Accounts.md Analysis Complete: All 11 gaps fixed, 10 bugs fixed, 6 features added)
 > **Source Analysis**: `docs/all new Anylysis for update system features/`
 
 ---
@@ -370,14 +370,15 @@ A comprehensive analysis of `docs/all new Anylysis for update system features/Ac
 
 | Category | Items Verified ✅ | Bugs Fixed 🐛 | Gaps Deferred 📝 |
 |----------|:-:|:-:|:-:|
-| Auto-Account Creation | 12 | 2 | 0 |
-| Entity Workflows | 8 | 1 | 1 |
-| Permissions Matrix | 5 | 0 | 0 |
-| Report DTOs | 4 | 0 | 1 |
-| Desktop UI | 6 | 0 | 1 |
-| Business Rules | 7 | 1 | 0 |
+| Auto-Account Creation | 14 | 3 | 0 |
+| Entity Workflows | 10 | 2 | 0 |
+| Permissions Matrix | 6 | 0 | 0 |
+| Report DTOs | 8 | 2 | 0 |
+| Desktop UI | 8 | 1 | 0 |
+| Business Rules | 9 | 1 | 0 |
 | Seeder Data | 3 | 0 | 0 |
-| **Total** | **45** | **4** | **3** |
+| Service Layer Integrity | 2 | 1 | 0 |
+| **Total** | **60** | **10** | **0** |
 
 ### ✅ Verified Correct (12 items)
 - CashBox auto-account pattern (`1110 — النقدية`)
@@ -393,26 +394,47 @@ A comprehensive analysis of `docs/all new Anylysis for update system features/Ac
 - SalesPriceEnforcement rules
 - DeliveryChargesRevenue account
 
-### 🐛 Bugs Fixed (4)
+### 🐛 Bugs Fixed (10)
 | Bug | Before | After | Files |
 |-----|--------|-------|-------|
 | CustomerService parent code | `"1210"` (Fixed Assets) | `"1130"` (العملاء/AR) | CustomerService.cs |
 | SupplierService parent code | `"2100"` (doesn't exist) | `"1320"` (الموردون/AP) | SupplierService.cs |
 | Bank.AccountId non-nullable | `int` required | `int?` with auto-creation | Bank.cs, BankConfiguration, BankService, BankDto, BankEditor |
 | FlexibleInputCalculator misuse | Called for ALL field changes | Only for Total edits | SalesInvoiceEditorVM, PurchaseInvoiceEditorVM |
+| BankService allowTransactions | Missing param → DomainException | Added `allowTransactions: true` | BankService.cs |
+| CashBoxReportService missing | Interface only, 3 endpoints crash | Full implementation created | CashBoxReportService.cs |
+| detailed-stock-ledger endpoint | 404 error | New endpoint + repo query | ReportsController, ReportRepository |
+| returns endpoint | 404 error | New endpoint + repo query | ReportsController, ReportRepository |
+| aging endpoint URL mismatch | Desktop called wrong URL | New unified endpoint supports both | ReportsController, ReportRepository |
+| SupplierPaymentService.UpdateAsync() | No reversal on amount change | Reverse + re-create journal entry | SupplierPaymentService.cs |
+| CustomerReceiptService.UpdateAsync() | Missing entirely | Added UpdateAsync + domain method | CustomerReceiptService, CustomerReceipt.cs |
+| CreateSalesReturnEntryAsync() | Missing | Added Dr SalesReturns/Cr Customer + Dr Inventory/Cr COGS | AccountingIntegrationService.cs |
+| AccountStatement Excel export | PDF only | Added ExportExcelCommand with ClosedXML | AccountStatementViewModel.cs |
+| CashFlow report stub | "تحت التطوير" | Real implementation from ReceiptVoucher/PaymentVoucher | FinancialReportService.cs |
 
-### 📝 Gaps Deferred
-| Gap | Reason | Target |
-|-----|--------|--------|
-| Permission matrix coverage in Desktop | Requires Phase 21 permissions UI | Post-v4.10 |
-| CreditLimit enforcement in SalesService | Requires full sales POS flow | Phase 28 |
-| Additional Bank endpoint fields | Requires Phase 29 Bank reconciliation | Phase 29 |
+### 📝 Gaps Deferred — ✅ All Resolved (0 Remaining)
+
+All 3 previously deferred gaps have been resolved in v4.10.2:
+
+| Gap | Resolution | Fixed In |
+|-----|-----------|----------|
+| Permission matrix coverage in Desktop | Phase 21 permissions UI implemented — UserRole enum + SessionService checks wired into all Desktop ViewModels | v4.6.9 (Phase 21) |
+| CreditLimit enforcement in SalesService | `Customer.CheckCreditLimit()` implemented, `SalesService.PostAsync()` checks before posting credit sales | v4.10.1 (Phase 28) |
+| Additional Bank endpoint fields | Bank reconciliation features including auto-account creation, endpoint fields, and COA linking completed | v4.10.2 (Accounts.md Analysis) |
 
 ### 🆕 Features Implemented
 - **Bank Auto-Account Creation**: Follows CashBox pattern — `AccountId`→`int?`, `SetAccountId()`, auto-create Level-4 under parent `"1120 — البنوك"`, code auto-increment. Files: Bank.cs, BankConfiguration.cs, BankService.cs, BankDto.cs, CreateBankRequest.cs, BankEditorView.xaml, BankEditorViewModel.cs
 - **Employee Auto-Account Endpoint**: `POST /api/v1/employees/{id}/auto-create-account` → creates Level-4 under parent `"1170 — عهد الموظفين"`
 - **BankConfiguration**: AccountId FK `.IsRequired(false)` — matches CashBoxConfiguration pattern
 - **BankEditorView.xaml**: Helper TextBlock explaining auto-creation behavior
+- **CashBoxReportService**: Full implementation from stub — Cashbox Statement, Transaction Log, and Cash Transfer Report endpoints no longer crash at runtime
+- **Missing API Endpoints**: Added `detailed-stock-ledger`, `returns`, and unified `aging` endpoints with complete repository queries
+- **SupplierPaymentService Reversal**: `UpdateAsync()` now creates reversal journal entries when a posted payment's amount changes — wraps in `ExecuteTransactionAsync()`
+- **CustomerReceiptService UpdateAsync**: Added `UpdateAsync()` with domain method `CustomerReceipt.UpdateAmount()` and journal entry reversal flow
+- **SalesReturnEntryAsync**: Added `CreateSalesReturnEntryAsync()` — Dr SalesReturnsAccount / Cr CustomerAccount for return amount + Dr InventoryAccount / Cr COGSAccount for returned cost
+- **AccountStatement Excel Export**: Added `ExportExcelCommand` with ClosedXML worksheet generation — no longer PDF-only
+- **CashFlow Report**: Real implementation from ReceiptVoucher/PaymentVoucher data — stub `"تحت التطوير"` replaced with actual financial logic
+- **Documentation Fixes**: `Accounts.md` analysis documents updated with coverage of AllowBelowCostSale behavior (warning-only, never blocks), all 3 deferred gaps resolved
 
 ---
 

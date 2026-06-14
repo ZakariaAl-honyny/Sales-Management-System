@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.10.2+ — Accounts.md Analysis Complete: Bank Auto-Account Creation, Employee Auto-Account Endpoint, Customer/Supplier Parent Code Fixes, FlexibleInputCalculator Bug Fix)
+# AGENTS.md — Sales Management System (v4.10.3+ — Inventory Operations Complete: BLOCKER #1-3 Fixed, Desktop ViewModels Rewritten, 0 Build Errors)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -1538,6 +1538,29 @@ The following rules codify the bugs found and fixed during Phase 22 code review.
 | RULE-503 | `EmployeesController` MUST expose `POST /api/v1/employees/{id}/auto-create-account` endpoint that calls `EmployeeService.AutoCreateEmployeeAccountAsync()` — creates a Level-4 detail account under parent `"1170 — عهد الموظفين"` (Employee Custody). This endpoint is needed because custody/advance/lone workflows need accounts created before transaction processing. |
 | RULE-504 | `CustomerService.AutoCreateCustomerAccountAsync()` MUST look up parent account by code `"1130"` (Accounts Receivable/العملاء) — NOT `"1210"` (Fixed Assets). `SupplierService.AutoCreateSupplierAccountAsync()` MUST look up parent account by code `"1320"` (Accounts Payable/الموردون) — NOT `"2100"` (doesn't exist). These parent codes were discovered during Accounts.md analysis and are CRITICAL for correct COA linking. |
 | RULE-505 | `RecalculateFromFlexibleInput()` in `InvoiceLineViewModel` and `PurchaseInvoiceLineViewModel` MUST ONLY call `FlexibleInputCalculator.Calculate()` when `_lastModifiedField == CalculationField.Total` — when user edited Quantity or UnitPrice/UnitCost, `_lineTotalInput` MUST be recomputed directly as `_quantity * _unitPrice` (or `_quantity * _unitCost`). NEVER pass Quantity or Price as `lastModifiedField` to the calculator because the auto-computed total is treated as a user-entered anchor, causing incorrect recalculation. |
+| RULE-506 | `Account.Create()` MUST receive `allowTransactions: true` when `level >= 4` — the domain guard `if (level >= 4 && !allowTransactions)` throws `DomainException("الحساب التفصيلي يجب أن يسمح بالحركات")`. This applies to ALL auto-creation callers: BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService. NEVER omit `allowTransactions: true` for detail accounts. |
+| RULE-507 | EVERY service interface registered in DI MUST have a concrete implementation class. Missing implementations cause `InvalidOperationException` at DI resolution. Search for ALL `services.AddScoped<I, T>` / `services.AddTransient<I, T>` and verify `T` exists as a concrete class. |
+| RULE-508 | Report API endpoints MUST match the URLs called by Desktop ViewModels. When adding a report ViewModel, verify the API controller has a matching route. Common mismatches: `detailed-stock-ledger`, `reports/returns`, `reports/aging`. For each `Get*Async()` call in `ReportApiService.cs`, verify the corresponding route exists in the controller. |
+| RULE-509 | `SupplierPaymentService.UpdateAsync()` and `CustomerReceiptService.UpdateAsync()` MUST create reversal journal entries when a posted payment's amount changes — (1) reverse the original via `ReverseSupplierPaymentEntryAsync()`/`ReverseCustomerPaymentEntryAsync()`, (2) create new entry for updated amount. Wrap in `ExecuteTransactionAsync()`. Use per-entity account routing with fallback to SystemAccountMappings. |
+| RULE-510 | `AccountingIntegrationService` MUST have `CreateSalesReturnEntryAsync()` for standalone sales returns — Dr `SalesReturnsAccount` / Cr `CustomerAccount` (per-entity routing) for return amount, Dr `InventoryAccount` / Cr `COGSAccount` for returned cost. This is separate from `ReverseSalesPostEntryAsync()` which handles full invoice cancellations. |
+| RULE-511 | Report services MUST NOT return hardcoded failure stubs. If a report query is complex, implement actual logic using available data entities (ReceiptVoucher, PaymentVoucher, InventoryTransaction, etc.) rather than returning `Result.Failure("تحت التطوير")` or similar stubs. |
+| RULE-512 | ALL financial report ViewModels MUST support Excel export via ClosedXML — if a report has PDF export but no Excel export, it is incomplete. Check `AccountStatementViewModel` and all 27 report ViewModels for `ExportExcelCommand`. |
+| RULE-506 | `AllowBelowCostSale` MUST default to `true` (allowed) with WARNING-only behavior — per analysis: "أنا أنصح: ✅ السماح. لكن مع تنبيه." When the setting is disabled (`false`), `SalesService.PostAsync()` MUST log a warning via `_logger.LogWarning` but MUST NOT block the sale (return `Result.Failure`). This differs from `PreventBelowRetailPrice` which DOES block. The analysis clearly states: "ولا نمنع البيع" (do not block the sale). |
+
+### 2.93 Inventory Operations Rules (v4.10.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-507 | `InventoryService.CreateTransactionAsync()` MUST auto-generate `TransactionNo` via `_sequenceService.GetNextIntAsync("InventoryTransaction", ct)` when the provided `TransactionNo <= 0`. NEVER require the Desktop to provide a TransactionNo — the service layer handles auto-generation (similar to InvoiceNo pattern in RULE-255). |
+| RULE-508 | `InventoryAdjustmentService.PostAsync()` MUST update `WarehouseStocks` per line — Addition=Increase, Deduction=Decrease, Correction=delta(target-current). MUST use `_inventoryService.IncreaseStockAsync()`/`DecreaseStockAsync()` for atomic stock changes with audit trail. MUST inject `IInventoryService` + `IDocumentSequenceService`. |
+| RULE-509 | `InventoryCountService.PostAsync()` MUST create a single `InventoryAdjustment` (Correction type per RULE-397) + update stock per line. MUST inject `IInventoryService` + `IDocumentSequenceService` + `IInventoryAdjustmentService`. Count creates one Adjustment per Post (not per line) for cleaner audit trail with `ReferenceType = "InventoryCount"`. |
+| RULE-510 | `InventoryAdjustmentEditorViewModel` MUST follow the `InventoryTransactionEditorViewModel` pattern — same DI, command, validation, and messaging patterns. 5 commands: `LoadWarehouses`, `LoadProducts`, `AddLine`, `RemoveLine`, `SaveDraft`/`Post`. Uses INotifyDataErrorInfo. AdjustmentType must support 1-3 (Addition, Deduction, Correction). |
+| RULE-511 | `InventoryCountEditorViewModel` MUST use `InventoryCountLineItem` mutable class for two-way binding. Supports `AddLine`/`RemoveLine` commands, Post flow with ValidateAllAsync, and edit mode for existing counts. Count lines store `ExpectedQuantity`, `ActualQuantity`, and compute `Difference`. |
+| RULE-512 | `WarehouseTransferEditorViewModel` MUST NOT hardcode IDs as `short` — use `short` for warehouse IDs matching `Warehouse.Id` type. Validate `SourceWarehouseId != DestinationWarehouseId` before posting. 5 commands: `LoadWarehouses`, `LoadSourceProducts`, `LoadDestinationProducts`, `AddLine`, `RemoveLine`, `SaveDraft`/`Post`. |
+| RULE-513 | `InventoryAdjustmentRequestValidator` MUST validate `AdjustmentType` range as `InclusiveBetween(1, 3)` — NOT `(1, 2)` which incorrectly excludes Correction=3. |
+| RULE-514 | `ReportsController` MUST place `CancellationToken` parameter BEFORE any optional parameters — ASP.NET Core model binding requires cancellation tokens to precede optional params to avoid binding errors. |
+| RULE-515 | `InventoryCountService.PostAsync()` MUST compute `Difference` for each line as `(ActualQuantity - ExpectedQuantity)` — positive difference = surplus (stock increase), negative difference = shortage (stock decrease). Apply increase or decrease via `IInventoryService` based on sign. |
+| RULE-516 | All Inventory Operations ViewModels (InventoryAdjustmentEditorViewModel, InventoryCountEditorViewModel, WarehouseTransferEditorViewModel) MUST implement `IDisposable` and call `Cleanup()` in `Dispose()` to unsubscribe EventBus subscriptions — same pattern as RULE-289. MUST use `IToastNotificationService` for minor success messages, not modal dialogs. |
 
 Phase 24: Accounting Engine Automation → Automatic journal entries for all money operations
 Phase 25: Payment Update/Delete Reversal Entries → Fix C-2/C-3: Reversal entries for payment update/delete
@@ -1900,6 +1923,24 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1130"` (العملاء)
 ❌ `SupplierService` looking up AP parent by code `"2100"` (doesn't exist) instead of `"1320"` (الموردون)
 ❌ Missing `POST /api/v1/employees/{id}/auto-create-account` endpoint (Employee custody workflow needs it)
+❌ `Account.Create()` for Level 4+ without `allowTransactions: true` (DomainException thrown)
+❌ Service interface without concrete implementation class (DI resolution crash)
+❌ Report API URL mismatch between Desktop ViewModel and Controller (404 errors)
+❌ Payment UpdateAsync without journal entry reversal for posted amounts
+❌ Standalone sales return without `CreateSalesReturnEntryAsync()` (missing journal entries)
+❌ Report service returning hardcoded stub `"تحت التطوير"` instead of real data
+❌ Report ViewModel with PDF export but NO Excel export (incomplete)
+❌ `CashBoxReportService` missing implementation (3 API endpoints crash at runtime)
+❌ `FinancialReportService.GetCashFlowReportAsync()` returning stub instead of computing from ReceiptVoucher/PaymentVoucher data
+❌ `AllowBelowCostSale` BLOCKING instead of WARNING-only (per analysis: "ولا نمنع البيع" — must warn but never block below-cost sales)
+❌ `AllowBelowCostSale` defaulting to `"false"` (must default to `true` per analysis spec: "السماح مع تنبيه")
+❌ `InventoryService.CreateTransactionAsync()` requiring Desktop to provide TransactionNo (service MUST auto-generate via DocumentSequenceService when `<= 0`)
+❌ `InventoryAdjustmentService.PostAsync()` directly setting `WarehouseStock.Quantity` (MUST use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` for atomic + audit trail)
+❌ `InventoryCountService.PostAsync()` creating one Adjustment per line (MUST create ONE adjustment per Post with `ReferenceType = "InventoryCount"`)
+❌ `AdjustmentType` validator with range `(1,2)` excluding Correction=3 (MUST use `InclusiveBetween(1, 3)`)
+❌ `ReportsController` with `CancellationToken` AFTER optional parameters (MUST precede optional params)
+❌ Inventory Operations ViewModels NOT implementing `IDisposable` (EventBus subscriptions MUST be disposed)
+❌ `InvoiceLineViewModel`/`PurchaseInvoiceLineViewModel` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator MUST only be called when `_lastModifiedField == Total`)
 ```
 
 
@@ -2247,5 +2288,18 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] `EmployeesController` has `POST /api/v1/employees/{id}/auto-create-account` endpoint?
 - [ ] `CustomerService.AutoCreateCustomerAccountAsync()` uses parent code `"1130"` (NOT `"1210"`)?
 - [ ] `SupplierService.AutoCreateSupplierAccountAsync()` uses parent code `"1320"` (NOT `"2100"`)?
+- [ ] All service interfaces have concrete implementations (no DI resolution crash)?
+- [ ] Report API endpoints match Desktop ViewModel calls (detailed-stock-ledger, returns, aging)?
+- [ ] Payment update/delete creates reversal journal entries?
+- [ ] `CreateSalesReturnEntryAsync()` exists in `AccountingIntegrationService`?
+- [ ] Report services don't return hardcoded stubs (CashFlowReport)?
+- [ ] ALL report ViewModels have Excel export (ClosedXML)?
+- [ ] AccountStatementViewModel has Excel export?
 - [ ] All stale navigation menu items guarded with "تحت التطوير" dialog (no NullReferenceException)?
 - [ ] All 2,083+ tests pass?
+- [ ] `InventoryService.CreateTransactionAsync()` uses `_sequenceService.GetNextIntAsync()` when `TransactionNo <= 0` — NEVER require Desktop to provide TransactionNo?
+- [ ] `InventoryAdjustmentService.PostAsync()` updates stock via `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` — NEVER direct `WarehouseStock.Quantity` assignment?
+- [ ] `InventoryCountService.PostAsync()` creates ONE `InventoryAdjustment` per Post with `ReferenceType = "InventoryCount"` — NOT one per line?
+- [ ] InventoryAdjustmentRequestValidator validates `AdjustmentType` with `InclusiveBetween(1, 3)` — NOT `(1, 2)`?
+- [ ] `ReportsController` places `CancellationToken` BEFORE optional parameters?
+- [ ] All Inventory Operations ViewModels implement `IDisposable` and dispose EventBus subscriptions in `Cleanup()`?

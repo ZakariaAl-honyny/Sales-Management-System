@@ -158,7 +158,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFinancialReportService, FinancialReportService>();
 builder.Services.AddScoped<ISalesReportService, SalesReportService>();
 builder.Services.AddScoped<IPurchaseReportService, PurchaseReportService>();
-// REMOVED: CashBoxReportService (implementation not yet created)
+builder.Services.AddScoped<ICashBoxReportService, CashBoxReportService>();
 builder.Services.AddScoped<IUserReportService, UserReportService>();
 // ReportExportService is in Infrastructure (uses QuestPDF + ClosedXML)
 builder.Services.AddScoped<IReportExportService, SalesSystem.Infrastructure.Services.ReportExportService>();

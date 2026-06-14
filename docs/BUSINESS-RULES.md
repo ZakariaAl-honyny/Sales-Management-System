@@ -139,3 +139,50 @@
 | BR-143 | Validation uses `INotifyDataErrorInfo` — NO `HasXxxError` booleans. |
 | BR-144 | EventBus: subscribe in OnLoad, unsubscribe in `Dispose()`. |
 | BR-145 | LineTotal column editable in DataGrid with Flexible Input support. |
+
+---
+
+## 16. Account.Create() — allowTransactions Validation
+
+| Rule | Description |
+|------|-------------|
+| BR-160 | ALL `Account.Create()` calls for Level 4+ MUST pass `allowTransactions: true`. The default is `false` and `Account.Create()` throws `DomainException("الحساب التفصيلي يجب أن يسمح بالحركات")` when `level >= 4 && !allowTransactions`. |
+| BR-161 | Check ALL callers: BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService — every auto-creation path MUST set `allowTransactions: true`. |
+
+## 17. Service Implementation Completeness
+
+| Rule | Description |
+|------|-------------|
+| BR-170 | EVERY service interface registered in DI MUST have a concrete implementation class. Missing implementations cause `InvalidOperationException` at DI resolution. |
+| BR-171 | Search `Program.cs` or `DependencyInjection.cs` for all `services.AddScoped<I, T>` and `services.AddTransient<I, T>` — verify `T` exists as a class. |
+
+## 18. Report API/ViewModel URL Alignment
+
+| Rule | Description |
+|------|-------------|
+| BR-180 | Desktop ViewModel report API calls MUST match actual controller routes. Check `ReportApiService.cs` for every `Get*Async()` URL against the API controllers. |
+| BR-181 | Common mismatches: `detailed-stock-ledger`, `reports/returns`, `reports/aging`. Add missing endpoints to `ReportsController` rather than changing Desktop URLs (unless Desktop URL is wrong). |
+
+## 19. Payment Update Reversal
+
+| Rule | Description |
+|------|-------------|
+| BR-190 | `SupplierPaymentService.UpdateAsync()` MUST reverse original journal entry and create new entry when a posted payment's amount changes. |
+| BR-191 | `CustomerReceiptService.UpdateAsync()` MUST exist and support Draft-only updates (posted receipts must be cancelled and recreated). |
+| BR-192 | Wrap reversal + re-creation in `ExecuteTransactionAsync()` for atomicity. Use per-entity account routing. |
+
+## 20. Standalone Sales Return Journal Entries
+
+| Rule | Description |
+|------|-------------|
+| BR-200 | `AccountingIntegrationService` MUST have `CreateSalesReturnEntryAsync()` for standalone (non-invoice-cancellation) returns. |
+| BR-201 | Entry: Dr `SalesReturnsAccount` / Cr `CustomerAccount` (per-entity routing) for return amount; Dr `InventoryAccount` / Cr `COGSAccount` for cost side. |
+| BR-202 | This is separate from `ReverseSalesPostEntryAsync()` which handles full invoice cancellations. |
+
+## 21. Report Service Quality
+
+| Rule | Description |
+|------|-------------|
+| BR-210 | Report services MUST NOT return hardcoded failure stubs like `Result.Failure("تحت التطوير")`. Implement actual queries using available entities. |
+| BR-211 | ALL financial report ViewModels MUST support Excel export via ClosedXML — PDF-only reports are incomplete. |
+| BR-212 | Check `AccountStatementViewModel` was missing Excel export — fix pattern: add `ExportExcelCommand` + `ExportExcelAsync()` matching other financial report VMs. |

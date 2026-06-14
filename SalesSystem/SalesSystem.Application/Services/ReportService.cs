@@ -182,6 +182,65 @@ public class ReportService : IReportService
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Detailed Stock Ledger
+    // ─────────────────────────────────────────────────────────────────────
+    public async Task<Result<List<DetailedStockLedgerDto>>> GetDetailedStockLedgerAsync(
+        int? productId, int? warehouseId, DateTime? from, DateTime? to, CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating detailed stock ledger — productId: {ProductId}, warehouseId: {WhId}, from: {From}, to: {To}",
+                productId, warehouseId, from, to);
+            var report = await _reportRepository.GetDetailedStockLedgerAsync(productId, warehouseId, from, to, ct);
+            return Result<List<DetailedStockLedgerDto>>.Success(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating detailed stock ledger");
+            return Result<List<DetailedStockLedgerDto>>.Failure("حدث خطأ أثناء إنشاء كشف حركة الأصناف");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Returns Report
+    // ─────────────────────────────────────────────────────────────────────
+    public async Task<Result<List<ReturnsReportDto>>> GetReturnsReportAsync(
+        string? returnType, DateTime? from, DateTime? to, int? productId, CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating returns report — returnType: {Type}, from: {From}, to: {To}, productId: {ProductId}",
+                returnType, from, to, productId);
+            var report = await _reportRepository.GetReturnsReportAsync(returnType, from, to, productId, ct);
+            return Result<List<ReturnsReportDto>>.Success(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating returns report");
+            return Result<List<ReturnsReportDto>>.Failure("حدث خطأ أثناء إنشاء تقرير المرتجعات");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Aging Report
+    // ─────────────────────────────────────────────────────────────────────
+    public async Task<Result<List<AgingReportDto>>> GetAgingReportAsync(
+        string partyType, int? partyId, CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("Generating aging report — partyType: {Type}, partyId: {Id}", partyType, partyId);
+            var report = await _reportRepository.GetAgingReportAsync(partyType, partyId, ct);
+            return Result<List<AgingReportDto>>.Success(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating aging report");
+            return Result<List<AgingReportDto>>.Failure("حدث خطأ أثناء إنشاء تقرير أعمار الديون");
+        }
+    }
+
     public async Task<Result<IEnumerable<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays, CancellationToken ct)
     {
         try

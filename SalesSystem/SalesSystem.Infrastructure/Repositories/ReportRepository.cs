@@ -341,6 +341,312 @@ public class ReportRepository : IReportRepository
         }).ToList();
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Detailed Stock Ledger
+    // ─────────────────────────────────────────────────────────────────────
+    public async Task<List<DetailedStockLedgerDto>> GetDetailedStockLedgerAsync(
+        int? productId, int? warehouseId, DateTime? from, DateTime? to, CancellationToken ct)
+    {
+        _logger.LogInformation("Fetching detailed stock ledger — productId: {ProductId}, warehouseId: {WhId}, from: {From}, to: {To}",
+            productId, warehouseId, from, to);
+
+        var query = _context.InventoryTransactionLines
+            .Include(tl => tl.InventoryTransaction)
+                .ThenInclude(t => t!.Warehouse)
+            .Include(tl => tl.Product)
+            .Where(tl => tl.InventoryTransaction!.Status == InvoiceStatus.Posted)
+            .AsQueryable();
+
+        if (productId.HasValue)
+            query = query.Where(tl => tl.ProductId == productId.Value);
+
+        if (warehouseId.HasValue)
+            query = query.Where(tl => tl.InventoryTransaction!.WarehouseId == warehouseId.Value);
+
+        if (from.HasValue)
+        {
+            var fromDate = from.Value.Date;
+            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate >= fromDate);
+        }
+
+        if (to.HasValue)
+        {
+            var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
+            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate <= toDate);
+        }
+
+        var rawData = await query
+            .OrderBy(tl => tl.InventoryTransaction!.TransactionDate)
+            .ThenBy(tl => tl.Id)
+            .Select(tl => new
+            {
+                tl.InventoryTransaction!.TransactionDate,
+                tl.InventoryTransaction.TransactionNo,
+                tl.InventoryTransaction.TransactionType,
+                tl.InventoryTransaction.ReferenceType,
+                tl.InventoryTransaction.ReferenceId,
+                tl.ProductId,
+                ProductName = tl.Product!.Name,
+                WarehouseName = tl.InventoryTransaction.Warehouse!.Name,
+                tl.Quantity,
+                tl.UnitCost,
+                tl.TotalCost,
+                WarehouseId = tl.InventoryTransaction.WarehouseId,
+                tl.InventoryTransaction.CreatedByUserId
+            })
+            .ToListAsync(ct);
+
+        // Compute running balance per (ProductId, WarehouseId)
+        var balances = new Dictionary<(int ProductId, short WarehouseId), decimal>();
+        var now = DateTime.UtcNow;
+        var users = await _context.Users
+            .Where(u => rawData.Select(r => r.CreatedByUserId).Distinct().Contains((int?)u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+
+        return rawData.Select(r =>
+        {
+            var key = (r.ProductId, (short)r.WarehouseId);
+            var before = balances.GetValueOrDefault(key, 0);
+
+            var isOutgoing = r.TransactionType == InventoryTransactionType.Sale
+                          || r.TransactionType == InventoryTransactionType.TransferOut
+                          || r.TransactionType == InventoryTransactionType.PurchaseReturn
+                          || r.TransactionType == InventoryTransactionType.Damage
+                          || r.TransactionType == InventoryTransactionType.InternalIssue;
+
+            var change = isOutgoing ? -r.Quantity : r.Quantity;
+            var after = before + change;
+            balances[key] = after;
+
+            var refNo = r.TransactionNo.ToString();
+            var refType = r.ReferenceType?.ToString() ?? r.TransactionType.ToString();
+
+            var createdByName = r.CreatedByUserId.HasValue && users.TryGetValue(r.CreatedByUserId.Value, out var name)
+                ? name
+                : null;
+
+            return new DetailedStockLedgerDto(
+                r.TransactionDate,
+                refNo,
+                refType,
+                GetInventoryTransactionTypeArabic(r.TransactionType),
+                before,
+                change,
+                after,
+                r.UnitCost,
+                r.TotalCost,
+                createdByName
+            );
+        }).ToList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Returns Report
+    // ─────────────────────────────────────────────────────────────────────
+    public async Task<List<ReturnsReportDto>> GetReturnsReportAsync(
+        string? returnType, DateTime? from, DateTime? to, int? productId, CancellationToken ct)
+    {
+        _logger.LogInformation("Fetching returns report — returnType: {Type}, from: {From}, to: {To}, productId: {ProductId}",
+            returnType, from, to, productId);
+
+        var result = new List<ReturnsReportDto>();
+
+        // Sales returns (unless filtering to Purchases only)
+        if (string.IsNullOrEmpty(returnType) || returnType == "Sales")
+        {
+            var salesQuery = _context.SalesReturnItems
+                .Include(sri => sri.SalesReturn)
+                    .ThenInclude(sr => sr!.Customer)
+                        .ThenInclude(c => c!.Party)
+                .Include(sri => sri.Product)
+                .Where(sri => sri.SalesReturn!.Status == InvoiceStatus.Posted)
+                .AsQueryable();
+
+            if (from.HasValue)
+            {
+                var fromDate = from.Value.Date;
+                salesQuery = salesQuery.Where(sri => sri.SalesReturn!.ReturnDate >= fromDate);
+            }
+            if (to.HasValue)
+            {
+                var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
+                salesQuery = salesQuery.Where(sri => sri.SalesReturn!.ReturnDate <= toDate);
+            }
+            if (productId.HasValue)
+                salesQuery = salesQuery.Where(sri => sri.ProductId == productId.Value);
+
+            var salesData = await salesQuery
+                .Select(sri => new ReturnsReportDto(
+                    sri.SalesReturn!.ReturnNo,
+                    sri.SalesReturn.ReturnDate,
+                    "مبيعات",
+                    sri.SalesReturn.Customer != null ? sri.SalesReturn.Customer.Party.Name : null,
+                    sri.Product!.Name,
+                    sri.Quantity,
+                    sri.LineTotal,
+                    null,
+                    sri.SalesReturn.Status == InvoiceStatus.Posted ? "مرحل" : "مسودة"
+                ))
+                .ToListAsync(ct);
+
+            result.AddRange(salesData);
+        }
+
+        // Purchase returns (unless filtering to Sales only)
+        if (string.IsNullOrEmpty(returnType) || returnType == "Purchases")
+        {
+            var purchaseQuery = _context.PurchaseReturnItems
+                .Include(pri => pri.PurchaseReturn)
+                    .ThenInclude(pr => pr!.Supplier)
+                        .ThenInclude(s => s!.Party)
+                .Include(pri => pri.Product)
+                .Where(pri => pri.PurchaseReturn!.Status == InvoiceStatus.Posted)
+                .AsQueryable();
+
+            if (from.HasValue)
+            {
+                var fromDate = from.Value.Date;
+                purchaseQuery = purchaseQuery.Where(pri => pri.PurchaseReturn!.ReturnDate >= fromDate);
+            }
+            if (to.HasValue)
+            {
+                var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
+                purchaseQuery = purchaseQuery.Where(pri => pri.PurchaseReturn!.ReturnDate <= toDate);
+            }
+            if (productId.HasValue)
+                purchaseQuery = purchaseQuery.Where(pri => pri.ProductId == productId.Value);
+
+            var purchaseData = await purchaseQuery
+                .Select(pri => new ReturnsReportDto(
+                    pri.PurchaseReturn!.ReturnNo.ToString(),
+                    pri.PurchaseReturn.ReturnDate,
+                    "مشتريات",
+                    pri.PurchaseReturn.Supplier.Party.Name,
+                    pri.Product!.Name,
+                    pri.Quantity,
+                    pri.LineTotal,
+                    null,
+                    pri.PurchaseReturn.Status == InvoiceStatus.Posted ? "مرحل" : "مسودة"
+                ))
+                .ToListAsync(ct);
+
+            result.AddRange(purchaseData);
+        }
+
+        return result.OrderByDescending(r => r.Date).ToList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Aging Report
+    // ─────────────────────────────────────────────────────────────────────
+    public async Task<List<AgingReportDto>> GetAgingReportAsync(
+        string partyType, int? partyId, CancellationToken ct)
+    {
+        _logger.LogInformation("Fetching aging report — partyType: {Type}, partyId: {Id}", partyType, partyId);
+
+        var today = DateTime.Today;
+        var result = new List<AgingReportDto>();
+
+        if (partyType == "Customers" || partyType == "Suppliers")
+        {
+            if (partyType == "Customers")
+            {
+                // Query customers with their posted sales invoices for aging computation
+                var customersQuery = _context.Customers
+                    .Include(c => c.Party)
+                    .Where(c => c.IsActive)
+                    .AsQueryable();
+
+                if (partyId.HasValue)
+                    customersQuery = customersQuery.Where(c => c.Id == partyId.Value);
+
+                var customers = await customersQuery.ToListAsync(ct);
+
+                foreach (var customer in customers)
+                {
+                    var invoices = await _context.SalesInvoices
+                        .Where(i => i.CustomerId == customer.Id && i.Status == InvoiceStatus.Posted)
+                        .ToListAsync(ct);
+
+                    var totalDue = invoices.Sum(i => i.DueAmount);
+                    var totalBalance = totalDue;
+                    decimal current = 0, days1To30 = 0, days31To60 = 0, days61To90 = 0, days90Plus = 0;
+
+                    foreach (var inv in invoices)
+                    {
+                        if (inv.DueAmount <= 0) continue;
+                        var ageDays = (today - inv.InvoiceDate).Days;
+
+                        if (ageDays <= 0) current += inv.DueAmount;
+                        else if (ageDays <= 30) days1To30 += inv.DueAmount;
+                        else if (ageDays <= 60) days31To60 += inv.DueAmount;
+                        else if (ageDays <= 90) days61To90 += inv.DueAmount;
+                        else days90Plus += inv.DueAmount;
+                    }
+
+                    result.Add(new AgingReportDto(
+                        customer.Party.Name,
+                        totalBalance,
+                        current,
+                        days1To30,
+                        days31To60,
+                        days61To90,
+                        days90Plus,
+                        totalDue
+                    ));
+                }
+            }
+            else // Suppliers
+            {
+                var suppliersQuery = _context.Suppliers
+                    .Include(s => s.Party)
+                    .Where(s => s.IsActive)
+                    .AsQueryable();
+
+                if (partyId.HasValue)
+                    suppliersQuery = suppliersQuery.Where(s => s.Id == partyId.Value);
+
+                var suppliers = await suppliersQuery.ToListAsync(ct);
+
+                foreach (var supplier in suppliers)
+                {
+                    var invoices = await _context.PurchaseInvoices
+                        .Where(i => i.SupplierId == supplier.Id && i.Status == InvoiceStatus.Posted)
+                        .ToListAsync(ct);
+
+                    var totalDue = invoices.Sum(i => i.RemainingAmount);
+                    var totalBalance = totalDue;
+                    decimal current = 0, days1To30 = 0, days31To60 = 0, days61To90 = 0, days90Plus = 0;
+
+                    foreach (var inv in invoices)
+                    {
+                        if (inv.RemainingAmount <= 0) continue;
+                        var ageDays = (today - inv.InvoiceDate).Days;
+
+                        if (ageDays <= 0) current += inv.RemainingAmount;
+                        else if (ageDays <= 30) days1To30 += inv.RemainingAmount;
+                        else if (ageDays <= 60) days31To60 += inv.RemainingAmount;
+                        else if (ageDays <= 90) days61To90 += inv.RemainingAmount;
+                        else days90Plus += inv.RemainingAmount;
+                    }
+
+                    result.Add(new AgingReportDto(
+                        supplier.Party.Name,
+                        totalBalance,
+                        current,
+                        days1To30,
+                        days31To60,
+                        days61To90,
+                        days90Plus,
+                        totalDue
+                    ));
+                }
+            }
+        }
+
+        return result.OrderByDescending(r => r.TotalDue).ToList();
+    }
+
     private static string GetInventoryTransactionTypeArabic(InventoryTransactionType type) => type switch
     {
         InventoryTransactionType.Purchase => "مشتريات",

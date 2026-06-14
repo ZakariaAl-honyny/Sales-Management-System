@@ -54,7 +54,7 @@ public class SupplierService : ISupplierService
     {
         try
         {
-            // Step 1: Auto-create account under AP parent (2100 — حسابات الموردين)
+            // Step 1: Auto-create account under AP parent (1320 — الموردون)
             var accountResult = await AutoCreateSupplierAccountAsync(request.Name, userId, ct);
             if (!accountResult.IsSuccess)
                 return Result<SupplierDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
@@ -200,7 +200,7 @@ public class SupplierService : ISupplierService
         {
             // Try to find parent account "2100 — حسابات الموردين" by code
             var apParentAccount = await _uow.Accounts.FirstOrDefaultAsync(
-                a => a.AccountCode == "2100" && a.IsActive, ct);
+                a => a.AccountCode == "1320" && a.IsActive, ct);
 
             // Fallback: use SystemAccountMappings.AccountsPayableAccountId parent
             if (apParentAccount == null)

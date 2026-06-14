@@ -243,6 +243,19 @@ Code quality and convention enforcement for the Sales Management System.
 ### Phase 20 CurrencyCode Validation
 - [ ] `Currency.Create()` validates `code.Trim().Length == 3` (not `> 10` or any generic length check).
 
+## v4.10.2 — Accounts.md Analysis Remediations
+
+| Check ID | Check Description |
+|----------|------------------|
+| CHECK-020 | Does `Account.Create()` pass `allowTransactions: true` for ALL Level 4+ accounts? (BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService — ALL MUST pass `allowTransactions: true` or DomainException is thrown.) |
+| CHECK-021 | Does EVERY service interface registered in DI have a concrete implementation class? (Search `services.AddScoped<I, T>` / `services.AddTransient<I, T>` and verify `T` exists. `CashBoxReportService` was previously missing.) |
+| CHECK-022 | Do Desktop ViewModel report URLs match actual API controller routes? (Check `ReportApiService.cs` for all `Get*Async()` URLs, verify each has a matching route in the API controller. Common mismatches: `detailed-stock-ledger`, `reports/returns`, `reports/aging`.) |
+| CHECK-023 | Does `SupplierPaymentService.UpdateAsync()` create reversal journal entries when a posted payment's amount changes? (Must reverse original via `ReverseSupplierPaymentEntryAsync()`, create new entry, wrap in `ExecuteTransactionAsync()`.) |
+| CHECK-024 | Does `CustomerReceiptService` have an `UpdateAsync()` method? (Previously missing entirely. Must update receipt fields and return `Result<CustomerReceiptDto>`.) |
+| CHECK-025 | Does `AccountingIntegrationService` have `CreateSalesReturnEntryAsync()` for standalone sales returns? (Must Dr SalesReturnsAccount / Cr CustomerAccount for revenue side + Dr InventoryAccount / Cr COGSAccount for cost side.) |
+| CHECK-026 | Do ALL report services return real data (not hardcoded failure stubs)? (Check `FinancialReportService.GetCashFlowReportAsync()` — was returning `"تحت التطوير"` stub instead of computing from ReceiptVoucher/PaymentVoucher data.) |
+| CHECK-027 | Do ALL financial report ViewModels have Excel (ClosedXML) export? (Check `AccountStatementViewModel` — was missing `ExportExcelCommand` while PDF export existed.) |
+
 ## v4.6.9 — Phase 19 Settings Module Remediations
 
 ### Phase 20 Currency Module — Enhancement Checks (v4.6.9)
@@ -479,7 +492,7 @@ For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`
 
 ## 📋 Phase Awareness (Phases 18-31)
 
-The system is currently at **v4.10.1 with Phases 18-25 completed and Phases 26-31 planned**. Phase 27 (Purchases) and Phase 28 (Sales) analysis gaps have been implemented: OtherCharges landed cost for purchases, delivery charges revenue separation, price enforcement in sales, purchase return standalone mode, and flexible input (any 2 of qty/price/total calculates the third).
+The system is currently at **v4.10.3 with Phases 18-25 completed and Phases 26-31 planned**. Phase 27 (Purchases) and Phase 28 (Sales) analysis gaps have been implemented: OtherCharges landed cost for purchases, delivery charges revenue separation, price enforcement in sales, purchase return standalone mode, and flexible input (any 2 of qty/price/total calculates the third). Inventory Operations (Phase 26) completed: all 3 BLOCKER bugs fixed, Desktop ViewModels rewritten, 0 build errors.
 
 | Phase | Status | Description |
 |-------|--------|-------------|
@@ -600,3 +613,18 @@ When you encounter any code related to these areas, apply fixes automatically:
 27. DeliveryCharges in wrong account → ADD `SystemAccountKey.DeliveryChargesRevenue = 21`, seed account 1533, credit DeliveryChargesRevenue separately.
 28. Purchase Return blocking standalone → ALLOW null PurchaseInvoiceId, fix ProductUnitId hardcode, add journal entry methods, add returned-quantities endpoint.
 29. No flexible input → CREATE FlexibleInputCalculator, add LineTotalInput/guards/RecalculateFromFlexibleInput, make LineTotal editable.
+30. `AllowBelowCostSale` blocking → CHANGE seed to `"true"`, change service from `Result.Failure` to `LogWarning`
+31. Deep review missing → Always check all 13 analysis documents before implementing new Sales/Purchases features
+32. `InventoryService.CreateTransactionAsync()` requiring Desktop to provide TransactionNo → ADD auto-generation via `_sequenceService.GetNextIntAsync()` when `<= 0`
+33. `InventoryAdjustmentService.PostAsync()` directly setting `WarehouseStock.Quantity` → CHANGE to use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync`
+34. `InventoryCountService.PostAsync()` creating one Adjustment per line → CHANGE to create ONE Adjustment per Post with `ReferenceType = "InventoryCount"`
+35. `AdjustmentType` validator with range `(1,2)` → CHANGE to `InclusiveBetween(1, 3)`
+36. `ReportsController` with `CancellationToken` after optional params → MOVE CancellationToken BEFORE optional params
+37. Inventory Operations ViewModels NOT implementing `IDisposable` → ADD `IDisposable` with `Cleanup()` in `Dispose()`
+38. `RecalculateFromFlexibleInput()` calling calculator for Quantity/Price changes → CHANGE to only call calculator when `_lastModifiedField == Total`
+39. `Account.Create()` for Level 4+ without `allowTransactions: true` → DomainException `"الحساب التفصيلي يجب أن يسمح بالحركات"` will be thrown. Check ALL callers: BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService.
+40. Service interface registered in DI but missing implementation class → `InvalidOperationException` at runtime. Check: `CashBoxReportService`, and search for all `I, T` DI registrations.
+41. Report API URL mismatch between Desktop ViewModel and Controller → `DetailedStockLedgerViewModel` calls `detailed-stock-ledger` but endpoint may not exist. `ReturnsReportViewModel` calls `reports/returns` but endpoint may not exist. `AgingReportViewModel` may call wrong URL.
+42. Payment UpdateAsync without journal entry reversal for posted amounts → SupplierPaymentService AND CustomerReceiptService must reverse + re-create journal entries when posted payment amount changes.
+43. Standalone sales return missing `CreateSalesReturnEntryAsync()` in AccountingIntegrationService → Must Dr SalesReturnsAccount/Cr CustomerAccount (revenue side) + Dr InventoryAccount/Cr COGSAccount (cost side).
+44. Report service returning hardcoded stub failure instead of actual data → Check CashFlowReport, replace `"قيد إعادة البناء"` stub with real implementation from ReceiptVoucher/PaymentVoucher.

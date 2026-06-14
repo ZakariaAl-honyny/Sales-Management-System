@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>A comprehensive sales management platform for small-to-medium retail businesses</strong><br/>
-  <em>Desktop Client + RESTful API Backend — Built with Clean Architecture</em>
+  <em>v4.10.3+ — Inventory Operations Complete: BLOCKER #1-3 Fixed, Desktop ViewModels Rewritten, 0 Build Errors</em>
 </p>
 
 <p align="center">
@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.10.2%2B%20Complete%20(Phases%2018-25)%20—%20Phases%2026-32%20Planned-2ECC71?style=for-the-badge" 
+  <img src="https://img.shields.io/badge/Status-v4.10.3%2B%20Inventory%20Operations%20Complete%20—%20BLOCKER%20%231-3%20Fixed-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.10.2%2B%20%7C%20Phases%2026-32%20Planned-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.10.3%2B%20%7C%20Phases%2026-32%20Planned-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -69,6 +69,7 @@ The API-first architecture is designed to support **future web and mobile client
 - 👤 **Employee Auto-Account Endpoint (v4.10.2)**: `POST /api/v1/employees/{id}/auto-create-account` endpoint for custody/advance workflows — creates Level-4 sub-account under `"1170 — عهد الموظفين"`
 - 🐛 **Parent Code Fixes (v4.10.2)**: CustomerService AR parent lookup `"1210"→"1130"`, SupplierService AP parent lookup `"2100"→"1320"` — critical for correct COA linking
 - 🐛 **FlexibleInputCalculator Fix (v4.10.2)**: `RecalculateFromFlexibleInput()` no longer calls `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (only for explicit LineTotal edits) — fixes incorrect auto-recalculation
+- 📦 **Inventory Operations Complete (v4.10.3)**: All 3 BLOCKER bugs fixed — TransactionNo auto-generation via DocumentSequenceService, InventoryAdjustment stock updates via IInventoryService (atomic + audit), InventoryCount creates single Adjustment per Post (not per line). Desktop ViewModels rewritten (InventoryAdjustmentEditor, InventoryCountEditor, WarehouseTransferEditor) — full INotifyDataErrorInfo, IDisposable, EventBus cleanup. AdjustmentType validator range fixed (1-3). ReportsController CancellationToken position fixed. **0 build errors across all 11 projects.**
 - 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Accountant/Cashier/Observer), 33 permission codes, MustChangePassword, lockout
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
 - 🎯 **Touch POS (Phase 15)**: Dual-mode toggle (Cart/QuickSale) with tile grid, category filtering, numeric keypad, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search
@@ -1137,6 +1138,35 @@ These architecture decisions come from the comprehensive system analysis:
 | **🔄 Purchase Return Standalone Mode** | Desktop editor allows standalone returns (`PurchaseInvoiceId = null`) when supplier selected and items entered — no more blocking validation. Fixed hardcoded `ProductUnitId: 1` to use actual ProductUnitId from return line items. `AccountingIntegrationService` has `CreatePurchaseReturnEntryAsync()` — Dr Supplier Account / Cr PurchaseReturnAccount — and `ReversePurchaseReturnEntryAsync()` for cancellations. New `GET /api/v1/purchase-returns/returned-quantities/{invoiceId:int}` endpoint querying previously returned quantities. `PostedAt`/`CancelledAt` now properly set in `Post()`/`Cancel()` |
 | **⌨️ Flexible Input** | New `FlexibleInputCalculator` helper class with `CalculationField` enum (`Quantity`/`Price`/`Total`) and `Calculate()` method — given any two of (Quantity, UnitPrice/UnitCost, LineTotal), computes the third. Sales and Purchase line ViewModels have `LineTotalInput` editable property, `_lastModifiedField` tracking, `_isRecalculating` guard flag, and `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()`. LineTotal column editable in DataGrids (not `IsReadOnly`) |
 | **🏗️ Build & Tests** | **0 errors, 0 warnings** across all 6 production projects. **2,083+ tests** total — all pass. **74 total seeded COA accounts** (up from 73). AGENTS.md updated with 15+ new FORBIDDEN items covering landed cost, price enforcement, delivery charges, standalone returns, and flexible input |
+
+---
+
+### 🔍 Deep Review Results
+
+A comprehensive deep review of all **13 analysis documents** (5,044+ lines) was completed on June 15, 2026. The review confirmed:
+
+#### ✅ Already Implemented (From Prior Phases)
+| Feature | Status |
+|---------|--------|
+| PurchaseInvoice OtherCharges (Landed Cost) | ✅ Phase 1 |
+| Sales Price Enforcement (PreventBelowRetailPrice) | ✅ Phase 2 |
+| DeliveryChargesRevenue Account (1533) | ✅ Phase 3 |
+| Purchase Return Standalone Mode | ✅ Phase 4 |
+| Flexible Input (Quantity/Price/Total any 2) | ✅ Phase 5 |
+| Purchase Invoice Attachment (صورة مرفقة) | ✅ Existing |
+| Sales Return (مرتجع المبيعات) | ✅ Existing |
+| Negative Stock Setting (AllowNegativeStock) | ✅ Existing |
+| Auto-Posting Setting (AutoPostInvoices) | ✅ Existing |
+| Document Sequences | ✅ Existing |
+| Chart of Accounts (74 accounts) | ✅ Existing |
+
+#### 🔧 Fixed in Deep Review
+| Fix | Before | After |
+|-----|--------|-------|
+| `AllowBelowCostSale` default | `"false"` (blocks below-cost sales) | `"true"` (allows with warning) |
+| Below-cost sale behavior | `Result.Failure` (blocks sale entirely) | `LogWarning` only (warns but allows per analysis: "ولا نمنع البيع") |
+
+The only gap found was the `AllowBelowCostSale` behavior — the analysis document clearly stated "✅ السماح مع تنبيه" (allow with warning) and "ولا نمنع البيع" (do not block the sale). All other features described in the analysis documents were already implemented.
 
 ---
 

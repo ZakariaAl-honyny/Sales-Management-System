@@ -129,6 +129,10 @@ public static class AccountingSeeder
             parentAccountId: l2["1100"].Id, colorCode: ColorAsset, allowTransactions: true,
             description: "تسويات وجرد المخزون الدوري — يسمح بحركات مباشرة",
             explanation: "تسويات وجرد المخزون الدوري"));
+        level3.Add(Account.Create("1170", "عهد الموظفين", "Employee Custody", AccountType.Asset, 3,
+            parentAccountId: l2["1100"].Id, colorCode: ColorAsset,
+            description: "العهد والمسؤوليات المالية للموظفين",
+            explanation: "العهد والسلف والمسؤوليات المالية للموظفين"));
 
         // Under 1200 Fixed Assets
         level3.Add(Account.Create("1210", "أصول ثابتة ملموسة", "Tangible Fixed Assets", AccountType.Asset, 3,
@@ -163,6 +167,10 @@ public static class AccountingSeeder
             parentAccountId: l2["1410"].Id, colorCode: ColorEquity, allowTransactions: true,
             description: "رأس مال المنشأة — يسمح بحركات مباشرة",
             explanation: "رأس مال المنشأة المستثمر"));
+        level3.Add(Account.Create("1412", "المسحوبات", "Drawings", AccountType.Equity, 3,
+            parentAccountId: l2["1410"].Id, colorCode: ColorEquity, allowTransactions: true,
+            description: "مسحوبات المالك أو الشركاء",
+            explanation: "المسحوبات الشخصية للمالك أو الشركاء من المنشأة"));
 
         // Under 1420 Profit & Loss
         level3.Add(Account.Create("1421", "أرباح مدورة", "Retained Earnings", AccountType.Equity, 3,
@@ -173,6 +181,10 @@ public static class AccountingSeeder
             parentAccountId: l2["1420"].Id, isSystemAccount: true, colorCode: ColorEquity, allowTransactions: true,
             description: "أرصدة افتتاحية للعملاء والموردين — يسمح بحركات مباشرة",
             explanation: "حساب يقابل أرصدة العملاء والموردين الافتتاحية عند بدء استخدام النظام — يتم ترحيل الرصيد الافتتاحي للعملاء مدينة لهذا الحساب والرصيد الافتتاحي للموردين دائنة"));
+        level3.Add(Account.Create("1423", "أرباح غير موزعة", "Undistributed Profits", AccountType.Equity, 3,
+            parentAccountId: l2["1420"].Id, isSystemAccount: true, colorCode: ColorEquity, allowTransactions: true,
+            description: "الأرباح التي لم توزع بعد على الشركاء أو المساهمين",
+            explanation: "الأرباح التي لم توزع بعد على الشركاء أو المساهمين"));
 
         // Under 1510 Operating Revenue
         level3.Add(Account.Create("1520", "إيرادات المبيعات", "Sales Revenue", AccountType.Revenue, 3,
@@ -208,7 +220,7 @@ public static class AccountingSeeder
         await db.SaveChangesAsync();
         var l3 = await db.Set<Account>().ToDictionaryAsync(a => a.AccountCode);
 
-        // ─── Level 4: Detail Accounts (26 accounts) ───────────────
+        // ─── Level 4: Detail Accounts (28 accounts) ───────────────
         var level4 = new List<Account>();
 
         // Under 1110 Cash
@@ -338,6 +350,30 @@ public static class AccountingSeeder
             parentAccountId: l3["1680"].Id, colorCode: ColorExpense, allowTransactions: true,
             description: "المصروفات الإدارية والتشغيلية العامة",
             explanation: "المصروفات الإدارية والتشغيلية العامة"));
+        level4.Add(Account.Create("1682", "الرواتب والأجور", "Salaries & Wages", AccountType.Expense, 4,
+            parentAccountId: l3["1680"].Id, colorCode: ColorExpense, allowTransactions: true,
+            description: "رواتب وأجور الموظفين",
+            explanation: "الرواتب والأجور الشهرية للموظفين"));
+        level4.Add(Account.Create("1683", "الكهرباء", "Electricity", AccountType.Expense, 4,
+            parentAccountId: l3["1680"].Id, colorCode: ColorExpense, allowTransactions: true,
+            description: "مصروفات الكهرباء",
+            explanation: "فواتير الكهرباء الشهرية"));
+        level4.Add(Account.Create("1684", "المياه", "Water", AccountType.Expense, 4,
+            parentAccountId: l3["1680"].Id, colorCode: ColorExpense, allowTransactions: true,
+            description: "مصروفات المياه",
+            explanation: "فواتير المياه الشهرية"));
+        level4.Add(Account.Create("1685", "الإيجارات", "Rent", AccountType.Expense, 4,
+            parentAccountId: l3["1680"].Id, colorCode: ColorExpense, allowTransactions: true,
+            description: "مصروفات الإيجار",
+            explanation: "إيجار المقرات والمخازن"));
+        level4.Add(Account.Create("1686", "النقل", "Transport", AccountType.Expense, 4,
+            parentAccountId: l3["1680"].Id, colorCode: ColorExpense, allowTransactions: true,
+            description: "مصروفات النقل والتوصيل",
+            explanation: "مصروفات النقل والشحن والتوصيل"));
+        level4.Add(Account.Create("1687", "الخصم المسموح به", "Discount Allowed", AccountType.Expense, 4,
+            parentAccountId: l3["1680"].Id, colorCode: ColorExpense, allowTransactions: true,
+            description: "خصومات مسموح بها للعملاء",
+            explanation: "الخصومات التي تمنح للعملاء"));
 
         // Under 1690 Other Expenses
         level4.Add(Account.Create("1691", "هالك المخزون", "Spoilage Loss", AccountType.Expense, 4,
@@ -353,10 +389,24 @@ public static class AccountingSeeder
             description: "زيادة في المخزون ينتج عن الجرد الدوري",
             explanation: "زيادة المخزون الناتجة عن أخطاء جرد سابقة أو إدخال غير مسجل"));
 
+        // Under 1530 Other Revenue
+        level4.Add(Account.Create("1531", "إيراد النقل", "Transport Revenue", AccountType.Revenue, 4,
+            parentAccountId: l3["1530"].Id, colorCode: ColorRevenue, allowTransactions: true,
+            description: "إيرادات النقل والتوصيل",
+            explanation: "إيرادات النقل والتوصيل للعملاء"));
+        level4.Add(Account.Create("1532", "الخصم المكتسب", "Discount Received", AccountType.Revenue, 4,
+            parentAccountId: l3["1530"].Id, colorCode: ColorRevenue, allowTransactions: true,
+            description: "خصومات مكتسبة من الموردين",
+            explanation: "الخصومات التي نحصل عليها من الموردين"));
+        level4.Add(Account.Create("1533", "إيرادات التوصيل", "Delivery Charges Revenue", AccountType.Revenue, 4,
+            parentAccountId: l3["1530"].Id, colorCode: ColorRevenue, allowTransactions: true,
+            description: "إيرادات رسوم التوصيل وخدمات الشحن",
+            explanation: "إيرادات التوصيل ورسوم الخدمة التي يتحملها العميل — مفصولة عن إيرادات المبيعات لأغراض التقارير المالية"));
+
         db.Set<Account>().AddRange(level4);
         await db.SaveChangesAsync();
 
-        var totalCount = 5 + 8 + 21 + 28; // 62
+        var totalCount = 5 + 8 + 24 + 37; // 74
         logger?.LogInformation("Chart of accounts seeded: {Count} accounts created across 4 levels.", totalCount);
 
         // ─── Query IDs by AccountCode for System Account Mappings ──
@@ -379,6 +429,8 @@ public static class AccountingSeeder
         var shortageAccount = allAccounts["1692"];
         var surplusAccount = allAccounts["1693"];
         var openingBalanceEquityAccount = allAccounts["1422"];
+        var undistributedProfitsAccount = allAccounts["1423"];
+        var deliveryChargesRevenueAccount = allAccounts["1533"];
 
         // ─── Seed system account mappings (key-value pattern) ────
         var mappingList = new List<SystemAccountMapping>
@@ -415,6 +467,18 @@ public static class AccountingSeeder
                 descriptionAr: "عجز المخزون", descriptionEn: "Inventory Shortage"),
             SystemAccountMapping.Create(SystemAccountKey.InventorySurplus, surplusAccount.Id,
                 descriptionAr: "زيادة المخزون", descriptionEn: "Inventory Surplus"),
+
+            // ─── Missing mappings (Phase 22-25 remediation) ─────
+            SystemAccountMapping.Create(SystemAccountKey.UndistributedProfits, undistributedProfitsAccount.Id,
+                descriptionAr: "الأرباح غير الموزعة", descriptionEn: "Undistributed Profits"),
+            SystemAccountMapping.Create(SystemAccountKey.GeneralExpense, generalExpenseAccount.Id,
+                descriptionAr: "مصروفات عمومية", descriptionEn: "General Expense"),
+            SystemAccountMapping.Create(SystemAccountKey.SpoilageLoss, spoilageAccount.Id,
+                descriptionAr: "هالك المخزون", descriptionEn: "Spoilage Loss"),
+            SystemAccountMapping.Create(SystemAccountKey.EmployeeCustody, allAccounts["1170"].Id,
+                descriptionAr: "عهد الموظفين", descriptionEn: "Employee Custody"),
+            SystemAccountMapping.Create(SystemAccountKey.DeliveryChargesRevenue, deliveryChargesRevenueAccount.Id,
+                descriptionAr: "إيرادات التوصيل", descriptionEn: "Delivery Charges Revenue"),
         };
 
         db.Set<SystemAccountMapping>().AddRange(mappingList);

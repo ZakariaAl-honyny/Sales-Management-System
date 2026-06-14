@@ -2,7 +2,71 @@
 
 All notable changes to this project will be documented in this file.
 
-## v4.10.2 — Accounts.md Analysis: Bank Auto-Account, Employee Endpoint, Parent Code Fixes & FlexibleInputCalculator Bug Fix (2026-06-15)
+## v4.10.3 — Inventory Operations Complete: BLOCKER #1-3 Fixed, Desktop ViewModels Rewritten, 0 Build Errors (2026-06-15)
+
+### 🐛 Bug Fix: BLOCKER #1 — InventoryService TransactionNo Auto-Generation
+- `InventoryService.CreateTransactionAsync()`: Auto-generates `TransactionNo` via `_sequenceService.GetNextIntAsync("InventoryTransaction", ct)` when the provided `TransactionNo <= 0`
+- Desktop no longer required to provide TransactionNo — service layer handles auto-generation (matching InvoiceNo pattern from RULE-255)
+- Injects `IDocumentSequenceService` for thread-safe sequence management
+
+### 🐛 Bug Fix: BLOCKER #2 — InventoryAdjustmentService Post Stock Updates
+- `InventoryAdjustmentService.PostAsync()`: Updates `WarehouseStocks` per line — Addition=Increase, Deduction=Decrease, Correction=delta(target-current)
+- Uses `_inventoryService.IncreaseStockAsync()`/`DecreaseStockAsync()` for atomic stock changes with full audit trail
+- Replaced raw `maxCode + 1` with `_sequenceService.GetNextIntAsync()` for transaction number generation
+- Injects `IInventoryService` + `IDocumentSequenceService`
+
+### 🐛 Bug Fix: BLOCKER #3 — InventoryCountService Post Creates Single Adjustment
+- `InventoryCountService.PostAsync()`: Creates ONE `InventoryAdjustment` (Correction type) per Post — NOT one per line
+- Updates stock per line via `IInventoryService`
+- Uses `_sequenceService.GetNextIntAsync()` for adjustment/transaction number
+- Sets `ReferenceType = "InventoryCount"` for clean audit trail
+- Computes `Difference = ActualQuantity - ExpectedQuantity` — surplus = stock increase, shortage = stock decrease
+- Injects `IInventoryService` + `IDocumentSequenceService` + `IInventoryAdjustmentService`
+
+### ✨ Feature: InventoryAdjustmentEditorViewModel Rewritten
+- 5 commands: `LoadWarehouses`, `LoadProducts`, `AddLine`, `RemoveLine`, `SaveDraft`/`Post`
+- Full `INotifyDataErrorInfo` with `AddError`/`ClearErrors` pattern
+- Product selection dialog integration
+- Post flow with `ValidateAllAsync` validation
+- `AdjustmentType` supports 1-3 (Addition, Deduction, Correction)
+- Implements `IDisposable` — EventBus subscriptions disposed in `Cleanup()`
+
+### ✨ Feature: InventoryCountEditorViewModel Rewritten
+- `InventoryCountLineItem` mutable class for two-way DataGrid binding
+- `AddLine`/`RemoveLine` commands
+- Post flow with `ValidateAllAsync` validation
+- Edit mode support for existing counts
+- Count lines store `ExpectedQuantity`, `ActualQuantity`, compute `Difference`
+- Implements `IDisposable` — EventBus subscriptions disposed in `Cleanup()`
+
+### ✨ Feature: WarehouseTransferEditorViewModel Rewritten
+- Service dependencies reduced from 10 to 5
+- `short` IDs matching `Warehouse.Id` type (no hardcoded casting)
+- `SourceWarehouseId != DestinationWarehouseId` validation before posting
+- 5 commands: `LoadWarehouses`, `LoadSourceProducts`, `LoadDestinationProducts`, `AddLine`, `RemoveLine`, `SaveDraft`/`Post`
+- Implements `IDisposable` — EventBus subscriptions disposed in `Cleanup()`
+
+### 🐛 Bug Fix: AdjustmentType Validator Range
+- `InventoryAdjustmentRequestValidator`: Fixed range from `InclusiveBetween(1, 2)` to `InclusiveBetween(1, 3)`
+- Was incorrectly excluding `Correction = 3` type
+
+### 🐛 Bug Fix: ReportsController CancellationToken Position
+- `ReportsController`: Fixed `CancellationToken` parameter position — moved BEFORE optional parameters
+- ASP.NET Core model binding requires cancellation tokens to precede optional params to avoid binding errors
+
+### 🔧 Maintenance
+- **Build**: 0 errors across all 11 projects (SalesSystem.Domain, .Application, .Infrastructure, .Api, .DesktopPWF, .Contracts, + 5 test projects)
+- Pre-existing E2E test warnings only (requires API+DB running)
+- AGENTS.md updated with RULE-507 through RULE-516 (Inventory Operations architecture rules)
+- AGENTS.md forbidden patterns updated with 7 new entries (TransactionNo auto-gen, stock update via IInventoryService, count creates one Adjustment, AdjustmentType range 1-3, CancellationToken position, IDisposable on Inventory VMs, FlexibleInputCalculator call guard)
+- AGENTS.md pre-submission checklist updated with 6 new Inventory Operations items
+- subagent files (implement-agent.md, code-reviewer.md, orchestrator.md) updated with Inventory Operations rules
+
+## v4.10.2 — Accounts.md Analysis: Complete Implementation (2026-06-15)
+
+### 🐛 Bug Fix: BankService allowTransactions Bug
+- `BankService.AutoCreateBankAccountAsync()` was missing `allowTransactions: true` in `Account.Create()` call, causing `DomainException("الحساب التفصيلي يجب أن يسمح بالحركات")` every time a bank was created without explicit AccountId
+- Fix: added `allowTransactions: true` parameter to the Account.Create() call
 
 ### ✨ Feature: Bank Auto-Account Creation
 - `Bank` entity: `AccountId` changed from `int` to `int?` with `SetAccountId()` domain method (follows `CashBox` pattern)
@@ -28,6 +92,55 @@ All notable changes to this project will be documented in this file.
 - When user edits Quantity or UnitPrice/UnitCost, `_lineTotalInput` is computed directly as `_quantity * _unitPrice` (or `_quantity * _unitCost`)
 - This prevents the calculator from treating the auto-computed total as a user-entered anchor, which caused incorrect Price/Quantity recalculation
 - All 449 DesktopPWF tests pass (0 failures)
+
+### 🆕 Feature: CashBoxReportService Implementation
+- Created `CashBoxReportService.cs` implementing `ICashBoxReportService` with 3 methods:
+  - `GetCashBoxSummaryAsync()` — computes TotalIncome/TotalExpense/NetBalance from ReceiptVoucher/PaymentVoucher data
+  - `GetReceiptVoucherReportAsync()` — queries posted ReceiptVouchers with date range + optional cashBoxId filter
+  - `GetPaymentVoucherReportAsync()` — queries posted PaymentVouchers with same filter pattern
+- Registered in DI: `builder.Services.AddScoped<ICashBoxReportService, CashBoxReportService>()`
+- All 3 previously-crashing API endpoints now work
+
+### 🆕 Feature: Missing Report API Endpoints
+- Added `GET api/v1/reports/detailed-stock-ledger` — queries InventoryTransactionLines with running balance computation per (ProductId, WarehouseId), supports productId/warehouseId/date filters
+- Added `GET api/v1/reports/returns` — supports returnType filter ("Sales"/"Purchases"/both), queries SalesReturnItems and PurchaseReturnItems with union, sorted by date descending
+- Added `GET api/v1/reports/aging?partyType=Clients|Suppliers` — unified aging endpoint supporting both Customers and Suppliers with aging buckets (Current/1-30/31-60/61-90/90+)
+- Repository layer: `IReportRepository` + `ReportRepository` with 3 new query methods
+
+### 🐛 Bug Fix: SupplierPaymentService.UpdateAsync — Journal Entry Reversal
+- When a posted payment's amount was changed, the original journal entry was never reversed
+- Fix: detect posted + amount change → call `ReverseSupplierPaymentEntryAsync()` then `CreateSupplierPaymentEntryAsync()` wrapped in `ExecuteTransactionAsync()`
+- Uses per-entity `Supplier.Party.AccountId` routing with fallback to SystemAccountMappings
+
+### 🆕 Feature: CustomerReceiptService.UpdateAsync
+- Added `UpdateAsync(int id, UpdateCustomerReceiptRequest, int userId, CancellationToken ct)` method
+- Created `UpdateCustomerReceiptRequest` DTO (CashBoxId, CurrencyId, Amount, Notes)
+- Added `CustomerReceipt.Update()` domain method — validates Draft status only, calls `SetUpdatedBy()` and `UpdateTimestamp()`
+- Added method signature to `ICustomerReceiptService` interface
+
+### 🆕 Feature: Standalone Sales Return Journal Entry
+- Added `CreateSalesReturnEntryAsync(SalesReturn, decimal totalCost, int userId, CancellationToken ct)` in `AccountingIntegrationService`
+- Revenue side: Dr `SalesReturnsAccount` / Cr `CustomerAccount` (per-entity routing via `Customer.Party.AccountId` with fallback to AccountsReceivable)
+- Cost side: Dr `InventoryAccount` / Cr `COGSAccount` (when totalCost > 0)
+- Uses `JournalEntryType.SalesReturn` with `ReferenceType: "SalesReturn"`
+- Added method signature to `IAccountingIntegrationService` interface
+
+### 🆕 Feature: Account Statement Excel Export
+- Added `ExportExcelCommand` and `ExportExcelAsync()` to `AccountStatementViewModel`
+- Uses ClosedXML with 6 columns: التاريخ, البيان, رقم المرجع, مدين, دائن, الرصيد
+- Header styling, bold total row, SaveFileDialog integration
+- Matches pattern used by all other financial report ViewModels (BalanceSheet, TrialBalance, etc.)
+
+### 🐛 Bug Fix: CashFlow Report Stub -> Real Implementation
+- `FinancialReportService.GetCashFlowReportAsync()` previously returned hardcoded `"قيد إعادة البناء"` failure
+- Fix: computes cash flow from posted ReceiptVoucher records (inflows) and PaymentVoucher records (outflows)
+- Computes opening balance from receipts/payments before the period
+- Computes net cash flow and closing balance
+- Supports optional cashBoxId filter
+
+### 🔧 Maintenance: Documentation Fixes
+- `SupplierService.cs`: Fixed stale comment `"(2100 — حسابات الموردين)"` → `"(1320 — الموردون)"`
+- `AccountingSeeder.cs`: Fixed counter comment `"73"` → `"74"` (actual account count is 5+8+24+37=74)
 
 ### 🔧 Maintenance
 - AGENTS.md updated with RULE-502 through RULE-505 (Accounts.md analysis)

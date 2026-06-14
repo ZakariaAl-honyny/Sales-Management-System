@@ -736,6 +736,18 @@ protected async Task<Result> HandleResponseAsync(HttpResponseMessage response)
 var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(); // ❌ crashes on empty/HTML body
 ```
 
+### Features to Fix By Default — Inventory Operations
+
+When you encounter any code related to these areas, apply fixes automatically:
+
+1. `InventoryService.CreateTransactionAsync()` requiring Desktop to provide TransactionNo → ADD auto-generation via `_sequenceService.GetNextIntAsync("InventoryTransaction", ct)` when `<= 0`
+2. `InventoryAdjustmentService.PostAsync()` directly setting `WarehouseStock.Quantity` → CHANGE to use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync`
+3. `InventoryCountService.PostAsync()` creating one Adjustment per line → CHANGE to create ONE Adjustment per Post with `ReferenceType = "InventoryCount"`
+4. `AdjustmentType` validator with range `(1,2)` → CHANGE to `InclusiveBetween(1, 3)`
+5. `ReportsController` with `CancellationToken` after optional parameters → MOVE CancellationToken BEFORE optional params
+6. Inventory Operations ViewModels NOT implementing `IDisposable` → ADD `IDisposable` with `Cleanup()` in `Dispose()`
+7. `InvoiceLineViewModel`/`PurchaseInvoiceLineViewModel` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes → CHANGE to only call calculator when `_lastModifiedField == Total`
+
 ### Logging Separation Policy
 ```csharp
 // SYSTEM ERRORS → Log.Error (DB down, connection fail, parse crash, file I/O)
@@ -2508,7 +2520,7 @@ if (!entryResult.IsSuccess)
 
 ## 📋 Phase Awareness (Phases 23-31 + Purchases/Sales Analysis Gaps)
 
-The system is currently at **v4.10.1+ with Phases 18-25 + Purchases/Sales Analysis Gaps Implemented: OtherCharges Landed Cost, Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone, Flexible Input**:
+The system is currently at **v4.10.2+ with Phases 18-25 + Purchases/Sales Analysis Gaps Implemented: OtherCharges Landed Cost, Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone, Flexible Input, AllowBelowCostSale Fixed to WARNING, Missing Analysis Doc Review**:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
@@ -2673,3 +2685,11 @@ When you encounter any code related to these areas, apply fixes automatically:
 28. DeliveryCharges NOT in separate account → ADD `SystemAccountKey.DeliveryChargesRevenue = 21`, seed account `1533 — إيرادات التوصيل` under parent `1530 — إيرادات أخرى`, update `CreateSalesPostEntryAsync()` to credit DeliveryChargesRevenue separately from SalesRevenue, mirror in `ReverseSalesPostEntryAsync()`.
 29. Purchase Return blocking standalone mode → FIX `Validate()` to allow `PurchaseInvoiceId = null` when supplier selected and items entered, add `SelectedSupplierId`/`IsLinkedToInvoice` properties, fix hardcoded `ProductUnitId: 1` to use actual ProductUnitId, add `CreatePurchaseReturnEntryAsync()`/`ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService, fix `PostedAt`/`CancelledAt` in `Post()`/`Cancel()`.
 30. Fixed-price input (no flexible input) → CREATE `FlexibleInputCalculator` helper class with `CalculationField` enum (Quantity/Price/Total) and `Calculate()`, add `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` to line ViewModels, make LineTotal column editable (not `IsReadOnly`), implement `RecalculateFromFlexibleInput()`.
+31. `AllowBelowCostSale` blocking instead of warning → CHANGE seed default from `"false"` to `"true"` in `DbSeeder.cs`. CHANGE `SalesService.PostAsync()` from `return Result.Failure(...)` to `_logger.LogWarning(...)` + continue (don't block). Per analysis: "ولا نمنع البيع" — below-cost sales must warn but never block. This applies to BOTH `CreateAsync()` and `PostAsync()` methods.
+32. Missing deep review of analysis documents → Before implementing new Sales/Purchases features, always check ALL 13 analysis documents in `docs/all new Anylysis for update system features/` to ensure no duplicated work. The file `Sales and Purchases new details.md` may be 0 bytes (empty) — check all other `.md` files in the directory for actual content.
+33. `Account.Create()` missing `allowTransactions: true` for Level 4+ accounts → ADD `allowTransactions: true` to ALL `Account.Create()` calls where `level >= 4`. The default is `false` and `Account.Create()` throws `DomainException("الحساب التفصيلي يجب أن يسمح بالحركات")` when Level >= 4 and `allowTransactions` is false. Check BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService — ALL must pass `allowTransactions: true`.
+34. Service interface without implementation → CHECK that every registered service interface has a concrete implementation class. Missing implementations cause `InvalidOperationException` at DI resolution. Currently affected: `CashBoxReportService` was missing (now fixed). Search for all `services.AddScoped<I, T>` or `services.AddTransient<I, T>` and verify `T` exists.
+35. Report API endpoints missing from controller → CHECK that Desktop ViewModel API calls match actual controller endpoints. Search `ReportApiService.cs` for all `Get*Async()` calls with URLs, then verify each URL has a matching route in the API controller. Common mismatches: `detailed-stock-ledger`, `reports/returns`, `reports/aging` (use `customers/reports/aging` for customer-specific vs unified for both).
+36. Payment update without journal entry reversal → ADD reversal logic to `SupplierPaymentService.UpdateAsync()` and `CustomerReceiptService.UpdateAsync()` for posted payments. When amount changes: (1) reverse original journal entry, (2) create new journal entry for updated amount. Wrap in `ExecuteTransactionAsync()`. Use per-entity `Supplier.Party.AccountId`/`Customer.Party.AccountId` routing.
+37. Standalone sales return without journal entries → ADD `CreateSalesReturnEntryAsync()` in `AccountingIntegrationService` that Dr `SalesReturnsAccount` / Cr `CustomerAccount` (for return amount) and Dr `InventoryAccount` / Cr `COGSAccount` (for returned cost). Use per-entity `Customer.Party.AccountId` with fallback to `AccountsReceivable`.
+38. Report service returning hardcoded failure stub → NEVER return stub failures from report services. If the query is complex, implement actual logic using available data entities (ReceiptVoucher, PaymentVoucher, etc.). Current example: `CashFlowReportService` was returning `"تقرير التدفق النقدي قيد إعادة البناء"` instead of computing from ReceiptVoucher/PaymentVoucher data.

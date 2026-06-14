@@ -50,7 +50,7 @@ public interface IAccountingIntegrationService
 
     /// <summary>
     /// Creates journal entry for a posted sales invoice.
-    /// Revenue side: Dr Cash/AR / Cr SalesRevenue + VatOutput.
+    /// Revenue side: Dr Cash/AR / Cr SalesRevenue + DeliveryChargesRevenue + VatOutput.
     /// COGS side: Dr COGS / Cr Inventory.
     /// </summary>
     Task<Result<int>> CreateSalesPostEntryAsync(
@@ -85,6 +85,28 @@ public interface IAccountingIntegrationService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Creates journal entry for a customer receipt.
+    /// Dr Cash / Cr AccountsReceivable.
+    /// </summary>
+    Task<Result<int>> CreateCustomerPaymentEntryAsync(
+        CustomerReceipt receipt,
+        string customerName,
+        int createdByUserId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Reverses a customer receipt journal entry.
+    /// Dr AccountsReceivable / Cr Cash.
+    /// </summary>
+    Task<Result<int>> ReverseCustomerPaymentEntryAsync(
+        int receiptId,
+        decimal amount,
+        string customerName,
+        int customerAccountId,
+        int reversedByUserId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Creates journal entry for a supplier payment.
     /// Dr AccountsPayable / Cr Cash.
     /// </summary>
@@ -103,6 +125,40 @@ public interface IAccountingIntegrationService
         decimal amount,
         string supplierName,
         int supplierAccountId,
+        int reversedByUserId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates journal entry for a standalone sales return.
+    /// Reverses revenue: Dr SalesReturnsAccount / Cr CustomerAccount (for the return amount).
+    /// Reverses COGS: Dr InventoryAccount / Cr COGSAccount (for the returned items' cost).
+    /// Uses per-entity Customer.Party.AccountId with fallback to AccountsReceivable.
+    /// </summary>
+    Task<Result<int>> CreateSalesReturnEntryAsync(
+        SalesReturn salesReturn,
+        decimal totalCost,
+        int createdByUserId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates journal entry for a posted purchase return.
+    /// Reverses the original purchase entry:
+    /// Dr: AccountsPayable (supplier account) = TotalAmount
+    /// Cr: PurchaseReturnAccount = TotalAmount
+    /// </summary>
+    Task<Result<int>> CreatePurchaseReturnEntryAsync(
+        PurchaseReturn purchaseReturn,
+        int createdByUserId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Reverses a posted purchase return journal entry (cancellation of return).
+    /// Re-creates the original purchase effect:
+    /// Dr: PurchaseReturnAccount = TotalAmount
+    /// Cr: AccountsPayable (supplier account) = TotalAmount
+    /// </summary>
+    Task<Result<int>> ReversePurchaseReturnEntryAsync(
+        PurchaseReturn purchaseReturn,
         int reversedByUserId,
         CancellationToken ct = default);
 }
