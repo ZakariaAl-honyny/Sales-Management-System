@@ -15,5 +15,4 @@ public interface ICurrencyService
     Task<Result> DeleteAsync(int id, int userId, CancellationToken ct = default);
     Task<Result> DeletePermanentlyAsync(int id, int userId, CancellationToken ct = default);
     Task<Result> UpdateExchangeRateAsync(int id, decimal newRate, int userId, CancellationToken ct = default);
-    Task<Result<List<ExchangeRateHistoryDto>>> GetRateHistoryAsync(int currencyId, CancellationToken ct = default);
 }

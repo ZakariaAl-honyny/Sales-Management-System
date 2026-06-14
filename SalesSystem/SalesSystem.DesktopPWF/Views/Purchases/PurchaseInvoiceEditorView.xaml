@@ -137,17 +137,6 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="الوحدة" Width="100">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <ComboBox ItemsSource="{Binding DataContext.SaleModeOptions, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                      SelectedValue="{Binding Mode, UpdateSourceTrigger=PropertyChanged}"
-                                                      SelectedValuePath="Value"
-                                                      DisplayMemberPath="Display"
-                                                      BorderThickness="0" Background="Transparent"/>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
                                 <DataGridTemplateColumn Header="الكمية" Width="90">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -157,24 +146,20 @@
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
                                 <!-- Unit Cost with sync indicator -->
-                                <DataGridTemplateColumn Header="التكلفة" Width="130">
+                                <DataGridTemplateColumn Header="التكلفة" Width="100">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <StackPanel>
-                                                <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
                                                          Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"/>
-                                                <!-- Sync warning — only shows when cost differs from DB -->
-                                                <TextBlock Text="{Binding PriceDifferenceIndicator}"
-                                                           FontSize="10"
-                                                           Foreground="#E65100"
-                                                           TextWrapping="Wrap"
-                                                           Visibility="{Binding CostChangedFromDatabase,
-                                                                        Converter={StaticResource BoolToVisibility}}"/>
-                                            </StackPanel>
+                                            </Grid>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="الخصم" Binding="{Binding DiscountAmount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="80"/>
                                 <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotal, StringFormat=N2}" Width="100" IsReadOnly="True" FontWeight="Bold"/>
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -217,9 +202,6 @@
                                         Style="{StaticResource SecondaryButton}" Width="28" Margin="4,0,0,0" ToolTip="البحث عن مورد"/>
                             </Grid>
 
-                            <TextBlock Text="رقم فاتورة المورد" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding SupplierInvoiceNo}" Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
-
                             <TextBlock Text="المستودع" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding Warehouses}" SelectedValue="{Binding SelectedWarehouseId}" 
                                       SelectedValuePath="Id" DisplayMemberPath="Name" Margin="0,0,0,6"/>
@@ -227,14 +209,6 @@
                             <TextBlock Text="طريقة الدفع" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding PaymentTypeOptions}" SelectedValue="{Binding SelectedPaymentType}" 
                                       SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,6"/>
-
-                            <TextBlock Text="الصندوق النقدي *" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox ItemsSource="{Binding CashBoxes}"
-                                      SelectedItem="{Binding SelectedCashBox}"
-                                      DisplayMemberPath="BoxName"
-                                      Style="{StaticResource ModernComboBox}"
-                                      Margin="0,0,0,6"
-                                      ToolTip="اختر الصندوق النقدي الذي سيتم إيداع المبلغ المدفوع فيه"/>
 
                             <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding Currencies}"
@@ -273,27 +247,7 @@
                                 <TextBox Text="{Binding TaxRate, UpdateSourceTrigger=PropertyChanged}" Width="60" HorizontalAlignment="Right" TextAlignment="Center"/>
                             </Grid>
 
-                            <!-- Discount Type -->
-                            <Border Background="#F8FAFC" CornerRadius="4" Padding="6,4" Margin="0,0,0,8"
-                                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
-                                <StackPanel>
-                                    <TextBlock Text="نوع الخصم" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                                    <RadioButton Content="مبلغ" IsChecked="{Binding IsAmountDiscount}" GroupName="DiscountType"
-                                                 Margin="0,0,0,2" FontSize="11" ToolTip="خصم بقيمة مالية ثابتة"/>
-                                    <RadioButton Content="نسبة %" IsChecked="{Binding IsPercentageDiscount}" GroupName="DiscountType"
-                                                 FontSize="11" ToolTip="خصم بنسبة مئوية من المجموع الفرعي"/>
-                                </StackPanel>
-                            </Border>
-
-                            <Grid Margin="0,0,0,8"
-                                  Visibility="{Binding IsPercentageDiscount, Converter={StaticResource BoolToVisibility}}">
-                                <TextBlock Text="نسبة الخصم (%)" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding DiscountRate, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
-                                         Width="80" HorizontalAlignment="Right" TextAlignment="Center"
-                                         ToolTip="نسبة الخصم من المجموع الفرعي"/>
-                            </Grid>
-                            <Grid Margin="0,0,0,8"
-                                  Visibility="{Binding IsAmountDiscount, Converter={StaticResource BoolToVisibility}}">
+                            <Grid Margin="0,0,0,8">
                                 <TextBlock Text="قيمة الخصم" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
                                 <TextBox Text="{Binding InvoiceDiscount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
                                          Width="100" HorizontalAlignment="Right" TextAlignment="Left"
@@ -311,8 +265,8 @@
                                 <TextBlock Text="{Binding TaxAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
                             </Grid>
                             <Grid Margin="0,0,0,6">
-                                <TextBlock Text="إجمالي الفاتورة" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                                <TextBlock Text="{Binding TotalAmount, StringFormat=N2}" HorizontalAlignment="Right" FontSize="16" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                <TextBlock Text="صافي الفاتورة" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                <TextBlock Text="{Binding NetTotal, StringFormat=N2}" HorizontalAlignment="Right" FontSize="16" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
                             </Grid>
 
                             <Separator Margin="0,8"/>
@@ -325,57 +279,9 @@
                             <Border Background="#FEF2F2" Padding="8,6" CornerRadius="4">
                                 <Grid>
                                     <TextBlock Text="المبلغ المتبقي" FontWeight="Bold" Foreground="#DC2626"/>
-                                    <TextBlock Text="{Binding DueAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="Bold" FontSize="15" Foreground="#DC2626"/>
+                                        <TextBlock Text="{Binding RemainingAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="Bold" FontSize="15" Foreground="#DC2626"/>
                                 </Grid>
                             </Border>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Additional Fees Card -->
-                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,6">
-                                <TextBlock Text="➕ المصاريف الإضافية" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-                                <Button Command="{Binding AddFeeCommand}" Content="+ إضافة"
-                                        Style="{StaticResource SmallPrimaryButton}"
-                                        HorizontalAlignment="Right"
-                                        ToolTip="إضافة مصروف إضافي (نقل، جمارك، تأمين...)"/>
-                            </Grid>
-
-                            <ItemsControl ItemsSource="{Binding AdditionalFees}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                                CornerRadius="4" Padding="6,4" Margin="0,0,0,4">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="80"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                                                    <TextBlock Text="الاسم" Style="{StaticResource LabelStyle}" FontSize="10"/>
-                                                    <TextBox Text="{Binding FeeName}" Style="{StaticResource ModernTextBox}" Height="24"
-                                                             ToolTip="اسم المصروف الإضافي (مثال: نقل، جمارك)"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Column="1" Margin="0,0,4,0">
-                                                    <TextBlock Text="المبلغ" Style="{StaticResource LabelStyle}" FontSize="10"/>
-                                                    <TextBox Text="{Binding FeeAmount, StringFormat=N2}" Style="{StaticResource ModernTextBox}" Height="24"
-                                                             ToolTip="قيمة المصروف"/>
-                                                </StackPanel>
-                                                <Button Grid.Column="2"
-                                                        Command="{Binding DataContext.RemoveFeeCommand, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
-                                                        CommandParameter="{Binding}"
-                                                        Content="✕" Width="24" Height="24" FontSize="11"
-                                                        VerticalAlignment="Top" Margin="2,8,0,0"
-                                                        Background="Transparent" BorderThickness="0"
-                                                        Foreground="#EF4444" Cursor="Hand"
-                                                        ToolTip="حذف هذا المصروف"/>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
                         </StackPanel>
                     </Border>
 

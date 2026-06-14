@@ -2,14 +2,6 @@ using SalesSystem.Contracts.Enums;
 
 namespace SalesSystem.Contracts.Requests;
 
-public record UpdateCustomerPaymentRequest(
-    int CustomerId,
-    decimal Amount,
-    PaymentMethod PaymentMethod,
-    DateTime? PaymentDate,
-    string? Notes = null
-);
-
 public record UpdateSupplierPaymentRequest(
     int SupplierId,
     decimal Amount,
@@ -18,16 +10,8 @@ public record UpdateSupplierPaymentRequest(
     string? Notes = null
 );
 
-public record UpdateStockTransferRequest(
-    int FromWarehouseId,
-    int ToWarehouseId,
-    DateTime TransferDate,
-    string? Notes,
-    List<CreateStockTransferItemRequest> Items
-);
-
 /// <summary>
-/// طلب تحديث فاتورة شراء — مع دعم العملات المتعددة والخصم والمرفقات والمصاريف الإضافية.
+/// طلب تحديث فاتورة شراء.
 /// </summary>
 public record UpdatePurchaseInvoiceRequest(
     int WarehouseId,
@@ -38,17 +22,10 @@ public record UpdatePurchaseInvoiceRequest(
     decimal DiscountAmount,
     decimal TaxAmount,
     decimal PaidAmount,
-    int? CashBoxId,
     int? CurrencyId,
     decimal? ExchangeRate,
-    byte? DiscountType,
-    decimal? DiscountRate,
-    string? AttachmentBase64,
-    string? AttachmentFileName,
     string? Notes,
-    string? SupplierInvoiceNo,
-    List<CreatePurchaseInvoiceItemRequest> Items,
-    List<CreateAdditionalFeeRequest>? AdditionalFees = null);
+    List<CreatePurchaseInvoiceItemRequest> Items);
 
 public record UpdateSalesInvoiceRequest(
     int WarehouseId,
@@ -58,10 +35,10 @@ public record UpdateSalesInvoiceRequest(
     PaymentType PaymentType,
     decimal DiscountAmount,
     decimal TaxAmount,
+    decimal OtherCharges,
     decimal PaidAmount,
     int? CashBoxId,
     string? Notes,
-    int? QuotationId,
     int? CurrencyId,
     decimal? ExchangeRate,
     int? TaxId,

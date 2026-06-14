@@ -265,19 +265,7 @@ These 4 issues were identified during analysis as **blocking** — they must be 
 3. Store the exchange rate at time of invoice creation (not live rate)
 4. When invoice is posted, convert all amounts to base currency for journal entries
 
-```csharp
-// SalesInvoice.cs — add
-public int? CurrencyId { get; private set; }
-public decimal ExchangeRate { get; private set; } = 1m; // Rate at invoice time
-public decimal BaseCurrencyTotal { get; private set; }  // Total in base currency
-
-public void SetCurrency(int? currencyId, decimal exchangeRate)
-{
-    CurrencyId = currencyId;
-    ExchangeRate = exchangeRate > 0 ? exchangeRate : 1m;
-    RecalculateTotals();
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). See `Domain/Entities/SalesInvoice.cs` for the canonical `SetCurrency()` method.
 
 **Files changed**: `SalesInvoice.cs`, `SalesInvoiceConfiguration.cs`, `SalesInvoiceDto.cs`, `SalesInvoiceResponse.cs`, `SalesInvoiceService.cs`, contracts, migrations
 
@@ -308,20 +296,7 @@ Currently, there is NO approval workflow. The price field on `SalesInvoiceItem` 
    - `AllowBelowCostSale` (bool, default false) — warn or block
 4. `SalesInvoiceService` checks override on Post — if price < official, requires approval record
 
-```csharp
-// SalesInvoiceItem.cs — add
-public int? PriceOverrideApprovedBy { get; private set; }
-public string? PriceOverrideReason { get; private set; }
-
-public void SetPriceOverride(decimal newPrice, int? approvedByUserId, string? reason)
-{
-    if (newPrice < 0) throw new DomainException("السعر لا يمكن أن يكون سالباً");
-    UnitPrice = newPrice;
-    PriceOverrideApprovedBy = approvedByUserId;
-    PriceOverrideReason = reason;
-    RecalculateLineTotal();
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns. See `Domain/Entities/SalesInvoiceItem.cs` for the canonical `SetPriceOverride()` method.
 
 **Files changed**: `SalesInvoiceItem.cs`, `SalesInvoiceItemConfiguration.cs`, `SalesInvoiceService.cs`, `SalesInvoiceEditorViewModel.cs`, `SalesInvoiceEditorView.xaml`, `PriceOverrideDialog.xaml` (NEW)
 
@@ -340,14 +315,7 @@ Currently, `SalesInvoiceService.PostAsync()` deducts stock and updates customer 
 
 **Fix**:
 1. Create `IJournalEntryService` interface in Application layer:
-```csharp
-public interface IJournalEntryService
-{
-    Task<Result> CreateSalesInvoiceEntriesAsync(SalesInvoice invoice, 
-        List<(int batchId, decimal quantity, decimal unitCost)> costAllocations,
-        CancellationToken ct);
-}
-```
+> See `docs/AGENTS.md` §2.76 (Phase 24 — Accounting Integration Rules, RULE-373) for journal entry mapping for sales. See `Application/Interfaces/Services/IJournalEntryService.cs` and `Application/Services/AccountingIntegrationService.cs` for the canonical interfaces and implementation.
 2. Create standard journal entry template for sales:
    - **Cash Sale**: Dr Cash/Bank | Cr Sales Revenue (+ Cr Tax Payable)
    - **Credit Sale**: Dr Customer Receivable | Cr Sales Revenue (+ Cr Tax Payable)
@@ -378,18 +346,7 @@ Currently, existing `SalesInvoiceService.PostAsync()` calls `_inventoryService.D
 3. `InventoryService.DecreaseStockAsync()` must accept batch selection strategy (FIFO/FEFO)
 4. Return list of `(batchId, quantity, unitCost)` for COGS calculation
 
-```csharp
-public record BatchAllocation(int BatchId, decimal Quantity, decimal UnitCost);
-
-public async Task<List<BatchAllocation>> DecreaseStockWithBatchAllocationAsync(
-    int productId, int warehouseId, decimal quantity, 
-    bool useFefo = false, CancellationToken ct = default)
-{
-    // Fetch active batches ordered by FIFO/FEFO
-    // Deduct from oldest/nearest-expiry batches
-    // Return allocation list for COGS
-}
-```
+> See `docs/AGENTS.md` §2.7 (Stock Integrity, RULE-028/029) and §2.25 (Costing Strategy). See `Application/Services/InventoryService.cs` for the canonical batch allocation implementation.
 
 **Files changed**: `InventoryService.cs`, `IInventoryService.cs`, `SalesInvoiceItem.cs` (add batch allocations), `SalesInvoiceService.cs` (use batch allocation)
 
@@ -532,17 +489,7 @@ public async Task<List<BatchAllocation>> DecreaseStockWithBatchAllocationAsync(
 
 ### 4.7 Quotation Status Enum — NEW
 
-```csharp
-public enum QuotationStatus : byte
-{
-    Draft = 1,
-    Sent = 2,
-    Accepted = 3,
-    Converted = 4,
-    Rejected = 5,
-    Expired = 6   // Auto-expired (ValidUntil passed) — HIGH: Phase 28 Fix 4
-}
-```
+> See `Domain/Enums/QuotationStatus.cs` for the canonical enum definition.
 
 ### 4.8 Barcode POS Mode — Specification
 
@@ -703,21 +650,7 @@ Following the analysis decision in Part 5 (lines 1065-1147): V1 uses two buttons
 | Credit (PaymentType = 2) | Reduce Customer balance (DueAmount decreases) |
 | Mixed (PaymentType = 3) | Cash refund for paid portion + reduce balance for unpaid |
 
-**Cash refund — explicit CashTransaction creation (HIGH):**
-```csharp
-// When a Sales Return is posted and refund is cash-based:
-// Automatically create CashTransaction with RefundOut type
-var cashTx = CashTransaction.Create(
-    cashBoxId: salesReturn.CashBoxId!.Value,
-    amount: salesReturn.RefundAmount,
-    type: CashTransactionType.RefundOut,   // RefundOut = 6
-    description: $"مرتجع مبيعات #{salesReturn.ReturnNo}",
-    referenceId: salesReturn.Id,            // Link to SalesReturn
-    referenceType: "SalesReturn"
-);
-await _uow.CashTransactions.AddAsync(cashTx, ct);
-// This updates CashBox.CurrentBalance automatically (via computed sum of transactions)
-```
+> See `docs/AGENTS.md` §2.26 (CashBox rules, RULE-079: RunningBalance, RULE-082: immutable transactions). See `Application/Services/SalesReturnService.cs` for the canonical refund CashTransaction creation.
 
 **If refund amount > customer balance**: Create credit balance (negative DueAmount) that customer can use for future purchases.
 
@@ -725,37 +658,7 @@ await _uow.CashTransactions.AddAsync(cashTx, ct);
 
 **Rule**: Before posting a Sales Invoice, check if the customer has a credit limit configured.
 
-**Logic**:
-```csharp
-// Pre-Post validation — runs BEFORE transaction opens
-if (invoice.CustomerId.HasValue)
-{
-    var customer = await _uow.Customers.GetByIdAsync(invoice.CustomerId.Value, ct);
-    if (customer == null)
-        return Result<SalesInvoiceDto>.Failure("العميل غير موجود", ErrorCodes.NotFound);
-
-    // Check if customer has credit limit
-    if (customer.CreditLimit.HasValue && customer.CreditLimit > 0)
-    {
-        var projectedBalance = customer.CurrentBalance + invoice.TotalAmount;
-        if (projectedBalance > customer.CreditLimit.Value)
-        {
-            // Log warning, notify user
-            Log.Warning("Customer {CustId} credit limit exceeded: {Balance} > {Limit}",
-                customer.Id, projectedBalance, customer.CreditLimit);
-
-            // Allow override with manager permission check
-            if (!currentUser.IsManagerOrAbove())
-                return Result<SalesInvoiceDto>.Failure(
-                    $"رصيد العميل {customer.Name} يتجاوز الحد الائتماني ({customer.CreditLimit:N2})",
-                    ErrorCodes.CreditLimitExceeded);
-            
-            // Manager override — show warning but allow
-            Log.Information("Manager override: credit limit exceeded for customer {CustId}", customer.Id);
-        }
-    }
-}
-```
+> See `docs/AGENTS.md` for service layer patterns (RULE-202: return Result<T>) and transaction patterns (RULE-003: validate before transaction). See `Application/Services/SalesInvoiceService.cs` for the canonical credit limit check in PostAsync.
 
 **Flow**:
 1. Pre-validate credit limit BEFORE opening the Post transaction
@@ -834,15 +737,7 @@ All tasks include:
 | `Application/Services/SalesInvoiceService.cs` | Map currency fields in DTO conversion |
 | `DesktopPWF/Services/Api/SalesInvoiceApiService.cs` | Update API client methods |
 
-**Domain method pattern**:
-```csharp
-public void SetCurrency(int? currencyId, decimal exchangeRate)
-{
-    CurrencyId = currencyId;
-    ExchangeRate = exchangeRate > 0 ? exchangeRate : 1m;
-    BaseCurrencyTotal = TotalAmount * ExchangeRate;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). See `Domain/Entities/SalesInvoice.cs` for the canonical `SetCurrency()` method.
 
 **Logging**: `Log.Information("Invoice {InvoiceNo}: Currency set to {CurrencyId} @ rate {ExchangeRate}", invoiceNo, currencyId, exchangeRate)`
 
@@ -866,19 +761,7 @@ public void SetCurrency(int? currencyId, decimal exchangeRate)
 | `Api/Controllers/ProductsController.cs` | Add prices endpoint |
 
 **Price selection logic**:
-```csharp
-private async Task LoadAvailablePrices(int productId, int unitId, int? currencyId)
-{
-    var result = await _productService.GetPricesAsync(productId, unitId, currencyId);
-    if (result.IsSuccess && result.Value != null)
-    {
-        AvailablePrices = new ObservableCollection<ProductPriceDto>(result.Value);
-        var activePrice = result.Value.FirstOrDefault(p => p.IsActive);
-        if (activePrice != null)
-            CurrentUnitPrice = activePrice.Price;
-    }
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns (ExecuteAsync wrapper, RULE-141). See `Desktop/ViewModels/Sales/SalesInvoiceEditorViewModel.cs` for the canonical price loading implementation.
 
 **Estimate**: ~2 hours
 
@@ -901,28 +784,7 @@ private async Task LoadAvailablePrices(int productId, int unitId, int? currencyI
 | `DesktopPWF/Services/App/IDialogService.cs` | Add `ShowPriceOverrideAsync(PriceOverrideRequest)` method |
 | `DesktopPWF/Services/App/DialogService.cs` | Implement price override dialog |
 
-**PriceOverrideDialog XAML pattern**:
-```xml
-<Window x:Class="SalesSystem.DesktopPWF.Views.Dialogs.PriceOverrideDialog"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent">
-    <Grid>
-        <Rectangle Fill="#80000000"/> <!-- Overlay -->
-        <Border Background="White" CornerRadius="16" Padding="24" Width="400">
-            <StackPanel>
-                <TextBlock Text="⚠️ السعر أقل من السعر الرسمي" FontSize="16" FontWeight="Bold"/>
-                <TextBlock Text="السعر الرسمي: {0:N2}" Margin="0,12,0,4"/>
-                <TextBlock Text="السعر المدخل: {1:N2}" Foreground="#E65100"/>
-                <TextBlock Text="سبب التعديل *" Margin="0,12,0,4"/>
-                <TextBox Text="{Binding Reason}" AcceptsReturn="True" Height="80"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
-                    <Button Content="✅ تأكيد" Command="{Binding ConfirmCommand}" Style="{StaticResource PrimaryButton}"/>
-                    <Button Content="❌ إلغاء" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}"/>
-                </StackPanel>
-            </StackPanel>
-        </Border>
-    </Grid>
-</Window>
-```
+> See `docs/AGENTS.md` §2.43 (UI ToolTips RULE-185-190) and §2.64 (UI Compacting RULE-262-274). See `Desktop/Views/Dialogs/PriceOverrideDialog.xaml` for the canonical dialog pattern.
 
 **Estimate**: ~3 hours
 
@@ -941,35 +803,10 @@ private async Task LoadAvailablePrices(int productId, int unitId, int? currencyI
 | `DesktopPWF/ViewModels/Sales/SalesInvoiceEditorViewModel.cs` | Add profit display properties + visibility toggle (based on ShowProfitInInvoice setting) |
 | `DesktopPWF/Views/Sales/SalesInvoiceEditorView.xaml` | Add profit columns in DataGrid (green/red) |
 
-**Profit calculation in service (PostAsync)**:
-```csharp
-// After batch allocation
-decimal itemTotalCost = 0;
-foreach (var alloc in batchAllocations)
-{
-    itemTotalCost += alloc.Quantity * alloc.UnitCost;
-}
-item.SetCost(allocationTotalCost: itemTotalCost, unitCost: itemTotalCost / item.Quantity);
-item.SetProfit(item.LineTotal - itemTotalCost);
-
-// Invoice totals
-invoice.SetTotalCost(Items.Sum(i => i.CostPrice ?? 0));
-invoice.SetTotalProfit(invoice.TotalAmount - invoice.TotalCost);
-```
+> See `docs/AGENTS.md` §2.2 for financial formulas. See `Application/Services/SalesInvoiceService.cs` for the canonical profit calculation in PostAsync.
 
 **XAML profit column**:
-```xml
-<DataGridTextColumn Header="التكلفة" Binding="{Binding UnitCost, StringFormat=N2}" 
-    Width="90" ElementStyle="{StaticResource NumericTextStyle}"/>
-<DataGridTextColumn Header="الربح" Binding="{Binding ProfitAmount, StringFormat=N2}" 
-    Width="90">
-    <DataGridTextColumn.ElementStyle>
-        <Style TargetType="TextBlock" BasedOn="{StaticResource NumericTextStyle}">
-            <Setter Property="Foreground" Value="{Binding ProfitAmount, Converter={StaticResource ProfitToColorConverter}}"/>
-        </Style>
-    </DataGridTextColumn.ElementStyle>
-</DataGridTextColumn>
-```
+> See `docs/AGENTS.md` §2.64 (UI Compacting Rules). See `Desktop/Views/Sales/SalesInvoiceEditorView.xaml` for the canonical profit column pattern.
 
 **Estimate**: ~2 hours
 
@@ -987,28 +824,7 @@ invoice.SetTotalProfit(invoice.TotalAmount - invoice.TotalCost);
 | `Application/Services/SalesInvoiceService.cs` | Call `_journalEntryService.CreateSalesInvoiceEntriesAsync()` inside Post transaction |
 | `Infrastructure/Data/Configurations/SalesInvoiceConfiguration.cs` | Add FK for JournalEntryId (Restrict) |
 
-**Journal entry template (Cash Sale)**:
-```csharp
-// Dr: Cash/Bank                    TotalAmount - TaxAmount (net cash)
-// Dr: Customer Receivable          0 (cash sale)
-// Cr: Sales Revenue                SubTotal - DiscountAmount
-// Cr: Tax Payable                  TaxAmount
-// Cr: Delivery Revenue             AdditionalCharges (if any)
-// --- COGS Entry ---
-// Dr: COGS                         TotalCost
-// Cr: Inventory                    TotalCost
-```
-
-**Journal entry template (Credit Sale)**:
-```csharp
-// Dr: Customer Receivable          TotalAmount
-// Cr: Sales Revenue                SubTotal - DiscountAmount
-// Cr: Tax Payable                  TaxAmount
-// Cr: Delivery Revenue             AdditionalCharges (if any)
-// --- COGS Entry ---
-// Dr: COGS                         TotalCost
-// Cr: Inventory                    TotalCost
-```
+> See `docs/AGENTS.md` §2.76 (Phase 24 — Accounting Integration Rules, RULE-373) for canonical journal entry templates for sales.
 
 **Condition**: Only create if SystemSetting `AutoCreateJournalEntry = true`
 
@@ -1033,51 +849,9 @@ invoice.SetTotalProfit(invoice.TotalAmount - invoice.TotalCost);
 | `DesktopPWF/ViewModels/Returns/SalesReturnEditorViewModel.cs` | Add: CashBox selector, discount fields, batch return display |
 | `DesktopPWF/Views/Returns/SalesReturnEditorView.xaml` | Enhanced: refund section, batch info, discount fields |
 
-**Batch return logic**:
-```csharp
-private async Task<Result> ReturnToBatchesAsync(SalesReturn salesReturn, CancellationToken ct)
-{
-    foreach (var item in salesReturn.Items)
-    {
-        if (item.ReturnedBatchId.HasValue)
-        {
-            // Return stock to original batch
-            await _inventoryService.IncreaseStockInBatchAsync(
-                item.ReturnedBatchId.Value,
-                item.Quantity,
-                MovementType.SaleReturnIn,
-                ct);
-        }
-    }
-    return Result.Success();
-}
-```
+> See `docs/AGENTS.md` §2.7 (Stock Integrity) and `Application/Services/SalesReturnService.cs` for the canonical batch return logic.
 
-**Refund logic** — create CashTransaction.RefundOut (HIGH — Phase 28 Fix 2):
-```csharp
-// When a Sales Return is posted and refund is cash-based, automatically:
-// 1. Create CashTransaction with RefundOut type
-// 2. Link CashTransaction to SalesReturn reference
-// 3. This updates CashBox.CurrentBalance automatically via computed sum
-
-if (salesReturn.CashBoxId.HasValue && salesReturn.RefundAmount > 0)
-{
-    // Create formal CashTransaction (immutable — RULE-082)
-    var cashTx = CashTransaction.Create(
-        cashBoxId: salesReturn.CashBoxId.Value,
-        amount: salesReturn.RefundAmount,
-        type: CashTransactionType.RefundOut,   // RefundOut = 6 (RULE-208)
-        description: $"مرتجع مبيعات #{salesReturn.ReturnNo}",
-        referenceId: salesReturn.Id,            // Link CashTransaction → SalesReturn
-        referenceType: "SalesReturn",
-        createdByUserId: currentUserId);
-    
-    await _uow.CashTransactions.AddAsync(cashTx, ct);
-    // CashBox.CurrentBalance recomputed from transaction sum
-    Log.Information("Refund transaction created: SalesReturn #{Rn}, CashBox {Cb}, Amount {Amt}",
-        salesReturn.ReturnNo, salesReturn.CashBoxId.Value, salesReturn.RefundAmount);
-}
-```
+> See `docs/AGENTS.md` §2.26 (CashBox rules, RULE-079: RunningBalance, RULE-082: immutable transactions). See `Application/Services/SalesReturnService.cs` for the canonical refund logic.
 
 **Estimate**: ~4 hours
 
@@ -1093,22 +867,7 @@ if (salesReturn.CashBoxId.HasValue && salesReturn.RefundAmount > 0)
 | `Application/Services/CustomerPaymentService.cs` | Implement auto-creation of payment receipt |
 | `Application/Services/SalesInvoiceService.cs` | Call auto-payment creation inside Post transaction |
 
-**Logic**:
-```csharp
-// Auto-create customer payment receipt when:
-// 1. PaymentType = Cash (1) or Mixed (3)
-// 2. PaidAmount > 0
-// 3. SystemSetting "AutoCreatePaymentReceipt" = true (default)
-
-if ((invoice.PaymentType == PaymentType.Cash || invoice.PaymentType == PaymentType.Mixed)
-    && invoice.PaidAmount > 0
-    && await _systemSettingsRepo.GetBoolAsync("AutoCreatePaymentReceipt", true, ct))
-{
-    var paymentResult = await _customerPaymentService.CreateFromSalesInvoiceAsync(invoice, ct);
-    if (!paymentResult.IsSuccess)
-        Log.Warning("Auto-payment creation failed for invoice {Id}: {Error}", invoice.Id, paymentResult.Error);
-}
-```
+> See `docs/AGENTS.md` for transaction patterns (RULE-003) and `docs/CONSTITUTION.md` for Result<T>. See `Application/Services/SalesInvoiceService.cs` for the canonical auto-payment logic in PostAsync.
 
 **Estimate**: ~2 hours
 
@@ -1143,105 +902,9 @@ if ((invoice.PaymentType == PaymentType.Cash || invoice.PaymentType == PaymentTy
 | `DesktopPWF/App.xaml.cs` | DI registrations + navigation |
 | `Api/Program.cs` | DI registrations |
 
-**SalesQuotation entity**:
-```csharp
-public class SalesQuotation : BaseEntity
-{
-    public int QuotationNo { get; private set; }
-    public int? CustomerId { get; private set; }
-    public int WarehouseId { get; private set; }
-    public int? CurrencyId { get; private set; }
-    public decimal ExchangeRate { get; private set; } = 1m;
-    public DateTime QuotationDate { get; private set; }
-    public DateOnly? ValidUntil { get; private set; }
-    public QuotationStatus Status { get; private set; }
-    public decimal SubTotal { get; private set; }
-    public decimal DiscountAmount { get; private set; }
-    public decimal TaxAmount { get; private set; }
-    public decimal TotalAmount { get; private set; }
-    public string? Notes { get; private set; }
-    public string? TermsAndConditions { get; private set; }
-    public int? ConvertedToInvoiceId { get; private set; }
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). See `Domain/Entities/SalesQuotation.cs` for the canonical entity definition.
 
-    public virtual Customer? Customer { get; private set; }
-    public virtual Warehouse? Warehouse { get; private set; }
-    public virtual Currency? Currency { get; private set; }
-    public virtual SalesInvoice? ConvertedToInvoice { get; private set; }
-    public virtual List<SalesQuotationItem> Items { get; private set; } = new();
-
-    // Factory method with guard clauses (RULE-052)
-    public static SalesQuotation Create(int quotationNo, int warehouseId, /*...*/) { /*...*/ }
-
-    // Convert to invoice — returns data, doesn't create
-    public SalesInvoiceData ToInvoiceData() { /*...*/ }
-
-    public void MarkAsSent() { /* guard Status == Draft */ }
-    public void MarkAsAccepted() { /* guard Status == Sent */ }
-    public void MarkAsConverted(int invoiceId) { /* guard Status == Accepted */ }
-    public void MarkAsRejected() { /* guard Status == Sent or Accepted */ }
-}
-```
-
-**ConvertToInvoice logic** (with auto-expiry check — Phase 28 Fix 4):
-```csharp
-public async Task<Result<SalesInvoiceDto>> ConvertToInvoiceAsync(int quotationId, CancellationToken ct)
-{
-    var quotation = await _uow.SalesQuotations.GetByIdAsync(quotationId, ct);
-    if (quotation == null)
-        return Result<SalesInvoiceDto>.Failure("عرض السعر غير موجود", ErrorCodes.NotFound);
-    if (quotation.Status != QuotationStatus.Accepted)
-        return Result<SalesInvoiceDto>.Failure("يجب أن يكون عرض السعر مقبولاً للتحويل", ErrorCodes.InvalidOperation);
-
-    // Auto-expiry check: if ValidUntil has passed, mark expired and block conversion
-    if (quotation.ValidUntil.HasValue && quotation.ValidUntil.Value < DateOnly.FromDateTime(DateTime.UtcNow))
-    {
-        quotation.MarkAsExpired();  // Sets Status = Expired
-        await _uow.SaveChangesAsync(ct);
-        return Result<SalesInvoiceDto>.Failure("انتهت صلاحية عرض السعر", ErrorCodes.QuotationExpired);
-    }
-
-    await using var tx = await _uow.BeginTransactionAsync(ct);
-    try
-    {
-        // Create SalesInvoice from quotation data
-        var invoiceNoResult = await _documentSequenceService.GetNextIntAsync("SalesInvoice", ct);
-        if (!invoiceNoResult.IsSuccess)
-            return Result<SalesInvoiceDto>.Failure(invoiceNoResult.Error!);
-        var invoiceNo = invoiceNoResult.Value;
-        var invoice = SalesInvoice.Create(
-            quotation.WarehouseId, invoiceNo,
-            customerId: quotation.CustomerId,
-            /* map from quotation */
-        );
-        
-        foreach (var qItem in quotation.Items)
-        {
-            var item = SalesInvoiceItem.Create(qItem.ProductId, qItem.Quantity, 
-                qItem.UnitPrice, qItem.DiscountAmount, qItem.Mode);
-            invoice.AddItem(item);
-        }
-
-        await _uow.SalesInvoices.AddAsync(invoice, ct);
-        
-        // Mark quotation as converted
-        quotation.MarkAsConverted(invoice.Id);
-        
-        await _uow.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        
-        Log.Information("Quotation {QId} converted to Invoice {InvId}", quotationId, invoice.Id);
-        _eventBus.Publish(new SaleInvoiceChangedMessage(invoice.Id));
-        
-        return Result<SalesInvoiceDto>.Success(MapToDto(invoice));
-    }
-    catch (Exception ex)
-    {
-        await tx.RollbackAsync(ct);
-        Log.Error(ex, "Failed to convert quotation {QId} to invoice", quotationId);
-        return Result<SalesInvoiceDto>.Failure("فشل تحويل عرض السعر إلى فاتورة", ErrorCodes.InternalError);
-    }
-}
-```
+> See `docs/AGENTS.md` for transaction patterns (RULE-003/RULE-005) and `docs/CONSTITUTION.md` for the Result<T> pattern. See `Application/Services/SalesQuotationService.cs` for the canonical `ConvertToInvoiceAsync()` implementation.
 
 **Estimate**: ~6 hours
 
@@ -1260,58 +923,7 @@ public async Task<Result<SalesInvoiceDto>> ConvertToInvoiceAsync(int quotationId
 | `DesktopPWF/Views/Sales/SalesInvoiceEditorView.xaml` | Add BarcodeScannerControl at top of editor |
 | `DesktopPWF/Services/App/ISoundService.cs` | **Fix 5**: Ensure `PlaySuccess()`, `PlayError()`, `PlayWarning()` are implemented and wired to all scan/validation/save events (RULE-231). Inject into BarcodeScannerControl and SalesInvoiceEditorViewModel |
 
-**BarcodeScannerControl logic** (event-driven, RULE-233):
-```csharp
-// Continuous scan mode — event-driven via Application.Current.Dispatcher
-// Scanner input is intercepted BEFORE focus change
-private async void OnBarcodeScanned(string barcode)
-{
-    _soundService.PlaySuccess(); // Audible feedback (RULE-231)
-    
-    // If quantity prefix typed (e.g., "5" then scan)
-    int quantityOverride = _pendingQuantity > 0 ? _pendingQuantity : 1;
-    _pendingQuantity = 0;
-    
-    // Lookup product via BarcodeService — no manual Search button click
-    var product = await _barcodeService.LookupAsync(barcode);
-    if (product == null)
-    {
-        _soundService.PlayError();
-        await _dialogService.ShowWarningAsync("باركود غير معروف", $"الباركود {barcode} غير مسجل");
-        return;
-    }
-    
-    // Marshal to UI thread via Application.Current.Dispatcher
-    await Application.Current.Dispatcher.InvokeAsync(() =>
-    {
-        // Check if already in grid → increment quantity
-        var existingItem = Items.FirstOrDefault(i => i.ProductId == product.Id);
-        if (existingItem != null)
-        {
-            existingItem.Quantity += quantityOverride;
-            existingItem.RecalculateLineTotal();
-        }
-        else
-        {
-            // Add new line
-            var newItem = new InvoiceLineViewModel
-            {
-                ProductId = product.Id,
-                ProductName = product.Name,
-                Quantity = quantityOverride,
-                UnitPrice = product.RetailPrice,
-                // ...
-            };
-            Items.Add(newItem);
-        }
-    });
-    
-    // Auto-clear scanner input for next scan
-    ScannerInput = string.Empty;
-    // Auto-refocus scanner input
-    _ = FocusScannerInput();
-}
-```
+> See `docs/AGENTS.md` §2.56 (Barcode Scanning, RULE-233/234) and §2.55 (Sound Service, RULE-231/232). See `Desktop/Controls/BarcodeScannerControl.xaml.cs` and `Desktop/ViewModels/Sales/SalesInvoiceEditorViewModel.cs` for the canonical scan logic.
 
 **Estimate**: ~3 hours
 
@@ -1337,30 +949,7 @@ private async void OnBarcodeScanned(string barcode)
 | **Post validation** | Validate: stock availability, price override approvals, **customer credit limit enforcement (Fix 3)** — if customer has `CreditLimit`, check `currentBalance + invoiceTotal <= creditLimit` before allowing Post; manager override allowed with warning |
 | **Auto-focus** | `FocusFirstInvalidFieldRequested` event for validation (RULE-059) |
 
-**Structure**:
-```csharp
-public class SalesInvoiceEditorViewModel : ViewModelBase
-{
-    // ── New Properties ──
-    public ObservableCollection<CurrencyDto> Currencies { get; }
-    public CurrencyDto? SelectedCurrency { get; set; }  // Triggers price refresh
-    public decimal ExchangeRate { get; set; } = 1m;
-    public decimal AdditionalCharges { get; set; }
-    public byte DiscountType { get; set; }  // 0=Amount, 1=Percent
-    public decimal DiscountValue { get; set; }
-    public decimal TotalCost { get; private set; }
-    public decimal TotalProfit { get; private set; }
-    public bool ShowProfit { get; set; }  // From SystemSettings
-    public string DraftAge { get; private set; }  // "منذ 3 أيام"
-
-    // ── New Commands ──
-    public ICommand ToggleScanModeCommand { get; }
-    public ICommand ConvertFromQuotationCommand { get; }
-    
-    // ── Existing (enhanced) ──
-    // SaveAsDraftCommand, PostCommand remain — no CanExecute (RULE-059)
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns (ExecuteAsync, RULE-141; INotifyDataErrorInfo, RULE-228). See `Desktop/ViewModels/Sales/SalesInvoiceEditorViewModel.cs` for the canonical implementation.
 
 **Estimate**: ~4 hours
 
@@ -1370,38 +959,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
 **Objective**: Restyle the editor view with compact dimensions (RULE-262-274) and comprehensive Arabic ToolTips (RULE-185-190).
 
-**Layout changes**:
-
-```xml
-<!-- Header section — compact padding -->
-<Border Background="{StaticResource PrimaryBrush}" Padding="12,6">
-    <TextBlock Text="فاتورة بيع" FontSize="14" FontWeight="Bold" Foreground="White"/>
-</Border>
-
-<!-- Scanner bar — compact -->
-<BarcodeScannerControl DataContext="{Binding}" 
-    Margin="0,6,0,6" Height="32"/>
-
-<!-- Invoice data grid — compact rows -->
-<DataGrid ItemsSource="{Binding Items}" 
-          Style="{StaticResource CompactDataGrid}"
-          RowHeight="24" ...>
-
-<!-- Profit column (conditional) -->
-<DataGridTextColumn Header="الربح" 
-    Visibility="{Binding ShowProfit, Converter={StaticResource BoolToVisibility}}"
-    .../>
-
-<!-- Footer — compact -->
-<Border Background="White" Padding="12,8" BorderThickness="0,1,0,0">
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-        <Button Content="💾 حفظ كمسودة" Command="{Binding SaveAsDraftCommand}" 
-                ToolTip="حفظ الفاتورة كمسودة — لا تؤثر على المخزون"/>
-        <Button Content="✅ ترحيل" Command="{Binding PostCommand}" 
-                ToolTip="ترحيل الفاتورة — سيتم خصم المخزون وتحديث رصيد العميل"/>
-    </StackPanel>
-</Border>
-```
+> See `docs/AGENTS.md` §2.64 (UI Compacting Rules RULE-262-274) and §2.43 (UI ToolTips RULE-185-190). See `Desktop/Views/Sales/SalesInvoiceEditorView.xaml` for the canonical compact layout.
 
 **ToolTips required (all buttons)** (RULE-185-190):
 
@@ -1435,64 +993,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 - Compact UI styles (RULE-262-274)
 - `INotifyDataErrorInfo` in editor (RULE-228)
 
-**List ViewModel**:
-```csharp
-public class SalesQuotationListViewModel : ViewModelBase, IDisposable
-{
-    public ObservableCollection<SalesQuotationDto> Quotations { get; }
-    public ICommand AddCommand { get; }
-    public ICommand EditCommand { get; }
-    public ICommand DeleteCommand { get; }
-    public ICommand ConvertToInvoiceCommand { get; }
-    public ICommand RefreshCommand { get; }
-
-    // Newest-first sort (RULE-220)
-    private async Task LoadQuotationsAsync()
-    {
-        var result = await _quotationService.GetAllAsync();
-        if (result.IsSuccess)
-        {
-            InvokeOnUIThread(() =>
-            {
-                Quotations.Clear();
-                foreach (var q in result.Value.OrderByDescending(x => x.Id))
-                    Quotations.Add(q);
-            });
-        }
-    }
-}
-```
-
-**Editor ViewModel**:
-```csharp
-public class SalesQuotationEditorViewModel : ViewModelBase
-{
-    // Properties with INotifyDataErrorInfo
-    public int QuotationNo { get; set; }
-    public int? CustomerId { get; set; }
-    public int WarehouseId { get; set; }
-    public int? CurrencyId { get; set; }
-    public decimal ExchangeRate { get; set; } = 1m;
-    public DateTime QuotationDate { get; set; } = DateTime.Today;
-    public DateOnly? ValidUntil { get; set; }
-    // ...
-
-    public SalesQuotationEditorViewModel(/* */)
-    {
-        SetDialogService(_dialogService);  // RULE-227
-        SaveCommand = new AsyncRelayCommand(SaveAsync);  // No CanExecute (RULE-059)
-    }
-
-    private bool Validate()
-    {
-        ClearAllErrors();  // RULE-229
-        if (WarehouseId <= 0) AddError(nameof(WarehouseId), "المستودع مطلوب");
-        if (!Items.Any()) AddError(nameof(Items), "يجب إضافة صنف واحد على الأقل");
-        // ...
-        return !HasErrors;
-    }
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns (RULE-141: ExecuteAsync, RULE-220: newest-first sort, RULE-228: INotifyDataErrorInfo, RULE-227: SetDialogService(), RULE-059: no CanExecute). See `Desktop/ViewModels/Sales/SalesQuotationListViewModel.cs` and `SalesQuotationEditorViewModel.cs` for canonical implementations.
 
 **Estimate**: ~4 hours
 
@@ -1563,28 +1064,7 @@ public class SalesQuotationEditorViewModel : ViewModelBase
 | `UpdateSalesQuotationRequestValidator` | **NEW**: Same |
 | `PostInvoiceRequestValidator` | **ENHANCED**: Validate stock, validate price overrides |
 
-**Example — Quotation validator** (RULE-044):
-```csharp
-public class CreateSalesQuotationRequestValidator : AbstractValidator<CreateSalesQuotationRequest>
-{
-    public CreateSalesQuotationRequestValidator()
-    {
-        RuleFor(x => x.QuotationNo).GreaterThan(0).WithMessage("رقم عرض السعر مطلوب");
-        RuleFor(x => x.WarehouseId).GreaterThan(0).WithMessage("المستودع مطلوب");
-        RuleFor(x => x.ExchangeRate).GreaterThan(0).When(x => x.CurrencyId.HasValue)
-            .WithMessage("سعر الصرف يجب أن يكون أكبر من صفر");
-        RuleFor(x => x.ValidUntil).GreaterThanOrEqualTo(DateOnly.FromDateTime(DateTime.UtcNow))
-            .When(x => x.ValidUntil.HasValue)
-            .WithMessage("تاريخ الصلاحية لا يمكن أن يكون في الماضي");
-        RuleForEach(x => x.Items).ChildRules(item =>
-        {
-            item.RuleFor(i => i.ProductId).GreaterThan(0);
-            item.RuleFor(i => i.Quantity).GreaterThan(0);
-            item.RuleFor(i => i.UnitPrice).GreaterThanOrEqualTo(0);
-        });
-    }
-}
-```
+> See `docs/AGENTS.md` for validation patterns (RULE-044: FluentValidation for EVERY Command). See `Api/Validators/CreateSalesQuotationRequestValidator.cs` for the canonical validator.
 
 **Estimate**: ~1 hour
 
@@ -1610,26 +1090,7 @@ public class CreateSalesQuotationRequestValidator : AbstractValidator<CreateSale
 | `GET` | `/api/v1/sales/reports/by-product?from=&to=` | Sales grouped by product | `ManagerAndAbove` |
 | `GET` | `/api/v1/sales/reports/daily?from=&to=` | Daily sales summary | `ManagerAndAbove` |
 
-**Report DTOs**:
-```csharp
-public record SalesProfitReportDto(
-    int TotalInvoices,
-    decimal TotalSales,
-    decimal TotalCost,
-    decimal TotalProfit,
-    decimal ProfitMargin,  // TotalProfit / TotalSales * 100
-    List<SalesInvoiceProfitDto> Invoices
-);
-
-public record SalesInvoiceProfitDto(
-    int InvoiceNo,
-    string CustomerName,
-    DateTime InvoiceDate,
-    decimal TotalAmount,
-    decimal TotalCost,
-    decimal Profit
-);
-```
+> See `docs/AGENTS.md` §2.83 (Phase 31 — Reports Module Rules, RULE-421). See `SalesSystem.Contracts/` for canonical report DTOs.
 
 **Estimate**: ~3 hours
 
@@ -1668,13 +1129,7 @@ public record SalesInvoiceProfitDto(
 | `DesktopPWF/Views/Sales/SalesReturnEditorView.xaml` | Add `ⓘ` tooltip next to: مرتجع بيع |
 | `DesktopPWF/Views/Sales/SalesInvoicesListView.xaml` | Add `ⓘ` tooltips next to column headers |
 
-**XAML usage pattern**:
-```xml
-<StackPanel Orientation="Horizontal">
-    <TextBlock Text="فاتورة بيع" Style="{StaticResource LabelStyle}"/>
-    <controls:InfoTooltip HelpText="فاتورة البيع هي مستند يثبت قيام الشركة ببيع بضاعة أو تقديم خدمة للعميل."/>
-</StackPanel>
-```
+> See `docs/AGENTS.md` §2.43 (UI ToolTips). See `Desktop/Controls/InfoTooltip.xaml` for the canonical tooltip control pattern.
 
 **Estimate**: ~1 hour
 

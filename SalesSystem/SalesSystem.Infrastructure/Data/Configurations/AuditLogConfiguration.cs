@@ -13,7 +13,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(a => a.Id).HasColumnType("bigint");
         builder.Property(a => a.Action).IsRequired().HasMaxLength(100);
         builder.Property(a => a.EntityType).IsRequired().HasMaxLength(100);
-        builder.Property(a => a.Details).HasMaxLength(2000);
+        builder.Property(a => a.Details).HasColumnType("nvarchar(max)");
         builder.Property(a => a.IpAddress).HasMaxLength(50);
         builder.Property(a => a.Timestamp).IsRequired();
 

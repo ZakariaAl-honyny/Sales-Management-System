@@ -10,9 +10,16 @@ namespace SalesSystem.Domain.Accounting.Entities;
 /// Lines must be added via AddDebitLine / AddCreditLine methods
 /// to ensure the entry remains internally consistent.
 /// </summary>
-public class JournalEntry : BaseEntity
+public class JournalEntry : DocumentEntity
 {
     public string EntryNumber { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Integer sequence number for this journal entry (matches DB sequence).
+    /// Separate from the formatted EntryNumber string for efficient indexing and querying.
+    /// </summary>
+    public int EntryNo { get; private set; }
+
     public DateTime TransactionDate { get; private set; }
     public string Description { get; private set; } = string.Empty;
     public JournalEntryType EntryType { get; private set; }
@@ -20,10 +27,10 @@ public class JournalEntry : BaseEntity
     public string? ReferenceType { get; private set; }
     public int? ReferenceId { get; private set; }
     public string? ReferenceNumber { get; private set; }
-    public int? CurrencyId { get; private set; }
+    public short? CurrencyId { get; private set; }
     public decimal? ExchangeRate { get; private set; }
     public string? AttachmentPath { get; private set; }
-    public int? BranchId { get; private set; }
+    public short? BranchId { get; private set; }
     public int? ReversedByEntryId { get; private set; }
     public JournalEntry? ReversedByEntry { get; private set; }
 
@@ -39,6 +46,7 @@ public class JournalEntry : BaseEntity
 
     public static JournalEntry Create(
         string entryNumber,
+        int entryNo,
         DateTime transactionDate,
         string description,
         JournalEntryType entryType,
@@ -46,12 +54,15 @@ public class JournalEntry : BaseEntity
         string? referenceType = null,
         int? referenceId = null,
         string? referenceNumber = null,
-        int? currencyId = null,
+        short? currencyId = null,
         decimal? exchangeRate = null,
         string? attachmentPath = null)
     {
         if (string.IsNullOrWhiteSpace(entryNumber))
             throw new DomainException("رقم القيد المحاسبي مطلوب");
+
+        if (entryNo <= 0)
+            throw new DomainException("الرقم التسلسلي للقيد المحاسبي مطلوب");
 
         if (transactionDate == default)
             throw new DomainException("تاريخ القيد المحاسبي مطلوب");
@@ -68,6 +79,7 @@ public class JournalEntry : BaseEntity
         var entry = new JournalEntry
         {
             EntryNumber = entryNumber.Trim(),
+            EntryNo = entryNo,
             TransactionDate = transactionDate,
             Description = description.Trim(),
             EntryType = entryType,

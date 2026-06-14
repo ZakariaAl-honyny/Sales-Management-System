@@ -16,6 +16,7 @@ public class SupplierEditorViewModel : ViewModelBase
     private readonly ISupplierApiService _supplierService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private int _supplierId;
     private string _name = string.Empty;
@@ -23,38 +24,36 @@ public class SupplierEditorViewModel : ViewModelBase
     private string _email = string.Empty;
     private string _address = string.Empty;
     private string _taxNumber = string.Empty;
-    private decimal _creditLimit;
-    private decimal _openingBalance;
     private string _notes = string.Empty;
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
-    private int? _accountId;
-
 
     public SupplierEditorViewModel()
-        : this(App.GetService<ISupplierApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
+        : this(App.GetService<ISupplierApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>(), App.GetService<IScreenWindowService>())
     {
     }
 
-    public SupplierEditorViewModel(ISupplierApiService supplierService, IEventBus eventBus, IDialogService dialogService)
+    public SupplierEditorViewModel(ISupplierApiService supplierService, IEventBus eventBus, IDialogService dialogService, IScreenWindowService screenWindowService)
     {
         _supplierService = supplierService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        _screenWindowService = screenWindowService;
         SetDialogService(dialogService);
 
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ المورد...")));
         CancelCommand = new RelayCommand(Cancel);
+        ManageContactsCommand = new RelayCommand(OpenContacts);
     }
 
     public SupplierEditorViewModel(SupplierDto supplier)
-        : this(supplier, App.GetService<ISupplierApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
+        : this(supplier, App.GetService<ISupplierApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>(), App.GetService<IScreenWindowService>())
     {
     }
 
-    public SupplierEditorViewModel(SupplierDto supplier, ISupplierApiService supplierService, IEventBus eventBus, IDialogService dialogService)
-        : this(supplierService, eventBus, dialogService)
+    public SupplierEditorViewModel(SupplierDto supplier, ISupplierApiService supplierService, IEventBus eventBus, IDialogService dialogService, IScreenWindowService screenWindowService)
+        : this(supplierService, eventBus, dialogService, screenWindowService)
     {
         _supplierId = supplier.Id;
         _name = supplier.Name;
@@ -62,11 +61,8 @@ public class SupplierEditorViewModel : ViewModelBase
         _email = supplier.Email ?? string.Empty;
         _address = supplier.Address ?? string.Empty;
         _taxNumber = supplier.TaxNumber ?? string.Empty;
-        _creditLimit = supplier.CreditLimit;
-        _openingBalance = supplier.OpeningBalance;
         _isActive = supplier.IsActive;
         _isEditMode = true;
-        _accountId = supplier.AccountId;
     }
 
     #region Properties
@@ -117,27 +113,6 @@ public class SupplierEditorViewModel : ViewModelBase
         set => SetProperty(ref _taxNumber, value);
     }
 
-    public decimal CreditLimit
-    {
-        get => _creditLimit;
-        set => SetProperty(ref _creditLimit, value);
-    }
-
-    public decimal OpeningBalance
-    {
-        get => _openingBalance;
-        set
-        {
-            if (SetProperty(ref _openingBalance, value))
-            {
-                if (value < 0)
-                    AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
-                else
-                    ClearErrors(nameof(OpeningBalance));
-            }
-        }
-    }
-
     public string Notes
     {
         get => _notes;
@@ -156,17 +131,12 @@ public class SupplierEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
-    public int? AccountId
-    {
-        get => _accountId;
-        set => SetProperty(ref _accountId, value);
-    }
-
     #endregion
 
     #region Commands
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
+    public ICommand ManageContactsCommand { get; }
     #endregion
 
     #region Methods
@@ -176,8 +146,6 @@ public class SupplierEditorViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(Name))
             AddError(nameof(Name), "اسم المورد مطلوب");
-        if (OpeningBalance < 0)
-            AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
 
         return await ValidateAllAsync();
     }
@@ -201,9 +169,7 @@ public class SupplierEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Email) ? null : Email,
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                CreditLimit,
-                IsActive,
-                AccountId: AccountId);
+                IsActive);
 
             result = await _supplierService.UpdateAsync(_supplierId, updateRequest);
         }
@@ -214,10 +180,7 @@ public class SupplierEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                 string.IsNullOrWhiteSpace(Email) ? null : Email,
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
-                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                OpeningBalance,
-                CreditLimit,
-                AccountId: AccountId);
+                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber);
 
             result = await _supplierService.CreateAsync(createRequest);
         }
@@ -236,6 +199,21 @@ public class SupplierEditorViewModel : ViewModelBase
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المورد", "SupplierEditorViewModel.SaveAsync", "[SupplierEditorViewModel.SaveAsync] Failed to save supplier.");
             await _dialogService.ShowErrorAsync("خطأ في حفظ المورد", ErrorMessage!);
         }
+    }
+
+    private void OpenContacts()
+    {
+        if (_supplierId <= 0) return;
+
+        var contactsVm = App.GetService<SupplierContactListViewModel>();
+        contactsVm.LoadContacts(_supplierId, Name);
+
+        _screenWindowService.OpenScreen(contactsVm, new ScreenWindowOptions
+        {
+            Title = $"جهات اتصال المورد: {Name}",
+            Width = 800,
+            Height = 500
+        });
     }
 
     private void Cancel()

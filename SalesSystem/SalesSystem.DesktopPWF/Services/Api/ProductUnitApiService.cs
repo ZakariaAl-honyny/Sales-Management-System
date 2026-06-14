@@ -48,11 +48,4 @@ public class ProductUnitApiService : ApiServiceBase, IProductUnitApiService
             () => _httpClient.GetAsync($"api/v1/barcodes/{Uri.EscapeDataString(barcode)}"),
             "ProductUnitApiService.ResolveBarCodeAsync");
     }
-
-    public async Task<Result<List<ProductPriceHistoryDto>>> GetPriceHistoryAsync(int productId)
-    {
-        return await ExecutePagedAsync<ProductPriceHistoryDto>(
-            () => _httpClient.GetAsync($"api/v1/products/{productId}/price-history"),
-            "ProductUnitApiService.GetPriceHistoryAsync");
-    }
 }

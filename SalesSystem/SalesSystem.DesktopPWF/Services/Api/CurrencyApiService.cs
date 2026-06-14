@@ -62,10 +62,4 @@ public class CurrencyApiService : ApiServiceBase, ICurrencyApiService
             "CurrencyApiService.UpdateExchangeRateAsync");
     }
 
-    public async Task<Result<List<ExchangeRateHistoryDto>>> GetRateHistoryAsync(int currencyId)
-    {
-        return await ExecuteAsync<List<ExchangeRateHistoryDto>>(
-            () => _httpClient.GetAsync($"api/v1/currencies/{currencyId}/history"),
-            "CurrencyApiService.GetRateHistoryAsync");
-    }
 }

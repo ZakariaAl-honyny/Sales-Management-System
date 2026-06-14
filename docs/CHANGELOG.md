@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.10 — 65-Table Schema Refactoring & Docs Cleanup (2026-06-13)
+
+### ✨ Major Architecture Changes
+- **Schema reduced from 82 to 65 tables**: 17 tables removed, 8 added/modified for V1 final design
+- **Perpetual Inventory**: NO Purchases clearing account — all inventory costs go DIRECTLY to Inventory Asset account
+- **Units as independent table**: Units table with smallint PK, user-addable, IsSystem flag for seed data protection
+- **ProductPrices**: Multi-currency pricing per (ProductUnit × CurrencyId) with effective date ranges — replaces RetailPrice/WholesalePrice on ProductUnit
+- **InventoryBatches**: Replaces PurchaseLots — batch-level FIFO/FEFO cost allocation with UnitCost per batch
+- **WarehouseTransfers/WarehouseTransferLines**: Replaces StockTransfers/StockTransferItems
+- **InventoryTransactions/InventoryTransactionLines**: Replaces InventoryMovements — 12 transaction types with status lifecycle
+- **CustomerReceipts**: Replaces CustomerPayments with multi-invoice allocation (CustomerReceiptApplications)
+- **ReceiptVouchers/PaymentVouchers**: Replace CashTransactions for box money flow
+- **Party entity**: Shared contact data (Name, Phone, Email, Address, TaxNumber) — Customers/Suppliers each have PartyId FK
+- **CashBox simplified**: NO OpeningBalance/CurrentBalance — balance lives on linked Account only
+- **Customer/Supplier simplified**: NO OpeningBalance/CurrentBalance/CurrencyId — balance on linked Account only
+- **smallint PKs**: Branches, Warehouses, Currencies, Units, Roles, Departments, Taxes, AccountCategories
+- **bigint PKs**: AuditLogs.Id, SystemLogs.Id for high-volume data
+- **SystemLog.Level**: nvarchar → tinyint (enum: Info=1, Warning=2, Error=3, Critical=4)
+- **BaseCurrency immutable**: IsBaseCurrency cannot be changed after system creation
+- **No CustomerGroup/SupplierType/CustomerType in V1**: Payment type is per-invoice, not per-entity
+- **No PriceLevel enum in V1**: Pricing is simply per (ProductUnit × CurrencyId)
+- **No Purchases Orders/Sales Quotations/Cheques/DailyClosure in V1**: Deferred to V2
+
+### 📄 Docs Consolidation
+- **docs/database-schema.md**: Established as SINGLE source of truth for all table definitions (65 tables, 8 modules)
+- **docs/PRD-MVP.md**: Removed 2,324 lines of duplicate schema definitions, SQL scripts, and C# entity code — replaced with references to database-schema.md
+- **docs/CONSTITUTION.md**: Removed duplicate schema details, added Perpetual Inventory, ProductPrices, Party, Units sections, added Schema Reference section
+- **Phase plans 18, 19, 21, 22**: Removed inline SQL/C# code — replaced with references to canonical docs
+- **AGENTS.md**: Updated with per-unit pricing, immutable base currency, independent Units, ProductPrices rules
+- **README.md**: Updated with Phases 15-32 features, new services, updated badges
+- **18 subagent files**: All updated with 65-table schema knowledge, new entity patterns, removed entity detection
+- **All numbers**: 460+ architecture rules enforced (AGENTS.md), 2,083+ tests
+
+### 🛠️ Entity/Service Changes
+- Removed entities: ProductBarcodes, ProductImages, BillOfMaterials, ProductPriceHistory (old), StoreSettings (old), CustomerGroup, CustomerPayments, SupplierPayments (old), InventoryMovements, StockTransfers, StockTransferItems, InventoryOperations, StockWriteOffs, CashTransactions, DailyClosures, Cheques, PurchaseLots
+- Added/modified entities: Parties, CustomerReceipts, CustomerReceiptApplications, InventoryBatches, InventoryTransactions, InventoryTransactionLines, WarehouseTransfers, WarehouseTransferLines, ProductPrices, ReceiptVouchers, PaymentVouchers, CompanySettings (replaces StoreSettings)
+- All FK types: smallint for lookup tables (Branches, Warehouses, Currencies, Units, Roles, Departments, Taxes, AccountCategories)
+- All money: decimal(18,2), quantities: decimal(18,3), percentages: decimal(5,2)
+
 ## v4.6.9 — Phase 23: Customers Module (2026-06-08)
 
 ### ✨ New Features

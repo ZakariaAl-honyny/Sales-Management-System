@@ -8,7 +8,7 @@ public record CashBoxDto(
     int? CategoryId,
     string? CategoryName,
     int? BranchId,
-    int? CurrencyId,
+    int CurrencyId,
     string? CurrencyName,
     string? CurrencyCode,
     int? AssignedUserId,

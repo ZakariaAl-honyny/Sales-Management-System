@@ -1,8 +1,11 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
+using ClosedXML.Excel;
+using Microsoft.Win32;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.Export;
 using Serilog;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Reports;
@@ -19,6 +22,9 @@ public class GeneralLedgerViewModel : ViewModelBase
     private IAccountApiService AccountApiService => _accountApiService ??= App.GetService<IAccountApiService>();
 
     private IDialogService D => DialogService!;
+
+    private IFinancialReportExportService? _pdfExportService;
+    private IFinancialReportExportService PdfExportService => _pdfExportService ??= App.GetService<IFinancialReportExportService>();
 
     private int? _selectedAccountId;
     private string? _selectedAccountName;
@@ -46,6 +52,9 @@ public class GeneralLedgerViewModel : ViewModelBase
 
         ExportExcelCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExportExcelAsync()));
+
+        ExportPdfCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExportPdfAsync()));
 
         LoadAccountsCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(LoadAccountsAsync)));
@@ -148,6 +157,7 @@ public class GeneralLedgerViewModel : ViewModelBase
     public AsyncRelayCommand GenerateReportCommand { get; }
     public AsyncRelayCommand ExportExcelCommand { get; }
     public AsyncRelayCommand LoadAccountsCommand { get; }
+    public AsyncRelayCommand ExportPdfCommand { get; }
 
     #endregion
 
@@ -226,7 +236,119 @@ public class GeneralLedgerViewModel : ViewModelBase
 
     private async Task ExportExcelAsync()
     {
-        await D.ShowInfoAsync("تصدير Excel", "سيتم تفعيل تصدير Excel قريباً");
+        if (Lines.Count == 0)
+        {
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
+            return;
+        }
+
+        try
+        {
+            var saveFileDialog = new SaveFileDialog
+            {
+                Filter = "Excel Files (*.xlsx)|*.xlsx",
+                FileName = $"GeneralLedger_{DateTime.Now:yyyyMMdd_HHmm}.xlsx"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                using (var workbook = new XLWorkbook())
+                {
+                    var worksheet = workbook.Worksheets.Add("دفتر الأستاذ");
+
+                    // Header info
+                    worksheet.Cell(1, 1).Value = "الحساب:";
+                    worksheet.Cell(1, 2).Value = SelectedAccountName ?? "";
+                    worksheet.Range(1, 1, 1, 2).Style.Font.Bold = true;
+                    worksheet.Cell(2, 1).Value = "الرصيد الافتتاحي:";
+                    worksheet.Cell(2, 2).Value = OpeningBalance;
+                    worksheet.Range(2, 1, 2, 2).Style.Font.Bold = true;
+
+                    // Column headers
+                    worksheet.Cell(4, 1).Value = "التاريخ";
+                    worksheet.Cell(4, 2).Value = "رقم القيد";
+                    worksheet.Cell(4, 3).Value = "البيان";
+                    worksheet.Cell(4, 4).Value = "رقم المرجع";
+                    worksheet.Cell(4, 5).Value = "مدين";
+                    worksheet.Cell(4, 6).Value = "دائن";
+                    worksheet.Cell(4, 7).Value = "الرصيد";
+
+                    for (int i = 0; i < Lines.Count; i++)
+                    {
+                        var item = Lines[i];
+                        worksheet.Cell(i + 5, 1).Value = item.Date.ToString("yyyy/MM/dd");
+                        worksheet.Cell(i + 5, 2).Value = item.EntryNumber;
+                        worksheet.Cell(i + 5, 3).Value = item.Description;
+                        worksheet.Cell(i + 5, 4).Value = item.ReferenceNumber ?? "";
+                        worksheet.Cell(i + 5, 5).Value = item.Debit;
+                        worksheet.Cell(i + 5, 6).Value = item.Credit;
+                        worksheet.Cell(i + 5, 7).Value = item.RunningBalance;
+                    }
+
+                    // Totals
+                    var totalRow = Lines.Count + 5;
+                    worksheet.Cell(totalRow, 1).Value = "الإجمالي";
+                    worksheet.Cell(totalRow, 5).Value = TotalDebit;
+                    worksheet.Cell(totalRow, 6).Value = TotalCredit;
+                    worksheet.Cell(totalRow, 7).Value = ClosingBalance;
+                    worksheet.Cell(totalRow, 1).Style.Font.Bold = true;
+
+                    // Footer info
+                    worksheet.Cell(totalRow + 2, 1).Value = "الرصيد الختامي:";
+                    worksheet.Cell(totalRow + 2, 2).Value = ClosingBalance;
+                    worksheet.Range(totalRow + 2, 1, totalRow + 2, 2).Style.Font.Bold = true;
+
+                    var headerRange = worksheet.Range(4, 1, 4, 7);
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#E3E8EE");
+                    worksheet.Columns().AdjustToContents();
+
+                    workbook.SaveAs(saveFileDialog.FileName);
+                }
+
+                await D.ShowInfoAsync("نجاح", "تم تصدير دفتر الأستاذ إلى Excel بنجاح");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تصدير دفتر الأستاذ إلى Excel", "GeneralLedgerViewModel.ExportToExcel", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        }
+    }
+
+    private async Task ExportPdfAsync()
+    {
+        if (Lines.Count == 0)
+        {
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
+            return;
+        }
+
+        try
+        {
+            var dataTable = new System.Data.DataTable();
+            dataTable.Columns.Add("التاريخ", typeof(string));
+            dataTable.Columns.Add("رقم القيد", typeof(string));
+            dataTable.Columns.Add("البيان", typeof(string));
+            dataTable.Columns.Add("رقم المرجع", typeof(string));
+            dataTable.Columns.Add("مدين", typeof(decimal));
+            dataTable.Columns.Add("دائن", typeof(decimal));
+            dataTable.Columns.Add("الرصيد", typeof(decimal));
+
+            foreach (var item in Lines)
+                dataTable.Rows.Add(item.Date.ToString("yyyy/MM/dd"),
+                    item.EntryNumber, item.Description,
+                    item.ReferenceNumber ?? "", item.Debit,
+                    item.Credit, item.RunningBalance);
+
+            await PdfExportService.ExportToPdfAsync("دفتر الأستاذ", dataTable, ClosingBalance,
+                $"GeneralLedger_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تصدير دفتر الأستاذ إلى PDF", "GeneralLedgerViewModel.ExportPdf", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        }
     }
 
     #endregion

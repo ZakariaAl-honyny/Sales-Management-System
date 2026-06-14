@@ -69,23 +69,21 @@ public class PurchaseInvoiceTests
             productId: 1,
             productUnitId: 1,
             quantity: 2,
-            unitCost: 100m,
-            discountAmount: 10m
+            unitCost: 100m
         );
 
         var item2 = PurchaseInvoiceItem.Create(
             productId: 2,
             productUnitId: 1,
             quantity: 3,
-            unitCost: 50m,
-            discountAmount: 5m
+            unitCost: 50m
         );
 
         invoice.AddItem(item1);
         invoice.AddItem(item2);
 
         invoice.Items.Should().HaveCount(2);
-        invoice.SubTotal.Should().Be(335m); // (2*100-10) + (3*50-5)
+        invoice.SubTotal.Should().Be(350m); // (2*100) + (3*50)
     }
 
     [Fact]
@@ -164,16 +162,15 @@ public class PurchaseInvoiceTests
             productId: 1,
             productUnitId: 1,
             quantity: 2,
-            unitCost: 100m,
-            discountAmount: 20m
+            unitCost: 100m
         );
         invoice.AddItem(item);
         invoice.SetTaxAmount(30m);
 
-        invoice.SubTotal.Should().Be(180m);
+        invoice.SubTotal.Should().Be(200m); // 2*100
         invoice.DiscountAmount.Should().Be(50m);
         invoice.TaxAmount.Should().Be(30m);
-        invoice.TotalAmount.Should().Be(160m); // 180 - 50 + 30
+        invoice.NetTotal.Should().Be(180m); // 200 - 50 + 30
     }
 
     [Fact]
@@ -239,7 +236,7 @@ public class PurchaseInvoiceTests
         invoice.SetPaidAmount(50m);
 
         invoice.PaidAmount.Should().Be(50m);
-        invoice.DueAmount.Should().Be(70m); // 120 - 50
+        invoice.RemainingAmount.Should().Be(70m); // 120 - 50
     }
 
     [Fact]
@@ -390,11 +387,11 @@ public class PurchaseInvoiceTests
 
         invoice.DiscountAmount.Should().Be(50m);
         invoice.TaxAmount.Should().Be(30m);
-        invoice.TotalAmount.Should().Be(180m); // SubTotal=200, 200 - 50 + 30 = 180
+        invoice.NetTotal.Should().Be(180m); // SubTotal=200, 200 - 50 + 30 = 180
     }
 
     [Fact]
-    public void TotalAmount_Formula_ShouldBeSubTotalMinusDiscountPlusTax()
+    public void NetTotal_Formula_ShouldBeSubTotalMinusDiscountPlusTax()
     {
         var invoice = PurchaseInvoice.Create(
             supplierId: 1,
@@ -409,6 +406,6 @@ public class PurchaseInvoiceTests
         invoice.SetTaxAmount(60m);
 
         invoice.SubTotal.Should().Be(500m);
-        invoice.TotalAmount.Should().Be(460m); // 500 - 100 + 60
+        invoice.NetTotal.Should().Be(460m); // 500 - 100 + 60
     }
 }

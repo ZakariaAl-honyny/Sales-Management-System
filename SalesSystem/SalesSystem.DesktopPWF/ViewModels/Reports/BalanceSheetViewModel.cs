@@ -1,8 +1,11 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
+using ClosedXML.Excel;
+using Microsoft.Win32;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.Export;
 using Serilog;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Reports;
@@ -177,12 +180,152 @@ public class BalanceSheetViewModel : ViewModelBase
 
     private async Task ExportExcelAsync()
     {
-        await D.ShowInfoAsync("تصدير Excel", "سيتم تفعيل تصدير Excel قريباً");
+        if (!HasData)
+        {
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
+            return;
+        }
+
+        try
+        {
+            var saveFileDialog = new SaveFileDialog
+            {
+                Filter = "Excel Files (*.xlsx)|*.xlsx",
+                FileName = $"BalanceSheet_{DateTime.Now:yyyyMMdd_HHmm}.xlsx"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                using (var workbook = new XLWorkbook())
+                {
+                    var worksheet = workbook.Worksheets.Add("الميزانية العمومية");
+
+                    var sections = new[] {
+                        new { Name = "الأصول", Data = AssetSections, Total = TotalAssets },
+                        new { Name = "الخصوم", Data = LiabilitySections, Total = TotalLiabilities },
+                        new { Name = "حقوق الملكية", Data = EquitySections, Total = TotalEquity }
+                    };
+
+                    int currentRow = 1;
+
+                    foreach (var sectionGroup in sections)
+                    {
+                        worksheet.Cell(currentRow, 1).Value = sectionGroup.Name;
+                        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+                        worksheet.Cell(currentRow, 1).Style.Font.FontSize = 14;
+                        currentRow++;
+
+                        foreach (var section in sectionGroup.Data)
+                        {
+                            worksheet.Cell(currentRow, 1).Value = section.Name;
+                            worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+                            worksheet.Cell(currentRow, 1).Style.Font.FontSize = 12;
+                            currentRow++;
+
+                            if (section.Lines != null)
+                            {
+                                foreach (var line in section.Lines)
+                                {
+                                    worksheet.Cell(currentRow, 1).Value = line.AccountName;
+                                    worksheet.Cell(currentRow, 2).Value = line.Balance;
+                                    currentRow++;
+                                }
+                            }
+
+                            worksheet.Cell(currentRow, 1).Value = $"إجمالي {section.Name}";
+                            worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+                            worksheet.Cell(currentRow, 2).Value = section.Total;
+                            worksheet.Cell(currentRow, 2).Style.Font.Bold = true;
+                            currentRow++;
+                            currentRow++; // blank row between sections
+                        }
+
+                        worksheet.Cell(currentRow, 1).Value = $"إجمالي {sectionGroup.Name}";
+                        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+                        worksheet.Cell(currentRow, 1).Style.Font.FontSize = 12;
+                        worksheet.Cell(currentRow, 2).Value = sectionGroup.Total;
+                        worksheet.Cell(currentRow, 2).Style.Font.Bold = true;
+                        currentRow += 2;
+                    }
+
+                    // Summary
+                    worksheet.Cell(currentRow, 1).Value = "ملخص الميزانية";
+                    worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+                    worksheet.Cell(currentRow, 1).Style.Font.FontSize = 14;
+                    currentRow++;
+
+                    worksheet.Cell(currentRow, 1).Value = "إجمالي الأصول";
+                    worksheet.Cell(currentRow, 2).Value = TotalAssets;
+                    currentRow++;
+                    worksheet.Cell(currentRow, 1).Value = "إجمالي الخصوم";
+                    worksheet.Cell(currentRow, 2).Value = TotalLiabilities;
+                    currentRow++;
+                    worksheet.Cell(currentRow, 1).Value = "حقوق الملكية";
+                    worksheet.Cell(currentRow, 2).Value = TotalEquity;
+                    currentRow++;
+                    worksheet.Cell(currentRow, 1).Value = "الحالة";
+                    worksheet.Cell(currentRow, 2).Value = IsBalanced ? "متوازن" : "غير متوازن";
+
+                    worksheet.Columns().AdjustToContents();
+
+                    worksheet.Column(2).Style.NumberFormat.Format = "#,##0.00";
+
+                    workbook.SaveAs(saveFileDialog.FileName);
+                }
+
+                await D.ShowInfoAsync("نجاح", "تم تصدير الميزانية العمومية إلى Excel بنجاح");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تصدير الميزانية العمومية إلى Excel", "BalanceSheetViewModel.ExportToExcel", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        }
     }
 
     private async Task ExportPdfAsync()
     {
-        await D.ShowInfoAsync("تصدير PDF", "سيتم تفعيل تصدير PDF قريباً");
+        if (!HasData)
+        {
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
+            return;
+        }
+
+        try
+        {
+            var dataTable = new System.Data.DataTable();
+            dataTable.Columns.Add("القسم", typeof(string));
+            dataTable.Columns.Add("الحساب", typeof(string));
+            dataTable.Columns.Add("الرصيد", typeof(decimal));
+
+            foreach (var section in AssetSections)
+            {
+                if (section.Lines != null)
+                    foreach (var line in section.Lines)
+                        dataTable.Rows.Add("أصول", line.AccountName, line.Balance);
+            }
+            foreach (var section in LiabilitySections)
+            {
+                if (section.Lines != null)
+                    foreach (var line in section.Lines)
+                        dataTable.Rows.Add("خصوم", line.AccountName, line.Balance);
+            }
+            foreach (var section in EquitySections)
+            {
+                if (section.Lines != null)
+                    foreach (var line in section.Lines)
+                        dataTable.Rows.Add("حقوق ملكية", line.AccountName, line.Balance);
+            }
+
+            var exportService = App.GetService<IFinancialReportExportService>();
+            await exportService.ExportToPdfAsync("الميزانية العمومية", dataTable, TotalAssets,
+                $"BalanceSheet_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تصدير الميزانية العمومية إلى PDF", "BalanceSheetViewModel.ExportToPdf", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        }
     }
 
     #endregion

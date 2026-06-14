@@ -51,6 +51,8 @@
             <converters:StringListJoinConverter x:Key="StringListJoinConverter"/>
             <converters:SalesViewModeToVisibilityConverter x:Key="SalesViewModeToVisibilityConverter"/>
             <converters:ImagePathConverter x:Key="ImagePathConverter"/>
+            <converters:BytesToKbConverter x:Key="BytesToKbConverter"/>
+            <converters:ByteToIndexConverter x:Key="ByteToIndexConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

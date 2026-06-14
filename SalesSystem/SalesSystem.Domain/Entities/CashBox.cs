@@ -10,27 +10,23 @@ namespace SalesSystem.Domain.Entities;
 /// in the Chart of Accounts. This entity is a lightweight register identifier
 /// with metadata (category, contact info) for operational use.
 /// </summary>
-public class CashBox : BaseEntity
+public class CashBox : ActivatableEntity
 {
     public string BoxName { get; private set; } = string.Empty;
 
     /// <summary>
     /// FK to the Chart of Accounts Account that holds this cash box's balance.
-    /// Nullable to support migration of existing data — auto-created by service layer
-    /// when not provided. Domain validation requires a valid AccountId for new boxes.
+    /// If null at creation time, the service layer auto-creates a sub-account under "1110 — النقدية".
     /// </summary>
     public int? AccountId { get; private set; }
     public Account? Account { get; private set; }
 
-    /// <summary>
-    /// FK to Categories table for classifying the cash box type
-    /// (e.g., cashier, fund, bank, representative custody).
-    /// </summary>
-    public int? CategoryId { get; private set; }
-    public Category? Category { get; private set; }
+    public short? BranchId { get; private set; }
 
-    public int? BranchId { get; private set; }
-    public int? CurrencyId { get; private set; }
+    /// <summary>
+    /// FK to Currencies table (required). The currency this cash box operates in.
+    /// </summary>
+    public short CurrencyId { get; private set; }
     public Currency? Currency { get; private set; }
     public int? AssignedUserId { get; private set; } // NULL = shared box
     public string? PhoneNumber { get; private set; }
@@ -38,23 +34,19 @@ public class CashBox : BaseEntity
     public string? Address { get; private set; }
     public string? Notes { get; private set; }
 
-    // Navigation
-    private readonly List<CashTransaction> _transactions = new();
-    public IReadOnlyCollection<CashTransaction> Transactions => _transactions.AsReadOnly();
-
     private CashBox() { } // EF Core
 
     /// <summary>
-    /// Creates a new cash box. AccountId may be omitted — the service layer
-    /// auto-creates a Chart of Accounts sub-account under "1110 — النقدية".
+    /// Creates a new cash box with required CurrencyId.
+    /// AccountId can be null — the service layer auto-creates a
+    /// Chart of Accounts sub-account under "1110 — النقدية" and calls SetAccountId.
     /// </summary>
     public static CashBox Create(
         string boxName,
+        short currencyId,
         int? accountId = null,
-        int? categoryId = null,
-        int? branchId = null,
+        short? branchId = null,
         int? assignedUserId = null,
-        int? currencyId = null,
         string? phoneNumber = null,
         string? taxNumber = null,
         string? address = null,
@@ -63,13 +55,13 @@ public class CashBox : BaseEntity
         if (string.IsNullOrWhiteSpace(boxName))
             throw new DomainException("اسم الصندوق مطلوب");
 
-        // AccountId is validated at the service layer — auto-created if null
+        if (currencyId <= 0)
+            throw new DomainException("عملة الصندوق مطلوبة");
 
         return new CashBox
         {
             BoxName = boxName.Trim(),
             AccountId = accountId,
-            CategoryId = categoryId,
             BranchId = branchId,
             AssignedUserId = assignedUserId,
             CurrencyId = currencyId,
@@ -77,11 +69,26 @@ public class CashBox : BaseEntity
             TaxNumber = taxNumber?.Trim(),
             Address = address?.Trim(),
             Notes = notes?.Trim(),
-            IsActive = true
         };
     }
 
     // ─── Domain Methods ───────────────────────────
+
+    /// <summary>
+    /// Sets the Chart of Accounts AccountId for this cash box.
+    /// Called by the service layer after auto-creating a sub-account under "1110 — النقدية".
+    /// Only allowed when the current AccountId is null (not yet set).
+    /// </summary>
+    public void SetAccountId(int accountId)
+    {
+        if (accountId <= 0)
+            throw new DomainException("معرف الحساب غير صالح");
+        if (AccountId.HasValue)
+            throw new DomainException("لا يمكن تغيير الحساب المحاسبي للصندوق بعد تعيينه");
+
+        AccountId = accountId;
+        UpdateTimestamp();
+    }
 
     /// <summary>
     /// Validates that a user can access this box.
@@ -116,10 +123,9 @@ public class CashBox : BaseEntity
         string? taxNumber,
         string? address,
         string? notes,
-        int? categoryId,
-        int? branchId,
+        short? branchId,
         int? assignedUserId,
-        int? currencyId)
+        short currencyId)
     {
         if (boxName != null)
         {
@@ -140,17 +146,15 @@ public class CashBox : BaseEntity
         if (notes != null)
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
 
-        if (categoryId.HasValue)
-            CategoryId = categoryId.Value > 0 ? categoryId : null;
-
         if (branchId.HasValue)
             BranchId = branchId.Value > 0 ? branchId : null;
 
         if (assignedUserId.HasValue)
             AssignedUserId = assignedUserId.Value > 0 ? assignedUserId : null;
 
-        if (currencyId.HasValue)
-            CurrencyId = currencyId.Value > 0 ? currencyId : null;
+        if (currencyId <= 0)
+            throw new DomainException("عملة الصندوق مطلوبة");
+        CurrencyId = currencyId;
 
         UpdateTimestamp();
     }

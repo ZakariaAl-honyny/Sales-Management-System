@@ -101,19 +101,48 @@ public class PrintDataService : IPrintDataService
         return (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate);
     }
 
-    public async Task<Result<StoreSettings>> GetStoreSettingsAsync(CancellationToken ct = default)
+    public async Task<Result<StoreSettingsDto>> GetStoreSettingsAsync(CancellationToken ct = default)
     {
         try
         {
-            var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
-            if (settings == null)
-                return Result<StoreSettings>.Failure("إعدادات المتجر غير موجودة");
-            return Result<StoreSettings>.Success(settings);
+            var storeName = await _systemSettingsRepo.GetStringAsync("Store.Name", "متجري", ct);
+            var phone = await _systemSettingsRepo.GetStringAsync("Store.Phone", "", ct);
+            var address = await _systemSettingsRepo.GetStringAsync("Store.Address", "", ct);
+            var logoPath = await _systemSettingsRepo.GetStringAsync("Store.LogoPath", "", ct);
+            var email = await _systemSettingsRepo.GetStringAsync("Store.Email", "", ct);
+            var currencyCode = await _systemSettingsRepo.GetStringAsync("Store.CurrencyCode", "SAR", ct);
+            var taxNumber = await _systemSettingsRepo.GetStringAsync("Store.TaxNumber", "", ct);
+            _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync("Store.EnableStockAlerts", "false", ct), out var enableStockAlerts);
+            _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync("Store.AllowNegativeStock", "false", ct), out var allowNegativeStock);
+            _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync("Store.AutoUpdatePrices", "false", ct), out var autoUpdatePrices);
+            var signaturePath = await _systemSettingsRepo.GetStringAsync("Store.SignaturePath", "", ct);
+            var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
+
+            var dto = new StoreSettingsDto(
+                1,
+                storeName ?? "متجري",
+                phone,
+                address,
+                logoPath,
+                email,
+                currencyCode ?? "SAR",
+                0m,         // DEPRECATED: DefaultTaxRate
+                true,       // DEPRECATED: IsTaxEnabled
+                taxNumber,
+                enableStockAlerts,
+                allowNegativeStock,
+                autoUpdatePrices,
+                "",         // DEPRECATED: InvoicePrefix
+                (int)costingMethod,
+                null, null, 30, null,
+                signaturePath);
+
+            return Result<StoreSettingsDto>.Success(dto);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading store settings");
-            return Result<StoreSettings>.Failure("فشل في تحميل إعدادات المتجر");
+            return Result<StoreSettingsDto>.Failure("فشل في تحميل إعدادات المتجر");
         }
     }
 

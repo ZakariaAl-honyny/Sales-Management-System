@@ -7,17 +7,269 @@
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
-    <Grid Margin="12">
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-            <TextBlock Text="استيراد الأصناف من Excel" 
-                       FontSize="16" FontWeight="Bold" 
-                       HorizontalAlignment="Center"
-                       Foreground="{StaticResource TextPrimaryBrush}"/>
-            <TextBlock Text="قيد التطوير — سيتم تفعيل هذه الشاشة قريباً" 
-                       FontSize="12" 
-                       HorizontalAlignment="Center"
-                       Margin="0,8,0,0"
-                       Foreground="{StaticResource TextSecondaryBrush}"/>
-        </StackPanel>
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6" CornerRadius="4">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="📥" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <TextBlock Text="استيراد الأصناف من Excel" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Action Bar: File Selection + Download Template -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,8,0,0" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Select File -->
+                <Button Grid.Column="0" Command="{Binding SelectFileCommand}" 
+                        Style="{StaticResource PrimaryButton}" MinWidth="110"
+                        ToolTip="اختيار ملف Excel (.xlsx) لاستيراد المنتجات منه">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📂" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="اختيار ملف" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- File path display -->
+                <TextBlock Grid.Column="1" Text="{Binding SelectedFileName}" 
+                           VerticalAlignment="Center" Margin="8,0"
+                           FontSize="12" Foreground="{StaticResource TextPrimaryBrush}"
+                           ToolTip="{Binding SelectedFilePath}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="لم يتم اختيار ملف بعد"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSelectedFile}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Download Template -->
+                <Button Grid.Column="3" Command="{Binding DownloadTemplateCommand}"
+                        Style="{StaticResource SecondaryButton}" MinWidth="110"
+                        ToolTip="تنزيل قالب Excel يحتوي على الأعمدة المطلوبة للاستيراد مع شرح لكل عمود">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📄" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="تنزيل قالب" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Preview DataGrid -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Margin="0,8,0,0" Padding="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Preview header -->
+                <Border Grid.Row="0" Background="{StaticResource MutedLightBrush}" Padding="8,4">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="معاينة البيانات" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding TotalParsedRows, StringFormat='عدد الصفوف: {0}'}"
+                                   HorizontalAlignment="Left" Margin="16,0,0,0"
+                                   FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPreviewMode}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+
+                <!-- DataGrid -->
+                <DataGrid Grid.Row="1" ItemsSource="{Binding ImportRows}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          Style="{StaticResource ModernDataGrid}"
+                          BorderThickness="0"
+                          RowHeaderWidth="0"
+                          ToolTip="عرض البيانات المستخرجة من ملف Excel قبل الاستيراد">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="اسم المنتج" Binding="{Binding ProductName}" Width="*" MinWidth="120"/>
+                        <DataGridTextColumn Header="الفئة" Binding="{Binding CategoryName}" Width="100"/>
+                        <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="120"/>
+                        <DataGridTextColumn Header="الوحدة الأساسية" Binding="{Binding BaseUnitId}" Width="100"/>
+                        <DataGridTextColumn Header="حد المخزون" Binding="{Binding MinStockLevel, StringFormat=N3}" Width="90"/>
+                        <DataGridTextColumn Header="الوصف" Binding="{Binding Description}" Width="150"/>
+                    </DataGrid.Columns>
+
+                </DataGrid>
+
+                <!-- Empty state when no file selected -->
+                <Border Grid.Row="1" Background="#FFF8F9FA"
+                        Visibility="{Binding HasSelectedFile, Converter={StaticResource InverseBoolToVisibility}}">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="📂" FontSize="48" HorizontalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="اختر ملف Excel لبدء استيراد المنتجات" FontSize="14"
+                                   HorizontalAlignment="Center" Margin="0,12,0,0"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="يدعم الملفات ذات الامتداد .xlsx" FontSize="11"
+                                   HorizontalAlignment="Center" Margin="0,4,0,0"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Bottom Action Bar -->
+        <Border Grid.Row="3" Style="{StaticResource CardStyle}" Margin="0,8,0,0" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Preview Button -->
+                <Button Grid.Column="0" Command="{Binding PreviewCommand}"
+                        Style="{StaticResource SecondaryButton}" MinWidth="100"
+                        ToolTip="معاينة البيانات المستخرجة من ملف Excel والتحقق من صحتها عبر الخادم">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="👁️" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="معاينة" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Execute Import Button (visible after preview) -->
+                <Button Grid.Column="1" Command="{Binding ExecuteImportCommand}"
+                        Style="{StaticResource SuccessButton}" MinWidth="120" Margin="8,0,0,0"
+                        ToolTip="تنفيذ استيراد المنتجات المعروضة في الجدول — سيتم إضافة المنتجات إلى النظام"
+                        Visibility="{Binding ShowActions, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📥" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="استيراد" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Reset Button (visible after preview) -->
+                <Button Grid.Column="3" Command="{Binding ResetCommand}"
+                        Style="{StaticResource DangerButton}" MinWidth="100"
+                        ToolTip="إعادة تعيين — مسح البيانات المحددة والبدء من جديد"
+                        Visibility="{Binding IsPreviewMode, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔄" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="إعادة تعيين" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Results Summary + Error List -->
+        <Border Grid.Row="4" Style="{StaticResource CardStyle}" Margin="0,8,0,0" Padding="8,6"
+                Visibility="{Binding HasImportResult, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <!-- Summary -->
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource SuccessLightBrush}" 
+                            CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="✓" FontWeight="Bold" Foreground="{StaticResource SuccessTextBrush}" Margin="0,0,4,0"/>
+                            <TextBlock Text="{Binding ImportResult.SuccessCount, StringFormat='ناجح: {0}'}" 
+                                       Foreground="{StaticResource SuccessTextBrush}" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Background="{StaticResource ErrorLightBrush}" 
+                            CornerRadius="4" Padding="8,4" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="✗" FontWeight="Bold" Foreground="{StaticResource ErrorTextBrush}" Margin="0,0,4,0"/>
+                            <TextBlock Text="{Binding ImportResult.FailureCount, StringFormat='فاشل: {0}'}" 
+                                       Foreground="{StaticResource ErrorTextBrush}" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Grid.Column="2" Text="{Binding ImportResult.TotalRows, StringFormat='الإجمالي: {0}'}" 
+                               VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
+                </Grid>
+
+                <!-- Error List -->
+                <Expander Header="تفاصيل الأخطاء" 
+                          IsExpanded="True"
+                          Visibility="{Binding HasImportErrorDetails, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl ItemsSource="{Binding ImportErrors}" Margin="0,4,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource ErrorLightBrush}" 
+                                        CornerRadius="2" Padding="6,3" Margin="0,1,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding RowNumber, StringFormat='#{0}'}" 
+                                                   FontWeight="SemiBold" Foreground="{StaticResource ErrorTextBrush}" FontSize="11"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding ProductName}" 
+                                                   Foreground="{StaticResource ErrorTextBrush}" FontSize="11" Margin="4,0"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding ErrorMessage}" 
+                                                   Foreground="{StaticResource ErrorTextBrush}" FontSize="11" TextWrapping="Wrap"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
+
+                <!-- General Error Message -->
+                <TextBlock Text="{Binding ErrorMessage}" 
+                           Foreground="{StaticResource ErrorBrush}" 
+                           FontSize="12" FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center"
+                           Margin="0,4,0,0"
+                           Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="5"
+                Background="#80FFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4" 
+                             Background="#E3E8EE" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="جاري معالجة البيانات..." FontSize="14" 
+                           Margin="0,12,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

@@ -17,6 +17,7 @@ public interface IAccountingIntegrationService
     Task<Result<int>> CreateCustomerOpeningEntryAsync(
         int customerId,
         string customerName,
+        int customerAccountId,
         decimal openingBalance,
         int createdByUserId,
         DateTime transactionDate,
@@ -29,7 +30,20 @@ public interface IAccountingIntegrationService
     Task<Result<int>> CreateSupplierOpeningEntryAsync(
         int supplierId,
         string supplierName,
+        int supplierAccountId,
         decimal openingBalance,
+        int createdByUserId,
+        DateTime transactionDate,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates opening balance journal entry for product (inventory opening stock).
+    /// Dr InventoryAssetAccount / Cr OpeningBalanceEquityAccount.
+    /// </summary>
+    Task<Result<int>> CreateProductOpeningEntryAsync(
+        int productId,
+        string productName,
+        decimal totalOpeningValue,
         int createdByUserId,
         DateTime transactionDate,
         CancellationToken ct = default);
@@ -71,16 +85,6 @@ public interface IAccountingIntegrationService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Creates journal entry for a customer payment (receipt).
-    /// Dr Cash / Cr AccountsReceivable.
-    /// </summary>
-    Task<Result<int>> CreateCustomerPaymentEntryAsync(
-        CustomerPayment payment,
-        string customerName,
-        int createdByUserId,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// Creates journal entry for a supplier payment.
     /// Dr AccountsPayable / Cr Cash.
     /// </summary>
@@ -91,17 +95,6 @@ public interface IAccountingIntegrationService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Reverses a customer payment journal entry.
-    /// Dr AccountsReceivable / Cr Cash.
-    /// </summary>
-    Task<Result<int>> ReverseCustomerPaymentEntryAsync(
-        int paymentId,
-        decimal amount,
-        string customerName,
-        int reversedByUserId,
-        CancellationToken ct = default);
-
-    /// <summary>
     /// Reverses a supplier payment journal entry.
     /// Dr Cash / Cr AccountsPayable.
     /// </summary>
@@ -109,6 +102,7 @@ public interface IAccountingIntegrationService
         int paymentId,
         decimal amount,
         string supplierName,
+        int supplierAccountId,
         int reversedByUserId,
         CancellationToken ct = default);
 }

@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-<img src="https://img.shields.io/badge/Status-v4.9%2B%20Complete%20(Phases%2018-24)-2ECC71?style=for-the-badge" 
+  <img src="https://img.shields.io/badge/Status-v4.10%2B%20Complete%20(Phases%2018-25)%20—%20Phases%2026-32%20Planned-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.9%2B%20%7C%20Phases%2025-31%20Planned-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.10%2B%20%7C%20Phases%2026-32%20Planned-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -57,10 +57,14 @@ The API-first architecture is designed to support **future web and mobile client
 - 📦 **Multi-warehouse & Low Stock AI** — Track inventory across branches with auto-calculated reorder suggestions
   - `ReorderLevel` on each product
   - Smart low-stock reporting (e.g., "1 box + 3 pieces")
-- 📒 **Accounting Foundation (Phases 18-31)**: Chart of Accounts (60 accounts), Journal Entries, Fiscal Years, Annual Closing
+- 📒 **Accounting Foundation (Phases 18-25)**: Chart of Accounts (60 accounts), Journal Entries, Fiscal Years, Annual Closing, Per-Entity Account Routing, Purchase Returns Account (1632), Single Revenue Account (1520)
 - 💱 **Multi-Currency (Phase 20)**: YER/USD/SAR support with exchange rates, FractionName, IsSystem guard
+- 📒 **Accounting Integration Remediations (Phase 18 v4.10)**: Per-entity account routing for all customer/supplier transactions, Purchase Returns account (1632) for accurate financial reporting, consolidated single Sales Revenue account (1520)
 - 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Accountant/Cashier/Observer), 33 permission codes, MustChangePassword, lockout
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
+- 🎯 **Touch POS (Phase 15)**: Dual-mode toggle (Cart/QuickSale) with tile grid, category filtering, numeric keypad, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search
+- 📋 **Critical Business Rules (Phase 16)**: Standardized transaction protocol (ExecuteTransactionAsync replacing BeginTransactionAsync), 15 transaction scenarios covering the full invoice lifecycle, FIFO/COGS on sale, cancellation reversal protocol, payment lifecycle (create/update/delete with JE reversal), stock integrity rules, buyer/supplier balance protocol
+- 🧭 **Sidebar Navigation (Phase 17)**: Multi-level nested Expanders (L1→L2→L3+), SidebarNestedExpanderStyle, permission-aware visibility, zero code-behind routing via MainViewModel.NavigateTo&lt;T&gt;()
 - 🧾 **Tax Module (Phase 19)** — Full tax management with `Tax` entity (name, rate, type percentage/fixed, `IsDefault`)
   - `ITaxService` with CRUD operations, `TaxesController` API endpoints
   - WPF Desktop UI: `TaxesListView` + `TaxEditorView` with `INotifyDataErrorInfo` validation
@@ -379,6 +383,72 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - Visual red borders on invalid fields
 - Arabic error messages: "الاسم مطلوب", "الكمية يجب أن تكون أكبر من صفر"
 
+### 📦 Products Module — Phase 25 (Planned)
+- **Multi-Currency Pricing per ProductUnit** — `ProductPrices` table with `CurrencyId` FK, `Price decimal(18,2)`, `EffectiveFrom`/`EffectiveTo` datetime2 ranges — pricing is per (ProductUnit + Currency), NOT per Product
+- **FIFO/FEFO Batch Tracking** — `InventoryBatches` entity: `ProductId`, `WarehouseId`, `BatchNo`, `ExpiryDate` (nullable), `QuantityReceived`, `QuantityRemaining`, `UnitCost`, `PurchaseInvoiceId` — enables FIFO/FEFO cost allocation
+- **PriceLevel Enum** — 4 levels: Retail=1, Wholesale=2, VIP=3, Distributor=4 — supports tiered pricing per ProductUnit + Currency
+- **BillOfMaterials** — Assemblies/manufacturing support with component breakdown and BOM cost calculation
+- **ProductImages** — Multiple images per product via `ProductImages` table (`ProductId` FK, `ImagePath`, `IsPrimary`) — NOT stored on Product entity
+- **Opening Stock on Creation** — Optional `OpeningQuantity`, `OpeningUnitCost`, `ExpiryDate` per warehouse on product creation — creates initial `InventoryBatch` + `WarehouseStock` entry
+- **Default Purchase/Sales Units** — `DefaultPurchaseUnitId` and `DefaultSalesUnitId` on Product entity for faster data entry in purchase/sales screens
+- **Cost Cascade** — Unit cost recalculates for all product units from base unit cost × `Factor` when purchase cost updates
+
+### 🏭 Warehouses Module — Phase 26 (Planned)
+- **Warehouse Type** — `WarehouseType` enum: Main=1, Store=2, Showroom=3 — classify warehouses by function
+- **Manager Tracking** — `ManagerName` (nullable string) on Warehouse entity for responsible person
+- **AccountId FK** — Optional FK to Chart of Accounts `Account` — enables warehouse-level inventory accounting
+- **Metadata Fields** — `Address` (nullable string), `Phone` (nullable string) for warehouse contact info
+- **StockAdjustmentType** — Enum: Addition=1, Deduction=2, Correction=3 — for inventory adjustment operations
+- **StockIssueReason** — Enum: SalesReturn=1, Damage=2, Expiry=3, InternalUse=4, Other=5 — reasons for stock issues
+- **WarehouseTransfer / WarehouseTransferLine** — Replace `StockTransfer`/`StockTransferItem` with multi-item transfers, full audit trail, ProductUnitId + BatchNo per line
+- **InventoryTransaction / InventoryTransactionLine** — Replace `InventoryMovement` with ReferenceType/ReferenceId, ProductUnitId, UnitCost, BatchNo tracking
+- **Perpetual Inventory** — ALL inventory costs go directly to Inventory Asset account (NO Purchases account used)
+- **Physical Count** deferred to V2
+
+### 🛒 Purchases Module — Phase 27 (Planned)
+- **Multi-Currency Support** — `CurrencyId` FK + `ExchangeRate decimal(18,2)` on PurchaseInvoice — record exchange rate per transaction
+- **Landed Cost Distribution** — `AdditionalCharge` entity (`PurchaseInvoiceId` FK, `Description`, `Amount`, `AccountId` FK) — distributes transport, customs, handling costs across invoice items for true inventory valuation
+- **Purchase Orders** — Separate `PurchaseOrder` entity with its own document sequence, partial receipt via PurchaseInvoice, `POStatus` enum (Draft/Approved/Received/Cancelled)
+- **Standalone Returns** — Purchase returns NOT linked to original invoice — supports returning items purchased outside the system
+- **PurchaseCost Distribution** — `AllocateAdditionalCharges()` service distributes AdditionalCharge amounts across invoice items by quantity or value weighting
+- **Attachments** — Single `AttachmentPath` on PurchaseInvoice for document/image uploads
+
+### 💳 Sales Module — Phase 28 (Planned)
+- **Multi-Currency Invoicing** — `CurrencyId` + `ExchangeRate` on SalesInvoice with profit display per line (SalePrice - AverageCost)
+- **Price Override** — Line-level price override with permission check (ManagerAndAbove policy)
+- **Sales Quotations** — `SalesQuotation` entity with `ExpiryDate`, `QuotationStatus` enum (Draft/Confirmed/Expired/Converted), convertible to SalesInvoice
+- **Continuous Barcode POS Mode** — Keyboard wedge scanner support — auto-adds product by barcode without manual focus/button click
+- **Credit Limit Check** — `Customer.CheckCreditLimit(additionalAmount)` returns bool — checked before posting credit sale
+- **Automatic Refund on Return** — Sales return generates `CashTransaction` with `RefundOut` type + reverse journal entry for the return amount
+
+### 💰 Receipts & Payments — Phase 29 (Planned)
+- **Multi-Invoice Payment Distribution** — One payment settles multiple invoices via `PaymentAllocation` entity (`PaymentId`, `InvoiceId`, `InvoiceType`, `AllocatedAmount`)
+- **Cheque Management** — `Cheque` entity: `ChequeNumber`, `BankName`, `IssueDate`, `MaturityDate`, `Status` (Pending=1/Cleared=2/Bounced=3/Cancelled=4), Amount, `PaymentId` FK
+- **Payment Methods** — Cash, Bank, Cheque — selectable per payment transaction
+- **CashBox.AccountId FK** — CashBox links to Chart of Accounts Account — cash transactions create automatic journal entries
+- **DailyClosure** — Computes `ActualCashCount`, `ExpectedBalance`, `Difference` (actual - expected), `DifferenceReconciled` flag
+
+### 📒 Journal Entries — Phase 30 (Planned)
+- **3-State Lifecycle** — Draft (1) → Posted (2) → Cancelled (3) — identical to invoice lifecycle
+- **Multi-Currency Support** — `CurrencyId` FK, `ExchangeRate decimal(18,2)` — display both original and base currency amounts per line
+- **Attachments** — `AttachmentPath` (single) on JournalEntry for supporting documents
+- **FiscalYear Entity** — `Year` int, `StartDate`, `EndDate`, `IsOpen` bool, `OpenedAt`, `ClosedAt`, `ClosedByUserId` FK
+- **Annual Closing** — Automatic transfer of revenue/expense balances to RetainedEarnings, lock fiscal year, opening entry for new year
+
+### 📊 Reports — Phase 31 (Planned)
+- **35+ Report DTOs** across 7 categories: Financial (6), Inventory (5), Sales (6), Purchases (4), Cash/Box (4), Transactions (5), Users (5)
+- **Hierarchical Income Statement** — Revenue - COGS = GrossProfit - OperatingExpenses = NetIncome with subtotals at each level
+- **Hierarchical Balance Sheet** — Assets = Liabilities + Equity with section subtotals
+- **Excel Export** — ALL report DTOs support ClosedXML `ToDataTable()` for worksheet generation
+- **Report Column Customization** — Hide/show/reorder columns per report type, saved per user
+
+### 👥 Suppliers Module — Phase 32 (Planned)
+- **AccountId MANDATORY** — Supplier entity has non-nullable `AccountId` FK to Account (auto-created under 2100 parent — حسابات الموردين)
+- **No SupplierType in V1** — Deferred to V2. Payment terms stored on PurchaseInvoice (per-invoice), not on Supplier entity
+- **Party Entity** — Shared contact data base class for Customer/Supplier unification
+- **Opening Balance via Journal Entry** — No `OpeningBalance`/`CurrentBalance` on Supplier entity — source of truth is the linked GL Account
+- **Phone Validation** — Regex `^05\d{8}$` with Arabic error message — `.EmailAddress()` for email
+
 ### 🚫 Out of Scope (Future Phases)
 
 The following features are **not included** in the current MVP but are planned for future development:
@@ -423,7 +493,7 @@ The following features are **not included** in the current MVP but are planned f
 
 ## 📐 Database Schema
 
-**30+ tables** covering the full retail domain:
+**65+ tables** covering the full retail + accounting domain:
 
 | Category | Tables |
 |----------|--------|
@@ -480,7 +550,7 @@ The following features are **not included** in the current MVP but are planned f
 | [`AGENTS.md`](AGENTS.md) | Master rules for AI-assisted development |
 | [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) | Non-negotiable architectural rules |
 | [`docs/PRD-MVP.md`](docs/PRD-MVP.md) | Full product requirements document |
-| [`docs/database-schema.md`](docs/database-schema.md) | SQL Server schema (30+ tables) |
+| [`docs/database-schema.md`](docs/database-schema.md) | SQL Server schema (65+ tables) |
 | [`docs/ui-screens.md`](docs/ui-screens.md) | UI/UX flows and EventBus patterns |
 
 ---
@@ -544,7 +614,10 @@ dotnet run
 | **v4.5.1a** | **Logging Separation & API Error Fixes** — Logging policy (Error vs Warning), `HandleResponseAsync` content-type guard, print test log level fix | ✅ **Complete** |
 | **Phase 13** | **Interactive Validation** — Remove CanExecute blocking, on-click warning dialogs, field ToolTips, required `*` markers, unique field explanations | ✅ **Completed** |
 | **Phase 14** | **Audit & Polish** — LogSystemError centralized, Dialog overlay + hover, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes | ✅ **Completed** |
-| **Phase 16** | **Audit & Service Layer Purity** — Result pattern enforcement, decimal precision fix, FK Restrict, Controller purity, FluentValidators, CostingMethod UI, Price Sync Indicators | ✅ **Completed** |
+| **Phase 15** | **Touch POS** — Dual-mode toggle (Cart/QuickSale), tile grid with category filtering, numeric keypad for quantity/price, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search | ✅ **Completed** |
+| **Phase 16** | **Critical Business Rules** — Standardized transaction protocol (ExecuteTransactionAsync), 15 transaction scenarios covering invoice lifecycle, FIFO/COGS on sale, cancellation reversal, payment lifecycle with JE reversal, stock integrity, buyer/supplier balance protocol | ✅ **Completed** |
+| **Phase 17** | **Sidebar Navigation** — Multi-level nested Expanders (L1→L2→L3+), SidebarNestedExpanderStyle, permission-aware visibility, zero code-behind routing via MainViewModel.NavigateTo&lt;T&gt;() | ✅ **Completed** |
+| **v4.6** | **Service Layer Purity & Code Audit** — Result pattern enforcement, decimal precision fix, FK Restrict, Controller purity, FluentValidators, CostingMethod UI, Price Sync Indicators | ✅ **Completed** |
 | **v4.6.1** | **UI Sorting & Dialog Safety** — Newest-first sorting across 14 ViewModels, DatabaseErrorDialog self-owner fix, comprehensive system audit | ✅ **Completed** |
 | **v4.6.2** | **WPF Validation ErrorTemplate** — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated | ✅ **Completed** |
 | **v4.6.3** | **Architecture Alignment & Code Quality Audit** — Settings ViewModels/Views relocation, DI registration, MessageBox removal, async void refactoring, shadowing resolved | ✅ **Completed** |
@@ -564,6 +637,7 @@ dotnet run
 | Phase 29 | **Receipts & Payments Module** — Multi-invoice payment distribution, Cheque management (Pending/Cleared/Bounced), PaymentAllocation entity, CashBox.AccountId FK, DailyClosure with ActualCashCount | 📝 Planned |
 | Phase 30 | **Journal Entries Module** — 3-state lifecycle (Draft/Posted/Cancelled), multi-currency support, attachments, FiscalYear entity, Annual Closing (revenue/expense → RetainedEarnings) | 📝 Planned |
 | Phase 31 | **Reports Module** — 35+ DTOs across 7 categories (Financial, Inventory, Sales, Purchases, Cash/Box, Transactions, Users), Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML | 📝 Planned |
+| Phase 32 | **Suppliers Module** — AccountId MANDATORY auto-created under 2100 parent, No SupplierType in V1, Party entity for shared contact data, phone validation regex `^05\d{8}$` | 📝 Planned |
 
 ### Printing Engine — Phase 7 Breakdown
 
@@ -1006,19 +1080,20 @@ dotnet run
 
 ---
 
-## 📋 What's Coming — Phases 25-31
+## 📋 What's Coming — Phases 25-32
 
 The following modules are planned for future development based on the comprehensive analysis in `docs/all new Anylysis for update system features/`:
 
 | Phase | Module | Key Features | Status |
 |-------|--------|-------------|--------|
-| **25** | **Products Module** | Multi-currency pricing, FIFO batches, BOM, images, PriceLevel enum (4 levels), opening stock on creation | 📝 Planned |
-| **26** | **Warehouses Module** | Warehouse types, AccountId FK, stock adjustments, issue reasons, physical count V2 | 📝 Planned |
-| **27** | **Purchases Module** | Multi-currency, landed cost distribution, Purchase Orders, standalone returns, attachments | 📝 Planned |
-| **28** | **Sales Module** | Multi-currency, profit display, quotations, barcode POS, credit limit enforcement | 📝 Planned |
-| **29** | **Receipts & Payments** | Multi-invoice distribution, cheques, PaymentAllocation, CashBox.AccountId, DailyClosure | 📝 Planned |
-| **30** | **Journal Entries** | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing | 📝 Planned |
-| **31** | **Reports** | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export | 📝 Planned |
+| **25** | **Products Module** | Multi-currency pricing (ProductPrices table with CurrencyId + effective dates), FIFO/FEFO batch tracking (InventoryBatches), PriceLevel enum (4 levels: Retail/Wholesale/VIP/Distributor), BillOfMaterials for assemblies, ProductImages (multiple per product), opening stock per warehouse on creation, DefaultPurchaseUnitId/DefaultSalesUnitId on Product | 📝 Planned |
+| **26** | **Warehouses Module** | Warehouse Type (Main/Store/Showroom), ManagerName, AccountId FK, Address, Phone, StockAdjustmentType (Addition/Deduction/Correction), StockIssueReason (Damage/Expiry/InternalUse), physical count deferred to V2 | 📝 Planned |
+| **27** | **Purchases Module** | Multi-currency (CurrencyId + ExchangeRate), landed cost distribution (AdditionalCharge entity), Purchase Orders (Draft/Approved/Received/Cancelled), standalone returns, PurchaseCost distribution via AllocateAdditionalCharges service | 📝 Planned |
+| **28** | **Sales Module** | Multi-currency with profit display per line, Sales Quotations (with expiry, convertible to invoice), continuous barcode scanning POS mode, credit limit check on post, automatic refund on sales return | 📝 Planned |
+| **29** | **Receipts & Payments** | Multi-invoice payment distribution (PaymentAllocation), Cheque management (Pending/Cleared/Bounced/Cancelled), Cash/Bank/Cheque payment methods, DailyClosure with ActualCashCount reconciliation | 📝 Planned |
+| **30** | **Journal Entries** | 3-state lifecycle (Draft→Posted→Cancelled), multi-currency (CurrencyId + ExchangeRate), attachments support, FiscalYear entity with open/close lifecycle, Annual Closing automation | 📝 Planned |
+| **31** | **Reports** | 35+ report DTOs across 7 categories (Financial, Inventory, Sales, Purchases, Cash/Box, Transactions, Users), Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML for ALL reports, report column customization (hide/show/reorder) | 📝 Planned |
+| **32** | **Suppliers Module** | AccountId MANDATORY auto-created under 2100 parent, No SupplierType in V1, Party entity for shared contact data, phone validation regex `^05\d{8}$` | 📝 Planned |
 
 ### Analysis-Driven Design Decisions
 
@@ -1318,7 +1393,7 @@ Phase 21 added RULE-305 through RULE-320 covering:
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 370 non-negotiable rules (RULE-001 to RULE-370)
+1. Read [`AGENTS.md`](AGENTS.md) — all 460+ non-negotiable rules (RULE-001 to RULE-463+)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 

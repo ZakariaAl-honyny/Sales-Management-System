@@ -31,18 +31,6 @@ public class CustomersController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
-    [HttpGet("groups")]
-    [Authorize(Policy = "AllStaff")]
-    [ProducesResponseType(typeof(List<CustomerGroupDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<List<CustomerGroupDto>>> GetAllGroups(CancellationToken ct)
-    {
-        var result = await _customerService.GetAllGroupsAsync(ct);
-        if (result.IsSuccess)
-            return Ok(result.Value);
-        return BadRequest(new { error = result.Error });
-    }
-
     [HttpGet("{id:int}")]
     [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status200OK)]
@@ -140,15 +128,6 @@ public class CustomersController : ControllerBase
         return result.ErrorCode == ErrorCodes.NotFound
             ? NotFound(new { error = result.Error })
             : BadRequest(new { error = result.Error });
-    }
-
-    [HttpGet("by-group/{groupId:int:min(1)}")]
-    [Authorize(Policy = "AllStaff")]
-    public async Task<IActionResult> GetByGroup(int groupId, CancellationToken ct)
-    {
-        var result = await _customerService.GetByGroupAsync(groupId, ct);
-        if (result.IsSuccess) return Ok(result.Value);
-        return BadRequest(new { error = result.Error });
     }
 
     [HttpGet("reports/balance")]

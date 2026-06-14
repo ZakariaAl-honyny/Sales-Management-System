@@ -10,10 +10,7 @@ public class AddProductUnitRequestValidator : AbstractValidator<AddProductUnitRe
         RuleFor(x => x.UnitId)
             .GreaterThan(0).WithMessage("يجب اختيار وحدة قياس صحيحة");
 
-        RuleFor(x => x.ConversionFactor)
+        RuleFor(x => x.Factor)
             .GreaterThan(0).WithMessage("معامل التحويل يجب أن يكون أكبر من صفر");
-
-        RuleFor(x => x.IsBaseUnit)
-            .NotNull().WithMessage("يرجى تحديد ما إذا كانت هذه هي الوحدة الأساسية");
     }
 }

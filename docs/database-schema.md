@@ -1,1251 +1,1135 @@
 # Database Schema Design
-# Sales Management System — v4.6.7 (InvoiceNo Int Re-addition)
+# Sales Management System — V1 Final (Module-by-Module Organization)
 # Platform: SQL Server 2019+
-# 30+ Tables | decimal-only financials | nvarchar text | Soft delete
-# Platform: SQL Server 2019+
-# 30+ Tables | decimal-only financials | nvarchar text | Soft delete
+# 64 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
 
 ---
 
 # 1) Important Design Rules Before Tables
-These rules will save you many problems later:
 
 ## Data Types
-- **Primary Keys**: `int IDENTITY(1,1)` — Named `Id` in all entities (BaseEntity pattern).
+- **Primary Keys**: `int IDENTITY(1,1)` — Named `Id` in all entities. High-volume audit tables use `bigint`. Small lookup tables use `smallint`.
 - **Texts**: `nvarchar` (to support Arabic/English).
+- **Barcodes**: `varchar(50)` — barcodes are ASCII-only.
 - **Currency/Money**: `decimal(18,2)` — Precision 18, Scale 2.
 - **Quantities**: `decimal(18,3)` — Precision 18, Scale 3.
+- **Percentages**: `decimal(5,2)` — Precision 5, Scale 2.
 - **Status and Types**: `tinyint` (for Enums).
 - **Flags**: `bit` (0/1).
-- **Dates and Times**: `datetime2`.
-- **Audit Tracking**: Standardized across all entities:
-    - `CreatedAt` datetime2
-    - `CreatedByUserId` int null (FK to Users.Id)
-    - `UpdatedAt` datetime2 null
-    - `UpdatedByUserId` int null (FK to Users.Id)
-    - `IsActive` bit (Soft delete flag)
+- **Dates**: `date` for document dates, `datetime2` for timestamps.
+
+## Base Inheritance Hierarchy
+
+Five base classes control column inheritance:
+
+| Class | Id | CreatedAt | CreatedByUserId | UpdatedAt | UpdatedByUserId | IsActive | Status |
+|-------|----|-----------|-----------------|-----------|-----------------|----------|--------|
+| **Entity** | int PK | — | — | — | — | — | — |
+| **AuditableEntity** | int PK | datetime2 | int null | datetime2 null | int null | — | — |
+| **ActivatableEntity** | int PK | datetime2 | int null | datetime2 null | int null | bit default 1 | — |
+| **DocumentEntity** | int PK | datetime2 | int null | datetime2 null | int null | — | tinyint |
+| **LongEntity** | bigint PK | — | — | — | — | — | — |
+
+Status values for DocumentEntity: `1=Draft, 2=Posted, 3=Cancelled`
+
+## Inheritance Rules by Table Category
+- **Admin entities** (Parties, Customers, etc.): `ActivatableEntity` — has IsActive for soft delete
+- **Document entities** (Invoices, Vouchers, etc.): `DocumentEntity` — has Status (Draft/Posted/Cancelled)
+- **Junction tables** (UserRoles, RolePermissions, etc.): `Entity` — no audit fields needed
+- **Live balances** (WarehouseStocks): `AuditableEntity` — no soft delete, tracks who updated
+- **High-volume logs** (AuditLogs, SystemLogs): `LongEntity` — bigint PK
+
+## Key Constraints
+- **All FK relationships**: `DeleteBehavior.Restrict` — NO cascade delete anywhere.
+- **Soft delete**: Global query filter `IsActive == true` on ActivatableEntity inheritors.
+- **CHECK constraints**: Stock quantities, financial amounts, debit/credit rules enforced at DB level.
+- **Filtered unique indexes**: Soft-deletable entities include `AND [IsActive] = 1` to prevent conflicts with soft-deleted records.
 
 ---
 
-# 2) Proposed Database
-Database Name example: **`SalesSystemDb`**
+# 2) Database
+Database Name: **`SalesSystemDb`**
 Default schema: **`dbo`**
 
 ---
 
-# 3) Core Tables
+# 3) Module-by-Module Table Definitions
 
 ---
 
-## A) Users
-### Columns
-- `Id` int PK
-- `UserName` nvarchar(50) not null unique
-- `PasswordHash` nvarchar(256) not null
-- `FullName` nvarchar(150) not null
-- `Role` tinyint not null (1=Admin, 2=Manager, 3=Cashier)
-- `MustChangePassword` bit not null default 1
-- `Status` tinyint not null default 1 (1=Active, 2=Locked, 3=Suspended)
-- `LastLoginAt` datetime2 null
-- `FailedLoginAttempts` int not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+## Module 1: Core, Parties & Security (النواة، الأطراف والأمان)
+
+### 1.1 Parties
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `Name` | nvarchar(200) not null | |
+| `Phone` | nvarchar(30) null | |
+| `Email` | nvarchar(100) null | |
+| `Address` | nvarchar(300) null | |
+| `TaxNumber` | nvarchar(50) null | |
+| `Notes` | nvarchar(500) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK → Users(Id) | |
+| `UpdatedByUserId` | int null FK → Users(Id) | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Indexes** | `(Name)`, `(Phone)` | |
+
+### 1.2 Customers
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `PartyId` | int not null FK → Parties(Id) | shared party data |
+| `AccountId` | int not null FK → Accounts(Id) | every customer = an account |
+| `CategoryId` | int null FK → AccountCategories(Id) | |
+| `CreditLimit` | decimal(18,2) not null default 0 | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Indexes** | `AccountId`, `CategoryId`, `PartyId` | |
+
+### 1.3 CustomerContacts
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `CustomerId` | int not null FK → Customers(Id) | |
+| `Name` | nvarchar(150) not null | |
+| `Phone` | nvarchar(30) null | |
+| `Email` | nvarchar(100) null | |
+| `Position` | nvarchar(100) null | |
+| `Notes` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 1.4 Suppliers
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `PartyId` | int not null FK → Parties(Id) | shared party data |
+| `AccountId` | int not null FK → Accounts(Id) | every supplier = an account |
+| `CategoryId` | int null FK → AccountCategories(Id) | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Indexes** | `AccountId`, `CategoryId`, `PartyId` | |
+
+### 1.5 SupplierContacts
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `SupplierId` | int not null FK → Suppliers(Id) | |
+| `Name` | nvarchar(150) not null | |
+| `Phone` | nvarchar(30) null | |
+| `Email` | nvarchar(100) null | |
+| `Position` | nvarchar(100) null | |
+| `Notes` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 1.6 Departments
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **smallint** PK | |
+| `Name` | nvarchar(100) not null | |
+| `Description` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 1.7 Employees
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `PartyId` | int not null FK → Parties(Id) | shared party data |
+| `DepartmentId` | smallint null FK → Departments(Id) | |
+| `AccountId` | int null FK → Accounts(Id) | optional, auto-created when needed |
+| `EmployeeNo` | int not null | |
+| `HireDate` | date not null | |
+| `Salary` | decimal(18,2) not null default 0 | |
+| `Notes` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 1.8 Roles
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **smallint** PK | |
+| `Name` | nvarchar(100) not null | |
+| `Description` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 1.9 Users
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `EmployeeId` | int null FK → Employees(Id) | links user to employee record |
+| `UserName` | nvarchar(50) not null | unique |
+| `PasswordHash` | nvarchar(256) not null | |
+| `MustChangePassword` | bit not null default 0 | |
+| `LoginAttempts` | smallint not null default 0 | |
+| `IsLocked` | bit not null default 0 | |
+| `LastLoginAt` | datetime2 null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Index** | `UNIQUE(UserName)` | |
+
+### 1.10 UserRoles
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `UserId` | int not null FK → Users(Id) | |
+| `RoleId` | smallint not null FK → Roles(Id) | |
+| **UK** | `UNIQUE(UserId, RoleId)` | |
+
+### 1.11 Permissions
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `Code` | nvarchar(100) not null | unique |
+| `DisplayName` | nvarchar(150) not null | |
+| `Category` | nvarchar(100) not null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 1.12 RolePermissions
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `RoleId` | smallint not null FK → Roles(Id) | |
+| `PermissionId` | int not null FK → Permissions(Id) | |
+| **UK** | `UNIQUE(RoleId, PermissionId)` | |
+
+### 1.13 UserBranches
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `UserId` | int not null FK → Users(Id) | |
+| `BranchId` | smallint not null FK → Branches(Id) | |
+
+### 1.14 UserSessions
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `UserId` | int not null FK → Users(Id) | |
+| `SessionToken` | nvarchar(200) not null | |
+| `DeviceName` | nvarchar(200) null | |
+| `IpAddress` | nvarchar(50) null | |
+| `UserAgent` | nvarchar(500) null | |
+| `LastActivityAt` | datetime2 not null | |
+| `ExpiresAt` | datetime2 not null | |
+| `IsRevoked` | bit not null default 0 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Index** | `(UserId, IsRevoked)` | for active session lookup |
 
 ---
 
-## B) Units
-### Columns
-- `Id` int PK
-- `Name` nvarchar(50) not null
-- `Symbol` nvarchar(20) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+## Module 2: Organization, Currencies & Settings (التنظيم، العملات والإعدادات)
+
+### 2.1 Branches
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **smallint** PK | |
+| `Name` | nvarchar(150) not null | unique |
+| `Phone` | nvarchar(30) null | |
+| `Address` | nvarchar(300) null | |
+| `ManagerName` | nvarchar(150) null | |
+| `Notes` | nvarchar(500) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 2.2 Warehouses
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **smallint** PK | |
+| `BranchId` | smallint not null FK → Branches(Id) | |
+| `Name` | nvarchar(150) not null | |
+| `Phone` | nvarchar(30) null | |
+| `Address` | nvarchar(300) null | |
+| `Notes` | nvarchar(500) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 2.3 Currencies
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **smallint** PK | |
+| `Name` | nvarchar(100) not null | unique filtered `[IsActive]=1` |
+| `Code` | char(3) not null | ISO 4217 — unique filtered `[IsActive]=1` |
+| `FractionName` | nvarchar(50) not null | e.g., "Halala", "Cent" |
+| `Symbol` | nvarchar(20) null | |
+| `DecimalPlaces` | tinyint not null default 2 | |
+| `IsBaseCurrency` | bit not null default 0 | unique filtered `IsBaseCurrency=1 AND IsActive=1` |
+| `IsSystem` | bit not null default 0 | system currencies protected from deletion |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 2.4 CurrencyRates
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `RateToBase` | decimal(18,2) not null | CHK `> 0` |
+| `EffectiveFrom` | datetime2 not null | |
+| `EffectiveTo` | datetime2 null | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Index** | `(CurrencyId, EffectiveFrom)` | for rate lookup by date |
+
+### 2.5 Taxes
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **smallint** PK | |
+| `Name` | nvarchar(100) not null | |
+| `Code` | nvarchar(20) not null | e.g., "VAT-15" |
+| `Rate` | decimal(5,2) not null | CHK 0-100 |
+| `TaxType` | tinyint not null | 1=Standard, 2=ZeroRated, 3=Exempt |
+| `IsDefault` | bit not null default 0 | unique filtered `IsDefault=1 AND IsActive=1` |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 2.6 CompanySettings
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | tinyint PK default 1 | singleton row |
+| `CompanyName` | nvarchar(200) not null | |
+| `Phone` | nvarchar(30) null | |
+| `Email` | nvarchar(100) null | |
+| `Address` | nvarchar(300) null | |
+| `TaxNumber` | nvarchar(50) null | |
+| `LogoPath` | nvarchar(500) null | |
+| `DefaultCurrencyId` | smallint not null FK → Currencies(Id) | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 2.7 SystemSettings
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `SettingKey` | nvarchar(100) not null | unique |
+| `SettingValue` | nvarchar(500) not null | |
+| `SettingType` | tinyint not null | 1=String, 2=Integer, 3=Decimal, 4=Boolean |
+| `Category` | nvarchar(100) not null | |
+| `DisplayName` | nvarchar(200) not null | |
+| `Description` | nvarchar(1000) null | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 2.8 DocumentSequences
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `DocumentType` | nvarchar(50) not null | e.g., "SalesInvoice", "PurchaseInvoice" |
+| `NextNumber` | int not null | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 2.9 FiscalYears
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `YearName` | nvarchar(20) not null | e.g., "2026" |
+| `StartDate` | date not null | |
+| `EndDate` | date not null | CHK `EndDate > StartDate` |
+| `IsClosed` | bit not null default 0 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 2.10 Notifications
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `UserId` | int not null FK → Users(Id) | |
+| `Type` | tinyint not null | 1=LowStock, 2=ExpirySoon, 3=CreditLimitExceeded, 4=System, 5=Reminder |
+| `Title` | nvarchar(200) not null | |
+| `Message` | nvarchar(1000) not null | |
+| `ReferenceType` | nvarchar(50) null | |
+| `ReferenceId` | int null | |
+| `IsRead` | bit not null default 0 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Indexes** | `(UserId, IsRead, CreatedAt DESC)` | for unread notification queries |
+
+### 2.11 Attachments
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `ReferenceType` | nvarchar(50) not null | e.g., "PurchaseInvoice", "InventoryAdjustment" |
+| `ReferenceId` | int not null | |
+| `FileName` | nvarchar(255) not null | |
+| `FilePath` | nvarchar(500) not null | |
+| `FileSize` | bigint not null | |
+| `ContentType` | nvarchar(100) null | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Index** | `(ReferenceType, ReferenceId)` | for document attachment lookup |
 
 ---
 
-## C) Categories
-### Columns
-- `Id` int PK
-- `Name` nvarchar(100) not null
-- `Description` nvarchar(250) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+## Module 3: Products (المنتجات)
+
+### 3.1 ProductCategories
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `Name` | nvarchar(100) not null | unique |
+| `Description` | nvarchar(500) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 3.2 Products
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `Name` | nvarchar(200) not null | |
+| `Barcode` | varchar(50) null | unique filtered `Barcode IS NOT NULL AND IsActive=1` |
+| `CategoryId` | int not null FK → ProductCategories(Id) | |
+| `TaxId` | smallint null FK → Taxes(Id) | |
+| `Description` | nvarchar(500) null | |
+| `TrackExpiry` | bit not null default 0 | |
+| `ImagePath` | nvarchar(500) null | primary image |
+| `ReorderLevel` | decimal(18,3) not null default 0 | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 3.3 Units
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **smallint** PK | |
+| `Name` | nvarchar(50) not null | e.g., "حبة", "كرتون" |
+| `Symbol` | nvarchar(20) null | e.g., "pc", "box" |
+| `IsSystem` | bit not null default 0 | system units protected from modification |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 3.4 ProductUnits
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `UnitId` | smallint not null FK → Units(Id) | |
+| `Factor` | decimal(18,3) not null | conversion factor: base=1, box=24 |
+| `IsBaseUnit` | bit not null default 0 | exactly one base unit per product |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 3.5 ProductPrices
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `ProductUnitId` | int not null FK → ProductUnits(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `Price` | decimal(18,2) not null | CHK `>= 0` |
+| `EffectiveFrom` | date not null | |
+| `EffectiveTo` | date null | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+**Design Notes:**
+- NO `ProductCost`, `StockQuantity`, or `UnitPrice` stored directly on Products table
+- Cost comes from `InventoryBatches`, stock from `WarehouseStocks`, prices from `ProductPrices`
+- Barcode is `varchar(50)` (ASCII-only), not `nvarchar`
+- Pricing is per `ProductUnit` × `CurrencyId` with effective date ranges
+- Units are decoupled from products via the `ProductUnits` junction table
 
 ---
 
-## D) Products
-### Columns
-- `Id` int PK
-- `Barcode` nvarchar(50) null unique (legacy — prefer UnitBarcodes)
-- `Name` nvarchar(150) not null
-- `CategoryId` int null FK
-- `SupplierPrice` decimal(18,2) not null default 0 (catalog price for SupplierPrice costing method)
-- `AvgCost` decimal(18,2) not null default 0 (computed by UpdateProductPricingService)
-- `ReorderLevel` decimal(18,3) not null default 0
-- `MinStock` decimal(18,3) not null default 0
-- `TrackExpiry` bit not null default 0
-- `IsExpirable` bit not null default 0
-- `Description` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+## Module 4: Accounting (المحاسبة)
 
-> **v4.3 Change:** Pricing (RetailPrice, WholesalePrice) and ConversionFactor moved to `ProductUnits` table.
-> Barcodes moved to `UnitBarcodes` table (one per product-unit combination).
-> **v4.5.3 Change:** `Code` column removed — use auto-increment `Id` as sole identifier.
+### 4.1 AccountCategories
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **smallint** PK | |
+| `Name` | nvarchar(100) not null | |
+| `Description` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
-## D2) ProductUnits (v4.3 — Dynamic Unit of Measure)
-### Columns
-- `Id` int PK
-- `ProductId` int not null FK → Products(Id)
-- `UnitName` nvarchar(50) not null  -- e.g., "Piece", "Box", "Carton"
-- `ConversionFactor` decimal(18,3) not null default 1  -- Base=1, Box=24, Carton=144
-- `RetailPrice` decimal(18,2) not null default 0
-- `WholesalePrice` decimal(18,2) not null default 0
-- `IsBaseUnit` bit not null default 0  -- Exactly one per product
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+### 4.2 Accounts
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `ParentId` | int null FK → Accounts(Id) | self-referencing hierarchy |
+| `AccountCode` | nvarchar(20) not null | unique filtered `[IsActive]=1` |
+| `Name` | nvarchar(200) not null | |
+| `Nature` | tinyint not null | 1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense |
+| `IsLeaf` | bit not null default 1 | leaf accounts allow transactions |
+| `IsSystem` | bit not null default 0 | system accounts protected from modification |
+| `CategoryId` | smallint null FK → AccountCategories(Id) | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
-### Constraints
-- `UNIQUE(ProductId, UnitName)` — no duplicate unit names per product
-- `UNIQUE(ProductId, IsBaseUnit)` filter where IsBaseUnit=1 — exactly one base unit per product
-- `CHECK (ConversionFactor > 0)`
+### 4.3 CashBoxes
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `AccountId` | int not null FK → Accounts(Id) | balance lives on Account, NOT CashBox |
+| `BranchId` | smallint not null FK → Branches(Id) | |
+| `Name` | nvarchar(150) not null | |
+| `Description` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Notes** | NO OpeningBalance, NO CurrentBalance | balance tracked on linked Account |
 
-## D3) UnitBarcodes (v4.3 — Replaces ProductBarcodes)
-### Columns
-- `Id` int PK
-- `ProductUnitId` int not null FK → ProductUnits(Id)
-- `BarcodeValue` nvarchar(100) not null unique
-- `IsDefault` bit not null default 0
-- `CreatedAt` datetime2 not null
-- `IsActive` bit not null default 1
+### 4.4 Banks
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `AccountId` | int not null FK → Accounts(Id) | |
+| `Name` | nvarchar(150) not null | |
+| `AccountNumber` | nvarchar(100) null | |
+| `IBAN` | nvarchar(100) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
----
+### 4.5 JournalEntries
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `EntryNo` | int not null | unique per fiscal year |
+| `EntryDate` | date not null | |
+| `EntryType` | tinyint not null | 1=Manual, 2=Sales, 3=Purchase, 4=Receipt, 5=Payment, 6=Inventory, 7=Adjustment |
+| `ReferenceType` | nvarchar(50) null | 'SalesInvoice', 'PurchaseInvoice', etc. |
+| `ReferenceId` | int null | |
+| `Description` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `IsReversed` | bit not null default 0 | |
+| `ReversedByEntryId` | int null FK → JournalEntries(Id) | Restrict |
+| `CreatedByUserId` | int null FK → Users(Id) | extracted from JWT, never client-supplied |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Indexes** | `EntryNo`, `(ReferenceType, ReferenceId)` | |
 
-## E) Warehouses
-### Columns
-- `Id` int PK
-- `Name` nvarchar(100) not null
-- `Location` nvarchar(250) null
-- `IsDefault` bit not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+### 4.6 JournalEntryLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `JournalEntryId` | int not null FK → JournalEntries(Id) | |
+| `AccountId` | int not null FK → Accounts(Id) | |
+| `Debit` | decimal(18,2) not null default 0 | |
+| `Credit` | decimal(18,2) not null default 0 | |
+| `Description` | nvarchar(300) null | |
+| `SortOrder` | smallint not null default 0 | |
+| **CHK** | `CHK_DebitOrCredit` | exactly one of Debit/Credit > 0, or both zero |
+| **CHK** | `CHK_NoNegativeValues` | Debit >= 0 AND Credit >= 0 |
 
-> **v4.5.3 Change:** `Code` column removed — use auto-increment `Id` as sole identifier.
+### 4.7 ReceiptVouchers (سندات قبض)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `VoucherNo` | int not null | unique |
+| `VoucherDate` | date not null | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `CashBoxId` | int not null FK → CashBoxes(Id) | |
+| `AccountId` | int not null FK → Accounts(Id) | |
+| `TotalAmount` | decimal(18,2) not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
----
+### 4.8 PaymentVouchers (سندات صرف)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `VoucherNo` | int not null | unique |
+| `VoucherDate` | date not null | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `CashBoxId` | int not null FK → CashBoxes(Id) | |
+| `AccountId` | int not null FK → Accounts(Id) | |
+| `TotalAmount` | decimal(18,2) not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
-## F) WarehouseStocks
-### Columns
-- `Id` int PK
-- `WarehouseId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null default 0
-- `ReorderLevel` decimal(18,3) not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 not null
+### 4.9 Expenses
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `ExpenseNo` | int not null | unique |
+| `ExpenseDate` | date not null | |
+| `ExpenseAccountId` | int not null FK → Accounts(Id) | |
+| `CashBoxId` | int not null FK → CashBoxes(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `Amount` | decimal(18,2) not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
-### Important Constraints
-- `UNIQUE(WarehouseId, ProductId)`
-- `CHECK (Quantity >= 0)` — CRITICAL: prevents negative stock at DB level
+### 4.10 SystemAccountMappings
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `MappingKey` | nvarchar(100) not null | e.g., "SalesRevenue", "COGS" |
+| `AccountId` | int not null FK → Accounts(Id) | |
+| `BranchId` | smallint null FK → Branches(Id) | branch-specific override |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Notes** | Flexible key-value design | replaces fixed-column approach |
 
----
-
-## G) Suppliers
-### Columns
-- `Id` int PK
-- `Name` nvarchar(150) not null
-- `Phone` nvarchar(20) null
-- `Email` nvarchar(100) null
-- `Address` nvarchar(250) null
-- `OpeningBalance` decimal(18,2) not null default 0
-- `CurrentBalance` decimal(18,2) not null default 0
-- `AccountId` int null FK → Accounts(Id)
-- `CurrencyId` int null FK → Currencies(Id)
-- `CreditLimit` decimal(18,2) not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
-> **v4.5.3 Change:** `Code` column removed — use auto-increment `Id` as sole identifier.
-
----
-
-## H) Customers
-### Columns
-- `Id` int PK
-- `Name` nvarchar(150) not null
-- `Phone` nvarchar(20) null
-- `Email` nvarchar(100) null
-- `Address` nvarchar(250) null
-- `OpeningBalance` decimal(18,2) not null default 0
-- `CurrentBalance` decimal(18,2) not null default 0
-- `AccountId` int null FK → Accounts(Id)
-- `CurrencyId` int null FK → Currencies(Id)
-- `CreditLimit` decimal(18,2) not null default 0
-- `CustomerType` tinyint null (1=Retail, 2=Wholesale, 3=Corporate)
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
-> **v4.5.3 Change:** `Code` column removed — use auto-increment `Id` as sole identifier.
-
----
-
-# 4) Purchases
-
-## I) PurchaseInvoices
-### Columns
-- `Id` int PK
-- `InvoiceNo` int not null (user-facing invoice number, UNIQUE per document type — generated via DocumentSequenceService.GetNextIntAsync)
-- `SupplierId` int not null FK
-- `WarehouseId` int not null FK
-- `InvoiceDate` datetime2 not null
-- `DueDate` date null
-- `PaymentType` tinyint not null (1=Cash, 2=Credit, 3=Mixed)
-- `SubTotal` decimal(18,2) not null default 0
-- `DiscountAmount` decimal(18,2) not null default 0
-- `TaxAmount` decimal(18,2) not null default 0
-- `TotalAmount` decimal(18,2) not null default 0
-- `PaidAmount` decimal(18,2) not null default 0
-- `DueAmount` decimal(18,2) not null default 0
-- `Notes` nvarchar(500) null
-- `Status` tinyint not null (1=Draft, 2=Posted, 3=Cancelled)
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-# 5) Sales
-
-## K) SalesInvoices
-### Columns
-- `Id` int PK
-- `InvoiceNo` int not null (user-facing invoice number, UNIQUE per document type — generated via DocumentSequenceService.GetNextIntAsync)
-- `CustomerId` int null FK
-- `WarehouseId` int not null FK
-- `InvoiceDate` datetime2 not null
-- `DueDate` date null
-- `PaymentType` tinyint not null (1=Cash, 2=Credit, 3=Mixed)
-- `SubTotal` decimal(18,2) not null default 0
-- `DiscountAmount` decimal(18,2) not null default 0
-- `TaxAmount` decimal(18,2) not null default 0
-- `TotalAmount` decimal(18,2) not null default 0
-- `PaidAmount` decimal(18,2) not null default 0
-- `DueAmount` decimal(18,2) not null default 0
-- `Notes` nvarchar(500) null
-- `Status` tinyint not null (1=Draft, 2=Posted, 3=Cancelled)
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-- `CashBoxId` int null FK → CashBoxes(Id)
+**Design Notes:**
+- NO CashTransactions table (replaced by ReceiptVouchers/PaymentVouchers)
+- NO DailyClosures table (removed from V1)
+- NO Cheques table (removed from V1)
+- SystemAccountMappings uses flexible key-value design
 
 ---
 
-## L) SalesInvoiceItems
-### Columns
-- `SalesInvoiceItemId` int PK
-- `SalesInvoiceId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null
-- `UnitPrice` decimal(18,2) not null
-- `DiscountAmount` decimal(18,2) not null default 0
-- `LineTotal` decimal(18,2) not null
-- `Notes` nvarchar(250) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+## Module 5: Inventory (المخزون)
+
+### 5.1 WarehouseStocks
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `Quantity` | decimal(18,3) not null default 0 | CHK `>= 0` |
+| `CreatedAt` | datetime2 not null | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedAt` | datetime2 null | |
+| `UpdatedByUserId` | int null FK | |
+| **UK** | `UNIQUE(WarehouseId, ProductId)` | one stock row per product per warehouse |
+| **Notes** | NO IsActive | live balance entity |
+
+### 5.2 InventoryBatches
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `BatchNo` | int not null | internal batch number |
+| `ProductId` | int not null FK → Products(Id) | |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `PurchaseInvoiceId` | int null FK → PurchaseInvoices(Id) | source purchase invoice |
+| `SupplierBatchNo` | varchar(100) null | supplier's batch reference |
+| `ExpiryDate` | date null | for FEFO tracking |
+| `QuantityReceived` | decimal(18,3) not null | CHK `>= 0` |
+| `QuantityRemaining` | decimal(18,3) not null | CHK `>= 0` |
+| `UnitCost` | decimal(18,2) not null | CHK `>= 0` |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Indexes** | `(ProductId, WarehouseId)`, `(ExpiryDate)` filtered, `(PurchaseInvoiceId)` | |
+
+### 5.3 InventoryTransactions
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `TransactionNo` | int not null | unique |
+| `TransactionType` | tinyint not null | 1=Purchase, 2=PurchaseReturn, 3=Sale, 4=SaleReturn, 5=TransferOut, 6=TransferIn, 7=Count, 8=Adjustment, 9=Damage, 10=OpeningBalance, 11=InternalIssue, 12=InternalReceipt |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `ReferenceType` | tinyint null | 1=PurchaseInvoice, 2=SalesInvoice, 3=PurchaseReturn, 4=SalesReturn, 5=Transfer, 6=Count, 7=Adjustment |
+| `ReferenceId` | int null | FK to the reference document |
+| `TransactionDate` | date not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **Indexes** | `(WarehouseId, TransactionDate DESC)`, `(ReferenceType, ReferenceId)` | |
+
+### 5.4 InventoryTransactionLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `InventoryTransactionId` | int not null FK → InventoryTransactions(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `ProductUnitId` | int not null FK → ProductUnits(Id) | |
+| `BatchId` | int null FK → InventoryBatches(Id) | null for non-batched products |
+| `Quantity` | decimal(18,3) not null | |
+| `UnitCost` | decimal(18,2) not null | |
+| `TotalCost` | decimal(18,2) not null | UnitCost x Quantity |
+
+### 5.5 InventoryCounts
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `CountNo` | int not null | unique |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `CountDate` | date not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 5.6 InventoryCountLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `InventoryCountId` | int not null FK → InventoryCounts(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `BatchId` | int not null FK → InventoryBatches(Id) | links count to specific batch |
+| `SystemQuantity` | decimal(18,3) not null | expected quantity from system |
+| `ActualQuantity` | decimal(18,3) not null | counted quantity |
+| `DifferenceQuantity` | decimal(18,3) not null | ActualQuantity - SystemQuantity |
+
+### 5.7 InventoryAdjustments
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `AdjustmentNo` | int not null | unique |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `AdjustmentType` | tinyint not null | 1=Opening, 2=Increase, 3=Shortage, 4=Damage |
+| `AdjustmentDate` | date not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 5.8 InventoryAdjustmentLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `InventoryAdjustmentId` | int not null FK → InventoryAdjustments(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `BatchId` | int null FK → InventoryBatches(Id) | null for opening adjustments |
+| `Quantity` | decimal(18,3) not null | |
+| `UnitCost` | decimal(18,2) not null | |
+| `TotalCost` | decimal(18,2) not null | UnitCost x Quantity |
+
+### 5.9 WarehouseTransfers
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `TransferNo` | int not null | unique |
+| `FromWarehouseId` | smallint not null FK → Warehouses(Id) | source warehouse |
+| `ToWarehouseId` | smallint not null FK → Warehouses(Id) | destination warehouse |
+| `TransferDate` | date not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+### 5.10 WarehouseTransferLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `WarehouseTransferId` | int not null FK → WarehouseTransfers(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `BatchId` | int not null FK → InventoryBatches(Id) | specific batch being transferred |
+| `Quantity` | decimal(18,3) not null | |
+| `UnitCost` | decimal(18,2) not null | |
+| `TotalCost` | decimal(18,2) not null | UnitCost x Quantity |
+
+**Design Notes:**
+- NO InventoryMovements table (replaced by InventoryTransactions/InventoryTransactionLines)
+- NO InventoryOperations table (merged into InventoryTransactions)
+- NO StockTransfers (renamed to WarehouseTransfers)
+- NO StockWriteOffs (covered by InventoryAdjustments with Damage type)
+- WarehouseStocks has NO IsActive (live balance)
+- Transfers do NOT create accounting entries (only adjustments do)
 
 ---
 
-# 6) Returns
+## Module 6: Sales (المبيعات)
 
-## M) PurchaseReturns
-### Columns
-- `Id` int PK
-- `ReturnNo` nvarchar(30) not null unique
-- `PurchaseInvoiceId` int null FK
-- `SupplierId` int not null FK
-- `WarehouseId` int not null FK
-- `ReturnDate` datetime2 not null
-- `Reason` nvarchar(250) null
-- `SubTotal` decimal(18,2) not null default 0
-- `TotalAmount` decimal(18,2) not null default 0
-- `Status` tinyint not null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+### 6.1 SalesInvoices
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `InvoiceNo` | int not null | user-facing number, UNIQUE per table |
+| `InvoiceDate` | date not null | |
+| `CustomerId` | int not null FK → Customers(Id) | |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `PaymentType` | tinyint not null | 1=Cash, 2=Credit, 3=Mixed |
+| `CashBoxId` | int null FK → CashBoxes(Id) | |
+| `TaxId` | smallint null FK → Taxes(Id) | |
+| `SubTotal` | decimal(18,2) not null | |
+| `DiscountAmount` | decimal(18,2) not null default 0 | |
+| `TaxAmount` | decimal(18,2) not null default 0 | |
+| `OtherCharges` | decimal(18,2) not null default 0 | |
+| `NetTotal` | decimal(18,2) not null | SubTotal - Discount + Tax + OtherCharges |
+| `PaidAmount` | decimal(18,2) not null default 0 | CHK 0 to NetTotal |
+| `RemainingAmount` | decimal(18,2) not null default 0 | NetTotal - PaidAmount |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **UK** | `UNIQUE(InvoiceNo)` | |
 
----
+### 6.2 SalesInvoiceLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `SalesInvoiceId` | int not null FK → SalesInvoices(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `ProductUnitId` | int not null FK → ProductUnits(Id) | |
+| `Quantity` | decimal(18,3) not null | |
+| `UnitPrice` | decimal(18,2) not null | |
+| `LineTotal` | decimal(18,2) not null | Quantity x UnitPrice |
+| **Notes** | NO DiscountAmount per line (header only). NO Cost field (sourced from InventoryBatches at posting). | |
 
-## N) PurchaseReturnItems
-### Columns
-- `PurchaseReturnItemId` int PK
-- `PurchaseReturnId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null
-- `UnitCost` decimal(18,2) not null
-- `LineTotal` decimal(18,2) not null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+### 6.3 SalesReturns
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `ReturnNo` | int not null | unique |
+| `ReturnDate` | date not null | |
+| `SalesInvoiceId` | int not null FK → SalesInvoices(Id) | |
+| `CustomerId` | int not null FK → Customers(Id) | |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `TotalAmount` | decimal(18,2) not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
----
+### 6.4 SalesReturnLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `SalesReturnId` | int not null FK → SalesReturns(Id) | |
+| `SalesInvoiceLineId` | int not null FK → SalesInvoiceLines(Id) | links to original line |
+| `Quantity` | decimal(18,3) not null | |
+| `Amount` | decimal(18,2) not null | |
 
-## O) SalesReturns
-### Columns
-- `Id` int PK
-- `ReturnNo` nvarchar(30) not null unique
-- `SalesInvoiceId` int null FK
-- `CustomerId` int not null FK
-- `WarehouseId` int not null FK
-- `ReturnDate` datetime2 not null
-- `Reason` nvarchar(250) null
-- `SubTotal` decimal(18,2) not null default 0
-- `TotalAmount` decimal(18,2) not null default 0
-- `Status` tinyint not null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+### 6.5 CustomerReceipts (سندات قبض)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `ReceiptNo` | int not null | unique |
+| `ReceiptDate` | date not null | |
+| `CustomerId` | int not null FK → Customers(Id) | |
+| `CashBoxId` | int not null FK → CashBoxes(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `Amount` | decimal(18,2) not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
----
+### 6.6 CustomerReceiptApplications
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `CustomerReceiptId` | int not null FK → CustomerReceipts(Id) | |
+| `SalesInvoiceId` | int not null FK → SalesInvoices(Id) | |
+| `AppliedAmount` | decimal(18,2) not null | |
+| **Notes** | Optional — only created when user explicitly distributes payment to specific invoices | |
 
-## P) SalesReturnItems
-### Columns
-- `SalesReturnItemId` int PK
-- `SalesReturnId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null
-- `UnitPrice` decimal(18,2) not null
-- `LineTotal` decimal(18,2) not null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-# 7) Stock Transfer Between Warehouses
-
-## Q) StockTransfers
-### Columns
-- `Id` int PK
-- `TransferNo` nvarchar(30) not null unique
-- `FromWarehouseId` int not null FK
-- `ToWarehouseId` int not null FK
-- `TransferDate` datetime2 not null
-- `Notes` nvarchar(500) null
-- `Status` tinyint not null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## R) StockTransferItems
-### Columns
-- `StockTransferItemId` int PK
-- `StockTransferId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null
-- `Notes` nvarchar(250) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+**Design Notes:**
+- NO CustomerPayments table (replaced by CustomerReceipts)
+- NO SalesQuotations table (removed from V1)
+- NO DiscountAmount per line (only at invoice header level)
+- SalesReturnLines link to SalesInvoiceLineId (not ProductId directly)
 
 ---
 
-# 8) Payments and Collections
+## Module 7: Purchases (المشتريات)
 
-## S) CustomerPayments
-### Columns
-- `Id` int PK
-- `PaymentNo` nvarchar(30) not null unique
-- `CustomerId` int not null FK
-- `SalesInvoiceId` int null FK
-- `PaymentDate` datetime2 not null
-- `Amount` decimal(18,2) not null
-- `PaymentMethod` tinyint not null (1=Cash, 2=Bank Transfer, 3=Card, 4=Other)
-- `ReferenceNo` nvarchar(50) null
-- `Notes` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+### 7.1 PurchaseInvoices
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `InvoiceNo` | int not null | user-facing number, UNIQUE per table |
+| `InvoiceDate` | date not null | |
+| `SupplierId` | int not null FK → Suppliers(Id) | |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `PaymentType` | tinyint not null | 1=Cash, 2=Credit, 3=Mixed |
+| `CashBoxId` | int null FK → CashBoxes(Id) | |
+| `TaxId` | smallint null FK → Taxes(Id) | |
+| `SubTotal` | decimal(18,2) not null | |
+| `DiscountAmount` | decimal(18,2) not null default 0 | |
+| `TaxAmount` | decimal(18,2) not null default 0 | |
+| `OtherCharges` | decimal(18,2) not null default 0 | additional costs (transport, customs) |
+| `NetTotal` | decimal(18,2) not null | SubTotal - Discount + Tax + OtherCharges |
+| `PaidAmount` | decimal(18,2) not null default 0 | |
+| `RemainingAmount` | decimal(18,2) not null default 0 | NetTotal - PaidAmount |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **UK** | `UNIQUE(InvoiceNo)` | |
 
----
+### 7.2 PurchaseInvoiceLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `PurchaseInvoiceId` | int not null FK → PurchaseInvoices(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `ProductUnitId` | int not null FK → ProductUnits(Id) | |
+| `Quantity` | decimal(18,3) not null | |
+| `UnitPrice` | decimal(18,2) not null | purchase unit cost |
+| `LineTotal` | decimal(18,2) not null | Quantity x UnitPrice |
 
-## T) SupplierPayments
-### Columns
-- `Id` int PK
-- `PaymentNo` nvarchar(30) not null unique
-- `SupplierId` int not null FK
-- `PurchaseInvoiceId` int null FK
-- `PaymentDate` datetime2 not null
-- `Amount` decimal(18,2) not null
-- `PaymentMethod` tinyint not null
-- `ReferenceNo` nvarchar(50) null
-- `Notes` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+### 7.3 PurchaseReturns
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `ReturnNo` | int not null | unique |
+| `ReturnDate` | date not null | |
+| `PurchaseInvoiceId` | int not null FK → PurchaseInvoices(Id) | |
+| `SupplierId` | int not null FK → Suppliers(Id) | |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `TotalAmount` | decimal(18,2) not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
----
+### 7.4 PurchaseReturnLines
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `PurchaseReturnId` | int not null FK → PurchaseReturns(Id) | |
+| `PurchaseInvoiceLineId` | int not null FK → PurchaseInvoiceLines(Id) | links to original line |
+| `Quantity` | decimal(18,3) not null | |
+| `Amount` | decimal(18,2) not null | |
 
-# 8b) Cash Box Management (v4.3)
+### 7.5 SupplierPayments
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `PaymentNo` | int not null | unique |
+| `PaymentDate` | date not null | |
+| `SupplierId` | int not null FK → Suppliers(Id) | |
+| `CashBoxId` | int not null FK → CashBoxes(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `Amount` | decimal(18,2) not null | |
+| `Notes` | nvarchar(500) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
 
-## U2) CashBoxes
-### Columns
-- `Id` int PK
-- `Name` nvarchar(100) not null
-- `OpeningBalance` decimal(18,2) not null default 0
-- `CurrentBalance` decimal(18,2) not null default 0 (computed from CashTransaction sum)
-- `IsDefault` bit not null default 0
-- `AccountId` int null FK → Accounts(Id)
-- `CurrencyId` int null FK → Currencies(Id)
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+### 7.6 SupplierPaymentApplications
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `SupplierPaymentId` | int not null FK → SupplierPayments(Id) | |
+| `PurchaseInvoiceId` | int not null FK → PurchaseInvoices(Id) | |
+| `AppliedAmount` | decimal(18,2) not null | |
+| **Notes** | Optional — only created when user explicitly distributes payment to specific invoices | |
 
-### Constraints
-- `CHECK (CurrentBalance >= 0)` — never negative
-
-## U3) CashTransactions (v4.3)
-### Columns
-- `Id` int PK
-- `CashBoxId` int not null FK → CashBoxes(Id)
-- `TransactionType` tinyint not null (1=OpeningBalance, 2=SalesIncome, 3=Expense, 4=TransferOut, 5=TransferIn, 6=RefundOut, 7=SupplierPayment, 8=CustomerPayment)
-- `Amount` decimal(18,2) not null (positive=IN, negative=OUT)
-- `BalanceBefore` decimal(18,2) not null
-- `BalanceAfter` decimal(18,2) not null
-- `ReferenceType` nvarchar(30) null  -- e.g., "SalesInvoice", "PurchaseInvoice"
-- `ReferenceId` int null
-- `Notes` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `CreatedAt` datetime2 not null
-
-### Constraints
-- Immutable — no UPDATE, no DELETE. Cancellations use offsetting entries.
-
-# 8c) Product Price History (v4.3)
-
-## U4) ProductPriceHistory
-### Columns
-- `Id` int PK
-- `ProductUnitId` int not null FK → ProductUnits(Id)
-- `OldRetailPrice` decimal(18,2) not null
-- `NewRetailPrice` decimal(18,2) not null
-- `OldWholesalePrice` decimal(18,2) not null
-- `NewWholesalePrice` decimal(18,2) not null
-- `OldCost` decimal(18,2) not null
-- `NewCost` decimal(18,2) not null
-- `ChangeReason` nvarchar(250) null
-- `ChangedByUserId` int not null FK → Users(Id)
-- `CreatedAt` datetime2 not null
-
-### Triggers
-- Purchase invoice posting (cost update via WeightedAverage/LastPurchasePrice/SupplierPrice)
-- Manual price adjustment in product editor
-- Supplier price sync
-
-# 9) Store Settings & System Settings
-
-## U) StoreSettings
-### Columns
-- `Id` int PK
-- `StoreName` nvarchar(150) not null
-- `Phone` nvarchar(20) null
-- `Address` nvarchar(250) null
-- `LogoPath` nvarchar(255) null
-- `CurrencyCode` nvarchar(10) not null default 'SAR'
-- `DefaultTaxRate` decimal(18,2) not null default 0
-- `IsTaxEnabled` bit not null default 0
-- `TaxNumber` nvarchar(50) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
-## U5) SystemSettings (v4.3)
-### Columns
-- `Id` int PK
-- `Key` nvarchar(100) not null unique
-- `Value` nvarchar(500) not null
-- `Description` nvarchar(250) null
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
-### Seed Data
-| Key | Value | Description |
-|-----|-------|-------------|
-| `CostingMethod` | `1` | 1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice |
-| `DefaultCashBoxId` | `1` | Default cash box for invoice payments |
+**Design Notes:**
+- NO PurchaseOrders table (removed from V1)
+- NO AdditionalFees/AdditionalFeeAllocations (OtherCharges on invoice handles this)
+- NO per-line discount on purchase lines (discounts at invoice header level only)
+- PurchaseReturnLines link to PurchaseInvoiceLineId
+- On posting: creates InventoryBatch with BatchNo, QuantityReceived, QuantityRemaining, UnitCost
 
 ---
 
-# 10) Inventory Movement Log (Critical)
-## V) InventoryMovements
-### Columns
-- `Id` int PK
-- `ProductId` int not null FK
-- `WarehouseId` int not null FK
-- `MovementType` tinyint not null (1=PurchaseIn, 2=SaleOut, 3=SaleReturnIn, 4=PurchaseReturnOut, 5=TransferOut, 6=TransferIn, 7=Adjustment)
-- `QuantityChange` decimal(18,3) not null — positive=IN, negative=OUT
-- `QuantityBefore` decimal(18,3) not null — stock before this movement
-- `QuantityAfter` decimal(18,3) not null — stock after (= Before + Change)
-- `ReferenceType` nvarchar(30) not null
-- `ReferenceId` int not null
-- `UnitCost` decimal(18,2) null
-- `MovementDate` datetime2 not null
-- `Notes` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
+## Module 8: Infrastructure & Support (البنية التحتية والدعم)
+
+### 8.1 AuditLogs
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **bigint** PK | high-volume logging |
+| `UserId` | int null FK → Users(Id) | performing user |
+| `Action` | nvarchar(100) not null | e.g., "CreateCustomer", "CancelInvoice" |
+| `EntityName` | nvarchar(100) null | e.g., "SalesInvoice", "Product" |
+| `EntityId` | nvarchar(50) null | entity identifier |
+| `Details` | nvarchar(max) null | JSON payload |
+| `IpAddress` | nvarchar(50) null | client IP |
+| `CreatedAt` | datetime2 not null | |
+| **Indexes** | `(UserId, CreatedAt DESC)`, `(EntityName, EntityId)`, `(CreatedAt DESC)` | |
+
+### 8.2 SystemLogs
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | **bigint** PK | high-volume logging |
+| `Level` | tinyint not null | 1=Info, 2=Warning, 3=Error, 4=Critical |
+| `Source` | nvarchar(100) null | component name |
+| `Message` | nvarchar(max) not null | |
+| `Exception` | nvarchar(max) null | serialized exception |
+| `CreatedAt` | datetime2 not null | |
+| **Index** | `(Level, CreatedAt DESC)` | for error monitoring |
 
 ---
 
-# 11) Full SQL Server Implementation Script
+# 4) Enums Reference
 
-```sql
-IF DB_ID(N'SalesSystemDb') IS NULL
-BEGIN
-    CREATE DATABASE SalesSystemDb;
-END
-GO
+| Enum | Values |
+|------|--------|
+| `UserStatus` | Active=1, Inactive=2, Locked=3 |
+| `InvoiceStatus` | Draft=1, Posted=2, Cancelled=3 |
+| `PaymentType` | Cash=1, Credit=2, Mixed=3 |
+| `AccountNature` | Asset=1, Liability=2, Equity=3, Revenue=4, Expense=5 |
+| `TaxType` | Standard=1, ZeroRated=2, Exempt=3 |
+| `JournalEntryType` | Manual=1, Sales=2, Purchase=3, Receipt=4, Payment=5, Inventory=6, Adjustment=7 |
+| `InventoryTransactionType` | Purchase=1, PurchaseReturn=2, Sale=3, SaleReturn=4, TransferOut=5, TransferIn=6, Count=7, Adjustment=8, Damage=9, OpeningBalance=10, InternalIssue=11, InternalReceipt=12 |
+| `InventoryReferenceType` | PurchaseInvoice=1, SalesInvoice=2, PurchaseReturn=3, SalesReturn=4, Transfer=5, Count=6, Adjustment=7 |
+| `AdjustmentType` | Opening=1, Increase=2, Shortage=3, Damage=4 |
+| `SettingType` | String=1, Integer=2, Decimal=3, Boolean=4 |
+| `NotificationType` | LowStock=1, ExpirySoon=2, CreditLimitExceeded=3, System=4, Reminder=5 |
+| `LogLevel` | Info=1, Warning=2, Error=3, Critical=4 |
 
-USE SalesSystemDb;
-GO
+---
 
--- 1. Users
-CREATE TABLE dbo.Users
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Users PRIMARY KEY,
-    UserName        NVARCHAR(50)  NOT NULL,
-    PasswordHash    NVARCHAR(256) NOT NULL,
-    FullName        NVARCHAR(150) NOT NULL,
-    Role            TINYINT       NOT NULL, -- 1=Admin, 2=Manager, 3=Cashier
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Users_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Users_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
+# 5) Table Count Summary
 
-    CONSTRAINT UQ_Users_UserName UNIQUE (UserName),
-    CONSTRAINT CK_Users_Role CHECK (Role IN (1,2,3))
-);
+| Module | Table Count | Tables |
+|--------|------------|--------|
+| 1. Core, Parties & Security | 14 | Parties, Customers, CustomerContacts, Suppliers, SupplierContacts, Departments, Employees, Roles, Users, UserRoles, Permissions, RolePermissions, UserBranches, UserSessions |
+| 2. Organization, Currencies & Settings | 11 | Branches, Warehouses, Currencies, CurrencyRates, Taxes, CompanySettings, SystemSettings, DocumentSequences, FiscalYears, Notifications, Attachments |
+| 3. Products | 5 | ProductCategories, Products, Units, ProductUnits, ProductPrices |
+| 4. Accounting | 10 | AccountCategories, Accounts, CashBoxes, Banks, JournalEntries, JournalEntryLines, ReceiptVouchers, PaymentVouchers, Expenses, SystemAccountMappings |
+| 5. Inventory | 10 | WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, InventoryCounts, InventoryCountLines, InventoryAdjustments, InventoryAdjustmentLines, WarehouseTransfers, WarehouseTransferLines |
+| 6. Sales | 6 | SalesInvoices, SalesInvoiceLines, SalesReturns, SalesReturnLines, CustomerReceipts, CustomerReceiptApplications |
+| 7. Purchases | 6 | PurchaseInvoices, PurchaseInvoiceLines, PurchaseReturns, PurchaseReturnLines, SupplierPayments, SupplierPaymentApplications |
+| 8. Infrastructure & Support | 2 | AuditLogs, SystemLogs |
+| **Total** | **65** | |
 
--- 2. Units
-CREATE TABLE dbo.Units
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Units PRIMARY KEY,
-    Name            NVARCHAR(50)  NOT NULL,
-    Symbol          NVARCHAR(20)  NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Units_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Units_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
+---
 
--- 3. Categories
-CREATE TABLE dbo.Categories
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Categories PRIMARY KEY,
-    Name            NVARCHAR(100) NOT NULL,
-    Description     NVARCHAR(250) NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Categories_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Categories_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
+# 6) Key Financial Formulas
 
--- 4. Warehouses
-CREATE TABLE dbo.Warehouses
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Warehouses PRIMARY KEY,
-    Name            NVARCHAR(100) NOT NULL,
-    Location        NVARCHAR(250) NULL,
-    IsDefault       BIT           NOT NULL CONSTRAINT DF_Warehouses_IsDefault DEFAULT(0),
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Warehouses_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Warehouses_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 5. Products
-CREATE TABLE dbo.Products
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Products PRIMARY KEY,
-    Barcode         NVARCHAR(50)  NULL,  -- Legacy — prefer UnitBarcodes
-    Name            NVARCHAR(150) NOT NULL,
-    CategoryId      INT           NULL REFERENCES dbo.Categories(Id),
-    SupplierPrice   DECIMAL(18,2) NOT NULL DEFAULT 0,  -- Catalog price for SupplierPrice costing
-    AvgCost         DECIMAL(18,2) NOT NULL DEFAULT 0,  -- Computed by UpdateProductPricingService
-    ReorderLevel    DECIMAL(18,3) NOT NULL DEFAULT 0,
-    MinStock        DECIMAL(18,3) NOT NULL DEFAULT 0,
-    Description     NVARCHAR(500) NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Products_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Products_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 5b. ProductUnits (v4.3 — Dynamic Unit of Measure)
-CREATE TABLE dbo.ProductUnits
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductUnits PRIMARY KEY,
-    ProductId         INT           NOT NULL REFERENCES dbo.Products(Id),
-    UnitName          NVARCHAR(50)  NOT NULL,
-    ConversionFactor  DECIMAL(18,3) NOT NULL CONSTRAINT DF_ProductUnits_ConversionFactor DEFAULT(1),
-    RetailPrice       DECIMAL(18,2) NOT NULL CONSTRAINT DF_ProductUnits_RetailPrice DEFAULT(0),
-    WholesalePrice    DECIMAL(18,2) NOT NULL CONSTRAINT DF_ProductUnits_WholesalePrice DEFAULT(0),
-    IsBaseUnit        BIT           NOT NULL CONSTRAINT DF_ProductUnits_IsBaseUnit DEFAULT(0),
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL CONSTRAINT DF_ProductUnits_IsActive DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL CONSTRAINT DF_ProductUnits_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt         DATETIME2     NULL,
-
-    CONSTRAINT UQ_ProductUnits_Product_UnitName UNIQUE (ProductId, UnitName),
-    CONSTRAINT CK_ProductUnits_ConversionFactor CHECK (ConversionFactor > 0)
-);
-CREATE INDEX IX_ProductUnits_ProductId ON dbo.ProductUnits(ProductId);
-
--- 5c. UnitBarcodes (v4.3 — Replaces ProductBarcodes)
-CREATE TABLE dbo.UnitBarcodes
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_UnitBarcodes PRIMARY KEY,
-    ProductUnitId   INT NOT NULL REFERENCES dbo.ProductUnits(Id),
-    BarcodeValue    NVARCHAR(100) NOT NULL,
-    IsDefault       BIT NOT NULL DEFAULT 0,
-    CreatedAt       DATETIME2 NOT NULL CONSTRAINT DF_UnitBarcodes_CreatedAt DEFAULT(SYSDATETIME()),
-    IsActive        BIT NOT NULL CONSTRAINT DF_UnitBarcodes_IsActive DEFAULT(1),
-
-    CONSTRAINT UQ_UnitBarcodes_BarcodeValue UNIQUE (BarcodeValue)
-);
-CREATE INDEX IX_UnitBarcodes_ProductUnitId ON dbo.UnitBarcodes(ProductUnitId);
-
--- 6. WarehouseStocks
-CREATE TABLE dbo.WarehouseStocks
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_WarehouseStocks PRIMARY KEY,
-    WarehouseId     INT NOT NULL REFERENCES dbo.Warehouses(Id),
-    ProductId       INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity        DECIMAL(18,3) NOT NULL DEFAULT 0,
-    ReorderLevel    DECIMAL(18,3) NOT NULL DEFAULT 0,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_WarehouseStocks_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_WarehouseStocks_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_WarehouseStocks_UpdatedAt DEFAULT(SYSDATETIME()),
-
-    CONSTRAINT UQ_WarehouseStocks_Warehouse_Product UNIQUE (WarehouseId, ProductId),
-    CONSTRAINT CK_WarehouseStocks_Qty CHECK (Quantity >= 0)
-);
-
--- 7. Suppliers
-CREATE TABLE dbo.Suppliers
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Suppliers PRIMARY KEY,
-    Name            NVARCHAR(150) NOT NULL,
-    Phone           NVARCHAR(20)  NULL,
-    Email           NVARCHAR(100) NULL,
-    Address         NVARCHAR(250) NULL,
-    OpeningBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CurrentBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Suppliers_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Suppliers_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 8. Customers
-CREATE TABLE dbo.Customers
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Customers PRIMARY KEY,
-    Name            NVARCHAR(150) NOT NULL,
-    Phone           NVARCHAR(20)  NULL,
-    Email           NVARCHAR(100) NULL,
-    Address         NVARCHAR(250) NULL,
-    OpeningBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CurrentBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Customers_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Customers_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 9. PurchaseInvoices
-CREATE TABLE dbo.PurchaseInvoices
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoices PRIMARY KEY,
-    InvoiceNo       INT           NOT NULL DEFAULT 0,
-    SupplierId      INT           NOT NULL REFERENCES dbo.Suppliers(Id),
-    WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    InvoiceDate     DATETIME2     NOT NULL,
-    DueDate         DATE          NULL,
-    PaymentType     TINYINT       NOT NULL,
-    SubTotal        DECIMAL(18,2) NOT NULL DEFAULT 0,
-    DiscountAmount  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TaxAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TotalAmount     DECIMAL(18,2) NOT NULL DEFAULT 0,
-    PaidAmount      DECIMAL(18,2) NOT NULL DEFAULT 0,
-    DueAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Notes           NVARCHAR(500) NULL,
-    Status          TINYINT       NOT NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_PurchaseInvoices_InvoiceNo UNIQUE (InvoiceNo)
-);
-
--- 10. PurchaseInvoiceItems
-CREATE TABLE dbo.PurchaseInvoiceItems
-(
-    PurchaseInvoiceItemId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoiceItems PRIMARY KEY,
-    PurchaseInvoiceId       INT NOT NULL REFERENCES dbo.PurchaseInvoices(Id),
-    ProductId               INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity                DECIMAL(18,3) NOT NULL,
-    UnitCost                DECIMAL(18,2) NOT NULL,
-    DiscountAmount          DECIMAL(18,2) NOT NULL DEFAULT 0,
-    LineTotal               DECIMAL(18,2) NOT NULL,
-    Notes                   NVARCHAR(250) NULL,
-    CreatedByUserId         INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId         INT           NULL REFERENCES dbo.Users(Id),
-    IsActive                BIT           NOT NULL DEFAULT(1),
-    CreatedAt               DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt               DATETIME2     NULL
-);
-
--- 11. SalesInvoices
-CREATE TABLE dbo.SalesInvoices
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoices PRIMARY KEY,
-    InvoiceNo       INT           NOT NULL DEFAULT 0,
-    CustomerId      INT           NULL REFERENCES dbo.Customers(Id),
-    WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    InvoiceDate     DATETIME2     NOT NULL,
-    DueDate         DATE          NULL,
-    PaymentType     TINYINT       NOT NULL,
-    SubTotal        DECIMAL(18,2) NOT NULL DEFAULT 0,
-    DiscountAmount  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TaxAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TotalAmount     DECIMAL(18,2) NOT NULL DEFAULT 0,
-    PaidAmount      DECIMAL(18,2) NOT NULL DEFAULT 0,
-    DueAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Notes           NVARCHAR(500) NULL,
-    Status          TINYINT       NOT NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_SalesInvoices_InvoiceNo UNIQUE (InvoiceNo)
-);
-
--- 12. SalesInvoiceItems
-CREATE TABLE dbo.SalesInvoiceItems
-(
-    SalesInvoiceItemId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoiceItems PRIMARY KEY,
-    SalesInvoiceId       INT NOT NULL REFERENCES dbo.SalesInvoices(Id),
-    ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity             DECIMAL(18,3) NOT NULL,
-    UnitPrice            DECIMAL(18,2) NOT NULL,
-    DiscountAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    LineTotal            DECIMAL(18,2) NOT NULL,
-    Notes                NVARCHAR(250) NULL,
-    CreatedByUserId      INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId      INT           NULL REFERENCES dbo.Users(Id),
-    IsActive             BIT           NOT NULL DEFAULT(1),
-    CreatedAt            DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt            DATETIME2     NULL
-);
-
--- 13. InventoryMovements
-CREATE TABLE dbo.InventoryMovements
-(
-    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InventoryMovements PRIMARY KEY,
-    ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
-    WarehouseId         INT NOT NULL REFERENCES dbo.Warehouses(Id),
-    MovementType        TINYINT NOT NULL,
-    QuantityChange      DECIMAL(18,3) NOT NULL,
-    QuantityBefore      DECIMAL(18,3) NOT NULL,
-    QuantityAfter       DECIMAL(18,3) NOT NULL,
-    ReferenceType       NVARCHAR(30) NOT NULL,
-    ReferenceId         INT NOT NULL,
-    UnitCost            DECIMAL(18,2) NULL,
-    MovementDate        DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-    Notes               NVARCHAR(500) NULL,
-    CreatedByUserId     INT NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId     INT NULL REFERENCES dbo.Users(Id),
-    IsActive            BIT NOT NULL DEFAULT(1),
-    CreatedAt           DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt           DATETIME2 NULL
-);
-
-CREATE INDEX IX_InventoryMovements_Product ON dbo.InventoryMovements(ProductId, MovementDate DESC);
-CREATE INDEX IX_InventoryMovements_Reference ON dbo.InventoryMovements(ReferenceType, ReferenceId);
-
--- 14. StoreSettings
-CREATE TABLE dbo.StoreSettings
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StoreSettings PRIMARY KEY,
-    StoreName       NVARCHAR(150) NOT NULL,
-    Phone           NVARCHAR(20)  NULL,
-    Address         NVARCHAR(250) NULL,
-    LogoPath        NVARCHAR(255) NULL,
-    CurrencyCode    NVARCHAR(10)  NOT NULL CONSTRAINT DF_StoreSettings_Currency DEFAULT(N'SAR'),
-    DefaultTaxRate  DECIMAL(18,2) NOT NULL CONSTRAINT DF_StoreSettings_TaxRate DEFAULT(0),
-    IsTaxEnabled    BIT           NOT NULL CONSTRAINT DF_StoreSettings_TaxEnabled DEFAULT(0),
-    TaxNumber       NVARCHAR(50)  NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_StoreSettings_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_StoreSettings_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 15. PurchaseReturns
-CREATE TABLE dbo.PurchaseReturns
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturns PRIMARY KEY,
-    ReturnNo          NVARCHAR(30)  NOT NULL UNIQUE,
-    PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
-    SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
-    WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    ReturnDate        DATETIME2     NOT NULL,
-    Reason            NVARCHAR(250) NULL,
-    SubTotal          DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TotalAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 16. PurchaseReturnItems
-CREATE TABLE dbo.PurchaseReturnItems
-(
-    PurchaseReturnItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturnItems PRIMARY KEY,
-    PurchaseReturnId     INT NOT NULL REFERENCES dbo.PurchaseReturns(Id),
-    ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity             DECIMAL(18,3) NOT NULL,
-    UnitCost             DECIMAL(18,2) NOT NULL,
-    LineTotal            DECIMAL(18,2) NOT NULL,
-    CreatedByUserId      INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId      INT           NULL REFERENCES dbo.Users(Id),
-    IsActive             BIT           NOT NULL DEFAULT(1),
-    CreatedAt            DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt            DATETIME2     NULL
-);
-
--- 17. SalesReturns
-CREATE TABLE dbo.SalesReturns
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturns PRIMARY KEY,
-    ReturnNo          NVARCHAR(30)  NOT NULL UNIQUE,
-    SalesInvoiceId    INT           NULL REFERENCES dbo.SalesInvoices(Id),
-    CustomerId        INT           NOT NULL REFERENCES dbo.Customers(Id),
-    WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    ReturnDate        DATETIME2     NOT NULL,
-    Reason            NVARCHAR(250) NULL,
-    SubTotal          DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TotalAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 18. SalesReturnItems
-CREATE TABLE dbo.SalesReturnItems
-(
-    SalesReturnItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturnItems PRIMARY KEY,
-    SalesReturnId     INT NOT NULL REFERENCES dbo.SalesReturns(Id),
-    ProductId         INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity          DECIMAL(18,3) NOT NULL,
-    UnitPrice         DECIMAL(18,2) NOT NULL,
-    LineTotal         DECIMAL(18,2) NOT NULL,
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 19. StockTransfers
-CREATE TABLE dbo.StockTransfers
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransfers PRIMARY KEY,
-    TransferNo        NVARCHAR(30)  NOT NULL UNIQUE,
-    FromWarehouseId   INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    ToWarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    TransferDate      DATETIME2     NOT NULL,
-    Notes             NVARCHAR(500) NULL,
-    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 20. StockTransferItems
-CREATE TABLE dbo.StockTransferItems
-(
-    StockTransferItemId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransferItems PRIMARY KEY,
-    StockTransferId     INT NOT NULL REFERENCES dbo.StockTransfers(Id),
-    ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity            DECIMAL(18,3) NOT NULL,
-    Notes               NVARCHAR(250) NULL,
-    CreatedByUserId     INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId     INT           NULL REFERENCES dbo.Users(Id),
-    IsActive            BIT           NOT NULL DEFAULT(1),
-    CreatedAt           DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt           DATETIME2     NULL
-);
-
--- 21. CustomerPayments
-CREATE TABLE dbo.CustomerPayments
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CustomerPayments PRIMARY KEY,
-    PaymentNo       NVARCHAR(30)  NOT NULL UNIQUE,
-    CustomerId      INT           NOT NULL REFERENCES dbo.Customers(Id),
-    SalesInvoiceId  INT           NULL REFERENCES dbo.SalesInvoices(Id),
-    PaymentDate     DATETIME2     NOT NULL,
-    Amount          DECIMAL(18,2) NOT NULL,
-    PaymentMethod   TINYINT       NOT NULL, -- 1=Cash, 2=Bank Transfer, 3=Card, 4=Other
-    ReferenceNo     NVARCHAR(50)  NULL,
-    Notes           NVARCHAR(500) NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 22. SupplierPayments
-CREATE TABLE dbo.SupplierPayments
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SupplierPayments PRIMARY KEY,
-    PaymentNo         NVARCHAR(30)  NOT NULL UNIQUE,
-    SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
-    PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
-    PaymentDate       DATETIME2     NOT NULL,
-    Amount            DECIMAL(18,2) NOT NULL,
-    PaymentMethod     TINYINT       NOT NULL,
-    ReferenceNo       NVARCHAR(50)  NULL,
-    Notes             NVARCHAR(500) NULL,
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 23. DocumentSequences
-CREATE TABLE dbo.DocumentSequences
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_DocumentSequences PRIMARY KEY,
-    Prefix          NVARCHAR(10)  NOT NULL UNIQUE,
-    LastNumber      INT           NOT NULL CONSTRAINT DF_DocumentSequences_LastNumber DEFAULT(0),
-    UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_DocumentSequences_UpdatedAt DEFAULT(SYSDATETIME())
-);
-
--- 24. CashBoxes (v4.3)
-CREATE TABLE dbo.CashBoxes
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashBoxes PRIMARY KEY,
-    Name            NVARCHAR(100) NOT NULL,
-    OpeningBalance  DECIMAL(18,2) NOT NULL CONSTRAINT DF_CashBoxes_OpeningBalance DEFAULT(0),
-    CurrentBalance  DECIMAL(18,2) NOT NULL CONSTRAINT DF_CashBoxes_CurrentBalance DEFAULT(0),
-    IsDefault       BIT           NOT NULL CONSTRAINT DF_CashBoxes_IsDefault DEFAULT(0),
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_CashBoxes_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_CashBoxes_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT CK_CashBoxes_CurrentBalance CHECK (CurrentBalance >= 0)
-);
-
--- 25. CashTransactions (v4.3)
-CREATE TABLE dbo.CashTransactions
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashTransactions PRIMARY KEY,
-    CashBoxId         INT           NOT NULL REFERENCES dbo.CashBoxes(Id),
-    TransactionType   TINYINT       NOT NULL,
-    Amount            DECIMAL(18,2) NOT NULL,
-    BalanceBefore     DECIMAL(18,2) NOT NULL,
-    BalanceAfter      DECIMAL(18,2) NOT NULL,
-    ReferenceType     NVARCHAR(30)  NULL,
-    ReferenceId       INT           NULL,
-    Notes             NVARCHAR(500) NULL,
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    CreatedAt         DATETIME2     NOT NULL CONSTRAINT DF_CashTransactions_CreatedAt DEFAULT(SYSDATETIME()),
-
-    CONSTRAINT CK_CashTransactions_TransactionType CHECK (TransactionType IN (1,2,3,4,5,6,7,8))
-);
-CREATE INDEX IX_CashTransactions_CashBoxId ON dbo.CashTransactions(CashBoxId, CreatedAt DESC);
-
--- 26. ProductPriceHistory (v4.3)
-CREATE TABLE dbo.ProductPriceHistory
-(
-    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductPriceHistory PRIMARY KEY,
-    ProductUnitId       INT           NOT NULL REFERENCES dbo.ProductUnits(Id),
-    OldRetailPrice      DECIMAL(18,2) NOT NULL,
-    NewRetailPrice      DECIMAL(18,2) NOT NULL,
-    OldWholesalePrice   DECIMAL(18,2) NOT NULL,
-    NewWholesalePrice   DECIMAL(18,2) NOT NULL,
-    OldCost             DECIMAL(18,2) NOT NULL,
-    NewCost             DECIMAL(18,2) NOT NULL,
-    ChangeReason        NVARCHAR(250) NULL,
-    ChangedByUserId     INT           NOT NULL REFERENCES dbo.Users(Id),
-    CreatedAt           DATETIME2     NOT NULL CONSTRAINT DF_ProductPriceHistory_CreatedAt DEFAULT(SYSDATETIME())
-);
-CREATE INDEX IX_ProductPriceHistory_ProductUnitId ON dbo.ProductPriceHistory(ProductUnitId, CreatedAt DESC);
-
--- 27. SystemSettings (v4.3)
-CREATE TABLE dbo.SystemSettings
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemSettings PRIMARY KEY,
-    [Key]           NVARCHAR(100) NOT NULL,
-    [Value]         NVARCHAR(500) NOT NULL,
-    [Description]   NVARCHAR(250) NULL,
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_SystemSettings_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_SystemSettings_Key UNIQUE ([Key])
-);
-
--- 28. SystemLog (v4.3)
-CREATE TABLE dbo.SystemLog
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemLog PRIMARY KEY,
-    [Level]         NVARCHAR(20)  NOT NULL,
-    [Source]        NVARCHAR(100) NULL,
-    [Message]       NVARCHAR(MAX) NOT NULL,
-    [Exception]     NVARCHAR(MAX) NULL,
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_SystemLog_CreatedAt DEFAULT(SYSDATETIME())
-);
-CREATE INDEX IX_SystemLog_Level ON dbo.SystemLog([Level], CreatedAt DESC);
-
--- ============================================================================
--- 29+ New Tables (v4.7+ — Accounting Foundation)
--- ============================================================================
-
--- 29. Currencies
-CREATE TABLE dbo.Currencies
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Currencies PRIMARY KEY,
-    Code            NVARCHAR(10)  NOT NULL,
-    Name            NVARCHAR(100) NOT NULL,
-    Symbol          NVARCHAR(10)  NULL,
-    ExchangeRate    DECIMAL(18,6) NOT NULL CONSTRAINT DF_Currencies_ExchangeRate DEFAULT(1),
-    IsDefault       BIT           NOT NULL CONSTRAINT DF_Currencies_IsDefault DEFAULT(0),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Currencies_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Currencies_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Currencies_Code UNIQUE (Code)
-);
-
--- 30. Accounts (Chart of Accounts)
-CREATE TABLE dbo.Accounts
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Accounts PRIMARY KEY,
-    AccountCode     NVARCHAR(20)  NOT NULL,
-    AccountName     NVARCHAR(150) NOT NULL,
-    AccountType     TINYINT       NOT NULL, -- 1=Asset, 2=Liability, 3=Equity, 4=Income, 5=Expense
-    ParentAccountId INT           NULL REFERENCES dbo.Accounts(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Accounts_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Accounts_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Accounts_AccountCode UNIQUE (AccountCode)
-);
-
--- 31. JournalEntries
-CREATE TABLE dbo.JournalEntries
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_JournalEntries PRIMARY KEY,
-    EntryDate       DATETIME2     NOT NULL,
-    ReferenceType   NVARCHAR(30)  NOT NULL, -- 'SalesInvoice', 'PurchaseInvoice', 'Payment', etc.
-    ReferenceId     INT           NOT NULL,
-    Description     NVARCHAR(500) NULL,
-    IsPosted        BIT           NOT NULL CONSTRAINT DF_JournalEntries_IsPosted DEFAULT(1),
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_JournalEntries_CreatedAt DEFAULT(SYSDATETIME()),
-    PostedAt        DATETIME2     NULL
-);
-CREATE INDEX IX_JournalEntries_Reference ON dbo.JournalEntries(ReferenceType, ReferenceId);
-CREATE INDEX IX_JournalEntries_EntryDate ON dbo.JournalEntries(EntryDate DESC);
-
--- 32. JournalEntryLines
-CREATE TABLE dbo.JournalEntryLines
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_JournalEntryLines PRIMARY KEY,
-    JournalEntryId  INT           NOT NULL REFERENCES dbo.JournalEntries(Id),
-    AccountId       INT           NOT NULL REFERENCES dbo.Accounts(Id),
-    DebitAmount     DECIMAL(18,2) NOT NULL CONSTRAINT DF_JournalEntryLines_Debit DEFAULT(0),
-    CreditAmount    DECIMAL(18,2) NOT NULL CONSTRAINT DF_JournalEntryLines_Credit DEFAULT(0),
-    Description     NVARCHAR(250) NULL,
-
-    CONSTRAINT CK_JournalEntryLines_Amounts CHECK (DebitAmount >= 0 AND CreditAmount >= 0)
-);
-CREATE INDEX IX_JournalEntryLines_JournalEntryId ON dbo.JournalEntryLines(JournalEntryId);
-CREATE INDEX IX_JournalEntryLines_AccountId ON dbo.JournalEntryLines(AccountId);
-
--- 33. PurchaseLots (FIFO/FEFO tracking)
-CREATE TABLE dbo.PurchaseLots
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseLots PRIMARY KEY,
-    ProductId       INT           NOT NULL REFERENCES dbo.Products(Id),
-    PurchaseInvoiceId INT         NOT NULL REFERENCES dbo.PurchaseInvoices(Id),
-    LotNo           NVARCHAR(50)  NULL,
-    ManufactureDate DATE          NULL,
-    ExpiryDate      DATE          NULL,
-    Quantity        DECIMAL(18,3) NOT NULL,
-    RemainingQty    DECIMAL(18,3) NOT NULL,
-    UnitCost        DECIMAL(18,2) NOT NULL,
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_PurchaseLots_CreatedAt DEFAULT(SYSDATETIME()),
-
-    CONSTRAINT CK_PurchaseLots_RemainingQty CHECK (RemainingQty >= 0)
-);
-CREATE INDEX IX_PurchaseLots_ProductId ON dbo.PurchaseLots(ProductId, ExpiryDate);
-CREATE INDEX IX_PurchaseLots_PurchaseInvoiceId ON dbo.PurchaseLots(PurchaseInvoiceId);
-
--- 34. FiscalYears
-CREATE TABLE dbo.FiscalYears
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_FiscalYears PRIMARY KEY,
-    YearName        NVARCHAR(20)  NOT NULL, -- e.g., '2026', '2026-2027'
-    StartDate       DATE          NOT NULL,
-    EndDate         DATE          NOT NULL,
-    IsClosed        BIT           NOT NULL CONSTRAINT DF_FiscalYears_IsClosed DEFAULT(0),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_FiscalYears_CreatedAt DEFAULT(SYSDATETIME()),
-
-    CONSTRAINT CK_FiscalYears_EndAfterStart CHECK (EndDate > StartDate)
-);
-
--- 35. Taxes
-CREATE TABLE dbo.Taxes
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Taxes PRIMARY KEY,
-    TaxName         NVARCHAR(100) NOT NULL,
-    TaxRate         DECIMAL(18,2) NOT NULL,
-    TaxType         TINYINT       NOT NULL, -- 1=Inclusive, 2=Exclusive, 3=Withholding
-    IsDefault       BIT           NOT NULL CONSTRAINT DF_Taxes_IsDefault DEFAULT(0),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Taxes_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Taxes_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- ============================================================================
--- ALTER TABLE Statements for New Columns (v4.7+)
--- ============================================================================
-
--- Customers: New columns
-ALTER TABLE dbo.Customers ADD
-    AccountId       INT NULL REFERENCES dbo.Accounts(Id),
-    CurrencyId      INT NULL REFERENCES dbo.Currencies(Id),
-    CreditLimit     DECIMAL(18,2) NOT NULL CONSTRAINT DF_Customers_CreditLimit DEFAULT(0),
-    CustomerType    TINYINT NULL; -- 1=Retail, 2=Wholesale, 3=Corporate
-
--- Suppliers: New columns
-ALTER TABLE dbo.Suppliers ADD
-    AccountId       INT NULL REFERENCES dbo.Accounts(Id),
-    CurrencyId      INT NULL REFERENCES dbo.Currencies(Id),
-    CreditLimit     DECIMAL(18,2) NOT NULL CONSTRAINT DF_Suppliers_CreditLimit DEFAULT(0);
-
--- Users: New columns
-ALTER TABLE dbo.Users ADD
-    MustChangePassword BIT NOT NULL CONSTRAINT DF_Users_MustChangePassword DEFAULT(1),
-    [Status]           TINYINT NOT NULL CONSTRAINT DF_Users_Status DEFAULT(1), -- 1=Active, 2=Locked, 3=Suspended
-    LastLoginAt        DATETIME2 NULL,
-    FailedLoginAttempts INT NOT NULL CONSTRAINT DF_Users_FailedLoginAttempts DEFAULT(0);
-
--- Products: New columns
-ALTER TABLE dbo.Products ADD
-    AvgCost         DECIMAL(18,2) NOT NULL CONSTRAINT DF_Products_AvgCost DEFAULT(0),
-    TrackExpiry     BIT NOT NULL CONSTRAINT DF_Products_TrackExpiry DEFAULT(0),
-    IsExpirable     BIT NOT NULL CONSTRAINT DF_Products_IsExpirable DEFAULT(0);
-
--- CashBoxes: New columns
-ALTER TABLE dbo.CashBoxes ADD
-    AccountId       INT NULL REFERENCES dbo.Accounts(Id),
-    CurrencyId      INT NULL REFERENCES dbo.Currencies(Id);
-
--- ============================================================================
--- Seed Data for SystemSettings
--- ============================================================================
-INSERT INTO dbo.SystemSettings ([Key], [Value], [Description])
-VALUES
-    (N'CostingMethod', N'1', N'1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice'),
-    (N'DefaultCashBoxId', N'1', N'Default cash box for invoice payments');
-GO
-
+## Sales Invoice
 ```
+LineTotal = Quantity x UnitPrice
+SubTotal  = SUM(LineTotal)
+NetTotal  = SubTotal - DiscountAmount + TaxAmount + OtherCharges
+RemainingAmount = NetTotal - PaidAmount
+Constraint: PaidAmount <= NetTotal
+```
+
+## Purchase Invoice
+```
+LineTotal = Quantity x UnitPrice
+SubTotal  = SUM(LineTotal)
+NetTotal  = SubTotal - DiscountAmount + TaxAmount + OtherCharges
+RemainingAmount = NetTotal - PaidAmount
+Constraint: PaidAmount <= NetTotal
+```
+
+## FIFO Costing (Default Method)
+```
+-On Sale: consume from earliest batch first (oldest QuantityRemaining > 0)
+-On Purchase Return: debit from the original batch's QuantityRemaining
+-On Expiry/FEFO: consume nearest expiry date first (when TrackExpiry = true)
+```
+
+## Journal Entry Balance
+```
+Per Line: (Debit > 0 AND Credit = 0) OR (Credit > 0 AND Debit = 0) OR (Debit = 0 AND Credit = 0)
+Per Entry: SUM(Debit) = SUM(Credit)
+```
+
+---
+
+# 7) Soft Delete Strategy
+
+- **Soft delete**: `IsActive = false` on all ActivatableEntity inheritors
+- **Filter**: Global EF Core query filter `.HasQueryFilter(x => x.IsActive)`
+- **Live balances**: WarehouseStocks has NO IsActive (auditable entity only)
+- **Invoices**: `Status = Cancelled` — NEVER hard delete invoiced transactions
+- **Users**: NEVER hard-delete — soft delete via `IsActive = false`
+- **Document entities**: use Status (Draft→Posted→Cancelled), not IsActive
+
+---
+
+# 8) FK Rules
+
+- **ALL foreign keys**: `DeleteBehavior.Restrict` — NO cascade delete anywhere
+- **Self-referencing FKs**: Accounts.ParentId
+- **Soft-delete reference safety**: Filtered unique indexes include `AND [IsActive] = 1`

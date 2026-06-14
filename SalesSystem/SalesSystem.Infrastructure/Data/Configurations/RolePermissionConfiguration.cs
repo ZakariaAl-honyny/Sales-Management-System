@@ -10,8 +10,22 @@ public class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermissi
     {
         builder.ToTable("RolePermissions");
         builder.HasKey(rp => rp.Id);
-        builder.Property(rp => rp.Role).IsRequired().HasConversion<byte>();
-        builder.HasIndex(rp => new { rp.Role, rp.PermissionId }).IsUnique();
-        builder.HasQueryFilter(rp => rp.IsActive);
+
+        // RoleId — FK to Roles table (was UserRole enum)
+        builder.Property(rp => rp.RoleId).IsRequired();
+        builder.HasIndex(rp => new { rp.RoleId, rp.PermissionId }).IsUnique();
+
+        // Navigation: Role
+        builder.HasOne(rp => rp.Role)
+            .WithMany(r => r.RolePermissions)
+            .HasForeignKey(rp => rp.RoleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Navigation: Permission
+        builder.HasOne(rp => rp.Permission)
+            .WithMany(p => p.RolePermissions)
+            .HasForeignKey(rp => rp.PermissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
     }
 }

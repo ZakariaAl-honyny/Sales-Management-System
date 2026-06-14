@@ -2,8 +2,11 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
-using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
+using System.Linq.Expressions;
 
 namespace SalesSystem.Application.Accounting.Services;
 
@@ -18,117 +21,142 @@ public class SystemAccountService : ISystemAccountService
         _logger = logger;
     }
 
-    public async Task<Result<SystemAccountMappingsDto>> GetMappingsAsync(int? branchId = null, CancellationToken ct = default)
+    public async Task<Result<SystemAccountMappingDto>> GetMappingAsync(SystemAccountKey key, int? branchId = null, CancellationToken ct = default)
     {
         try
         {
-            // Try branch-specific first, fall back to global (branchId == null)
-            var mappings = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-                m => (branchId == null && m.BranchId == null) || (branchId != null && m.BranchId == branchId),
-                ct: ct);
+            Expression<Func<SystemAccountMapping, bool>> predicate;
 
-            if (mappings == null)
-                return Result<SystemAccountMappingsDto>.Failure("لم يتم إعداد حسابات النظام — يرجى الاتصال بالمسؤول");
+            if (branchId.HasValue)
+                predicate = m => m.MappingKey == key && m.BranchId == branchId.Value && m.IsActive;
+            else
+                predicate = m => m.MappingKey == key && m.BranchId == 0 && m.IsActive;
 
-            // Load all referenced accounts in a single query for name/code resolution
-            var accountIds = new HashSet<int>
-            {
-                mappings.DefaultCashAccountId,
-                mappings.DefaultBankAccountId,
-                mappings.InventoryAssetAccountId,
-                mappings.AccountsReceivableAccountId,
-                mappings.AccountsPayableAccountId,
-                mappings.VatOutputAccountId,
-                mappings.VatInputAccountId,
-                mappings.CapitalAccountId,
-                mappings.SalesRevenueAccountId,
-                mappings.SalesReturnAccountId,
-                mappings.CogsAccountId,
-                mappings.GeneralExpenseAccountId,
-                mappings.SpoilageLossAccountId
-            };
+            var mapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(predicate, ct, "Account");
 
-            if (mappings.OpeningBalanceEquityAccountId.HasValue)
-                accountIds.Add(mappings.OpeningBalanceEquityAccountId.Value);
+            if (mapping == null)
+                return Result<SystemAccountMappingDto>.Failure($"لم يتم تعيين حساب لمفتاح '{key}'");
 
-            var accounts = await _uow.Accounts.ToListAsync(
-                a => accountIds.Contains(a.Id), ct: ct);
-
-            var accountLookup = accounts.ToDictionary(a => a.Id);
-
-            static (string? name, string? code) GetAccountInfo(Dictionary<int, Account> lookup, int id)
-                => lookup.TryGetValue(id, out var acc) ? (acc.NameAr, acc.AccountCode) : (null, null);
-
-            var (cashName, cashCode) = GetAccountInfo(accountLookup, mappings.DefaultCashAccountId);
-            var (bankName, bankCode) = GetAccountInfo(accountLookup, mappings.DefaultBankAccountId);
-            var (invName, invCode) = GetAccountInfo(accountLookup, mappings.InventoryAssetAccountId);
-            var (arName, arCode) = GetAccountInfo(accountLookup, mappings.AccountsReceivableAccountId);
-            var (apName, apCode) = GetAccountInfo(accountLookup, mappings.AccountsPayableAccountId);
-            var (vatOutName, vatOutCode) = GetAccountInfo(accountLookup, mappings.VatOutputAccountId);
-            var (vatInName, vatInCode) = GetAccountInfo(accountLookup, mappings.VatInputAccountId);
-            var (capName, capCode) = GetAccountInfo(accountLookup, mappings.CapitalAccountId);
-            var (revName, revCode) = GetAccountInfo(accountLookup, mappings.SalesRevenueAccountId);
-            var (retName, retCode) = GetAccountInfo(accountLookup, mappings.SalesReturnAccountId);
-            var (cogsName, cogsCode) = GetAccountInfo(accountLookup, mappings.CogsAccountId);
-            var (expName, expCode) = GetAccountInfo(accountLookup, mappings.GeneralExpenseAccountId);
-            var (spoilName, spoilCode) = GetAccountInfo(accountLookup, mappings.SpoilageLossAccountId);
-
-            var (obeName, obeCode) = mappings.OpeningBalanceEquityAccountId.HasValue
-                ? GetAccountInfo(accountLookup, mappings.OpeningBalanceEquityAccountId.Value)
-                : (null, (string?)null);
-
-            var dto = new SystemAccountMappingsDto(
-                Id: mappings.Id,
-                DefaultCashAccountId: mappings.DefaultCashAccountId,
-                DefaultCashAccountName: cashName,
-                DefaultCashAccountCode: cashCode,
-                DefaultBankAccountId: mappings.DefaultBankAccountId,
-                DefaultBankAccountName: bankName,
-                DefaultBankAccountCode: bankCode,
-                InventoryAssetAccountId: mappings.InventoryAssetAccountId,
-                InventoryAssetAccountName: invName,
-                InventoryAssetAccountCode: invCode,
-                AccountsReceivableAccountId: mappings.AccountsReceivableAccountId,
-                AccountsReceivableAccountName: arName,
-                AccountsReceivableAccountCode: arCode,
-                AccountsPayableAccountId: mappings.AccountsPayableAccountId,
-                AccountsPayableAccountName: apName,
-                AccountsPayableAccountCode: apCode,
-                VatOutputAccountId: mappings.VatOutputAccountId,
-                VatOutputAccountName: vatOutName,
-                VatOutputAccountCode: vatOutCode,
-                VatInputAccountId: mappings.VatInputAccountId,
-                VatInputAccountName: vatInName,
-                VatInputAccountCode: vatInCode,
-                CapitalAccountId: mappings.CapitalAccountId,
-                CapitalAccountName: capName,
-                CapitalAccountCode: capCode,
-                SalesRevenueAccountId: mappings.SalesRevenueAccountId,
-                SalesRevenueAccountName: revName,
-                SalesRevenueAccountCode: revCode,
-                SalesReturnAccountId: mappings.SalesReturnAccountId,
-                SalesReturnAccountName: retName,
-                SalesReturnAccountCode: retCode,
-                CogsAccountId: mappings.CogsAccountId,
-                CogsAccountName: cogsName,
-                CogsAccountCode: cogsCode,
-                GeneralExpenseAccountId: mappings.GeneralExpenseAccountId,
-                GeneralExpenseAccountName: expName,
-                GeneralExpenseAccountCode: expCode,
-                SpoilageLossAccountId: mappings.SpoilageLossAccountId,
-                SpoilageLossAccountName: spoilName,
-                SpoilageLossAccountCode: spoilCode,
-                OpeningBalanceEquityAccountId: mappings.OpeningBalanceEquityAccountId,
-                OpeningBalanceEquityAccountName: obeName,
-                OpeningBalanceEquityAccountCode: obeCode,
-                BranchId: mappings.BranchId);
-
-            return Result<SystemAccountMappingsDto>.Success(dto);
+            return Result<SystemAccountMappingDto>.Success(MapToDto(mapping));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving system account mappings for branch {BranchId}", branchId);
-            return Result<SystemAccountMappingsDto>.Failure("حدث خطأ أثناء استرجاع حسابات النظام");
+            _logger.LogError(ex, "Error getting mapping for key {Key}", key);
+            return Result<SystemAccountMappingDto>.Failure("حدث خطأ أثناء استرجاع حساب النظام");
         }
+    }
+
+    public async Task<Result<List<SystemAccountMappingDto>>> GetAllMappingsAsync(int? branchId = null, CancellationToken ct = default)
+    {
+        try
+        {
+            Expression<Func<SystemAccountMapping, bool>> predicate;
+            if (branchId.HasValue)
+                predicate = m => m.BranchId == branchId.Value && m.IsActive;
+            else
+                predicate = m => m.IsActive;
+
+            var mappings = await _uow.SystemAccountMappings.ToListAsync(predicate, ct: ct, includePaths: "Account");
+
+            var dtos = mappings.Select(MapToDto).ToList();
+            return Result<List<SystemAccountMappingDto>>.Success(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all mappings for branch {BranchId}", branchId);
+            return Result<List<SystemAccountMappingDto>>.Failure("حدث خطأ أثناء استرجاع حسابات النظام");
+        }
+    }
+
+    public async Task<Result<SystemAccountMappingDto>> CreateMappingAsync(CreateSystemAccountMappingRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            // Check for duplicate key + branch combination
+            var existing = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
+                m => m.MappingKey == request.MappingKey && m.BranchId == request.BranchId && m.IsActive, ct: ct);
+
+            if (existing != null)
+                return Result<SystemAccountMappingDto>.Failure("يوجد تعيين نشط لنفس المفتاح والفرع");
+
+            var mapping = SystemAccountMapping.Create(
+                request.MappingKey,
+                request.AccountId,
+                request.BranchId,
+                request.DescriptionAr,
+                request.DescriptionEn);
+
+            await _uow.SystemAccountMappings.AddAsync(mapping, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Created system account mapping: Key={Key}, AccountId={AccountId}, BranchId={BranchId}",
+                mapping.MappingKey, mapping.AccountId, mapping.BranchId);
+
+            return Result<SystemAccountMappingDto>.Success(MapToDto(mapping));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating system account mapping");
+            return Result<SystemAccountMappingDto>.Failure("حدث خطأ أثناء إنشاء حساب النظام");
+        }
+    }
+
+    public async Task<Result<SystemAccountMappingDto>> UpdateMappingAsync(int id, UpdateSystemAccountMappingRequest request, CancellationToken ct = default)
+    {
+        try
+        {
+            var mapping = await _uow.SystemAccountMappings.GetByIdAsync(id, ct);
+            if (mapping == null)
+                return Result<SystemAccountMappingDto>.Failure("حساب النظام غير موجود", ErrorCodes.NotFound);
+
+            mapping.Update(request.AccountId, request.DescriptionAr, request.DescriptionEn);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Updated system account mapping {Id}: AccountId={AccountId}", id, request.AccountId);
+
+            return Result<SystemAccountMappingDto>.Success(MapToDto(mapping));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating system account mapping {Id}", id);
+            return Result<SystemAccountMappingDto>.Failure("حدث خطأ أثناء تحديث حساب النظام");
+        }
+    }
+
+    public async Task<Result> DeleteMappingAsync(int id, CancellationToken ct = default)
+    {
+        try
+        {
+            var mapping = await _uow.SystemAccountMappings.GetByIdAsync(id, ct);
+            if (mapping == null)
+                return Result.Failure("حساب النظام غير موجود", ErrorCodes.NotFound);
+
+            mapping.MarkAsDeleted();
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Deleted system account mapping {Id}", id);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting system account mapping {Id}", id);
+            return Result.Failure("حدث خطأ أثناء حذف حساب النظام");
+        }
+    }
+
+    private static SystemAccountMappingDto MapToDto(SystemAccountMapping mapping)
+    {
+        return new SystemAccountMappingDto(
+            Id: mapping.Id,
+            MappingKey: mapping.MappingKey,
+            MappingKeyName: mapping.MappingKey.ToString(),
+            AccountId: mapping.AccountId,
+            AccountName: mapping.Account?.NameAr,
+            AccountCode: mapping.Account?.AccountCode,
+            BranchId: mapping.BranchId,
+            DescriptionAr: mapping.DescriptionAr,
+            DescriptionEn: mapping.DescriptionEn,
+            IsActive: mapping.IsActive
+        );
     }
 }

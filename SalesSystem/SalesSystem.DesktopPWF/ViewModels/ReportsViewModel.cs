@@ -98,11 +98,11 @@ public class ReportsViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Warehouses.Clear();
-                    Warehouses.Add(new WarehouseDto(0, "كل المخازن", 1, string.Empty, null, null, null, true, true, null, null));
+                    Warehouses.Add(new WarehouseDto(0, string.Empty, "كل المخازن", (byte)1, null, null, null, null, true));
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
                     
-                    var defaultOrFirst = result.Value.FirstOrDefault(w => w.IsDefault) ?? result.Value.FirstOrDefault();
+                    var defaultOrFirst = result.Value.FirstOrDefault();
                     if (defaultOrFirst != null)
                     {
                         SelectedWarehouseId = defaultOrFirst.Id;

@@ -30,7 +30,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(ClaimTypes.Name, user.UserName),
             new Claim(ClaimTypes.GivenName, user.FullName),
-            new Claim(ClaimTypes.Role, user.Role.ToString("d")),
+            new Claim(ClaimTypes.Role, user.UserRoles.FirstOrDefault()?.RoleId.ToString() ?? "3"),
         };
 
         var token = new JwtSecurityToken(

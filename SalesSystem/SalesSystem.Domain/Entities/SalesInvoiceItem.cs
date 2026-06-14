@@ -4,7 +4,7 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SalesInvoiceItem : BaseEntity
+public class SalesInvoiceItem : Entity
 {
     public int SalesInvoiceId { get; private set; }
     public int ProductId { get; private set; }

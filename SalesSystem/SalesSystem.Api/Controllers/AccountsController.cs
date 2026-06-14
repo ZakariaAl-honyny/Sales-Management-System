@@ -106,7 +106,7 @@ public class AccountsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMappings([FromQuery] int? branchId, CancellationToken ct)
     {
-        var result = await _systemAccountService.GetMappingsAsync(branchId, ct);
+        var result = await _systemAccountService.GetAllMappingsAsync(branchId, ct);
         if (!result.IsSuccess)
         {
             if (result.ErrorCode == ErrorCodes.NotFound)

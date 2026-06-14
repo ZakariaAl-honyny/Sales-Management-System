@@ -187,20 +187,13 @@ The Users & Permissions module is divided into **3 sub-modules** based on the an
 ### 2.4 Contracts Layer
 
 **DTOs** (in `SalesSystem.Contracts.DTOs.AllDtos.cs`):
-```csharp
-public record UserDto(int Id, string UserName, string FullName, byte Role, bool IsActive);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 **Requests** (in `SalesSystem.Contracts.Requests.UserRequests.cs`):
-```csharp
-public record CreateUserRequest(string UserName, string Password, string FullName, byte Role);
-public record UpdateUserRequest(string FullName, byte Role, bool IsActive, string? Password);
-```
+> See `SalesSystem.Contracts/` for canonical Request definitions.
 
 **Responses** (in `SalesSystem.Contracts.Responses.LoginResponse.cs`):
-```csharp
-public record LoginResponse(int UserId, string UserName, string FullName, byte Role, string Token, DateTime ExpiresAt);
-```
+> See `SalesSystem.Contracts/` for canonical Response definitions.
 
 **Validators** (in `SalesSystem.Api.Validators.UserRequestValidators.cs`):
 - `CreateUserRequestValidator` — ✅ Exists
@@ -310,14 +303,7 @@ public record LoginResponse(int UserId, string UserName, string FullName, byte R
 **Problem**: Adding `Phone`, `Email`, `AvatarPath`, `LastLoginAt`, `LoginAttempts`, `IsLocked` to an existing `Users` table with production data.
 
 **Fix**: All new columns must be nullable or have safe defaults:
-```sql
-ALTER TABLE Users ADD Phone nvarchar(20) NULL;
-ALTER TABLE Users ADD Email nvarchar(100) NULL;
-ALTER TABLE Users ADD AvatarPath nvarchar(255) NULL;
-ALTER TABLE Users ADD LastLoginAt datetime2 NULL;
-ALTER TABLE Users ADD LoginAttempts int NOT NULL DEFAULT 0;
-ALTER TABLE Users ADD IsLocked bit NOT NULL DEFAULT 0;
-```
+> See `docs/database-schema.md` Module 1.9 for the canonical Users table definition.
 
 **Migration is additive** — no breaking changes, no data loss.
 
@@ -340,14 +326,7 @@ ALTER TABLE Users ADD IsLocked bit NOT NULL DEFAULT 0;
 
 **File**: `Domain/Enums/UserStatus.cs`
 
-```csharp
-public enum UserStatus : byte
-{
-    Active = 1,
-    Inactive = 2,
-    Locked = 3
-}
-```
+> See `docs/AGENTS.md` Section 3 for the UserStatus enum values (Active=1, Inactive=2, Locked=3).
 
 Note: Replaces the simple `IsActive` bool per analysis requirement (lines 5007-5018 of Analysis Part 5 — Active/Inactive/Locked states).
 
@@ -357,156 +336,7 @@ Note: Replaces the simple `IsActive` bool per analysis requirement (lines 5007-5
 
 **Design decision (v4.6.9)**: Admin creates user with a default password "12345678". The user is forced to change it on first login (MustChangePassword = true). No passwordless creation, no token-based SetPassword flow. The default password is immediately hashed via BCrypt at creation time.
 
-```csharp
-public class User : BaseEntity
-{
-    // Existing
-    public string UserName { get; private set; } = string.Empty;
-
-    // REQUIRED (not nullable) — BCrypt hash of "12345678" on create, replaced on first change
-    public string PasswordHash { get; private set; } = string.Empty;
-    public string FullName { get; private set; } = string.Empty;
-    public UserRole Role { get; private set; }
-
-    // REPLACES IsActive: UserStatus with Active/Inactive/Locked (analysis lines 5007-5018)
-    public UserStatus Status { get; private set; } = UserStatus.Active;
-
-    // NEW fields from analysis
-    public string? Phone { get; private set; }
-    public string? Email { get; private set; }
-    public string? AvatarPath { get; private set; }
-    public DateTime? LastLoginAt { get; private set; }
-    public int LoginAttempts { get; private set; }
-
-    // CHANGED: IsLocked replaced by UserStatus.Locked, but keep as computed helper
-    public bool IsLocked => Status == UserStatus.Locked;
-
-    // NEW: Password management
-    public bool MustChangePassword { get; private set; } = true;  // Default: must change on first login
-    public DateTime? PasswordChangedAt { get; private set; }
-
-    // NEW: Default cashbox assignment per user (analysis line 4905)
-    public int? DefaultCashBoxId { get; private set; }
-
-    protected User() { } // EF Core
-
-    /// <summary>
-    /// Creates a new user with a default BCrypt-hashed password ("12345678" if none provided).
-    /// MustChangePassword = true by default — user is forced to change on first login.
-    /// </summary>
-    public static User Create(string userName, string fullName,
-        UserRole role, string? phone = null, string? email = null,
-        int? defaultCashBoxId = null, int? createdByUserId = null,
-        string? passwordHash = null)
-    {
-        if (string.IsNullOrWhiteSpace(userName))
-            throw new DomainException("اسم المستخدم مطلوب.");
-        if (string.IsNullOrWhiteSpace(fullName))
-            throw new DomainException("الاسم الكامل مطلوب.");
-
-        // Default password is "12345678" — always hashed, never stored in plaintext
-        var hash = passwordHash ?? BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
-
-        return new User
-        {
-            UserName = userName.Trim(),
-            FullName = fullName.Trim(),
-            Role = role,
-            Status = UserStatus.Active,
-            PasswordHash = hash,
-            Phone = phone?.Trim(),
-            Email = email?.Trim(),
-            DefaultCashBoxId = defaultCashBoxId,
-            MustChangePassword = true,      // Forces password change on first login
-            CreatedByUserId = createdByUserId,
-            CreatedAt = DateTime.UtcNow
-        };
-    }
-
-    // NEW methods
-    public void UpdateProfile(string fullName, UserRole role, string? phone, string? email,
-        int? defaultCashBoxId = null, int? updatedByUserId = null)
-    {
-        FullName = fullName.Trim();
-        Role = role;
-        Phone = phone?.Trim();
-        Email = email?.Trim();
-        DefaultCashBoxId = defaultCashBoxId;
-        UpdatedByUserId = updatedByUserId;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public void ChangePassword(string newPasswordHash, int? updatedByUserId = null)
-    {
-        if (string.IsNullOrWhiteSpace(newPasswordHash))
-            throw new DomainException("كلمة المرور الجديدة مطلوبة.");
-        PasswordHash = newPasswordHash;
-        PasswordChangedAt = DateTime.UtcNow;
-        MustChangePassword = false;
-        UpdatedByUserId = updatedByUserId;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public void RecordLoginAttempt(bool success)
-    {
-        if (success)
-        {
-            LoginAttempts = 0;
-            LastLoginAt = DateTime.UtcNow;
-            // Do NOT auto-unlock — use explicit Unlock() for that
-        }
-        else
-        {
-            LoginAttempts++;
-            if (LoginAttempts >= 5)
-                Status = UserStatus.Locked;
-        }
-    }
-
-    public void Lock()    => Status = UserStatus.Locked;
-    public void Unlock()  => Status = UserStatus.Active;
-    public void SetAvatar(string avatarPath) => AvatarPath = avatarPath;
-    public void ClearAvatar() => AvatarPath = null;
-    public void Deactivate() // Status = UserStatus.Inactive (soft deactivate)
-    {
-        Status = UserStatus.Inactive;
-        IsActive = false;  // Keep BaseEntity.IsActive in sync
-    }
-    public void Activate()   // Status = UserStatus.Active
-    {
-        Status = UserStatus.Active;
-        IsActive = true;   // Keep BaseEntity.IsActive in sync
-    }
-
-    /// <summary>
-    /// Admin reset: sets password back to default "12345678" hash.
-    /// MustChangePassword = true — user forced to change on next login.
-    /// </summary>
-    public void ResetPassword()
-    {
-        PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
-        MustChangePassword = true;
-        PasswordChangedAt = null;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    // Override BaseEntity.MarkAsDeleted to keep Status in sync
-    public new void MarkAsDeleted()
-    {
-        Status = UserStatus.Inactive;
-        IsActive = false;
-    }
-
-    // Override BaseEntity.Restore to keep Status in sync
-    public new void Restore()
-    {
-        Status = UserStatus.Active;
-        IsActive = true;
-    }
-}
-```
-
-**Guard Clauses** (RULE-052) — All updated:
+> See `docs/database-schema.md` Module 1.9 (Users table) for the canonical User entity definition and `docs/CONSTITUTION.md`/`AGENTS.md` for entity patterns (private set, Guard Clauses, domain methods).
 - `if (string.IsNullOrWhiteSpace(userName))` → `throw new DomainException("اسم المستخدم مطلوب.")`
 - `if (string.IsNullOrWhiteSpace(fullName))` → `throw new DomainException("الاسم الكامل مطلوب.")`
 - `if (phone?.Length > 20)` → `throw new DomainException("رقم الهاتف لا يتجاوز 20 رقماً.")`
@@ -516,267 +346,39 @@ public class User : BaseEntity
 
 ### 4.3 UserConfiguration (Extended)
 
-**File**: `Infrastructure/Data/Configurations/UserConfiguration.cs`
+> See `docs/database-schema.md` Module 1.9 for the canonical User Fluent API configuration and `docs/AGENTS.md` §2.16 for EF Core conventions.
 
-```csharp
-public class UserConfiguration : IEntityTypeConfiguration<User>
-{
-    public void Configure(EntityTypeBuilder<User> builder)
-    {
-        builder.ToTable("Users");
-        builder.HasKey(u => u.Id);
-        builder.Property(u => u.UserName).IsRequired().HasMaxLength(50);
-        builder.HasIndex(u => u.UserName).IsUnique();
-
-        // PasswordHash is REQUIRED — default "12345678" hash set at creation
-        builder.Property(u => u.PasswordHash).IsRequired().HasMaxLength(256);
-
-        builder.Property(u => u.FullName).IsRequired().HasMaxLength(150);
-        builder.Property(u => u.Role).IsRequired().HasConversion<byte>();
-
-        // CHANGED: UserStatus replaces IsActive
-        builder.Property(u => u.Status).IsRequired().HasConversion<byte>().HasDefaultValue(UserStatus.Active);
-
-        // NEW properties
-        builder.Property(u => u.Phone).HasMaxLength(20);
-        builder.Property(u => u.Email).HasMaxLength(100);
-        builder.Property(u => u.AvatarPath).HasMaxLength(255);
-        builder.Property(u => u.LastLoginAt);
-        builder.Property(u => u.LoginAttempts).HasDefaultValue(0);
-
-        // NEW: Password management fields
-        builder.Property(u => u.MustChangePassword).HasDefaultValue(true);
-        builder.Property(u => u.PasswordChangedAt);
-
-        // NEW: DefaultCashBoxId FK (nullable)
-        builder.Property(u => u.DefaultCashBoxId);
-        builder.HasOne(u => u.DefaultCashBox)
-            .WithMany()
-            .HasForeignKey(u => u.DefaultCashBoxId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // CHANGED: Query filter uses UserStatus + IsActive for defense-in-depth
-        builder.HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte)UserStatus.Active);
-    }
-}
-```
+Updated query filter: `HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte)UserStatus.Active)`
 
 ### 4.4 Permission Entity (NEW — Using exact codes from Analysis Part 5 lines 3981-4022)
 
-**File**: `Domain/Entities/Permission.cs`
-
-```csharp
-public class Permission : BaseEntity
-{
-    public string Name { get; private set; } = string.Empty;          // e.g., "Sales.View"
-    public string DisplayNameAr { get; private set; } = string.Empty;  // e.g., "عرض فواتير البيع"
-    public string Category { get; private set; } = string.Empty;       // e.g., "Sales"
-    public bool IsSystem { get; private set; }                        // System = cannot delete
-
-    private readonly List<RolePermission> _rolePermissions = new();
-    public IReadOnlyCollection<RolePermission> RolePermissions => _rolePermissions.AsReadOnly();
-
-    protected Permission() { }
-
-    public static Permission Create(string name, string displayNameAr, string category, bool isSystem = false)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم الصلاحية مطلوب");
-        if (string.IsNullOrWhiteSpace(displayNameAr))
-            throw new DomainException("الاسم العربي للصلاحية مطلوب");
-        return new Permission
-        {
-            Name = name.Trim(),
-            DisplayNameAr = displayNameAr.Trim(),
-            Category = category.Trim(),
-            IsSystem = isSystem,
-            IsActive = true
-        };
-    }
-}
-```
+> See `docs/database-schema.md` Module 1.10 (Permissions table) for the canonical Permission entity definition and `docs/AGENTS.md`/`CONSTITUTION.md` for entity patterns (private set, Guard Clauses, domain methods).
 
 ### 4.5 RolePermission Join Entity (NEW — 4-role model per analysis)
 
-**File**: `Domain/Entities/RolePermission.cs`
-
-**Note**: The analysis (lines 3721-3737) specifies **4 roles**, not 3:
-- 1 = مدير النظام (Admin) — all permissions
-- 2 = محاسب (Accountant) — sales, purchases, reports, entries
-- 3 = كاشير (Cashier) — sales only, cash receipt only
-- 4 = مراقب (Observer) — reports only
-
-The existing `UserRole` enum must be extended to add `Accountant = 2` (current Manager becomes obsolete) and `Observer = 4`.
-
-```csharp
-// EXTENDED UserRole enum:
-public enum UserRole : byte
-{
-    Admin = 1,
-    Accountant = 2,   // NEW: replaces old "Manager" — handles sales, purchases, reports
-    Cashier = 3,
-    Observer = 4      // NEW: reports-only access
-}
-```
-
-```csharp
-public class RolePermission
-{
-    public int Id { get; private set; }
-    public UserRole Role { get; private set; }  // 1=Admin, 2=Accountant, 3=Cashier, 4=Observer
-    public int PermissionId { get; private set; }
-    public Permission Permission { get; private set; } = null!;
-
-    protected RolePermission() { }
-
-    public static RolePermission Create(UserRole role, int permissionId)
-    {
-        return new RolePermission
-        {
-            Role = role,
-            PermissionId = permissionId
-        };
-    }
-}
-```
+> See `docs/database-schema.md` Module 1.11 (RolePermissions table) for the canonical definition and `docs/AGENTS.md` Section 3 for the extended UserRole enum (Admin=1, Accountant=2, Cashier=3, Observer=4).
 
 ### 4.6 AuditLog Entity (NEW)
 
-**File**: `Domain/Entities/AuditLog.cs`
-
-```csharp
-public class AuditLog
-{
-    public long Id { get; private set; }  // bigint PK (high volume)
-    public int? UserId { get; private set; }
-    public User? User { get; private set; }
-    public string Action { get; private set; } = string.Empty;      // "Login", "CreateUser", "PostInvoice"
-    public string EntityType { get; private set; } = string.Empty;   // "User", "SalesInvoice"
-    public int? EntityId { get; private set; }
-    public string? Details { get; private set; }                     // JSON diff or description
-    public string? IpAddress { get; private set; }
-    public DateTime Timestamp { get; private set; }
-
-    protected AuditLog() { }
-
-    public static AuditLog Create(int? userId, string action, string entityType,
-        int? entityId = null, string? details = null, string? ipAddress = null)
-    {
-        if (string.IsNullOrWhiteSpace(action))
-            throw new DomainException("نوع الحركة مطلوب");
-        if (string.IsNullOrWhiteSpace(entityType))
-            throw new DomainException("نوع الكيان مطلوب");
-
-        return new AuditLog
-        {
-            UserId = userId,
-            Action = action,
-            EntityType = entityType,
-            EntityId = entityId,
-            Details = details,
-            IpAddress = ipAddress,
-            Timestamp = DateTime.UtcNow
-        };
-    }
-}
-```
+> See `docs/database-schema.md` Module 8.1 (AuditLogs table) for the canonical AuditLog entity definition with bigint PK, indexes, and FK to Users.
 
 ### 4.7 UserSession Entity (NEW)
 
-**File**: `Domain/Entities/UserSession.cs`
-
-```csharp
-public class UserSession
-{
-    public int Id { get; private set; }
-    public int UserId { get; private set; }
-    public User User { get; private set; } = null!;
-    public string TokenHash { get; private set; } = string.Empty;  // SHA256 of JWT
-    public DateTime LoginAt { get; private set; }
-    public DateTime? LastActivityAt { get; private set; }
-    public DateTime? ExpiresAt { get; private set; }
-    public bool IsActive { get; private set; }
-
-    protected UserSession() { }
-
-    public static UserSession Create(int userId, string tokenHash,
-        DateTime loginAt, int expirationHours = 8)
-    {
-        return new UserSession
-        {
-            UserId = userId,
-            TokenHash = tokenHash,
-            LoginAt = loginAt,
-            LastActivityAt = loginAt,
-            ExpiresAt = loginAt.AddHours(expirationHours),
-            IsActive = true
-        };
-    }
-
-    public void Touch() => LastActivityAt = DateTime.UtcNow;
-    public void Terminate() => IsActive = false;
-}
-```
+> See `docs/database-schema.md` Module 8.1 (UserSessions table) for the canonical UserSession entity definition with SessionToken, LoginAt, LastActivityAt, ExpiresAt, and IsActive.
 
 ### 4.8 DTO Changes (Default Password Flow)
 
 **UserDto — Extended**:
-```csharp
-// Current:   UserDto(int Id, string UserName, string FullName, byte Role, bool IsActive)
-// New: Status replaces IsActive, adds MustChangePassword, PasswordChangedAt, DefaultCashBoxId
-public record UserDto(int Id, string UserName, string FullName, byte Role,
-    byte Status,                       // UserStatus: 1=Active, 2=Inactive, 3=Locked
-    bool MustChangePassword,           // NEW: true = user must change password on login
-    DateTime? PasswordChangedAt,       // NEW: when password was last changed
-    string? Phone, string? Email, string? AvatarPath,
-    DateTime? LastLoginAt,
-    int LoginAttempts,
-    int? DefaultCashBoxId);            // NEW: default cashbox for user receipts
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 **Request Changes — Default Password Flow**:
-```csharp
-// CHANGED: Password field is OPTIONAL — defaults to "12345678" if null/empty
-// Admin can set a custom password during creation if desired
-public record CreateUserRequest(string UserName, string FullName, byte Role,
-    string? Password,                       // Optional — defaults to "12345678"
-    string? Phone, string? Email, int? DefaultCashBoxId);
-
-// CHANGED: IsActive replaced by Status
-// Password is optional (only when admin wants to change it)
-public record UpdateUserRequest(string FullName, byte Role, byte Status,
-    string? Password,                       // Optional — only when changing password
-    string? Phone, string? Email, int? DefaultCashBoxId);
-
-// REMOVED: SetPasswordRequest — no longer needed (default password flow replaces passwordless)
-
-// Admin reset user password
-public record ResetUserPasswordRequest(int UserId);
-```
+> See `SalesSystem.Contracts/` for canonical Request definitions.
 
 **Response Changes**:
-```csharp
-// NEW: LoginResponse includes RequiresPasswordChange flag
-public record LoginResponse(int UserId, string UserName, string FullName, byte Role,
-    string Token, DateTime ExpiresAt,
-    bool RequiresPasswordChange);          // NEW: true = user must change password
-```
+> See `SalesSystem.Contracts/` for canonical Response definitions.
 
 **New DTOs**:
-```csharp
-public record AuditLogDto(long Id, int? UserId, string? UserName, string Action,
-    string EntityType, int? EntityId, string? Details, string? IpAddress, DateTime Timestamp);
-
-public record PermissionDto(int Id, string Name, string DisplayNameAr, string Category, bool IsActive);
-public record RolePermissionDto(UserRole Role, List<int> PermissionIds);
-
-public record LoginHistoryDto(DateTime Timestamp, string Action, string? IpAddress, bool IsSuccess);
-public record UserSessionDto(int Id, DateTime LoginAt, DateTime? LastActivityAt, bool IsActive);
-public record CurrentUserDto(int Id, string UserName, string FullName, byte Role,
-    string? AvatarPath, List<string> Permissions);
-public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
-public record AvatarUploadResponse(string AvatarUrl);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 ### 4.9 Seed Data — Permissions (30 exact codes from Analysis Part 5 lines 3981-4022)
 
@@ -784,133 +386,7 @@ public record AvatarUploadResponse(string AvatarUrl);
 
 **Note**: These are the EXACT 33 permission codes from Analysis Part 5 (lines 3981-4022). Each follows `Domain.Action` dot-notation. The CRUD + Post + Cancel model (analysis lines 4200-4243) separates View/Create/EditDraft/Post/Cancel as distinct permissions.
 
-```csharp
-// ═══════════════════════════════════════════════════════
-// Seed Permissions (33 system permissions — Analysis Part 5 lines 3981-4022)
-// Format: Domain.Action (dot-notation)
-// ═══════════════════════════════════════════════════════
-if (!await db.Set<Permission>().AnyAsync())
-{
-    var permissions = new List<Permission>
-    {
-        // ── Sales (7 permissions) ──
-        Permission.Create("Sales.View",         "عرض فواتير البيع", "Sales", isSystem: true),
-        Permission.Create("Sales.Create",       "إنشاء فاتورة بيع", "Sales", isSystem: true),
-        Permission.Create("Sales.EditDraft",    "تعديل مسودة بيع", "Sales", isSystem: true),
-        Permission.Create("Sales.Post",         "ترحيل فاتورة بيع", "Sales", isSystem: true),
-        Permission.Create("Sales.Cancel",       "إلغاء فاتورة بيع", "Sales", isSystem: true),
-        Permission.Create("Sales.ViewProfit",   "عرض الربح في البيع", "Sales", isSystem: true),
-        Permission.Create("Sales.EditPrice",    "تعديل سعر البيع", "Sales", isSystem: true),
-
-        // ── Purchases (5 permissions) ──
-        Permission.Create("Purchase.View",       "عرض فواتير الشراء", "Purchase", isSystem: true),
-        Permission.Create("Purchase.Create",     "إنشاء فاتورة شراء", "Purchase", isSystem: true),
-        Permission.Create("Purchase.EditDraft",  "تعديل مسودة شراء", "Purchase", isSystem: true),
-        Permission.Create("Purchase.Post",       "ترحيل فاتورة شراء", "Purchase", isSystem: true),
-        Permission.Create("Purchase.Cancel",     "إلغاء فاتورة شراء", "Purchase", isSystem: true),
-
-        // ── Inventory (3 permissions) ──
-        Permission.Create("Inventory.View",      "عرض المخزون", "Inventory", isSystem: true),
-        Permission.Create("Inventory.Transfer",  "نقل مخزني", "Inventory", isSystem: true),
-        Permission.Create("Inventory.Adjust",    "تسوية مخزنية", "Inventory", isSystem: true),
-
-        // ── Customers (3 permissions) ──
-        Permission.Create("Customer.View",       "عرض العملاء", "Customer", isSystem: true),
-        Permission.Create("Customer.Create",     "إضافة عميل", "Customer", isSystem: true),
-        Permission.Create("Customer.Edit",       "تعديل عميل", "Customer", isSystem: true),
-
-        // ── Suppliers (3 permissions) ──
-        Permission.Create("Supplier.View",       "عرض الموردين", "Supplier", isSystem: true),
-        Permission.Create("Supplier.Create",     "إضافة مورد", "Supplier", isSystem: true),
-        Permission.Create("Supplier.Edit",       "تعديل مورد", "Supplier", isSystem: true),
-
-        // ── Products (3 permissions) ──
-        Permission.Create("Product.View",        "عرض المنتجات", "Product", isSystem: true),
-        Permission.Create("Product.Create",      "إضافة منتج", "Product", isSystem: true),
-        Permission.Create("Product.Edit",        "تعديل منتج", "Product", isSystem: true),
-
-        // ── Reports (1 permission) ──
-        Permission.Create("Reports.View",        "عرض التقارير", "Reports", isSystem: true),
-
-        // ── Accounting (2 permissions) ──
-        Permission.Create("Accounting.Manage",   "إدارة الحسابات", "Accounting", isSystem: true),
-        Permission.Create("Accounting.Journal",  "قيد يومية", "Accounting", isSystem: true),
-
-        // ── System (2 permissions) ──
-        Permission.Create("Settings.Manage",     "إدارة الإعدادات", "System", isSystem: true),
-        Permission.Create("UserManagement",      "إدارة المستخدمين", "System", isSystem: true),
-
-        // ── Operations (3 permissions) ──
-        Permission.Create("Backup.Manage",       "النسخ الاحتياطي", "Operations", isSystem: true),
-        Permission.Create("Cashbox.Close",       "إغلاق الصندوق", "Operations", isSystem: true),
-        Permission.Create("DeleteRecord",        "حذف سجل", "Operations", isSystem: true),
-
-        // ── Audit (1 permission) ──
-        Permission.Create("AuditLog.View",       "عرض سجل الحركات", "Audit", isSystem: true),
-    };
-    db.Set<Permission>().AddRange(permissions);
-    await db.SaveChangesAsync(ct);
-
-    // ════════════════════════════════════════
-    // Seed RolePermissions (4 roles — Analysis Part 5 lines 3721-3737)
-    // ════════════════════════════════════════
-    var rolePermissions = new List<RolePermission>();
-    var pByName = permissions.ToDictionary(p => p.Name);
-
-    // ── Admin (1) = ALL 30 permissions ──
-    foreach (var p in permissions)
-        rolePermissions.Add(RolePermission.Create(UserRole.Admin, p.Id));
-
-    // ── Accountant (2) = Sales, Purchases, Inventory, Customers, Suppliers, Products, Reports, Accounting, Journal, AuditLog ──
-    var accountantPerms = new[]
-    {
-        "Sales.View", "Sales.Create", "Sales.EditDraft", "Sales.Post", "Sales.Cancel",
-        "Purchase.View", "Purchase.Create", "Purchase.EditDraft", "Purchase.Post", "Purchase.Cancel",
-        "Inventory.View", "Inventory.Transfer", "Inventory.Adjust",
-        "Customer.View", "Customer.Create", "Customer.Edit",
-        "Supplier.View", "Supplier.Create", "Supplier.Edit",
-        "Product.View", "Product.Create", "Product.Edit",
-        "Reports.View",
-        "Accounting.Manage", "Accounting.Journal",
-        "AuditLog.View"
-    };
-    foreach (var pName in accountantPerms)
-        if (pByName.TryGetValue(pName, out var p))
-            rolePermissions.Add(RolePermission.Create(UserRole.Accountant, p.Id));
-
-    // ── Cashier (3) = Sales only + Customer View + Cashbox Close ──
-    var cashierPerms = new[]
-    {
-        "Sales.View", "Sales.Create", "Sales.EditPrice",
-        "Customer.View", "Customer.Create",
-        "Inventory.View",
-        "Cashbox.Close"
-    };
-    foreach (var pName in cashierPerms)
-        if (pByName.TryGetValue(pName, out var p))
-            rolePermissions.Add(RolePermission.Create(UserRole.Cashier, p.Id));
-
-    // ── Observer (4) = Reports + View only ──
-    var observerPerms = new[]
-    {
-        "Sales.View",
-        "Purchase.View",
-        "Inventory.View",
-        "Customer.View",
-        "Supplier.View",
-        "Product.View",
-        "Reports.View",
-        "AuditLog.View"
-    };
-    foreach (var pName in observerPerms)
-        if (pByName.TryGetValue(pName, out var p))
-            rolePermissions.Add(RolePermission.Create(UserRole.Observer, p.Id));
-
-    db.Set<RolePermission>().AddRange(rolePermissions);
-    logger?.LogInformation("Seeded {Count} permissions and {RpCount} role-permission mappings.",
-        permissions.Count, rolePermissions.Count);
-}
-```
+> See `Infrastructure/Data/DbSeeder.cs` for the canonical seeder implementation and `docs/AGENTS.md` Section 1.2 for the 33 permission codes matrix.
 
 ### 4.9.1 Seed Data — Default Admin User
 
@@ -922,27 +398,7 @@ if (!await db.Set<Permission>().AnyAsync())
 - The admin user has the `Admin` role with ALL permissions
 - No passwordless creation, no token-based flow
 
-```csharp
-// ═══════════════════════════════════════════════════════
-// Seed Default Admin User (default password "12345678" — must change on first login)
-// ═══════════════════════════════════════════════════════
-if (!await db.Set<User>().AnyAsync())
-{
-    var adminUser = User.Create(
-        userName: "admin",
-        fullName: "مدير النظام",
-        role: UserRole.Admin,
-        phone: null,
-        email: null,
-        createdByUserId: null  // System-created
-        // PasswordHash defaults to BCrypt hash of "12345678"
-    );
-    // MustChangePassword is already true by default from User.Create()
-    db.Set<User>().Add(adminUser);
-    logger?.LogInformation("Seeded default admin user: admin/مدير النظام (default password)");
-    await db.SaveChangesAsync(ct);
-}
-```
+> See `Infrastructure/Data/DbSeeder.cs` for the canonical admin user seed implementation.
 
 **Note on first-run flow**:
 1. On first application launch, no users exist → `User.AnyAsync()` returns false
@@ -964,42 +420,11 @@ if (!await db.Set<User>().AnyAsync())
 
 ### 4.10 IAuditLogService Interface (NEW)
 
-```csharp
-public interface IAuditLogService
-{
-    Task<Result> LogAsync(int? userId, string action, string entityType,
-        int? entityId = null, string? details = null, string? ipAddress = null,
-        CancellationToken ct = default);
-    Task<Result<PaginatedResult<AuditLogDto>>> QueryAsync(AuditLogQuery query, CancellationToken ct = default);
-    Task<Result<List<AuditLogDto>>> GetUserHistoryAsync(int userId, int limit = 50, CancellationToken ct = default);
-    Task<Result<List<LoginHistoryDto>>> GetLoginHistoryAsync(int? userId = null, int limit = 50, CancellationToken ct = default);
-}
-
-public record AuditLogQuery
-{
-    public int? UserId { get; init; }
-    public string? Action { get; init; }
-    public string? EntityType { get; init; }
-    public DateTime? From { get; init; }
-    public DateTime? To { get; init; }
-    public int Page { get; init; } = 1;
-    public int PageSize { get; init; } = 50;
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 ### 4.11 IPermissionService Interface (NEW)
 
-```csharp
-public interface IPermissionService
-{
-    Task<Result<List<PermissionDto>>> GetAllPermissionsAsync(CancellationToken ct = default);
-    Task<Result<PermissionDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<List<RolePermissionDto>>> GetRolePermissionsAsync(CancellationToken ct = default);
-    Task<Result> UpdateRolePermissionsAsync(UserRole role, List<int> permissionIds, CancellationToken ct = default);
-    Task<Result<List<string>>> GetUserPermissionsAsync(int userId, CancellationToken ct = default);
-    Task<Result<bool>> UserHasPermissionAsync(int userId, string permissionName, CancellationToken ct = default);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 ---
 
@@ -1222,109 +647,10 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 | `Contracts/Requests/UserRequests.cs` | CreateUserRequest with optional Password (default "12345678"), no SetPasswordRequest needed |
 
 **User.Create — Default Password Flow**:
-```csharp
-public static User Create(string userName, string fullName, UserRole role,
-    string? phone = null, string? email = null, int? defaultCashBoxId = null,
-    int? createdByUserId = null, string? passwordHash = null)
-{
-    if (string.IsNullOrWhiteSpace(userName))
-        throw new DomainException("اسم المستخدم مطلوب.");
-    if (string.IsNullOrWhiteSpace(fullName))
-        throw new DomainException("الاسم الكامل مطلوب.");
-
-    // If no password hash provided, hash the default "12345678"
-    var hash = passwordHash ?? BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
-
-    return new User
-    {
-        UserName = userName.Trim(),
-        FullName = fullName.Trim(),
-        Role = role,
-        Status = UserStatus.Active,
-        PasswordHash = hash,               // Always hashed — never stored in plaintext
-        Phone = phone?.Trim(),
-        Email = email?.Trim(),
-        DefaultCashBoxId = defaultCashBoxId,
-        MustChangePassword = true,         // Forces password change on first login
-        LoginAttempts = 0,
-        CreatedByUserId = createdByUserId,
-        CreatedAt = DateTime.UtcNow
-    };
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` Module 1.9 for the canonical Users table definition.
 
 **Domain methods**:
-```csharp
-public void RecordLoginAttempt(bool success)
-{
-    if (success)
-    {
-        LoginAttempts = 0;
-        LastLoginAt = DateTime.UtcNow;
-        // Do NOT auto-unlock — use explicit Unlock() for that
-    }
-    else
-    {
-        LoginAttempts++;
-        if (LoginAttempts >= 5)
-            Status = UserStatus.Locked;
-    }
-}
-
-// REMOVED: SetInitialPassword() — no longer needed (default password flow replaces passwordless)
-
-/// <summary>
-/// Admin reset: sets password back to default "12345678" hash.
-/// MustChangePassword = true — user forced to change on next login.
-/// </summary>
-public void ResetPassword()
-{
-    PasswordHash = BCrypt.Net.BCrypt.HashPassword("12345678", workFactor: 12);
-    MustChangePassword = true;
-    PasswordChangedAt = null;
-    UpdatedAt = DateTime.UtcNow;
-}
-
-public void ChangePassword(string newPasswordHash, int? updatedByUserId = null)
-{
-    if (string.IsNullOrWhiteSpace(newPasswordHash))
-        throw new DomainException("كلمة المرور الجديدة مطلوبة.");
-    PasswordHash = newPasswordHash;
-    PasswordChangedAt = DateTime.UtcNow;
-    MustChangePassword = false;
-    UpdatedByUserId = updatedByUserId;
-    UpdatedAt = DateTime.UtcNow;
-}
-
-public void Lock() => Status = UserStatus.Locked;
-public void Unlock() => Status = UserStatus.Active;
-public void Deactivate()
-{
-    Status = UserStatus.Inactive;
-    IsActive = false;
-}
-public void Activate()
-{
-    Status = UserStatus.Active;
-    IsActive = true;
-}
-public void SetAvatar(string avatarPath) => AvatarPath = avatarPath;
-public void ClearAvatar() => AvatarPath = null;
-
-// Override BaseEntity.MarkAsDeleted to keep Status in sync
-public new void MarkAsDeleted()
-{
-    Status = UserStatus.Inactive;
-    IsActive = false;
-}
-
-// Override BaseEntity.Restore to keep Status in sync
-public new void Restore()
-{
-    Status = UserStatus.Active;
-    IsActive = true;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) — `RecordLoginAttempt`, `ChangePassword`, `ResetPassword`, `Lock`/`Unlock`, `Deactivate`/`Activate`, `SetAvatar`/`ClearAvatar`, `MarkAsDeleted`/`Restore` methods follow the same pattern.
 
 **Logging**: 
 - `Log.Information("User {UserId} profile updated: phone={Phone}, email={Email}", id, phone, email)`
@@ -1353,41 +679,9 @@ public new void Restore()
 | `Infrastructure/Data/Migrations/` | New migration: CREATE Permissions + RolePermissions tables |
 | `Infrastructure/Data/DbSeeder.cs` | Seed 22 permissions + role mappings **+ default admin user** |
 
-**PermissionConfiguration**:
-```csharp
-public class PermissionConfiguration : IEntityTypeConfiguration<Permission>
-{
-    public void Configure(EntityTypeBuilder<Permission> builder)
-    {
-        builder.ToTable("Permissions");
-        builder.HasKey(p => p.Id);
-        builder.Property(p => p.Name).IsRequired().HasMaxLength(100);
-        builder.HasIndex(p => p.Name).IsUnique();
-        builder.Property(p => p.DisplayNameAr).IsRequired().HasMaxLength(200);
-        builder.Property(p => p.Category).HasMaxLength(50);
-        builder.HasQueryFilter(p => p.IsActive);
+**PermissionConfiguration**: See `docs/database-schema.md` Module 1.10 for the canonical Permission Fluent API configuration.
 
-        builder.HasMany(p => p.RolePermissions)
-            .WithOne(rp => rp.Permission)
-            .HasForeignKey(rp => rp.PermissionId)
-            .OnDelete(DeleteBehavior.Restrict);  // RULE-214
-    }
-}
-```
-
-**RolePermissionConfiguration**:
-```csharp
-public class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
-{
-    public void Configure(EntityTypeBuilder<RolePermission> builder)
-    {
-        builder.ToTable("RolePermissions");
-        builder.HasKey(rp => rp.Id);
-        builder.Property(rp => rp.Role).IsRequired().HasConversion<byte>();
-        builder.HasIndex(rp => new { rp.Role, rp.PermissionId }).IsUnique();
-    }
-}
-```
+**RolePermissionConfiguration**: See `docs/database-schema.md` Module 1.11 for the canonical RolePermission Fluent API configuration.
 
 **Logging**: `Log.Information("Seeded {Count} permissions and {RpCount} role-permission mappings", count, rpCount)`
 
@@ -1405,34 +699,7 @@ public class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermissi
 | `Infrastructure/Data/Configurations/AuditLogConfiguration.cs` | Fluent API — indexes on (UserId, Timestamp), (EntityType, EntityId), (Timestamp DESC) |
 | `Infrastructure/Data/Migrations/` | New migration: CREATE AuditLogs table |
 
-**AuditLogConfiguration**:
-```csharp
-public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
-{
-    public void Configure(EntityTypeBuilder<AuditLog> builder)
-    {
-        builder.ToTable("AuditLogs");
-        builder.HasKey(a => a.Id);
-        // Use bigint for high-volume audit table
-        builder.Property(a => a.Id).UseIdentityColumn(1, 1);
-        builder.Property(a => a.Action).IsRequired().HasMaxLength(100);
-        builder.Property(a => a.EntityType).IsRequired().HasMaxLength(100);
-        builder.Property(a => a.Details).HasMaxLength(2000);
-        builder.Property(a => a.IpAddress).HasMaxLength(50);
-
-        // Indexes for performance
-        builder.HasIndex(a => a.Timestamp).IsDescending();
-        builder.HasIndex(a => new { a.UserId, a.Timestamp }).IsDescending();
-        builder.HasIndex(a => new { a.EntityType, a.EntityId });
-
-        // FK to Users with Restrict (RULE-214)
-        builder.HasOne(a => a.User)
-            .WithMany()
-            .HasForeignKey(a => a.UserId)
-            .OnDelete(DeleteBehavior.Restrict);
-    }
-}
-```
+**AuditLogConfiguration**: See `docs/database-schema.md` Module 8.1 for the canonical AuditLog Fluent API configuration (bigint PK, indexes on Timestamp, (UserId, Timestamp), (EntityType, EntityId), FK to Users with Restrict).
 
 **Logging**: No logging in AuditLog service (it IS the logging layer)
 
@@ -1467,44 +734,7 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 | `Contracts/DTOs/AllDtos.cs` | Add AuditLogDto, LoginHistoryDto, AuditLogQuery record |
 
 **AuditLogService**:
-```csharp
-public async Task<Result> LogAsync(int? userId, string action, string entityType,
-    int? entityId = null, string? details = null, string? ipAddress = null,
-    CancellationToken ct = default)
-{
-    var log = AuditLog.Create(userId, action, entityType, entityId, details, ipAddress);
-    await _uow.AuditLogs.AddAsync(log, ct);
-    await _uow.SaveChangesAsync(ct);
-    return Result.Success();
-}
-
-public async Task<Result<PaginatedResult<AuditLogDto>>> QueryAsync(AuditLogQuery query, CancellationToken ct)
-{
-    var q = _uow.AuditLogs.GetQueryable();
-
-    if (query.UserId.HasValue)
-        q = q.Where(a => a.UserId == query.UserId);
-    if (!string.IsNullOrWhiteSpace(query.Action))
-        q = q.Where(a => a.Action == query.Action);
-    if (!string.IsNullOrWhiteSpace(query.EntityType))
-        q = q.Where(a => a.EntityType == query.EntityType);
-    if (query.From.HasValue)
-        q = q.Where(a => a.Timestamp >= query.From.Value);
-    if (query.To.HasValue)
-        q = q.Where(a => a.Timestamp <= query.To.Value);
-
-    var total = await q.CountAsync(ct);
-    var items = await q.OrderByDescending(a => a.Timestamp)  // RULE-220
-        .Skip((query.Page - 1) * query.PageSize)
-        .Take(query.PageSize)
-        .Select(a => new AuditLogDto(a.Id, a.UserId, a.User!.UserName, a.Action,
-            a.EntityType, a.EntityId, a.Details, a.IpAddress, a.Timestamp))
-        .ToListAsync(ct);
-
-    return Result<PaginatedResult<AuditLogDto>>.Success(
-        new PaginatedResult<AuditLogDto>(items, total, query.Page, query.PageSize));
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns (IUnitOfWork, RULE-024).
 
 **Logging**: `Log.Information("Audit log entry: {Action} on {EntityType}#{EntityId} by user {UserId}", ...)`
 
@@ -1523,39 +753,7 @@ public async Task<Result<PaginatedResult<AuditLogDto>>> QueryAsync(AuditLogQuery
 | `Contracts/DTOs/AllDtos.cs` | Add PermissionDto, RolePermissionDto |
 
 **PermissionService.UpdateRolePermissionsAsync**:
-```csharp
-public async Task<Result> UpdateRolePermissionsAsync(UserRole role,
-    List<int> permissionIds, CancellationToken ct)
-{
-    await using var tx = await _uow.BeginTransactionAsync(ct);
-    try
-    {
-        // Remove existing mappings for this role
-        var existing = await _uow.RolePermissions.GetQueryable()
-            .Where(rp => rp.Role == role)
-            .ToListAsync(ct);
-        _uow.RolePermissions.RemoveRange(existing);
-
-        // Add new mappings
-        foreach (var permId in permissionIds)
-        {
-            var rp = RolePermission.Create(role, permId);
-            await _uow.RolePermissions.AddAsync(rp, ct);
-        }
-
-        await _uow.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-
-        _logger.LogInformation("Permissions updated for role {Role}: {Count} permissions", role, permissionIds.Count);
-        return Result.Success();
-    }
-    catch
-    {
-        await tx.RollbackAsync(ct);
-        throw;
-    }
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns (transaction pattern RULE-003, IUnitOfWork RULE-024).
 
 **Logging**: `Log.Warning("Permission {PermissionId} is system-locked — cannot modify", id)` on IsSystem guard
 **Validation**: Must have at least 1 permission per role
@@ -1575,101 +773,10 @@ public async Task<Result> UpdateRolePermissionsAsync(UserRole role,
 | `Application/Services/AuthService.cs` | Add `ChangePasswordAsync(ChangePasswordRequest, int userId)` |
 
 **LoginAsync logic — Default password with MustChangePassword check**:
-```csharp
-public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken ct)
-{
-    // 1. Find user
-    // 2. Check if active
-    // 3. Check if locked
-    if (user.Status == UserStatus.Locked)
-    {
-        _logger.LogWarning("Login blocked: User {UserName} is locked", request.UserName);
-        await _auditLogService.LogAsync(user.Id, "LoginBlocked_Locked", "User", user.Id,
-            "Account locked due to too many failed attempts", ipAddress, ct);
-        return Result<LoginResponse>.Failure("الحساب مغلق مؤقتاً. يرجى الاتصال بالمدير",
-            ErrorCodes.Forbidden);
-    }
-
-    // 4. Verify password (BCrypt)
-    bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-    user.RecordLoginAttempt(isPasswordValid);
-
-    if (!isPasswordValid)
-    {
-        _logger.LogWarning("Login failed: Incorrect password for user {UserName} (attempt {Attempts})",
-            request.UserName, user.LoginAttempts);
-        await _auditLogService.LogAsync(user.Id, "LoginFailed", "User", user.Id,
-            $"Failed login attempt #{user.LoginAttempts}", ipAddress, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        if (user.Status == UserStatus.Locked)
-            return Result<LoginResponse>.Failure("الحساب مغلق مؤقتاً. يرجى الاتصال بالمدير",
-                ErrorCodes.Forbidden);
-
-        return Result<LoginResponse>.Failure("بيانات الاعتماد غير صالحة", ErrorCodes.Unauthorized);
-    }
-
-    // 5. Success — record login
-    await _auditLogService.LogAsync(user.Id, "LoginSuccess", "User", user.Id, null, ipAddress, ct);
-
-    // 6. Check if user must change password (first login with default password)
-    bool requiresPasswordChange = user.MustChangePassword;
-    if (requiresPasswordChange)
-    {
-        _logger.LogInformation("User {UserName} must change password (MustChangePassword=true)",
-            request.UserName);
-    }
-
-    // 7. Generate JWT with RequiresPasswordChange flag
-    string token = _jwtTokenGenerator.GenerateToken(user);
-    return Result<LoginResponse>.Success(new LoginResponse(
-        UserId: user.Id,
-        UserName: user.UserName,
-        FullName: user.FullName,
-        Role: (byte)user.Role,
-        Token: token,
-        ExpiresAt: DateTime.UtcNow.AddHours(8),
-        RequiresPasswordChange: requiresPasswordChange
-    ));
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for AuthService patterns (RULE-305 through RULE-315 for login flow, lockout, audit logging).
 
 **ChangePasswordAsync**:
-```csharp
-public async Task<Result> ChangePasswordAsync(ChangePasswordRequest request, int userId, CancellationToken ct)
-{
-    var user = await _uow.Users.GetByIdAsync(userId, ct);
-    if (user == null)
-        return Result.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
-
-    // Verify current password
-    if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
-    {
-        _logger.LogWarning("Password change failed: Incorrect current password for user {UserId}", userId);
-        await _auditLogService.LogAsync(userId, "PasswordChangeFailed", "User", userId,
-            "Incorrect current password", null, ct);
-        return Result.Failure("كلمة المرور الحالية غير صحيحة", ErrorCodes.ValidationError);
-    }
-
-    // Verify new password matches confirm
-    if (request.NewPassword != request.ConfirmPassword)
-        return Result.Failure("كلمة المرور الجديدة وتأكيدها غير متطابقتين", ErrorCodes.ValidationError);
-
-    // Verify minimum length
-    if (request.NewPassword.Length < 8)
-        return Result.Failure("كلمة المرور يجب أن تكون 8 أحرف على الأقل", ErrorCodes.ValidationError);
-
-    // Hash and save
-    string newHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, workFactor: 12);
-    user.ChangePassword(newHash, userId);
-    await _uow.SaveChangesAsync(ct);
-
-    _logger.LogInformation("Password changed for user {UserId}", userId);
-    await _auditLogService.LogAsync(userId, "PasswordChanged", "User", userId, null, null, ct);
-
-    return Result.Success();
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for AuthService patterns (RULE-314/315 for password change flow).
 
 **Validation** (RULE-044):
 - `ChangePasswordRequestValidator`: CurrentPassword required, NewPassword min 8 chars, ConfirmPassword must match
@@ -1700,94 +807,16 @@ public async Task<Result> ChangePasswordAsync(ChangePasswordRequest request, int
 **Note**: No `set-password` endpoint exists — the default password flow ("12345678") replaces the token-based SetPassword flow. Users log in with the default password, then are forced to change it via `change-password`.
 
 **AuthController additions**:
-```csharp
-[Authorize]
-[HttpPost("change-password")]
-public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
-{
-    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-    var result = await _authService.ChangePasswordAsync(request, userId, ct);
-    if (result.IsSuccess)
-        return Ok(new { message = "تم تغيير كلمة المرور بنجاح" });
-    return BadRequest(new { error = result.Error });
-}
-```
+> See `docs/AGENTS.md` for controller layer patterns (RULE-022/203) and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **UsersController additions**:
-```csharp
-[HttpGet("current")]
-public async Task<IActionResult> GetCurrentUser(CancellationToken ct)
-{
-    var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-    var result = await _userService.GetByIdAsync(userId, ct);
-    return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
-}
-
-[HttpPost("{id:int}/reset-password")]
-[Authorize(Policy = "AdminOnly")]
-public async Task<IActionResult> ResetPassword(int id, CancellationToken ct)
-{
-    var result = await _userService.ResetPasswordAsync(id, ct);
-    if (result.IsSuccess)
-        return Ok(new { message = "تم إعادة تعيين كلمة المرور إلى 12345678 — سيطلب من المستخدم تغييرها عند تسجيل الدخول" });
-    return BadRequest(new { error = result.Error });
-}
-
-// POST /api/v1/users/avatar — upload avatar
-// GET /api/v1/users/{id}/avatar — serve avatar image
-```
+> See `docs/AGENTS.md` for controller layer patterns (RULE-022/203) and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **AuditLogsController**:
-```csharp
-[ApiController]
-[Route("api/v1/audit-logs")]
-[Authorize(Policy = "AdminOnly")]
-public class AuditLogsController : ControllerBase
-{
-    private readonly IAuditLogService _auditLogService;
-
-    [HttpGet]
-    public async Task<IActionResult> Query([FromQuery] AuditLogQuery query, CancellationToken ct)
-    {
-        var result = await _auditLogService.QueryAsync(query, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-    }
-
-    [HttpGet("user/{userId:int}")]
-    public async Task<IActionResult> GetUserHistory(int userId, [FromQuery] int limit = 50, CancellationToken ct)
-    {
-        var result = await _auditLogService.GetUserHistoryAsync(userId, limit, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-    }
-
-    [HttpGet("login-history")]
-    public async Task<IActionResult> GetLoginHistory([FromQuery] int? userId, [FromQuery] int limit = 50, CancellationToken ct)
-    {
-        var result = await _auditLogService.GetLoginHistoryAsync(userId, limit, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-    }
-}
-```
+> See `docs/AGENTS.md` for controller layer patterns (RULE-022/203 — inject services only, no DbContext/IUnitOfWork) and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **PermissionsController**:
-```csharp
-[ApiController]
-[Route("api/v1/permissions")]
-[Authorize(Policy = "AdminOnly")]
-public class PermissionsController : ControllerBase
-{
-    private readonly IPermissionService _permissionService;
-
-    [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct) { /* ... */ }
-
-    [HttpGet("roles")]
-    public async Task<IActionResult> GetRolePermissions(CancellationToken ct) { /* ... */ }
-
-    [HttpPut("roles/{role}")]
-    public async Task<IActionResult> UpdateRolePermissions(byte role, [FromBody] List<int> permissionIds, CancellationToken ct) { /* ... */ }
-}
-```
+> See `docs/AGENTS.md` for controller layer patterns (RULE-022/203 — inject services only, no DbContext/IUnitOfWork) and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **Controller purity** (RULE-203): All controllers inject service interfaces only — NO direct DbContext or IUnitOfWork.
 
@@ -1813,50 +842,10 @@ public class PermissionsController : ControllerBase
 | `Services/Api/UserApiService.cs` | Implement avatar upload via multipart form |
 
 **New properties** in UserEditorViewModel:
-```csharp
-private string _phone = string.Empty;
-private string _email = string.Empty;
-private string? _avatarUrl;
-private bool _isLocked;
-private bool _hasAvatar;
-private byte[]? _avatarImageData;  // For preview
-
-public string Phone { get => _phone; set { /* validate + set */ } }
-public string Email { get => _email; set { /* validate + set */ } }
-public string? AvatarUrl { get => _avatarUrl; set => SetProperty(ref _avatarUrl, value); }
-public bool IsLocked { get => _isLocked; set => SetProperty(ref _isLocked, value); }
-public bool HasAvatar { get => _hasAvatar; set => SetProperty(ref _hasAvatar, value); }
-
-public ICommand UploadAvatarCommand { get; private set; }
-public ICommand RemoveAvatarCommand { get; private set; }
-public ICommand ChangePasswordCommand { get; private set; }
-```
+> See `docs/AGENTS.md` for ViewModel patterns (ExecuteAsync wrapper, INotifyDataErrorInfo, DialogService, ScreenWindowService).
 
 **ValidateAsync expanded**:
-```csharp
-private async Task<bool> ValidateAsync()
-{
-    var errors = new List<string>();
-    if (string.IsNullOrWhiteSpace(Username))
-        errors.Add("• اسم المستخدم مطلوب — تأكد من إدخال اسم فريد للدخول إلى النظام");
-    if (string.IsNullOrWhiteSpace(FullName))
-        errors.Add("• الاسم بالكامل مطلوب — سيظهر هذا الاسم في الفواتير والتقارير");
-    // NOTE: Password is optional on create — defaults to "12345678" if empty.
-    // MustChangePassword = true forces user to change on first login.
-    if (!string.IsNullOrWhiteSpace(Email) && !IsValidEmail(Email))
-        errors.Add("• البريد الإلكتروني غير صالح — أدخل بريداً إلكترونياً صحيحاً");
-    if (!string.IsNullOrWhiteSpace(Phone) && Phone.Length > 20)
-        errors.Add("• رقم الهاتف لا يتجاوز 20 رقماً");
-
-    if (errors.Any())
-    {
-        await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-        RequestFocusFirstInvalidField();
-        return false;
-    }
-    return true;
-}
-```
+> See `docs/AGENTS.md` for ViewModel validation patterns (RULE-228/229: INotifyDataErrorInfo with AddError/ClearErrors, ValidateAllAsync).
 
 **ToolTips** (RULE-185-190):
 - Phone field: `"رقم الهاتف — اختياري، سيظهر في تقارير المستخدمين"`
@@ -1964,45 +953,7 @@ private async Task<bool> ValidateAsync()
 | `App.xaml.cs` | DI registration for PasswordChangeViewModel |
 
 **PasswordChangeViewModel**:
-```csharp
-public class PasswordChangeViewModel : ViewModelBase
-{
-    private readonly IAuthApiService _authService;
-    private readonly IDialogService _dialogService;
-    private readonly ISessionService _sessionService;
-
-    private string _currentPassword = string.Empty;
-    private string _newPassword = string.Empty;
-    private string _confirmPassword = string.Empty;
-
-    // Properties with INotifyDataErrorInfo validation
-    // ValidateAsync: all 3 fields required, NewPassword min 8, ConfirmPassword must match
-
-    public ICommand SaveCommand { get; private set; }
-    public ICommand CancelCommand { get; private set; }
-
-    private async Task SaveOperationAsync()
-    {
-        if (!await ValidateAsync()) return;
-
-        var request = new ChangePasswordRequest(CurrentPassword, NewPassword, ConfirmPassword);
-        var result = await _authService.ChangePasswordAsync(request);
-
-        if (result.IsSuccess)
-        {
-            await _dialogService.ShowSuccessAsync("تغيير كلمة المرور", "تم تغيير كلمة المرور بنجاح");
-            RequestClose();
-        }
-        else
-        {
-            ErrorMessage = HandleFailure(result.Error ?? "فشل في تغيير كلمة المرور",
-                "PasswordChangeViewModel.SaveAsync",
-                "[PasswordChangeViewModel.SaveAsync] Password change failed.");
-            await _dialogService.ShowErrorAsync("خطأ في تغيير كلمة المرور", ErrorMessage!);
-        }
-    }
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns (ExecuteAsync wrapper RULE-141, INotifyDataErrorInfo RULE-228/229, DialogService RULE-054, HandleFailure RULE-172).
 
 **Validation** (RULE-228/229):
 - CurrentPassword: required
@@ -2035,60 +986,7 @@ public class PasswordChangeViewModel : ViewModelBase
 | `App.xaml.cs` | DI registrations + navigation entry |
 
 **AuditLogListViewModel**:
-```csharp
-public class AuditLogListViewModel : AdminOnlyViewModel
-{
-    private readonly IAuditLogApiService _auditLogService;
-    private readonly IDialogService _dialogService;
-
-    // Filters
-    private string? _searchText;
-    private string? _selectedAction;
-    private string? _selectedEntityType;
-    private DateTime? _fromDate;
-    private DateTime? _toDate;
-    private int _page = 1;
-    private int _totalPages;
-    private int _totalRecords;
-
-    public ObservableCollection<AuditLogDto> Logs { get; } = new();
-    public ObservableCollection<string> ActionFilters { get; }  // Distinct actions from API
-    public ObservableCollection<string> EntityTypeFilters { get; }  // Distinct entity types
-
-    public ICommand SearchCommand { get; private set; }
-    public ICommand NextPageCommand { get; private set; }
-    public ICommand PrevPageCommand { get; private set; }
-    public ICommand RefreshCommand { get; private set; }
-    public ICommand ViewUserHistoryCommand { get; private set; }
-    public ICommand ViewLoginHistoryCommand { get; private set; }
-
-    private async Task LoadLogsOperationAsync()
-    {
-        var query = new AuditLogQuery
-        {
-            UserId = null,  // Could parse searchText as int
-            Action = SelectedAction,
-            EntityType = SelectedEntityType,
-            From = FromDate,
-            To = ToDate,
-            Page = Page,
-            PageSize = 50
-        };
-        var result = await _auditLogService.QueryAsync(query);
-        if (result.IsSuccess && result.Value != null)
-        {
-            await InvokeOnUIThreadAsync(() =>
-            {
-                Logs.Clear();
-                foreach (var log in result.Value.Items)
-                    Logs.Add(log);
-                TotalPages = result.Value.TotalPages;
-                TotalRecords = result.Value.TotalCount;
-            });
-        }
-    }
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns (AdminOnlyViewModel base class RULE-130, ExecuteAsync wrapper RULE-141, paginated query, EventBus lifecycle RULE-012/013).
 
 **Login History sub-view**:
 - Shows `LoginSuccess` / `LoginFailed` entries from AuditLog
@@ -2122,51 +1020,7 @@ public class AuditLogListViewModel : AdminOnlyViewModel
 | `App.xaml.cs` | DI registrations + navigation entry |
 
 **PermissionManagementViewModel**:
-```csharp
-public class PermissionManagementViewModel : AdminOnlyViewModel
-{
-    private readonly IPermissionApiService _permissionService;
-    private readonly IEventBus _eventBus;
-
-    public ObservableCollection<PermissionCategoryGroup> Categories { get; } = new();
-    // Each PermissionCategoryGroup contains:
-    //   string CategoryName
-    //   ObservableCollection<PermissionCheckItem> Permissions
-    // RoleSelection = Admin, Manager, Cashier (tabs or radio buttons)
-
-    private UserRole _selectedRole = UserRole.Admin;
-    public UserRole SelectedRole { get => _selectedRole; set { /* reload check states */ } }
-
-    public ICommand SaveCommand { get; private set; }
-    public ICommand SelectAllCommand { get; private set; }
-    public ICommand DeselectAllCommand { get; private set; }
-
-    public record PermissionCheckItem : ViewModelBase
-    {
-        public int Id { get; init; }
-        public string Name { get; init; }
-        public string DisplayNameAr { get; init; }
-        private bool _isChecked;
-        public bool IsChecked { get => _isChecked; set => SetProperty(ref _isChecked, value); }
-    }
-
-    private async Task SaveOperationAsync()
-    {
-        var selectedIds = Categories.SelectMany(c => c.Permissions)
-            .Where(p => p.IsChecked)
-            .Select(p => p.Id)
-            .ToList();
-
-        var result = await _permissionService.UpdateRolePermissionsAsync(SelectedRole, selectedIds);
-        if (result.IsSuccess)
-        {
-            await _dialogService.ShowSuccessAsync("تحديث الصلاحيات",
-                $"تم تحديث صلاحيات دور {GetRoleDisplayName(SelectedRole)} بنجاح");
-            _eventBus.Publish(new PermissionsChangedMessage());
-        }
-    }
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns (AdminOnlyViewModel RULE-130, ExecuteAsync RULE-141, DialogService RULE-054, EventBus RULE-012/013). The 4-role selector and permission checkboxes follow the permission matrix in Section 1.2 above.
 
 **XAML structure**:
 ```xml
@@ -2265,50 +1119,7 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
 ```
 
 **ApplyPermissions** (using new dot-notation codes from analysis):
-```csharp
-private void ApplyPermissions()
-{
-    var s = _session;
-
-    // Sales
-    NavSalesItem.Visibility = s.HasPermission("Sales.View") ? Visibility.Visible : Visibility.Collapsed;
-    NavSalesReturnsItem.Visibility = s.HasPermission("Sales.View") ? Visibility.Visible : Visibility.Collapsed;
-
-    // Purchases
-    NavPurchasesItem.Visibility = s.HasPermission("Purchase.View") ? Visibility.Visible : Visibility.Collapsed;
-    NavPurchaseReturnsItem.Visibility = s.HasPermission("Purchase.View") ? Visibility.Visible : Visibility.Collapsed;
-
-    // Products
-    NavProductsItem.Visibility = s.HasPermission("Product.View") ? Visibility.Visible : Visibility.Collapsed;
-
-    // Customers
-    NavCustomersItem.Visibility = s.HasPermission("Customer.View") ? Visibility.Visible : Visibility.Collapsed;
-    NavCustomerPaymentsItem.Visibility = s.HasPermission("Customer.View") ? Visibility.Visible : Visibility.Collapsed;
-
-    // Suppliers
-    NavSuppliersItem.Visibility = s.HasPermission("Supplier.View") ? Visibility.Visible : Visibility.Collapsed;
-    NavSupplierPaymentsItem.Visibility = s.HasPermission("Supplier.View") ? Visibility.Visible : Visibility.Collapsed;
-
-    // Inventory
-    NavStockTransfersItem.Visibility = s.HasPermission("Inventory.Transfer") ? Visibility.Visible : Visibility.Collapsed;
-    NavLowStockItem.Visibility = s.HasPermission("Reports.View") ? Visibility.Visible : Visibility.Collapsed;
-
-    // Reports
-    NavReportsItem.Visibility = s.HasPermission("Reports.View") ? Visibility.Visible : Visibility.Collapsed;
-
-    // Settings (Admin only)
-    NavCategoriesItem.Visibility = s.HasPermission("Settings.Manage") ? Visibility.Visible : Visibility.Collapsed;
-    NavUnitsItem.Visibility = s.HasPermission("Settings.Manage") ? Visibility.Visible : Visibility.Collapsed;
-    NavWarehousesItem.Visibility = s.HasPermission("Settings.Manage") ? Visibility.Visible : Visibility.Collapsed;
-    NavUsersItem.Visibility = s.HasPermission("UserManagement") ? Visibility.Visible : Visibility.Collapsed;
-    NavSettingsItem.Visibility = s.HasPermission("Settings.Manage") ? Visibility.Visible : Visibility.Collapsed;
-
-    // NEW: Audit log menu (Admin only)
-    NavAuditLogItem.Visibility = s.HasPermission("AuditLog.View") ? Visibility.Visible : Visibility.Collapsed;
-    // NEW: Permission management menu (Admin only)
-    NavPermissionsItem.Visibility = s.HasPermission("UserManagement") ? Visibility.Visible : Visibility.Collapsed;
-}
-```
+> See `docs/AGENTS.md` for permission filtering patterns (RULE-318: API-based permission checks using `HasPermission` with dot-notation codes). The permission codes used here match Section 1.2 matrix.
 
 **ToolTips** (RULE-185-190):
 - Avatar + name: `"المستخدم الحالي — {UserName}"`
@@ -2333,16 +1144,7 @@ private void ApplyPermissions()
 | `DesktopPWF/App.xaml.cs` | Register all new ViewModels + API services |
 
 **DI Registrations needed**:
-```csharp
-// NEW API Services
-services.AddSingleton<IAuditLogApiService, AuditLogApiService>();
-services.AddSingleton<IPermissionApiService, PermissionApiService>();
-
-// NEW ViewModels
-services.AddTransient<PasswordChangeViewModel>();
-services.AddTransient<AuditLogListViewModel>();
-services.AddTransient<PermissionManagementViewModel>();
-```
+> See `DesktopPWF/App.xaml.cs` and `Api/Program.cs` for canonical DI registration patterns.
 
 **Estimate**: ~45 minutes
 

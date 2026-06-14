@@ -24,7 +24,7 @@ public class ReportRepository : IReportRepository
         var endDate = to.Date.AddDays(1).AddTicks(-1);
 
         return await _context.SalesInvoices
-            .Include(i => i.Customer)
+            .Include(i => i.Customer).ThenInclude(c => c!.Party)
             .Where(i => i.Status == InvoiceStatus.Posted &&
                         i.InvoiceDate >= startDate &&
                         i.InvoiceDate <= endDate &&
@@ -33,7 +33,7 @@ public class ReportRepository : IReportRepository
             .Select(i => new SalesReportDto(
                 i.InvoiceDate,
                 i.Id,
-                i.Customer != null ? i.Customer.Name : "عميل نقدي",
+                i.Customer != null ? i.Customer.Party.Name : "عميل نقدي",
                 i.SubTotal,
                 i.DiscountAmount,
                 i.TaxAmount,
@@ -50,7 +50,7 @@ public class ReportRepository : IReportRepository
         var endDate = to.Date.AddDays(1).AddTicks(-1);
 
         return await _context.PurchaseInvoices
-            .Include(i => i.Supplier)
+            .Include(i => i.Supplier).ThenInclude(s => s!.Party)
             .Where(i => i.Status == InvoiceStatus.Posted &&
                         i.InvoiceDate >= startDate &&
                         i.InvoiceDate <= endDate &&
@@ -59,13 +59,13 @@ public class ReportRepository : IReportRepository
             .Select(i => new PurchaseReportDto(
                 i.InvoiceDate,
                 i.Id,
-                i.Supplier != null ? i.Supplier.Name : "Unknown",
+                i.Supplier != null ? i.Supplier.Party.Name : "غير معروف",
                 i.SubTotal,
                 i.DiscountAmount,
                 i.TaxAmount,
-                i.TotalAmount,
+                i.NetTotal,
                 i.PaidAmount,
-                i.DueAmount
+                i.RemainingAmount
             ))
             .ToListAsync(ct);
     }
@@ -74,9 +74,7 @@ public class ReportRepository : IReportRepository
     {
         var query = _context.WarehouseStocks
             .Include(s => s.Product)
-                .ThenInclude(p => p!.Category)
-            .Include(s => s.Product)
-                .ThenInclude(p => p!.Category)
+                .ThenInclude(p => p!.ProductCategory)
             .Include(s => s.Warehouse)
             .AsQueryable();
 
@@ -91,13 +89,13 @@ public class ReportRepository : IReportRepository
             .Select(s => new StockReportDto(
                 s.ProductId,
                 s.Product!.Name,
-                s.Product!.Category != null ? s.Product!.Category.Name : "General",
-                "-", // TODO: Phase 25 — UnitName from Product.Units.FirstOrDefault(u=>u.IsBaseUnit)?.Unit?.Name
+                s.Product!.ProductCategory != null ? s.Product.ProductCategory.Name : "General",
+                "-",
                 s.Warehouse!.Name,
                 s.Quantity,
-                s.ReorderLevel,
-                0m, // TODO: Phase 25 — PurchasePrice moved to ProductPrices table
-                s.Quantity * 0m // TODO: Phase 25 — total cost from Product.Cost
+                s.Product.ReorderLevel,
+                0m,
+                s.Quantity * 0m
             ))
             .ToListAsync(ct);
     }
@@ -106,99 +104,134 @@ public class ReportRepository : IReportRepository
     {
         var stocks = await _context.WarehouseStocks
             .Include(s => s.Product)
-                .ThenInclude(p => p!.Category)
+                .ThenInclude(p => p!.ProductCategory)
             .Include(s => s.Warehouse)
-            .Where(s => s.Quantity <= s.ReorderLevel && s.ReorderLevel > 0 && (!warehouseId.HasValue || s.WarehouseId == warehouseId.Value))
+            .Where(s => s.Quantity <= s.Product!.ReorderLevel && s.Product.ReorderLevel > 0 && (!warehouseId.HasValue || s.WarehouseId == warehouseId.Value))
             .ToListAsync(ct);
 
         return stocks.Select(s =>
         {
             var product = s.Product!;
-            var deficit = s.ReorderLevel - s.Quantity;
+            var deficit = product.ReorderLevel - s.Quantity;
             return new LowStockReportDto(
                 s.ProductId,
                 product.Name,
-                product.Category?.Name ?? "General",
+                product.ProductCategory?.Name ?? "General",
                 s.Warehouse!.Name,
                 s.Quantity,
-                s.ReorderLevel,
+                product.ReorderLevel,
                 deficit,
-                0m, // TODO: Phase 25 — Wholesale box conversion removed with dual-unit system
-                0m, // TODO: Phase 25 — remaining retail after wholesale removed
-                "-", // TODO: Phase 25 — WholesaleUnit navigation removed
-                "-", // TODO: Phase 25 — RetailUnit navigation removed
-                1m  // TODO: Phase 25 — ConversionFactor removed from Product
+                0m,
+                0m,
+                "-",
+                "-",
+                1m
             );
         });
     }
 
     public async Task<IEnumerable<CustomerFinancialBalanceDto>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct)
     {
-        var query = _context.Customers.AsQueryable();
+        var query = _context.Customers
+            .Include(c => c.Party)
+                .ThenInclude(p => p.Account)
+            .AsQueryable();
 
         if (customerId.HasValue)
             query = query.Where(c => c.Id == customerId.Value);
 
         return await query
-            .OrderBy(c => c.Name)
+            .OrderBy(c => c.Party.Name)
             .Select(c => new CustomerFinancialBalanceDto(
                 c.Id,
-                c.Name,
-                c.OpeningBalance,
+                c.Party.Name,
+                c.Party.Account.OpeningBalance ?? 0m,
                 _context.SalesInvoices.Where(i => i.CustomerId == c.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.TotalAmount),
-                _context.SalesReturns.Where(r => r.CustomerId == c.Id).Sum(r => r.TotalAmount),
-                _context.CustomerPayments.Where(p => p.CustomerId == c.Id).Sum(p => p.Amount),
-                0m, // TotalCredit (PlaceHolder)
-                c.CurrentBalance
+                _context.SalesReturns.Where(r => r.CustomerId == c.Id && r.Status == InvoiceStatus.Posted).Sum(r => r.TotalAmount),
+                0m,
+                0m,
+                c.Party.Account.CurrentBalance ?? 0m
             ))
             .ToListAsync(ct);
     }
 
     public async Task<IEnumerable<SupplierBalanceReportDto>> GetSupplierBalancesReportAsync(int? supplierId, CancellationToken ct)
     {
-        var query = _context.Suppliers.AsQueryable();
+        var query = _context.Suppliers
+            .Include(s => s.Party)
+                .ThenInclude(p => p.Account)
+            .AsQueryable();
 
         if (supplierId.HasValue)
             query = query.Where(s => s.Id == supplierId.Value);
 
         return await query
-            .OrderBy(s => s.Name)
+            .OrderBy(s => s.Party.Name)
             .Select(s => new SupplierBalanceReportDto(
                 s.Id,
-                s.Name,
-                s.OpeningBalance,
-                _context.PurchaseInvoices.Where(i => i.SupplierId == s.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.TotalAmount),
-                _context.PurchaseReturns.Where(r => r.SupplierId == s.Id).Sum(r => r.TotalAmount),
+                s.Party.Name,
+                s.Party.Account.OpeningBalance ?? 0m,
+                _context.PurchaseInvoices.Where(i => i.SupplierId == s.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.NetTotal),
+                _context.PurchaseReturns.Where(r => r.SupplierId == s.Id && r.Status == InvoiceStatus.Posted).Sum(r => r.TotalAmount),
                 _context.SupplierPayments.Where(p => p.SupplierId == s.Id).Sum(p => p.Amount),
-                0m, // TotalDebit (PlaceHolder)
-                s.CurrentBalance
+                0m,
+                s.Party.Account.CurrentBalance ?? 0m
             ))
             .ToListAsync(ct);
     }
 
     public async Task<IEnumerable<ProductMovementReportDto>> GetProductMovementsReportAsync(int productId, DateTime? from, DateTime? to, CancellationToken ct)
     {
-        var query = _context.InventoryMovements
-            .Include(m => m.Warehouse)
-            .Where(m => m.ProductId == productId);
+        var query = _context.InventoryTransactionLines
+            .Include(tl => tl.InventoryTransaction)
+                .ThenInclude(t => t!.Warehouse)
+            .Where(tl => tl.ProductId == productId && tl.InventoryTransaction!.Status == InvoiceStatus.Posted);
 
         if (from.HasValue)
-            query = query.Where(m => m.MovementDate >= from.Value.Date);
+            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate >= from.Value.Date);
 
         if (to.HasValue)
-            query = query.Where(m => m.MovementDate <= to.Value.Date.AddDays(1).AddTicks(-1));
+            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate <= to.Value.Date.AddDays(1).AddTicks(-1));
 
-        return await query
-            .OrderByDescending(m => m.MovementDate)
-            .Select(m => new ProductMovementReportDto(
-                m.MovementDate,
-                m.Warehouse!.Name,
-                m.MovementType.ToString(),
-                m.ReferenceType + " #" + m.ReferenceId,
-                m.QuantityChange,
-                m.QuantityAfter
-            ))
+        var rawData = await query
+            .OrderBy(tl => tl.InventoryTransaction!.TransactionDate)
+            .ThenBy(tl => tl.Id)
+            .Select(tl => new
+            {
+                tl.InventoryTransaction!.TransactionDate,
+                WarehouseName = tl.InventoryTransaction.Warehouse!.Name,
+                TransactionType = tl.InventoryTransaction.TransactionType,
+                ReferenceType = tl.InventoryTransaction.ReferenceType,
+                ReferenceId = tl.InventoryTransaction.ReferenceId,
+                tl.Quantity
+            })
             .ToListAsync(ct);
+
+        decimal runningBalance = 0;
+        var result = new List<ProductMovementReportDto>();
+
+        foreach (var item in rawData)
+        {
+            var isOutgoing = item.TransactionType == InventoryTransactionType.Sale
+                          || item.TransactionType == InventoryTransactionType.TransferOut
+                          || item.TransactionType == InventoryTransactionType.PurchaseReturn
+                          || item.TransactionType == InventoryTransactionType.Damage
+                          || item.TransactionType == InventoryTransactionType.InternalIssue;
+
+            var quantityChange = isOutgoing ? -item.Quantity : item.Quantity;
+            runningBalance += quantityChange;
+
+            result.Add(new ProductMovementReportDto(
+                item.TransactionDate,
+                item.WarehouseName,
+                item.TransactionType.ToString(),
+                $"{item.ReferenceType} #{item.ReferenceId}",
+                quantityChange,
+                runningBalance
+            ));
+        }
+
+        return result.OrderByDescending(r => r.Date).ToList();
     }
 
     public async Task<List<StockBalanceReportDto>> GetStockBalanceReportAsync(int? warehouseId, CancellationToken ct)
@@ -207,7 +240,7 @@ public class ReportRepository : IReportRepository
 
         var query = _context.WarehouseStocks
             .Include(ws => ws.Product)
-                .ThenInclude(p => p!.Category)
+                .ThenInclude(p => p!.ProductCategory)
             .Include(ws => ws.Product)
                 .ThenInclude(p => p!.Units)
             .Include(ws => ws.Warehouse)
@@ -222,13 +255,13 @@ public class ReportRepository : IReportRepository
             .Select(ws => new StockBalanceReportDto(
                 ws.ProductId,
                 ws.Product!.Name,
-                ws.Product!.Category != null ? ws.Product!.Category.Name : null,
+                ws.Product!.ProductCategory != null ? ws.Product.ProductCategory.Name : null,
                 ws.WarehouseId,
                 ws.Warehouse!.Name,
                 ws.Quantity,
-                ws.ReorderLevel,
-                ws.Product.Cost,
-                ws.Quantity * ws.Product.Cost
+                ws.Product.ReorderLevel,
+                ws.AvgCost,
+                ws.Quantity * ws.AvgCost
             ))
             .ToListAsync(ct);
     }
@@ -239,66 +272,89 @@ public class ReportRepository : IReportRepository
         _logger.LogInformation("Fetching warehouse movements — warehouseId: {Id}, from: {From}, to: {To}",
             warehouseId, from, to);
 
-        var query = _context.InventoryMovements
-            .Include(im => im.Product)
-            .Include(im => im.Warehouse)
+        var query = _context.InventoryTransactionLines
+            .Include(tl => tl.InventoryTransaction)
+                .ThenInclude(t => t!.Warehouse)
+            .Include(tl => tl.Product)
+            .Where(tl => tl.InventoryTransaction!.Status == InvoiceStatus.Posted)
             .AsQueryable();
 
         if (warehouseId.HasValue)
-            query = query.Where(im => im.WarehouseId == warehouseId.Value);
+            query = query.Where(tl => tl.InventoryTransaction!.WarehouseId == warehouseId.Value);
 
         if (from.HasValue)
         {
             var fromDate = from.Value.Date;
-            query = query.Where(im => im.MovementDate >= fromDate);
+            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate >= fromDate);
         }
 
         if (to.HasValue)
         {
             var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
-            query = query.Where(im => im.MovementDate <= toDate);
+            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate <= toDate);
         }
 
         var items = await query
-            .OrderByDescending(im => im.MovementDate)
-            .Select(im => new
+            .OrderByDescending(tl => tl.InventoryTransaction!.TransactionDate)
+            .Select(tl => new
             {
-                im.MovementDate,
-                im.ProductId,
-                ProductName = im.Product!.Name,
-                WarehouseName = im.Warehouse!.Name,
-                im.MovementType,
-                im.QuantityChange,
-                im.QuantityBefore,
-                im.QuantityAfter,
-                im.ReferenceType,
-                im.ReferenceId
+                tl.InventoryTransaction!.TransactionDate,
+                tl.ProductId,
+                ProductName = tl.Product!.Name,
+                WarehouseName = tl.InventoryTransaction.Warehouse!.Name,
+                TransactionType = tl.InventoryTransaction.TransactionType,
+                tl.Quantity,
+                ReferenceType = tl.InventoryTransaction.ReferenceType,
+                tl.InventoryTransaction.ReferenceId,
+                WarehouseId = tl.InventoryTransaction.WarehouseId
             })
             .ToListAsync(ct);
 
-        return items.Select(im => new WarehouseMovementReportDto(
-            im.MovementDate,
-            im.ProductId,
-            im.ProductName,
-            im.WarehouseName,
-            GetMovementTypeArabic(im.MovementType),
-            im.QuantityChange,
-            im.QuantityBefore,
-            im.QuantityAfter,
-            im.ReferenceType,
-            im.ReferenceId
-        )).ToList();
+        var balances = new Dictionary<(int ProductId, short WarehouseId), decimal>();
+        return items.Select(im =>
+        {
+            var key = (im.ProductId, im.WarehouseId);
+            var before = balances.GetValueOrDefault(key, 0);
+
+            var isOutgoing = im.TransactionType == InventoryTransactionType.Sale
+                          || im.TransactionType == InventoryTransactionType.TransferOut
+                          || im.TransactionType == InventoryTransactionType.PurchaseReturn
+                          || im.TransactionType == InventoryTransactionType.Damage
+                          || im.TransactionType == InventoryTransactionType.InternalIssue;
+
+            var change = isOutgoing ? -im.Quantity : im.Quantity;
+            var after = before + change;
+            balances[key] = after;
+
+            return new WarehouseMovementReportDto(
+                im.TransactionDate,
+                im.ProductId,
+                im.ProductName,
+                im.WarehouseName,
+                GetInventoryTransactionTypeArabic(im.TransactionType),
+                change,
+                before,
+                after,
+                im.ReferenceType?.ToString(),
+                im.ReferenceId
+            );
+        }).ToList();
     }
 
-    private static string GetMovementTypeArabic(MovementType type) => type switch
+    private static string GetInventoryTransactionTypeArabic(InventoryTransactionType type) => type switch
     {
-        MovementType.PurchaseIn => "مشتريات",
-        MovementType.SaleOut => "مبيعات",
-        MovementType.SaleReturnIn => "مرتجع مبيعات",
-        MovementType.PurchaseReturnOut => "مرتجع مشتريات",
-        MovementType.TransferOut => "تحويل خارج",
-        MovementType.TransferIn => "تحويل داخل",
-        MovementType.Adjustment => "تسوية",
+        InventoryTransactionType.Purchase => "مشتريات",
+        InventoryTransactionType.Sale => "مبيعات",
+        InventoryTransactionType.SaleReturn => "مرتجع مبيعات",
+        InventoryTransactionType.PurchaseReturn => "مرتجع مشتريات",
+        InventoryTransactionType.TransferOut => "تحويل خارج",
+        InventoryTransactionType.TransferIn => "تحويل داخل",
+        InventoryTransactionType.Adjustment => "تسوية",
+        InventoryTransactionType.Damage => "تلف",
+        InventoryTransactionType.OpeningBalance => "رصيد افتتاحي",
+        InventoryTransactionType.InternalIssue => "صرف داخلي",
+        InventoryTransactionType.InternalReceipt => "إيراد داخلي",
+        InventoryTransactionType.Count => "جرد",
         _ => type.ToString()
     };
 
@@ -314,7 +370,7 @@ public class ReportRepository : IReportRepository
 
         var purchasesToday = await _context.PurchaseInvoices
             .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= today && i.InvoiceDate < tomorrow)
-            .SumAsync(i => i.TotalAmount, ct);
+            .SumAsync(i => i.NetTotal, ct);
 
         var salesMonth = await _context.SalesInvoices
             .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= monthStart && i.InvoiceDate < tomorrow)
@@ -322,10 +378,10 @@ public class ReportRepository : IReportRepository
 
         var purchasesMonth = await _context.PurchaseInvoices
             .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= monthStart && i.InvoiceDate < tomorrow)
-            .SumAsync(i => i.TotalAmount, ct);
+            .SumAsync(i => i.NetTotal, ct);
 
         var lowStockCount = await _context.WarehouseStocks
-            .CountAsync(s => s.Quantity <= s.ReorderLevel && s.ReorderLevel > 0, ct);
+            .CountAsync(s => s.Quantity <= s.Product!.ReorderLevel && s.Product.ReorderLevel > 0, ct);
 
         var activeCustomersCount = await _context.Customers
             .CountAsync(c => c.IsActive, ct);
@@ -336,11 +392,13 @@ public class ReportRepository : IReportRepository
         var totalProductsCount = await _context.Products
             .CountAsync(p => p.IsActive, ct);
 
-        var totalReceivables = await _context.Customers
-            .SumAsync(c => c.CurrentBalance, ct);
+        var totalReceivables = await _context.Parties
+            .Where(p => p.PartyType == PartyType.Customer)
+            .SumAsync(p => p.Account.CurrentBalance ?? 0m, ct);
 
-        var totalPayables = await _context.Suppliers
-            .SumAsync(s => s.CurrentBalance, ct);
+        var totalPayables = await _context.Parties
+            .Where(p => p.PartyType == PartyType.Supplier)
+            .SumAsync(p => p.Account.CurrentBalance ?? 0m, ct);
 
         return new DashboardSummaryDto(
             salesToday.Sum(i => i.TotalAmount),

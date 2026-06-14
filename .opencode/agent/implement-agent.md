@@ -23,36 +23,330 @@ Write production-quality C# code that exactly implements the patterns from AGENT
 
 ## Code Patterns
 
-### Domain Entity Pattern (WPF + MVVM)
+### Domain Entity Pattern — Product (65-table schema — no price/cost on entity)
 ```csharp
 public class Product : BaseEntity
 {
     // Private setters — immutable after creation
     public string Name { get; private set; }
+    public int CategoryId { get; private set; }
+    public Category? Category { get; private set; }
+    public string? Description { get; private set; }
+    public bool TrackExpiry { get; private set; }
+    public int? DefaultPurchaseUnitId { get; private set; }  // Pre-selects unit in purchase screens
+    public int? DefaultSalesUnitId { get; private set; }     // Pre-selects unit in sales screens
     public bool IsActive { get; private set; } = true;
-    
-    // Units collection (Dynamic UOM — prices live on ProductUnit)
+
+    // Units collection — prices live on ProductPrices, not here
     private readonly List<ProductUnit> _units = new();
     public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
 
-    // Get price from product unit  
-    public decimal GetPriceByUnit(UnitType type, int productUnitId)
-    {
-        var unit = _units.FirstOrDefault(u => u.Id == productUnitId)
-            ?? throw new DomainException("الوحدة غير موجودة");
-        return type == UnitType.Retail ? unit.RetailPrice : unit.WholesalePrice;
-    }
+    // NO PurchasePrice, SalePrice, WholesalePrice, RetailPrice, Barcode, AvgCost, OpeningQuantity on Product
 
     // Protected constructor for EF Core
     protected Product() { }
 
     // Static factory method with validation
-    public static Product Create(string name, int createdByUserId)
+    public static Product Create(string name, int categoryId, int createdByUserId,
+        string? description = null, bool trackExpiry = false,
+        int? defaultPurchaseUnitId = null, int? defaultSalesUnitId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب");
-        return new Product { Name = name, IsActive = true, CreatedByUserId = createdByUserId, CreatedAt = DateTime.UtcNow };
+        if (categoryId <= 0)
+            throw new DomainException("مجموعة المنتج مطلوبة");
+        return new Product
+        {
+            Name = name.Trim(),
+            CategoryId = categoryId,
+            Description = description?.Trim(),
+            TrackExpiry = trackExpiry,
+            DefaultPurchaseUnitId = defaultPurchaseUnitId,
+            DefaultSalesUnitId = defaultSalesUnitId,
+            IsActive = true,
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTime.UtcNow
+        };
     }
+}
+```
+
+### ProductPrices Entity Pattern (per unit × currency × effective dates)
+```csharp
+public class ProductPrice : BaseEntity
+{
+    public int ProductUnitId { get; private set; }
+    public ProductUnit? ProductUnit { get; private set; }
+    public int CurrencyId { get; private set; }
+    public Currency? Currency { get; private set; }
+    public decimal Price { get; private set; }           // decimal(18,2)
+    public DateTime EffectiveFrom { get; private set; }   // datetime2
+    public DateTime? EffectiveTo { get; private set; }    // nullable datetime2
+
+    protected ProductPrice() { }
+
+    public static ProductPrice Create(int productUnitId, int currencyId, decimal price,
+        DateTime effectiveFrom, DateTime? effectiveTo = null, int createdByUserId = 0)
+    {
+        if (price < 0)
+            throw new DomainException("السعر لا يمكن أن يكون سالباً");
+        if (effectiveFrom == default)
+            throw new DomainException("تاريخ بدء السعر مطلوب");
+        if (effectiveTo.HasValue && effectiveTo <= effectiveFrom)
+            throw new DomainException("تاريخ الانتهاء يجب أن يكون بعد تاريخ البداية");
+        return new ProductPrice
+        {
+            ProductUnitId = productUnitId,
+            CurrencyId = currencyId,
+            Price = price,
+            EffectiveFrom = effectiveFrom,
+            EffectiveTo = effectiveTo,
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+    }
+}
+```
+
+### InventoryBatch Entity Pattern (FIFO/FEFO)
+```csharp
+public class InventoryBatch : BaseEntity
+{
+    public int ProductId { get; private set; }
+    public Product? Product { get; private set; }
+    public int WarehouseId { get; private set; }
+    public Warehouse? Warehouse { get; private set; }
+    public string? BatchNo { get; private set; }
+    public DateTime? ExpiryDate { get; private set; }
+    public decimal QuantityReceived { get; private set; }  // decimal(18,3)
+    public decimal QuantityRemaining { get; private set; } // decimal(18,3) — decreases on sale
+    public decimal UnitCost { get; private set; }          // decimal(18,2)
+    public int? PurchaseInvoiceId { get; private set; }    // nullable FK
+
+    public static InventoryBatch Create(int productId, int warehouseId, decimal quantity,
+        decimal unitCost, string? batchNo = null, DateTime? expiryDate = null,
+        int? purchaseInvoiceId = null, int createdByUserId = 0)
+    {
+        if (quantity <= 0)
+            throw new DomainException("الكمية يجب أن تكون أكبر من صفر");
+        if (unitCost < 0)
+            throw new DomainException("التكلفة لا يمكن أن تكون سالبة");
+        return new InventoryBatch
+        {
+            ProductId = productId,
+            WarehouseId = warehouseId,
+            BatchNo = batchNo,
+            ExpiryDate = expiryDate,
+            QuantityReceived = quantity,
+            QuantityRemaining = quantity,
+            UnitCost = unitCost,
+            PurchaseInvoiceId = purchaseInvoiceId,
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+    }
+
+    public void Deduct(decimal quantity)
+    {
+        if (quantity <= 0)
+            throw new DomainException("الكمية المراد خصمها يجب أن تكون أكبر من صفر");
+        if (quantity > QuantityRemaining)
+            throw new DomainException("الكمية المطلوبة غير متوفرة في هذه الدفعة");
+        QuantityRemaining -= quantity;
+        UpdateTimestamp();
+    }
+}
+```
+
+### Party Entity Pattern (shared contact data)
+```csharp
+public class Party : ActivatableEntity
+{
+    public string Name { get; private set; }
+    public string? Phone { get; private set; }
+    public string? Email { get; private set; }
+    public string? Address { get; private set; }
+    public string? TaxNumber { get; private set; }
+    public string? Notes { get; private set; }
+
+    protected Party() { }
+
+    public static Party Create(string name, string? phone = null, string? email = null,
+        string? address = null, string? taxNumber = null, string? notes = null,
+        int createdByUserId = 0)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("الاسم مطلوب");
+        return new Party
+        {
+            Name = name.Trim(),
+            Phone = phone?.Trim(),
+            Email = email?.Trim(),
+            Address = address?.Trim(),
+            TaxNumber = taxNumber?.Trim(),
+            Notes = notes?.Trim(),
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+    }
+
+    public void Update(string name, string? phone = null, string? email = null,
+        string? address = null, string? taxNumber = null, string? notes = null)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("الاسم مطلوب");
+        Name = name.Trim();
+        Phone = phone?.Trim();
+        Email = email?.Trim();
+        Address = address?.Trim();
+        TaxNumber = taxNumber?.Trim();
+        Notes = notes?.Trim();
+        UpdateTimestamp();
+    }
+}
+```
+
+### Unit Entity Pattern (independent table, seedable)
+```csharp
+public class Unit : BaseEntity
+{
+    // smallint PK — lookup table
+    public string Name { get; private set; }
+    public string Symbol { get; private set; }
+    public bool IsSystem { get; private set; }   // Protects seed units
+    public bool IsActive { get; private set; } = true;
+
+    protected Unit() { }
+
+    public static Unit Create(string name, string symbol, bool isSystem = false,
+        int createdByUserId = 0)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم الوحدة مطلوب");
+        if (string.IsNullOrWhiteSpace(symbol))
+            throw new DomainException("رمز الوحدة مطلوب");
+        return new Unit
+        {
+            Name = name.Trim(),
+            Symbol = symbol.Trim(),
+            IsSystem = isSystem,
+            IsActive = true,
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    public override void MarkAsDeleted()
+    {
+        if (IsSystem)
+            throw new DomainException("لا يمكن حذف وحدة النظام — الوحدة محمية");
+        IsActive = false;
+        UpdateTimestamp();
+    }
+}
+```
+
+### ProductUnit Pattern (with Factor, IsBaseUnit, DefaultPurchase/Sales)
+```csharp
+public class ProductUnit : BaseEntity
+{
+    public int ProductId { get; private set; }
+    public Product? Product { get; private set; }
+    public int UnitId { get; private set; }              // FK to Units table
+    public Unit? Unit { get; private set; }
+    public decimal Factor { get; private set; }           // Conversion to base unit (Base=1, Carton=24)
+    public bool IsBaseUnit { get; private set; }          // Exactly one per product
+    public bool IsActive { get; private set; } = true;
+
+    private readonly List<UnitBarcode> _barcodes = new();
+    public IReadOnlyCollection<UnitBarcode> Barcodes => _barcodes.AsReadOnly();
+
+    protected ProductUnit() { }
+
+    public static ProductUnit Create(int productId, int unitId, decimal factor,
+        bool isBaseUnit = false, int createdByUserId = 0)
+    {
+        if (factor <= 0)
+            throw new DomainException("معامل التحويل يجب أن يكون أكبر من صفر");
+        if (isBaseUnit && factor != 1)
+            throw new DomainException("الوحدة الأساسية يجب أن يكون معامل تحويلها 1");
+        return new ProductUnit
+        {
+            ProductId = productId,
+            UnitId = unitId,
+            Factor = factor,
+            IsBaseUnit = isBaseUnit,
+            IsActive = true,
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    // Unit conversion
+    public decimal ConvertToBase(decimal quantity) => quantity * Factor;
+    public decimal ConvertFromBase(decimal baseQuantity) => baseQuantity / Factor;
+}
+```
+
+### WarehouseTransfer / WarehouseTransferLine Pattern (replaces StockTransfer)
+```csharp
+public class WarehouseTransfer : DocumentEntity  // Draft/Posted/Cancelled
+{
+    public string TransferNo { get; private set; }  // Generated via DocumentSequence
+    public int FromWarehouseId { get; private set; }
+    public Warehouse? FromWarehouse { get; private set; }
+    public int ToWarehouseId { get; private set; }
+    public Warehouse? ToWarehouse { get; private set; }
+    public string? Notes { get; private set; }
+
+    private readonly List<WarehouseTransferLine> _lines = new();
+    public IReadOnlyCollection<WarehouseTransferLine> Lines => _lines.AsReadOnly();
+
+    public static WarehouseTransfer Create(string transferNo, int fromWarehouseId,
+        int toWarehouseId, string? notes = null, int createdByUserId = 0) { ... }
+}
+
+public class WarehouseTransferLine : BaseEntity
+{
+    public int TransferId { get; private set; }
+    public WarehouseTransfer? Transfer { get; private set; }
+    public int ProductUnitId { get; private set; }
+    public ProductUnit? ProductUnit { get; private set; }
+    public decimal Quantity { get; private set; }  // In base unit
+    public string? BatchNo { get; private set; }
+}
+```
+
+### InventoryTransaction / InventoryTransactionLine Pattern (replaces InventoryMovement)
+```csharp
+public class InventoryTransaction : BaseEntity
+{
+    public int WarehouseId { get; private set; }
+    public Warehouse? Warehouse { get; private set; }
+    public string ReferenceType { get; private set; }  // "SalesInvoice", "PurchaseInvoice", "Transfer"
+    public int ReferenceId { get; private set; }
+    public string? Notes { get; private set; }
+
+    private readonly List<InventoryTransactionLine> _lines = new();
+    public IReadOnlyCollection<InventoryTransactionLine> Lines => _lines.AsReadOnly();
+
+    public static InventoryTransaction Create(int warehouseId, string referenceType,
+        int referenceId, string? notes = null, int createdByUserId = 0) { ... }
+}
+
+public class InventoryTransactionLine : BaseEntity
+{
+    public int TransactionId { get; private set; }
+    public InventoryTransaction? Transaction { get; private set; }
+    public int ProductUnitId { get; private set; }
+    public ProductUnit? ProductUnit { get; private set; }
+    public decimal Quantity { get; private set; }     // In base unit (positive = in, negative = out)
+    public decimal UnitCost { get; private set; }      // decimal(18,2)
+    public string? BatchNo { get; private set; }
+    public DateTime? ExpiryDate { get; private set; }
 }
 ```
 
@@ -159,6 +453,46 @@ public async Task<IActionResult> Delete(int id, CancellationToken ct)
 
 // DocumentSequence entity has both GetNextNumber() and GetNextInt() methods
 // ALWAYS use GetNextIntAsync for InvoiceNo generation — NEVER lastId + 1
+```
+
+### Per-Entity Account Routing Pattern (v4.10 — Phase 18 Remediation)
+
+```csharp
+// AccountingIntegrationService — Use per-entity accounts instead of fixed system mappings
+
+// Helper methods for per-entity account resolution:
+private static int GetCustomerAccountId(SalesInvoice invoice, SystemAccountMappingsDto m)
+{
+    return invoice.Customer?.AccountId > 0
+        ? invoice.Customer.AccountId
+        : m.AccountsReceivableAccountId;
+}
+
+private static int GetSupplierAccountId(PurchaseInvoice invoice, SystemAccountMappingsDto m)
+{
+    return invoice.Supplier?.AccountId > 0
+        ? invoice.Supplier.AccountId
+        : m.AccountsPayableAccountId;
+}
+
+// CORRECT — use helpers in all sales/purchase journal entry methods:
+var customerAccountId = GetCustomerAccountId(invoice, m);
+// then use customerAccountId instead of m.AccountsReceivableAccountId
+lines.Add(new JournalEntryLineRequest(customerAccountId, invoice.TotalAmount, 0, "الجزء الآجل"));
+
+// CORRECT — opening entries accept per-entity account parameter:
+public async Task<Result<int>> CreateCustomerOpeningEntryAsync(
+    int customerId, string customerName, int customerAccountId, decimal openingBalance, ...)
+{
+    lines.Add(new JournalEntryLineRequest(customerAccountId, openingBalance, 0, "رصيد افتتاحي"));
+}
+
+// CORRECT — payment reversals accept per-entity account parameter:
+public async Task<Result<int>> ReverseCustomerPaymentEntryAsync(
+    int paymentId, decimal amount, string customerName, int customerAccountId, ...)
+
+// WRONG — NEVER use fixed system mapping account IDs:
+m.AccountsReceivableAccountId  // ❌ use invoice.Customer?.AccountId instead!
 ```
 
 ### ViewModel Pattern (v4.5 — ExecuteAsync)
@@ -353,6 +687,9 @@ private async Task SaveAsync()
 - Serilog.Log.Error directly in ViewModels (use LogSystemError from ViewModelBase instead)
 - lastId + 1 for InvoiceNo generation (use DocumentSequenceService.GetNextIntAsync instead — not thread-safe)
 - Non-unique InvoiceNo (duplicates cause search/return/report confusion — use UNIQUE index per document type)
+- Fixed `AccountsReceivableAccountId`/`AccountsPayableAccountId` in journal entries (use per-entity account routing via `GetCustomerAccountId`/`GetSupplierAccountId` helpers instead)
+- Split Cash Sales (1521) and Credit Sales (1522) revenue accounts (use single `1520 — إيرادات المبيعات` instead)
+- Crediting `InventoryAssetAccountId` for purchase return reversals (use `PurchaseReturnAccountId` instead)
 
 ### Error Message Pattern (v4.5.1)
 
@@ -1876,28 +2213,164 @@ catch (DbUpdateException ex)
 public async Task<IActionResult> GetByType(AccountType type, CancellationToken ct)
 ```
 
-### Phase 23 — Customers Module Implementation Patterns
+### Smallint FK Pattern (Lookup Tables)
 
-#### CustomerGroup Entity Pattern
+Lookup tables (Units, Roles, Departments, Currencies, Branches, Taxes, AccountCategories) use **smallint PK**:
 ```csharp
-public class CustomerGroup : BaseEntity
+// EF Core Configuration for lookup tables:
+builder.Property(x => x.Id).HasColumnType("smallint").ValueGeneratedOnAdd();
+builder.HasKey(x => x.Id);
+
+// Entity — Id stays as int but DB stores smallint:
+public class Unit : BaseEntity
 {
+    public int Id { get; private set; }  // int in C#, smallint in SQL
     public string Name { get; private set; }
-    public string? Description { get; private set; }
+}
+```
 
-    public static CustomerGroup Create(string name, string? description = null, int? createdByUserId = null)
+### Bigint PK Pattern (High-Volume Tables)
+
+AuditLog and ImportLog use **bigint PK**:
+```csharp
+// EF Core Configuration:
+builder.Property(x => x.Id).HasColumnType("bigint").ValueGeneratedOnAdd();
+builder.HasKey(x => x.Id);
+
+// Entity — Id stays as long in C#:
+public class AuditLog
+{
+    public long Id { get; private set; }  // bigint in SQL
+    public int? UserId { get; private set; }
+    public string Action { get; private set; } = string.Empty;
+    public string EntityType { get; private set; } = string.Empty;
+    public int EntityId { get; private set; }
+    public string? OldValues { get; private set; }  // JSON
+    public string? NewValues { get; private set; }   // JSON
+    public DateTime Timestamp { get; private set; }
+
+    // Indexes: (UserId, Timestamp DESC), (EntityType, EntityId), (Timestamp DESC)
+}
+
+public class ImportLog
+{
+    public long Id { get; private set; }  // bigint
+    public string EntityType { get; private set; } = string.Empty;
+    public int ImportedCount { get; private set; }
+    public int FailedCount { get; private set; }
+    public DateTime ImportedAt { get; private set; }
+}
+```
+
+### Perpetual Inventory Transaction Pattern (65-table schema)
+
+NO `Purchases` account — ALL inventory costs go DIRECTLY to Inventory Asset account:
+
+```csharp
+// Purchase Invoice Post → Dr Inventory (not Purchases), Cr Cash/AP
+// Journal entry lines:
+//   Dr InventoryAssetAccountId (for item costs)
+//   Dr VAT Input Account (if taxable)
+//   Cr AccountsPayableAccountId or CashAccountId
+
+// Sales Invoice Post → COGS side:
+// Dr COGS AccountId (via AverageCost)
+// Cr InventoryAssetAccountId
+
+// Purchase Return → Dr Cash/AP, Cr PurchaseReturnAccountId (not Inventory directly)
+// Journal entry lines:
+//   Dr AccountsPayableAccountId or CashAccountId
+//   Cr PurchaseReturnAccountId (contra expense, not Inventory)
+```
+
+### Phase 23 — Customers Module Implementation Patterns (65-table schema: Parties + Accounts, No CustomerGroup)
+
+#### Architecture
+- **Parties** table stores shared contact data (Name, Phone, Email, Address, TaxNumber)
+- **Customers** table: PartyId FK, AccountId FK (mandatory), CategoryId FK, CreditLimit
+- **Suppliers** table: PartyId FK, AccountId FK (mandatory), CategoryId FK
+- **No CustomerGroup/SupplierType** — payment type is per-invoice (SalesInvoice.PaymentType)
+- **Account auto-created** under `"1210 — العملاء"` for customers, `"2100 — حسابات الموردين"` for suppliers
+
+#### Customer Entity Pattern (no CustomerGroupId, no OpeningBalance, no CustomerType)
+```csharp
+public class Customer : BaseEntity
+{
+    public int PartyId { get; private set; }          // FK to Parties (shared contact data)
+    public Party? Party { get; private set; }
+    public int AccountId { get; private set; }        // FK to Account — auto-created by service
+    public Account? Account { get; private set; }
+    public int? CategoryId { get; private set; }      // FK to Categories
+    public Category? Category { get; private set; }
+    public decimal CreditLimit { get; private set; }  // decimal(18,2)
+    public string? Notes { get; private set; }
+
+    // NO CustomerGroupId, NO CustomerType, NO OpeningBalance, NO CurrentBalance, NO CurrencyId
+
+    public static Customer Create(int partyId, int accountId, int? categoryId = null,
+        decimal creditLimit = 0, string? notes = null, int createdByUserId = 0)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المجموعة مطلوب.");
-        // ...
+        if (partyId <= 0) throw new DomainException("الطرف مطلوب");
+        if (accountId <= 0) throw new DomainException("الحساب مطلوب");
+        return new Customer
+        {
+            PartyId = partyId, AccountId = accountId, CategoryId = categoryId,
+            CreditLimit = Math.Max(0, creditLimit), Notes = notes?.Trim(),
+            IsActive = true, CreatedByUserId = createdByUserId, CreatedAt = DateTime.UtcNow
+        };
     }
 
-    public void Update(string name, string? description = null, int? updatedByUserId = null)
+    // CheckCreditLimit returns bool — never throws
+    public bool CheckCreditLimit(decimal additionalAmount)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المجموعة مطلوب.");
-        // ...
+        if (CreditLimit <= 0) return true;  // No limit = no restriction
+        // Balance is on linked Account, not here — caller must check Account balance
+        return true;  // Soft warning only, caller decides enforcement
     }
+}
+```
+
+#### Supplier Entity Pattern (no SupplierType, no OpeningBalance)
+```csharp
+public class Supplier : BaseEntity
+{
+    public int PartyId { get; private set; }          // FK to Parties
+    public Party? Party { get; private set; }
+    public int AccountId { get; private set; }        // FK to Account — auto-created by service
+    public Account? Account { get; private set; }
+    public int? CategoryId { get; private set; }
+    public Category? Category { get; private set; }
+    public string? Notes { get; private set; }
+
+    // NO SupplierType, NO OpeningBalance, NO CurrentBalance, NO CurrencyId
+
+    public static Supplier Create(int partyId, int accountId, int? categoryId = null,
+        string? notes = null, int createdByUserId = 0) { /* similar to Customer.Create */ }
+
+    // CheckCreditLimit returns bool — never throws
+    public bool CheckCreditLimit(decimal additionalAmount) => true;
+}
+```
+
+#### Account Auto-Creation Pattern (Customer/Supplier Service)
+```csharp
+// CustomerService.CreateAsync:
+private async Task<Account> CreateCustomerAccountAsync(CancellationToken ct)
+{
+    var parentAccount = await _uow.Accounts.GetByCodeAsync("1210", ct);  // العملاء
+    var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount!.Id, ct);
+    var newCode = (int.Parse(maxCode ?? "1210") + 1).ToString();
+    var account = Account.Create(newCode, $"عميل {request.Name}", $"Customer {request.Name}",
+        AccountType.Asset, 4, parentAccount.Id, false, null, "#2196F3", true, 0m, null, userId);
+    await _uow.Accounts.AddAsync(account, ct);
+    return account;
+}
+
+// SupplierService.CreateAsync:
+private async Task<Account> CreateSupplierAccountAsync(CancellationToken ct)
+{
+    var parentAccount = await _uow.Accounts.GetByCodeAsync("2100", ct);  // حسابات الموردين
+    // ... same pattern with AccountType.Liability and "#F44336" color
 }
 ```
 
@@ -1905,110 +2378,38 @@ public class CustomerGroup : BaseEntity
 ```csharp
 var (items, total) = await _uow.Customers.GetPagedAsync(
     predicate, q => q.OrderByDescending(c => c.Id), page, pageSize, ct, includeInactive,
-    "Account", "CustomerGroup");  // Include navigation properties
+    "Party", "Account", "Category");  // NO "CustomerGroup" — removed in 65-table schema
 ```
 
-#### CustomerGroupsController Route Pattern
-```csharp
-[Route("api/v1/customer-groups")]  // kebab-case per RULE-361
-[Authorize(Policy = "ManagerAndAbove")]
-public class CustomerGroupsController : ControllerBase
-{
-    // GET with AllStaff, POST/PUT/DELETE with ManagerAndAbove
-    // Route params use :int:min(1) — NEVER :byte
-}
-```
-
-#### CustomerEditorViewModel Lookup Loading Pattern
+#### CustomerEditorViewModel Pattern (no CustomerGroup dropdown)
 ```csharp
 private async Task LoadLookupDataAsync()
 {
-    // Load groups
-    var groupsResult = await _customerService.GetAllGroupsAsync();
-    if (groupsResult.IsSuccess && groupsResult.Value != null)
-    {
-        AvailableGroups = new ObservableCollection<CustomerGroupDto>(groupsResult.Value);
-    }
-
-    // Load accounts
-    var accountsResult = await _accountService.GetAllAsync();
-    if (accountsResult.IsSuccess && accountsResult.Value != null)
-    {
-        AvailableAccounts = new ObservableCollection<AccountDto>(accountsResult.Value);
-    }
-}
-```
-
-#### CustomerType Storage Pattern
-```csharp
-// Domain entity
-public byte? CustomerType { get; private set; }
-public bool CheckCreditLimit() => CustomerType.HasValue && (Domain.Enums.CustomerType)CustomerType.Value == Domain.Enums.CustomerType.Credit;
-
-// EF Configuration
-builder.Property(c => c.CustomerType)
-    .HasColumnType("tinyint");
-```
-
-#### Customer Validator Enhancement Pattern
-```csharp
-RuleFor(x => x.CustomerType)
-    .Must(v => v == null || v == 1 || v == 2)
-    .WithMessage("نوع العميل يجب أن يكون نقدي (1) أو آجل (2)");
-RuleFor(x => x.AccountId)
-    .GreaterThan(0).When(x => x.AccountId.HasValue)
-    .WithMessage("رقم الحساب يجب أن يكون أكبر من صفر");
-```
-
-#### Desktop Group Filter Pattern
-```csharp
-public CustomerGroupDto? SelectedGroupFilter
-{
-    get => _selectedGroupFilter;
-    set
-    {
-        _selectedGroupFilter = value;
-        OnPropertyChanged();
-        CustomersView?.Refresh();  // Apply filter
-    }
+    // NO CustomerGroup loading — removed
+    // Load categories (optional)
+    var categoriesResult = await _categoryService.GetAllAsync();
+    // Account is display-only after save — NOT user-selectable
 }
 
-private bool FilterCustomers(object obj)
-{
-    if (obj is not CustomerDto c) return false;
-    if (SelectedGroupFilter != null && c.CustomerGroupId != SelectedGroupFilter.Id)
-        return false;
-    // ... text search filter continues
-}
-```
-
-#### API Endpoint Pattern for Customer Groups
-```csharp
-[HttpGet]
-[Authorize(Policy = "AllStaff")]
-public async Task<IActionResult> GetAll(CancellationToken ct)
-{
-    var result = await _service.GetAllAsync(ct);
-    if (result.IsSuccess) return Ok(result.Value);
-    return BadRequest(new { error = result.Error });
-}
+// DTO without CustomerGroupId/CustomerType
+public record CustomerDto(int Id, int PartyId, string Name, string? Phone, string? Email,
+    int AccountId, string? AccountName, decimal CreditLimit, bool IsActive);
 ```
 
 #### XAML Pitfalls — Critical WPF Patterns
 ```xml
 <!-- CORRECT: ComboBox uses ModernComboBox style -->
-<ComboBox ItemsSource="{Binding CustomerTypeOptions}"
-          SelectedValue="{Binding CustomerType}"
+<ComboBox ItemsSource="{Binding CategoryOptions}"
+          SelectedValue="{Binding CategoryId}"
           Style="{StaticResource ModernComboBox}"
-          TabIndex="8"
-          ToolTip="اختر نوع العميل"/>
+          ToolTip="اختر تصنيف العميل"/>
 
 <!-- WRONG: ModernTextBox has TargetType=TextBox, throws XamlParseException on ComboBox -->
 <ComboBox Style="{StaticResource ModernTextBox}"/>  <!-- ❌ CRASHES -->
 
 <!-- CORRECT: Use ItemTemplate (no DisplayMemberPath) -->
-<ComboBox ItemsSource="{Binding AvailableGroups}"
-          SelectedItem="{Binding SelectedGroup}"
+<ComboBox ItemsSource="{Binding CategoryOptions}"
+          SelectedItem="{Binding SelectedCategory}"
           Style="{StaticResource ModernComboBox}">
     <ComboBox.ItemTemplate>
         <DataTemplate>
@@ -2021,31 +2422,6 @@ public async Task<IActionResult> GetAll(CancellationToken ct)
 <ComboBox DisplayMemberPath="Name" ...>     <!-- ❌ Remove this -->
     <ComboBox.ItemTemplate>...              <!-- ❌ CRASHES if both present -->
 </ComboBox>
-```
-
-#### CustomerType — Informational Only Pattern
-```csharp
-// CustomerType on Customer entity is INFORMATIONAL ONLY
-// The actual Cash/Credit decision is on SalesInvoice.PaymentType
-// Credit limit enforcement checks CreditLimit > 0, NOT CustomerType
-
-// Domain: CheckCreditLimit returns bool, never throws
-public bool CheckCreditLimit(decimal additionalAmount)
-{
-    if (CreditLimit <= 0) return true;          // No limit = no restriction
-    return (CurrentBalance + additionalAmount) <= CreditLimit;
-}
-
-// SalesService.PostAsync: Enforce credit limit
-if (customer.CreditLimit > 0 && invoice.DueAmount > 0)
-{
-    if (!customer.CheckCreditLimit(invoice.DueAmount))
-    {
-        await transaction.RollbackAsync(ct);
-        _logger.LogWarning("Customer {Id} credit limit exceeded", customer.Id);
-        return Result<SalesInvoiceDto>.Failure("تجاوز الحد الائتماني للعميل");
-    }
-}
 ```
 
 #### Phone & Email Validation Pattern
@@ -2062,8 +2438,6 @@ RuleFor(x => x.Email)
 
 #### Report Endpoint Pattern
 ```csharp
-// ICustomerService
-Task<Result<List<CustomerDto>>> GetByGroupAsync(int groupId, CancellationToken ct = default);
 Task<Result<PagedResult<CustomerBalanceReportDto>>> GetCustomerBalanceReportAsync(int page, int pageSize, string? search = null, CancellationToken ct = default);
 Task<Result<PagedResult<CustomerAgingReportDto>>> GetCustomerAgingReportAsync(int page, int pageSize, CancellationToken ct = default);
 
@@ -2140,7 +2514,7 @@ The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-3
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
+| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices — per unit × currency × effective dates), FIFO batches (InventoryBatches), product images, opening stock, Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, Perpetual Inventory (no Purchases account) |
 | 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
 | 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
 | 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
@@ -2276,13 +2650,21 @@ When you encounter any code related to these areas, apply fixes automatically:
 5. Client-side balance validation in CashTransfer → REMOVE (server validates via Account)
 6. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1110 — النقدية"
 7. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
-4. Missing `CurrencyId` on financial entities → Add multi-currency support
-5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
-6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
-7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
-8. Missing journal entry on cash operations → Call AccountingIntegrationService
-9. Missing Excel export on report → Add ClosedXML worksheet generation
-10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
-11. Payment without allocation → Add PaymentAllocation tracking
-12. Missing reversal entries on payment update/delete → Add reversal journal entries
+8. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record (shared contact data)
+9. Missing `CurrencyId` on financial entities → Add multi-currency support (NOT on Customer/Supplier)
+10. Missing `ProductPrices` → Replace SalePrice/RetailPrice on Product with per-unit pricing table
+11. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking via InventoryBatches
+12. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
+13. Missing journal entry on cash operations → Call AccountingIntegrationService
+14. Missing Excel export on report → Add ClosedXML worksheet generation
+15. COGS using PurchaseCost → Change to AverageCost from ProductUnit
+16. Payment without allocation → Add PaymentAllocation tracking
+17. Missing reversal entries on payment update/delete → Add reversal journal entries
+18. Using fixed AR/AP account IDs instead of per-entity customer/supplier accounts → Use `GetCustomerAccountId`/`GetSupplierAccountId` helpers
+19. Missing `PurchaseReturnAccountId` from SystemAccountMappings → Add it with FK to Accounts
+20. Using split 1521/1522 revenue accounts → Merge into single `1520 — إيرادات المبيعات`
+21. Crediting Inventory for purchase returns → Credit `PurchaseReturnAccountId` instead
+22. Old `StockTransfer`/`StockTransferItem` → Replace with `WarehouseTransfer`/`WarehouseTransferLine`
+23. Old `InventoryMovement` → Replace with `InventoryTransaction`/`InventoryTransactionLine`
+24. CustomerGroup/SupplierType references in V1 → Remove (deferred to V2)
+25. OpeningBalance/CurrentBalance on Customer/Supplier/CashBox → Remove (balance on linked Account)

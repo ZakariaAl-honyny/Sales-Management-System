@@ -21,7 +21,6 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
     private CurrencyDto? _selectedCurrency;
     private decimal _newRate;
     private DateTime _effectiveFromDate = DateTime.Today;
-    private ObservableCollection<ExchangeRateHistoryDto> _rateHistory = new();
     private string? _errorMessage;
     private string _windowTitle = "أسعار العملات";
 
@@ -81,10 +80,6 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
 
                 OnPropertyChanged(nameof(IsCurrencySelected));
 
-                if (value != null)
-                    _ = LoadRateHistoryAsync();
-                else
-                    RateHistory.Clear();
             }
         }
     }
@@ -111,18 +106,6 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
         get => _effectiveFromDate;
         set => SetProperty(ref _effectiveFromDate, value);
     }
-
-    public ObservableCollection<ExchangeRateHistoryDto> RateHistory
-    {
-        get => _rateHistory;
-        set
-        {
-            if (SetProperty(ref _rateHistory, value))
-                OnPropertyChanged(nameof(HasRateHistory));
-        }
-    }
-
-    public bool HasRateHistory => RateHistory.Count > 0;
 
     public string? ErrorMessage
     {
@@ -203,40 +186,6 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public async Task LoadRateHistoryAsync()
-    {
-        if (SelectedCurrency == null) return;
-
-        await ExecuteAsync(LoadRateHistoryOperationAsync,
-            ex => ErrorMessage = HandleException(ex, "CurrencyRatesViewModel.LoadRateHistoryAsync"));
-    }
-
-    private async Task LoadRateHistoryOperationAsync()
-    {
-        if (SelectedCurrency == null) return;
-
-        ErrorMessage = null;
-
-        var result = await _currencyService.GetRateHistoryAsync(SelectedCurrency.Id);
-
-        if (result.IsSuccess && result.Value != null)
-        {
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                RateHistory.Clear();
-                foreach (var item in result.Value.OrderByDescending(x => x.EffectiveDate).ThenByDescending(x => x.Id))
-                {
-                    RateHistory.Add(item);
-                }
-                OnPropertyChanged(nameof(HasRateHistory));
-            });
-        }
-        else
-        {
-            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل سجل أسعار الصرف", "CurrencyRatesViewModel.LoadRateHistoryAsync");
-        }
-    }
-
     private async Task AddRateOperationAsync()
     {
         if (!await ValidateAsync()) return;
@@ -250,7 +199,6 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
             _toastService.ShowSuccess($"تم إضافة سعر الصرف الجديد للعملة {SelectedCurrency.Name}");
             _soundService.PlaySuccess();
             _eventBus.Publish(new CurrencyRateChangedMessage(SelectedCurrency.Id));
-            await LoadRateHistoryAsync();
             NewRate = 0;
             EffectiveFromDate = DateTime.Today;
         }
@@ -280,10 +228,6 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
     {
         System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
         {
-            if (SelectedCurrency != null && SelectedCurrency.Id == msg.CurrencyId)
-            {
-                await LoadRateHistoryAsync();
-            }
             await LoadCurrenciesAsync();
         });
     }

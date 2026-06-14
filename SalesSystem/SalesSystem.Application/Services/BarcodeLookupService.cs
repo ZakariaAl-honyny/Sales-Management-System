@@ -44,16 +44,16 @@ public class BarcodeLookupService : IBarcodeLookupService
         }
 
         // Phase 25: UnitName replaced by UnitId+Unit navigation property;
-        // SalesPrice and PurchaseCost removed from ProductUnit (pricing in ProductPrices table).
+        // SalesPrice/ConversionFactor sourced from ProductUnit.
+        // Cost removed from Product entity — tracked via InventoryBatches.
         return Result<BarcodeSearchResult>.Success(new BarcodeSearchResult(
             product.Id,
             product.Name,
             baseUnit.Id,
             baseUnit.Unit?.Name ?? "غير معروف",
-            baseUnit.BaseConversionFactor,
+            baseUnit.Factor,
             baseUnit.IsBaseUnit,
-            product.Cost,
-            product.Cost,
+            0m,
             0m
         ));
     }

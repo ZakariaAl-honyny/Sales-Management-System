@@ -125,14 +125,7 @@ Account.Entity (Chart of Accounts — Phase 22)
 
 **File**: `Infrastructure/Data/DbSeeder.cs` — Lines 120-126
 
-```csharp
-// CURRENT — needs rename
-var defaultCustomer = Customer.Create(
-    name: "العميل الافتراضي في النظام",  // ← MUST rename to "عميل نقدي"
-    openingBalance: 0m,
-    createdByUserId: null
-);
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and see DbSeeder.cs for seed data patterns.
 
 Also needs to seed:
 - Default CustomerGroup (e.g., "عام") — ⬜ NEW
@@ -171,13 +164,7 @@ Observations:
 ### 2.5 Contracts Layer ⚠️ (Needs enhancement)
 
 **File**: `Contracts/DTOs/AllDtos.cs` — Line 51
-```csharp
-public record CustomerDto(int Id, string Name, string? Phone, string? Email, string? Address, 
-    string? TaxNumber, decimal OpeningBalance, decimal CurrentBalance, decimal CreditLimit, bool IsActive)
-{
-    public bool IsBalanceNegative { get => CurrentBalance > 0; }
-}
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 **Missing fields in CustomerDto:**
 - `int? AccountId` — ⬜ NEW
@@ -187,12 +174,7 @@ public record CustomerDto(int Id, string Name, string? Phone, string? Email, str
 - `string? CustomerGroupName` — ⬜ NEW
 
 **File**: `Contracts/Requests/CustomerRequests.cs`
-```csharp
-public record CreateCustomerRequest(string Name, string? Phone, string? Email, string? Address, 
-    string? TaxNumber, decimal OpeningBalance, decimal CreditLimit = 0);
-public record UpdateCustomerRequest(string Name, string? Phone, string? Email, string? Address, 
-    string? TaxNumber, decimal CreditLimit, bool IsActive);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 **Missing fields in requests:**
 - `int? AccountId` — ⬜ NEW
@@ -200,10 +182,7 @@ public record UpdateCustomerRequest(string Name, string? Phone, string? Email, s
 - `int? CustomerGroupId` — ⬜ NEW
 
 **File**: `Contracts/Responses/CustomerResponse.cs`
-```csharp
-public record CustomerResponse(int Id, string Name, string? Phone, string? Address, string? Email,
-    decimal CurrentBalance, decimal CreditLimit, bool IsActive);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 **Missing:**
 - `string? TaxNumber` — ⬜ NEW (needed for invoice printing)
@@ -339,13 +318,7 @@ public record CustomerResponse(int Id, string Name, string? Phone, string? Addre
 - `SalesInvoiceEditorViewModel.cs` line 589: filter includes `"عميل نقدي"`
 - `DashboardViewModel.cs` line 249: `inv.CustomerName ?? "عميل نقدي"`
 
-```csharp
-// FIX — DbSeeder.cs line 122
-// CHANGE THIS:
-name: "العميل الافتراضي في النظام",
-// TO THIS:
-name: "عميل نقدي",
-```
+> See `Infrastructure/Data/DbSeeder.cs` for seed data patterns.
 
 **Additionally**, the default supplier must also be renamed from "المورد الافتراضي في النظام" to "مورد نقدي" (though this is the Supplier module scope — include here for cross-reference).
 
@@ -363,13 +336,7 @@ name: "عميل نقدي",
 
 **Decision**: Make `AccountId` nullable (optional). If no account is linked, the customer still works functionally but won't appear in account-based reports.
 
-**SQL Migration**:
-```sql
-ALTER TABLE Customers ADD AccountId int NULL;
-ALTER TABLE Customers ADD CONSTRAINT FK_Customers_Accounts_AccountId 
-    FOREIGN KEY (AccountId) REFERENCES Accounts(Id) ON DELETE NO ACTION;
-CREATE INDEX IX_Customers_AccountId ON Customers(AccountId);
-```
+> See `docs/database-schema.md` for the canonical table definitions and migration patterns.
 
 ### 3.3 Blocker 3: CustomerType & CustomerGroup — New Entities
 
@@ -377,14 +344,7 @@ CREATE INDEX IX_Customers_AccountId ON Customers(AccountId);
 - "نوع العميل: نقدي / آجل" (Customer Type: Cash / Credit)
 - "مجموعة العملاء" (Customer Group) — for categorizing customers (e.g., Wholesale, Retail, VIP)
 
-**CustomerType Enum**:
-```csharp
-public enum CustomerType : byte
-{
-    Cash = 1,    // Cash customer — payment on delivery
-    Credit = 2   // Credit customer — has credit limit, invoice on account
-}
-```
+> See `Domain/Enums/` for enum definitions and `docs/AGENTS.md` §3 for canonical enum values.
 
 **CustomerGroup Entity** (new standalone entity):
 
@@ -440,42 +400,15 @@ public enum CustomerType : byte
 
 ### 4.3 CustomerType Enum (New)
 
-```csharp
-public enum CustomerType : byte
-{
-    Cash = 1,    // عميل نقدي — cash sales, no credit tracking
-    Credit = 2   // عميل آجل — credit sales, credit limit enforced
-}
-```
+> See `Domain/Enums/` for enum definitions and `docs/AGENTS.md` §3 for canonical enum values.
 
 ### 4.4 CustomerBalanceReportDto (New — for reports)
 
-```csharp
-public record CustomerBalanceReportDto(
-    int CustomerId,
-    string CustomerName,
-    decimal CurrentBalance,
-    decimal CreditLimit,
-    decimal AvailableCredit,   // CreditLimit - CurrentBalance
-    decimal CreditUtilizationPercent,  // (CurrentBalance / CreditLimit) * 100
-    int DaysSinceLastTransaction,
-    DateTime? LastTransactionDate
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 ### 4.5 CustomerAgingReportDto (New — for aging reports)
 
-```csharp
-public record CustomerAgingReportDto(
-    int CustomerId,
-    string CustomerName,
-    decimal Balance0To30,    // 0-30 days
-    decimal Balance31To60,   // 31-60 days
-    decimal Balance61To90,   // 61-90 days
-    decimal Balance91Plus,   // 90+ days
-    decimal TotalBalance
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 ---
 
@@ -595,19 +528,7 @@ The customer may be created without an Account link if the Chart of Accounts mod
 **Decision**: Credit limit is checked **during sales invoice posting**, not during draft save.
 
 **Flow**:
-```csharp
-// In SalesService.PostAsync() — before transaction
-if (customer.CustomerType == CustomerType.Credit && customer.CreditLimit > 0)
-{
-    var projectedBalance = customer.CurrentBalance + invoice.TotalAmount - invoice.PaidAmount;
-    if (projectedBalance > customer.CreditLimit)
-    {
-        return Result<SalesInvoiceDto>.Failure(
-            "تجاوز الحد الائتماني للعميل. الرصيد المتوقع سيكون {ProjectedBalance:N2} والحد المسموح هو {Customer.CreditLimit:N2}",
-            ErrorCodes.CreditLimitExceeded);
-    }
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Note**: This is a soft check — admin users can override (phase 24 feature — "Force Post" permission). In V1, the check blocks the post with a clear Arabic message.
 
@@ -668,17 +589,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | `Infrastructure/Data/DbSeeder.cs` (line 130) | Change `"المورد الافتراضي في النظام"` → `"مورد نقدي"` (cross-reference for Supplier module) |
 
 **Code change**:
-```csharp
-// BEFORE (line 122)
-name: "العميل الافتراضي في النظام",
-// AFTER
-name: "عميل نقدي",
-
-// BEFORE (line 130)
-name: "المورد الافتراضي في النظام",
-// AFTER
-name: "مورد نقدي",
-```
+> See `Infrastructure/Data/DbSeeder.cs` for seed data patterns.
 
 **Logging**: `Log.Information("Default customer seeded: عميل نقدي (ID: {CustomerId})")`
 
@@ -704,22 +615,10 @@ name: "مورد نقدي",
 | `Api/Validators/CustomerRequestValidators.cs` | Add `AccountId must exist if provided` rule |
 
 **Domain method**:
-```csharp
-public void LinkToAccount(int accountId)
-{
-    if (accountId <= 0)
-        throw new DomainException("رقم الحساب المحاسبي غير صحيح");
-    AccountId = accountId;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
 
 **SQL migration**:
-```sql
-ALTER TABLE Customers ADD AccountId int NULL;
-ALTER TABLE Customers ADD CONSTRAINT FK_Customers_Accounts_AccountId 
-    FOREIGN KEY (AccountId) REFERENCES Accounts(Id) ON DELETE NO ACTION;
-CREATE INDEX IX_Customers_AccountId ON Customers(AccountId);
-```
+> See `docs/database-schema.md` for the canonical table definitions and migration patterns.
 
 **Logging**: `Log.Information("Customer {CustomerId} linked to Account {AccountId}", customerId, accountId)`
 
@@ -750,102 +649,19 @@ CREATE INDEX IX_Customers_AccountId ON Customers(AccountId);
 | `Application/Services/CustomerService.cs` | Map new fields in `MapToDto()` + eager load CustomerGroup nav property |
 
 **CustomerGroup entity**:
-```csharp
-public class CustomerGroup : BaseEntity
-{
-    public string Name { get; private set; } = string.Empty;
-    public string? Description { get; private set; }
 
-    private CustomerGroup() { }
-
-    public static CustomerGroup Create(string name, string? description = null, int? createdByUserId = null)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المجموعة مطلوب");
-        return new CustomerGroup
-        {
-            Name = name.Trim(),
-            Description = description?.Trim(),
-            IsActive = true,
-            CreatedByUserId = createdByUserId,
-            CreatedAt = DateTime.UtcNow
-        };
-    }
-
-    public void Update(string name, string? description, int? updatedByUserId)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المجموعة مطلوب");
-        Name = name.Trim();
-        Description = description?.Trim();
-        SetUpdatedBy(updatedByUserId);
-        UpdateTimestamp();
-    }
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
 
 **Customer configuration additions**:
-```csharp
-builder.Property(c => c.CustomerType).HasColumnType("tinyint");
-builder.HasIndex(c => c.CustomerGroupId);
-builder.HasOne(c => c.CustomerGroup)
-    .WithMany()
-    .HasForeignKey(c => c.CustomerGroupId)
-    .OnDelete(DeleteBehavior.Restrict);
-```
 
-**CustomerGroup configuration**:
-```csharp
-public class CustomerGroupConfiguration : IEntityTypeConfiguration<CustomerGroup>
-{
-    public void Configure(EntityTypeBuilder<CustomerGroup> builder)
-    {
-        builder.ToTable("CustomerGroups");
-        builder.HasKey(g => g.Id);
-        builder.Property(g => g.Name).IsRequired().HasMaxLength(100);
-        builder.Property(g => g.Description).HasMaxLength(250);
-        builder.HasIndex(g => g.Name).IsUnique();
-        builder.HasQueryFilter(g => g.IsActive);
-    }
-}
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
 
-**Seed data** (DbSeeder):
-```csharp
-if (!await db.Set<CustomerGroup>().AnyAsync())
-{
-    var groups = new List<CustomerGroup>
-    {
-        CustomerGroup.Create("عام", "المجموعة الافتراضية — لجميع العملاء غير المصنفين"),
-        CustomerGroup.Create("جملة", "عملاء الجملة"),
-        CustomerGroup.Create("قطاعي", "عملاء البيع القطاعي"),
-        CustomerGroup.Create("VIP", "عملاء مميزون"),
-    };
-    db.Set<CustomerGroup>().AddRange(groups);
-    logger?.LogInformation("Seeded {Count} customer groups.", groups.Count);
-}
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
+
+> See `Infrastructure/Data/DbSeeder.cs` for seed data patterns.
 
 **SQL migration**:
-```sql
-CREATE TABLE CustomerGroups (
-    Id int IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    Name nvarchar(100) NOT NULL,
-    Description nvarchar(250) NULL,
-    IsActive bit NOT NULL DEFAULT 1,
-    CreatedAt datetime2 NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt datetime2 NULL,
-    CreatedByUserId int NULL,
-    UpdatedByUserId int NULL
-);
-CREATE UNIQUE INDEX IX_CustomerGroups_Name ON CustomerGroups(Name);
-
-ALTER TABLE Customers ADD CustomerType tinyint NULL;
-ALTER TABLE Customers ADD CustomerGroupId int NULL;
-ALTER TABLE Customers ADD CONSTRAINT FK_Customers_CustomerGroups_GroupId 
-    FOREIGN KEY (CustomerGroupId) REFERENCES CustomerGroups(Id) ON DELETE NO ACTION;
-CREATE INDEX IX_Customers_CustomerGroupId ON Customers(CustomerGroupId);
-```
+> See `docs/database-schema.md` for the canonical table definitions and migration patterns.
 
 **Logging**: `Log.Information("Customer {Id} type set to {CustomerType}", id, customerType)`
 
@@ -869,83 +685,9 @@ CREATE INDEX IX_Customers_CustomerGroupId ON Customers(CustomerGroupId);
 | `Infrastructure/Data/Migrations/` | Ensure Account sequence exists for auto-code generation |
 | `Contracts/DTOs/AllDtos.cs` — `CustomerDto` | Ensure `AccountId`, `AccountName` returned after creation |
 
-**Service method — CreateCustomerAccountAsync()**:
-```csharp
-private async Task<Result<Account>> CreateCustomerAccountAsync(
-    Customer customer, int? createdByUserId, CancellationToken ct)
-{
-    // Find parent account: العملاء — Account Code = "1210"
-    var parentAccount = await _uow.Accounts.FirstOrDefaultAsync(
-        a => a.AccountCode == "1210", ct);
-    if (parentAccount == null)
-        return Result<Account>.Failure(
-            "حساب العملاء (1210) غير موجود في دليل الحسابات. يرجى التأكد من تشغيل Phase 22",
-            ErrorCodes.NotFound);
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
-    // Generate next account code under parent
-    var maxCode = await _uow.Accounts.GetMaxCodeUnderParentAsync(1210, ct);
-    var newCode = $"121{maxCode + 1}"; // e.g., 1211, 1212, ...
-
-    var account = Account.Create(
-        nameAr: customer.Name,
-        nameEn: "",
-        accountCode: newCode,
-        parentId: parentAccount.Id,
-        accountType: AccountType.Receivable,
-        level: 4,              // Detail level
-        isSystemAccount: false,
-        createdByUserId: createdByUserId
-    );
-
-    await _uow.Accounts.AddAsync(account, ct);
-    return Result<Account>.Success(account);
-}
-```
-
-**Integration into CreateAsync flow**:
-```csharp
-public async Task<Result<CustomerDto>> CreateAsync(
-    CreateCustomerRequest request, CancellationToken ct)
-{
-    await using var transaction = await _uow.BeginTransactionAsync(ct);
-    try
-    {
-        var customer = Customer.Create(/* ... */);
-
-        // Step 1: Save customer first (get ID)
-        await _uow.Customers.AddAsync(customer, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        // Step 2: If Credit type, auto-create sub-account
-        int? accountId = null;
-        if (request.CustomerType == (byte)CustomerType.Credit)
-        {
-            var accountResult = await CreateCustomerAccountAsync(
-                customer, request.CreatedByUserId, ct);
-            if (!accountResult.IsSuccess)
-                return Result<CustomerDto>.Failure(accountResult.Error!);
-
-            accountId = accountResult.Value.Id;
-            customer.LinkToAccount(accountId.Value);
-            await _uow.SaveChangesAsync(ct);
-        }
-
-        await transaction.CommitAsync(ct);
-
-        _logger.LogInformation(
-            "Customer {Id} created with AccountId {AccountId}",
-            customer.Id, accountId);
-
-        return Result<CustomerDto>.Success(MapToDto(customer));
-    }
-    catch (Exception ex)
-    {
-        await transaction.RollbackAsync(ct);
-        _logger.LogError(ex, "Failed to create customer with account");
-        return Result<CustomerDto>.Failure("حدث خطأ أثناء إنشاء العميل");
-    }
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer + transaction patterns.
 
 **⚠️ Dependency**: Phase 22 must be complete — the parent account `1210 — العملاء` must exist in the seeded Chart of Accounts. If Phase 22 is not yet deployed, this feature will skip account creation and return a clear error message.
 
@@ -969,64 +711,11 @@ public async Task<Result<CustomerDto>> CreateAsync(
 | `Application/Interfaces/Services/ICustomerService.cs` | Add `CheckCreditLimitAsync` signature |
 | `Contracts/DTOs/AllDtos.cs` | Add `CreditLimitCheckResultDto` record |
 
-**Domain methods**:
-```csharp
-public bool IsCreditLimitExceeded(decimal projectedBalance)
-{
-    if (CreditLimit <= 0) return false; // No limit = no restriction
-    return projectedBalance > CreditLimit;
-}
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
 
-public decimal GetAvailableCredit()
-{
-    if (CreditLimit <= 0) return decimal.MaxValue; // No limit
-    var available = CreditLimit - CurrentBalance;
-    return available < 0 ? 0 : available;
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
-**Service check**:
-```csharp
-public async Task<Result<CreditLimitCheckResult>> CheckCreditLimitAsync(
-    int customerId, decimal additionalAmount, CancellationToken ct)
-{
-    var customer = await _uow.Customers.GetByIdAsync(customerId, ct);
-    if (customer == null)
-        return Result<CreditLimitCheckResult>.Failure("العميل غير موجود", ErrorCodes.NotFound);
-    
-    if (customer.CustomerType != (byte)CustomerType.Credit)
-        return Result<CreditLimitCheckResult>.Success(
-            new CreditLimitCheckResult(true, 0, customer.CurrentBalance, "عميل نقدي — لا يوجد حد ائتماني"));
-    
-    var projectedBalance = customer.CurrentBalance + additionalAmount;
-    var isExceeded = customer.IsCreditLimitExceeded(projectedBalance);
-    
-    if (isExceeded)
-    {
-        _logger.LogWarning(
-            "Credit limit would be exceeded for Customer {Id}: Current={Current}, Additional={Additional}, Projected={Projected}, Limit={Limit}",
-            customerId, customer.CurrentBalance, additionalAmount, projectedBalance, customer.CreditLimit);
-        
-        return Result<CreditLimitCheckResult>.Failure(
-            $"تجاوز الحد الائتماني. الرصيد الحالي: {customer.CurrentBalance:N2}، المبلغ الإضافي: {additionalAmount:N2}، الحد المسموح: {customer.CreditLimit:N2}",
-            ErrorCodes.CreditLimitExceeded);
-    }
-    
-    return Result<CreditLimitCheckResult>.Success(
-        new CreditLimitCheckResult(false, customer.CreditLimit, projectedBalance, string.Empty));
-}
-```
-
-**SalesService integration**:
-```csharp
-// In SalesService.PostAsync() — before transaction
-if (customer.CustomerType == (byte)CustomerType.Credit && customer.CreditLimit > 0)
-{
-    var checkResult = await CheckCreditLimitAsync(customerId, invoice.TotalAmount - invoice.PaidAmount, ct);
-    if (!checkResult.IsSuccess)
-        return Result<SalesInvoiceDto>.Failure(checkResult.Error!, ErrorCodes.CreditLimitExceeded);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Logging**: 
 - `Log.Warning("Credit limit exceeded for Customer {Id}: Current={Current}, Limit={Limit}", ...)` (RULE-183 — user mistake)
@@ -1046,38 +735,11 @@ if (customer.CustomerType == (byte)CustomerType.Credit && customer.CreditLimit >
 |------|--------|
 | `ViewModels/Customers/CustomerEditorViewModel.cs` | Add AccountId, CustomerType, CustomerGroupId properties + load groups + validation |
 
-**New properties to add**:
-```csharp
-private int? _accountId;
-private string? _accountName;
-private byte? _customerType;
-private int? _customerGroupId;
-private ObservableCollection<CustomerGroupDto> _customerGroups = new();
-private ObservableCollection<AccountDto> _accounts = new();
+> See `docs/AGENTS.md` for ViewModel patterns (INotifyDataErrorInfo, ExecuteAsync wrapper). See existing editor ViewModels for property binding conventions.
 
-// Properties with INotifyDataErrorInfo validation:
-public int? AccountId { get; set; ... }  // AddError if non-null but invalid
-public byte? CustomerType { get; set; ... }  // 1 or 2 validation
-public int? CustomerGroupId { get; set; ... }
-public ObservableCollection<CustomerGroupDto> CustomerGroups { get; set; }
-public ObservableCollection<AccountDto> Accounts { get; set; }
-```
+> See `docs/AGENTS.md` §2.23 for INotifyDataErrorInfo validation patterns.
 
-**Validation in ValidateAsync()**:
-```csharp
-if (CustomerType.HasValue && CustomerType.Value < 1 || CustomerType.Value > 2)
-    AddError(nameof(CustomerType), "نوع العميل يجب أن يكون نقدي (1) أو آجل (2)");
-
-// CustomerGroupId: validate if provided
-// AccountId: validate if provided
-```
-
-**Load operations in constructor**:
-```csharp
-// Add to initialization sequence:
-_ = LoadCustomerGroupsAsync();
-_ = LoadAccountsAsync();
-```
+> See existing ViewModel constructors in `DesktopPWF/ViewModels/` for initialization patterns.
 
 **Logging**: `LogSystemError("Failed to load customer groups", "CustomerEditorViewModel.LoadCustomerGroupsAsync", ex)`
 
@@ -1095,66 +757,11 @@ _ = LoadAccountsAsync();
 
 **New XAML sections (in order)**:
 
-**1. Customer Type** (after Name field, before Phone):
-```xml
-<StackPanel Margin="0,0,0,6">
-    <TextBlock Text="نوع العميل" Style="{StaticResource LabelStyle}"/>
-    <ComboBox ItemsSource="{Binding CustomerTypes}" 
-              SelectedValue="{Binding CustomerType}" 
-              SelectedValuePath="Value"
-              DisplayMemberPath="Key"
-              Style="{StaticResource ModernComboBox}"
-              ToolTip="اختيار نوع العميل — نقدي (الدفع عند الاستلام) أو آجل (فاتورة على الحساب)"/>
-    <TextBlock Text="النقدي = الدفع عند الاستلام، الآجل = فاتورة على الحساب مع حد ائتماني" 
-               Style="{StaticResource HelperTextStyle}"/>
-</StackPanel>
-```
+> See XAML patterns in existing views at `DesktopPWF/Views/` and `DesktopPWF/Styles/Styles.xaml` for control styling conventions.
 
-**2. Customer Group** (after Address, before TaxNumber grid):
-```xml
-<StackPanel Margin="0,0,0,6">
-    <TextBlock Text="مجموعة العميل" Style="{StaticResource LabelStyle}"/>
-    <ComboBox ItemsSource="{Binding CustomerGroups}" 
-              SelectedValue="{Binding CustomerGroupId}" 
-              SelectedValuePath="Id"
-              DisplayMemberPath="Name"
-              Style="{StaticResource ModernComboBox}"
-              ToolTip="تصنيف العميل ضمن مجموعة — يساعد في التقارير والتصفية"/>
-    <TextBlock Text="مثال: جملة، قطاعي، VIP — يُستخدم في تقارير المبيعات" 
-               Style="{StaticResource HelperTextStyle}"/>
-</StackPanel>
-```
+> See `docs/AGENTS.md` §2.64 for UI compact style rules (RULE-262–274).
 
-**3. Account Link** (after CreditLimit grid, before OpeningBalance):
-```xml
-<StackPanel Margin="0,0,0,6">
-    <TextBlock Text="الحساب المحاسبي (اختياري)" Style="{StaticResource LabelStyle}"/>
-    <ComboBox ItemsSource="{Binding Accounts}" 
-              SelectedValue="{Binding AccountId}" 
-              SelectedValuePath="Id"
-              DisplayMemberPath="NameAr"
-              Style="{StaticResource ModernComboBox}"
-              ToolTip="ربط العميل بحساب في دليل الحسابات — ضروري للتقارير المحاسبية"/>
-    <TextBlock Text="اختياري — يُستخدم لربط العميل بحساب في دليل الحسابات للتقارير المحاسبية" 
-               Style="{StaticResource HelperTextStyle}"/>
-</StackPanel>
-```
-
-**Fix FontSize violation** (line 28):
-```xml
-<!-- BEFORE: FontSize="20" -->
-<TextBlock Text="👤 " FontSize="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
-<!-- AFTER: FontSize="16" (RULE-266) -->
-<TextBlock Text="👤 " FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-```
-
-**Fix excessive Border Height** (line 47):
-```xml
-<!-- BEFORE: Border Height="12" -->
-<Border Height="12"/>
-<!-- AFTER: Border Height="6" (RULE-265) -->
-<Border Height="6"/>
-```
+> See `docs/AGENTS.md` §2.64 for UI compact style rules (RULE-262–274).
 
 **Arabic ToolTips (RULE-185-190)**:
 - CustomerType combo: `"اختيار نوع العميل — نقدي (الدفع عند الاستلام) أو آجل (فاتورة على الحساب)"`
@@ -1179,149 +786,15 @@ _ = LoadAccountsAsync();
 **ViewModel changes**:
 
 **a) Add group filter property**:
-```csharp
-private ObservableCollection<CustomerGroupDto> _customerGroups = new();
-private CustomerGroupDto? _selectedGroup;
+> See existing ViewModel patterns in `DesktopPWF/ViewModels/` for ObservableCollection and filter property conventions.
 
-public ObservableCollection<CustomerGroupDto> CustomerGroups 
-{ 
-    get => _customerGroups; 
-    set => SetProperty(ref _customerGroups, value); 
-}
+> See `docs/AGENTS.md` §2.36 for the ExecuteAsync pattern (RULE-141–146).
 
-public CustomerGroupDto? SelectedGroup
-{
-    get => _selectedGroup;
-    set
-    {
-        if (SetProperty(ref _selectedGroup, value))
-        {
-            _ = LoadCustomersAsync(); // Reload with group filter
-        }
-    }
-}
-```
+> See `docs/AGENTS.md` §2.23 for interactive validation patterns (RULE-059 — buttons always enabled).
 
-**b) Fix async patterns — move LoadCustomersAsync to use ExecuteAsync wrapper (RULE-141)**:
-```csharp
-// Current (WRONG — manual try/catch/finally)
-public async Task LoadCustomersAsync()
-{
-    IsBusy = true;
-    ErrorMessage = null;
-    try { ... }
-    catch (Exception ex) { ... }
-    finally { IsBusy = false; }
-}
+> See `docs/AGENTS.md` §2.23 — CanExecute predicates are never used (buttons always enabled).
 
-// Fixed (CORRECT — use ExecuteAsync):
-// Keep the command pointing to a wrapper that calls ExecuteAsync:
-RefreshCommand = new AsyncRelayCommand(
-    (Func<Task>)(async () => await ExecuteAsync(LoadCustomersOperationAsync)));
-
-private async Task LoadCustomersOperationAsync()
-{
-    ErrorMessage = null;
-    var result = await _customerService.GetAllAsync(IncludeInactive);
-    
-    if (result.IsSuccess && result.Value != null)
-    {
-        InvokeOnUIThread(() =>
-        {
-            Customers.Clear();
-            var filtered = SelectedGroup != null 
-                ? result.Value.Where(c => c.CustomerGroupId == SelectedGroup.Id) 
-                : result.Value;
-                
-            foreach (var item in filtered.OrderByDescending(x => x.Id))
-                Customers.Add(item);
-                
-            SetupCollectionView();
-            IsEmpty = Customers.Count == 0;
-            OnPropertyChanged(nameof(CustomersCount));
-        });
-    }
-    else
-    {
-        ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملاء", 
-            "CustomerListViewModel.LoadCustomersOperationAsync", 
-            "[CustomerListViewModel.LoadCustomersOperationAsync] Failed to load customers.");
-    }
-}
-```
-
-**c) Fix CanExecute predicates (RULE-059)**:
-```csharp
-// BEFORE (WRONG):
-EditCommand = new RelayCommand(EditCustomer, () => SelectedCustomer != null);
-DeleteCommand = new AsyncRelayCommand(DeleteCustomerAsync, () => SelectedCustomer != null && SelectedCustomer.IsActive);
-RestoreCommand = new AsyncRelayCommand(RestoreCustomerAsync, () => SelectedCustomer != null && !SelectedCustomer.IsActive);
-
-// AFTER (CORRECT — always enabled):
-EditCommand = new RelayCommand(EditCustomer);  // NO CanExecute
-DeleteCommand = new AsyncRelayCommand(DeleteCustomerAsync);  // NO CanExecute
-RestoreCommand = new AsyncRelayCommand(RestoreCustomerAsync);  // NO CanExecute
-```
-
-**Also remove RaiseCanExecuteChanged from SelectedCustomer setter**:
-```csharp
-// BEFORE:
-(EditCommand as RelayCommand)?.RaiseCanExecuteChanged();
-(DeleteCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-(RestoreCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
-
-// AFTER: remove all three lines
-```
-
-**XAML changes — add group filter in toolbar**:
-```xml
-<!-- Group Filter — insert after Status Filter group -->
-<StackPanel Orientation="Horizontal" Margin="0,5,20,5">
-    <TextBlock Text="المجموعة" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold" 
-               Foreground="{StaticResource TextSecondaryBrush}"/>
-    <ComboBox ItemsSource="{Binding CustomerGroups}" 
-              SelectedItem="{Binding SelectedGroup}"
-              DisplayMemberPath="Name"
-              Width="120"
-              Style="{StaticResource ModernComboBox}"
-              ToolTip="تصفية العملاء حسب المجموعة"/>
-</StackPanel>
-```
-
-**XAML — add CustomerGroup column in DataGrid**:
-```xml
-<DataGridTextColumn Header="المجموعة" 
-                    Binding="{Binding CustomerGroupName}" 
-                    Width="100" 
-                    CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-```
-
-**Add credit limit usage indicator column**:
-```xml
-<DataGridTemplateColumn Header="الحد الائتماني" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}">
-    <DataGridTemplateColumn.CellTemplate>
-        <DataTemplate>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="{Binding CreditLimit, StringFormat=N2}" FontSize="12"/>
-                <TextBlock Text=" / " FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"/>
-                <TextBlock Text="{Binding CurrentBalance, StringFormat=N2}" FontSize="12" 
-                           FontWeight="SemiBold">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsBalanceNegative}" Value="True">
-                                    <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </StackPanel>
-        </DataTemplate>
-    </DataGridTemplateColumn.CellTemplate>
-</DataGridTemplateColumn>
-```
+> See XAML patterns in existing views at `DesktopPWF/Views/Customers/` for DataGrid/ToolBar conventions.
 
 **Fix XAML ToolTips**:
 - Edit button: `"تعديل بيانات العميل المحدد"` (not `"تعديل العنصر المحدد"`)
@@ -1358,23 +831,9 @@ RestoreCommand = new AsyncRelayCommand(RestoreCustomerAsync);  // NO CanExecute
 | `Desktop/Messaging/Messages/AppMessages.cs` | **NEW** — `CustomerGroupChangedMessage` |
 | `Desktop/App.xaml.cs` | DI registrations + navigation |
 
-**CustomerGroupDto**:
-```csharp
-public record CustomerGroupDto(int Id, string Name, string? Description, bool IsActive);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
-**ICustomerGroupService**:
-```csharp
-public interface ICustomerGroupService
-{
-    Task<Result<List<CustomerGroupDto>>> GetAllAsync(CancellationToken ct = default);
-    Task<Result<CustomerGroupDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<CustomerGroupDto>> CreateAsync(CreateCustomerGroupRequest request, CancellationToken ct = default);
-    Task<Result<CustomerGroupDto>> UpdateAsync(int id, UpdateCustomerGroupRequest request, CancellationToken ct = default);
-    Task<Result> DeleteAsync(int id, CancellationToken ct = default);  // Soft delete
-    Task<Result> DeletePermanentlyAsync(int id, CancellationToken ct = default);  // With DbUpdateException catch
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **API Endpoints** (CustomerGroupsController):
 
@@ -1428,30 +887,11 @@ public interface ICustomerGroupService
 
 **Changes in CustomerListViewModel**:
 
-```csharp
-// 1. RefreshCommand — use ExecuteAsync wrapper
-RefreshCommand = new AsyncRelayCommand(
-    (Func<Task>)(async () => await ExecuteAsync(LoadCustomersOperationAsync, "جاري تحميل العملاء...")));
-
-// 2. DeleteCommand — wrap in ExecuteAsync
-DeleteCommand = new AsyncRelayCommand(
-    (Func<Task>)(async () => await ExecuteAsync(DeleteCustomerOperationAsync, "جاري حذف العميل...")));
-
-// 3. RestoreCommand — wrap in ExecuteAsync
-RestoreCommand = new AsyncRelayCommand(
-    (Func<Task>)(async () => await ExecuteAsync(RestoreCustomerOperationAsync, "جاري استعادة العميل...")));
-```
+> See `docs/AGENTS.md` §2.36 for the ExecuteAsync pattern (RULE-141–146).
 
 **Changes in CustomerSelectionViewModel**:
 
-```csharp
-// Replace empty catch with LogSystemError
-catch (Exception ex)
-{
-    LogSystemError("Failed to load customers for selection", 
-        "CustomerSelectionViewModel.LoadCustomersAsync", ex);
-}
-```
+> See `docs/AGENTS.md` §2.46 for the LogSystemError pattern (RULE-199).
 
 **Remove manual IsBusy assignments** (no longer needed — managed by ExecuteAsync):
 - Remove all `IsBusy = true` / `IsBusy = false` from the 3 operation methods
@@ -1475,58 +915,11 @@ catch (Exception ex)
 | `Desktop/Services/Api/CustomerApiService.cs` | Add GetBalanceReportAsync, GetAgingReportAsync |
 | `Desktop/Services/Api/IApiService.cs` | Add balance report + aging report method signatures |
 
-**Report DTOs**:
-```csharp
-public record CustomerBalanceReportDto(
-    int CustomerId, string CustomerName, string? Phone, 
-    decimal CurrentBalance, decimal CreditLimit, decimal AvailableCredit,
-    decimal CreditUtilizationPercent, DateTime? LastTransactionDate,
-    int DaysSinceLastTransaction);
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
-public record CustomerAgingReportDto(
-    int CustomerId, string CustomerName, 
-    decimal Balance0To30, decimal Balance31To60, 
-    decimal Balance61To90, decimal Balance91Plus, decimal TotalBalance);
-```
+> See `docs/AGENTS.md` for controller patterns (RULE-022, RULE-025) and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
-**New API endpoints**:
-```csharp
-// Add to CustomersController or new CustomerReportsController
-[HttpGet("{id:int}/balance-report")]
-[Authorize(Policy = "ManagerAndAbove")]
-public async Task<ActionResult<CustomerBalanceReportDto>> GetBalanceReport(
-    int id, CancellationToken ct) { ... }
-
-[HttpGet("aging")]
-[Authorize(Policy = "ManagerAndAbove")]
-public async Task<ActionResult<List<CustomerAgingReportDto>>> GetAgingReport(
-    CancellationToken ct) { ... }
-
-[HttpGet("{id:int}/transactions")]
-[Authorize(Policy = "AllStaff")]
-public async Task<ActionResult<PagedResult<CustomerTransactionDto>>> GetTransactions(
-    int id, [FromQuery] DateTime? from, [FromQuery] DateTime? to, 
-    [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct) { ... }
-```
-
-**FluentValidation enhancements**:
-```csharp
-// Add Phone regex pattern validation
-RuleFor(x => x.Phone)
-    .MaximumLength(20).WithMessage("رقم الهاتف لا يمكن أن يتجاوز 20 حرف")
-    .Matches(@"^\+?[0-9\s\-\(\)]{7,20}$").WithMessage("صيغة رقم الهاتف غير صحيحة")
-    .When(x => !string.IsNullOrEmpty(x.Phone));
-
-// Add CustomerType validation
-RuleFor(x => x.CustomerType)
-    .InclusiveBetween((byte)1, (byte)2).WithMessage("نوع العميل يجب أن يكون نقدي (1) أو آجل (2)")
-    .When(x => x.CustomerType.HasValue);
-
-// Add CustomerGroupId validation (existence checked in service)
-RuleFor(x => x.CustomerGroupId)
-    .GreaterThan(0).WithMessage("رقم المجموعة غير صحيح")
-    .When(x => x.CustomerGroupId.HasValue);
-```
+> See `SalesSystem.Api/Validators/` for FluentValidation patterns and `docs/AGENTS.md` §2.13 for validation layers.
 
 **Logging**: 
 - `Log.Information("Customer balance report generated for {CustomerId}", id)`
@@ -1545,77 +938,15 @@ RuleFor(x => x.CustomerGroupId)
 | `ViewModels/Customers/CustomerSelectionViewModel.cs` | Add CustomerType filter + fix async patterns + fix empty catch block |
 | `Views/Customers/CustomerSelectionView.xaml` | Add CustomerType filter dropdown + ToolTips |
 
-**Add filter by CustomerType**:
-```csharp
-private byte? _customerTypeFilter;
-public byte? CustomerTypeFilter
-{
-    get => _customerTypeFilter;
-    set
-    {
-        if (SetProperty(ref _customerTypeFilter, value))
-        {
-            CustomersView?.Refresh();
-        }
-    }
-}
-```
+> See existing selection ViewModel patterns in `DesktopPWF/ViewModels/` for filter properties.
 
-**Fix LoadCustomersAsync**:
-```csharp
-// BEFORE — manual try/catch/finally
-public async Task LoadCustomersAsync()
-{
-    IsBusy = true;
-    try { ... }
-    catch { }  // EMPTY CATCH ❌
-    finally { IsBusy = false; }
-}
-
-// AFTER — use ExecuteAsync wrapper
-RefreshCommand = new AsyncRelayCommand(
-    (Func<Task>)(async () => await ExecuteAsync(LoadCustomersOperationAsync, "جاري تحميل العملاء...")));
-
-private async Task LoadCustomersOperationAsync()
-{
-    var result = await _customerService.GetAllAsync();
-    if (result.IsSuccess && result.Value != null)
-    {
-        Customers = new ObservableCollection<CustomerDto>(
-            result.Value.Where(c => c.IsActive && 
-                (!CustomerTypeFilter.HasValue || c.CustomerType == CustomerTypeFilter.Value)));
-        CustomersView = CollectionViewSource.GetDefaultView(Customers);
-        // ... filter setup
-    }
-    else
-    {
-        ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملاء", 
-            "CustomerSelectionViewModel.LoadCustomersOperationAsync",
-            "[CustomerSelectionViewModel.LoadCustomersOperationAsync] Failed to load customers.");
-    }
-}
-```
+> See `docs/AGENTS.md` §2.36 for the ExecuteAsync pattern (RULE-141–146).
 
 **Fix empty catch block**:
-```csharp
-// Replace empty catch with LogSystemError
-catch (Exception ex)
-{
-    LogSystemError("Failed to load customers for selection", 
-        "CustomerSelectionViewModel.LoadCustomersAsync", ex);
-}
-```
 
-**XAML — add CustomerType filter**:
-```xml
-<ComboBox ItemsSource="{Binding CustomerTypeOptions}" 
-          SelectedValue="{Binding CustomerTypeFilter}" 
-          SelectedValuePath="Value"
-          DisplayMemberPath="Key"
-          Width="100"
-          Style="{StaticResource ModernComboBox}"
-          ToolTip="تصفية العملاء حسب النوع — نقدي أو آجل"/>
-```
+> See `docs/AGENTS.md` §2.46 for the LogSystemError pattern (RULE-199).
+
+> See XAML patterns in existing views at `DesktopPWF/Views/` for control styling conventions.
 
 **Estimate**: ~45 minutes
 
@@ -1631,30 +962,9 @@ catch (Exception ex)
 | `Desktop/App.xaml.cs` | Add navigation menu item for Customer Groups under Customers section |
 | `Desktop/MainWindow.xaml` | Add "مجموعات العملاء" MenuItem in Customers navigation section |
 
-**DI registrations** (in `App.xaml.cs` ConfigureServices):
-```csharp
-// Customer Group services
-services.AddTransient<ICustomerGroupApiService, CustomerGroupApiService>();
-services.AddTransient<CustomerGroupListViewModel>();
-services.AddTransient<CustomerGroupEditorViewModel>();
+> See `DesktopPWF/App.xaml.cs` for DI registration patterns.
 
-// Customer Report services
-services.AddTransient<ICustomerReportApiService, CustomerReportApiService>();
-```
-
-**Navigation entries** (in `MainWindow.xaml` or navigation configuration):
-```xml
-<TextBlock Text="العملاء" Style="{StaticResource NavHeaderStyle}"/>
-<Button Content="قائمة العملاء" Command="{Binding NavigateToCommand}" 
-        CommandParameter="CustomersListView"
-        ToolTip="عرض وإدارة جميع العملاء"/>
-<Button Content="مجموعات العملاء" Command="{Binding NavigateToCommand}" 
-        CommandParameter="CustomerGroupListView"
-        ToolTip="إدارة مجموعات العملاء — إنشاء وتعديل المجموعات"/>
-<Button Content="تقارير العملاء" Command="{Binding NavigateToCommand}" 
-        CommandParameter="CustomerReportsView"
-        ToolTip="تقارير العملاء — أرصدة وتصنيف عمري"/>
-```
+> See `DesktopPWF/MainWindow.xaml` for navigation entry patterns.
 
 **Estimate**: ~30 minutes
 

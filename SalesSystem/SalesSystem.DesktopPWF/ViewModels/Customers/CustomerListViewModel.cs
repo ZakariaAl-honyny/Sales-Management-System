@@ -31,8 +31,6 @@ public class CustomerListViewModel : ViewModelBase
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
-    private ObservableCollection<CustomerGroupDto> _availableGroups = new();
-    private CustomerGroupDto? _selectedGroupFilter;
 
     public CustomerListViewModel()
     {
@@ -43,7 +41,6 @@ public class CustomerListViewModel : ViewModelBase
         _screenWindowService = App.GetService<IScreenWindowService>();
 
         InitializeCommands();
-        _ = LoadGroupsAsync();
     }
 
     /// <summary>    
@@ -63,7 +60,6 @@ public class CustomerListViewModel : ViewModelBase
         _toastService = toastService ?? throw new ArgumentNullException(nameof(toastService));
 
         InitializeCommands();
-        _ = LoadGroupsAsync();
     }
 
     private void InitializeCommands()
@@ -140,24 +136,6 @@ public class CustomerListViewModel : ViewModelBase
     }
 
     public int CustomersCount => Customers.Count;
-
-    public ObservableCollection<CustomerGroupDto> AvailableGroups
-    {
-        get => _availableGroups;
-        set => SetProperty(ref _availableGroups, value);
-    }
-
-    public CustomerGroupDto? SelectedGroupFilter
-    {
-        get => _selectedGroupFilter;
-        set
-        {
-            if (SetProperty(ref _selectedGroupFilter, value))
-            {
-                CustomersView?.Refresh();
-            }
-        }
-    }
     #endregion
 
     #region Commands
@@ -170,29 +148,6 @@ public class CustomerListViewModel : ViewModelBase
     #endregion
 
     #region Methods
-    private async Task LoadGroupsAsync()
-    {
-        try
-        {
-            var result = await _customerService.GetAllGroupsAsync();
-            if (result.IsSuccess && result.Value != null)
-            {
-                InvokeOnUIThread(() =>
-                {
-                    AvailableGroups.Clear();
-                    foreach (var group in result.Value)
-                    {
-                        AvailableGroups.Add(group);
-                    }
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            LogSystemError("فشل في تحميل مجموعات العملاء", "CustomerListViewModel.LoadGroupsAsync", ex);
-        }
-    }
-
     public async Task LoadCustomersAsync()
     {
         await ExecuteAsync(LoadCustomersOperationAsync);
@@ -242,13 +197,6 @@ public class CustomerListViewModel : ViewModelBase
                 (customer.Phone?.ToLower().Contains(searchLower) ?? false) == false &&
                 (customer.Email?.ToLower().Contains(searchLower) ?? false) == false &&
                 (customer.Address?.ToLower().Contains(searchLower) ?? false) == false)
-                return false;
-        }
-
-        // Filter by customer group
-        if (SelectedGroupFilter != null)
-        {
-            if (customer.CustomerGroupId != SelectedGroupFilter.Id)
                 return false;
         }
 

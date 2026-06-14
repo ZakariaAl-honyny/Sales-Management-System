@@ -214,6 +214,7 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         SubTotal: 100.00m,
         DiscountAmount: 0.00m,
         TaxAmount: 15.00m,
+        OtherCharges: 0m,
         TotalAmount: 115.00m,
         PaidAmount: 50.00m,
         DueAmount: 65.00m,
@@ -224,9 +225,10 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         TaxRate: null,
         CurrencyId: null,
         ExchangeRate: null,
+        CashBoxId: null,
+        CashBoxName: null,
         TotalCost: null,
         TotalProfit: null,
-        QuotationId: null,
         Items: new List<SalesInvoiceItemDto>
         {
             new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
@@ -242,9 +244,9 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         PaymentType: PaymentType.Cash,
         DiscountAmount: 0.00m,
         TaxAmount: 15.00m,
+        OtherCharges: 0m,
         PaidAmount: 50.00m,
         Notes: null,
-        QuotationId: null,
         CurrencyId: null,
         ExchangeRate: null,
         TaxId: null,

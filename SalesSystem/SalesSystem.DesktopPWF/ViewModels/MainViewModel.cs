@@ -1,13 +1,15 @@
+using System.Collections.ObjectModel;
 using System.Windows.Input;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Enums;
+using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
-using SalesSystem.DesktopPWF.ViewModels.Categories;
 using SalesSystem.DesktopPWF.ViewModels.Customers;
 using SalesSystem.DesktopPWF.ViewModels.Inventory;
-using SalesSystem.DesktopPWF.ViewModels.Payments;
 using SalesSystem.DesktopPWF.ViewModels.Products;
 using SalesSystem.DesktopPWF.ViewModels.Purchases;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
@@ -24,10 +26,28 @@ using SalesSystem.DesktopPWF.ViewModels.Accounts;
 using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
+using SalesSystem.DesktopPWF.ViewModels.Logs;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
-
 using SalesSystem.DesktopPWF.ViewModels.Warehouses;
-using SalesSystem.DesktopPWF.ViewModels.InventoryOperations;
+using SalesSystem.DesktopPWF.ViewModels.Branch;
+using SalesSystem.DesktopPWF.ViewModels.Department;
+using SalesSystem.DesktopPWF.ViewModels.Employee;
+using SalesSystem.DesktopPWF.ViewModels.Bank;
+using SalesSystem.DesktopPWF.ViewModels.Payments;
+using SalesSystem.DesktopPWF.ViewModels.Party;
+using SalesSystem.DesktopPWF.ViewModels.Expense;
+using SalesSystem.DesktopPWF.ViewModels.CustomerReceipt;
+using SalesSystem.DesktopPWF.ViewModels.PaymentVouchers;
+using SalesSystem.DesktopPWF.ViewModels.InventoryCount;
+using SalesSystem.DesktopPWF.ViewModels.InventoryAdjustment;
+using SalesSystem.DesktopPWF.ViewModels.Notifications;
+using SalesSystem.DesktopPWF.ViewModels.Attachments;
+using SalesSystem.DesktopPWF.ViewModels.Roles;
+using SalesSystem.DesktopPWF.ViewModels.Sessions;
+using SalesSystem.DesktopPWF.ViewModels.CompanySettings;
+using SalesSystem.DesktopPWF.ViewModels.DocumentSequences;
+using SalesSystem.DesktopPWF.ViewModels.AccountCategories;
+using SalesSystem.DesktopPWF.ViewModels.SystemAccountMappings;
 
 namespace SalesSystem.DesktopPWF.ViewModels;
 
@@ -48,6 +68,20 @@ public class MainViewModel : ViewModelBase
     {
         get => _currentUser;
         set => SetProperty(ref _currentUser, value);
+    }
+
+    private ObservableCollection<BranchDto> _userBranches = new();
+    public ObservableCollection<BranchDto> UserBranches
+    {
+        get => _userBranches;
+        set => SetProperty(ref _userBranches, value);
+    }
+
+    private BranchDto? _selectedUserBranch;
+    public BranchDto? SelectedUserBranch
+    {
+        get => _selectedUserBranch;
+        set => SetProperty(ref _selectedUserBranch, value);
     }
 
     public MainViewModel(ISessionService sessionService, IDialogService dialogService)
@@ -83,16 +117,15 @@ public class MainViewModel : ViewModelBase
             });
         });
         NavigateToSalesInvoicesCommand = new RelayCommand(() => NavigateTo<SalesInvoiceListViewModel>());
-        NavigateToSalesQuotationsCommand = new RelayCommand(() => NavigateTo<SalesQuotationListViewModel>());
         NavigateToSalesReturnsCommand = new RelayCommand(() => NavigateTo<SalesReturnListViewModel>());
 
         // Purchases section
         NavigateToPurchasesCommand = new RelayCommand(() => NavigateTo<PurchaseInvoiceListViewModel>());
-        NavigateToPurchaseOrdersCommand = new RelayCommand(() => NavigateTo<PurchaseOrderListViewModel>());
+        NavigateToPurchaseOrdersCommand = new RelayCommand(async () =>
+            await _dialogService.ShowInfoAsync("تحت التطوير", "هذه الميزة قيد التطوير وسيتم إضافتها في الإصدارات القادمة"));
         NavigateToPurchaseReturnsCommand = new RelayCommand(() => NavigateTo<PurchaseReturnListViewModel>());
 
         // Finance section
-        NavigateToCustomerPaymentsCommand = new RelayCommand(() => NavigateTo<CustomerPaymentsListViewModel>());
         NavigateToSupplierPaymentsCommand = new RelayCommand(() => NavigateTo<SupplierPaymentsListViewModel>());
         NavigateToCashBoxesCommand = new RelayCommand(() => NavigateTo<CashBoxesListViewModel>());
 
@@ -103,39 +136,94 @@ public class MainViewModel : ViewModelBase
         NavigateToStockBalanceReportCommand = new RelayCommand(() => NavigateTo<StockBalanceReportViewModel>());
         NavigateToWarehouseMovementReportCommand = new RelayCommand(() => NavigateTo<WarehouseMovementReportViewModel>());
 
+        // Phase 31v2 — New Report Commands
+        NavigateToDetailedStockLedgerCommand = new RelayCommand(() => NavigateTo<DetailedStockLedgerViewModel>());
+        NavigateToProductProfitabilityCommand = new RelayCommand(() => NavigateTo<ProductProfitabilityViewModel>());
+        NavigateToProfitByCustomerCommand = new RelayCommand(() => NavigateTo<ProfitByCustomerViewModel>());
+        NavigateToReturnsReportCommand = new RelayCommand(() => NavigateTo<ReturnsReportViewModel>());
+        NavigateToAgingReportCommand = new RelayCommand(() => NavigateTo<AgingReportViewModel>());
+        NavigateToWorkingCapitalCommand = new RelayCommand(() => NavigateTo<WorkingCapitalViewModel>());
+        NavigateToAccountBalancesCommand = new RelayCommand(() => NavigateTo<AccountBalancesViewModel>());
+
         // Financial Reports
         NavigateToIncomeStatementCommand = new RelayCommand(() => NavigateTo<Reports.IncomeStatementViewModel>());
         NavigateToCashFlowReportCommand = new RelayCommand(() => NavigateTo<Reports.CashFlowReportViewModel>());
         NavigateToVatReportCommand = new RelayCommand(() => NavigateTo<Reports.VatReportViewModel>());
         NavigateToAccountStatementCommand = new RelayCommand(() => NavigateTo<Reports.AccountStatementViewModel>());
 
+        // Phase 31v2 — More Report Commands (13 missing reports)
+        NavigateToBalanceSheetCommand = new RelayCommand(() => NavigateTo<BalanceSheetViewModel>());
+        NavigateToTrialBalanceCommand = new RelayCommand(() => NavigateTo<TrialBalanceViewModel>());
+        NavigateToGeneralLedgerCommand = new RelayCommand(() => NavigateTo<GeneralLedgerViewModel>());
+        NavigateToDailyClosureReportCommand = new RelayCommand(() => NavigateTo<DailyClosureReportViewModel>());
+        NavigateToCashBoxSummaryCommand = new RelayCommand(() => NavigateTo<CashBoxSummaryViewModel>());
+        NavigateToDailySalesCommand = new RelayCommand(() => NavigateTo<DailySalesViewModel>());
+        NavigateToSalesByCategoryCommand = new RelayCommand(() => NavigateTo<SalesByCategoryViewModel>());
+        NavigateToSalesByProductCommand = new RelayCommand(() => NavigateTo<SalesByProductViewModel>());
+        NavigateToSalesByCustomerCommand = new RelayCommand(() => NavigateTo<SalesByCustomerViewModel>());
+        NavigateToPurchasesByProductCommand = new RelayCommand(() => NavigateTo<PurchasesByProductViewModel>());
+        NavigateToPurchasesBySupplierCommand = new RelayCommand(() => NavigateTo<PurchasesBySupplierViewModel>());
+        NavigateToLoginHistoryCommand = new RelayCommand(() => NavigateTo<LoginHistoryViewModel>());
+        NavigateToUserActivityCommand = new RelayCommand(() => NavigateTo<UserActivityViewModel>());
+
         // Settings section
         NavigateToProductsCommand = new RelayCommand(() => NavigateTo<ProductListViewModel>());
         NavigateToCustomersCommand = new RelayCommand(() => NavigateTo<CustomerListViewModel>());
-        NavigateToCustomerGroupsCommand = new RelayCommand(() => NavigateTo<CustomerGroupListViewModel>());
         NavigateToSuppliersCommand = new RelayCommand(() => NavigateTo<SupplierListViewModel>());
         NavigateToWarehousesCommand = new RelayCommand(() => NavigateTo<WarehouseListViewModel>());
-        NavigateToCategoriesCommand = new RelayCommand(() => NavigateTo<CategoryListViewModel>());
         NavigateToUnitsCommand = new RelayCommand(() => NavigateTo<UnitListViewModel>());
         NavigateToUsersCommand = new RelayCommand(() => NavigateTo<UserListViewModel>());
         NavigateToAuditLogCommand = new RelayCommand(() => NavigateTo<AuditLogListViewModel>());
         NavigateToPermissionsCommand = new RelayCommand(() => NavigateTo<PermissionManagementViewModel>());
+        NavigateToRolesCommand = new RelayCommand(() => NavigateTo<RoleListViewModel>());
+        NavigateToSessionsCommand = new RelayCommand(() => NavigateTo<UserSessionListViewModel>());
         NavigateToSettingsCommand = new RelayCommand(() => NavigateTo<SettingsViewModel>());
         NavigateToSystemSettingsCommand = new RelayCommand(() => NavigateTo<SystemSettingsViewModel>());
         NavigateToBackupCommand = new RelayCommand(() => NavigateTo<BackupViewModel>());
-        NavigateToStockTransfersCommand = new RelayCommand(() => NavigateTo<StockTransfersListViewModel>());
+        NavigateToSystemLogsCommand = new RelayCommand(() => NavigateTo<SystemLogListViewModel>());
+        NavigateToWarehouseTransfersCommand = new RelayCommand(() => NavigateTo<WarehouseTransfersListViewModel>());
         NavigateToInventoryCommand = new RelayCommand(() => NavigateTo<InventoryViewModel>());
+        NavigateToInventoryTransactionsCommand = new RelayCommand(() => NavigateTo<InventoryTransactionListViewModel>());
+        NavigateToInventoryIssueCommand = new AsyncRelayCommand(() => OpenInventoryTransactionEditor(11));
+        NavigateToInventoryReceiptCommand = new AsyncRelayCommand(() => OpenInventoryTransactionEditor(12));
+        NavigateToInventoryDamageCommand = new AsyncRelayCommand(() => OpenInventoryTransactionEditor(9));
         NavigateToProductPricesCommand = new RelayCommand(() => NavigateTo<ProductPricesListViewModel>());
-        NavigateToProductImagesCommand = new RelayCommand(() => NavigateTo<ProductImagesViewModel>());
-        NavigateToBillOfMaterialsCommand = new RelayCommand(() => NavigateTo<BillOfMaterialsListViewModel>());
         NavigateToInventoryBatchesCommand = new RelayCommand(() => NavigateTo<InventoryBatchesViewModel>());
-        NavigateToInventoryOperationsCommand = new RelayCommand(() => NavigateTo<InventoryOperationListViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
         NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
         NavigateToCurrencyRatesCommand = new RelayCommand(() => NavigateTo<CurrencyRatesViewModel>());
         NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
         NavigateToJournalEntriesCommand = new RelayCommand(() => NavigateTo<JournalEntriesListViewModel>());
         NavigateToFiscalYearsCommand = new RelayCommand(() => NavigateTo<FiscalYearListViewModel>());
+        NavigateToCompanySettingsCommand = new RelayCommand(() => NavigateTo<CompanySettingsViewModel>());
+        NavigateToDocumentSequencesCommand = new RelayCommand(() => NavigateTo<DocumentSequenceListViewModel>());
+        NavigateToAccountCategoriesCommand = new RelayCommand(() => NavigateTo<AccountCategoryListViewModel>());
+        NavigateToSystemAccountMappingsCommand = new RelayCommand(() => NavigateTo<SystemAccountMappingListViewModel>());
+
+        // Organization Management section
+        NavigateToBranchesCommand = new RelayCommand(() => NavigateTo<BranchListViewModel>());
+        NavigateToDepartmentsCommand = new RelayCommand(() => NavigateTo<DepartmentListViewModel>());
+        NavigateToEmployeesCommand = new RelayCommand(() => NavigateTo<EmployeeListViewModel>());
+        NavigateToBanksCommand = new RelayCommand(() => NavigateTo<BankListViewModel>());
+        NavigateToPartiesCommand = new RelayCommand(() => NavigateTo<PartyListViewModel>());
+        NavigateToExpensesCommand = new RelayCommand(() => NavigateTo<ExpenseListViewModel>());
+
+        // Customer Receipts
+        NavigateToCustomerReceiptsCommand = new RelayCommand(() => NavigateTo<CustomerReceiptListViewModel>());
+
+        // Receipt Vouchers (Accounting)
+        NavigateToReceiptVouchersCommand = new RelayCommand(() => NavigateTo<ReceiptVoucherListViewModel>());
+
+        // Payment Vouchers
+        NavigateToPaymentVouchersCommand = new RelayCommand(() => NavigateTo<PaymentVoucherListViewModel>());
+
+        // Inventory Operations
+        NavigateToInventoryCountsCommand = new RelayCommand(() => NavigateTo<InventoryCountListViewModel>());
+        NavigateToInventoryAdjustmentsCommand = new RelayCommand(() => NavigateTo<InventoryAdjustmentListViewModel>());
+
+        // Notifications & Attachments
+        NavigateToNotificationsCommand = new RelayCommand(() => NavigateTo<NotificationListViewModel>());
+        NavigateToAttachmentsCommand = new RelayCommand(() => NavigateTo<AttachmentListViewModel>());
 
         // Products section commands
         NavigateToProductUnitsCommand = new RelayCommand(() => NavigateTo<ProductUnitsListViewModel>());
@@ -170,6 +258,7 @@ public class MainViewModel : ViewModelBase
                 CurrentUser = result.Value;
             }
         });
+        _ = LoadUserBranchesAsync();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -204,9 +293,6 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى فواتير البيع — عرض وإدارة جميع فواتير البيع (مسودات ومرحلة وملغية)</summary>
     public ICommand NavigateToSalesInvoicesCommand { get; }
 
-    /// <summary>نقل إلى عروض الأسعار — عرض وإدارة عروض الأسعار وتحويلها إلى فواتير</summary>
-    public ICommand NavigateToSalesQuotationsCommand { get; }
-
     /// <summary>نقل إلى مرتجعات المبيعات</summary>
     public ICommand NavigateToSalesReturnsCommand { get; }
 
@@ -217,18 +303,15 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى فواتير المشتريات</summary>
     public ICommand NavigateToPurchasesCommand { get; }
 
-    /// <summary>نقل إلى أوامر الشراء — عرض وإدارة أوامر الشراء (قيد الانتظار والمستلمة والملغية)</summary>
-    public ICommand NavigateToPurchaseOrdersCommand { get; }
-
     /// <summary>نقل إلى مرتجعات المشتريات</summary>
     public ICommand NavigateToPurchaseReturnsCommand { get; }
+
+    /// <summary>نقل إلى أوامر الشراء — غير متاحة (قيد التطوير)</summary>
+    public ICommand NavigateToPurchaseOrdersCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Finance Section Commands
     // ═══════════════════════════════════════════════════════════════
-
-    /// <summary>نقل إلى مدفوعات العملاء</summary>
-    public ICommand NavigateToCustomerPaymentsCommand { get; }
 
     /// <summary>نقل إلى مدفوعات الموردين</summary>
     public ICommand NavigateToSupplierPaymentsCommand { get; }
@@ -255,6 +338,27 @@ public class MainViewModel : ViewModelBase
         /// <summary>نقل إلى تقرير حركة المخازن — عرض تاريخ حركات المخزون (إضافة/خصم) مع التصفية حسب المستودع والفترة</summary>
         public ICommand NavigateToWarehouseMovementReportCommand { get; }
 
+        /// <summary>نقل إلى كشف حساب مفصل للمخزون — عرض حركات المخزون التفصيلية مع أرصدة الفترات</summary>
+        public ICommand NavigateToDetailedStockLedgerCommand { get; }
+
+        /// <summary>نقل إلى تقرير ربحية المنتج — عرض هامش الربح لكل منتج مع إجمالي المبيعات والتكلفة</summary>
+        public ICommand NavigateToProductProfitabilityCommand { get; }
+
+        /// <summary>نقل إلى تقرير الربح حسب العميل — عرض إجمالي المبيعات والتكلفة والربح لكل عميل</summary>
+        public ICommand NavigateToProfitByCustomerCommand { get; }
+
+        /// <summary>نقل إلى تقرير المرتجعات — عرض جميع مرتجعات المبيعات والمشتريات مع التفاصيل</summary>
+        public ICommand NavigateToReturnsReportCommand { get; }
+
+        /// <summary>نقل إلى تقرير التقادم (Aging) — عرض توزيع الديون حسب الفترات الزمنية للعملاء والموردين</summary>
+        public ICommand NavigateToAgingReportCommand { get; }
+
+        /// <summary>نقل إلى تقرير رأس المال العامل — عرض الأصول المتداولة والخصوم المتداولة والنسبة الحالية</summary>
+        public ICommand NavigateToWorkingCapitalCommand { get; }
+
+        /// <summary>نقل إلى تقرير أرصدة الحسابات — عرض الأرصدة المدينة والدائنة وصافي الرصيد لكل حساب</summary>
+        public ICommand NavigateToAccountBalancesCommand { get; }
+
     // ═══════════════════════════════════════════════════════════════
     // Financial Reports Commands
     // ═══════════════════════════════════════════════════════════════
@@ -272,6 +376,49 @@ public class MainViewModel : ViewModelBase
     public ICommand NavigateToAccountStatementCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
+    // Phase 31v2 — More Report Commands (13 missing reports)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>نقل إلى الميزانية العمومية — عرض الأصول والخصوم وحقوق الملكية في تاريخ محدد</summary>
+    public ICommand NavigateToBalanceSheetCommand { get; }
+
+    /// <summary>نقل إلى ميزان المراجعة — عرض أرصدة جميع الحسابات المدينة والدائنة</summary>
+    public ICommand NavigateToTrialBalanceCommand { get; }
+
+    /// <summary>نقل إلى دفتر الأستاذ العام — عرض حركات الحسابات التفصيلية مع الأرصدة</summary>
+    public ICommand NavigateToGeneralLedgerCommand { get; }
+
+    /// <summary>نقل إلى تقرير الإغلاق اليومي — عرض ملخص المعاملات النقدية والبنكية لكل يوم</summary>
+    public ICommand NavigateToDailyClosureReportCommand { get; }
+
+    /// <summary>نقل إلى ملخص الخزينة — عرض حركات الصندوق والإيرادات والمصروفات والأرصدة</summary>
+    public ICommand NavigateToCashBoxSummaryCommand { get; }
+
+    /// <summary>نقل إلى تقرير المبيعات اليومية — عرض إجمالي المبيعات والإيرادات اليومية</summary>
+    public ICommand NavigateToDailySalesCommand { get; }
+
+    /// <summary>نقل إلى تقرير المبيعات حسب التصنيف — عرض المبيعات مصنفة حسب تصنيف المنتجات</summary>
+    public ICommand NavigateToSalesByCategoryCommand { get; }
+
+    /// <summary>نقل إلى تقرير المبيعات حسب المنتج — عرض كمية وقيمة المبيعات لكل منتج</summary>
+    public ICommand NavigateToSalesByProductCommand { get; }
+
+    /// <summary>نقل إلى تقرير المبيعات حسب العميل — عرض إجمالي المبيعات لكل عميل</summary>
+    public ICommand NavigateToSalesByCustomerCommand { get; }
+
+    /// <summary>نقل إلى تقرير المشتريات حسب المنتج — عرض كمية وقيمة المشتريات لكل منتج</summary>
+    public ICommand NavigateToPurchasesByProductCommand { get; }
+
+    /// <summary>نقل إلى تقرير المشتريات حسب المورد — عرض إجمالي المشتريات لكل مورد</summary>
+    public ICommand NavigateToPurchasesBySupplierCommand { get; }
+
+    /// <summary>نقل إلى سجل الدخول — عرض محاولات تسجيل الدخول للمستخدمين والنتائج</summary>
+    public ICommand NavigateToLoginHistoryCommand { get; }
+
+    /// <summary>نقل إلى نشاط المستخدمين — عرض سجل الإجراءات والعمليات لكل مستخدم</summary>
+    public ICommand NavigateToUserActivityCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
     // Settings Section Commands
     // ═══════════════════════════════════════════════════════════════
 
@@ -281,17 +428,11 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة العملاء</summary>
     public ICommand NavigateToCustomersCommand { get; }
 
-    /// <summary>نقل إلى إدارة مجموعات العملاء — تصنيف وترتيب العملاء في مجموعات</summary>
-    public ICommand NavigateToCustomerGroupsCommand { get; }
-
     /// <summary>نقل إلى إدارة الموردين</summary>
     public ICommand NavigateToSuppliersCommand { get; }
 
     /// <summary>نقل إلى إدارة المخازن</summary>
     public ICommand NavigateToWarehousesCommand { get; }
-
-    /// <summary>نقل إلى إدارة التصنيفات</summary>
-    public ICommand NavigateToCategoriesCommand { get; }
 
     /// <summary>نقل إلى إدارة الوحدات</summary>
     public ICommand NavigateToUnitsCommand { get; }
@@ -305,6 +446,12 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة الصلاحيات — تعديل صلاحيات الأدوار</summary>
     public ICommand NavigateToPermissionsCommand { get; }
 
+    /// <summary>نقل إلى إدارة الأدوار — إضافة وتعديل وحذف أدوار المستخدمين</summary>
+    public ICommand NavigateToRolesCommand { get; }
+
+    /// <summary>نقل إلى جلسات المستخدمين — عرض وإلغاء الجلسات النشطة</summary>
+    public ICommand NavigateToSessionsCommand { get; }
+
     /// <summary>تغيير كلمة المرور للمستخدم الحالي</summary>
     public ICommand ChangePasswordCommand { get; private set; } = null!;
 
@@ -317,26 +464,32 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة النسخ الاحتياطي — إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات</summary>
     public ICommand NavigateToBackupCommand { get; }
 
+    /// <summary>نقل إلى سجل أحداث النظام — عرض أخطاء النظام وسجلات التشغيل والتحذيرات</summary>
+    public ICommand NavigateToSystemLogsCommand { get; }
+
     /// <summary>نقل إلى التحويلات المخزنية</summary>
-    public ICommand NavigateToStockTransfersCommand { get; }
+    public ICommand NavigateToWarehouseTransfersCommand { get; }
 
     /// <summary>نقل إلى شاشة المخزون</summary>
     public ICommand NavigateToInventoryCommand { get; }
 
+    /// <summary>نقل إلى حركات المخزون — عرض تاريخ حركات المخزون والتفاصيل</summary>
+    public ICommand NavigateToInventoryTransactionsCommand { get; }
+
+    /// <summary>نقل إلى شاشة صرف مخزني — صرف أصناف من المخزون بدون فاتورة بيع</summary>
+    public ICommand NavigateToInventoryIssueCommand { get; }
+
+    /// <summary>نقل إلى شاشة توريد مخزني — إضافة أصناف إلى المخزون بدون فاتورة شراء</summary>
+    public ICommand NavigateToInventoryReceiptCommand { get; }
+
+    /// <summary>نقل إلى شاشة تالف وهالك — تسجيل الأصناف التالفة والمنتهية الصلاحية</summary>
+    public ICommand NavigateToInventoryDamageCommand { get; }
+
     /// <summary>نقل إلى إدارة أسعار المنتجات — عرض وتحديث أسعار البيع متعددة العملات لكل وحدة منتج</summary>
     public ICommand NavigateToProductPricesCommand { get; }
 
-    /// <summary>نقل إلى صور المنتجات — إدارة صور متعددة لكل منتج</summary>
-    public ICommand NavigateToProductImagesCommand { get; }
-
-    /// <summary>نقل إلى قائمة المكونات (BOM) — إدارة المكونات اللازمة لتصنيع المنتجات المُجمَّعة</summary>
-    public ICommand NavigateToBillOfMaterialsCommand { get; }
-
     /// <summary>نقل إلى إدارة الدفعات المخزنية — تتبع الكميات حسب تاريخ انتهاء الصلاحية</summary>
     public ICommand NavigateToInventoryBatchesCommand { get; }
-
-    /// <summary>نقل إلى العمليات المخزنية — الصرف والإستلام والتسوية</summary>
-    public ICommand NavigateToInventoryOperationsCommand { get; }
 
     /// <summary>نقل إلى إدارة الضرائب</summary>
     public ICommand NavigateToTaxesCommand { get; }
@@ -355,6 +508,73 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى السنوات المالية — إنشاء وفتح وإغلاق السنوات المالية</summary>
     public ICommand NavigateToFiscalYearsCommand { get; }
+    /// <summary>نقل إلى إعدادات الشركة — تعديل اسم الشركة وبيانات الاتصال والعملة الافتراضية</summary>
+    public ICommand NavigateToCompanySettingsCommand { get; }
+    /// <summary>نقل إلى تسلسل المستندات — عرض وإعادة تعيين أرقام المستندات التلقائية</summary>
+    public ICommand NavigateToDocumentSequencesCommand { get; }
+    /// <summary>نقل إلى التصنيفات المحاسبية — إدارة تصنيفات دليل الحسابات</summary>
+    public ICommand NavigateToAccountCategoriesCommand { get; }
+    /// <summary>نقل إلى حسابات النظام — ربط العمليات التجارية بالحسابات المحاسبية</summary>
+    public ICommand NavigateToSystemAccountMappingsCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Organization Management Commands
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>نقل إلى إدارة الفروع — عرض وإضافة وتعديل الفروع</summary>
+    public ICommand NavigateToBranchesCommand { get; }
+
+    /// <summary>نقل إلى إدارة الأقسام — عرض وإضافة وتعديل الأقسام</summary>
+    public ICommand NavigateToDepartmentsCommand { get; }
+
+    /// <summary>نقل إلى إدارة الموظفين — عرض وإضافة وتعديل الموظفين</summary>
+    public ICommand NavigateToEmployeesCommand { get; }
+
+    /// <summary>نقل إلى إدارة البنوك — عرض وإضافة وتعديل بيانات البنوك</summary>
+    public ICommand NavigateToBanksCommand { get; }
+
+    /// <summary>نقل إلى إدارة الجهات — عرض وإضافة وتعديل الجهات الخارجية</summary>
+    public ICommand NavigateToPartiesCommand { get; }
+
+    /// <summary>نقل إلى إدارة المصروفات — عرض وإضافة وتعديل المصروفات</summary>
+    public ICommand NavigateToExpensesCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Customer Receipts Commands
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>نقل إلى سندات القبض — إدارة سندات القبض النقدية والبنكية</summary>
+    public ICommand NavigateToCustomerReceiptsCommand { get; }
+
+    /// <summary>نقل إلى سندات القبض المحاسبية — عرض وإدارة سندات القبض (سندات الصندوق)</summary>
+    public ICommand NavigateToReceiptVouchersCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Payment Vouchers Commands
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>نقل إلى سندات الصرف — إدارة سندات الصرف النقدية والبنكية</summary>
+    public ICommand NavigateToPaymentVouchersCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Inventory Operations Commands
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>نقل إلى الجرد المخزني — إدارة وإجراء جرد المخزون الدوري</summary>
+    public ICommand NavigateToInventoryCountsCommand { get; }
+
+    /// <summary>نقل إلى تسويات المخزون — إضافة وتعديل تسويات المخزون</summary>
+    public ICommand NavigateToInventoryAdjustmentsCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Notifications & Attachments Commands
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>نقل إلى الإشعارات — عرض إشعارات النظام والتنبيهات</summary>
+    public ICommand NavigateToNotificationsCommand { get; }
+
+    /// <summary>نقل إلى المرفقات — عرض وإدارة الملفات المرفقة</summary>
+    public ICommand NavigateToAttachmentsCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Products Section Commands
@@ -365,6 +585,45 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى شاشة استيراد الأصناف من Excel</summary>
     public ICommand NavigateToProductImportCommand { get; }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Helper Methods
+    // ═══════════════════════════════════════════════════════════════
+
+    private async Task OpenInventoryTransactionEditor(byte transactionType)
+    {
+        var editorVm = new InventoryTransactionEditorViewModel();
+        editorVm.SetTransactionType(transactionType);
+        var screenService = App.GetService<IScreenWindowService>();
+        screenService.OpenScreen(editorVm, new ScreenWindowOptions
+        {
+            Title = editorVm.Title,
+            OnClosed = (vm) =>
+            {
+                if (vm is InventoryTransactionEditorViewModel editor && editor.TransactionId.HasValue)
+                {
+                    var eventBus = App.GetService<IEventBus>();
+                    eventBus.Publish(new InventoryTransactionChangedMessage(editor.TransactionId.Value));
+                    System.Windows.Application.Current.Dispatcher.InvokeAsync(() => NavigateTo<InventoryTransactionListViewModel>());
+                }
+            }
+        });
+    }
+
+    public async Task LoadUserBranchesAsync()
+    {
+        await ExecuteAsync(async () =>
+        {
+            var branchService = App.GetService<IBranchApiService>();
+            var result = await branchService.GetAllAsync();
+            if (result.IsSuccess && result.Value != null)
+            {
+                UserBranches = new ObservableCollection<BranchDto>(result.Value);
+                if (result.Value.Count > 0)
+                    SelectedUserBranch = result.Value[0];
+            }
+        });
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // Navigation Methods
@@ -441,20 +700,19 @@ public class MainViewModel : ViewModelBase
             "Products"         => _sessionService.CanAccess(Permission.ProductManagement),
             "Suppliers"        => _sessionService.CanAccess(Permission.SupplierManagement),
             "SupplierPayments" => _sessionService.CanAccess(Permission.SupplierManagement),
-            "StockTransfers"   => _sessionService.CanAccess(Permission.StockTransfer),
+            "WarehouseTransfers"   => _sessionService.CanAccess(Permission.WarehouseTransfer),
             "Reports"          => _sessionService.CanAccess(Permission.Reports),
             "ExpiredProducts"  => _sessionService.CanAccess(Permission.Reports),
             "LowStock"         => _sessionService.CanAccess(Permission.Reports),
             "Warehouses"       => _sessionService.CanAccess(Permission.WarehouseManagement),
             "Users"            => _sessionService.CanAccess(Permission.UserManagement),
             "Settings"         => _sessionService.CanAccess(Permission.Settings),
-            "Categories"       => _sessionService.CanAccess(Permission.ProductManagement),
             "Units"            => _sessionService.CanAccess(Permission.ProductManagement),
             "ProductUnits"     => _sessionService.CanAccess(Permission.ProductManagement),
             "ProductImport"    => _sessionService.CanAccess(Permission.ProductManagement),
             "Taxes"            => _sessionService.CanAccess(Permission.Settings),
             "Currencies"       => _sessionService.CanAccess(Permission.Settings),
-            _ => true // Dashboard, Sales, SalesReturns, Customers, CustomerPayments, POS, CashBoxes, Inventory
+            _ => true // Dashboard, Sales, SalesReturns, Customers, POS, CashBoxes, Inventory
         };
     }
 
@@ -482,9 +740,7 @@ public class MainViewModel : ViewModelBase
             nameof(SalesInvoiceListViewModel)       => "Sales",
             nameof(SalesReturnListViewModel)        => "SalesReturns",
             nameof(PurchaseInvoiceListViewModel)    => "Purchases",
-            nameof(PurchaseOrderListViewModel)      => "PurchaseOrders",
             nameof(PurchaseReturnListViewModel)     => "PurchaseReturns",
-            nameof(CustomerPaymentsListViewModel)   => "CustomerPayments",
             nameof(SupplierPaymentsListViewModel)   => "SupplierPayments",
             nameof(CashBoxesListViewModel)          => "CashBoxes",
             nameof(ReportsViewModel)                => "Reports",
@@ -492,6 +748,13 @@ public class MainViewModel : ViewModelBase
             nameof(ExpiredProductsReportViewModel)  => "ExpiredProducts",
             nameof(StockBalanceReportViewModel)     => "Reports",
             nameof(WarehouseMovementReportViewModel) => "Reports",
+            nameof(DetailedStockLedgerViewModel)     => "Reports",
+            nameof(ProductProfitabilityViewModel)    => "Reports",
+            nameof(ProfitByCustomerViewModel)        => "Reports",
+            nameof(ReturnsReportViewModel)           => "Reports",
+            nameof(AgingReportViewModel)             => "Reports",
+            nameof(WorkingCapitalViewModel)          => "Reports",
+            nameof(AccountBalancesViewModel)         => "Reports",
             nameof(IncomeStatementViewModel)         => "Reports",
             nameof(CashFlowReportViewModel)           => "Reports",
             nameof(VatReportViewModel)                => "Reports",
@@ -500,19 +763,22 @@ public class MainViewModel : ViewModelBase
             nameof(CustomerListViewModel)           => "Customers",
             nameof(SupplierListViewModel)           => "Suppliers",
             nameof(WarehouseListViewModel)          => "Warehouses",
-            nameof(CategoryListViewModel)           => "Categories",
             nameof(UnitListViewModel)               => "Units",
             nameof(UserListViewModel)               => "Users",
             nameof(AuditLogListViewModel)           => "Settings",
             nameof(PermissionManagementViewModel)   => "Settings",
+            nameof(RoleListViewModel)               => "Settings",
+            nameof(RoleEditorViewModel)              => "Settings",
+            nameof(RolePermissionViewModel)          => "Settings",
+            nameof(UserSessionListViewModel)         => "Settings",
+            nameof(SystemLogListViewModel)           => "Settings",
             nameof(SettingsViewModel)               => "Settings",
             nameof(SystemSettingsViewModel)         => "Settings",
             nameof(BackupViewModel)                 => "Settings",
-            nameof(StockTransfersListViewModel)     => "StockTransfers",
+            nameof(WarehouseTransfersListViewModel)     => "WarehouseTransfers",
             nameof(InventoryViewModel)              => "Inventory",
+            nameof(InventoryTransactionListViewModel) => "InventoryActivity",
             nameof(ProductPricesListViewModel)      => "Products",
-            nameof(ProductImagesViewModel)          => "Products",
-            nameof(BillOfMaterialsListViewModel)   => "Products",
             nameof(InventoryBatchesViewModel)       => "Products",
             nameof(ProductUnitsListViewModel)       => "ProductUnits",
             nameof(ProductImportViewModel)          => "ProductImport",
@@ -522,6 +788,25 @@ public class MainViewModel : ViewModelBase
             nameof(AccountsListViewModel)           => "Settings",
             nameof(JournalEntriesListViewModel)     => "Settings",
             nameof(FiscalYearListViewModel)         => "Settings",
+            // Organization Management
+            nameof(BranchListViewModel)               => "Settings",
+            nameof(DepartmentListViewModel)           => "Settings",
+            nameof(EmployeeListViewModel)             => "Settings",
+            nameof(BankListViewModel)                 => "Settings",
+            nameof(PartyListViewModel)                => "Settings",
+            nameof(ExpenseListViewModel)              => "Settings",
+            // Customer Receipts
+            nameof(CustomerReceiptListViewModel)      => "CustomerPayments",
+            // Accounting - Receipt Vouchers
+            nameof(ReceiptVoucherListViewModel)       => "Settings",
+            // Payment Vouchers
+            nameof(PaymentVoucherListViewModel)       => "Settings",
+            // Inventory Operations
+            nameof(InventoryCountListViewModel)       => "Inventory",
+            nameof(InventoryAdjustmentListViewModel)  => "Inventory",
+            // Notifications & Attachments
+            nameof(NotificationListViewModel)         => "Settings",
+            nameof(AttachmentListViewModel)           => "Settings",
             // Phase 31 — Reports
             nameof(BalanceSheetViewModel)           => "Reports",
             nameof(TrialBalanceViewModel)           => "Reports",

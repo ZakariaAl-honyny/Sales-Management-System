@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Enums;
-using SalesSystem.Contracts.Enums;
 
 namespace SalesSystem.DesktopPWF.Services.App;
 
@@ -12,7 +12,8 @@ public class SessionService : ISessionService
     private string? _token;
     private string? _userName;
     private int? _userId;
-    private UserRole? _role;
+    private List<int> _roleIds = new();
+    private string? _roleName;
     private Permission _permissions = Permission.None;
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_token);
@@ -20,16 +21,25 @@ public class SessionService : ISessionService
     public string? GetToken() => _token;
     public string? GetUserName() => _userName;
     public int? GetUserId() => _userId;
-    public UserRole? GetUserRole() => _role;
+    public List<int>? GetUserRoleIds() => _roleIds.Count > 0 ? _roleIds : null;
+    public string? GetUserRoleName() => _roleName;
 
-    public void SetSession(string token, string userName, int userId, UserRole role)
+    public bool HasRole(int roleId) => _roleIds.Contains(roleId);
+
+    public bool IsAdmin => HasRole(1);
+
+    public bool IsManagerOrAbove => HasRole(1) || HasRole(2);
+
+    public void SetSession(string token, string userName, int userId, List<int> roleIds, string roleName)
     {
         _token = token;
         _userName = userName;
         _userId = userId;
-        _role = role;
-        // Calculate permissions based on role
-        _permissions = role.GetPermissionsForRole();
+        _roleIds = roleIds ?? new List<int>();
+        _roleName = roleName;
+        // Calculate permissions based on primary role
+        var primaryRoleId = _roleIds.Count > 0 ? _roleIds[0] : 0;
+        _permissions = primaryRoleId.GetPermissionsForRole();
     }
 
     public void ClearSession()
@@ -37,21 +47,9 @@ public class SessionService : ISessionService
         _token = null;
         _userName = null;
         _userId = null;
-        _role = null;
+        _roleIds = new List<int>();
+        _roleName = null;
         _permissions = Permission.None;
-    }
-
-    public bool HasPermission(UserRole requiredRole)
-    {
-        if (!_role.HasValue) return false;
-
-        return _role.Value switch
-        {
-            UserRole.Admin => true,
-            UserRole.Manager => requiredRole != UserRole.Admin,
-            UserRole.Cashier => requiredRole == UserRole.Cashier,
-            _ => false
-        };
     }
 
     /// <summary>

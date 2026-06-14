@@ -90,15 +90,24 @@ public class UserService : IUserService
                 request.UserName,
                 defaultPasswordHash,
                 request.FullName,
-                (UserRole)request.Role,
-                request.Phone,
-                request.Email,
-                request.DefaultCashBoxId,
+                phone: request.Phone,
+                email: request.Email,
+                employeeId: null,
+                createdByUserId: null,
                 mustChangePassword: true
             );
 
             await _uow.Users.AddAsync(user, ct);
             await _uow.SaveChangesAsync(ct);
+
+            // 3. Assign role via UserRole join entity (many-to-many)
+            var roleEntity = await _uow.Roles.GetByIdAsync(request.Role, ct);
+            if (roleEntity != null)
+            {
+                var userRole = SalesSystem.Domain.Entities.UserRole.Create(user.Id, roleEntity.Id);
+                await _uow.UserRoles.AddAsync(userRole, ct);
+                await _uow.SaveChangesAsync(ct);
+            }
 
             _logger.LogInformation("Created new user: {UserName} (Id={UserId})", user.UserName, user.Id);
 
@@ -123,13 +132,13 @@ public class UserService : IUserService
             if (user == null)
                 return Result<UserDto>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 
-            // Update basic info with new fields
+            // Update basic info — role is assigned separately via UserRole join entity
             user.Update(
                 request.FullName,
-                (UserRole)request.Role,
-                request.Phone,
-                request.Email,
-                request.DefaultCashBoxId
+                phone: request.Phone,
+                email: request.Email,
+                employeeId: null,
+                updatedByUserId: null
             );
 
             // Update status
@@ -143,6 +152,16 @@ public class UserService : IUserService
             {
                 string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
                 user.ChangePassword(passwordHash);
+            }
+
+            // Update role assignment via UserRole join entity
+            var existingRoles = await _uow.UserRoles.ToListAsync(ur => ur.UserId == user.Id, ct: ct);
+            _uow.UserRoles.DeleteRange(existingRoles);
+            var newRole = await _uow.Roles.GetByIdAsync(request.Role, ct);
+            if (newRole != null)
+            {
+                var userRole = SalesSystem.Domain.Entities.UserRole.Create(user.Id, newRole.Id);
+                await _uow.UserRoles.AddAsync(userRole, ct);
             }
 
             await _uow.SaveChangesAsync(ct);
@@ -169,11 +188,24 @@ public class UserService : IUserService
             if (user == null)
                 return Result.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 
-            if (user.Role == UserRole.Admin && user.Status == UserStatus.Active)
+            // Check if user has the Admin role (Id=1)
+            var adminRoleId = 1;
+            var isAdmin = await _uow.UserRoles.AnyAsync(
+                ur => ur.UserId == user.Id && ur.RoleId == adminRoleId, ct);
+
+            if (isAdmin && user.Status == UserStatus.Active)
             {
-                var activeAdmins = await _uow.Users.CountIgnoreFiltersAsync(
-                    u => u.Role == UserRole.Admin && u.Status == UserStatus.Active, ct);
-                if (activeAdmins <= 1)
+                var adminUserRoles = await _uow.UserRoles.ToListAsync(
+                    ur => ur.RoleId == adminRoleId,
+                    ct: ct,
+                    includePaths: "User");
+                var activeAdminCount = adminUserRoles
+                    .Where(ur => ur.User?.Status == UserStatus.Active)
+                    .Select(ur => ur.UserId)
+                    .Distinct()
+                    .Count();
+
+                if (activeAdminCount <= 1)
                 {
                     return Result.Failure("لا يمكن تعطيل آخر مدير نشط في النظام", ErrorCodes.InvalidOperation);
                 }
@@ -241,8 +273,8 @@ public class UserService : IUserService
                 Id: user.Id,
                 UserName: user.UserName,
                 FullName: user.FullName,
-                Role: (byte)user.Role,
-                AvatarPath: user.AvatarPath,
+                Role: (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
+                AvatarPath: null,  // Removed from User entity in v4.7+
                 Permissions: permissions
             ));
         }
@@ -259,16 +291,16 @@ public class UserService : IUserService
             Id: user.Id,
             UserName: user.UserName,
             FullName: user.FullName,
-            Role: (byte)user.Role,
+            Role: (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
             Status: (byte)user.Status,
             MustChangePassword: user.MustChangePassword,
             PasswordChangedAt: user.PasswordChangedAt,
             Phone: user.Phone,
             Email: user.Email,
-            AvatarPath: user.AvatarPath,
+            AvatarPath: null,        // Removed from User entity in v4.7+
             LastLoginAt: user.LastLoginAt,
             LoginAttempts: user.LoginAttempts,
-            DefaultCashBoxId: user.DefaultCashBoxId
+            DefaultCashBoxId: null   // Removed from User entity in v4.7+
         );
     }
 }

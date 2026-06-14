@@ -3,51 +3,94 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class Product : BaseEntity
+/// <summary>
+/// Represents a product item in the inventory.
+/// Maps to the "Products" table in the new 65-table schema.
+/// - No prices stored directly (use ProductUnits → ProductPrices)
+/// - Cost tracked via InventoryBatches (weighted average)
+/// - Barcode is a varchar(50) primary barcode for quick lookup
+/// - Images managed as a single ImagePath (ProductImages table removed)
+/// </summary>
+public class Product : ActivatableEntity
 {
-    public string Name { get; private set; } = string.Empty;
-    public int? CategoryId { get; private set; }
-    public decimal MinStockLevel { get; private set; }
-    public decimal ReorderLevel { get; private set; }
-    public string? Description { get; private set; }
-    
     /// <summary>
-    /// The single source of truth for product barcodes.
-    /// V1 enforces one barcode per product. All barcode-based lookups use this property.
+    /// Product display name.
+    /// </summary>
+    public string Name { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Primary barcode for quick lookup. varchar(50) in DB — ASCII-only barcodes.
     /// </summary>
     public string? Barcode { get; private set; }
-    
-    // Phase 25 Additions
-    public decimal Cost { get; private set; }
-    public bool HasExpiry { get; private set; }
-    public bool TrackBatches { get; private set; }
 
-    // Navigation properties
-    public virtual Category? Category { get; private set; }
+    /// <summary>
+    /// Product description / notes.
+    /// </summary>
+    public string? Description { get; private set; }
+
+    /// <summary>
+    /// FK to ProductCategory — every product must belong to a category.
+    /// </summary>
+    public int CategoryId { get; private set; }
+
+    /// <summary>
+    /// FK to Tax. Optional tax rate override for this product.
+    /// </summary>
+    public int? TaxId { get; private set; }
+
+    /// <summary>
+    /// Quantity threshold that triggers a reorder alert.
+    /// </summary>
+    public decimal ReorderLevel { get; private set; }
+
+    /// <summary>
+    /// Indicates whether this product can expire (has an expiry date).
+    /// When true, expiry tracking via InventoryBatches is enforced.
+    /// </summary>
+    public bool TrackExpiry { get; private set; }
+
+    /// <summary>
+    /// File path or URL to the primary product image.
+    /// Single image — no separate ProductImages table.
+    /// </summary>
+    public string? ImagePath { get; private set; }
+
+    /// <summary>
+    /// Internal notes about the product.
+    /// </summary>
+    public string? Notes { get; private set; }
+
+    // ─── Navigation Properties ────────────────────────────
+
+    /// <summary>
+    /// The category this product belongs to.
+    /// </summary>
+    public virtual ProductCategory? ProductCategory { get; private set; }
+
+    /// <summary>
+    /// The tax rate override for this product.
+    /// </summary>
+    public virtual Tax? Tax { get; private set; }
+
+    /// <summary>
+    /// Stock records per warehouse.
+    /// </summary>
     public virtual ICollection<WarehouseStock> WarehouseStocks { get; private set; } = new List<WarehouseStock>();
 
-    // ─── Dynamic UOM (Phase 1) ───────────────────────────────────────────
+    // ─── Dynamic UOM ──────────────────────────────────────
     private readonly List<ProductUnit> _units = new();
     public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
 
-    // ─── Phase 25 — Multi-Currency Pricing & Batch Tracking ──────────────
-    // Prices are accessed via ProductUnit → ProductPrice (no direct Product → ProductPrice FK).
-    // Use service-layer aggregation: product.Units.SelectMany(u => u.Prices)
-    // to get all prices across all units.
-
+    // ─── Inventory Batches ─────────────────────────────────
     private readonly List<InventoryBatch> _inventoryBatches = new();
     public IReadOnlyCollection<InventoryBatch> InventoryBatches => _inventoryBatches.AsReadOnly();
 
-    private readonly List<ProductImage> _images = new();
-    public IReadOnlyCollection<ProductImage> Images => _images.AsReadOnly();
-
     private Product() { }
 
-    // ─── Dynamic UOM Methods (Phase 1) ──────────────────────────────────
+    // ─── Dynamic UOM Methods ─────────────────────────────
 
     /// <summary>
-    /// Returns the base unit (Piece/Egg/etc). ALWAYS exists for valid products.
-    /// Throws if not found — product data is corrupted.
+    /// Returns the base unit. ALWAYS exists for valid products.
     /// </summary>
     public ProductUnit GetBaseUnit()
     {
@@ -58,7 +101,7 @@ public class Product : BaseEntity
     }
 
     /// <summary>
-    /// Gets a unit by its ID. Throws if not found.
+    /// Gets a unit by its ID.
     /// </summary>
     public ProductUnit GetUnitById(int unitId)
     {
@@ -84,7 +127,7 @@ public class Product : BaseEntity
                 "لا يمكن تعريف أكثر من وحدة صغرى واحدة للمنتج الواحد.");
 
         var invalidDerived = _units
-            .Where(u => !u.IsBaseUnit && u.BaseConversionFactor <= 1)
+            .Where(u => !u.IsBaseUnit && u.Factor <= 1)
             .ToList();
 
         if (invalidDerived.Any())
@@ -99,9 +142,8 @@ public class Product : BaseEntity
     /// </summary>
     public void RemoveUnit(ProductUnit unit)
     {
-        if (_units.Count(u => u.IsActive) <= 1 && unit.IsActive)
+        if (_units.Count <= 1)
             throw new DomainException("يجب أن يكون للمنتج وحدة قياس واحدة على الأقل");
-
         _units.Remove(unit);
     }
 
@@ -113,30 +155,7 @@ public class Product : BaseEntity
         _units.Add(unit);
     }
 
-    // ─── Image Collection Methods ──────────────────────────────────────
-
-    /// <summary>
-    /// Adds an image to the product. If marked as primary, unmarks any existing primary.
-    /// </summary>
-    public void AddImage(ProductImage image)
-    {
-        if (image.IsPrimary)
-        {
-            foreach (var img in _images)
-                img.UnsetPrimary();
-        }
-        _images.Add(image);
-    }
-
-    /// <summary>
-    /// Removes an image from the product.
-    /// </summary>
-    public void RemoveImage(ProductImage image)
-    {
-        _images.Remove(image);
-    }
-
-    // ─── Inventory Batch Methods ───────────────────────────────────────
+    // ─── Inventory Batch Methods ─────────────────────────
 
     /// <summary>
     /// Adds an inventory batch to the product.
@@ -146,75 +165,89 @@ public class Product : BaseEntity
         _inventoryBatches.Add(batch);
     }
 
+    // ─── Factory ─────────────────────────────────────────
+
     /// <summary>
-    /// Updates the average cost of the product based on inventory batches.
+    /// Creates a new product.
     /// </summary>
-    public void UpdateCost(decimal newCost)
-    {
-        if (newCost < 0)
-            throw new DomainException("متوسط التكلفة لا يمكن أن يكون سالباً.");
-        Cost = newCost;
-        UpdateTimestamp();
-    }
-
-    // ─── Factory ───────────────────────────────────────────────────────
-
+    /// <param name="name">Product display name (required).</param>
+    /// <param name="categoryId">FK to ProductCategory (required).</param>
+    /// <param name="description">Optional product description.</param>
+    /// <param name="barcode">Optional primary barcode for quick lookup.</param>
+    /// <param name="taxId">Optional FK to Tax.</param>
+    /// <param name="reorderLevel">Quantity threshold for reorder alert (default 0).</param>
+    /// <param name="trackExpiry">Whether this product can expire (default false).</param>
+    /// <param name="imagePath">Optional primary image path.</param>
+    /// <param name="notes">Optional internal notes.</param>
+    /// <param name="createdByUserId">User who created this record.</param>
+    /// <returns>The newly created Product entity.</returns>
     public static Product Create(
         string name,
-        int? categoryId = null,
-        decimal minStockLevel = 0,
-        decimal reorderLevel = 0,
-        bool hasExpiry = false,
-        string? barcode = null,
+        int categoryId,
         string? description = null,
+        string? barcode = null,
+        int? taxId = null,
+        decimal reorderLevel = 0,
+        bool trackExpiry = false,
+        string? imagePath = null,
+        string? notes = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
-        if (minStockLevel < 0)
-            throw new DomainException("الحد الأدنى للمخزون لا يمكن أن يكون سالباً.");
+        if (categoryId <= 0)
+            throw new DomainException("التصنيف مطلوب.");
         if (reorderLevel < 0)
             throw new DomainException("مستوى إعادة الطلب لا يمكن أن يكون سالباً.");
 
         var product = new Product
         {
             Name = name,
+            Description = description?.Trim(),
+            Barcode = barcode?.Trim(),
             CategoryId = categoryId,
-            MinStockLevel = minStockLevel,
+            TaxId = taxId,
             ReorderLevel = reorderLevel,
-            HasExpiry = hasExpiry,
-            TrackBatches = true,
-            Barcode = barcode,
-            Description = description
+            TrackExpiry = trackExpiry,
+            ImagePath = imagePath?.Trim(),
+            Notes = notes?.Trim(),
+            IsActive = true
         };
         product.SetCreatedBy(createdByUserId);
         return product;
     }
 
+    /// <summary>
+    /// Updates the product properties.
+    /// </summary>
     public void Update(
         string name,
-        int? categoryId,
-        decimal minStockLevel,
-        decimal reorderLevel,
-        bool hasExpiry,
-        string? barcode,
-        string? description,
-        int? updatedByUserId)
+        int categoryId,
+        string? description = null,
+        string? barcode = null,
+        int? taxId = null,
+        decimal reorderLevel = 0,
+        bool trackExpiry = false,
+        string? imagePath = null,
+        string? notes = null,
+        int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
-        if (minStockLevel < 0)
-            throw new DomainException("الحد الأدنى للمخزون لا يمكن أن يكون سالباً.");
+        if (categoryId <= 0)
+            throw new DomainException("التصنيف مطلوب.");
         if (reorderLevel < 0)
             throw new DomainException("مستوى إعادة الطلب لا يمكن أن يكون سالباً.");
 
         Name = name;
+        Description = description?.Trim();
+        Barcode = barcode?.Trim();
         CategoryId = categoryId;
-        MinStockLevel = minStockLevel;
+        TaxId = taxId;
         ReorderLevel = reorderLevel;
-        HasExpiry = hasExpiry;
-        Barcode = barcode;
-        Description = description;
+        TrackExpiry = trackExpiry;
+        ImagePath = imagePath?.Trim();
+        Notes = notes?.Trim();
 
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

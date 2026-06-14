@@ -66,7 +66,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingUnit_ReturnsDto");
 
-        var unit = Unit.Create("Kilogram", "kg", null);
+        var unit = Unit.Create(name: "Kilogram", symbol: "kg");
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
@@ -117,7 +117,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_DuplicateName_ReturnsFailure");
 
-        var existing = Unit.Create("Kilogram", "kg", null);
+        var existing = Unit.Create(name: "Kilogram", symbol: "kg");
         _dbContext.Units.Add(existing);
         await _dbContext.SaveChangesAsync();
 
@@ -140,7 +140,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesUnit");
 
-        var unit = Unit.Create("Kilo", "kg", null);
+        var unit = Unit.Create(name: "Kilo", symbol: "kg");
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
@@ -179,11 +179,11 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_UnitWithProducts_ReturnsFailure");
 
-        var unit = Unit.Create("Kilogram", "kg", null);
+        var unit = Unit.Create(name: "Kilogram", symbol: "kg");
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Product");
+        var product = Product.Create("Product", categoryId: 1);
         _dbContext.Products.Add(product);
         await _dbContext.SaveChangesAsync();
 
@@ -205,7 +205,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_UnitWithoutProducts_SoftDeletes");
 
-        var unit = Unit.Create("Unlinked Unit", "U", null);
+        var unit = Unit.Create(name: "Unlinked Unit", symbol: "U");
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
@@ -225,8 +225,8 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetAllAsync_WithSearch_FiltersResults");
 
-        var unit1 = Unit.Create("Kilogram", "kg", null);
-        var unit2 = Unit.Create("Meter", "m", null);
+        var unit1 = Unit.Create(name: "Kilogram", symbol: "kg");
+        var unit2 = Unit.Create(name: "Meter", symbol: "m");
         _dbContext.Units.Add(unit1);
         _dbContext.Units.Add(unit2);
         await _dbContext.SaveChangesAsync();
@@ -253,7 +253,7 @@ public class UnitServiceTests : IDisposable
         public DbSet<ProductUnit> ProductUnits => Set<ProductUnit>();
     }
 
-    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity
+    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : Entity
     {
         private readonly DbContext _context;
 
@@ -284,9 +284,9 @@ public class UnitServiceTests : IDisposable
         public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
         {
             var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
-            if (entity != null)
+            if (entity != null && entity is ActivatableEntity activatable)
             {
-                entity.MarkAsDeleted();
+                activatable.MarkAsDeleted();
                 _context.Set<T>().Update(entity);
                 await _context.SaveChangesAsync(ct);
             }

@@ -291,7 +291,7 @@ public class DocumentSequenceServiceTests : IDisposable
         public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
     }
 
-    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity
+    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : Entity
     {
         private readonly DbContext _context;
 

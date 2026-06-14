@@ -279,6 +279,26 @@
                                           SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,12"
                                           ToolTip="اختر طريقة الدفع: نقداً أو آجل (دفع لاحق) أو مختلط"/>
 
+                                <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
+                                <ComboBox ItemsSource="{Binding Currencies}"
+                                          SelectedValue="{Binding SelectedCurrencyId}"
+                                          SelectedValuePath="Id"
+                                          DisplayMemberPath="Name"
+                                          Style="{StaticResource ModernComboBox}"
+                                          Margin="0,0,0,6"
+                                          ToolTip="اختر عملة الفاتورة — إذا كانت غير العملة الأساسية سيظهر حقل سعر الصرف"/>
+                                <Grid Margin="0,0,0,6"
+                                      Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="سعر الصرف:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11"/>
+                                    <TextBox Grid.Column="1" Text="{Binding ExchangeRate, StringFormat=N2}"
+                                             Style="{StaticResource ModernTextBox}"
+                                             ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية"/>
+                                </Grid>
+
                                 <TextBlock Text="الصندوق النقدي *" Style="{StaticResource LabelStyle}"/>
                                 <ComboBox ItemsSource="{Binding CashBoxes}"
                                           SelectedItem="{Binding SelectedCashBox}"
@@ -323,6 +343,11 @@
                                 <Grid Margin="0,0,0,6">
                                     <TextBlock Text="قيمة الضريبة" Foreground="{StaticResource TextSecondaryBrush}"/>
                                     <TextBlock Text="{Binding TaxAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <TextBlock Text="مصاريف إضافية" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding OtherCharges, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="80" HorizontalAlignment="Right" TextAlignment="Left"
+                                             ToolTip="أدخل قيمة المصاريف الإضافية (نقل، شحن، إلخ)"/>
                                 </Grid>
                                 <Grid Margin="0,0,0,6">
                                     <TextBlock Text="إجمالي الفاتورة" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>

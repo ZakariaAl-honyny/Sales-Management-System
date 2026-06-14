@@ -53,11 +53,11 @@ public class UpdateProductRequestValidatorTests
     #endregion
 
     private static UpdateProductRequest CreateValidRequest() => new(
-        Barcode: "123456789",
         Name: "Valid Product",
         CategoryId: 1,
-        MinStock: 10,
         Description: "Test description",
+        Barcode: "123456789",
+        ReorderLevel: 10,
         IsActive: true
     );
 }

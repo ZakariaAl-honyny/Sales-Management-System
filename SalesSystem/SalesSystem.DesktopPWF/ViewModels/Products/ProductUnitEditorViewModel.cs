@@ -235,7 +235,7 @@ public class ProductUnitEditorViewModel : ViewModelBase
         {
             var request = new AddProductUnitRequest(
                 UnitId: SelectedUnitLookupId!.Value,
-                ConversionFactor: ConversionFactor,
+                Factor: ConversionFactor,
                 IsBaseUnit: IsBaseUnit);
             var result = await _unitService.AddUnitAsync(ProductId, request);
 

@@ -4,67 +4,37 @@ using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
-public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
-{
-    public void Configure(EntityTypeBuilder<Supplier> builder)
-    {
-        builder.ToTable("Suppliers");
-        builder.HasKey(s => s.Id);
-        builder.Property(s => s.Name).IsRequired().HasMaxLength(150);
-        builder.Property(s => s.Phone).HasMaxLength(20);
-        builder.Property(s => s.Email).HasMaxLength(100);
-        builder.Property(s => s.Address).HasMaxLength(250);
-        builder.Property(s => s.OpeningBalance).HasPrecision(18, 2);
-        builder.Property(s => s.CurrentBalance).HasPrecision(18, 2);
-        builder.Property(s => s.CreditLimit).HasPrecision(18, 2);
-        builder.Property(s => s.TaxNumber).HasMaxLength(30);
-
-        // ─── Phase 32: FK to Account (Chart of Accounts) ───
-        builder.HasOne(s => s.Account)
-            .WithMany()
-            .HasForeignKey(s => s.AccountId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasIndex(s => s.AccountId)
-            .HasDatabaseName("IX_Suppliers_AccountId");
-
-        builder.HasQueryFilter(s => s.IsActive);
-    }
-}
-
 public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 {
     public void Configure(EntityTypeBuilder<Customer> builder)
     {
         builder.ToTable("Customers");
+
+        // Id is both PK and FK to Parties(Id) — shared primary key pattern
         builder.HasKey(c => c.Id);
-        builder.Property(c => c.Name).IsRequired().HasMaxLength(150);
-        builder.Property(c => c.Phone).HasMaxLength(20);
-        builder.Property(c => c.Email).HasMaxLength(100);
-        builder.Property(c => c.Address).HasMaxLength(250);
-        builder.Property(c => c.OpeningBalance).HasPrecision(18, 2);
-        builder.Property(c => c.CurrentBalance).HasPrecision(18, 2);
-        builder.Property(c => c.CreditLimit).HasPrecision(18, 2);
-        builder.Property(c => c.TaxNumber).HasMaxLength(30);
 
-        // ─── Phase 23: FK to Account (Chart of Accounts) ───
-        builder.HasOne(c => c.Account)
-            .WithMany()
-            .HasForeignKey(c => c.AccountId)
-            .OnDelete(DeleteBehavior.Restrict);
+        builder.Property(c => c.Id)
+            .ValueGeneratedNever(); // Id is assigned from Party.Id, not auto-generated
 
-        builder.HasIndex(c => c.AccountId)
-            .HasDatabaseName("IX_Customers_AccountId");
+        // Properties
+        builder.Property(c => c.CreditLimit)
+            .HasPrecision(18, 2);
 
-        // ─── Phase 23: FK to CustomerGroup ───
-        builder.HasOne(c => c.CustomerGroup)
-            .WithMany()
-            .HasForeignKey(c => c.CustomerGroupId)
-            .OnDelete(DeleteBehavior.Restrict);
+        builder.Property(c => c.CustomerSince);
 
-        builder.HasIndex(c => c.CustomerGroupId)
-            .HasDatabaseName("IX_Customers_CustomerGroupId");
+        builder.Property(c => c.PriceLevel);
 
+        builder.Property(c => c.Notes)
+            .HasMaxLength(500);
+
+        // 1:1 relationship with Party via shared PK
+        builder.HasOne(c => c.Party)
+            .WithOne()
+            .HasForeignKey<Customer>(c => c.Id)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
+
+        // Global query filter — soft delete
         builder.HasQueryFilter(c => c.IsActive);
     }
 }

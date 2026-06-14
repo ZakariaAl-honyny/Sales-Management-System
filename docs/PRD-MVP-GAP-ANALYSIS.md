@@ -6,6 +6,15 @@
 
 ---
 
+## Update (v4.10 — June 2026)
+**Most gaps identified below have been resolved in the v4.10 schema refactoring (82→65 tables).**
+- GAP-001: Header version fixed in PRD-MVP.md (now v4.10)
+- GAP-002: CQRS references removed from PRD-MVP.md
+- GAP-003 through GAP-N: Many gaps related to old entity names (PurchaseLots, StockTransfers, etc.) are now resolved by the 65-table schema migration.
+- See `docs/database-schema.md` for current schema and `docs/PRD-MVP.md` for current requirements.
+
+---
+
 ## Gap Classification Key
 
 | Severity | Meaning | Action Required |

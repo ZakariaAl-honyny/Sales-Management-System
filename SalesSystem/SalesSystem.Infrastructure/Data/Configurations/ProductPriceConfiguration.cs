@@ -12,6 +12,10 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
         builder.HasKey(x => x.Id);
 
         // Properties
+        builder.Property(x => x.CurrencyId)
+            .HasColumnType("smallint")
+            .IsRequired();
+
         builder.Property(x => x.Price)
             .HasPrecision(18, 2)
             .IsRequired()
@@ -24,9 +28,6 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
         builder.Property(x => x.EffectiveTo)
             .IsRequired(false)
             .HasComment("تاريخ انتهاء السريان (اختياري)");
-
-        builder.Property(x => x.IsActive)
-            .HasDefaultValue(true);
 
         // Relationships
         builder.HasOne(x => x.ProductUnit)
@@ -42,10 +43,6 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
         // Indexes
         builder.HasIndex(x => new { x.ProductUnitId, x.CurrencyId, x.EffectiveFrom })
             .IsUnique()
-            .HasFilter("[IsActive] = 1")
             .HasDatabaseName("IX_ProductPrices_ProductUnit_Currency_Date");
-
-        // Global query filter
-        builder.HasQueryFilter(x => x.IsActive);
     }
 }

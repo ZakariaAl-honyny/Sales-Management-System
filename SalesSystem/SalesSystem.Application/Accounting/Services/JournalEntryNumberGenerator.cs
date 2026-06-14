@@ -24,7 +24,7 @@ public class JournalEntryNumberGenerator : IJournalEntryNumberGenerator
         _logger = logger;
     }
 
-    public async Task<Result<string>> GenerateAsync(CancellationToken ct = default)
+    public async Task<Result<JournalEntryNumberResult>> GenerateAsync(CancellationToken ct = default)
     {
         try
         {
@@ -32,18 +32,19 @@ public class JournalEntryNumberGenerator : IJournalEntryNumberGenerator
             // SemaphoreSlim held through SaveChangesAsync prevents duplicate numbers.
             var seqResult = await _sequenceService.GetNextIntAsync("JournalEntry", ct);
             if (!seqResult.IsSuccess)
-                return Result<string>.Failure(seqResult.Error!);
+                return Result<JournalEntryNumberResult>.Failure(seqResult.Error!);
 
             var today = DateTime.Today;
-            var entryNumber = $"JE-{today:yyyyMMdd}-{seqResult.Value:D4}";
+            var entryNo = seqResult.Value;
+            var entryNumber = $"JE-{today:yyyyMMdd}-{entryNo:D4}";
 
             _logger.LogDebug("Generated journal entry number: {EntryNumber}", entryNumber);
-            return Result<string>.Success(entryNumber);
+            return Result<JournalEntryNumberResult>.Success(new JournalEntryNumberResult(entryNumber, entryNo));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating journal entry number");
-            return Result<string>.Failure("حدث خطأ أثناء إنشاء رقم القيد المحاسبي");
+            return Result<JournalEntryNumberResult>.Failure("حدث خطأ أثناء إنشاء رقم القيد المحاسبي");
         }
     }
 }

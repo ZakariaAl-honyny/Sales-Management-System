@@ -16,13 +16,12 @@ public interface IFifoAllocationService
     /// </summary>
     Task<Result<List<InventoryBatch>>> AddPurchaseBatchesAsync(
         int productId,
-        int warehouseId,
+        short warehouseId,
         decimal quantity,
         decimal unitCost,
         string? batchNo,
-        DateTime? manufactureDate,
         DateTime? expiryDate,
-        int? purchaseInvoiceItemId,
+        int? purchaseInvoiceId,
         bool isOpeningBatch,
         CancellationToken ct);
 
@@ -33,7 +32,7 @@ public interface IFifoAllocationService
     /// </summary>
     Task<Result<List<InventoryBatchAllocation>>> DeductFromBatchesAsync(
         int productId,
-        int warehouseId,
+        short warehouseId,
         decimal quantityNeeded,
         int? salesInvoiceItemId,
         int? createdByUserId,
@@ -56,25 +55,20 @@ public interface IFifoAllocationService
     /// Returns all active (non-zero quantity) batches sorted by FIFO/FEFO order.
     /// </summary>
     Task<Result<List<BatchStockInfo>>> GetBatchBreakdownAsync(
-        int productId, int warehouseId, CancellationToken ct);
+        int productId, short warehouseId, CancellationToken ct);
 
     /// <summary>
     /// Gets the current weighted average cost from all active batches with remaining quantity.
     /// Returns 0 if no stock exists.
     /// </summary>
     Task<Result<decimal>> GetCurrentStockCostAsync(
-        int productId, int warehouseId, CancellationToken ct);
+        int productId, short warehouseId, CancellationToken ct);
 }
 
 /// <summary>
 /// Tracks allocation from a specific batch to a sales invoice line.
-/// Used as a return DTO — no dedicated entity exists; allocations
-/// are reconstructed from InventoryMovement records if needed later.
+/// Used as a return DTO — no dedicated entity exists.
 /// </summary>
-/// <param name="BatchId">The ID of the source inventory batch.</param>
-/// <param name="Quantity">Quantity allocated from this batch.</param>
-/// <param name="UnitCost">Per-unit cost at time of allocation.</param>
-/// <param name="SalesInvoiceItemId">FK to the sales invoice item, if applicable.</param>
 public record InventoryBatchAllocation(
     int BatchId,
     decimal Quantity,
@@ -85,17 +79,9 @@ public record InventoryBatchAllocation(
 /// <summary>
 /// Snapshot of a single batch's current stock state for display/reporting.
 /// </summary>
-/// <param name="BatchId">The inventory batch ID.</param>
-/// <param name="BatchNo">Supplier or system batch reference number.</param>
-/// <param name="RemainingQuantity">Current available quantity in base units.</param>
-/// <param name="OriginalQuantity">Original quantity when the batch was created (estimated from movements).</param>
-/// <param name="UnitCost">Per-unit cost.</param>
-/// <param name="ExpiryDate">Optional expiry date.</param>
-/// <param name="ReceivedDate">Date the batch was created/received.</param>
-/// <param name="IsExpired">Whether the batch has expired as of now.</param>
 public record BatchStockInfo(
     int BatchId,
-    string BatchNo,
+    string? BatchNo,
     decimal RemainingQuantity,
     decimal OriginalQuantity,
     decimal UnitCost,

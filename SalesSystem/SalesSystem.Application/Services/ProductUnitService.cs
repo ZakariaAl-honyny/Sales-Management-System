@@ -3,8 +3,8 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
@@ -49,11 +49,11 @@ public class ProductUnitService : IProductUnitService
             if (product == null)
                 return Result<ProductUnitDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
-            // Phase 25: Prices managed via ProductPrices entity (not on ProductUnit).
-            // Barcodes managed via Product.Barcode (single source of truth) + UnitBarcode table.
+            // Phase 28: Prices managed via ProductPrices entity (not on ProductUnit).
+            // Barcodes managed via Product.Barcode column (single source of truth).
             var unit = req.IsBaseUnit
                 ? ProductUnit.CreateBaseUnit(productId, req.UnitId)
-                : ProductUnit.CreateDerivedUnit(productId, req.UnitId, req.ConversionFactor);
+                : ProductUnit.CreateDerivedUnit(productId, req.UnitId, req.Factor);
 
             product.AddUnit(unit);
             await _uow.ProductUnits.AddAsync(unit, ct);
@@ -210,7 +210,7 @@ public class ProductUnitService : IProductUnitService
                 baseUnit.Id,
                 baseUnit.UnitId,
                 baseUnit.Unit?.Name ?? "",
-                baseUnit.BaseConversionFactor);
+                baseUnit.Factor);
 
             return Result<BarcodeResolutionDto>.Success(dto);
         }
@@ -221,44 +221,6 @@ public class ProductUnitService : IProductUnitService
         }
     }
 
-    public async Task<Result<List<ProductPriceHistoryDto>>> GetPriceHistoryAsync(int productId, CancellationToken ct)
-    {
-        try
-        {
-            var historyEntries = await _uow.ProductPriceHistory.ToListAsync(
-                h => h.ProductUnit.ProductId == productId,
-                q => q.OrderByDescending(h => h.Id),
-                ct,
-                includePaths: new[] { "ProductUnit", "ProductUnit.Unit" });
-
-            if (historyEntries.Count == 0)
-                return Result<List<ProductPriceHistoryDto>>.Success(new List<ProductPriceHistoryDto>());
-
-            var userIds = historyEntries.Select(h => h.ChangedByUserId).Distinct().ToList();
-            var users = await _uow.Users.ToListAsync(ct);
-            var userMap = users.ToDictionary(u => u.Id, u => u.FullName);
-
-            // Phase 25: ProductPriceHistoryDto simplified to 7 params.
-            // RetailPrice, WholesalePrice fields removed from ProductPriceHistory entity.
-            var dtos = historyEntries.Select(h => new ProductPriceHistoryDto(
-                h.Id,
-                h.ProductUnitId,
-                h.OldCost,
-                h.NewCost,
-                h.ChangeReason ?? "",
-                userMap.GetValueOrDefault(h.ChangedByUserId, ""),
-                h.ChangedAt
-            )).ToList();
-
-            return Result<List<ProductPriceHistoryDto>>.Success(dtos);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to load price history for product {ProductId}", productId);
-            return Result<List<ProductPriceHistoryDto>>.Failure("حدث خطأ أثناء تحميل سجل الأسعار.");
-        }
-    }
-
     private static ProductUnitDto MapToDto(ProductUnit unit)
     {
         return new ProductUnitDto(
@@ -266,7 +228,7 @@ public class ProductUnitService : IProductUnitService
             unit.ProductId,
             unit.UnitId,
             unit.Unit?.Name ?? "",
-            unit.BaseConversionFactor,
+            unit.Factor,
             unit.IsBaseUnit,
             unit.IsActive);
     }

@@ -21,12 +21,14 @@ public class SupplierEditorViewModelTests : IDisposable
     private readonly Mock<ISupplierApiService> _mockSupplierService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
+    private readonly Mock<IScreenWindowService> _mockScreenWindowService;
 
     public SupplierEditorViewModelTests()
     {
         _mockSupplierService = new Mock<ISupplierApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
+        _mockScreenWindowService = new Mock<IScreenWindowService>();
     }
 
     public void Dispose()
@@ -42,7 +44,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
 
         // Assert
         viewModel.SaveCommand.Should().NotBeNull();
@@ -56,7 +59,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
 
         // Assert
         viewModel.IsEditMode.Should().BeFalse();
@@ -73,13 +77,11 @@ public class SupplierEditorViewModelTests : IDisposable
             Email: null,
             Address: null,
             TaxNumber: null,
-            OpeningBalance: 0,
-            CurrentBalance: 0,
-            CreditLimit: 0,
-            IsActive: true);
+            IsActive: true,
+            AccountId: 1);
 
         // Act - Use the service-based constructor
-        var viewModel = new SupplierEditorViewModel(supplier, _mockSupplierService.Object, _mockEventBus.Object, _mockDialogService.Object);
+        var viewModel = new SupplierEditorViewModel(supplier, _mockSupplierService.Object, _mockEventBus.Object, _mockDialogService.Object, _mockScreenWindowService.Object);
 
         // Assert
         viewModel.IsEditMode.Should().BeTrue();
@@ -92,7 +94,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
 
         // Assert
         viewModel.Name.Should().BeEmpty();
@@ -100,7 +103,6 @@ public class SupplierEditorViewModelTests : IDisposable
         viewModel.Email.Should().BeEmpty();
         viewModel.Address.Should().BeEmpty();
         viewModel.TaxNumber.Should().BeEmpty();
-        viewModel.OpeningBalance.Should().Be(0);
         viewModel.Notes.Should().BeEmpty();
         viewModel.IsActive.Should().BeTrue();
         viewModel.IsBusy.Should().BeFalse();
@@ -117,13 +119,11 @@ public class SupplierEditorViewModelTests : IDisposable
             Email: "test@example.com",
             Address: "العنوان",
             TaxNumber: null,
-            OpeningBalance: 1000,
-            CurrentBalance: 0,
-            CreditLimit: 0,
-            IsActive: false);
+            IsActive: false,
+            AccountId: 1);
 
         // Act
-        var viewModel = new SupplierEditorViewModel(supplier, _mockSupplierService.Object, _mockEventBus.Object, _mockDialogService.Object);
+        var viewModel = new SupplierEditorViewModel(supplier, _mockSupplierService.Object, _mockEventBus.Object, _mockDialogService.Object, _mockScreenWindowService.Object);
 
         // Assert - field is private, verify through behavior
         viewModel.IsEditMode.Should().BeTrue();
@@ -131,7 +131,6 @@ public class SupplierEditorViewModelTests : IDisposable
         viewModel.Phone.Should().Be("0501234567");
         viewModel.Email.Should().Be("test@example.com");
         viewModel.Address.Should().Be("العنوان");
-        viewModel.OpeningBalance.Should().Be(1000);
         viewModel.IsActive.Should().BeFalse();
     }
 
@@ -142,7 +141,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
 
         // Assert
         viewModel.Title.Should().Be("إضافة مورد جديد");
@@ -153,7 +153,7 @@ public class SupplierEditorViewModelTests : IDisposable
     {
         // Arrange
         var supplier = CreateTestSupplierDto(1, "مورد تجريبي");
-        var viewModel = new SupplierEditorViewModel(supplier, _mockSupplierService.Object, _mockEventBus.Object, _mockDialogService.Object);
+        var viewModel = new SupplierEditorViewModel(supplier, _mockSupplierService.Object, _mockEventBus.Object, _mockDialogService.Object, _mockScreenWindowService.Object);
 
         // Assert
         viewModel.Title.Should().Be("تعديل مورد");
@@ -170,7 +170,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         // Set a non-empty value first so SetProperty detects the change to empty
         viewModel.Name = "test";
         viewModel.Name = string.Empty;
@@ -178,21 +179,6 @@ public class SupplierEditorViewModelTests : IDisposable
         // Assert - INotifyDataErrorInfo validation fires on property change
         var errors = viewModel.GetErrors("Name").Cast<string>().ToList();
         errors.Should().Contain(e => e.Contains("اسم المورد مطلوب"));
-    }
-
-    [Fact]
-    public void Validate_WhenOpeningBalanceIsNegative_ProducesValidationError()
-    {
-        // Arrange
-        var viewModel = new SupplierEditorViewModel(
-            _mockSupplierService.Object,
-            _mockEventBus.Object,
-            _mockDialogService.Object);
-        viewModel.OpeningBalance = -100;
-
-        // Assert - INotifyDataErrorInfo validation fires on property change
-        var errors = viewModel.GetErrors("OpeningBalance").Cast<string>().ToList();
-        errors.Should().Contain(e => e.Contains("الرصيد الافتتاحي"));
     }
 
     #endregion
@@ -206,7 +192,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -224,7 +211,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -242,7 +230,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
 
         // Assert
         viewModel.IsBusy.Should().BeFalse();
@@ -255,7 +244,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -273,7 +263,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -291,7 +282,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -309,7 +301,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         var propertyChangedEvents = new List<string>();
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
@@ -318,24 +311,6 @@ public class SupplierEditorViewModelTests : IDisposable
 
         // Assert
         propertyChangedEvents.Should().Contain("Address");
-    }
-
-    [Fact]
-    public void OpeningBalance_Set_NotifiesPropertyChanged()
-    {
-        // Arrange
-        var viewModel = new SupplierEditorViewModel(
-            _mockSupplierService.Object,
-            _mockEventBus.Object,
-            _mockDialogService.Object);
-        var propertyChangedEvents = new List<string>();
-        viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
-
-        // Act
-        viewModel.OpeningBalance = 5000;
-
-        // Assert
-        propertyChangedEvents.Should().Contain("OpeningBalance");
     }
 
     #endregion
@@ -349,7 +324,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         viewModel.Name = ""; // Invalid - name is empty
 
         // Assert - Validation not triggered yet
@@ -363,9 +339,9 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         viewModel.Name = "مورد جديد";
-        viewModel.OpeningBalance = 1000;
 
         // Assert - Check SaveCommand exists
         viewModel.SaveCommand.Should().NotBeNull();
@@ -378,7 +354,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
 
         // Act
         viewModel.ErrorMessage = "فشل في الحفظ";
@@ -394,7 +371,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
 
         // Assert - IsBusy initially false, managed by ExecuteAsync
         viewModel.IsBusy.Should().BeFalse();
@@ -411,7 +389,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
         var closeRequestedInvoked = false;
         viewModel.CloseRequested += () => closeRequestedInvoked = true;
 
@@ -429,7 +408,8 @@ public class SupplierEditorViewModelTests : IDisposable
         var viewModel = new SupplierEditorViewModel(
             _mockSupplierService.Object,
             _mockEventBus.Object,
-            _mockDialogService.Object);
+            _mockDialogService.Object,
+            _mockScreenWindowService.Object);
 
         // Act & Assert
         viewModel.CancelCommand.CanExecute(null).Should().BeTrue();
@@ -450,10 +430,8 @@ public class SupplierEditorViewModelTests : IDisposable
             Email: null,
             Address: null,
             TaxNumber: null,
-            OpeningBalance: 0,
-            CurrentBalance: 0,
-            CreditLimit: 0,
-            IsActive: true);
+            IsActive: true,
+            AccountId: 1);
     }
 
     #endregion

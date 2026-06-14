@@ -56,17 +56,21 @@ DueAmount   = TotalAmount - PaidAmount;
 
 ### 2.2 Database Transactions
 
-Every operation affecting more than one table: inside `BeginTransactionAsync`.
+Every operation affecting more than one table: use `IUnitOfWork.ExecuteTransactionAsync()` which wraps `CreateExecutionStrategy().ExecuteAsync()` with an explicit transaction inside the delegate.
 
-**Transaction Protocol:**
-1. Validate ALL preconditions (stock, balances) BEFORE opening transaction
-2. `BeginTransactionAsync()`
+**IMPORTANT:** NEVER use `BeginTransactionAsync()` / `CommitAsync()` / `RollbackAsync()` directly when `SqlServerRetryingExecutionStrategy` is configured — the execution strategy does not support user-initiated transactions. Use `IUnitOfWork.ExecuteTransactionAsync()` instead. See Section 10.1 for full details.
+
+**Transaction Protocol (inside ExecuteTransactionAsync):**
+1. Validate ALL preconditions (stock, balances) BEFORE the transaction delegate
+2. BeginTransactionAsync (inside the execution strategy)
 3. Save invoice → get ID
-4. Modify stock (using invoice ID as reference)
-5. Create InventoryMovement records
+4. Deduct stock (using invoice ID as reference — AFTER save so invoice has an ID)
+5. Create InventoryTransaction records (replaces old InventoryMovement)
 6. Update customer/supplier balance
-7. `CommitAsync()`
-8. On ANY exception: `RollbackAsync()` — NO partial commits EVER
+7. CommitAsync
+8. On ANY exception: RollbackAsync — NO partial commits EVER
+
+**Schema Reference:** See `docs/database-schema.md` Module 5 (Inventory) for InventoryTransaction and InventoryBatch table definitions.
 
 ---
 
@@ -97,21 +101,179 @@ FORBIDDEN:
 - NO editing a Posted invoice — cancel + create new
 - Cancellation MUST reverse ALL stock and balance effects
 
----
+**Schema Reference:** See `docs/database-schema.md` Module 2 (Sales) for SalesInvoice/PurchaseInvoice table definitions and Module 1 (Security) for base entity inheritance (Entity, AuditableEntity, ActivatableEntity, DocumentEntity).
 
-### 2.5 Stock Integrity
+### 2.5 Stock Integrity (v4.10 — Perpetual Inventory)
 
-- Validate stock availability BEFORE opening transaction (Stock is always in Retail Units)
+- Validate stock availability BEFORE opening transaction (Stock is always in base units)
 - Deduct stock AFTER saving invoice (to have reference ID)
-- Record EVERY stock change in InventoryMovements table
+- Record EVERY stock change in `InventoryTransaction` + `InventoryTransactionLine` (replaces old `InventoryMovement`)
 - NO negative quantities — enforced at DB level: `CHECK (Quantity >= 0)`
+- ALL inventory costs go DIRECTLY to Inventory Asset account — NO intermediate "Purchases" clearing account
 
-**InventoryMovement Required Fields:**
-`ProductId`, `WarehouseId`, `MovementType`, `QuantityChange`, `QuantityBefore`, `QuantityAfter`, `ReferenceType`, `ReferenceId`, `MovementDate`, `CreatedByUserId`
+**Schema Reference:** See `docs/database-schema.md` Module 5 (Inventory) for WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, WarehouseTransfers, and WarehouseTransferLines table definitions.
 
 ---
 
-### 2.6 Balance Direction Convention
+#### 2.5a Perpetual Inventory System (v4.10)
+
+ALL inventory costs go DIRECTLY to Inventory Asset account — NO intermediate "Purchases" clearing account.
+
+```csharp
+// Purchase invoice posting (Perpetual Inventory):
+// Dr: Inventory Asset Account (from SystemAccountMappings)
+// Cr: Cash (or Accounts Payable)
+
+// Sale invoice posting (COGS via batch costing):
+// Dr: COGS Account (from SystemAccountMappings)
+// Cr: Inventory Asset Account
+
+// NO Purchases account is ever used
+```
+
+**InventoryTransaction Pattern:**
+Every stock change MUST create an `InventoryTransaction` header + `InventoryTransactionLine` detail. The transaction captures:
+- TransactionType (Purchase=1, Sale=3, TransferOut=5, Adjustment=8, etc.)
+- WarehouseId, ReferenceType, ReferenceId
+- Per line: ProductId, ProductUnitId, BatchId, Quantity, UnitCost, TotalCost
+
+**InventoryBatches (FIFO/FEFO):**
+```csharp
+// Purchase creates batch:
+new InventoryBatch
+{
+    BatchNo = nextBatchNo,
+    ProductId = productId,
+    WarehouseId = warehouseId,
+    PurchaseInvoiceId = invoiceId,
+    QuantityReceived = quantity,
+    QuantityRemaining = quantity,
+    UnitCost = unitCost,
+    ExpiryDate = expiryDate    // null if TrackExpiry = false
+};
+
+// Sale consumes from batches FIFO:
+var availableBatches = stock.Batches
+    .Where(b => b.QuantityRemaining > 0)
+    .OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue)  // FEFO when expiry tracked
+    .ThenBy(b => b.Id);                                 // FIFO otherwise
+
+foreach (var batch in availableBatches)
+{
+    var consumeQty = Math.Min(remainingQty, batch.QuantityRemaining);
+    batch.QuantityRemaining -= consumeQty;
+    remainingQty -= consumeQty;
+    totalCost += consumeQty * batch.UnitCost;
+    if (remainingQty <= 0) break;
+}
+
+// COGS = totalCost (sum of batch costs consumed)
+```
+
+**Schema Reference:** See `docs/database-schema.md` Module 5 (Inventory) — `InventoryBatches` table definition (BatchNo, QuantityReceived, QuantityRemaining, UnitCost, ExpiryDate, and FK relationships).
+
+---
+
+### 2.5b ProductPrices (Multi-Currency Pricing) (v4.10)
+
+```csharp
+// Prices stored on ProductPrices table — NEVER on Product entity
+public class ProductPrice
+{
+    public int ProductUnitId { get; private set; }   // FK → ProductUnits
+    public int CurrencyId { get; private set; }      // FK → Currencies (smallint)
+    public decimal Price { get; private set; }       // decimal(18,2)
+    public DateTime EffectiveFrom { get; private set; }
+    public DateTime? EffectiveTo { get; private set; }
+    
+    public bool IsEffective(DateTime date, int currencyId)
+    {
+        return CurrencyId == currencyId
+            && date >= EffectiveFrom
+            && (!EffectiveTo.HasValue || date <= EffectiveTo.Value);
+    }
+}
+
+// Price lookup:
+var price = productUnit.Prices
+    .FirstOrDefault(p => p.IsEffective(today, sessionCurrencyId))
+    ?.Price ?? 0m;
+```
+
+**Schema Reference:** See `docs/database-schema.md` Module 4 (Products) — `ProductPrices` table definition (ProductUnitId FK, CurrencyId FK, Price, EffectiveFrom, EffectiveTo).
+
+---
+
+### 2.5c Party Entity Pattern (v4.10)
+
+```csharp
+// Customers and Suppliers share contact data via Parties table
+public class Party
+{
+    public string Name { get; private set; }
+    public string? Phone { get; private set; }
+    public string? Email { get; private set; }
+    public string? Address { get; private set; }
+    public string? TaxNumber { get; private set; }
+    public string? Notes { get; private set; }
+}
+
+// Customer — NO direct Name/Phone/Email fields
+public class Customer
+{
+    public int PartyId { get; private set; }          // FK → Parties (mandatory)
+    public Party Party { get; private set; }          // Navigation
+    public int AccountId { get; private set; }        // FK → Accounts (mandatory)
+    public int? CategoryId { get; private set; }      // FK → AccountCategories
+    
+    // NO OpeningBalance, CurrentBalance, CurrencyId, CustomerGroupId
+    // NO Name, Phone, Email, Address (use Party.Name etc.)
+}
+
+// Supplier — same pattern
+public class Supplier
+{
+    public int PartyId { get; private set; }
+    public Party Party { get; private set; }
+    public int AccountId { get; private set; }
+    
+    // NO OpeningBalance, CurrentBalance, CurrencyId, SupplierType
+}
+```
+
+**Schema Reference:** See `docs/database-schema.md` Module 3 (Customers & Suppliers) — `Parties`, `Customers`, and `Suppliers` table definitions.
+
+---
+
+### 2.5d Units (Independent Table) (v4.10)
+
+```csharp
+// Units is an independent lookup table — NOT embedded in ProductUnit
+public class Unit
+{
+    public short Id { get; private set; }             // smallint PK
+    public string Name { get; private set; }           // e.g., "حبة", "كرتون"
+    public string? Symbol { get; private set; }        // e.g., "pc", "box"
+    public bool IsSystem { get; private set; }         // protects seed units
+    public bool IsActive { get; private set; }
+}
+
+// ProductUnit links Product → Unit via UnitId FK
+public class ProductUnit
+{
+    public int ProductId { get; private set; }
+    public short UnitId { get; private set; }          // smallint FK → Units
+    public Unit Unit { get; private set; }             // Navigation
+    public decimal Factor { get; private set; }        // Conversion factor (base=1, box=24)
+    public bool IsBaseUnit { get; private set; }       // Exactly one per product
+}
+```
+
+**Schema Reference:** See `docs/database-schema.md` Module 4 (Products) — `Units`, `ProductUnits`, and `UnitBarcodes` table definitions.
+
+---
+
+## 2.6 Balance Direction Convention
 
 | Entity | Positive Balance | Negative Balance |
 |--------|-----------------|------------------|
@@ -241,7 +403,7 @@ public static Product Create(...)
 }
 ```
 
-**Entities with Guard Clauses:** Product, Customer, Supplier, SalesInvoice, PurchaseInvoice, WarehouseStock, StockTransfer, SalesReturn, PurchaseReturn, User, Category, Unit, Warehouse, DocumentSequence, StoreSettings, InventoryMovement, CustomerPayment, SupplierPayment, SalesInvoiceItem, PurchaseInvoiceItem, SalesReturnItem, PurchaseReturnItem, StockTransferItem, ProductUnit, UnitBarcode, CashBox, CashTransaction, ProductPriceHistory
+**Entities with Guard Clauses:** Product, Customer, Supplier, SalesInvoice, PurchaseInvoice, WarehouseStock, StockTransfer, SalesReturn, PurchaseReturn, User, Category, Unit, Warehouse, DocumentSequence, StoreSettings, InventoryTransaction, InventoryBatch, CustomerPayment, SupplierPayment, SalesInvoiceItem, PurchaseInvoiceItem, SalesReturnItem, PurchaseReturnItem, StockTransferItem, ProductUnit, UnitBarcode, CashBox, CashTransaction, ProductPriceHistory
 
 **Exception Type:** `DomainException` — NEVER `ArgumentException` in Domain layer.
 
@@ -428,17 +590,18 @@ var targetQty = baseQty / targetUnit.ConversionFactor;
 
 ---
 
-### 2.21 Cash Boxes (v4.3)
+### 2.21 Cash Boxes (v4.10 — Refactored for Chart of Accounts Integration)
+
+CashBox is a **lightweight register entity** — balance lives on the linked Chart of Accounts Account, NOT on CashBox.
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-077 | CashBox has `OpeningBalance`, `CurrentBalance` — computed from `CashTransaction` sum |
-| RULE-078 | `CashTransaction` records: OpeningBalance, Income, Expense, Transfer, Refund, Payment |
-| RULE-079 | Every invoice payment references `CashBoxId` |
-| RULE-080 | `CashBox.CurrentBalance` NEVER goes negative |
-| RULE-081 | Cash transfer between boxes requires TWO transactions (Out + In) |
-| RULE-082 | Cash transactions immutable — no editing, cancellation via offsetting entry |
-| RULE-083 | `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance |
+| RULE-077 | CashBox is a lightweight register with `AccountId` (required FK to Account) — balance tracked on the linked GL Account. CashBox has NO `OpeningBalance` or `CurrentBalance` fields. |
+| RULE-078 | `CashTransaction` records: OpeningBalance, Income, Expense, Transfer, Refund, Payment — uses `RunningBalance` (computed cumulative sum) instead of `BalanceBefore`/`BalanceAfter`. `CashTransaction.Create()` is public (callable from service layer). |
+| RULE-079 | Account balance (NOT CashBox) NEVER goes negative — the Account entity validates before dispensing. CashBox service computes running balance as sum of all CashTransaction amounts. |
+| RULE-080 | Cash transfer between boxes requires TWO transactions (Out + In) — server validates via running balance from CashTransaction records. |
+| RULE-081 | Cash transactions are immutable once created — no editing, cancellation via offsetting entry. |
+| RULE-082 | `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance (OpeningBalance sourced from Account's opening balance via Chart of Accounts). |
 
 **CashTransactionType:**
 ```csharp
@@ -450,7 +613,11 @@ public enum CashTransactionType : byte
 }
 ```
 
+**Auto-Account Creation:** When creating a CashBox without an `AccountId`, the service auto-creates a Level-4 detail account under parent `"1110 — النقدية"` (Cash & Cash Equivalents — a Level 3 account under Current Assets 1100). Account codes auto-increment (1111, 1112, 1113...).
+
 **Entities:** `CashBox`, `CashTransaction`
+
+**Schema Reference:** See `docs/database-schema.md` Module 6 (Cash) — `CashBoxes`, `CashTransactions`, and `DailyClosures` table definitions.
 
 ---
 
@@ -593,7 +760,7 @@ Step 7: Quality validation (all checklist items must PASS)
 - [ ] Multi-table operations in a transaction
 - [ ] Stock checked BEFORE transaction opens
 - [ ] Stock deducted AFTER invoice saved
-- [ ] InventoryMovement created for every stock change
+- [ ] InventoryTransaction created for every stock change (replaces InventoryMovement)
 - [ ] Rollback on ANY failure
 
 ### Architecture
@@ -626,7 +793,8 @@ Step 7: Quality validation (all checklist items must PASS)
 - [ ] Unit conversions computed in Domain (not UI or Service)
 - [ ] Barcodes stored in UnitBarcode table (not embedded in Unit)
 - [ ] Costing update uses UpdateProductPricingService
-- [ ] CashBox.CurrentBalance validated before dispensing
+- [ ] CashBox.AccountId FK links to Chart of Accounts (balance lives on Account, not CashBox)
+- [ ] CashTransaction uses RunningBalance (not BalanceBefore/BalanceAfter)
 - [ ] CashTransaction entries immutable — no direct editing
 - [ ] ProductPriceHistory recorded on EVERY price/cost change
 - [ ] At least one ProductUnit per product enforced in Domain
@@ -766,3 +934,26 @@ if (code.Trim().Length != 3)
 ```
 
 All validation layers (Domain, FluentValidation, Desktop VM) must consistently enforce exactly 3 characters.
+
+---
+
+## 11. Schema Reference
+
+All table definitions, column types, constraints, indexes, and FK relationships are maintained in `docs/database-schema.md` (single source of truth — 65 tables across 8 modules).
+
+| Module | File Section | Tables |
+|--------|-------------|--------|
+| 1 — Security & Users | `# 3) Security & Identity` | Users, Roles, Permissions, AuditLogs, UserSessions |
+| 2 — Sales & Purchases | `# 4) Sales & Purchases` | SalesInvoices, SalesInvoiceItems, PurchaseInvoices, PurchaseInvoiceItems, SalesReturns, PurchaseReturns |
+| 3 — Customers & Suppliers | `# 5) Customers & Suppliers` | Parties, Customers, Suppliers |
+| 4 — Products & Inventory | `# 6) Products & Inventory` | Products, Categories, Units, ProductUnits, UnitBarcodes, ProductPrices, ProductImages |
+| 5 — Inventory Transactions | `# 7) Inventory Transactions` | InventoryBatches, WarehouseStocks, InventoryTransactions, InventoryTransactionLines, WarehouseTransfers, WarehouseTransferLines |
+| 6 — Cash & Banking | `# 8) Cash & Banking` | CashBoxes, CashTransactions, DailyClosures, Cheques |
+| 7 — Accounting | `# 9) Accounting` | Accounts, JournalEntries, JournalEntryLines, SystemAccountMappings, FiscalYears |
+| 8 — System Configuration | `# 10) System Config` | SystemSettings, DocumentSequences, StoreSettings, TaxConfigs |
+
+**How to use:**
+- Domain entity patterns are in this file (`CONSTITUTION.md`) and `AGENTS.md`
+- Functional requirements are in `docs/PRD-MVP.md`
+- UI/UX flows and screen layouts are in `docs/ui-screens.md`
+- Database table definitions are in `docs/database-schema.md` — NEVER duplicate table schemas in this file.

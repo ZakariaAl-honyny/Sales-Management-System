@@ -96,6 +96,73 @@ if (string.IsNullOrEmpty(connectionString))
   }
 }
 
+## v4.10 — Schema Restructuring Migration (65 Tables)
+
+### Removed Tables (17 — must drop or migrate)
+1. `InventoryMovements` → migrate to `InventoryTransactions` + `InventoryTransactionLines`
+2. `StockTransfers` / `StockTransferItems` → migrate to `WarehouseTransfers` / `WarehouseTransferLines`
+3. `InventoryOperations` → map to `InventoryTransactions` with appropriate TransactionType
+4. `StockWriteOffs` → map to `InventoryAdjustments` with AdjustmentType = Damage
+5. `ProductBarcodes` → migrate to `UnitBarcodes` (if exists)
+6. `CashTransactions` → migrate to `ReceiptVouchers` / `PaymentVouchers`
+7. `CustomerGroups` → drop (deferred to V2)
+8. `SupplierTypes` → drop (deferred to V2)
+9. `SalesQuotations` → drop (deferred to V2)
+10. `PurchaseOrders` → drop (deferred to V2)
+11. `Cheques` → drop (deferred to V2)
+12. `DailyClosures` → drop (deferred to V2)
+13. `CustomerPayments` → migrate to `CustomerReceipts`
+14. `SupplierPayments` → keep as `SupplierPayments` (renamed columns)
+15. `InvoiceSettings` / `GeneralSettings` → merge into `SystemSettings`
+16. Old `ProductPrices` (if existed with different schema) → replace with new multi-currency schema
+17. `CustomerLedger` / `SupplierLedger` → remove (balance via Account)
+
+### Added Tables (8 — must create EF migrations)
+1. `Parties` — shared contact data (Name, Phone, Email, Address, TaxNumber, Notes)
+2. `Units` — independent lookup table (smallint PK, Name, Symbol, IsSystem, IsActive)
+3. `ProductPrices` — multi-currency pricing per (ProductUnitId, CurrencyId)
+4. `InventoryBatches` — FIFO/FEFO batch tracking (BatchNo, QuantityReceived, QuantityRemaining, UnitCost)
+5. `InventoryTransactions` — header for ALL inventory movements (TransactionType, WarehouseId, ReferenceType, ReferenceId)
+6. `InventoryTransactionLines` — detail lines for each transaction (ProductId, ProductUnitId, BatchId, Quantity, UnitCost, TotalCost)
+7. `WarehouseTransfers` — header for warehouse-to-warehouse transfers (FromWarehouseId, ToWarehouseId)
+8. `WarehouseTransferLines` — detail lines with BatchId, Quantity, UnitCost
+
+### Seed Data Updates
+1. **Units**: Seed 7 default units (حبة/PCS, كرتون/CTN, كيلو/KG, جرام/G, لتر/L, متر/M, بالة/BAL) with `IsSystem = true`
+2. **Currencies**: Seed local currency + USD with `IsSystem = true`; set IsBaseCurrency on local currency
+3. **Parties**: Auto-create default "نقدي" Party for default cash customer/supplier
+4. **SystemSettings**: Update CostingMethod to use InventoryBatches-based costing
+5. **SystemAccountMappings**: Add PurchaseReturnAccountId mapping (1632)
+
+### FK Type Changes (int → smallint)
+- `Roles.Id` → smallint (was int): update UserRoles.RoleId, RolePermissions.RoleId
+- `Departments.Id` → smallint: update Employees.DepartmentId
+- `Branches.Id` → smallint: update UserBranches.BranchId, Warehouses.BranchId
+- `Warehouses.Id` → smallint: update ALL FK references across 20+ tables
+- `Currencies.Id` → smallint: update ALL FK references across 15+ tables
+- `Taxes.Id` → smallint: update Products.TaxId, invoice TaxId columns
+- `Units.Id` → smallint: update ProductUnits.UnitId
+- `AccountCategories.Id` → smallint: update Accounts.CategoryId
+
+**Migration strategy**: Create new smallint FK columns alongside old int columns → populate from lookup → drop old int columns → rename new columns.
+
+### AuditLog/SystemLog Type Changes
+- `AuditLogs.Id` → bigint (was int)
+- `SystemLogs.Id` → bigint (was int)
+- `SystemLogs.Level` → tinyint (was nvarchar)
+
+### EF Migration Commands
+```powershell
+# From Infrastructure project directory:
+dotnet ef migrations add Phase25_ProductsModule_v2 --context SalesDbContext
+dotnet ef migrations add Phase26_WarehousesModule --context SalesDbContext
+dotnet ef migrations add Phase27_InventoryTransaction --context SalesDbContext
+dotnet ef migrations add Phase28_Party_Units_Upgrade --context SalesDbContext
+
+# Apply all pending:
+dotnet ef database update --context SalesDbContext
+```
+
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
 Phase 21 (PRD alignment) — Users & Permissions is now complete. Deployment impact:

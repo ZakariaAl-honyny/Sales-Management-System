@@ -14,16 +14,25 @@ public class UpdateProductRequestValidator : AbstractValidator<UpdateProductRequ
         RuleFor(x => x.Barcode)
             .MaximumLength(100).WithMessage("الباركود لا يمكن أن يتجاوز 100 حرف");
 
-        RuleFor(x => x.MinStock)
-            .GreaterThanOrEqualTo(0).WithMessage("الحد الأدنى للمخزون لا يمكن أن يكون سالباً");
-
         RuleFor(x => x.CategoryId)
-            .GreaterThan(0).When(x => x.CategoryId.HasValue).WithMessage("يجب اختيار تصنيف صحيح");
+            .GreaterThan(0).WithMessage("التصنيف مطلوب");
+
+        RuleFor(x => x.ReorderLevel)
+            .GreaterThanOrEqualTo(0).WithMessage("مستوى إعادة الطلب لا يمكن أن يكون سالباً");
+
+        RuleFor(x => x.TaxId)
+            .GreaterThan(0).WithMessage("معرف الضريبة يجب أن يكون أكبر من صفر")
+            .When(x => x.TaxId.HasValue);
 
         RuleFor(x => x.Description)
             .MaximumLength(500).WithMessage("الوصف لا يمكن أن يتجاوز 500 حرف");
 
-        RuleFor(x => x.IsActive)
-            .NotNull().WithMessage("حالة النشاط مطلوبة");
+        RuleFor(x => x.ImagePath)
+            .MaximumLength(500).WithMessage("مسار الصورة لا يمكن أن يتجاوز 500 حرف")
+            .When(x => !string.IsNullOrEmpty(x.ImagePath));
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(1000).WithMessage("الملاحظات لا يمكن أن تتجاوز 1000 حرف")
+            .When(x => !string.IsNullOrEmpty(x.Notes));
     }
 }

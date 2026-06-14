@@ -75,14 +75,13 @@ public class InventoryBatchService : IInventoryBatchService
 
             var batch = InventoryBatch.Create(
                 request.ProductId,
-                request.WarehouseId,
+                (short)request.WarehouseId,
                 request.Quantity,
                 request.UnitCost,
-                request.BatchNo,
-                purchaseInvoiceItemId: null,
-                request.ManufactureDate,
-                request.ExpiryDate,
-                userId);
+                purchaseInvoiceId: request.PurchaseInvoiceId,
+                batchNo: request.BatchNo,
+                expiryDate: request.ExpiryDate,
+                createdByUserId: userId);
 
             await _uow.InventoryBatches.AddAsync(batch, ct);
             await _uow.SaveChangesAsync(ct);
@@ -113,10 +112,10 @@ public class InventoryBatchService : IInventoryBatchService
             if (batch == null)
                 return Result.Failure("الدفعة غير موجودة", ErrorCodes.NotFound);
 
-            batch.MarkAsDeleted();
+            _uow.InventoryBatches.DeleteRange(new[] { batch });
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Inventory batch {Id} deactivated", id);
+            _logger.LogInformation("Inventory batch {Id} permanently deleted", id);
             return Result.Success();
         }
         catch (Exception ex)
@@ -132,13 +131,12 @@ public class InventoryBatchService : IInventoryBatchService
         batch.Id,
         batch.ProductId,
         batch.Product?.Name,
-        batch.PurchaseInvoiceItemId,
+        batch.PurchaseInvoiceId,
         batch.WarehouseId,
         batch.Warehouse?.Name,
         batch.Quantity,
         batch.UnitCost,
         batch.BatchNo,
-        batch.ManufactureDate,
         batch.ExpiryDate,
-        batch.IsActive);
+        batch.Quantity > 0);
 }

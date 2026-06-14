@@ -12,7 +12,6 @@ namespace SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 public class CashBoxEditorViewModel : ViewModelBase
 {
     private readonly ICashBoxApiService _cashBoxService;
-    private readonly ICategoryApiService _categoryService;
     private readonly IDialogService _dialogService;
     private readonly IEventBus _eventBus;
     private readonly IToastNotificationService _toastService;
@@ -22,7 +21,6 @@ public class CashBoxEditorViewModel : ViewModelBase
     private int? _accountId;
     private bool _isAccountAutoCreated = true;
     private string? _accountInfo;
-    private int? _categoryId;
     private string? _phoneNumber;
     private string? _taxNumber;
     private string? _address;
@@ -32,13 +30,10 @@ public class CashBoxEditorViewModel : ViewModelBase
     private int? _currencyId;
     private bool _isEditMode;
     private string? _errorMessage;
-    private ObservableCollection<CategoryDto> _categories = new();
-    private CategoryDto? _selectedCategory;
 
     public CashBoxEditorViewModel()
         : this(
             App.GetService<ICashBoxApiService>(),
-            App.GetService<ICategoryApiService>(),
             App.GetService<IDialogService>(),
             App.GetService<IEventBus>(),
             App.GetService<IToastNotificationService>())
@@ -47,20 +42,17 @@ public class CashBoxEditorViewModel : ViewModelBase
 
     public CashBoxEditorViewModel(
         ICashBoxApiService cashBoxService,
-        ICategoryApiService categoryService,
         IDialogService dialogService,
         IEventBus eventBus,
         IToastNotificationService? toastService = null)
     {
         _cashBoxService = cashBoxService ?? throw new ArgumentNullException(nameof(cashBoxService));
-        _categoryService = categoryService ?? throw new ArgumentNullException(nameof(categoryService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _toastService = toastService ?? App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
 
         InitializeCommands();
-        _ = LoadCategoriesAsync();
     }
 
     private void InitializeCommands()
@@ -99,30 +91,6 @@ public class CashBoxEditorViewModel : ViewModelBase
     {
         get => _accountInfo;
         set => SetProperty(ref _accountInfo, value);
-    }
-
-    public ObservableCollection<CategoryDto> Categories
-    {
-        get => _categories;
-        set => SetProperty(ref _categories, value);
-    }
-
-    public CategoryDto? SelectedCategory
-    {
-        get => _selectedCategory;
-        set
-        {
-            if (SetProperty(ref _selectedCategory, value))
-            {
-                CategoryId = value?.Id;
-            }
-        }
-    }
-
-    public int? CategoryId
-    {
-        get => _categoryId;
-        set => SetProperty(ref _categoryId, value);
     }
 
     public string? PhoneNumber
@@ -197,7 +165,6 @@ public class CashBoxEditorViewModel : ViewModelBase
         AccountId = accountId;
         IsAccountAutoCreated = accountId == null;
         AccountInfo = accountName ?? "سيتم إنشاء حساب تلقائي";
-        CategoryId = categoryId;
         BranchId = branchId;
         AssignedUserId = assignedUserId;
         CurrencyId = currencyId;
@@ -206,33 +173,6 @@ public class CashBoxEditorViewModel : ViewModelBase
         Address = address;
         Notes = notes;
         IsEditMode = true;
-
-        // Pre-select category if available
-        if (categoryId.HasValue && Categories.Any(c => c.Id == categoryId.Value))
-        {
-            SelectedCategory = Categories.FirstOrDefault(c => c.Id == categoryId.Value);
-        }
-    }
-
-    public async Task LoadCategoriesAsync()
-    {
-        await ExecuteAsync(LoadCategoriesOperationAsync);
-    }
-
-    private async Task LoadCategoriesOperationAsync()
-    {
-        var result = await _categoryService.GetAllAsync();
-        if (result.IsSuccess && result.Value != null)
-        {
-            InvokeOnUIThread(() =>
-        {
-            Categories.Clear();
-            foreach (var cat in result.Value)
-            {
-                Categories.Add(cat);
-            }
-        });
-        }
     }
 
     private async Task<bool> ValidateAsync()
@@ -263,12 +203,11 @@ public class CashBoxEditorViewModel : ViewModelBase
     {
         // Determine AccountId: null = auto-create
         int? requestAccountId = IsAccountAutoCreated ? null : AccountId;
-        int? requestCategoryId = SelectedCategory?.Id ?? CategoryId;
 
         var request = new CreateCashBoxRequest(
             BoxName.Trim(),
             requestAccountId,
-            requestCategoryId,
+            CategoryId: null,
             BranchId,
             AssignedUserId,
             CurrencyId,
@@ -299,11 +238,10 @@ public class CashBoxEditorViewModel : ViewModelBase
         if (!_editingId.HasValue) return;
 
         int id = _editingId.Value;
-        int? requestCategoryId = SelectedCategory?.Id ?? CategoryId;
 
         var request = new UpdateCashBoxRequest(
             BoxName.Trim(),
-            requestCategoryId,
+            CategoryId: null,
             BranchId,
             AssignedUserId,
             CurrencyId,
@@ -338,7 +276,6 @@ public class CashBoxEditorViewModel : ViewModelBase
         _editingId = null;
         IsEditMode = false;
         ErrorMessage = null;
-        Categories.Clear();
         base.Cleanup();
     }
 

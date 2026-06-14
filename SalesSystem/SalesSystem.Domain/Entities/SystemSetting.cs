@@ -3,7 +3,7 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SystemSetting : BaseEntity
+public class SystemSetting : AuditableEntity
 {
     public string SettingKey { get; private set; } = string.Empty;
     public string SettingValue { get; private set; } = string.Empty;
@@ -11,6 +11,7 @@ public class SystemSetting : BaseEntity
     public string Category { get; private set; } = string.Empty;
     public string DisplayName { get; private set; } = string.Empty;
     public string? Description { get; private set; }
+    public string? Note { get; private set; }
     public int? UpdatedBy { get; private set; }
 
     private SystemSetting() : base() { } // EF Core - calls base constructor to init CreatedAt
@@ -21,7 +22,8 @@ public class SystemSetting : BaseEntity
         string dataType = "string",
         string category = "General",
         string displayName = "",
-        string? description = null)
+        string? description = null,
+        string? note = null)
     {
         if (string.IsNullOrWhiteSpace(settingKey))
             throw new DomainException("مفتاح الإعداد مطلوب.");
@@ -40,14 +42,16 @@ public class SystemSetting : BaseEntity
             Category = category,
             DisplayName = displayName,
             Description = description,
+            Note = note,
             UpdatedAt = DateTime.UtcNow
         };
     }
 
-    public void UpdateValue(string newValue, int? updatedBy = null)
+    public void UpdateValue(string newValue, int? updatedBy = null, string? note = null)
     {
         SettingValue = newValue;
         UpdatedBy = updatedBy;
+        Note = note;
         UpdatedAt = DateTime.UtcNow;
     }
 }

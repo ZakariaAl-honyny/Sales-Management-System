@@ -25,7 +25,7 @@ public class ProductSelectionItemViewModel
     public string Name => Product.Name;
     public string? Barcode => Product.Barcode;
     public string? CategoryName => Product.CategoryName;
-    public decimal Cost => Product.Cost;
+    public decimal Cost => 0m;
 
     public ProductSelectionItemViewModel(ProductDto product, decimal stock = 0)
     {

@@ -258,673 +258,156 @@ Reports are divided into **7 main categories** based on functional domain:
 ### 4.1 Financial Reports (6 reports)
 
 #### FR-01: Trial Balance (`TrialBalanceDto`)
-```csharp
-public record TrialBalanceLineDto(
-    int AccountId,
-    string AccountCode,
-    string AccountNameAr,
-    string AccountNameEn,
-    byte AccountType,          // 1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense
-    decimal TotalDebit,
-    decimal TotalCredit,
-    decimal Balance,
-    bool IsDebitNormal,
-    int? ParentAccountId,
-    int Level                 // Hierarchy level for grouping
-);
 
-public record TrialBalanceDto(
-    DateTime AsOfDate,
-    string BaseCurrency,
-    decimal TotalDebit,
-    decimal TotalCredit,
-    bool IsBalanced,
-    List<TrialBalanceLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### FR-02: Income Statement (`IncomeStatementReportDto`) — Hierarchical with Sections
-```csharp
-public record IncomeStatementReportDto(
-    string Title,                          // "قائمة الدخل"
-    DateTime FromDate,
-    DateTime ToDate,
-    List<IncomeStatementSectionDto> Sections,
-    decimal TotalRevenues,
-    decimal TotalExpenses,
-    decimal NetProfitOrLoss                // TotalRevenues - TotalExpenses
-);
 
-public record IncomeStatementSectionDto(
-    string SectionName,                    // "الإيرادات" or "المصروفات"
-    string SectionType,                    // "Revenue" or "Expense"
-    List<AccountBalanceDto> Accounts,      // See §4.9 for AccountBalanceDto
-    decimal SectionTotal
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### FR-03: Balance Sheet (`BalanceSheetReportDto`) — Hierarchical with Sections
-```csharp
-public record BalanceSheetReportDto(
-    string Title,                          // "قائمة المركز المالي"
-    DateTime AsOfDate,
-    List<BalanceSheetSectionDto> Sections,
-    decimal TotalAssets,
-    decimal TotalLiabilities,
-    decimal TotalEquity,
-    decimal TotalLiabilitiesAndEquity      // Must equal TotalAssets
-);
 
-public record BalanceSheetSectionDto(
-    string SectionName,                    // "الأصول المتداولة", "الأصول الثابتة", "الخصوم المتداولة", "حقوق الملكية"
-    string SectionType,                    // "CurrentAssets", "FixedAssets", "CurrentLiabilities", "Equity"
-    List<AccountBalanceDto> Accounts,      // See §4.9 for AccountBalanceDto
-    decimal SectionTotal
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### FR-04: Account Statement (`AccountStatementDto`)
-```csharp
-public record AccountStatementLineDto(
-    DateTime Date,
-    string ReferenceNumber,    // Invoice/transaction number
-    string Description,
-    decimal Debit,
-    decimal Credit,
-    decimal RunningBalance
-);
 
-public record AccountStatementDto(
-    int AccountId,
-    string AccountName,
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal OpeningBalance,
-    decimal TotalDebit,
-    decimal TotalCredit,
-    decimal ClosingBalance,
-    List<AccountStatementLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### FR-05: VAT Report (`VatReportDto` — already exists ✅)
-```csharp
-// Already exists at AllDtos.cs:470
-public record VatReportDto(
-    string InvoiceNumber,
-    DateTime InvoiceDate,
-    string? PartyName,
-    decimal TaxableAmount,
-    decimal TaxRate,
-    decimal TaxAmount
-);
-```
+
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 #### FR-06: Journal Entries Report (`JournalEntryReportDto`)
-```csharp
-public record JournalEntryLineReportDto(
-    int JournalEntryId,
-    DateTime EntryDate,
-    string? ReferenceNumber,
-    string? Description,
-    string AccountName,
-    decimal Debit,
-    decimal Credit
-);
 
-public record JournalEntryReportDto(
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal TotalDebit,
-    decimal TotalCredit,
-    List<JournalEntryLineReportDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 ### 4.2 Inventory Reports (5 reports)
 
 #### IR-01: Product Movement (`ProductMovementReportDto` — already exists ✅)
-```csharp
-// Already exists at AllDtos.cs:405
-public record ProductMovementReportDto(
-    DateTime Date,
-    string WarehouseName,
-    string MovementType,
-    string ReferenceNo,
-    decimal QuantityChange,
-    decimal QuantityAfter
-);
-```
+
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 #### IR-02: Remaining Stock (`RemainingStockDto`)
-```csharp
-public record RemainingStockDto(
-    int ProductId,
-    string ProductName,
-    string? CategoryName,
-    string? WarehouseName,
-    decimal CurrentStock,
-    decimal PurchasePrice,
-    decimal TotalValue,
-    DateTime? LastMovementDate
-);
-```
+
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### IR-03: Low Stock Report (`LowStockReportDto` — already exists ✅)
-```csharp
-// Already exists at AllDtos.cs:436
-public record LowStockReportDto(
-    int     ProductId,
-    string  ProductName,
-    string? CategoryName,
-    string  WarehouseName,
-    decimal CurrentRetailQty,
-    decimal ReorderLevelRetailQty,
-    // ...
-);
-```
+
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 #### IR-04: Expired Products (`ExpiredProductDto` — already exists ✅)
-```csharp
-// Already exists at AllDtos.cs:427
-public record ExpiredProductDto(
-    int ProductId,
-    string ProductName,
-    string? CategoryName,
-    string? WarehouseName,
-    decimal CurrentStock,
-    DateTime ExpirationDate,
-    int DaysExpired
-);
-```
+
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 #### IR-05: Category Totals (`CategoryTotalsDto`)
-```csharp
-public record CategoryTotalsLineDto(
-    int? CategoryId,
-    string CategoryName,
-    int ProductCount,
-    decimal TotalStock,
-    decimal TotalStockValue,
-    decimal PercentageOfTotal  // Calculated: (TotalStockValue / GrandTotal) * 100
-);
 
-public record CategoryTotalsDto(
-    decimal GrandTotalStock,
-    decimal GrandTotalValue,
-    List<CategoryTotalsLineDto> Categories
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 ### 4.3 Sales Reports (5 reports)
 
 #### SR-01: Sales Report (`SalesReportDto` — already exists ✅)
-```csharp
-// Already exists at AllDtos.cs:347
-public record SalesReportDto(
-    DateTime InvoiceDate,
-    int Id,
-    string CustomerName,
-    decimal SubTotal,
-    decimal DiscountAmount,
-    decimal TaxAmount,
-    decimal TotalAmount,
-    decimal PaidAmount,
-    decimal DueAmount
-);
-```
+
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 #### SR-02: Customer Account (`CustomerAccountDto`)
-```csharp
-public record CustomerAccountLineDto(
-    DateTime Date,
-    string ReferenceType,      // Invoice, Payment, Return
-    int ReferenceId,
-    decimal Debit,             // Sales + returns increase debit
-    decimal Credit,            // Payments decrease debit
-    decimal RunningBalance
-);
 
-public record CustomerAccountDto(
-    int CustomerId,
-    string CustomerName,
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal OpeningBalance,
-    decimal TotalDebit,
-    decimal TotalCredit,
-    decimal ClosingBalance,
-    decimal CreditLimit,
-    List<CustomerAccountLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### SR-03: Sales Profit (`SalesProfitDto`)
-```csharp
-public record SalesProfitLineDto(
-    DateTime InvoiceDate,
-    int InvoiceNo,
-    string CustomerName,
-    decimal SalesTotal,
-    decimal CostTotal,
-    decimal Profit,
-    decimal ProfitPercentage
-);
 
-public record SalesProfitDto(
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal TotalSales,
-    decimal TotalCost,
-    decimal TotalProfit,
-    decimal AverageProfitPercentage,
-    List<SalesProfitLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### SR-04: Unpaid Sales Invoices (`UnpaidSalesDto`)
-```csharp
-public record UnpaidSalesLineDto(
-    int InvoiceNo,
-    DateTime InvoiceDate,
-    string CustomerName,
-    decimal TotalAmount,
-    decimal PaidAmount,
-    decimal DueAmount,
-    int DaysOverdue
-);
 
-public record UnpaidSalesDto(
-    decimal GrandTotalDue,
-    int TotalUnpaidInvoices,
-    List<UnpaidSalesLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### SR-05: Sales by Product (`SalesByProductDto`)
-```csharp
-public record SalesByProductLineDto(
-    int ProductId,
-    string ProductName,
-    string? CategoryName,
-    decimal TotalQuantity,
-    decimal TotalSales,
-    decimal TotalCost,
-    decimal TotalProfit,
-    int TransactionCount
-);
 
-public record SalesByProductDto(
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal GrandTotalSales,
-    List<SalesByProductLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 ### 4.4 Purchase Reports (4 reports)
 
 #### PR-01: Purchase Report (`PurchaseReportDto` — already exists ✅)
-```csharp
-// Already exists at AllDtos.cs:359
-public record PurchaseReportDto(
-    DateTime InvoiceDate,
-    int Id,
-    string SupplierName,
-    decimal SubTotal,
-    decimal DiscountAmount,
-    decimal TaxAmount,
-    decimal TotalAmount,
-    decimal PaidAmount,
-    decimal DueAmount
-);
-```
+
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 #### PR-02: Supplier Account (`SupplierAccountDto`)
-```csharp
-public record SupplierAccountLineDto(
-    DateTime Date,
-    string ReferenceType,
-    int ReferenceId,
-    decimal Debit,             // Payments decrease credit
-    decimal Credit,            // Purchases increase credit
-    decimal RunningBalance
-);
 
-public record SupplierAccountDto(
-    int SupplierId,
-    string SupplierName,
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal OpeningBalance,
-    decimal TotalDebit,
-    decimal TotalCredit,
-    decimal ClosingBalance,
-    List<SupplierAccountLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### PR-03: Unpaid Purchase Invoices (`UnpaidPurchasesDto`)
-```csharp
-public record UnpaidPurchasesLineDto(
-    int InvoiceNo,
-    DateTime InvoiceDate,
-    string SupplierName,
-    decimal TotalAmount,
-    decimal PaidAmount,
-    decimal DueAmount,
-    int DaysOverdue
-);
 
-public record UnpaidPurchasesDto(
-    decimal GrandTotalDue,
-    int TotalUnpaidInvoices,
-    List<UnpaidPurchasesLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### PR-04: Purchases by Product (`PurchasesByProductDto`)
-```csharp
-public record PurchasesByProductLineDto(
-    int ProductId,
-    string ProductName,
-    string? CategoryName,
-    decimal TotalQuantity,
-    decimal TotalCost,
-    int TransactionCount
-);
 
-public record PurchasesByProductDto(
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal GrandTotalCost,
-    List<PurchasesByProductLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 ### 4.5 Cash Reports (3 reports)
 
 #### CR-01: Cashbox Statement (`CashboxStatementDto`)
-```csharp
-public record CashboxStatementLineDto(
-    DateTime Date,
-    string TransactionType,
-    string? ReferenceNumber,
-    string? Description,
-    decimal Income,
-    decimal Expense,
-    decimal RunningBalance
-);
 
-public record CashboxStatementDto(
-    int CashBoxId,
-    string CashBoxName,
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal OpeningBalance,
-    decimal TotalIncome,
-    decimal TotalExpense,
-    decimal ClosingBalance,
-    List<CashboxStatementLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### CR-02: Cash Movement (`CashMovementDto`)
-```csharp
-public record CashMovementLineDto(
-    DateTime Date,
-    string TransactionType,    // SalesIncome, Expense, TransferOut, etc.
-    decimal Amount,
-    string? ReferenceNumber,
-    string? Description
-);
 
-public record CashMovementDto(
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal TotalInflows,
-    decimal TotalOutflows,
-    decimal NetMovement,
-    List<CashMovementLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### CR-03: Daily Closure (`DailyClosureDto`)
-```csharp
-public record DailyClosureDto(
-    DateTime Date,
-    int CashBoxId,
-    string CashBoxName,
-    decimal OpeningBalance,
-    decimal TotalIncome,
-    decimal TotalExpense,
-    decimal ClosingBalance,
-    decimal ExpectedCash,
-    decimal ActualCash,
-    decimal Variance,
-    bool IsBalanced
-);
-```
+
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 ### 4.6 Transaction Reports (2 reports)
 
 #### TR-01: Daily Operations (`DailyOperationsDto`)
-```csharp
-public record DailyOperationLineDto(
-    DateTime Time,
-    string OperationType,      // بيع, مشتريات, مرتجع بيع, مرتجع مشتريات, سند قبض, سند صرف
-    string ReferenceNumber,
-    string? PartyName,
-    decimal Amount,
-    string UserName
-);
 
-public record DailyOperationsDto(
-    DateTime Date,
-    decimal TotalOperations,
-    int OperationCount,
-    List<DailyOperationLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### TR-02: Payments Report (`PaymentsReportDto`)
-```csharp
-public record PaymentLineDto(
-    DateTime Date,
-    string PaymentType,        // CustomerPayment, SupplierPayment
-    string? ReferenceNumber,
-    string? PartyName,
-    decimal Amount,
-    string? PaymentMethod,
-    string UserName
-);
 
-public record PaymentsReportDto(
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal TotalPayments,
-    List<PaymentLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 ### 4.7 Profit & Analysis Reports (5 reports)
 
 #### AR-01: Product Profit (`ProductProfitDto`)
-```csharp
-public record ProductProfitLineDto(
-    int ProductId,
-    string ProductName,
-    string? CategoryName,
-    decimal TotalSold,
-    decimal TotalCost,
-    decimal TotalRevenue,
-    decimal TotalProfit,
-    decimal ProfitMarginPercentage,
-    int UnitsSold
-);
 
-public record ProductProfitDto(
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal GrandTotalProfit,
-    List<ProductProfitLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### AR-02: Customer Profit (`CustomerProfitDto`)
-```csharp
-public record CustomerProfitLineDto(
-    int CustomerId,
-    string CustomerName,
-    decimal TotalSales,
-    decimal TotalCost,
-    decimal TotalProfit,
-    decimal ProfitMarginPercentage,
-    int TransactionCount
-);
 
-public record CustomerProfitDto(
-    DateTime FromDate,
-    DateTime ToDate,
-    decimal GrandTotalProfit,
-    List<CustomerProfitLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### AR-03: Period Profit (`PeriodProfitDto`)
-```csharp
-public record PeriodProfitLineDto(
-    int Year,
-    int Month,
-    string MonthName,
-    decimal TotalRevenue,
-    decimal TotalCost,
-    decimal TotalExpenses,
-    decimal NetProfit,
-    decimal NetProfitPercentage
-);
 
-public record PeriodProfitDto(
-    int FromYear,
-    int ToYear,
-    decimal GrandTotalProfit,
-    List<PeriodProfitLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### AR-04: Customer Aging (`CustomerAgingDto`)
-```csharp
-public record CustomerAgingLineDto(
-    int CustomerId,
-    string CustomerName,
-    decimal TotalDue,
-    decimal Current,            // 0-30 days
-    decimal Days31_60,          // 31-60 days
-    decimal Days61_90,          // 61-90 days
-    decimal Days91Plus,         // 90+ days
-    decimal WeightedScore       // Higher = riskier
-);
 
-public record CustomerAgingDto(
-    DateTime AsOfDate,
-    decimal GrandTotalDue,
-    decimal TotalCurrent,
-    decimal TotalOverdue,
-    List<CustomerAgingLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### AR-05: Supplier Aging (`SupplierAgingDto`)
-```csharp
-public record SupplierAgingLineDto(
-    int SupplierId,
-    string SupplierName,
-    decimal TotalDue,
-    decimal Current,
-    decimal Days31_60,
-    decimal Days61_90,
-    decimal Days91Plus
-);
 
-public record SupplierAgingDto(
-    DateTime AsOfDate,
-    decimal GrandTotalDue,
-    List<SupplierAgingLineDto> Lines
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 ### 4.8 Additional DTOs for Infrastructure
 
 #### Report Filtering
-```csharp
-public record ReportFilterOptions(
-    DateTime? FromDate,
-    DateTime? ToDate,
-    int? EntityId,
-    string? EntityType,       // Customer, Supplier, Product, Warehouse
-    int? WarehouseId,
-    int? CategoryId,
-    bool IncludeInactive,
-    RowStatus RowStatus       // All (0), ActiveOnly (1), InactiveOnly (2)
-);
 
-public enum RowStatus : byte
-{
-    All = 0,
-    ActiveOnly = 1,
-    InactiveOnly = 2
-}
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO/enum patterns.
 
 #### Column Customization (Sub-Reporting System)
-```csharp
-public record ColumnDefinition(
-    string Key,
-    string DisplayName,        // Arabic column header
-    bool IsVisible,
-    int Order,
-    string DataType,           // "decimal", "string", "date", "int"
-    string Format              // "N2", "dd/MM/yyyy", etc.
-);
 
-public record ReportColumnConfig(
-    string ReportType,         // Unique key for each report
-    List<ColumnDefinition> Columns,
-    string? GroupByColumn,     // Column key for grouping
-    string? SortByColumn,      // Column key for default sort
-    bool SortDescending
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 #### Export Base
-```csharp
-public abstract class BaseReportDto
-{
-    public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
-    public string GeneratedBy { get; set; } = string.Empty;
-    public string BaseCurrency { get; set; } = "SAR";
-}
 
-// Each report DTO has an implicit ReportTitle property
-// mapped via convention: "تقرير {ArabicName}"
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for base class patterns.
 
 ### 4.9 Shared Hierarchy DTOs — AccountBalanceDto with Children
 
 `AccountBalanceDto` is the **universal hierarchy node** used by both Income Statement and Balance Sheet. Each node carries its own balance plus a `Children` list for drill-down by account tree level.
 
-```csharp
-public record AccountBalanceDto(
-    int AccountId,
-    string AccountCode,
-    string AccountName,
-    int Level,                           // 1=Heading, 2=Group, 3=Account, 4=Sub-Account
-    decimal Debit,
-    decimal Credit,
-    decimal Balance,                     // Debit - Credit (direction depends on account type)
-    List<AccountBalanceDto> Children     // Nested children for expand/collapse in UI
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions and `docs/AGENTS.md` for DTO patterns.
 
 **Data flow — Report Service builds the hierarchy in C#:**
 
@@ -1107,32 +590,7 @@ All report service methods return `Result<T>` or `Result<IEnumerable<T>>` (RULE-
 
 **Decision**: Create a unified `IReportExportService` that handles both Excel and PDF for any report type.
 
-```csharp
-public interface IReportExportService
-{
-    // Generic export: accepts any tabular data with column metadata
-    Task<Result> ExportToExcelAsync<T>(
-        string reportTitle,
-        List<T> data,
-        List<ColumnDefinition> columns,
-        Stream outputStream,
-        CancellationToken ct = default);
-
-    Task<Result> ExportToPdfAsync<T>(
-        string reportTitle,
-        List<T> data,
-        List<ColumnDefinition> columns,
-        Stream outputStream,
-        CancellationToken ct = default);
-
-    // Preview: returns HTML for WebView
-    Task<Result<string>> GetPreviewHtmlAsync<T>(
-        string reportTitle,
-        List<T> data,
-        List<ColumnDefinition> columns,
-        CancellationToken ct = default);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Why generic**: Avoids creating 20 separate export methods — one generic method handles all report types via reflection + column definitions.
 
@@ -1179,12 +637,7 @@ All reports share a **common filter control** at the top of each report screen:
 
 **Decision**: Create a single `ReportPreviewWindow` (WPF) that displays report data in a DataGrid with export buttons.
 
-```csharp
-// ReportPreviewWindow.xaml hosts:
-// - DataGrid bound to report results
-// - Toolbar: Export to Excel, Export to PDF, Print, Column Settings
-// - Filter bar at top (collapsible)
-```
+> See `docs/AGENTS.md` for WPF MVVM patterns (ViewModelBase, ExecuteAsync, IDialogService).
 
 Opened via `ScreenWindowService.OpenScreen()` (RULE-160) — non-modal.
 
@@ -1246,23 +699,8 @@ All tasks include:
 | `Application/Services/ReportColumnService.cs` | Persist column config in `ReportColumnConfig` table |
 
 **Generic export method signature**:
-```csharp
-public async Task<Result> ExportToExcelAsync<T>(
-    string reportTitle,
-    List<T> data,
-    List<ColumnDefinition> columns,
-    Stream outputStream,
-    CancellationToken ct)
-{
-    using var workbook = new XLWorkbook();
-    var ws = workbook.Worksheets.Add(reportTitle);
-    // Map ColumnDefinition headers + data via reflection
-    // Apply formatting (N2 for money, N3 for quantity, dd/MM/yyyy for dates)
-    // Auto-fit columns
-    workbook.SaveAs(outputStream);
-    return Result.Success();
-}
-```
+
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Estimate**: ~4 hours
 
@@ -1290,36 +728,12 @@ public async Task<Result> ExportToExcelAsync<T>(
 | `Desktop/ViewModels/Reports/ExpiredProductsReportViewModel.cs` | Enhance with filtering |
 
 **RemainingStock query**:
-```sql
-SELECT 
-    p.Id AS ProductId, p.Name AS ProductName,
-    c.Name AS CategoryName, w.Name AS WarehouseName,
-    ws.Quantity AS CurrentStock,
-    p.PurchasePrice,
-    (ws.Quantity * p.PurchasePrice) AS TotalValue,
-    (SELECT MAX(im.CreatedAt) FROM InventoryMovements im WHERE im.ProductId = p.Id) AS LastMovementDate
-FROM WarehouseStocks ws
-JOIN Products p ON ws.ProductId = p.Id
-LEFT JOIN Categories c ON p.CategoryId = c.Id
-JOIN Warehouses w ON ws.WarehouseId = w.Id
-WHERE ws.Quantity > 0
-ORDER BY p.Name;
-```
+
+> See `docs/database-schema.md` for the canonical `InventoryTransactions` (formerly `InventoryMovements`) table schema.
 
 **CategoryTotals query**:
-```sql
-SELECT 
-    ISNULL(c.Id, 0) AS CategoryId,
-    ISNULL(c.Name, 'بدون تصنيف') AS CategoryName,
-    COUNT(DISTINCT p.Id) AS ProductCount,
-    SUM(ws.Quantity) AS TotalStock,
-    SUM(ws.Quantity * p.PurchasePrice) AS TotalStockValue
-FROM WarehouseStocks ws
-JOIN Products p ON ws.ProductId = p.Id
-LEFT JOIN Categories c ON p.CategoryId = c.Id
-GROUP BY c.Id, c.Name
-ORDER BY TotalStockValue DESC;
-```
+
+> See `docs/database-schema.md` for the canonical `WarehouseStocks`, `Products`, and `Categories` table schemas.
 
 **Logging** (RULE-035):
 - `Log.Information("Generating remaining stock report — {Count} products found", count)`
@@ -1353,40 +767,12 @@ ORDER BY TotalStockValue DESC;
 | `Desktop/Views/Reports/SalesByProductView.xaml` | New |
 
 **Customer Account query pattern**:
-```sql
--- Opening balance: sum of all invoice dues BEFORE fromDate
--- Then: UNION of sales invoices + payments + returns ordered by date
--- Running balance computed in C# service layer
-SELECT Date, 'فاتورة بيع' AS ReferenceType, Id AS ReferenceId,
-    TotalAmount AS Debit, 0 AS Credit
-FROM SalesInvoices
-WHERE CustomerId = @CustomerId AND InvoiceDate BETWEEN @From AND @To AND Status = 2
 
-UNION ALL
-
-SELECT Date, 'سند قبض' AS ReferenceType, Id,
-    0 AS Debit, Amount AS Credit
-FROM CustomerPayments
-WHERE CustomerId = @CustomerId AND PaymentDate BETWEEN @From AND @To
-
-ORDER BY Date;
-```
+> See `docs/database-schema.md` for the canonical `SalesInvoices` and `CustomerReceipts` (formerly `CustomerPayments`) table schemas.
 
 **Unpaid Sales query**:
-```sql
-SELECT 
-    si.InvoiceNo,
-    si.InvoiceDate,
-    c.Name AS CustomerName,
-    si.TotalAmount,
-    si.PaidAmount,
-    si.DueAmount,
-    DATEDIFF(DAY, si.InvoiceDate, GETUTCDATE()) AS DaysOverdue
-FROM SalesInvoices si
-JOIN Customers c ON si.CustomerId = c.Id
-WHERE si.DueAmount > 0 AND si.Status = 2
-ORDER BY DaysOverdue DESC;
-```
+
+> See `docs/database-schema.md` for the canonical `SalesInvoices` table schema.
 
 **Estimate**: ~10 hours
 
@@ -1430,87 +816,12 @@ ORDER BY DaysOverdue DESC;
 | `Desktop/ViewModels/Reports/AccountStatementViewModel.cs` | Enhance existing |
 
 **Trial Balance query pattern** (against JournalEntryLine):
-```sql
-SELECT 
-    coa.Id AS AccountId,
-    coa.AccountCode,
-    coa.AccountNameAr,
-    coa.AccountType,
-    SUM(jel.Debit) AS TotalDebit,
-    SUM(jel.Credit) AS TotalCredit,
-    CASE WHEN coa.IsDebitNormal 
-        THEN SUM(jel.Debit) - SUM(jel.Credit)
-        ELSE SUM(jel.Credit) - SUM(jel.Debit)
-    END AS Balance,
-    coa.IsDebitNormal,
-    coa.ParentAccountId,
-    coa.Level
-FROM JournalEntryLines jel
-JOIN ChartOfAccounts coa ON jel.AccountId = coa.Id
-JOIN JournalEntries je ON jel.JournalEntryId = je.Id
-WHERE je.EntryDate <= @AsOfDate
-    AND je.Status = 2  -- Posted
-GROUP BY coa.Id, coa.AccountCode, coa.AccountNameAr, 
-         coa.AccountType, coa.IsDebitNormal, 
-         coa.ParentAccountId, coa.Level
-ORDER BY coa.Level, coa.AccountCode;
-```
+
+> See `docs/database-schema.md` for the canonical `JournalEntryLines`, `ChartOfAccounts`, and `JournalEntries` table schemas.
 
 **Income Statement hierarchy logic** (in `FinancialReportService`):
-```csharp
-public async Task<Result<IncomeStatementReportDto>> GetIncomeStatementAsync(
-    DateTime fromDate, DateTime toDate, CancellationToken ct)
-{
-    // Step 1: Fetch all account balances from JournalEntryLine
-    var flatBalances = await _financialRepo.GetAccountBalancesAsync(
-        fromDate, toDate, ct);
-    if (!flatBalances.IsSuccess || flatBalances.Value == null)
-        return Result<IncomeStatementReportDto>.Failure("فشل في تحميل أرصدة الحسابات");
 
-    // Step 2: Filter revenue accounts (AccountType = 4) and expense accounts (AccountType = 5)
-    var revenueAccounts = flatBalances.Value.Where(a => a.AccountType == 4).ToList();
-    var expenseAccounts = flatBalances.Value.Where(a => a.AccountType == 5).ToList();
-
-    // Step 3: Build hierarchy tree (Level 1 → groups → leaf accounts)
-    var revenueTree = BuildAccountTree(revenueAccounts);
-    var expenseTree = BuildAccountTree(expenseAccounts);
-
-    // Step 4: Compute section totals bottom-up
-    var revenueSection = new IncomeStatementSectionDto(
-        "الإيرادات", "Revenue", revenueTree, revenueTree.Sum(n => ComputeNodeTotal(n)));
-    var expenseSection = new IncomeStatementSectionDto(
-        "المصروفات", "Expense", expenseTree, expenseTree.Sum(n => ComputeNodeTotal(n)));
-
-    // Step 5: Compute Net Profit/Loss
-    var netProfitOrLoss = revenueSection.SectionTotal - expenseSection.SectionTotal;
-
-    return Result<IncomeStatementReportDto>.Success(new IncomeStatementReportDto(
-        "قائمة الدخل", fromDate, toDate,
-        new List<IncomeStatementSectionDto> { revenueSection, expenseSection },
-        revenueSection.SectionTotal, expenseSection.SectionTotal, netProfitOrLoss));
-}
-
-// Recursive helper: builds parent–child tree from flat account list
-private List<AccountBalanceDto> BuildAccountTree(List<...> flatAccounts)
-{
-    var lookup = flatAccounts.ToLookup(a => a.ParentAccountId);
-    return BuildLevel(lookup, null);  // null parent = Level 1
-}
-
-private List<AccountBalanceDto> BuildLevel(ILookup<int?, ...> lookup, int? parentId)
-{
-    return lookup[parentId].Select(a => new AccountBalanceDto(
-        a.Id, a.Code, a.Name, a.Level, a.TotalDebit, a.TotalCredit, a.Balance,
-        BuildLevel(lookup, a.Id)  // Recursively attach children
-    )).ToList();
-}
-
-private decimal ComputeNodeTotal(AccountBalanceDto node)
-{
-    var childrenTotal = node.Children.Sum(ComputeNodeTotal);
-    return node.Balance + childrenTotal;
-}
-```
+> See `docs/AGENTS.md` §2.83 (RULE-422 – Hierarchical Income Statement DTO) and §2.5 (Result<T> pattern) for the canonical implementation pattern.
 
 **Balance Sheet hierarchy logic** — same pattern but groups by:
 - AccountType = 1 (Assets) → sections: CurrentAssets, FixedAssets, OtherAssets
@@ -1570,13 +881,8 @@ private decimal ComputeNodeTotal(AccountBalanceDto node)
 | `Desktop` | 3 new VM + View pairs |
 
 **Product Profit formula** (in service):
-```csharp
-// For each sold item:
-var revenue = item.Price * item.Quantity;
-var cost = item.UnitCost * item.Quantity;  // From weighted average cost
-var profit = revenue - cost;
-var margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-```
+
+> See `docs/AGENTS.md` §2.25 (Costing Strategy — RULE-068 to RULE-076) for the canonical cost calculation and weighted average pattern.
 
 **Estimate**: ~6 hours
 
@@ -1662,19 +968,8 @@ var agingLine = new CustomerAgingLineDto
 ```
 
 **ViewModel pattern** (RULE-141):
-```csharp
-public class ReportPreviewViewModel : ViewModelBase, IDisposable
-{
-    public ICommand LoadReportCommand { get; }
-    public ICommand ExportToExcelCommand { get; }
-    public ICommand ExportToPdfCommand { get; }
-    public ICommand PrintCommand { get; }
-    public ICommand ConfigureColumnsCommand { get; }
 
-    // All async commands wrapped in ExecuteAsync()
-    // NO manual try/catch — ExecuteAsync handles errors + IsBusy
-}
-```
+> See `docs/AGENTS.md` §2.36 (ExecuteAsync Pattern — RULE-141 to RULE-146) for the canonical ViewModel pattern. All async commands wrapped in `ExecuteAsync()` — NO manual try/catch.
 
 **ToolTips** (RULE-185-190):
 - Excel button: `"تصدير التقرير إلى ملف Excel"`
@@ -1698,64 +993,8 @@ public class ReportPreviewViewModel : ViewModelBase, IDisposable
 | `Desktop/ViewModels/Reports/ReportPreviewViewModel.cs` | Wire ExportToExcelCommand to call export service |
 
 **Excel generation pattern**:
-```csharp
-public async Task<Result> ExportToExcelAsync<T>(
-    string reportTitle, List<T> data, List<ColumnDefinition> columns,
-    Stream outputStream, CancellationToken ct)
-{
-    using var workbook = new XLWorkbook();
-    var ws = workbook.Worksheets.Add(reportTitle.Length > 31 ? reportTitle[..31] : reportTitle);
 
-    // Row 1: Title (merged, bold, 14pt)
-    ws.Cell(1, 1).Value = reportTitle;
-    ws.Range(1, 1, 1, columns.Count).Merge().Style.Font.Bold = true.FontSize = 14;
-
-    // Row 2: Headers from ColumnDefinition
-    for (int i = 0; i < columns.Count; i++)
-    {
-        ws.Cell(2, i + 1).Value = columns[i].DisplayName;
-        ws.Cell(2, i + 1).Style.Font.Bold = true;
-        ws.Cell(2, i + 1).Style.Fill.BackgroundColor = XLColor.LightGray;
-    }
-
-    // Row 3+: Data via reflection
-    var props = typeof(T).GetProperties();
-    int row = 3;
-    foreach (var item in data)
-    {
-        for (int i = 0; i < columns.Count; i++)
-        {
-            var prop = props.FirstOrDefault(p => p.Name == columns[i].Key);
-            if (prop != null)
-            {
-                var value = prop.GetValue(item);
-                var cell = ws.Cell(row, i + 1);
-                
-                if (value is decimal dec)
-                    cell.Value = dec;
-                else if (value is DateTime dt)
-                    cell.Value = dt;
-                else
-                    cell.Value = value?.ToString() ?? "";
-
-                // Apply format
-                if (!string.IsNullOrEmpty(columns[i].Format))
-                    cell.Style.NumberFormat.Format = columns[i].Format;
-            }
-        }
-        row++;
-    }
-
-    // Totals row
-    ws.Range(row, 1, row, columns.Count).Style.Font.Bold = true;
-
-    // Auto-fit
-    ws.Columns().AdjustToContents();
-
-    workbook.SaveAs(outputStream);
-    return Result.Success();
-}
-```
+> See ClosedXML documentation for `XLWorkbook` usage and `docs/AGENTS.md` §2.5 for the Result<T> pattern. The generic reflection-based column mapping follows the ColumnDefinition pattern.
 
 **Estimate**: ~3 hours
 
@@ -1871,23 +1110,8 @@ Document.Create(container =>
 ```
 
 **Each report ViewModel** includes its own filter properties:
-```csharp
-public class SalesProfitViewModel : ViewModelBase
-{
-    // Filter properties
-    public DateTime FromDate { get; set; } = DateTime.Today.AddMonths(-1);
-    public DateTime ToDate { get; set; } = DateTime.Today;
-    public int? CustomerId { get; set; }
-    public int? WarehouseId { get; set; }
-    
-    // Filter collections
-    public ObservableCollection<CustomerDto> Customers { get; set; }
-    public ObservableCollection<WarehouseDto> Warehouses { get; set; }
-    
-    // Generate command
-    public ICommand GenerateReportCommand { get; }
-}
-```
+
+> See `docs/AGENTS.md` §2.36 (ExecuteAsync Pattern) and existing ViewModel patterns in `Desktop/ViewModels/` for the canonical filter + command implementation pattern.
 
 **Estimate**: ~4 hours (shared across all report screens)
 

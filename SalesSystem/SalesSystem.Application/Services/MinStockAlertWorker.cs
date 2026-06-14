@@ -114,8 +114,11 @@ public sealed class MinStockAlertWorker : BackgroundService
 
         // Query all WarehouseStocks where quantity is at or below reorder level
         // Include Product and Warehouse navigations for detailed logging
+        // ReorderLevel was removed from WarehouseStock in Phase 25.
+        // Use a default low-stock threshold (e.g., <= 0) or read from SystemSetting.
+        // For now, alert on any stock at or below zero quantity.
         var lowStockItems = await uow.WarehouseStocks.ToListAsync(
-            ws => ws.Quantity <= ws.ReorderLevel && ws.IsActive,
+            ws => ws.Quantity <= 0,
             queryConfig: q => q.OrderBy(ws => ws.ProductId).ThenBy(ws => ws.WarehouseId),
             ct: ct,
             includePaths: new[] { "Product", "Warehouse" });
@@ -134,15 +137,14 @@ public sealed class MinStockAlertWorker : BackgroundService
         {
             var productName = item.Product?.Name ?? $"(Id={item.ProductId})";
             var warehouseName = item.Warehouse?.Name ?? $"(Id={item.WarehouseId})";
-            var reorderLevel = item.ReorderLevel;
 
             _logger.LogWarning(
                 "Low stock alert: Product \"{ProductName}\" (ID {ProductId}) " +
                 "in Warehouse \"{WarehouseName}\" (ID {WarehouseId}) — " +
-                "Current Qty: {Quantity:N3}, Reorder Level: {ReorderLevel:N3}",
+                "Current Qty: {Quantity:N3} (at or below zero)",
                 productName, item.ProductId,
                 warehouseName, item.WarehouseId,
-                item.Quantity, reorderLevel);
+                item.Quantity);
         }
 
         // Also log a summary with total counts

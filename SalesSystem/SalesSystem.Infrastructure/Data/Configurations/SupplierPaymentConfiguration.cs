@@ -50,8 +50,9 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
             .HasMaxLength(500)
             .IsRequired(false);
 
-        builder.Property(x => x.IsActive)
-            .HasDefaultValue(true);
+        builder.Property(x => x.Status)
+            .HasConversion<int>()
+            .IsRequired();
 
         builder.HasOne(x => x.Supplier)
             .WithMany()
@@ -73,22 +74,10 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
             .HasForeignKey(x => x.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Cheque is owned by the payment (1:1)
-        builder.HasOne(x => x.Cheque)
-            .WithOne(x => x.SupplierPayment)
-            .HasForeignKey<Cheque>(x => x.SupplierPaymentId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // Allocations
-        builder.HasMany(x => x.Allocations)
-            .WithOne(x => x.SupplierPayment)
-            .HasForeignKey(x => x.SupplierPaymentId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasIndex(x => x.PaymentNo)
             .IsUnique()
             .HasDatabaseName("IX_SupplierPayments_PaymentNo");
 
-        builder.HasQueryFilter(x => x.IsActive);
+        builder.HasQueryFilter(x => x.Status != SalesSystem.Domain.Enums.InvoiceStatus.Cancelled);
     }
 }

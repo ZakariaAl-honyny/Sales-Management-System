@@ -188,45 +188,53 @@ public record PurchaseTrendDto(
 // ═══════════════════════════════════════════════════════
 
 /// <summary>
-/// Cash box summary.
+/// Cash box summary — per-box balance snapshot used by CashBoxSummaryViewModel.
 /// </summary>
 public record CashBoxSummaryDto(
     int CashBoxId,
     string CashBoxName,
-    decimal OpeningBalance,
     decimal TotalIncome,
     decimal TotalExpense,
-    decimal ClosingBalance);
+    decimal NetBalance);
 
 /// <summary>
-/// Daily closure report.
+/// Daily closure report line — used by DailyClosureReportView DataGrid.
+/// Mapped from CashBoxSummaryDto at runtime since DailyClosure entity is deferred to V2.
 /// </summary>
 public record DailyClosureReportDto(
-    int CashBoxId,
+    DateTime Date,
     string CashBoxName,
-    DateTime ClosureDate,
-    decimal OpeningBalance,
     decimal TotalIncome,
     decimal TotalExpense,
-    decimal ExpectedClosingBalance,
-    decimal ActualCashCount,
-    decimal Difference,
-    bool IsReconciled,
-    string? Notes);
+    decimal NetBalance,
+    bool IsReconciled);
 
 /// <summary>
-/// Cash transaction detail.
+/// Receipt voucher report line.
 /// </summary>
-public record CashTransactionDetailDto(
-    int CashBoxId,
+public record ReceiptVoucherReportDto(
+    int Id,
+    int VoucherNo,
+    DateTime VoucherDate,
     string CashBoxName,
-    DateTime TransactionDate,
-    string TypeDisplay,
+    string AccountName,
+    decimal TotalAmount,
     string? Notes,
-    decimal Amount,
-    decimal RunningBalance,
-    string? ReferenceType,
-    int? ReferenceId);
+    string StatusDisplay);
+
+/// <summary>
+/// Payment voucher report line.
+/// </summary>
+public record PaymentVoucherReportDto(
+    int Id,
+    int VoucherNo,
+    DateTime VoucherDate,
+    string CashBoxName,
+    string AccountName,
+    decimal TotalAmount,
+    string? Notes,
+    string? SourceDocumentType,
+    string StatusDisplay);
 
 // ═══════════════════════════════════════════════════════
 // Phase 31 — User Activity & Login Reports

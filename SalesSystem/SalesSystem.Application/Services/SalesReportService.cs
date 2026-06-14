@@ -30,11 +30,11 @@ public class SalesReportService : ISalesReportService
 
             var invoices = await _uow.SalesInvoices.ToListAsync(
                 si => si.Status == InvoiceStatus.Posted && si.InvoiceDate >= from && si.InvoiceDate <= to,
-                q => q.Include(si => si.Customer),
+                q => q.Include(si => si.Customer).ThenInclude(c => c!.Party),
                 ct);
 
             var grouped = invoices
-                .GroupBy(si => new { si.CustomerId, CustomerName = si.Customer != null ? si.Customer.Name : "عميل نقدي" })
+                .GroupBy(si => new { si.CustomerId, CustomerName = si.Customer?.Party?.Name ?? "عميل نقدي" })
                 .Select(g => new SalesByCustomerDto(
                     g.Key.CustomerId ?? 0,
                     g.Key.CustomerName,
@@ -65,10 +65,10 @@ public class SalesReportService : ISalesReportService
             _logger.LogInformation("Getting sales by product from {From} to {To}", from, to);
 
             var invoiceItems = await _uow.SalesInvoiceItems.ToListAsync(
-                item => item.SalesInvoice.Status == InvoiceStatus.Posted
-                     && item.SalesInvoice.InvoiceDate >= from
-                     && item.SalesInvoice.InvoiceDate <= to,
-                q => q.Include(item => item.SalesInvoice).Include(item => item.Product),
+                item => item.SalesInvoice!.Status == InvoiceStatus.Posted
+                     && item.SalesInvoice!.InvoiceDate >= from
+                     && item.SalesInvoice!.InvoiceDate <= to,
+                q => q.Include(item => item.SalesInvoice!).Include(item => item.Product),
                 ct);
 
             var grouped = invoiceItems
@@ -114,17 +114,17 @@ public class SalesReportService : ISalesReportService
             _logger.LogInformation("Getting sales by category from {From} to {To}", from, to);
 
             var invoiceItems = await _uow.SalesInvoiceItems.ToListAsync(
-                item => item.SalesInvoice.Status == InvoiceStatus.Posted
-                     && item.SalesInvoice.InvoiceDate >= from
-                     && item.SalesInvoice.InvoiceDate <= to,
-                q => q.Include(item => item.SalesInvoice)
+                item => item.SalesInvoice!.Status == InvoiceStatus.Posted
+                     && item.SalesInvoice!.InvoiceDate >= from
+                     && item.SalesInvoice!.InvoiceDate <= to,
+                q => q.Include(item => item.SalesInvoice!)
                       .Include(item => item.Product)
-                      .ThenInclude(p => p!.Category),
+                      .ThenInclude(p => p!.ProductCategory),
                 ct);
 
             var grouped = invoiceItems
-                .Where(item => item.Product?.Category != null)
-                .GroupBy(item => new { item.Product!.Category!.Id, item.Product.Category.Name })
+                .Where(item => item.Product?.ProductCategory != null)
+                .GroupBy(item => new { item.Product!.ProductCategory!.Id, item.Product.ProductCategory.Name })
                 .Select(g => new SalesByCategoryDto(
                     g.Key.Id,
                     g.Key.Name,
@@ -135,7 +135,7 @@ public class SalesReportService : ISalesReportService
                 .ToList();
 
             // Include uncategorized items
-            var uncategorizedItems = invoiceItems.Where(item => item.Product?.Category == null).ToList();
+            var uncategorizedItems = invoiceItems.Where(item => item.Product?.ProductCategory == null).ToList();
             if (uncategorizedItems.Count > 0)
             {
                 grouped.Add(new SalesByCategoryDto(

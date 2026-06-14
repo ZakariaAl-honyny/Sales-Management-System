@@ -1,5 +1,18 @@
 namespace SalesSystem.Contracts.Requests;
 
+public record UpdateCompanySettingsRequest(
+    string CompanyName,
+    short DefaultCurrencyId,
+    string? Phone = null,
+    string? Email = null,
+    string? Address = null,
+    string? TaxNumber = null,
+    string? LogoPath = null);
+
+public record UpdateDocumentSequenceRequest(
+    int Id,
+    int NextNumber);
+
 public record RestoreBackupRequest(string FileName);
 
 public record ReportFilterRequest(
@@ -24,12 +37,6 @@ public record UpdateSettingsRequest(
 public record UpdateCostingMethodRequest(
     int Method);
 
-public record CreateStockWriteOffRequest(
-    int ProductId,
-    int WarehouseId,
-    decimal Quantity,
-    string Reason,
-    int? UnitId = null);
 
 public record UpdatePrintSettingsRequest(
     string ThermalPrinterName,

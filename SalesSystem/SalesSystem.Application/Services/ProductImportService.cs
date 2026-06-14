@@ -128,12 +128,12 @@ public class ProductImportService : IProductImportService
                     if (!string.IsNullOrWhiteSpace(row.CategoryName))
                     {
                         var categoryName = row.CategoryName.Trim();
-                        var category = await _uow.Categories.FirstOrDefaultAsync(
+                        var category = await _uow.ProductCategories.FirstOrDefaultAsync(
                             c => c.Name == categoryName, ct);
                         if (category == null)
                         {
-                            category = Category.Create(categoryName, createdByUserId: userId);
-                            await _uow.Categories.AddAsync(category, ct);
+                            category = ProductCategory.Create(categoryName, createdByUserId: userId);
+                            await _uow.ProductCategories.AddAsync(category, ct);
                             await _uow.SaveChangesAsync(ct);
                             categoryId = category.Id;
                         }
@@ -146,12 +146,11 @@ public class ProductImportService : IProductImportService
                     // Create the product entity
                     var product = Product.Create(
                         name: row.ProductName!.Trim(),
-                        categoryId: categoryId,
-                        minStockLevel: row.MinStockLevel ?? 0,
-                        reorderLevel: 0,
-                        hasExpiry: false,
-                        barcode: row.Barcode?.Trim(),
+                        categoryId: categoryId ?? 0,
                         description: row.Description?.Trim(),
+                        barcode: row.Barcode?.Trim(),
+                        reorderLevel: row.MinStockLevel ?? 0,
+                        trackExpiry: false,
                         createdByUserId: userId
                     );
                     await _uow.Products.AddAsync(product, ct);

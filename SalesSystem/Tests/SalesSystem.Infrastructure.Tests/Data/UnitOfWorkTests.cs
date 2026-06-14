@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Infrastructure.Data;
 
 namespace SalesSystem.Infrastructure.Tests.Data;
@@ -14,6 +15,17 @@ public class UnitOfWorkTests
             .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning))
             .Options;
         return new SalesDbContext(options);
+    }
+
+    private async Task<int> CreatePartyAndCustomer(SalesDbContext context, string name, int accountId = 1)
+    {
+        var party = Party.Create(name, PartyType.Customer, accountId);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
+        context.Customers.Add(customer);
+        await context.SaveChangesAsync();
+        return customer.Id;
     }
 
     [Fact]
@@ -95,7 +107,10 @@ public class UnitOfWorkTests
         await using var context = CreateContext("UowDb6");
         var unitOfWork = new UnitOfWork(context);
 
-        var customer = Customer.Create(name: "Test Customer");
+        var party = Party.Create("Test Customer", PartyType.Customer, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
         await unitOfWork.Customers.AddAsync(customer);
 
         // Act
@@ -133,14 +148,17 @@ public class UnitOfWorkTests
         // Act
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var customer = Customer.Create(name: "Test Customer");
+        var party = Party.Create("Test Customer", PartyType.Customer, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.SaveChangesAsync();
         
         await transaction.CommitAsync();
 
         // Assert
-        var savedCustomer = await context.Customers.FirstOrDefaultAsync(c => c.Name == "Test Customer");
+        var savedCustomer = await context.Customers.Include(c => c.Party).FirstOrDefaultAsync(c => c.Party.Name == "Test Customer");
         savedCustomer.Should().NotBeNull();
     }
 
@@ -154,14 +172,17 @@ public class UnitOfWorkTests
         // Act
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var customer = Customer.Create(name: "Rollback Customer");
+        var party = Party.Create("Rollback Customer", PartyType.Customer, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.SaveChangesAsync();
         
         await transaction.RollbackAsync();
 
         // Assert - should not be in database after rollback (NOT SUPPORTED BY INMEMORY)
-        var savedCustomer = await context.Customers.FirstOrDefaultAsync(c => c.Name == "Rollback Customer");
+        var savedCustomer = await context.Customers.Include(c => c.Party).FirstOrDefaultAsync(c => c.Party.Name == "Rollback Customer");
         savedCustomer.Should().BeNull();
     }
 
@@ -175,7 +196,10 @@ public class UnitOfWorkTests
         // Act - Test that InMemory can save and query data within transaction scope
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var customer = Customer.Create(name: "Queryable Customer");
+        var party = Party.Create("Queryable Customer", PartyType.Customer, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.SaveChangesAsync();
         
@@ -183,9 +207,9 @@ public class UnitOfWorkTests
         await transaction.CommitAsync();
 
         // Assert - Verify data is queryable after transaction
-        var savedCustomer = await context.Customers.FirstOrDefaultAsync(c => c.Name == "Queryable Customer");
+        var savedCustomer = await context.Customers.Include(c => c.Party).FirstOrDefaultAsync(c => c.Party.Name == "Queryable Customer");
         savedCustomer.Should().NotBeNull();
-        savedCustomer!.Name.Should().Be("Queryable Customer");
+        savedCustomer!.Party.Name.Should().Be("Queryable Customer");
     }
 
     [Fact]
@@ -196,8 +220,11 @@ public class UnitOfWorkTests
         var unitOfWork = new UnitOfWork(context);
 
         // Act - use multiple repositories in same unit of work
-        var customer = Customer.Create(name: "Customer");
-        var warehouse = Warehouse.Create(name: "Warehouse");
+        var party = Party.Create("Customer", PartyType.Customer, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
+        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse", code: "WH-01");
         
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.Warehouses.AddAsync(warehouse);
@@ -222,7 +249,6 @@ public class UnitOfWorkTests
         // Act & Assert - All repositories should be accessible
         unitOfWork.Users.Should().NotBeNull();
         unitOfWork.Units.Should().NotBeNull();
-        unitOfWork.Categories.Should().NotBeNull();
         unitOfWork.Products.Should().NotBeNull();
         unitOfWork.Warehouses.Should().NotBeNull();
         unitOfWork.Suppliers.Should().NotBeNull();
@@ -231,13 +257,12 @@ public class UnitOfWorkTests
         unitOfWork.PurchaseInvoices.Should().NotBeNull();
         unitOfWork.SalesReturns.Should().NotBeNull();
         unitOfWork.PurchaseReturns.Should().NotBeNull();
-        unitOfWork.StockTransfers.Should().NotBeNull();
-        unitOfWork.CustomerPayments.Should().NotBeNull();
+        unitOfWork.WarehouseTransfers.Should().NotBeNull();
+        unitOfWork.InventoryTransactions.Should().NotBeNull();
         unitOfWork.SupplierPayments.Should().NotBeNull();
         unitOfWork.WarehouseStocks.Should().NotBeNull();
-        unitOfWork.InventoryMovements.Should().NotBeNull();
         unitOfWork.DocumentSequences.Should().NotBeNull();
-        unitOfWork.StoreSettings.Should().NotBeNull();
+        /* StoreSettings removed */
     }
 
     [Fact(Skip = "InMemory database does not support transaction rollback - data persists even after RollbackAsync(). This test requires a real SQL Server database to verify rollback behavior. The alternative test 'Transaction_MultipleEntities_CommitSavesAllData' verifies atomic operations work correctly.")]
@@ -250,10 +275,18 @@ public class UnitOfWorkTests
         // Simulate an operation that should fail mid-way
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var customer1 = Customer.Create(name: "Customer 1");
-        var customer2 = Customer.Create(name: "Customer 2");
+        var party1 = Party.Create("Customer 1", PartyType.Customer, 1);
+        context.Parties.Add(party1);
+        await context.SaveChangesAsync();
+        var customer1 = Customer.Create(party1.Id);
+        
+        var party2 = Party.Create("Customer 2", PartyType.Customer, 1);
+        context.Parties.Add(party2);
+        await context.SaveChangesAsync();
+        var customer2 = Customer.Create(party2.Id);
         
         await unitOfWork.Customers.AddAsync(customer1);
+        await unitOfWork.Customers.AddAsync(customer2);
         await unitOfWork.SaveChangesAsync();
         
         // This would be a simulated failure - we rollback (NOT SUPPORTED BY INMEMORY)
@@ -274,8 +307,11 @@ public class UnitOfWorkTests
         // Act - Test multiple operations that commit successfully
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var customer = Customer.Create(name: "Multi Entity Customer");
-        var warehouse = Warehouse.Create(name: "Multi Entity Warehouse");
+        var party = Party.Create("Multi Entity Customer", PartyType.Customer, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
+        var warehouse = Warehouse.Create(branchId: 1, name: "Multi Entity Warehouse", code: "WH-ME");
         
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.Warehouses.AddAsync(warehouse);
@@ -284,7 +320,7 @@ public class UnitOfWorkTests
         await transaction.CommitAsync();
 
         // Assert - All entities should be persisted
-        var customerCount = await context.Customers.CountAsync(c => c.Name == "Multi Entity Customer");
+        var customerCount = await context.Customers.Include(c => c.Party).CountAsync(c => c.Party.Name == "Multi Entity Customer");
         var warehouseCount = await context.Warehouses.CountAsync(w => w.Name == "Multi Entity Warehouse");
         
         customerCount.Should().Be(1);

@@ -19,11 +19,10 @@ public abstract class ControllerTestBase
     protected Mock<IProductService> ProductServiceMock { get; }
     protected Mock<ICustomerService> CustomerServiceMock { get; }
     protected Mock<ISupplierService> SupplierServiceMock { get; }
-    protected Mock<ICategoryService> CategoryServiceMock { get; }
     protected Mock<IUnitService> UnitServiceMock { get; }
     protected Mock<IWarehouseService> WarehouseServiceMock { get; }
     protected Mock<IInventoryService> InventoryServiceMock { get; }
-    protected Mock<IPaymentService> PaymentServiceMock { get; }
+    protected Mock<ISupplierPaymentService> PaymentServiceMock { get; }
     protected Mock<IReportService> ReportServiceMock { get; }
     protected Mock<IStoreSettingsService> StoreSettingsServiceMock { get; }
     protected Mock<IBackupService> BackupServiceMock { get; }
@@ -42,11 +41,10 @@ public abstract class ControllerTestBase
         ProductServiceMock = new Mock<IProductService>();
         CustomerServiceMock = new Mock<ICustomerService>();
         SupplierServiceMock = new Mock<ISupplierService>();
-        CategoryServiceMock = new Mock<ICategoryService>();
         UnitServiceMock = new Mock<IUnitService>();
         WarehouseServiceMock = new Mock<IWarehouseService>();
         InventoryServiceMock = new Mock<IInventoryService>();
-        PaymentServiceMock = new Mock<IPaymentService>();
+        PaymentServiceMock = new Mock<ISupplierPaymentService>();
         ReportServiceMock = new Mock<IReportService>();
         StoreSettingsServiceMock = new Mock<IStoreSettingsService>();
         BackupServiceMock = new Mock<IBackupService>();

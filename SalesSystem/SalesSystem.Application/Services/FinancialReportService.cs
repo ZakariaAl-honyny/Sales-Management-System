@@ -4,7 +4,6 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
@@ -43,7 +42,7 @@ public class FinancialReportService : IFinancialReportService
                 pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
                 ct: ct);
 
-            var totalPurchases = purchaseInvoices.Sum(pi => pi.TotalAmount);
+            var totalPurchases = purchaseInvoices.Sum(pi => pi.NetTotal);
 
             var netProfit = totalSales - totalPurchases;
 
@@ -86,9 +85,6 @@ public class FinancialReportService : IFinancialReportService
                 q => q.Include(je => je.Lines),
                 ct);
 
-            var mappingsList = await _uow.SystemAccountMappings.ToListAsync(null, ct: ct);
-            var mappings = mappingsList.FirstOrDefault();
-
             var accountBalances = new Dictionary<int, (decimal TotalDebit, decimal TotalCredit)>();
             foreach (var entry in entries)
             {
@@ -111,11 +107,14 @@ public class FinancialReportService : IFinancialReportService
             }
 
             var accountIds = accountBalances.Keys.ToList();
+            // Lookup COGS account from key-value system mappings
+            var cogsMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
+                m => m.MappingKey == SystemAccountKey.CostOfGoodsSold, ct);
+            int? cogsAccountId = cogsMapping?.AccountId;
+
             var accounts = await _uow.Accounts.ToListAsync(a => accountIds.Contains(a.Id), ct: ct);
             var revenueAccounts = accounts.Where(a => a.AccountType == AccountType.Revenue).ToList();
             var expenseAccounts = accounts.Where(a => a.AccountType == AccountType.Expense).ToList();
-
-            int? cogsAccountId = mappings?.CogsAccountId;
 
             decimal totalRevenue = 0;
             decimal totalCogs = 0;
@@ -415,9 +414,9 @@ public class FinancialReportService : IFinancialReportService
 
             var priorLines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.AccountId == accountId
-                    && jel.JournalEntry.Status == JournalEntryStatus.Posted
-                    && jel.JournalEntry.TransactionDate < from,
-                q => q.Include(jel => jel.JournalEntry),
+                    && jel.JournalEntry!.Status == JournalEntryStatus.Posted
+                    && jel.JournalEntry!.TransactionDate < from,
+                q => q.Include(jel => jel.JournalEntry!),
                 ct);
 
             var priorDebit = priorLines.Sum(jel => jel.Debit);
@@ -431,12 +430,12 @@ public class FinancialReportService : IFinancialReportService
 
             var periodLines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.AccountId == accountId
-                    && jel.JournalEntry.Status == JournalEntryStatus.Posted
-                    && jel.JournalEntry.TransactionDate >= from
-                    && jel.JournalEntry.TransactionDate <= to,
-                q => q.OrderBy(jel => jel.JournalEntry.TransactionDate)
+                    && jel.JournalEntry!.Status == JournalEntryStatus.Posted
+                    && jel.JournalEntry!.TransactionDate >= from
+                    && jel.JournalEntry!.TransactionDate <= to,
+                q => q.OrderBy(jel => jel.JournalEntry!.TransactionDate)
                       .ThenBy(jel => jel.Id)
-                      .Include(jel => jel.JournalEntry),
+                      .Include(jel => jel.JournalEntry!),
                 ct);
 
             var lines = new List<GeneralLedgerLineDto>();
@@ -450,9 +449,9 @@ public class FinancialReportService : IFinancialReportService
                     runningBalance += line.Credit - line.Debit;
 
                 lines.Add(new GeneralLedgerLineDto(
-                    line.JournalEntry.TransactionDate,
-                    line.JournalEntry.EntryNumber,
-                    line.JournalEntry.Description,
+                    line.JournalEntry!.TransactionDate,
+                    line.JournalEntry!.EntryNumber,
+                    line.JournalEntry!.Description,
                     line.Debit, line.Credit,
                     runningBalance
                 ));
@@ -486,145 +485,9 @@ public class FinancialReportService : IFinancialReportService
     {
         try
         {
-            if (from > to)
-                return Result<CashFlowReportDto>.Failure("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
+            _logger.LogWarning("Cash flow report not available - CashTransaction entity removed. Rewrite using ReceiptVoucher/PaymentVoucher.");
 
-            _logger.LogInformation("Generating cash flow report from {From} to {To} for cash box {CashBoxId}", from, to, cashBoxId);
-
-            var transactions = await _uow.CashTransactions.ToListAsync(
-                tx => tx.CreatedAt >= from
-                   && tx.CreatedAt <= to
-                   && (!cashBoxId.HasValue || tx.CashBoxId == cashBoxId.Value),
-                q => q.OrderBy(tx => tx.CreatedAt),
-                ct: ct);
-
-            decimal openingBalance = 0;
-
-            if (cashBoxId.HasValue)
-            {
-                var lastTxList = await _uow.CashTransactions.ToListAsync(
-                    tx => tx.CashBoxId == cashBoxId.Value && tx.CreatedAt < from,
-                    q => q.OrderByDescending(tx => tx.CreatedAt),
-                    ct: ct);
-                var lastTxBefore = lastTxList.FirstOrDefault();
-
-                if (lastTxBefore != null)
-                {
-                    openingBalance = lastTxBefore.RunningBalance;
-                }
-                else
-                {
-                    var netInPeriod = transactions
-                        .Where(tx => tx.CashBoxId == cashBoxId.Value)
-                        .Sum(tx => tx.Amount);
-                    openingBalance = -netInPeriod;
-                    if (openingBalance < 0)
-                        openingBalance = 0m;
-                }
-            }
-            else
-            {
-                var firstTx = transactions.FirstOrDefault();
-                if (firstTx != null)
-                {
-                    openingBalance = firstTx.RunningBalance - firstTx.Amount;
-                }
-            }
-
-            var incomeItems = new List<CashFlowItemDto>();
-            var expenseItems = new List<CashFlowItemDto>();
-
-            decimal totalIncome = 0;
-            decimal totalExpense = 0;
-
-            var incomeTransactions = transactions
-                .Where(tx => tx.TransactionType == CashTransactionType.SalesIncome
-                          || tx.TransactionType == CashTransactionType.CustomerPayment
-                          || tx.TransactionType == CashTransactionType.TransferIn)
-                .ToList();
-
-            var salesIncome = incomeTransactions
-                .Where(tx => tx.TransactionType == CashTransactionType.SalesIncome)
-                .Sum(tx => Math.Abs(tx.Amount));
-            if (salesIncome > 0)
-            {
-                incomeItems.Add(new CashFlowItemDto("إيرادات مبيعات", salesIncome));
-                totalIncome += salesIncome;
-            }
-
-            var customerPayments = incomeTransactions
-                .Where(tx => tx.TransactionType == CashTransactionType.CustomerPayment)
-                .Sum(tx => Math.Abs(tx.Amount));
-            if (customerPayments > 0)
-            {
-                incomeItems.Add(new CashFlowItemDto("مدفوعات عملاء", customerPayments));
-                totalIncome += customerPayments;
-            }
-
-            var transfersIn = incomeTransactions
-                .Where(tx => tx.TransactionType == CashTransactionType.TransferIn)
-                .Sum(tx => Math.Abs(tx.Amount));
-            if (transfersIn > 0)
-            {
-                incomeItems.Add(new CashFlowItemDto("تحويلات واردة", transfersIn));
-                totalIncome += transfersIn;
-            }
-
-            var expenseTransactions = transactions
-                .Where(tx => tx.TransactionType == CashTransactionType.Expense
-                          || tx.TransactionType == CashTransactionType.SupplierPayment
-                          || tx.TransactionType == CashTransactionType.RefundOut
-                          || tx.TransactionType == CashTransactionType.TransferOut)
-                .ToList();
-
-            var expenses = expenseTransactions
-                .Where(tx => tx.TransactionType == CashTransactionType.Expense)
-                .Sum(tx => Math.Abs(tx.Amount));
-            if (expenses > 0)
-            {
-                expenseItems.Add(new CashFlowItemDto("مصروفات", expenses));
-                totalExpense += expenses;
-            }
-
-            var supplierPayments = expenseTransactions
-                .Where(tx => tx.TransactionType == CashTransactionType.SupplierPayment)
-                .Sum(tx => Math.Abs(tx.Amount));
-            if (supplierPayments > 0)
-            {
-                expenseItems.Add(new CashFlowItemDto("مدفوعات موردين", supplierPayments));
-                totalExpense += supplierPayments;
-            }
-
-            var refundsOut = expenseTransactions
-                .Where(tx => tx.TransactionType == CashTransactionType.RefundOut)
-                .Sum(tx => Math.Abs(tx.Amount));
-            if (refundsOut > 0)
-            {
-                expenseItems.Add(new CashFlowItemDto("مرتجعات مبيعات", refundsOut));
-                totalExpense += refundsOut;
-            }
-
-            var transfersOut = expenseTransactions
-                .Where(tx => tx.TransactionType == CashTransactionType.TransferOut)
-                .Sum(tx => Math.Abs(tx.Amount));
-            if (transfersOut > 0)
-            {
-                expenseItems.Add(new CashFlowItemDto("تحويلات صادرة", transfersOut));
-                totalExpense += transfersOut;
-            }
-
-            var netCashFlow = totalIncome - totalExpense;
-            var closingBalance = openingBalance + netCashFlow;
-
-            var report = new CashFlowReportDto(
-                openingBalance, totalIncome, totalExpense, netCashFlow, closingBalance,
-                incomeItems, expenseItems);
-
-            _logger.LogInformation(
-                "Cash flow report generated: Opening={Opening}, Income={Income}, Expense={Expense}, Closing={Closing}",
-                openingBalance, totalIncome, totalExpense, closingBalance);
-
-            return Result<CashFlowReportDto>.Success(report);
+            return Result<CashFlowReportDto>.Failure("تقرير التدفق النقدي قيد إعادة البناء باستخدام سندات القبض والصرف الجديدة");
         }
         catch (Exception ex)
         {
@@ -653,7 +516,7 @@ public class FinancialReportService : IFinancialReportService
                    && si.InvoiceDate <= to,
                 q => q.OrderBy(si => si.InvoiceDate),
                 ct: ct,
-                includePaths: "Customer");
+                includePaths: "Customer.Party");
 
             foreach (var invoice in salesInvoices)
             {
@@ -664,7 +527,7 @@ public class FinancialReportService : IFinancialReportService
 
                 vatItems.Add(new VatReportDto(
                     invoice.Id.ToString(), invoice.InvoiceDate,
-                    invoice.Customer?.Name, taxableAmount, taxRate, invoice.TaxAmount));
+                    invoice.Customer?.Party?.Name, taxableAmount, taxRate, invoice.TaxAmount));
             }
 
             var purchaseInvoices = await _uow.PurchaseInvoices.ToListAsync(
@@ -674,7 +537,7 @@ public class FinancialReportService : IFinancialReportService
                    && pi.InvoiceDate <= to,
                 q => q.OrderBy(pi => pi.InvoiceDate),
                 ct: ct,
-                includePaths: "Supplier");
+                includePaths: "Supplier.Party");
 
             foreach (var invoice in purchaseInvoices)
             {
@@ -685,7 +548,7 @@ public class FinancialReportService : IFinancialReportService
 
                 vatItems.Add(new VatReportDto(
                     invoice.Id.ToString(), invoice.InvoiceDate,
-                    invoice.Supplier?.Name, taxableAmount, taxRate, invoice.TaxAmount));
+                    invoice.Supplier?.Party?.Name, taxableAmount, taxRate, invoice.TaxAmount));
             }
 
             vatItems = vatItems.OrderBy(v => v.InvoiceDate).ToList();
@@ -725,16 +588,6 @@ public class FinancialReportService : IFinancialReportService
             {
                 entries.Add(new AccountStatementDto(invoice.InvoiceDate, "فاتورة بيع",
                     invoice.Id.ToString(), invoice.TotalAmount, 0, 0));
-            }
-
-            var payments = await _uow.CustomerPayments.ToListAsync(
-                cp => cp.CustomerId == customerId && cp.PaymentDate >= from && cp.PaymentDate <= to,
-                q => q.OrderBy(cp => cp.PaymentDate), ct: ct);
-
-            foreach (var payment in payments)
-            {
-                entries.Add(new AccountStatementDto(payment.PaymentDate, "دفعة عميل",
-                    payment.PaymentNo, 0, payment.Amount, 0));
             }
 
             entries = entries.OrderBy(e => e.Date).ThenByDescending(e => e.Debit > 0 ? 0 : 1).ToList();
@@ -779,7 +632,7 @@ public class FinancialReportService : IFinancialReportService
             foreach (var invoice in invoices)
             {
                 entries.Add(new AccountStatementDto(invoice.InvoiceDate, "فاتورة شراء",
-                    invoice.Id.ToString(), 0, invoice.TotalAmount, 0));
+                    invoice.Id.ToString(), 0, invoice.NetTotal, 0));
             }
 
             var payments = await _uow.SupplierPayments.ToListAsync(

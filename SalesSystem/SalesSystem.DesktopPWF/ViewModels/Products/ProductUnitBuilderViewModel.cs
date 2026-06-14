@@ -58,7 +58,7 @@ public class ProductUnitBuilderViewModel : ViewModelBase
         var baseRow = new ProductUnitRowViewModel
         {
             IsBaseUnit = true,
-            BaseConversionFactor = 1,
+            Factor = 1,
             SortOrder = 0,
             Placeholder_UnitName = "حبة، قطعة، بيضة"
         };

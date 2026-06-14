@@ -229,7 +229,7 @@ public class ReportService : IReportService
                 return new ExpiredProductDto(
                     p.Id,
                     p.Name,
-                    p.Category?.Name,
+                    p.ProductCategory?.Name,
                     null,
                     totalStock,
                     expiryDate,

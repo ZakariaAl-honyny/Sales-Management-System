@@ -165,28 +165,29 @@ public class ProductsControllerTests : ControllerTestBase
 
     private static ProductDto CreateProductDto(int id) => new(
         Id: id,
-        Barcode: null,
         Name: $"منتج {id}",
         CategoryId: 1,
         CategoryName: "تصنيف",
-        MinStock: 10.00m,
+        Barcode: null,
         Description: null,
-        HasExpiry: false,
-        Cost: 50.00m,
+        ReorderLevel: 10.00m,
+        TrackExpiry: false,
+        ImagePath: null,
+        Notes: null,
         IsActive: true);
 
     private static CreateProductRequest CreateValidRequest() => new(
-        Barcode: null!,
         Name: "منتج جديد",
         CategoryId: 1,
-        MinStock: 10.00m,
-        Description: null);
+        Description: null,
+        Barcode: null!,
+        ReorderLevel: 10.00m);
 
     private static UpdateProductRequest UpdateValidRequest() => new(
-        Barcode: null!,
         Name: "منتج محدث",
         CategoryId: 1,
-        MinStock: 15.00m,
         Description: "وصف محدث",
+        Barcode: null!,
+        ReorderLevel: 15.00m,
         IsActive: true);
 }

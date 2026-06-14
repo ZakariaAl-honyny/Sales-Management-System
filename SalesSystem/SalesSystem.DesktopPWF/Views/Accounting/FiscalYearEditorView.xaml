@@ -1,0 +1,78 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Accounting.FiscalYearEditorView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Accounting"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance vm:FiscalYearEditorViewModel, IsDesignTimeCreatable=False}"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="{Binding Title}" Style="{StaticResource HeaderStyle}"/>
+
+        <!-- Form -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="24" Margin="0,16,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Year -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="السنة *" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Year, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="أدخل السنة المالية — مثال: 2026"
+                         Style="{StaticResource ModernTextBox}" Margin="0,0,0,12"/>
+
+                <!-- Start Date -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="تاريخ البداية *" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                <DatePicker Grid.Row="1" Grid.Column="1" SelectedDate="{Binding StartDate}"
+                            ToolTip="تاريخ بداية السنة المالية"
+                            Style="{StaticResource ModernDatePicker}" Margin="0,0,0,12"/>
+
+                <!-- End Date -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="تاريخ النهاية *" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                <DatePicker Grid.Row="2" Grid.Column="1" SelectedDate="{Binding EndDate}"
+                            ToolTip="تاريخ نهاية السنة المالية"
+                            Style="{StaticResource ModernDatePicker}" Margin="0,0,0,12"/>
+
+                <!-- Hint -->
+                <TextBlock Grid.Row="3" Grid.Column="1" 
+                           Text="— الحقول التي تحمل علامة * إلزامية. السنة المالية تحدد الفترة المحاسبية للتقرير."
+                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+            </Grid>
+        </Border>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Style="{StaticResource FooterStyle}" Padding="12,8">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
+                        ToolTip="حفظ السنة المالية">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="💾" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="حفظ" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}"
+                        ToolTip="إلغاء وإغلاق النافذة">
+                    <TextBlock Text="إلغاء" VerticalAlignment="Center"/>
+                </Button>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

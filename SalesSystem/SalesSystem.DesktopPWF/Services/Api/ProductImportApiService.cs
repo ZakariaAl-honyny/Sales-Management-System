@@ -1,5 +1,4 @@
 using System.Net.Http;
-using System.Net.Http;
 using System.Net.Http.Json;
 using SalesSystem.Contracts.DTOs;
 using Serilog;

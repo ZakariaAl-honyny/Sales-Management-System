@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// فواتير المشتريات — إدارة فواتير الشراء مع دعم العملات المتعددة والمرفقات والمصاريف الإضافية.
+/// فواتير المشتريات — إدارة فواتير الشراء مع دعم العملات المتعددة والمرفقات.
 /// </summary>
 [ApiController]
 [Route("api/v1/purchase-invoices")]
@@ -17,16 +17,13 @@ namespace SalesSystem.Api.Controllers;
 public class PurchaseInvoicesController : ControllerBase
 {
     private readonly IPurchaseService _purchaseService;
-    private readonly IAdditionalFeeService _additionalFeeService;
     private readonly ILogger<PurchaseInvoicesController> _logger;
 
     public PurchaseInvoicesController(
         IPurchaseService purchaseService,
-        IAdditionalFeeService additionalFeeService,
         ILogger<PurchaseInvoicesController> logger)
     {
         _purchaseService = purchaseService;
-        _additionalFeeService = additionalFeeService;
         _logger = logger;
     }
 
@@ -153,54 +150,6 @@ public class PurchaseInvoicesController : ControllerBase
     {
         var result = await _purchaseService.DeleteAttachmentAsync(id, ct);
         if (result.IsSuccess) return Ok();
-        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
-        return BadRequest(new { error = result.Error });
-    }
-
-    #endregion
-
-    #region Additional Fees
-
-    /// <summary>الحصول على المصاريف الإضافية لفاتورة الشراء.</summary>
-    [HttpGet("{id:int}/fees")]
-    [ProducesResponseType(typeof(List<AdditionalFeeDto>), 200)]
-    [ProducesResponseType(404)]
-    public async Task<IActionResult> GetFees(int id, CancellationToken ct)
-    {
-        var result = await _additionalFeeService.GetFeesByInvoiceAsync(id, ct);
-        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
-    }
-
-    /// <summary>إضافة مصروف إضافي لفاتورة الشراء.</summary>
-    [HttpPost("{id:int}/fees")]
-    [ProducesResponseType(typeof(AdditionalFeeDto), 201)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
-    public async Task<IActionResult> CreateFee(int id, [FromBody] CreateAdditionalFeeRequest request, CancellationToken ct)
-    {
-        var result = await _additionalFeeService.CreateFeeAsync(request, id, ct);
-        if (result.IsSuccess)
-        {
-            _logger.LogInformation("تم إضافة مصروف إضافي {FeeName} للفاتورة {InvoiceId}", request.FeeName, id);
-            return CreatedAtAction(nameof(GetFees), new { id }, result.Value);
-        }
-        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
-        return BadRequest(new { error = result.Error });
-    }
-
-    /// <summary>إزالة مصروف إضافي من فاتورة الشراء.</summary>
-    [HttpDelete("{id:int}/fees/{feeId:int}")]
-    [ProducesResponseType(200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(404)]
-    public async Task<IActionResult> RemoveFee(int id, int feeId, CancellationToken ct)
-    {
-        var result = await _additionalFeeService.RemoveFeeAsync(feeId, ct);
-        if (result.IsSuccess)
-        {
-            _logger.LogInformation("تم إزالة المصروف الإضافي {FeeId} من الفاتورة {InvoiceId}", feeId, id);
-            return Ok();
-        }
         if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }

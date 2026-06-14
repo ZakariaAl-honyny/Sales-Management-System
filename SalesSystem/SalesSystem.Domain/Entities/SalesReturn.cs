@@ -4,10 +4,11 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SalesReturnItem : BaseEntity
+public class SalesReturnItem : Entity
 {
     public int SalesReturnId { get; private set; }
     public int ProductId { get; private set; }
+    public int? SalesInvoiceLineId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
     public decimal DiscountAmount { get; private set; }
@@ -20,7 +21,7 @@ public class SalesReturnItem : BaseEntity
 
     private SalesReturnItem() { }
 
-    public static SalesReturnItem Create(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, SaleMode mode = SaleMode.Retail, string? notes = null)
+    public static SalesReturnItem Create(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, SaleMode mode = SaleMode.Retail, string? notes = null, int? salesInvoiceLineId = null)
     {
         if (productId <= 0)
             throw new DomainException("المنتج مطلوب.");
@@ -38,7 +39,8 @@ public class SalesReturnItem : BaseEntity
             UnitPrice = unitPrice,
             DiscountAmount = discountAmount,
             Mode = mode,
-            Notes = notes
+            Notes = notes,
+            SalesInvoiceLineId = salesInvoiceLineId
         };
         item.RecalculateLineTotal();
         return item;
@@ -47,17 +49,17 @@ public class SalesReturnItem : BaseEntity
     public void RecalculateLineTotal() => LineTotal = (Quantity * UnitPrice) - DiscountAmount;
 }
 
-public class SalesReturn : BaseEntity
+public class SalesReturn : DocumentEntity
 {
     public string ReturnNo { get; private set; } = string.Empty;
     public int? SalesInvoiceId { get; private set; }
     public int? CustomerId { get; private set; }
-    public int WarehouseId { get; private set; }
+    public short WarehouseId { get; private set; }
     public DateTime ReturnDate { get; private set; }
     public string? Notes { get; private set; }
     public decimal SubTotal { get; private set; }
     public decimal TotalAmount { get; private set; }
-    public int? CurrencyId { get; private set; }
+    public short? CurrencyId { get; private set; }
     public decimal? ExchangeRate { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
@@ -82,12 +84,12 @@ public class SalesReturn : BaseEntity
 
     public static SalesReturn Create(
         string returnNo,
-        int warehouseId,
+        short warehouseId,
         int? customerId,
         int? salesInvoiceId = null,
         DateTime? returnDate = null,
         string? notes = null,
-        int? currencyId = null,
+        short? currencyId = null,
         decimal? exchangeRate = null,
         int? userId = null,
         int? cashBoxId = null,
@@ -120,9 +122,9 @@ public class SalesReturn : BaseEntity
         return sr;
     }
 
-    public void AddItem(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, SaleMode mode = SaleMode.Retail, string? notes = null)
+    public void AddItem(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, SaleMode mode = SaleMode.Retail, string? notes = null, int? salesInvoiceLineId = null)
     {
-        var item = SalesReturnItem.Create(productId, quantity, unitPrice, discountAmount, mode, notes);
+        var item = SalesReturnItem.Create(productId, quantity, unitPrice, discountAmount, mode, notes, salesInvoiceLineId);
         Items.Add(item);
         RecalculateTotals();
     }

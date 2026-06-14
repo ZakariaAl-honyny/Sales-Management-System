@@ -6,6 +6,7 @@ using Moq;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
+using System.Collections.Generic;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services;
@@ -195,7 +196,8 @@ public class LoginViewModelTests
                 loginResponse.Token,
                 loginResponse.UserName,
                 loginResponse.UserId,
-                UserRole.Admin),
+                new List<int> { 1 },
+                "مدير النظام"),
             Times.Once);
     }
 
@@ -369,7 +371,7 @@ public class LoginViewModelTests
             UserId: 1,
             UserName: "admin",
             FullName: "المدير العام",
-            Role: (byte)UserRole.Admin,
+            Role: (byte)1,
             Token: "test-token-123",
             ExpiresAt: DateTime.UtcNow.AddHours(8));
     }

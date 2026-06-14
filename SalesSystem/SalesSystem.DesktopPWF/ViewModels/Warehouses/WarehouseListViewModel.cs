@@ -321,15 +321,15 @@ public class WarehouseListViewModel : ViewModelBase
         ErrorMessage = null;
 
         var request = new UpdateWarehouseRequest(
+            BranchId: (short)1,
+            Code: string.Empty,
             Name: SelectedWarehouse.Name,
             Type: SelectedWarehouse.Type,
             Location: SelectedWarehouse.Location,
             Phone: SelectedWarehouse.Phone,
             Address: SelectedWarehouse.Address,
             ManagerName: SelectedWarehouse.ManagerName,
-            IsDefault: SelectedWarehouse.IsDefault,
-            IsActive: true,
-            Notes: SelectedWarehouse.Notes
+            IsActive: true
         );
 
         var result = await WarehouseService.UpdateAsync(SelectedWarehouse.Id, request);

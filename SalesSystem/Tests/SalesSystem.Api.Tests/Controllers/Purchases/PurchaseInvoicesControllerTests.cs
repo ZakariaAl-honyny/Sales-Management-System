@@ -15,14 +15,12 @@ namespace SalesSystem.Api.Tests.Controllers.Purchases;
 public class PurchaseInvoicesControllerTests : ControllerTestBase
 {
     private readonly PurchaseInvoicesController _controller;
-    private readonly Mock<IAdditionalFeeService> _additionalFeeServiceMock;
     private readonly Mock<ILogger<PurchaseInvoicesController>> _loggerMock;
 
     public PurchaseInvoicesControllerTests()
     {
-        _additionalFeeServiceMock = new Mock<IAdditionalFeeService>();
         _loggerMock = new Mock<ILogger<PurchaseInvoicesController>>();
-        _controller = new PurchaseInvoicesController(PurchaseServiceMock.Object, _additionalFeeServiceMock.Object, _loggerMock.Object);
+        _controller = new PurchaseInvoicesController(PurchaseServiceMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -204,10 +202,9 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         SubTotal: 200.00m,
         DiscountAmount: 10.00m,
         TaxAmount: 28.50m,
-        TotalAmount: 218.50m,
+        NetTotal: 218.50m,
         PaidAmount: 100.00m,
-        DueAmount: 118.50m,
-        SupplierInvoiceNo: null,
+        RemainingAmount: 118.50m,
         Notes: null,
         Status: status,
         TaxId: null,
@@ -215,15 +212,10 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         TaxRate: null,
         CurrencyId: null,
         ExchangeRate: null,
-        CostInBaseCurrency: null,
-        AdditionalFeesTotal: 0m,
         AttachmentPath: null,
-        DiscountType: null,
-        DiscountRate: null,
-        AdditionalFees: null,
         Items: new List<PurchaseInvoiceItemDto>
         {
-            new(id * 10, 1, "منتج اختبار", 1, null, 5.000m, 40.00m, 0.00m, 200.00m, null, null, null, 0m, 1)
+            new(id * 10, 1, "منتج اختبار", 1, null, 5.000m, 40.00m, 200.00m)
         });
 
     private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(
@@ -233,20 +225,14 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         InvoiceDate: null,
         DueDate: null,
         PaymentType: PaymentType.Cash,
-        CashBoxId: null,
         DiscountAmount: 10.00m,
         TaxAmount: 28.50m,
         PaidAmount: 100.00m,
         CurrencyId: null,
         ExchangeRate: null,
-        DiscountType: null,
-        DiscountRate: null,
-        AttachmentBase64: null,
-        AttachmentFileName: null,
         Notes: null,
-        SupplierInvoiceNo: null,
         Items: new List<CreatePurchaseInvoiceItemRequest>
         {
-            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, Mode: SaleMode.Retail, Notes: null)
+            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitCost: 40.00m)
         });
 }

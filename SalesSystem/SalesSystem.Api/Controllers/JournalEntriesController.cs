@@ -257,7 +257,7 @@ public class JournalEntriesController : ControllerBase
     /// </summary>
     /// <param name="request">Fiscal year to close.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>Fiscal year closure details.</returns>
+    /// <returns>Journal entry ID of the closing entry.</returns>
     [HttpPost("close-fiscal-year")]
     [Authorize(Policy = "ManagerAndAbove")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -270,31 +270,8 @@ public class JournalEntriesController : ControllerBase
 
         var result = await _annualClosingService.CloseFiscalYearAsync(request.FiscalYear, userId, ct);
         return result.IsSuccess
-            ? Ok(result.Value)
+            ? Ok(new { journalEntryId = result.Value })
             : BadRequest(new { error = result.Error });
-    }
-
-    /// <summary>
-    /// Gets all fiscal year closures.
-    /// </summary>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>List of fiscal year closures.</returns>
-    [HttpGet("closed-years")]
-    [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAllClosures(CancellationToken ct)
-    {
-        var result = await _annualClosingService.GetAllClosuresAsync(ct);
-        if (result.IsSuccess)
-        {
-            return Ok(result.Value ?? new List<FiscalYearClosureDto>());
-        }
-
-        if (result.ErrorCode == ErrorCodes.NotFound)
-            return NotFound(new { error = result.Error });
-        return BadRequest(new { error = result.Error });
     }
 
     /// <summary>

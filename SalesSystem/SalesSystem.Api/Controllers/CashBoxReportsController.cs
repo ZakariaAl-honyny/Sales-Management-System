@@ -5,8 +5,7 @@ using SalesSystem.Application.Interfaces.Services;
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Controller for cash box-related reports (Phase 31).
-/// All endpoints require Manager or Admin role.
+/// Controller for cash box-related reports.
 /// </summary>
 [ApiController]
 [Route("api/v1/reports/cash-boxes")]
@@ -21,7 +20,7 @@ public class CashBoxReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Gets cash box summary (opening, income, expense, closing) for each cash box.
+    /// Gets cash box summary (balance info per cash box).
     /// </summary>
     [HttpGet("summary")]
     public async Task<IActionResult> GetCashBoxSummary([FromQuery] DateTime? asOfDate, CancellationToken ct)
@@ -31,33 +30,30 @@ public class CashBoxReportsController : ControllerBase
     }
 
     /// <summary>
-    /// Gets daily closure report for cash boxes.
+    /// Gets receipt vouchers for a specific period.
     /// </summary>
-    [HttpGet("daily-closures")]
-    public async Task<IActionResult> GetDailyClosureReport([FromQuery] DateTime from, [FromQuery] DateTime to,
+    [HttpGet("receipt-vouchers")]
+    public async Task<IActionResult> GetReceiptVoucherReport([FromQuery] DateTime from, [FromQuery] DateTime to,
         [FromQuery] int? cashBoxId, CancellationToken ct)
     {
         if (from > to)
             return BadRequest(new { error = "تاريخ البداية يجب أن يكون قبل تاريخ النهاية" });
 
-        var result = await _cashBoxReportService.GetDailyClosureReportAsync(from, to, cashBoxId, ct);
+        var result = await _cashBoxReportService.GetReceiptVoucherReportAsync(from, to, cashBoxId, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>
-    /// Gets transaction details for a specific cash box.
+    /// Gets payment vouchers for a specific period.
     /// </summary>
-    [HttpGet("transaction-detail/{cashBoxId:int:min(1)}")]
-    public async Task<IActionResult> GetCashTransactionDetails(int cashBoxId, [FromQuery] DateTime from, [FromQuery] DateTime to, CancellationToken ct)
+    [HttpGet("payment-vouchers")]
+    public async Task<IActionResult> GetPaymentVoucherReport([FromQuery] DateTime from, [FromQuery] DateTime to,
+        [FromQuery] int? cashBoxId, CancellationToken ct)
     {
         if (from > to)
             return BadRequest(new { error = "تاريخ البداية يجب أن يكون قبل تاريخ النهاية" });
 
-        var result = await _cashBoxReportService.GetCashTransactionDetailsAsync(cashBoxId, from, to, ct);
-        if (!result.IsSuccess)
-        {
-            return result.ErrorCode == "NotFound" ? NotFound(new { error = result.Error }) : BadRequest(new { error = result.Error });
-        }
-        return Ok(result.Value);
+        var result = await _cashBoxReportService.GetPaymentVoucherReportAsync(from, to, cashBoxId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 }

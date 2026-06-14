@@ -65,6 +65,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
@@ -88,6 +89,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .Returns(tcs.Task);
 
@@ -112,6 +114,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(new List<PurchaseInvoiceDto>
             {
@@ -146,6 +149,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
@@ -182,6 +186,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
@@ -459,10 +464,9 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             SubTotal: totalAmount,
             DiscountAmount: 0,
             TaxAmount: 0,
-            TotalAmount: totalAmount,
+            NetTotal: totalAmount,
             PaidAmount: totalAmount,
-            DueAmount: 0,
-            SupplierInvoiceNo: null,
+            RemainingAmount: 0,
             Notes: null,
             Status: status,
             TaxId: null,
@@ -470,12 +474,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
-            CostInBaseCurrency: null,
-            AdditionalFeesTotal: 0m,
             AttachmentPath: null,
-            DiscountType: null,
-            DiscountRate: null,
-            AdditionalFees: null,
             Items: new List<PurchaseInvoiceItemDto>());
     }
 

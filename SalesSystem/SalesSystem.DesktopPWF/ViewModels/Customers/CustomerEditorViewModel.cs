@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
@@ -17,6 +16,7 @@ public class CustomerEditorViewModel : ViewModelBase
     private readonly ICustomerApiService _customerService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IScreenWindowService _screenWindowService;
 
     private int _customerId;
     private string _name = string.Empty;
@@ -25,42 +25,37 @@ public class CustomerEditorViewModel : ViewModelBase
     private string _address = string.Empty;
     private string _taxNumber = string.Empty;
     private decimal _creditLimit;
-    private decimal _openingBalance;
+    private byte? _priceLevel;
     private string _notes = string.Empty;
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
-    private int? _customerGroupId;
-    private int? _accountId;
-    private CustomerGroupDto? _selectedGroup;
-    private ObservableCollection<CustomerGroupDto> _availableGroups = new();
-
 
     public CustomerEditorViewModel()
-        : this(App.GetService<ICustomerApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
+        : this(App.GetService<ICustomerApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>(), App.GetService<IScreenWindowService>())
     {
     }
 
-    public CustomerEditorViewModel(ICustomerApiService customerService, IEventBus eventBus, IDialogService dialogService)
+    public CustomerEditorViewModel(ICustomerApiService customerService, IEventBus eventBus, IDialogService dialogService, IScreenWindowService screenWindowService)
     {
         _customerService = customerService;
         _eventBus = eventBus;
         _dialogService = dialogService;
+        _screenWindowService = screenWindowService;
         SetDialogService(dialogService);
 
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ العميل...")));
         CancelCommand = new RelayCommand(Cancel);
-
-        _ = LoadLookupDataAsync();
+        ManageContactsCommand = new RelayCommand(OpenContacts);
     }
 
     public CustomerEditorViewModel(CustomerDto customer)
-        : this(customer, App.GetService<ICustomerApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>())
+        : this(customer, App.GetService<ICustomerApiService>(), App.GetService<IEventBus>(), App.GetService<IDialogService>(), App.GetService<IScreenWindowService>())
     {
     }
 
-    public CustomerEditorViewModel(CustomerDto customer, ICustomerApiService customerService, IEventBus eventBus, IDialogService dialogService)
-        : this(customerService, eventBus, dialogService)
+    public CustomerEditorViewModel(CustomerDto customer, ICustomerApiService customerService, IEventBus eventBus, IDialogService dialogService, IScreenWindowService screenWindowService)
+        : this(customerService, eventBus, dialogService, screenWindowService)
     {
         _customerId = customer.Id;
         _name = customer.Name;
@@ -69,11 +64,9 @@ public class CustomerEditorViewModel : ViewModelBase
         _address = customer.Address ?? string.Empty;
         _taxNumber = customer.TaxNumber ?? string.Empty;
         _creditLimit = customer.CreditLimit;
-        _openingBalance = customer.OpeningBalance;
+        _priceLevel = customer.PriceLevel;
         _isActive = customer.IsActive;
         _isEditMode = true;
-        _customerGroupId = customer.CustomerGroupId;
-        _accountId = customer.AccountId;
     }
 
     #region Properties
@@ -157,17 +150,17 @@ public class CustomerEditorViewModel : ViewModelBase
         }
     }
 
-    public decimal OpeningBalance
+    public byte? PriceLevel
     {
-        get => _openingBalance;
+        get => _priceLevel;
         set
         {
-            if (SetProperty(ref _openingBalance, value))
+            if (SetProperty(ref _priceLevel, value))
             {
-                if (value < 0)
-                    AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
+                if (value.HasValue && (value < 1 || value > 4))
+                    AddError(nameof(PriceLevel), "مستوى السعر يجب أن يكون بين 1 و 4");
                 else
-                    ClearErrors(nameof(OpeningBalance));
+                    ClearErrors(nameof(PriceLevel));
             }
         }
     }
@@ -190,69 +183,15 @@ public class CustomerEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
-    public ObservableCollection<CustomerGroupDto> AvailableGroups
-    {
-        get => _availableGroups;
-        set => SetProperty(ref _availableGroups, value);
-    }
-
-    public CustomerGroupDto? SelectedGroup
-    {
-        get => _selectedGroup;
-        set
-        {
-            if (SetProperty(ref _selectedGroup, value))
-            {
-                CustomerGroupId = value?.Id;
-            }
-        }
-    }
-
-    public int? CustomerGroupId
-    {
-        get => _customerGroupId;
-        set
-        {
-            if (SetProperty(ref _customerGroupId, value))
-            {
-                if (value.HasValue && value.Value <= 0)
-                    AddError(nameof(CustomerGroupId), "مجموعة العملاء غير صالحة");
-                else
-                    ClearErrors(nameof(CustomerGroupId));
-            }
-        }
-    }
-
-    public int? AccountId
-    {
-        get => _accountId;
-        set => SetProperty(ref _accountId, value);
-    }
-
     #endregion
 
     #region Commands
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
+    public ICommand ManageContactsCommand { get; }
     #endregion
 
     #region Methods
-    private async Task LoadLookupDataAsync()
-    {
-        // Load customer groups
-        var groupsResult = await _customerService.GetAllGroupsAsync();
-        if (groupsResult.IsSuccess && groupsResult.Value != null)
-        {
-            AvailableGroups = new ObservableCollection<CustomerGroupDto>(groupsResult.Value);
-        }
-
-        // If in edit mode, set selected group from loaded data
-        if (_isEditMode && _customerGroupId.HasValue)
-        {
-            SelectedGroup = AvailableGroups.FirstOrDefault(g => g.Id == _customerGroupId.Value);
-        }
-    }
-
     private async Task<bool> ValidateAsync()
     {
         ClearAllErrors();
@@ -261,10 +200,8 @@ public class CustomerEditorViewModel : ViewModelBase
             AddError(nameof(Name), "اسم العميل مطلوب");
         if (CreditLimit < 0)
             AddError(nameof(CreditLimit), "الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر");
-        if (OpeningBalance < 0)
-            AddError(nameof(OpeningBalance), "الرصيد الافتتاحي يجب أن يكون أكبر من أو يساوي صفر");
-        if (CustomerGroupId.HasValue && CustomerGroupId.Value <= 0)
-            AddError(nameof(CustomerGroupId), "مجموعة العملاء غير صالحة");
+        if (PriceLevel.HasValue && (PriceLevel < 1 || PriceLevel > 4))
+            AddError(nameof(PriceLevel), "مستوى السعر يجب أن يكون بين 1 و 4");
 
         return await ValidateAllAsync();
     }
@@ -287,8 +224,7 @@ public class CustomerEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
                 CreditLimit,
                 IsActive,
-                AccountId: AccountId,
-                CustomerGroupId: CustomerGroupId);
+                PriceLevel: PriceLevel);
 
             result = await _customerService.UpdateAsync(_customerId, updateRequest);
         }
@@ -300,10 +236,8 @@ public class CustomerEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Email) ? null : Email,
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                OpeningBalance,
                 CreditLimit,
-                AccountId: AccountId,
-                CustomerGroupId: CustomerGroupId);
+                PriceLevel: PriceLevel);
 
             result = await _customerService.CreateAsync(createRequest);
         }
@@ -322,6 +256,21 @@ public class CustomerEditorViewModel : ViewModelBase
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ العميل", "CustomerEditorViewModel.SaveAsync", "[CustomerEditorViewModel.SaveAsync] Failed to save customer.");
             await _dialogService.ShowErrorAsync("خطأ في حفظ العميل", ErrorMessage!);
         }
+    }
+
+    private void OpenContacts()
+    {
+        if (_customerId <= 0) return;
+
+        var contactsVm = App.GetService<CustomerContactListViewModel>();
+        contactsVm.LoadContacts(_customerId, Name);
+
+        _screenWindowService.OpenScreen(contactsVm, new ScreenWindowOptions
+        {
+            Title = $"جهات اتصال العميل: {Name}",
+            Width = 800,
+            Height = 500
+        });
     }
 
     private void Cancel()

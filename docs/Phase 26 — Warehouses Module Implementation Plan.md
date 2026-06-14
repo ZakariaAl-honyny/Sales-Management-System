@@ -183,18 +183,7 @@ Desktop (WPF) → (HttpClient) → API Controllers → Application Services → 
 
 ### 2.9 MovementType Enum ✅ (Exists)
 
-```csharp
-public enum MovementType : byte
-{
-    PurchaseIn = 1,
-    SaleOut = 2,
-    SaleReturnIn = 3,
-    PurchaseReturnOut = 4,
-    TransferOut = 5,
-    TransferIn = 6,
-    Adjustment = 7
-}
-```
+> See `docs/AGENTS.md` §3 for canonical enum definitions including `MovementType`.
 
 **Gap**: No `StockIssue`, `StockReceipt`, `PhysicalCount` values. Need to extend.
 
@@ -249,15 +238,7 @@ public enum MovementType : byte
 
 **Fix**:
 1. Create new `InventoryOperationType` enum in Domain:
-```csharp
-public enum InventoryOperationType : byte
-{
-    StockIssue = 1,       // صرف مخزني
-    StockReceipt = 2,     // توريد مخزني
-    Adjustment = 3,       // تسوية مخزنية
-    PhysicalCount = 4     // جرد مخزني (headers only)
-}
-```
+> See `Domain/Enums/InventoryOperationType.cs` for the canonical enum definition.
 
 2. All standalone operations create `InventoryMovement` with `MovementType.Adjustment`, `ReferenceType = "InventoryOperation"`, `ReferenceId = operation.Id`
 
@@ -331,15 +312,7 @@ This is fundamentally different from a simple stock adjustment (which directly c
 > **Rationale for Notes**: Allows warehouse staff to record free-text observations about the warehouse (e.g., "يتطلب صيانة دورية", "مستودع مؤقت"). Simple and additive — no breaking changes.
 
 **WarehouseType Enum** (New — to be added in Domain/Enums):
-```csharp
-public enum WarehouseType : byte
-{
-    Main = 1,         // رئيسي
-    Secondary = 2,    // ثانوي
-    Showroom = 3,     // صالة عرض
-    Damaged = 4       // توالف
-}
-```
+> See `Domain/Enums/WarehouseType.cs` for the canonical enum definition.
 
 ### 4.2 InventoryOperation Entity (NEW)
 
@@ -416,14 +389,7 @@ public enum WarehouseType : byte
 **InventoryOperationType.PhysicalCount (4)** is NOT a standalone operation — it's the HEADER. Adjustment operations are created when "Apply" is executed.
 
 **PhysicalCountStatus Enum** (New):
-```csharp
-public enum PhysicalCountStatus : byte
-{
-    Draft = 1,      // Counting in progress
-    Completed = 2,  // Count done, discrepancies visible
-    Applied = 3     // Adjustments applied to stock (terminal)
-}
-```
+> See `Domain/Enums/PhysicalCountStatus.cs` for the canonical enum definition.
 
 ### 4.5 PhysicalCountItem Entity (NEW) ⏳ DEFERRED TO V2
 
@@ -459,15 +425,7 @@ public enum PhysicalCountStatus : byte
 
 **File**: `Domain/Enums/AdjustmentType.cs`
 
-```csharp
-public enum AdjustmentType : byte
-{
-    Opening = 1,   // افتتاحي — opening stock entry for new warehouse
-    Damaged = 2,   // تالف — damaged/write-off stock
-    Surplus = 3,   // زيادة — inventory surplus (counted > system)
-    Shortage = 4   // عجز — inventory shortage (counted < system)
-}
-```
+> See `Domain/Enums/AdjustmentType.cs` for the canonical enum definition.
 
 **Integration**:
 - `InventoryOperation` entity gains an optional `AdjustmentType` field (`byte?`) — only populated when `OperationType = Adjustment`.
@@ -488,15 +446,7 @@ public enum AdjustmentType : byte
 
 **File**: `Domain/Enums/StockIssueReason.cs`
 
-```csharp
-public enum StockIssueReason : byte
-{
-    Damaged = 1,       // تالف
-    InternalUse = 2,   // استهلاك داخلي
-    FreeSample = 3,    // عينات مجانية
-    Other = 4          // أخرى
-}
-```
+> See `Domain/Enums/StockIssueReason.cs` for the canonical enum definition.
 
 **Integration**:
 - `InventoryOperationItem` gains an optional `StockIssueReason` field (`byte?`) — only populated when the parent `OperationType = StockIssue`.
@@ -745,31 +695,9 @@ All tasks include:
 | **Desktop** — `ViewModels/Warehouses/WarehouseListViewModel.cs` | Add `SelectedType` filter property. Update `FilterWarehouses()`. |
 | **Desktop** — `Services/Api/IApiService.cs` — `IWarehouseApiService` | Update `CreateAsync`/`UpdateAsync` signatures (no breaking change — parameter objects changed). |
 
-**Warehouse.Create enhanced signature**:
-```csharp
-public static Warehouse Create(
-    string name,
-    WarehouseType type = WarehouseType.Main,
-    string? location = null,
-    string? phone = null,
-    string? address = null,
-    string? managerName = null,
-    bool isDefault = false,
-    int? createdByUserId = null)
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions. See `Domain/Entities/Warehouse.cs` for the canonical `Create()` factory method signature.
 
-**Warehouse.Update enhanced signature**:
-```csharp
-public void Update(
-    string name,
-    WarehouseType type,
-    string? location,
-    string? phone,
-    string? address,
-    string? managerName,
-    bool isDefault,
-    int? updatedByUserId = null)
-```
+> See `Domain/Entities/Warehouse.cs` for the canonical `Update()` method signature.
 
 **Logging**: `Log.Information("Warehouse {Id} {Name} enhanced with Type {Type}", id, name, type)`
 
@@ -791,63 +719,9 @@ public void Update(
 | `Contracts/DTOs/AllDtos.cs` | Add `InventoryOperationDto`, `InventoryOperationItemDto` |
 | `Contracts/Requests/InventoryOperationRequests.cs` | **NEW** — `CreateInventoryOperationItemRequest`, `CreateInventoryOperationRequest`. Issue items include optional `StockIssueReason`. Adjustment include optional `AdjustmentType`. |
 
-**InventoryOperationDto**:
-```csharp
-public record InventoryOperationDto(
-    int Id,
-    string OperationNo,
-    int WarehouseId,
-    string WarehouseName,
-    byte OperationType,
-    DateTime OperationDate,
-    string? ReferenceNo,
-    string? Notes,
-    byte Status,
-    IReadOnlyList<InventoryOperationItemDto> Items)
-{
-    public string OperationTypeDisplay => OperationType switch
-    {
-        1 => "صرف مخزني",
-        2 => "توريد مخزني",
-        3 => "تسوية مخزنية",
-        _ => "غير معروف"
-    };
-    public string StatusDisplay => Status switch
-    {
-        1 => "مسودة",
-        2 => "تم الترحيل",
-        3 => "ملغي",
-        _ => "غير معروف"
-    };
-}
+> See `SalesSystem.Contracts/` for canonical DTO definitions, including `InventoryOperationDto` and `InventoryOperationItemDto`.
 
-public record InventoryOperationItemDto(
-    int Id,
-    int ProductId,
-    string ProductName,
-    decimal Quantity,
-    decimal? UnitCost,
-    string? Notes);
-```
-
-**CreateInventoryOperationRequest**:
-```csharp
-public record CreateInventoryOperationRequest(
-    int WarehouseId,
-    byte OperationType,
-    byte? AdjustmentType,         // Only for Adjustment ops (1-4)
-    DateTime? OperationDate,
-    string? ReferenceNo,
-    string? Notes,
-    List<CreateInventoryOperationItemRequest> Items);
-
-public record CreateInventoryOperationItemRequest(
-    int ProductId,
-    decimal Quantity,
-    decimal? UnitCost,
-    byte? StockIssueReason,       // Only for Issue ops (1-4, see §4.8)
-    string? Notes);
-```
+> See `Contracts/Requests/InventoryOperationRequests.cs` and `SalesSystem.Contracts/` for canonical request definitions.
 
 **Estimate**: ~2 hours
 
@@ -862,132 +736,9 @@ public record CreateInventoryOperationItemRequest(
 | `Application/Interfaces/Services/IInventoryOperationService.cs` | **NEW** — Interface with 6 methods |
 | `Application/Services/InventoryOperationService.cs` | **NEW** — Full implementation (see below) |
 
-**Interface**:
-```csharp
-public interface IInventoryOperationService
-{
-    Task<Result<InventoryOperationDto>> GetByIdAsync(int id, CancellationToken ct);
-    Task<Result<PagedResult<InventoryOperationDto>>> GetAllAsync(int? warehouseId, byte? operationType, int page, int pageSize, CancellationToken ct);
-    Task<Result<InventoryOperationDto>> CreateAsync(CreateInventoryOperationRequest request, int userId, CancellationToken ct);
-    Task<Result<InventoryOperationDto>> PostAsync(int id, int userId, CancellationToken ct);  // Stock change happens HERE
-    Task<Result<InventoryOperationDto>> CancelAsync(int id, int userId, CancellationToken ct);  // Reverses if posted
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns. See `Application/Interfaces/Services/IInventoryOperationService.cs` for the canonical interface definition.
 
-**Service Implementation Pattern** (RULE-003, RULE-006, RULE-024, RULE-028):
-
-```csharp
-public async Task<Result<InventoryOperationDto>> PostAsync(int id, int userId, CancellationToken ct)
-{
-    var operation = await _uow.InventoryOperations.FirstOrDefaultAsync(
-        o => o.Id == id, ct, "Items.Product", "Warehouse");
-
-    if (operation == null)
-        return Result<InventoryOperationDto>.Failure("العملية غير موجودة", ErrorCodes.NotFound);
-    if (operation.Status != InvoiceStatus.Draft)
-        return Result<InventoryOperationDto>.Failure("يمكن فقط ترحيل العمليات المسودة");
-
-    // Validate stock for Issue operations
-    if (operation.OperationType == InventoryOperationType.StockIssue)
-    {
-        foreach (var item in operation.Items)
-        {
-            var validation = await _inventoryService.ValidateStockAsync(
-                item.ProductId, operation.WarehouseId, item.Quantity, false, ct);
-            if (!validation.IsSuccess)
-                return Result<InventoryOperationDto>.Failure(validation.Error!);
-        }
-    }
-
-    return await _uow.ExecuteAsync(async () =>
-    {
-        await using var transaction = await _uow.BeginTransactionAsync(ct);
-        try
-        {
-            operation.Post();
-
-            foreach (var item in operation.Items)
-            {
-                decimal qtyBefore, qtyAfter;
-                if (operation.OperationType == InventoryOperationType.StockReceipt)
-                {
-                    // Increase stock
-                    qtyBefore = (await _inventoryService.GetStockAsync(item.ProductId, operation.WarehouseId, ct)).Value;
-                    await _inventoryService.IncreaseStockAsync(
-                        item.ProductId, operation.WarehouseId, item.Quantity,
-                        MovementType.Adjustment, "InventoryOperation", operation.Id,
-                        item.UnitCost, userId, ct);
-                    qtyAfter = qtyBefore + item.Quantity;
-
-                    // Update costing if UnitCost provided
-                    if (item.UnitCost.HasValue)
-                    {
-                        await _pricingService.UpdateCostAsync(item.ProductId,
-                            operation.WarehouseId, item.Quantity, item.UnitCost.Value, userId, ct);
-                    }
-                }
-                else if (operation.OperationType == InventoryOperationType.StockIssue)
-                {
-                    // Decrease stock
-                    qtyBefore = (await _inventoryService.GetStockAsync(item.ProductId, operation.WarehouseId, ct)).Value;
-                    await _inventoryService.DecreaseStockAsync(
-                        item.ProductId, operation.WarehouseId, item.Quantity,
-                        MovementType.Adjustment, "InventoryOperation", operation.Id,
-                        null, userId, ct);
-                    qtyAfter = qtyBefore - item.Quantity;
-                }
-                else // Adjustment
-                {
-                    var stock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                        ws => ws.WarehouseId == operation.WarehouseId && ws.ProductId == item.ProductId, ct);
-                    qtyBefore = stock?.Quantity ?? 0;
-                    
-                    // Adjustment can go either direction via SetQuantity
-                    if (stock != null)
-                    {
-                        stock.SetQuantity(qtyBefore + item.Quantity); // item.Quantity is the CHANGE (+ or -)
-                        qtyAfter = stock.Quantity;
-                    }
-                    else
-                    {
-                        stock = WarehouseStock.Create(operation.WarehouseId, item.ProductId, item.Quantity);
-                        await _uow.WarehouseStocks.AddAsync(stock, ct);
-                        qtyAfter = item.Quantity;
-                    }
-
-                    var movement = InventoryMovement.Create(
-                        item.ProductId, operation.WarehouseId,
-                        MovementType.Adjustment, item.Quantity,
-                        qtyBefore, qtyAfter,
-                        "InventoryOperation", operation.Id,
-                        item.UnitCost, null, userId);
-                    await _uow.InventoryMovements.AddAsync(movement, ct);
-                }
-            }
-
-            await _uow.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-
-            _logger.LogInformation(
-                "InventoryOperation {Id} ({Type}) posted for Warehouse {WarehouseId}",
-                operation.Id, operation.OperationType, operation.WarehouseId);
-
-            return await GetByIdAsync(operation.Id, ct);
-        }
-        catch (DomainException ex)
-        {
-            await transaction.RollbackAsync(ct);
-            return Result<InventoryOperationDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Error posting inventory operation {Id}", id);
-            return Result<InventoryOperationDto>.Failure("حدث خطأ أثناء ترحيل العملية المخزنية");
-        }
-    }, ct);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern, `docs/AGENTS.md` for the transaction pattern (RULE-003/RULE-005/RULE-024), and `docs/AGENTS.md` §2.3 for the step-by-step transaction pattern. See `Application/Services/InventoryOperationService.cs` for the canonical implementation.
 
 **Logging** (RULE-035/036):
 - `Log.Information("InventoryOperation {Id} created: {Type}", id, type)` on create
@@ -1094,17 +845,7 @@ public async Task<Result<InventoryOperationDto>> PostAsync(int id, int userId, C
 
 **Reuses**: Same ViewModels as Task 5 with an `OperationType` parameter passed to editor. No duplicate files.
 
-**Editor constructor**:
-```csharp
-public InventoryOperationEditorViewModel(
-    IInventoryOperationApiService operationService,
-    IWarehouseApiService warehouseService,
-    IProductApiService productService,
-    IEventBus eventBus,
-    IDialogService dialogService,
-    byte operationType,  // 1=Issue, 2=Receipt, 3=Adjustment
-    int? operationId = null)
-```
+> See `DesktopPWF/ViewModels/InventoryOperations/InventoryOperationEditorViewModel.cs` for the canonical editor pattern.
 
 **Estimate**: ~1 hour (reuses Task 5 infrastructure)
 
@@ -1190,119 +931,9 @@ public InventoryOperationEditorViewModel(
 | `Messaging/Messages/AppMessages.cs` | Add `PhysicalCountChangedMessage` |
 | `App.xaml.cs` | DI registration + navigation |
 
-**PhysicalCountDto**:
-```csharp
-public record PhysicalCountDto(
-    int Id,
-    string CountNo,
-    int WarehouseId,
-    string WarehouseName,
-    DateTime CountDate,
-    string? Notes,
-    byte Status,
-    IReadOnlyList<PhysicalCountItemDto> Items)
-{
-    public string StatusDisplay => Status switch
-    {
-        1 => "جاري",
-        2 => "مكتمل",
-        3 => "تم التطبيق",
-        _ => "غير معروف"
-    };
-    public int DiscrepancyCount => Items?.Count(i => i.Difference != 0) ?? 0;
-    public bool HasDiscrepancies => DiscrepancyCount > 0;
-}
+> See `SalesSystem.Contracts/` for canonical DTO definitions, including `PhysicalCountDto` and `PhysicalCountItemDto`.
 
-public record PhysicalCountItemDto(
-    int Id,
-    int ProductId,
-    string ProductName,
-    decimal SystemQuantity,
-    decimal CountedQuantity,
-    decimal Difference,
-    decimal? UnitCost,
-    string? Notes);
-```
-
-**PhysicalCountService — ApplyAsync Pattern**:
-```csharp
-public async Task<Result<PhysicalCountDto>> ApplyAsync(int id, int userId, CancellationToken ct)
-{
-    var count = await _uow.PhysicalCounts.FirstOrDefaultAsync(
-        c => c.Id == id, ct, "Items.Product", "Warehouse");
-
-    if (count == null)
-        return Result<PhysicalCountDto>.Failure("الجرد غير موجود", ErrorCodes.NotFound);
-    if (count.Status != PhysicalCountStatus.Completed)
-        return Result<PhysicalCountDto>.Failure("يجب إكمال الجرد أولاً قبل التطبيق");
-    if (!count.Items.Any(i => i.Difference != 0))
-        return Result<PhysicalCountDto>.Failure("لا توجد فروقات لتطبيقها");
-
-    return await _uow.ExecuteAsync(async () =>
-    {
-        await using var transaction = await _uow.BeginTransactionAsync(ct);
-        try
-        {
-            foreach (var item in count.Items.Where(i => i.Difference != 0))
-            {
-                // Create InventoryOperation for each discrepancy
-                var op = InventoryOperation.Create(
-                    operationNo: GenerateOperationNo(), // Async call
-                    warehouseId: count.WarehouseId,
-                    operationType: InventoryOperationType.Adjustment,
-                    notes: $"تسوية جرد {count.CountNo} — {item.Product?.Name}",
-                    createdByUserId: userId);
-                op.Post(); // Immediately post
-
-                var opItem = InventoryOperationItem.Create(
-                    op.Id, item.ProductId, item.Difference,
-                    item.UnitCost,
-                    $"الفرق: {item.Difference} (النظام: {item.SystemQuantity}, الجرد: {item.CountedQuantity})");
-                op.AddItem(opItem);
-
-                await _uow.InventoryOperations.AddAsync(op, ct);
-
-                // Update stock
-                var stock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                    ws => ws.WarehouseId == count.WarehouseId && ws.ProductId == item.ProductId, ct);
-                var qtyBefore = stock?.Quantity ?? 0;
-                var qtyAfter = qtyBefore + item.Difference;
-
-                if (stock != null)
-                    stock.SetQuantity(qtyAfter);
-                else
-                    await _uow.WarehouseStocks.AddAsync(
-                        WarehouseStock.Create(count.WarehouseId, item.ProductId, qtyAfter), ct);
-
-                // Log movement
-                var movement = InventoryMovement.Create(
-                    item.ProductId, count.WarehouseId,
-                    MovementType.Adjustment, item.Difference,
-                    qtyBefore, qtyAfter,
-                    "PhysicalCount", count.Id,
-                    item.UnitCost, null, userId);
-                await _uow.InventoryMovements.AddAsync(movement, ct);
-            }
-
-            count.Apply();
-            await _uow.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-
-            _logger.LogInformation(
-                "PhysicalCount {Id} applied — {Count} discrepancies adjusted",
-                count.Id, count.DiscrepancyCount);
-
-            return await GetByIdAsync(count.Id, ct);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Error applying physical count {Id}", id);
-            return Result<PhysicalCountDto>.Failure("حدث خطأ أثناء تطبيق الجرد");
-        }
-    }, ct);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern, `docs/AGENTS.md` §2.3 for the transaction pattern, and `Application/Services/PhysicalCountService.cs` for the canonical implementation.
 
 **Physical Count UI Flow**:
 1. User opens `PhysicalCountEditorView` — selects warehouse
@@ -1430,41 +1061,9 @@ public async Task<Result<PhysicalCountDto>> ApplyAsync(int id, int userId, Cance
        └── ⚠️ إنذار المخزون (existing, enhance)
 ```
 
-**Navigation ViewModel registration pattern**:
-```csharp
-// In App.xaml.cs ConfigureServices:
-services.AddTransient<InventoryOperationListViewModel>();
-services.AddTransient<InventoryOperationEditorViewModel>();
-services.AddTransient<PhysicalCountListViewModel>();
-services.AddTransient<PhysicalCountEditorViewModel>();
-services.AddTransient<PhysicalCountCompareViewModel>();
-services.AddTransient<StockBalanceReportViewModel>();
-services.AddTransient<WarehouseMovementReportViewModel>();
-services.AddTransient<LowStockViewModel>(); // Already exists
+> See `DesktopPWF/App.xaml.cs` for the canonical DI registration and ViewModel registration pattern.
 
-services.AddSingleton<IInventoryOperationApiService, InventoryOperationApiService>();
-services.AddSingleton<IPhysicalCountApiService, PhysicalCountApiService>();
-```
-
-**Navigation command pattern**:
-```csharp
-private void NavigateToInventoryOperationList(object param)
-{
-    byte operationType = (byte)param; // 1=Issue, 2=Receipt, 3=Adjustment
-    var vm = App.GetService<InventoryOperationListViewModel>();
-    vm.SetOperationTypeFilter(operationType);
-    OpenScreen(vm, new ScreenWindowOptions
-    {
-        Title = operationType switch
-        {
-            1 => "صرف مخزني",
-            2 => "توريد مخزني",
-            3 => "تسوية مخزنية",
-            _ => "عمليات مخزنية"
-        }
-    });
-}
-```
+> See `DesktopPWF/App.xaml.cs` for the canonical navigation command pattern using `ScreenWindowService`.
 
 **Estimate**: ~1 hour
 

@@ -215,13 +215,8 @@
                                             Width="*" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
                         
-                        <DataGridTextColumn Header="رقم فاتورة المورد" 
-                                            Binding="{Binding SupplierInvoiceNo}" 
-                                            Width="150" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                        
                         <DataGridTextColumn Header="الإجمالي" 
-                                            Binding="{Binding TotalAmount, StringFormat=N2}" 
+                                            Binding="{Binding NetTotal, StringFormat=N2}" 
                                             Width="140" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTextColumn.ElementStyle>

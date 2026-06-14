@@ -101,7 +101,43 @@
                                 <StackPanel>
                                     <CheckBox Content="منتج نشط" IsChecked="{Binding IsActive}" TabIndex="7"
                                               ToolTip="إلغاء التفعيل يخفي المنتج من قوائم الاختيار"/>
+                                    <CheckBox Content="تتبع الصلاحية" IsChecked="{Binding TrackExpiry}" TabIndex="8"
+                                              ToolTip="تفعيل تتبع تواريخ انتهاء الصلاحية للمنتج — يظهر حقل تاريخ الانتهاء في المعاملات"
+                                              Visibility="{Binding ShowOpeningFields, Converter={StaticResource BoolToVisibility}}"/>
                                 </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Opening Stock Section (create mode only) -->
+                        <Border Style="{StaticResource CardStyle}" Margin="0,8,0,0"
+                                Visibility="{Binding ShowOpeningFields, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="المخزون الافتتاحي" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                        <TextBlock Text="الكمية الافتتاحية" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding OpeningQuantity, StringFormat=N3, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 ToolTip="الكمية المتاحة عند إضافة المنتج لأول مرة — يمكن تركها فارغة لبدء المخزون من الصفر"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="4,0">
+                                        <TextBlock Text="تكلفة الوحدة" Style="{StaticResource LabelStyle}"/>
+                                        <TextBox Text="{Binding OpeningUnitCost, StringFormat=N2, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 ToolTip="تكلفة شراء الوحدة الواحدة عند فتح المخزون — تستخدم لحساب تكلفة المخزون الافتتاحي"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                        <TextBlock Text="تاريخ الانتهاء" Style="{StaticResource LabelStyle}"/>
+                                        <DatePicker SelectedDate="{Binding OpeningExpiryDate, ValidatesOnDataErrors=True}"
+                                                    Style="{StaticResource ModernDatePicker}"
+                                                    ToolTip="تاريخ انتهاء صلاحية الدفعة الافتتاحية — مطلوب إذا كان المنتج يتطلب تتبع الصلاحية وتم إدخال كمية افتتاحية"/>
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
                         

@@ -55,14 +55,6 @@ public class CreatePurchaseReturnValidator : AbstractValidator<CreatePurchaseRet
             .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.ReturnDate.HasValue)
             .WithMessage("تاريخ المرتجع لا يمكن أن يكون في المستقبل");
 
-        RuleFor(x => x.DiscountAmount)
-            .GreaterThanOrEqualTo(0).WithMessage("الخصم لا يمكن أن يكون سالباً");
-
-        RuleFor(x => x.DiscountRate)
-            .InclusiveBetween(0, 100).When(x => x.DiscountType.HasValue && x.DiscountType == (byte)1)
-            .WithMessage("نسبة الخصم يجب أن تكون بين 0 و 100");
-
-        // Currency rules
         RuleFor(x => x.CurrencyId)
             .GreaterThan(0).When(x => x.CurrencyId.HasValue)
             .WithMessage("العملة غير صحيحة");
@@ -87,11 +79,6 @@ public class CreatePurchaseReturnValidator : AbstractValidator<CreatePurchaseRet
             item.RuleFor(i => i.ProductUnitId).GreaterThan(0).WithMessage("يجب اختيار الوحدة");
             item.RuleFor(i => i.Quantity).GreaterThan(0).WithMessage("الكمية يجب أن تكون أكبر من صفر");
             item.RuleFor(i => i.UnitCost).GreaterThanOrEqualTo(0).WithMessage("التكلفة لا يمكن أن تكون سالبة");
-            item.RuleFor(i => i.DiscountAmount).GreaterThanOrEqualTo(0).WithMessage("الخصم لا يمكن أن يكون سالباً");
-            item.RuleFor(i => i.Notes)
-                .MaximumLength(200).When(i => i.Notes != null)
-                .WithMessage("ملاحظات الصنف لا يمكن أن تتجاوز 200 حرف");
         });
     }
 }
-

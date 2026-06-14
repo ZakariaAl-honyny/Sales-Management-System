@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
-using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Accounting.Entities;
@@ -13,31 +12,46 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Application.Services;
 
+/// <summary>
+/// Service for managing cash boxes and their associated receipt/payment vouchers.
+/// Handles CRUD, auto-account creation, voucher lifecycle, transfers, and
+/// invoice payment recording for the cash module.
+/// </summary>
 public class CashBoxService : ICashBoxService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IDocumentSequenceService _documentSequence;
+    private readonly IJournalEntryService _journalEntryService;
     private readonly ILogger<CashBoxService> _logger;
 
-    private const string CashParentAccountCode = "1110";
-
-    public CashBoxService(IUnitOfWork uow, ILogger<CashBoxService> logger)
+    public CashBoxService(
+        IUnitOfWork uow,
+        IDocumentSequenceService documentSequence,
+        IJournalEntryService journalEntryService,
+        ILogger<CashBoxService> logger)
     {
         _uow = uow;
+        _documentSequence = documentSequence;
+        _journalEntryService = journalEntryService;
         _logger = logger;
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // Cash Box CRUD
+    // ═══════════════════════════════════════════════════════════
 
     public async Task<Result<List<CashBoxDto>>> GetAllAsync(CancellationToken ct)
     {
         try
         {
-            var boxes = await _uow.CashBoxes.ToListAsync(ct, "Account", "Category");
+            var boxes = await _uow.CashBoxes.ToListAsync(ct, "Currency", "Account");
             var dtos = boxes.Select(MapToDto).ToList();
             return Result<List<CashBoxDto>>.Success(dtos);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving all cash boxes");
-            return Result<List<CashBoxDto>>.Failure("حدث خطأ أثناء استرجاع قائمة الصناديق");
+            return Result<List<CashBoxDto>>.Failure("حدث خطأ أثناء استرجاع قائمة الصناديق النقدية");
         }
     }
 
@@ -45,16 +59,17 @@ public class CashBoxService : ICashBoxService
     {
         try
         {
-            var box = await _uow.CashBoxes.GetByIdAsync(id, ct);
+            var box = await _uow.CashBoxes.FirstOrDefaultAsync(
+                b => b.Id == id, ct, "Currency", "Account");
             if (box == null)
-                return Result<CashBoxDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
+                return Result<CashBoxDto>.Failure("الصندوق النقدي غير موجود", ErrorCodes.NotFound);
 
             return Result<CashBoxDto>.Success(MapToDto(box));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving cash box {Id}", id);
-            return Result<CashBoxDto>.Failure("حدث خطأ أثناء استرجاع بيانات الصندوق");
+            return Result<CashBoxDto>.Failure("حدث خطأ أثناء استرجاع بيانات الصندوق النقدي");
         }
     }
 
@@ -62,43 +77,48 @@ public class CashBoxService : ICashBoxService
     {
         try
         {
-            // Step 1: Resolve AccountId (auto-create if not provided)
-            int accountId;
-            if (request.AccountId.HasValue && request.AccountId.Value > 0)
-            {
-                accountId = request.AccountId.Value;
-            }
-            else
-            {
-                // Create the account and persist it FIRST so EF Core populates account.Id with the real DB-generated value
-                var account = await CreateCashBoxAccountAsync(request.BoxName, ct);
-                await _uow.Accounts.AddAsync(account, ct);
-                await _uow.SaveChangesAsync(ct);
-                accountId = account.Id;
-            }
+            // Validate required currency
+            if (!request.CurrencyId.HasValue || request.CurrencyId.Value <= 0)
+                return Result<CashBoxDto>.Failure("عملة الصندوق مطلوبة");
 
-            // Step 2: Create the CashBox entity
+            var currency = await _uow.Currencies.FirstOrDefaultAsync(
+                c => c.Id == request.CurrencyId.Value, ct);
+            if (currency == null)
+                return Result<CashBoxDto>.Failure("العملة المحددة غير موجودة", ErrorCodes.NotFound);
+
+            // Create the cash box domain entity
             var box = CashBox.Create(
                 request.BoxName,
-                accountId,
-                categoryId: request.CategoryId,
-                branchId: request.BranchId,
+                (short)request.CurrencyId.Value,
+                accountId: request.AccountId,
+                branchId: request.BranchId.HasValue ? (short)request.BranchId.Value : null,
                 assignedUserId: request.AssignedUserId,
-                currencyId: request.CurrencyId,
                 phoneNumber: request.PhoneNumber,
                 taxNumber: request.TaxNumber,
                 address: request.Address,
                 notes: request.Notes);
-
             box.SetCreatedBy(userId);
+
+            // Auto-create Chart of Accounts sub-account under "1110 — النقدية" if no AccountId provided
+            if (!box.AccountId.HasValue || box.AccountId.Value <= 0)
+            {
+                var accountResult = await CreateCashBoxAccountAsync(box.BoxName, userId, ct);
+                if (!accountResult.IsSuccess || accountResult.Value == null)
+                    return Result<CashBoxDto>.Failure(
+                        accountResult.Error ?? "فشل إنشاء الحساب المحاسبي للصندوق");
+                box.SetAccountId(accountResult.Value.Id);
+            }
+
             await _uow.CashBoxes.AddAsync(box, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Cash box created: {BoxName} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
-                box.BoxName, box.Id, accountId, userId);
+                "CashBox created: {BoxName} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
+                box.BoxName, box.Id, box.AccountId, userId);
 
-            return Result<CashBoxDto>.Success(MapToDto(box));
+            var created = await _uow.CashBoxes.FirstOrDefaultAsync(
+                b => b.Id == box.Id, ct, "Currency", "Account");
+            return Result<CashBoxDto>.Success(MapToDto(created!));
         }
         catch (DomainException ex)
         {
@@ -108,88 +128,47 @@ public class CashBoxService : ICashBoxService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating cash box");
-            return Result<CashBoxDto>.Failure("حدث خطأ أثناء إنشاء الصندوق");
+            return Result<CashBoxDto>.Failure("حدث خطأ أثناء إنشاء الصندوق النقدي");
         }
-    }
-
-    /// <summary>
-    /// Creates a Level-4 detail Account entity under "1110 — النقدية" (Cash &amp; Cash Equivalents).
-    /// Generates the next available account code (e.g., 1113, 1114, ...).
-    /// NOTE: Does NOT save to DB — caller must persist and use the returned Account.Id.
-    /// </summary>
-    private async Task<Account> CreateCashBoxAccountAsync(string boxName, CancellationToken ct)
-    {
-        // Find the parent account "1110 — النقدية"
-        var parentAccount = await _uow.Accounts.FirstOrDefaultAsync(
-            a => a.AccountCode == CashParentAccountCode, ct);
-
-        if (parentAccount == null)
-            throw new DomainException(
-                "الحساب المحاسبي للخزنة (1110) غير موجود. يرجى التأكد من ترحيل دليل الحسابات.");
-
-        // Generate next account code for Level 4 under 1110
-        // Fetch existing children and find max code
-        var children = await _uow.Accounts.ToListAsync(
-            a => a.ParentAccountId == parentAccount.Id, q => q.OrderByDescending(a => a.AccountCode), ct);
-
-        string nextCode;
-        if (children.Count == 0)
-        {
-            nextCode = "1111";
-        }
-        else
-        {
-            var maxChildCode = children.First().AccountCode;
-            if (int.TryParse(maxChildCode, out var maxCode))
-                nextCode = (maxCode + 1).ToString();
-            else
-                nextCode = "1111";
-        }
-
-        return Account.Create(
-            accountCode: nextCode,
-            nameAr: boxName,
-            nameEn: boxName,
-            accountType: AccountType.Asset,
-            level: 4,
-            parentAccountId: parentAccount.Id,
-            isSystemAccount: false,
-            colorCode: "#2196F3",
-            allowTransactions: true,
-            description: $"خزنة: {boxName}",
-            explanation: $"حساب الخزنة النقدية: {boxName}",
-            openingBalance: 0,
-            notes: null,
-            createdByUserId: 0);
     }
 
     public async Task<Result<CashBoxDto>> UpdateAsync(int id, UpdateCashBoxRequest request, int userId, CancellationToken ct)
     {
         try
         {
-            var box = await _uow.CashBoxes.GetByIdAsync(id, ct);
+            var box = await _uow.CashBoxes.FirstOrDefaultAsync(
+                b => b.Id == id, ct, "Currency", "Account");
             if (box == null)
-                return Result<CashBoxDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
+                return Result<CashBoxDto>.Failure("الصندوق النقدي غير موجود", ErrorCodes.NotFound);
+
+            if (!request.CurrencyId.HasValue || request.CurrencyId.Value <= 0)
+                return Result<CashBoxDto>.Failure("عملة الصندوق مطلوبة");
+
+            var currency = await _uow.Currencies.FirstOrDefaultAsync(
+                c => c.Id == request.CurrencyId.Value, ct);
+            if (currency == null)
+                return Result<CashBoxDto>.Failure("العملة المحددة غير موجودة", ErrorCodes.NotFound);
 
             box.Update(
-                boxName: request.BoxName,
-                phoneNumber: request.PhoneNumber,
-                taxNumber: request.TaxNumber,
-                address: request.Address,
-                notes: request.Notes,
-                categoryId: request.CategoryId,
-                branchId: request.BranchId,
-                assignedUserId: request.AssignedUserId,
-                currencyId: request.CurrencyId);
-
+                request.BoxName,
+                request.PhoneNumber,
+                request.TaxNumber,
+                request.Address,
+                request.Notes,
+                request.BranchId.HasValue ? (short)request.BranchId.Value : null,
+                request.AssignedUserId,
+                (short)request.CurrencyId.Value);
             box.SetUpdatedBy(userId);
+
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Cash box updated: {BoxName} (ID: {Id}) by User {UserId}",
+                "CashBox updated: {BoxName} (ID: {Id}) by User {UserId}",
                 box.BoxName, id, userId);
 
-            return Result<CashBoxDto>.Success(MapToDto(box));
+            var updated = await _uow.CashBoxes.FirstOrDefaultAsync(
+                b => b.Id == id, ct, "Currency", "Account");
+            return Result<CashBoxDto>.Success(MapToDto(updated!));
         }
         catch (DomainException ex)
         {
@@ -199,7 +178,7 @@ public class CashBoxService : ICashBoxService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating cash box {Id}", id);
-            return Result<CashBoxDto>.Failure("حدث خطأ أثناء تحديث بيانات الصندوق");
+            return Result<CashBoxDto>.Failure("حدث خطأ أثناء تحديث بيانات الصندوق النقدي");
         }
     }
 
@@ -209,450 +188,794 @@ public class CashBoxService : ICashBoxService
         {
             var box = await _uow.CashBoxes.GetByIdAsync(id, ct);
             if (box == null)
-                return Result.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
+                return Result.Failure("الصندوق النقدي غير موجود", ErrorCodes.NotFound);
 
             box.MarkAsDeleted();
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Cash box deactivated: {BoxName} (ID: {Id})", box.BoxName, id);
+            _logger.LogInformation("CashBox deactivated: {BoxName} (ID: {Id})", box.BoxName, id);
             return Result.Success();
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation deactivating cash box {Id}: {Message}", id, ex.Message);
+            return Result.Failure(ex.Message);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deactivating cash box {Id}", id);
-            return Result.Failure("حدث خطأ أثناء إلغاء تنشيط الصندوق");
+            return Result.Failure("حدث خطأ أثناء إلغاء تنشيط الصندوق النقدي");
         }
     }
 
-    public async Task<Result<List<CashTransactionDto>>> GetTransactionsAsync(
-        int cashBoxId, DateOnly? from, DateOnly? to, CancellationToken ct)
+    // ═══════════════════════════════════════════════════════════
+    // Receipt Vouchers (سندات قبض)
+    // ═══════════════════════════════════════════════════════════
+
+    public async Task<Result<ReceiptVoucherDto>> CreateReceiptVoucherAsync(
+        CreateReceiptVoucherRequest request, int userId, CancellationToken ct)
+    {
+        return await CreateReceiptVoucherInternalAsync(
+            request.CashBoxId,
+            request.CurrencyId,
+            request.AccountId,
+            request.TotalAmount,
+            request.Notes,
+            null,   // no reference for user-created vouchers
+            null,
+            userId,
+            ct);
+    }
+
+    public async Task<Result<ReceiptVoucherDto>> PostReceiptVoucherAsync(
+        int id, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var voucher = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
+                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+            if (voucher == null)
+                return Result<ReceiptVoucherDto>.Failure(
+                    "سند القبض غير موجود", ErrorCodes.NotFound);
+
+            voucher.Post(userId);
+
+            // Build journal entry: Dr CashBox Account / Cr Credited Account
+            var box = await _uow.CashBoxes.FirstOrDefaultAsync(
+                b => b.Id == voucher.CashBoxId, ct, "Account");
+            if (box?.AccountId == null)
+                return Result<ReceiptVoucherDto>.Failure(
+                    "الحساب المحاسبي للصندوق غير مهيأ");
+
+            var cashAccountId = box.AccountId.Value;
+
+            var journalRequest = new CreateJournalEntryRequest(
+                TransactionDate: voucher.VoucherDate,
+                Description: $"قيد سند قبض رقم {voucher.VoucherNo}",
+                EntryType: JournalEntryType.CustomerReceipt,
+                ReferenceType: "ReceiptVoucher",
+                ReferenceId: voucher.Id,
+                ReferenceNumber: voucher.VoucherNo.ToString(),
+                Lines: new List<JournalEntryLineRequest>
+                {
+                    new(cashAccountId, voucher.TotalAmount, 0,
+                        "سند قبض - الجانب المدين (النقدية)"),
+                    new(voucher.AccountId, 0, voucher.TotalAmount,
+                        $"سند قبض - الجانب الدائن ({voucher.Account?.NameAr ?? "الحساب"})")
+                });
+
+            var entryResult = await _journalEntryService.CreateJournalEntryAsync(
+                journalRequest, userId, ct);
+            if (!entryResult.IsSuccess)
+                return Result<ReceiptVoucherDto>.Failure(entryResult.Error!);
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(
+                entryResult.Value, userId, ct);
+            if (!postResult.IsSuccess)
+                return Result<ReceiptVoucherDto>.Failure(postResult.Error!);
+
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "ReceiptVoucher {Id} posted by User {UserId}", id, userId);
+
+            var posted = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
+                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+            return Result<ReceiptVoucherDto>.Success(MapReceiptVoucherToDto(posted!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(
+                ex, "Domain rule violation posting receipt voucher {Id}: {Message}",
+                id, ex.Message);
+            return Result<ReceiptVoucherDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error posting receipt voucher {Id}", id);
+            return Result<ReceiptVoucherDto>.Failure(
+                "حدث خطأ أثناء ترحيل سند القبض");
+        }
+    }
+
+    public async Task<Result<ReceiptVoucherDto>> CancelReceiptVoucherAsync(
+        int id, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var voucher = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
+                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+            if (voucher == null)
+                return Result<ReceiptVoucherDto>.Failure(
+                    "سند القبض غير موجود", ErrorCodes.NotFound);
+
+            var wasPosted = voucher.Status == (byte)InvoiceStatus.Posted;
+            voucher.Cancel(userId);
+
+            // Reverse journal entry if the voucher was previously posted
+            if (wasPosted)
+            {
+                var box = await _uow.CashBoxes.FirstOrDefaultAsync(
+                    b => b.Id == voucher.CashBoxId, ct, "Account");
+                if (box?.AccountId == null)
+                    return Result<ReceiptVoucherDto>.Failure(
+                        "الحساب المحاسبي للصندوق غير مهيأ");
+
+                var cashAccountId = box.AccountId.Value;
+
+                var reverseRequest = new CreateJournalEntryRequest(
+                    TransactionDate: DateTime.UtcNow,
+                    Description: $"قيد عكس سند قبض رقم {voucher.VoucherNo}",
+                    EntryType: JournalEntryType.Manual,
+                    ReferenceType: "ReceiptVoucher",
+                    ReferenceId: voucher.Id,
+                    ReferenceNumber: $"{voucher.VoucherNo}-REV",
+                    Lines: new List<JournalEntryLineRequest>
+                    {
+                        new(voucher.AccountId, voucher.TotalAmount, 0,
+                            $"عكس سند قبض - الجانب المدين ({voucher.Account?.NameAr ?? "الحساب"})"),
+                        new(cashAccountId, 0, voucher.TotalAmount,
+                            "عكس سند قبض - الجانب الدائن (النقدية)")
+                    });
+
+                var entryResult = await _journalEntryService.CreateJournalEntryAsync(
+                    reverseRequest, userId, ct);
+                if (!entryResult.IsSuccess)
+                    return Result<ReceiptVoucherDto>.Failure(entryResult.Error!);
+
+                var postResult = await _journalEntryService.PostJournalEntryAsync(
+                    entryResult.Value, userId, ct);
+                if (!postResult.IsSuccess)
+                    return Result<ReceiptVoucherDto>.Failure(postResult.Error!);
+            }
+
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "ReceiptVoucher {Id} cancelled by User {UserId}", id, userId);
+
+            var cancelled = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
+                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+            return Result<ReceiptVoucherDto>.Success(MapReceiptVoucherToDto(cancelled!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(
+                ex, "Domain rule violation cancelling receipt voucher {Id}: {Message}",
+                id, ex.Message);
+            return Result<ReceiptVoucherDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cancelling receipt voucher {Id}", id);
+            return Result<ReceiptVoucherDto>.Failure(
+                "حدث خطأ أثناء إلغاء سند القبض");
+        }
+    }
+
+    public async Task<Result<List<ReceiptVoucherDto>>> GetReceiptVouchersAsync(
+        int cashBoxId, CancellationToken ct)
     {
         try
         {
             var boxExists = await _uow.CashBoxes.AnyAsync(b => b.Id == cashBoxId, ct);
             if (!boxExists)
-                return Result<List<CashTransactionDto>>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
+                return Result<List<ReceiptVoucherDto>>.Failure(
+                    "الصندوق النقدي غير موجود", ErrorCodes.NotFound);
 
-            var fromDate = from?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var toDate = to?.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+            var vouchers = await _uow.ReceiptVouchers.ToListAsync(
+                v => v.CashBoxId == cashBoxId,
+                q => q.OrderByDescending(v => v.VoucherDate)
+                      .ThenByDescending(v => v.Id),
+                ct: ct,
+                includePaths: new[] { "Currency", "CashBox", "Account" });
 
-            var transactions = await _uow.CashTransactions.ToListAsync(
-                t => t.CashBoxId == cashBoxId &&
-                     (!fromDate.HasValue || t.CreatedAt >= fromDate.Value) &&
-                     (!toDate.HasValue || t.CreatedAt <= toDate.Value),
-                q => q.OrderByDescending(t => t.CreatedAt),
-                ct);
-
-            var dtos = transactions.Select(MapToTransactionDto).ToList();
-            return Result<List<CashTransactionDto>>.Success(dtos);
+            var dtos = vouchers.Select(MapReceiptVoucherToDto).ToList();
+            return Result<List<ReceiptVoucherDto>>.Success(dtos);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving transactions for cash box {CashBoxId}", cashBoxId);
-            return Result<List<CashTransactionDto>>.Failure("حدث خطأ أثناء استرجاع المعاملات");
+            _logger.LogError(
+                ex, "Error retrieving receipt vouchers for cash box {CashBoxId}",
+                cashBoxId);
+            return Result<List<ReceiptVoucherDto>>.Failure(
+                "حدث خطأ أثناء استرجاع سندات القبض");
         }
     }
 
-    public async Task<Result<CashTransactionDto>> RecordExpenseAsync(
-        int cashBoxId, AddCashTransactionRequest request, int userId, CancellationToken ct)
+    // ═══════════════════════════════════════════════════════════
+    // Payment Vouchers (سندات صرف)
+    // ═══════════════════════════════════════════════════════════
+
+    public async Task<Result<PaymentVoucherDto>> CreatePaymentVoucherAsync(
+        CreatePaymentVoucherRequest request, int userId, CancellationToken ct)
+    {
+        return await CreatePaymentVoucherInternalAsync(
+            request.CashBoxId,
+            request.CurrencyId,
+            request.AccountId,
+            request.TotalAmount,
+            request.Notes,
+            request.SourceDocumentId,
+            request.SourceDocumentType,
+            userId,
+            ct);
+    }
+
+    public async Task<Result<PaymentVoucherDto>> PostPaymentVoucherAsync(
+        int id, int userId, CancellationToken ct)
     {
         try
         {
-            var box = await _uow.CashBoxes.GetByIdAsync(cashBoxId, ct);
-            if (box == null)
-                return Result<CashTransactionDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
+            var voucher = await _uow.PaymentVouchers.FirstOrDefaultAsync(
+                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+            if (voucher == null)
+                return Result<PaymentVoucherDto>.Failure(
+                    "سند الصرف غير موجود", ErrorCodes.NotFound);
 
-            // Compute running balance from all existing transactions
-            var runningBalance = await ComputeRunningBalanceAsync(cashBoxId, ct);
-            var amount = -Math.Abs(request.Amount); // expense is always negative
-            var newRunningBalance = runningBalance + amount;
+            voucher.Post(userId);
 
-            var transaction = CashTransaction.Create(
-                cashBoxId, CashTransactionType.Expense, amount, newRunningBalance,
-                referenceType: null, referenceId: null, createdBy: userId,
-                notes: request.Notes, currencyId: null);
+            // Build journal entry: Dr Debited Account / Cr CashBox Account
+            var box = await _uow.CashBoxes.FirstOrDefaultAsync(
+                b => b.Id == voucher.CashBoxId, ct, "Account");
+            if (box?.AccountId == null)
+                return Result<PaymentVoucherDto>.Failure(
+                    "الحساب المحاسبي للصندوق غير مهيأ");
 
-            await _uow.CashTransactions.AddAsync(transaction, ct);
+            var cashAccountId = box.AccountId.Value;
+
+            var journalRequest = new CreateJournalEntryRequest(
+                TransactionDate: voucher.VoucherDate,
+                Description: $"قيد سند صرف رقم {voucher.VoucherNo}",
+                EntryType: JournalEntryType.SupplierPayment,
+                ReferenceType: "PaymentVoucher",
+                ReferenceId: voucher.Id,
+                ReferenceNumber: voucher.VoucherNo.ToString(),
+                Lines: new List<JournalEntryLineRequest>
+                {
+                    new(voucher.AccountId, voucher.TotalAmount, 0,
+                        $"سند صرف - الجانب المدين ({voucher.Account?.NameAr ?? "الحساب"})"),
+                    new(cashAccountId, 0, voucher.TotalAmount,
+                        "سند صرف - الجانب الدائن (النقدية)")
+                });
+
+            var entryResult = await _journalEntryService.CreateJournalEntryAsync(
+                journalRequest, userId, ct);
+            if (!entryResult.IsSuccess)
+                return Result<PaymentVoucherDto>.Failure(entryResult.Error!);
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(
+                entryResult.Value, userId, ct);
+            if (!postResult.IsSuccess)
+                return Result<PaymentVoucherDto>.Failure(postResult.Error!);
+
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Expense of {Amount:N2} recorded in cash box {CashBoxId} by User {UserId}",
-                request.Amount, cashBoxId, userId);
+                "PaymentVoucher {Id} posted by User {UserId}", id, userId);
 
-            return Result<CashTransactionDto>.Success(MapToTransactionDto(transaction));
+            var posted = await _uow.PaymentVouchers.FirstOrDefaultAsync(
+                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+            return Result<PaymentVoucherDto>.Success(MapPaymentVoucherToDto(posted!));
         }
         catch (DomainException ex)
         {
-            _logger.LogWarning(ex, "Domain rule violation recording expense in cash box {CashBoxId}: {Message}", cashBoxId, ex.Message);
-            return Result<CashTransactionDto>.Failure(ex.Message);
+            _logger.LogWarning(
+                ex, "Domain rule violation posting payment voucher {Id}: {Message}",
+                id, ex.Message);
+            return Result<PaymentVoucherDto>.Failure(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error recording expense in cash box {CashBoxId}", cashBoxId);
-            return Result<CashTransactionDto>.Failure("حدث خطأ أثناء تسجيل المصروف");
+            _logger.LogError(ex, "Error posting payment voucher {Id}", id);
+            return Result<PaymentVoucherDto>.Failure(
+                "حدث خطأ أثناء ترحيل سند الصرف");
         }
     }
 
-    public async Task<Result> TransferAsync(CashTransferRequest request, int userId, CancellationToken ct)
+    public async Task<Result<PaymentVoucherDto>> CancelPaymentVoucherAsync(
+        int id, int userId, CancellationToken ct)
     {
-        if (request.SourceCashBoxId == request.DestinationCashBoxId)
-            return Result.Failure("لا يمكن تحويل الأموال إلى نفس الصندوق");
-
-        // Validate source and destination exist BEFORE entering the transaction (per RULE-027)
-        var sourceBox = await _uow.CashBoxes.GetByIdAsync(request.SourceCashBoxId, ct);
-        if (sourceBox == null)
-        {
-            _logger.LogWarning("Source cash box {SourceCashBoxId} not found for transfer", request.SourceCashBoxId);
-            return Result.Failure("الصندوق المصدر غير موجود", ErrorCodes.NotFound);
-        }
-
-        var destBox = await _uow.CashBoxes.GetByIdAsync(request.DestinationCashBoxId, ct);
-        if (destBox == null)
-        {
-            _logger.LogWarning("Destination cash box {DestCashBoxId} not found for transfer", request.DestinationCashBoxId);
-            return Result.Failure("الصندوق الوجهة غير موجود", ErrorCodes.NotFound);
-        }
-
         try
         {
-            // Use ExecuteTransactionAsync instead of BeginTransactionAsync (per RULE-275)
+            var voucher = await _uow.PaymentVouchers.FirstOrDefaultAsync(
+                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+            if (voucher == null)
+                return Result<PaymentVoucherDto>.Failure(
+                    "سند الصرف غير موجود", ErrorCodes.NotFound);
+
+            var wasPosted = voucher.Status == (byte)InvoiceStatus.Posted;
+            voucher.Cancel(userId);
+
+            // Reverse journal entry if the voucher was previously posted
+            if (wasPosted)
+            {
+                var box = await _uow.CashBoxes.FirstOrDefaultAsync(
+                    b => b.Id == voucher.CashBoxId, ct, "Account");
+                if (box?.AccountId == null)
+                    return Result<PaymentVoucherDto>.Failure(
+                        "الحساب المحاسبي للصندوق غير مهيأ");
+
+                var cashAccountId = box.AccountId.Value;
+
+                var reverseRequest = new CreateJournalEntryRequest(
+                    TransactionDate: DateTime.UtcNow,
+                    Description: $"قيد عكس سند صرف رقم {voucher.VoucherNo}",
+                    EntryType: JournalEntryType.Manual,
+                    ReferenceType: "PaymentVoucher",
+                    ReferenceId: voucher.Id,
+                    ReferenceNumber: $"{voucher.VoucherNo}-REV",
+                    Lines: new List<JournalEntryLineRequest>
+                    {
+                        new(cashAccountId, voucher.TotalAmount, 0,
+                            "عكس سند صرف - الجانب المدين (النقدية)"),
+                        new(voucher.AccountId, 0, voucher.TotalAmount,
+                            $"عكس سند صرف - الجانب الدائن ({voucher.Account?.NameAr ?? "الحساب"})")
+                    });
+
+                var entryResult = await _journalEntryService.CreateJournalEntryAsync(
+                    reverseRequest, userId, ct);
+                if (!entryResult.IsSuccess)
+                    return Result<PaymentVoucherDto>.Failure(entryResult.Error!);
+
+                var postResult = await _journalEntryService.PostJournalEntryAsync(
+                    entryResult.Value, userId, ct);
+                if (!postResult.IsSuccess)
+                    return Result<PaymentVoucherDto>.Failure(postResult.Error!);
+            }
+
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "PaymentVoucher {Id} cancelled by User {UserId}", id, userId);
+
+            var cancelled = await _uow.PaymentVouchers.FirstOrDefaultAsync(
+                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+            return Result<PaymentVoucherDto>.Success(MapPaymentVoucherToDto(cancelled!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(
+                ex, "Domain rule violation cancelling payment voucher {Id}: {Message}",
+                id, ex.Message);
+            return Result<PaymentVoucherDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cancelling payment voucher {Id}", id);
+            return Result<PaymentVoucherDto>.Failure(
+                "حدث خطأ أثناء إلغاء سند الصرف");
+        }
+    }
+
+    public async Task<Result<List<PaymentVoucherDto>>> GetPaymentVouchersAsync(
+        int cashBoxId, CancellationToken ct)
+    {
+        try
+        {
+            var boxExists = await _uow.CashBoxes.AnyAsync(b => b.Id == cashBoxId, ct);
+            if (!boxExists)
+                return Result<List<PaymentVoucherDto>>.Failure(
+                    "الصندوق النقدي غير موجود", ErrorCodes.NotFound);
+
+            var vouchers = await _uow.PaymentVouchers.ToListAsync(
+                v => v.CashBoxId == cashBoxId,
+                q => q.OrderByDescending(v => v.VoucherDate)
+                      .ThenByDescending(v => v.Id),
+                ct: ct,
+                includePaths: new[] { "Currency", "CashBox", "Account" });
+
+            var dtos = vouchers.Select(MapPaymentVoucherToDto).ToList();
+            return Result<List<PaymentVoucherDto>>.Success(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex, "Error retrieving payment vouchers for cash box {CashBoxId}",
+                cashBoxId);
+            return Result<List<PaymentVoucherDto>>.Failure(
+                "حدث خطأ أثناء استرجاع سندات الصرف");
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Transfer
+    // ═══════════════════════════════════════════════════════════
+
+    public async Task<Result> TransferAsync(
+        CashTransferRequest request, int userId, CancellationToken ct)
+    {
+        try
+        {
+            if (request.SourceCashBoxId == request.DestinationCashBoxId)
+                return Result.Failure("لا يمكن التحويل من صندوق إلى نفسه");
+
+            if (request.Amount <= 0)
+                return Result.Failure("مبلغ التحويل يجب أن يكون أكبر من الصفر");
+
+            var sourceBox = await _uow.CashBoxes.FirstOrDefaultAsync(
+                b => b.Id == request.SourceCashBoxId, ct, "Account");
+            if (sourceBox == null)
+                return Result.Failure("صندوق المصدر غير موجود", ErrorCodes.NotFound);
+
+            var destBox = await _uow.CashBoxes.FirstOrDefaultAsync(
+                b => b.Id == request.DestinationCashBoxId, ct, "Account");
+            if (destBox == null)
+                return Result.Failure("صندوق الوجهة غير موجود", ErrorCodes.NotFound);
+
+            if (sourceBox.AccountId == null)
+                return Result.Failure("الحساب المحاسبي لصندوق المصدر غير مهيأ");
+
+            if (destBox.AccountId == null)
+                return Result.Failure("الحساب المحاسبي لصندوق الوجهة غير مهيأ");
+
+            // Execute transfer atomically within a single transaction
             await _uow.ExecuteTransactionAsync(async () =>
             {
-                var sourceRunningBalance = await ComputeRunningBalanceAsync(request.SourceCashBoxId, ct);
-                var destRunningBalance = await ComputeRunningBalanceAsync(request.DestinationCashBoxId, ct);
+                // Payment from source cash box (Dr Destination Account / Cr Source Cash Account)
+                var paymentResult = await CreatePaymentVoucherInternalAsync(
+                    request.SourceCashBoxId,
+                    request.CurrencyId,
+                    destBox.AccountId!.Value,
+                    request.Amount,
+                    $"تحويل إلى {destBox.BoxName}" +
+                        (string.IsNullOrWhiteSpace(request.Notes) ? "" : $" - {request.Notes}"),
+                    null,
+                    null,
+                    userId,
+                    ct);
 
-                // Create withdrawal from source
-                var sourceNewBalance = sourceRunningBalance - request.Amount;
-                var withdrawalTx = CashTransaction.Create(
-                    request.SourceCashBoxId, CashTransactionType.TransferOut,
-                    -request.Amount, sourceNewBalance,
-                    "CashTransfer", request.DestinationCashBoxId,
-                    userId, request.Notes, null);
-                await _uow.CashTransactions.AddAsync(withdrawalTx, ct);
+                if (!paymentResult.IsSuccess || paymentResult.Value == null)
+                    throw new DomainException(
+                        paymentResult.Error ?? "فشل إنشاء سند الصرف للتحويل");
 
-                // Create deposit to destination
-                var destNewBalance = destRunningBalance + request.Amount;
-                var depositTx = CashTransaction.Create(
-                    request.DestinationCashBoxId, CashTransactionType.TransferIn,
-                    request.Amount, destNewBalance,
-                    "CashTransfer", request.SourceCashBoxId,
-                    userId, request.Notes, null);
-                await _uow.CashTransactions.AddAsync(depositTx, ct);
+                // Receipt to destination cash box (Dr Destination Cash Account / Cr Source Account)
+                var receiptResult = await CreateReceiptVoucherInternalAsync(
+                    request.DestinationCashBoxId,
+                    request.CurrencyId,
+                    sourceBox.AccountId!.Value,
+                    request.Amount,
+                    $"تحويل من {sourceBox.BoxName}" +
+                        (string.IsNullOrWhiteSpace(request.Notes) ? "" : $" - {request.Notes}"),
+                    null,
+                    null,
+                    userId,
+                    ct);
 
-                await _uow.SaveChangesAsync(ct);
+                if (!receiptResult.IsSuccess || receiptResult.Value == null)
+                    throw new DomainException(
+                        receiptResult.Error ?? "فشل إنشاء سند القبض للتحويل");
+
+                // Post the payment voucher
+                var postPayment = await PostPaymentVoucherAsync(
+                    paymentResult.Value.Id, userId, ct);
+                if (!postPayment.IsSuccess)
+                    throw new DomainException(
+                        postPayment.Error ?? "فشل ترحيل سند الصرف للتحويل");
+
+                // Post the receipt voucher
+                var postReceipt = await PostReceiptVoucherAsync(
+                    receiptResult.Value.Id, userId, ct);
+                if (!postReceipt.IsSuccess)
+                    throw new DomainException(
+                        postReceipt.Error ?? "فشل ترحيل سند القبض للتحويل");
             }, ct);
 
             _logger.LogInformation(
-                "Cash transfer of {Amount:N2} from box {SourceBoxId} to box {DestBoxId} by User {UserId}",
+                "Cash transfer completed: {Amount} from CashBox {SourceId} to CashBox {DestId} by User {UserId}",
                 request.Amount, request.SourceCashBoxId, request.DestinationCashBoxId, userId);
 
             return Result.Success();
         }
         catch (DomainException ex)
         {
-            _logger.LogWarning(ex, "Domain rule violation transferring cash from {SourceBoxId} to {DestBoxId}: {Message}",
-                request.SourceCashBoxId, request.DestinationCashBoxId, ex.Message);
+            _logger.LogWarning(
+                ex, "Domain rule violation during transfer: {Message}", ex.Message);
             return Result.Failure(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error transferring cash from {SourceBoxId} to {DestBoxId}",
+            _logger.LogError(
+                ex, "Error during cash transfer from {Source} to {Dest}",
                 request.SourceCashBoxId, request.DestinationCashBoxId);
-            return Result.Failure("حدث خطأ أثناء تحويل الأموال");
+            return Result.Failure("حدث خطأ أثناء التحويل النقدي");
         }
     }
 
-    public async Task<Result<DailyClosureDto>> PerformDailyClosureAsync(int cashBoxId, int userId, CancellationToken ct)
+    // ═══════════════════════════════════════════════════════════
+    // Invoice Payment Recording (called by other services)
+    // ═══════════════════════════════════════════════════════════
+
+    public async Task<Result<ReceiptVoucherDto>> RecordInvoiceReceiptAsync(
+        int cashBoxId, short currencyId, decimal amount, int accountId,
+        string? notes = null, int? referenceId = null, string? referenceType = null,
+        int userId = 0, CancellationToken ct = default)
     {
-        try
-        {
-            var box = await _uow.CashBoxes.GetByIdAsync(cashBoxId, ct);
-            if (box == null)
-                return Result<DailyClosureDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
-
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-            var hasExistingClosure = await _uow.DailyClosures.AnyAsync(
-                dc => dc.CashBoxId == cashBoxId && dc.ClosureDate == today, ct);
-            if (hasExistingClosure)
-                return Result<DailyClosureDto>.Failure("تم إغلاق الصندوق بالفعل اليوم");
-
-            var todayStart = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-
-            var allTransactions = await _uow.CashTransactions.ToListAsync(
-                t => t.CashBoxId == cashBoxId,
-                q => q.OrderBy(t => t.CreatedAt),
-                ct);
-
-            if (allTransactions.Count == 0)
-            {
-                var emptyClosure = DailyClosure.Create(
-                    cashBoxId, today, 0, 0, 0, 0, userId);
-                await _uow.DailyClosures.AddAsync(emptyClosure, ct);
-                await _uow.SaveChangesAsync(ct);
-
-                _logger.LogInformation("Daily closure for empty cash box {CashBoxId} by User {UserId}", cashBoxId, userId);
-                return Result<DailyClosureDto>.Success(MapToClosureDto(emptyClosure));
-            }
-
-            var beforeTodayTransactions = allTransactions.Where(t => t.CreatedAt < todayStart).ToList();
-            var todayTransactions = allTransactions.Where(t => t.CreatedAt >= todayStart).ToList();
-
-            // Opening balance = running balance of last transaction before today
-            var openingBalance = beforeTodayTransactions.Count > 0
-                ? beforeTodayTransactions.Last().RunningBalance
-                : 0m;
-
-            var totalIncome = todayTransactions.Where(t => t.Amount > 0).Sum(t => t.Amount);
-            var totalExpense = todayTransactions.Where(t => t.Amount < 0).Sum(t => Math.Abs(t.Amount));
-
-            var dailyClosure = DailyClosure.Create(
-                cashBoxId, today, openingBalance, totalIncome, totalExpense, userId);
-
-            await _uow.DailyClosures.AddAsync(dailyClosure, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation(
-                "Daily closure for cash box {CashBoxId}: Opening={Opening:N2}, Income={Income:N2}, Expense={Expense:N2}, ExpectedClosing={ExpectedClosing:N2}",
-                cashBoxId, openingBalance, totalIncome, totalExpense, dailyClosure.ExpectedClosingBalance);
-
-            return Result<DailyClosureDto>.Success(MapToClosureDto(dailyClosure));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation performing daily closure for cash box {CashBoxId}: {Message}", cashBoxId, ex.Message);
-            return Result<DailyClosureDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error performing daily closure for cash box {CashBoxId}", cashBoxId);
-            return Result<DailyClosureDto>.Failure("حدث خطأ أثناء تنفيذ الإغلاق اليومي");
-        }
+        return await CreateReceiptVoucherInternalAsync(
+            cashBoxId, currencyId, accountId, amount, notes,
+            referenceId, referenceType, userId, ct);
     }
 
-    public async Task<Result<List<DailyClosureDto>>> GetDailyClosuresAsync(int cashBoxId, CancellationToken ct)
+    public async Task<Result<PaymentVoucherDto>> RecordInvoicePaymentAsync(
+        int cashBoxId, short currencyId, decimal amount, int accountId,
+        string? notes = null, int? sourceDocumentId = null,
+        string? sourceDocumentType = null, int userId = 0,
+        CancellationToken ct = default)
     {
-        try
-        {
-            var boxExists = await _uow.CashBoxes.AnyAsync(b => b.Id == cashBoxId, ct);
-            if (!boxExists)
-                return Result<List<DailyClosureDto>>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
-
-            var closures = await _uow.DailyClosures.ToListAsync(
-                dc => dc.CashBoxId == cashBoxId,
-                q => q.OrderByDescending(dc => dc.ClosureDate),
-                ct);
-
-            var dtos = closures.Select(MapToClosureDto).ToList();
-            return Result<List<DailyClosureDto>>.Success(dtos);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving daily closures for cash box {CashBoxId}", cashBoxId);
-            return Result<List<DailyClosureDto>>.Failure("حدث خطأ أثناء استرجاع الإغلاقات اليومية");
-        }
+        return await CreatePaymentVoucherInternalAsync(
+            cashBoxId, currencyId, accountId, amount, notes,
+            sourceDocumentId, sourceDocumentType, userId, ct);
     }
 
-    public async Task<Result<DailyClosureDto>> CreateClosureByCashBoxAsync(
-        CreateDailyClosureRequest request, int userId, CancellationToken ct)
-    {
-        try
-        {
-            var box = await _uow.CashBoxes.GetByIdAsync(request.CashBoxId, ct);
-            if (box == null)
-                return Result<DailyClosureDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
-
-            var closureDate = DateOnly.FromDateTime(request.ClosureDate.Kind == DateTimeKind.Utc
-                ? request.ClosureDate
-                : request.ClosureDate.ToUniversalTime());
-
-            var hasExistingClosure = await _uow.DailyClosures.AnyAsync(
-                dc => dc.CashBoxId == request.CashBoxId && dc.ClosureDate == closureDate, ct);
-            if (hasExistingClosure)
-                return Result<DailyClosureDto>.Failure("تم إغلاق الصندوق بالفعل في هذا التاريخ");
-
-            var dayStart = closureDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var dayEnd = closureDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
-
-            var allTransactions = await _uow.CashTransactions.ToListAsync(
-                t => t.CashBoxId == request.CashBoxId,
-                q => q.OrderBy(t => t.CreatedAt),
-                ct);
-
-            // Opening balance = running balance of last transaction before today
-            var beforeToday = allTransactions.Where(t => t.CreatedAt < dayStart).ToList();
-            var todayTransactions = allTransactions.Where(t => t.CreatedAt >= dayStart && t.CreatedAt <= dayEnd).ToList();
-
-            var openingBalance = beforeToday.Count > 0
-                ? beforeToday.Last().RunningBalance
-                : 0m;
-
-            var totalIncome = todayTransactions.Where(t => t.Amount > 0).Sum(t => t.Amount);
-            var totalExpense = todayTransactions.Where(t => t.Amount < 0).Sum(t => Math.Abs(t.Amount));
-
-            var dailyClosure = DailyClosure.Create(
-                request.CashBoxId, closureDate, openingBalance, totalIncome, totalExpense, userId);
-
-            await _uow.DailyClosures.AddAsync(dailyClosure, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation(
-                "Daily closure created for cash box {CashBoxId} on {Date}: Opening={Opening:N2}, Income={Income:N2}, Expense={Expense:N2}",
-                request.CashBoxId, closureDate, openingBalance, totalIncome, totalExpense);
-
-            return Result<DailyClosureDto>.Success(MapToClosureDto(dailyClosure));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation creating daily closure: {Message}", ex.Message);
-            return Result<DailyClosureDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating daily closure for cash box {CashBoxId}", request.CashBoxId);
-            return Result<DailyClosureDto>.Failure("حدث خطأ أثناء إنشاء الإغلاق اليومي");
-        }
-    }
-
-    public async Task<Result<DailyClosureDto>> ReconcileClosureAsync(
-        int closureId, ReconcileDailyClosureRequest request, int userId, CancellationToken ct)
-    {
-        try
-        {
-            if (request.ActualCashCount < 0)
-                return Result<DailyClosureDto>.Failure("العدد الفعلي للنقدية لا يمكن أن يكون سالباً");
-
-            var closure = await _uow.DailyClosures.GetByIdAsync(closureId, ct);
-            if (closure == null)
-                return Result<DailyClosureDto>.Failure("الإغلاق اليومي غير موجود", ErrorCodes.NotFound);
-
-            closure.Reconcile(request.ActualCashCount, request.Notes);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation(
-                "Daily closure {ClosureId} reconciled: Actual={Actual:N2}, Expected={Expected:N2}, Diff={Diff:N2} by User {UserId}",
-                closureId, request.ActualCashCount, closure.ExpectedClosingBalance, closure.Difference, userId);
-
-            return Result<DailyClosureDto>.Success(MapToClosureDto(closure));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation reconciling daily closure {ClosureId}: {Message}", closureId, ex.Message);
-            return Result<DailyClosureDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error reconciling daily closure {ClosureId}", closureId);
-            return Result<DailyClosureDto>.Failure("حدث خطأ أثناء تسوية الإغلاق اليومي");
-        }
-    }
-
-    public async Task<Result<CashTransactionDto>> RecordInvoicePaymentAsync(
-        int cashBoxId, decimal amount, CashTransactionType type,
-        string referenceType, int referenceId, int userId, CancellationToken ct)
-    {
-        try
-        {
-            var box = await _uow.CashBoxes.GetByIdAsync(cashBoxId, ct);
-            if (box == null)
-            {
-                _logger.LogWarning("Cash box {CashBoxId} not found for invoice payment", cashBoxId);
-                return Result<CashTransactionDto>.Failure("الصندوق غير موجود", ErrorCodes.NotFound);
-            }
-
-            var runningBalance = await ComputeRunningBalanceAsync(cashBoxId, ct);
-            var signedAmount = IsIncomeType(type) ? amount : -amount;
-            var newRunningBalance = runningBalance + signedAmount;
-
-            var transaction = CashTransaction.Create(
-                cashBoxId, type, signedAmount, newRunningBalance,
-                referenceType, referenceId, userId, null, null);
-
-            await _uow.CashTransactions.AddAsync(transaction, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation(
-                "Invoice payment recorded: {Amount:N2} in cash box {CashBoxId} for {ReferenceType} #{ReferenceId} by User {UserId}",
-                amount, cashBoxId, referenceType, referenceId, userId);
-
-            return Result<CashTransactionDto>.Success(MapToTransactionDto(transaction));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation recording invoice payment in cash box {CashBoxId}: {Message}", cashBoxId, ex.Message);
-            return Result<CashTransactionDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error recording invoice payment in cash box {CashBoxId}", cashBoxId);
-            return Result<CashTransactionDto>.Failure("حدث خطأ أثناء تسجيل الدفعة");
-        }
-    }
-
-    // ─── Helper Methods ─────────────────────────────
-
-    private static bool IsIncomeType(CashTransactionType type) => type switch
-    {
-        CashTransactionType.OpeningBalance => true,
-        CashTransactionType.SalesIncome => true,
-        CashTransactionType.TransferIn => true,
-        CashTransactionType.CustomerPayment => true,
-        _ => false
-    };
+    // ═══════════════════════════════════════════════════════════
+    // Private Helpers
+    // ═══════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Computes the running balance of a cash box by summing all transaction amounts.
+    /// Auto-creates a Level-4 detail account under parent "1110 — النقدية"
+    /// (Cash & Cash Equivalents) for a new cash box.
+    /// Account code auto-increments from existing child codes.
     /// </summary>
-    private async Task<decimal> ComputeRunningBalanceAsync(int cashBoxId, CancellationToken ct)
+    private async Task<Result<Account>> CreateCashBoxAccountAsync(
+        string boxName, int userId, CancellationToken ct)
     {
-        var allTransactions = await _uow.CashTransactions.ToListAsync(
-            t => t.CashBoxId == cashBoxId, null, ct);
-        return allTransactions.Sum(t => t.Amount);
+        try
+        {
+            // Find the Cash & Cash Equivalents parent account (1110)
+            var parent = await _uow.Accounts.FirstOrDefaultAsync(
+                a => a.AccountCode == "1110", ct);
+            if (parent == null)
+                return Result<Account>.Failure(
+                    "الحساب الرئيسي للنقدية (1110) غير موجود في شجرة الحسابات");
+
+            // Find max child code under parent to auto-increment
+            var children = await _uow.Accounts.ToListAsync(
+                a => a.ParentAccountId == parent.Id,
+                q => q.OrderByDescending(a => a.AccountCode),
+                ct: ct);
+
+            var maxCodeStr = children.FirstOrDefault()?.AccountCode
+                             ?? parent.AccountCode;
+            var newCode = (int.Parse(maxCodeStr) + 1).ToString();
+
+            // Create Level-4 detail account with Asset type
+            var account = Account.Create(
+                accountCode: newCode,
+                nameAr: $"صندوق {boxName}",
+                nameEn: $"Cash Box {boxName}",
+                accountType: AccountType.Asset,
+                level: 4,
+                parentAccountId: parent.Id,
+                isSystemAccount: false,
+                description: $"حساب الصندوق النقدي: {boxName}",
+                colorCode: "#2196F3",
+                allowTransactions: true,
+                openingBalance: 0,
+                explanation: null,
+                notes: null,
+                createdByUserId: userId);
+
+            await _uow.Accounts.AddAsync(account, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Auto-created account for cash box '{BoxName}': Code={AccountCode}, Id={AccountId}",
+                boxName, account.AccountCode, account.Id);
+
+            return Result<Account>.Success(account);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex, "Error auto-creating account for cash box '{BoxName}'", boxName);
+            return Result<Account>.Failure(
+                "فشل إنشاء الحساب المحاسبي للصندوق النقدي");
+        }
     }
 
-    private static CashBoxDto MapToDto(CashBox box) => new(
-        box.Id,
-        box.BoxName,
-        box.AccountId,
-        box.Account?.NameAr ?? box.Account?.NameEn,
-        box.CategoryId,
-        box.Category?.Name,
-        box.BranchId,
-        box.CurrencyId,
-        box.Currency?.Name,
-        box.Currency?.Code,
-        box.AssignedUserId,
-        box.PhoneNumber,
-        box.TaxNumber,
-        box.Address,
-        box.Notes,
-        box.IsActive);
+    private async Task<Result<ReceiptVoucherDto>> CreateReceiptVoucherInternalAsync(
+        int cashBoxId, short currencyId, int accountId, decimal amount,
+        string? notes, int? referenceId, string? referenceType,
+        int userId, CancellationToken ct)
+    {
+        try
+        {
+            var voucherNo = await GetNextReceiptVoucherNumberAsync(ct);
+            if (voucherNo <= 0)
+                return Result<ReceiptVoucherDto>.Failure(
+                    "فشل في توليد رقم سند القبض");
 
-    private static CashTransactionDto MapToTransactionDto(CashTransaction t) => new(
-        t.Id,
-        t.CashBoxId,
-        (byte)t.TransactionType,
-        t.Amount,
-        t.RunningBalance,
-        t.ReferenceType,
-        t.ReferenceId,
-        t.CurrencyId,
-        t.Notes,
-        t.CreatedByUserId ?? 0,
-        t.CreatedAt);
+            var voucher = ReceiptVoucher.Create(
+                voucherNo,
+                DateTime.UtcNow,
+                currencyId,
+                cashBoxId,
+                accountId,
+                amount,
+                notes,
+                userId);
 
-    private static DailyClosureDto MapToClosureDto(DailyClosure c) => new(
-        c.Id,
-        c.CashBoxId,
-        c.ClosureDate,
-        c.OpeningBalance,
-        c.TotalIncome,
-        c.TotalExpense,
-        c.ExpectedClosingBalance,
-        c.ActualCashCount,
-        c.Difference,
-        c.IsReconciled,
-        c.ClosedByUserId,
-        c.Notes,
-        c.CreatedAt);
+            await _uow.ReceiptVouchers.AddAsync(voucher, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "ReceiptVoucher created (No: {VoucherNo}, ID: {Id}, Amount: {Amount}) " +
+                "by User {UserId}",
+                voucher.VoucherNo, voucher.Id, amount, userId);
+
+            var created = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
+                v => v.Id == voucher.Id, ct, "Currency", "CashBox", "Account");
+            return Result<ReceiptVoucherDto>.Success(
+                MapReceiptVoucherToDto(created!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(
+                ex, "Domain rule violation creating receipt voucher: {Message}",
+                ex.Message);
+            return Result<ReceiptVoucherDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating receipt voucher");
+            return Result<ReceiptVoucherDto>.Failure(
+                "حدث خطأ أثناء إنشاء سند القبض");
+        }
+    }
+
+    private async Task<Result<PaymentVoucherDto>> CreatePaymentVoucherInternalAsync(
+        int cashBoxId, short currencyId, int accountId, decimal amount,
+        string? notes, int? sourceDocumentId, string? sourceDocumentType,
+        int userId, CancellationToken ct)
+    {
+        try
+        {
+            var voucherNo = await GetNextPaymentVoucherNumberAsync(ct);
+            if (voucherNo <= 0)
+                return Result<PaymentVoucherDto>.Failure(
+                    "فشل في توليد رقم سند الصرف");
+
+            var voucher = PaymentVoucher.Create(
+                voucherNo,
+                DateTime.UtcNow,
+                currencyId,
+                cashBoxId,
+                accountId,
+                amount,
+                notes,
+                sourceDocumentId,
+                sourceDocumentType,
+                userId);
+
+            await _uow.PaymentVouchers.AddAsync(voucher, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "PaymentVoucher created (No: {VoucherNo}, ID: {Id}, Amount: {Amount}) " +
+                "by User {UserId}",
+                voucher.VoucherNo, voucher.Id, amount, userId);
+
+            var created = await _uow.PaymentVouchers.FirstOrDefaultAsync(
+                v => v.Id == voucher.Id, ct, "Currency", "CashBox", "Account");
+            return Result<PaymentVoucherDto>.Success(
+                MapPaymentVoucherToDto(created!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(
+                ex, "Domain rule violation creating payment voucher: {Message}",
+                ex.Message);
+            return Result<PaymentVoucherDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating payment voucher");
+            return Result<PaymentVoucherDto>.Failure(
+                "حدث خطأ أثناء إنشاء سند الصرف");
+        }
+    }
+
+    private async Task<int> GetNextReceiptVoucherNumberAsync(CancellationToken ct)
+    {
+        var seqResult = await _documentSequence.GetNextIntAsync("ReceiptVoucher", ct);
+        return seqResult.IsSuccess ? seqResult.Value : 0;
+    }
+
+    private async Task<int> GetNextPaymentVoucherNumberAsync(CancellationToken ct)
+    {
+        var seqResult = await _documentSequence.GetNextIntAsync("PaymentVoucher", ct);
+        return seqResult.IsSuccess ? seqResult.Value : 0;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Mapping Helpers
+    // ═══════════════════════════════════════════════════════════
+
+    private static CashBoxDto MapToDto(CashBox box)
+    {
+        return new CashBoxDto(
+            box.Id,
+            box.BoxName,
+            box.AccountId,
+            box.Account?.NameAr,
+            null,   // CategoryId — not currently tracked on CashBox entity
+            null,   // CategoryName
+            box.BranchId.HasValue ? (int)box.BranchId.Value : null,
+            box.CurrencyId,
+            box.Currency?.Name,
+            box.Currency?.Code,
+            box.AssignedUserId,
+            box.PhoneNumber,
+            box.TaxNumber,
+            box.Address,
+            box.Notes,
+            box.IsActive
+        );
+    }
+
+    private static ReceiptVoucherDto MapReceiptVoucherToDto(ReceiptVoucher voucher)
+    {
+        return new ReceiptVoucherDto(
+            voucher.Id,
+            voucher.VoucherNo,
+            voucher.VoucherDate,
+            voucher.CurrencyId,
+            voucher.Currency?.Name,
+            voucher.Currency?.Code,
+            voucher.CashBoxId,
+            voucher.CashBox?.BoxName,
+            voucher.AccountId,
+            voucher.Account?.NameAr,
+            voucher.TotalAmount,
+            voucher.Notes,
+            voucher.Status,
+            voucher.CreatedAt,
+            voucher.PostedAt,
+            voucher.CancelledAt
+        );
+    }
+
+    private static PaymentVoucherDto MapPaymentVoucherToDto(PaymentVoucher voucher)
+    {
+        return new PaymentVoucherDto(
+            voucher.Id,
+            voucher.VoucherNo,
+            voucher.VoucherDate,
+            voucher.CurrencyId,
+            voucher.Currency?.Name,
+            voucher.Currency?.Code,
+            voucher.CashBoxId,
+            voucher.CashBox?.BoxName,
+            voucher.AccountId,
+            voucher.Account?.NameAr,
+            voucher.TotalAmount,
+            voucher.Notes,
+            voucher.Status,
+            voucher.SourceDocumentId,
+            voucher.SourceDocumentType,
+            voucher.CreatedAt,
+            voucher.PostedAt,
+            voucher.CancelledAt
+        );
+    }
 }

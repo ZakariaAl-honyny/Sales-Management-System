@@ -186,8 +186,7 @@ public class CreateSupplierRequestValidatorTests
         Phone: "01234567890",
         Email: "supplier@example.com",
         Address: "Test Address",
-        TaxNumber: null,
-        OpeningBalance: 0
+        TaxNumber: null
     );
 }
 
@@ -401,7 +400,6 @@ public class UpdateSupplierRequestValidatorTests
         Email: "updated@supplier.com",
         Address: "Updated Address",
         TaxNumber: null,
-        IsActive: true,
-        CreditLimit: 0
+        IsActive: true
     );
 }

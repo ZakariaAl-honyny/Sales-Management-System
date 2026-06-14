@@ -49,4 +49,24 @@ public class LogsController : ControllerBase
 
         return Ok();
     }
+
+    /// <summary>
+    /// Queries system logs with optional filtering and pagination.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int? level,
+        [FromQuery] string? source,
+        [FromQuery] string? search,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        var result = await _logService.QueryLogsAsync(level, source, search, from, to, page, pageSize, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+        return BadRequest(new { error = result.Error });
+    }
 }

@@ -18,10 +18,14 @@ public class SalesInvoiceRepositoryTests
 
     private async Task SeedTestData(SalesDbContext context)
     {
-        var warehouse = Warehouse.Create(name: "Test Warehouse");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse", code: "WH-TEST");
         context.Warehouses.Add(warehouse);
+        await context.SaveChangesAsync();
         
-        var customer = Customer.Create(name: "Test Customer");
+        var party = Party.Create("Test Customer", PartyType.Customer, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
         context.Customers.Add(customer);
         
         await context.SaveChangesAsync();

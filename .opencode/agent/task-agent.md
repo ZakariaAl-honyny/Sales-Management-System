@@ -46,6 +46,121 @@ TASK-001: [Strong Verb] [Specific Noun]
   Blocked by: [TASK-### or "none"]
 ```
 
+## v4.10 — Task Templates for New Entities
+
+### ProductPrices Implementation Task Template
+```text
+TASK-PP-001: [Create] ProductPrices domain entity with Guard Clauses
+  Refs: REQ-PROD-001, PRD-Phase-25
+  Acceptance: ProductPrice entity with ProductUnitId FK, CurrencyId FK, Price decimal(18,2), EffectiveFrom date, EffectiveTo date
+  Estimate: 2h
+  Critical: YES
+  Blocked by: none
+
+TASK-PP-002: [Create] ProductPrice EF configuration with Fluent API
+  Refs: REQ-PROD-001, PRD-Phase-25
+  Acceptance: HasPrecision(18,2), FK Restrict, CHECK Price >= 0, composite index (ProductUnitId, CurrencyId, EffectiveFrom)
+  Estimate: 1h
+  Critical: NO
+  Blocked by: TASK-PP-001
+
+TASK-PP-003: [Create] ProductPrices API controller + service
+  Refs: REQ-PROD-001, PRD-Phase-25
+  Acceptance: CRUD endpoints, price lookup by (ProductUnitId, CurrencyId, date)
+  Estimate: 3h
+  Critical: NO
+  Blocked by: TASK-PP-002
+```
+
+### InventoryBatches Implementation Task Template
+```text
+TASK-IB-001: [Create] InventoryBatch domain entity
+  Refs: REQ-INV-001, PRD-Phase-25
+  Acceptance: BatchNo, ProductId FK, WarehouseId FK, PurchaseInvoiceId FK, ExpiryDate, QuantityReceived, QuantityRemaining, UnitCost
+  Estimate: 2h
+  Critical: YES
+  Blocked by: none
+
+TASK-IB-002: [Create] FIFO/FEFO batch allocation service
+  Refs: REQ-INV-001, PRD-Phase-27/28
+  Acceptance: Sale consumes oldest batch first; if TrackExpiry, consume nearest expiry; QuantityRemaining never < 0
+  Estimate: 4h
+  Critical: YES
+  Blocked by: TASK-IB-001
+
+TASK-IB-003: [Create] Purchase posting to create InventoryBatch
+  Refs: REQ-INV-001, PRD-Phase-27
+  Acceptance: On PurchaseInvoice.Post, create batch with QuantityReceived = line qty, UnitCost = line cost
+  Estimate: 2h
+  Critical: NO
+  Blocked by: TASK-IB-002
+```
+
+### Party Entity Implementation Task Template
+```text
+TASK-PARTY-001: [Create] Party domain entity
+  Refs: REQ-PARTY-001, PRD-Phase-23
+  Acceptance: Party with Name, Phone, Email, Address, TaxNumber, Notes, IsActive
+  Estimate: 1h
+  Critical: YES
+  Blocked by: none
+
+TASK-PARTY-002: [Migrate] Customer to use PartyId FK
+  Refs: REQ-PARTY-001, PRD-Phase-23
+  Acceptance: Customer entity has PartyId FK, no direct Name/Phone/Email/Address fields; Customer references Party for contact data
+  Estimate: 3h
+  Critical: YES
+  Blocked by: TASK-PARTY-001
+
+TASK-PARTY-003: [Migrate] Supplier to use PartyId FK
+  Refs: REQ-PARTY-001, PRD-Phase-24
+  Acceptance: Same pattern as Customer — Supplier.PartyId FK, contact data from Party
+  Estimate: 2h
+  Critical: YES
+  Blocked by: TASK-PARTY-001
+```
+
+### Units (Independent Table) Task Template
+```text
+TASK-UNIT-001: [Create] Unit domain entity
+  Refs: REQ-UNIT-001, PRD-Phase-25
+  Acceptance: Unit with smallint PK, Name, Symbol, IsSystem, IsActive, seed data (7 units)
+  Estimate: 1h
+  Critical: YES
+  Blocked by: none
+
+TASK-UNIT-002: [Migrate] ProductUnit to use UnitId FK (not string UnitName)
+  Refs: REQ-UNIT-001, PRD-Phase-25
+  Acceptance: ProductUnit.UnitId FK → Units, Factor decimal(18,3), IsBaseUnit bit; no embedded UnitName
+  Estimate: 2h
+  Critical: YES
+  Blocked by: TASK-UNIT-001
+```
+
+### Migration Task Template (Old → New Schema)
+```text
+TASK-MIG-001: [Migrate] Data from old InventoryMovement to InventoryTransaction + InventoryTransactionLine
+  Refs: PRD-Schema, v4.10
+  Acceptance: All historical movements migrated; no data loss; transaction types mapped correctly
+  Estimate: 4h
+  Critical: YES
+  Blocked by: TASK-IT-001, TASK-ITL-001
+
+TASK-MIG-002: [Migrate] Data from old StockTransfer to WarehouseTransfer + WarehouseTransferLine
+  Refs: PRD-Schema, v4.10
+  Acceptance: All historical transfers migrated; FromWarehouseId/ToWarehouseId preserved; BatchId linked
+  Estimate: 2h
+  Critical: YES
+  Blocked by: TASK-WT-001, TASK-WTL-001
+
+TASK-MIG-003: [Migrate] int→smallint FK types for lookup tables
+  Refs: PRD-Schema, v4.10
+  Acceptance: All FK columns referencing Roles, Departments, Branches, Warehouses, Currencies, Taxes, Units changed from int to smallint; migration script handles FK drops/recreates
+  Estimate: 3h
+  Critical: YES
+  Blocked by: none
+```
+
 ## Critical Tasks (MUST be flagged)
 - DocumentSequenceService (thread-safe SemaphoreSlim — GetNextIntAsync for UNIQUE InvoiceNo)
 - InvoiceNo generation via DocumentSequenceService.GetNextIntAsync() (never lastId + 1)

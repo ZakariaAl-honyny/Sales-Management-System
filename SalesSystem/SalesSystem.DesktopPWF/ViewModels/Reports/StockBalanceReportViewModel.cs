@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using ClosedXML.Excel;
@@ -7,6 +7,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.Export;
 using Serilog;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Reports;
@@ -25,6 +26,9 @@ public class StockBalanceReportViewModel : ViewModelBase
 
     private IDialogService D => DialogService!;
 
+    private IFinancialReportExportService? _pdfExportService;
+    private IFinancialReportExportService PdfExportService => _pdfExportService ??= App.GetService<IFinancialReportExportService>();
+
     private int? _selectedWarehouseId;
     private string? _errorMessage;
     private bool _hasSearched;
@@ -40,6 +44,8 @@ public class StockBalanceReportViewModel : ViewModelBase
             (Func<Task>)(async () => await ExecuteAsync(LoadDataAsync)));
 
         ExportCommand = new RelayCommand(ExportToExcel);
+        ExportPdfCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExportPdfAsync()));
 
         // Load data on initialization
         _ = LoadWarehousesAsync();
@@ -151,6 +157,11 @@ public class StockBalanceReportViewModel : ViewModelBase
     /// </summary>
     public RelayCommand ExportCommand { get; }
 
+    /// <summary>
+    /// Exports the report data to PDF.
+    /// </summary>
+    public AsyncRelayCommand ExportPdfCommand { get; }
+
     #endregion
 
     #region Data Loading
@@ -194,7 +205,7 @@ public class StockBalanceReportViewModel : ViewModelBase
                     Warehouses.Clear();
 
                     // Add "All Warehouses" option with Id=0
-                    Warehouses.Add(new WarehouseDto(0, "جميع المخازن", 1, string.Empty, null, null, null, true, true, null, null));
+                    Warehouses.Add(new WarehouseDto(0, string.Empty, "جميع المخازن", (byte)1, null, null, null, null, true));
 
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
@@ -272,6 +283,41 @@ public class StockBalanceReportViewModel : ViewModelBase
         catch (Exception ex)
         {
             LogSystemError("فشل في تصدير كشف رصيد المخازن إلى Excel", "StockBalanceReportViewModel.ExportToExcel", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        }
+    }
+
+    private async Task ExportPdfAsync()
+    {
+        if (ReportData.Count == 0)
+        {
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
+            return;
+        }
+
+        try
+        {
+            var dataTable = new System.Data.DataTable();
+            dataTable.Columns.Add("المنتج", typeof(string));
+            dataTable.Columns.Add("التصنيف", typeof(string));
+            dataTable.Columns.Add("المستودع", typeof(string));
+            dataTable.Columns.Add("الكمية", typeof(decimal));
+            dataTable.Columns.Add("حد الطلب", typeof(decimal));
+            dataTable.Columns.Add("متوسط التكلفة", typeof(decimal));
+            dataTable.Columns.Add("القيمة الإجمالية", typeof(decimal));
+            dataTable.Columns.Add("حالة المخزون", typeof(string));
+
+            foreach (var item in ReportData)
+                dataTable.Rows.Add(item.ProductName, item.CategoryName,
+                    item.WarehouseName, item.CurrentStock, item.ReorderLevel,
+                    item.Cost, item.TotalValue, item.BalanceStatus);
+
+            await PdfExportService.ExportToPdfAsync("كشف رصيد المخازن", dataTable, ReportData.Sum(x => x.TotalValue),
+                $"StockBalanceReport_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تصدير كشف رصيد المخازن إلى PDF", "StockBalanceReportViewModel.ExportPdf", ex);
             await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
         }
     }

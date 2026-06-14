@@ -82,9 +82,9 @@ public static class PrintDtoExtensions
             ProductName = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitCost,
-            Discount = i.DiscountAmount,
+            Discount = 0m,
             LineTotal = i.LineTotal,
-            Mode = i.Mode
+            Mode = 1
         }).ToList();
     }
 
@@ -95,9 +95,9 @@ public static class PrintDtoExtensions
             SubTotal = invoice.SubTotal,
             TaxAmount = invoice.TaxAmount,
             Discount = invoice.DiscountAmount,
-            TotalAmount = invoice.TotalAmount,
+            TotalAmount = invoice.NetTotal,
             PaidAmount = invoice.PaidAmount,
-            DueAmount = invoice.DueAmount
+            DueAmount = invoice.RemainingAmount
         };
     }
 
@@ -145,7 +145,7 @@ public static class PrintDtoExtensions
     {
         return new InvoicePrintDto
         {
-            InvoiceNumber = @return.ReturnNo,
+            InvoiceNumber = @return.ReturnNo.ToString(),
             InvoiceDate = @return.ReturnDate,
             TypeName = "مرتجع مشتريات",
             CashierName = string.Empty,
@@ -162,9 +162,9 @@ public static class PrintDtoExtensions
             ProductName = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitCost,
-            Discount = i.DiscountAmount,
+            Discount = 0m,
             LineTotal = i.LineTotal,
-            Mode = i.Mode
+            Mode = 1
         }).ToList();
     }
 
@@ -178,21 +178,6 @@ public static class PrintDtoExtensions
             TotalAmount = @return.TotalAmount,
             PaidAmount = 0,
             DueAmount = @return.TotalAmount
-        };
-    }
-
-    public static PaymentPrintDto ToPrintDto(this CustomerPaymentDto payment)
-    {
-        return new PaymentPrintDto
-        {
-            PaymentNumber = payment.PaymentNo,
-            Date = payment.PaymentDate,
-            Name = payment.CustomerName,
-            Amount = payment.Amount,
-            AmountWord = PrintHelper.ToWord(payment.Amount),
-            Notes = payment.Notes ?? string.Empty,
-            PaymentMethod = payment.PaymentTypeDisplay,
-            TypeName = "سند قبض عميل"
         };
     }
 
@@ -211,28 +196,28 @@ public static class PrintDtoExtensions
         };
     }
 
-    public static TransferPrintDto ToPrintDto(this StockTransferDto transfer)
+    public static TransferPrintDto ToPrintDto(this WarehouseTransferDto transfer)
     {
         return new TransferPrintDto
         {
-            TransferNumber = transfer.TransferNo,
+            TransferNumber = transfer.TransferNo.ToString(),
             Date = transfer.TransferDate,
-            FromWarehouse = transfer.FromWarehouseName ?? "غير معروف",
-            ToWarehouse = transfer.ToWarehouseName ?? "غير معروف",
+            FromWarehouse = transfer.SourceWarehouseName ?? "غير معروف",
+            ToWarehouse = transfer.DestinationWarehouseName ?? "غير معروف",
             Notes = transfer.Notes ?? string.Empty
         };
     }
 
-    public static List<InvoiceItemPrintDto> ToPrintDtos(this IEnumerable<StockTransferItemDto> items)
+    public static List<InvoiceItemPrintDto> ToPrintDtos(this IEnumerable<WarehouseTransferLineDto> lines)
     {
-        return items.Select(i => new InvoiceItemPrintDto
+        return lines.Select(i => new InvoiceItemPrintDto
         {
-            ProductName = i.ProductName,
+            ProductName = i.ProductName ?? string.Empty,
             Quantity = i.Quantity,
             UnitPrice = 0,
             Discount = 0,
             LineTotal = 0,
-            Mode = i.Mode
+            Mode = 1
         }).ToList();
     }
 

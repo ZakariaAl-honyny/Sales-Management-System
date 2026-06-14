@@ -10,65 +10,76 @@ public interface IUnitOfWork
     IGenericRepository<User> Users { get; }
     IGenericRepository<Unit> Units { get; }
     IGenericRepository<Tax> Taxes { get; }
-    IGenericRepository<Category> Categories { get; }
     IGenericRepository<Product> Products { get; }
     IGenericRepository<Warehouse> Warehouses { get; }
     IGenericRepository<Supplier> Suppliers { get; }
     IGenericRepository<Customer> Customers { get; }
     IGenericRepository<DocumentSequence> DocumentSequences { get; }
     IGenericRepository<WarehouseStock> WarehouseStocks { get; }
-    IGenericRepository<InventoryMovement> InventoryMovements { get; }
     IGenericRepository<SalesInvoice> SalesInvoices { get; }
     IGenericRepository<PurchaseInvoice> PurchaseInvoices { get; }
     IGenericRepository<SalesReturn> SalesReturns { get; }
     IGenericRepository<PurchaseReturn> PurchaseReturns { get; }
-    IGenericRepository<StockTransfer> StockTransfers { get; }
-    IGenericRepository<CustomerPayment> CustomerPayments { get; }
     IGenericRepository<SupplierPayment> SupplierPayments { get; }
-    IGenericRepository<StoreSettings> StoreSettings { get; }
-    IGenericRepository<SystemLog> SystemLogs { get; }
-    IGenericRepository<StockTransferItem> StockTransferItems { get; }
+    IGenericRepository<CurrencyRate> CurrencyRates { get; }
+    ISystemLogRepository SystemLogs { get; }
     IGenericRepository<SalesInvoiceItem> SalesInvoiceItems { get; }
     IGenericRepository<PurchaseInvoiceItem> PurchaseInvoiceItems { get; }
-    IGenericRepository<ProductBarcode> ProductBarcodes { get; }
     IGenericRepository<ProductUnit> ProductUnits { get; }
     IGenericRepository<CashBox> CashBoxes { get; }
-    IGenericRepository<CashTransaction> CashTransactions { get; }
     IGenericRepository<SystemSetting> SystemSettings { get; }
-    IGenericRepository<DailyClosure> DailyClosures { get; }
-    IGenericRepository<ProductPriceHistory> ProductPriceHistory { get; }
-    IGenericRepository<StockWriteOff> StockWriteOffs { get; }
     IGenericRepository<Account> Accounts { get; }
     IGenericRepository<JournalEntry> JournalEntries { get; }
     IGenericRepository<JournalEntryLine> JournalEntryLines { get; }
-    IGenericRepository<SystemAccountMappings> SystemAccountMappings { get; }
-    IGenericRepository<FiscalYearClosure> FiscalYearClosures { get; }
+    IGenericRepository<SystemAccountMapping> SystemAccountMappings { get; }
+    IGenericRepository<ReceiptVoucher> ReceiptVouchers { get; }
+    IGenericRepository<PaymentVoucher> PaymentVouchers { get; }
     IGenericRepository<FiscalYear> FiscalYears { get; }
     IGenericRepository<Currency> Currencies { get; }
-    IGenericRepository<ExchangeRateHistory> ExchangeRateHistories { get; }
     IGenericRepository<Permission> Permissions { get; }
     IGenericRepository<RolePermission> RolePermissions { get; }
     IGenericRepository<InventoryBatch> InventoryBatches { get; }
     IGenericRepository<ProductPrice> ProductPrices { get; }
-    IGenericRepository<CustomerGroup> CustomerGroups { get; }
-    IGenericRepository<ProductImage> ProductImages { get; }
-    IGenericRepository<InventoryOperation> InventoryOperations { get; }
-    IGenericRepository<InventoryOperationItem> InventoryOperationItems { get; }
-    IGenericRepository<BillOfMaterials> BillOfMaterials { get; }
-    IGenericRepository<PurchaseOrder> PurchaseOrders { get; }
-    IGenericRepository<PurchaseOrderItem> PurchaseOrderItems { get; }
-    IGenericRepository<AdditionalFee> AdditionalFees { get; }
-    IGenericRepository<AdditionalFeeAllocation> AdditionalFeeAllocations { get; }
-    IGenericRepository<SalesQuotation> SalesQuotations { get; }
-    IGenericRepository<SalesQuotationItem> SalesQuotationItems { get; }
-    IGenericRepository<Cheque> Cheques { get; }
-    IGenericRepository<PaymentAllocation> PaymentAllocations { get; }
+    IGenericRepository<Role> Roles { get; }
+    IGenericRepository<UserRole> UserRoles { get; }
     IAuditLogRepository AuditLogs { get; }
     IGenericRepository<UserSession> UserSessions { get; }
+    IGenericRepository<UserBranch> UserBranches { get; }
+
+    // New entity repositories (v4.7+)
+    IGenericRepository<Party> Parties { get; }
+    IGenericRepository<Attachment> Attachments { get; }
+    IGenericRepository<Notification> Notifications { get; }
+    IGenericRepository<Branch> Branches { get; }
+    IGenericRepository<Department> Departments { get; }
+    IGenericRepository<Bank> Banks { get; }
+    IGenericRepository<Employee> Employees { get; }
+    IGenericRepository<ProductCategory> ProductCategories { get; }
+    IGenericRepository<InventoryCount> InventoryCounts { get; }
+    IGenericRepository<InventoryCountLine> InventoryCountLines { get; }
+    IGenericRepository<InventoryAdjustment> InventoryAdjustments { get; }
+    IGenericRepository<InventoryAdjustmentLine> InventoryAdjustmentLines { get; }
+    IGenericRepository<Expense> Expenses { get; }
+    IGenericRepository<CustomerReceipt> CustomerReceipts { get; }
+    IGenericRepository<CustomerReceiptApplication> CustomerReceiptApplications { get; }
+    IGenericRepository<SupplierPaymentApplication> SupplierPaymentApplications { get; }
+    IGenericRepository<AccountCategory> AccountCategories { get; }
+    IGenericRepository<CompanySettings> CompanySettings { get; }
+
+    // Customer/Supplier Contact repositories
+    IGenericRepository<CustomerContact> CustomerContacts { get; }
+    IGenericRepository<SupplierContact> SupplierContacts { get; }
+
+    // === New Inventory Module (v4.10+) ===
+    IGenericRepository<InventoryTransaction> InventoryTransactions { get; }
+    IGenericRepository<InventoryTransactionLine> InventoryTransactionLines { get; }
+    IGenericRepository<WarehouseTransfer> WarehouseTransfers { get; }
+    IGenericRepository<WarehouseTransferLine> WarehouseTransferLines { get; }
+
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
     Task<T> ExecuteAsync<T>(Func<Task<T>> operation, CancellationToken ct = default);
-    
+
     /// <summary>
     /// Executes the given operation within an execution strategy + explicit transaction.
     /// Use this when multiple SaveChangesAsync calls must be atomic.

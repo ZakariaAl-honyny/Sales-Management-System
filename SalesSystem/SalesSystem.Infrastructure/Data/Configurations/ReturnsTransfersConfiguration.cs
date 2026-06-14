@@ -39,7 +39,7 @@ public class SalesReturnConfiguration : IEntityTypeConfiguration<SalesReturn>
             .HasForeignKey(i => i.SalesReturnId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(sr => sr.IsActive);
+        builder.HasQueryFilter(sr => sr.Status != SalesSystem.Domain.Enums.InvoiceStatus.Cancelled);
     }
 }
 
@@ -60,54 +60,10 @@ public class SalesReturnItemConfiguration : IEntityTypeConfiguration<SalesReturn
             .HasForeignKey(sri => sri.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(sri => sri.IsActive);
-    }
-}
-
-public class StockTransferConfiguration : IEntityTypeConfiguration<StockTransfer>
-{
-    public void Configure(EntityTypeBuilder<StockTransfer> builder)
-    {
-        builder.ToTable("StockTransfers");
-        builder.HasKey(st => st.Id);
-        builder.Property(st => st.TransferNo).IsRequired().HasMaxLength(30);
-        builder.HasIndex(st => st.TransferNo).IsUnique();
-        builder.Property(st => st.Notes).HasMaxLength(500);
-        builder.Property(st => st.Status).HasConversion<byte>();
-
-        builder.HasOne(st => st.FromWarehouse)
+        builder.HasOne<SalesInvoiceItem>()
             .WithMany()
-            .HasForeignKey(st => st.FromWarehouseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(st => st.ToWarehouse)
-            .WithMany()
-            .HasForeignKey(st => st.ToWarehouseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasMany(st => st.Items)
-            .WithOne(i => i.StockTransfer)
-            .HasForeignKey(i => i.StockTransferId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(st => st.IsActive);
-    }
-}
-
-public class StockTransferItemConfiguration : IEntityTypeConfiguration<StockTransferItem>
-{
-    public void Configure(EntityTypeBuilder<StockTransferItem> builder)
-    {
-        builder.ToTable("StockTransferItems");
-        builder.HasKey(sti => sti.Id);
-        builder.Property(sti => sti.Quantity).HasPrecision(18, 3);
-        builder.Property(sti => sti.Notes).HasMaxLength(250);
-
-        builder.HasOne(sti => sti.Product)
-            .WithMany()
-            .HasForeignKey(sti => sti.ProductId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(sti => sti.IsActive);
+            .HasForeignKey(sri => sri.SalesInvoiceLineId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

@@ -34,48 +34,11 @@ Add the following field to `SystemAccountMappings`:
 |-------|------|---------|---------|
 | `OpeningBalanceEquityAccountId` | `int` | `1422` (أرصدة افتتاحية) | Used for customer/supplier opening balance entries |
 
-**To add to the entity (`SystemAccountMappings.cs`):**
-
-```csharp
-public int OpeningBalanceEquityAccountId { get; private set; }
-public Account? OpeningBalanceEquityAccount { get; private set; }
-```
-
-**To add to `Create()` factory:**
-
-```csharp
-if (openingBalanceEquityAccountId <= 0)
-    throw new DomainException("رقم حساب الأرصدة الافتتاحية مطلوب");
-```
-
-**To add to guards and seed data in `AccountingSeeder`:**
-
-After the 13 existing mappings, add:
-```csharp
-openingBalanceEquityAccountId: allAccounts["1422"].Id,
-```
-
-**To add to `SystemAccountMappingsConfiguration`:**
-
-```csharp
-builder.Property(x => x.OpeningBalanceEquityAccountId)
-    .IsRequired()
-    .HasComment("أرصدة افتتاحية (حقوق الملكية)");
-
-builder.HasOne(x => x.OpeningBalanceEquityAccount)
-    .WithMany()
-    .HasForeignKey(x => x.OpeningBalanceEquityAccountId)
-    .OnDelete(DeleteBehavior.Restrict);
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
 
 ### 1.3 New JournalEntryType Enum Values
 
-Add the following to `JournalEntryType.cs`:
-
-```csharp
-CustomerReceipt = 10,   // تحصيل من عميل
-SupplierPayment = 11,   // دفع لمورد
-```
+> See `Domain/Enums/` for enum definitions and `docs/AGENTS.md` §3 for canonical enum values.
 
 These new types enable traceability — payment journal entries are identifiable by type in reports and account ledgers.
 
@@ -96,89 +59,13 @@ These new types enable traceability — payment journal entries are identifiable
 
 All accounting entry creation is centralized into a single **dedicated service** to avoid duplicating account-resolution logic across five business services.
 
-### 2.1 Interface
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
-```csharp
-public interface IAccountingIntegrationService
-{
-    // ─── Opening Balances ───────────────────────────────
-    Task<Result<int>> CreateCustomerOpeningEntryAsync(
-        Customer customer, int userId, CancellationToken ct);
+> See `docs/AGENTS.md` for service layer patterns and DI conventions.
 
-    Task<Result<int>> CreateSupplierOpeningEntryAsync(
-        Supplier supplier, int userId, CancellationToken ct);
+> See `docs/AGENTS.md` for DI registration patterns.
 
-    // ─── Sales Invoices ─────────────────────────────────
-    Task<Result<int>> CreateSalesInvoiceEntryAsync(
-        SalesInvoice invoice, int userId, CancellationToken ct);
-
-    Task<Result<int>> ReverseSalesInvoiceEntryAsync(
-        SalesInvoice invoice, int userId, CancellationToken ct);
-
-    // ─── Purchase Invoices ──────────────────────────────
-    Task<Result<int>> CreatePurchaseInvoiceEntryAsync(
-        PurchaseInvoice invoice, int userId, CancellationToken ct);
-
-    Task<Result<int>> ReversePurchaseInvoiceEntryAsync(
-        PurchaseInvoice invoice, int userId, CancellationToken ct);
-
-    // ─── Payments ───────────────────────────────────────
-    Task<Result<int>> CreateCustomerPaymentEntryAsync(
-        CustomerPayment payment, int userId, CancellationToken ct);
-
-    Task<Result<int>> CreateSupplierPaymentEntryAsync(
-        SupplierPayment payment, int userId, CancellationToken ct);
-}
-```
-
-### 2.2 Dependencies
-
-```csharp
-public class AccountingIntegrationService : IAccountingIntegrationService
-{
-    private readonly IUnitOfWork _uow;
-    private readonly IJournalEntryNumberGenerator _numberGenerator;
-    private readonly ILogger<AccountingIntegrationService> _logger;
-
-    public AccountingIntegrationService(
-        IUnitOfWork uow,
-        IJournalEntryNumberGenerator numberGenerator,
-        ILogger<AccountingIntegrationService> logger)
-    { ... }
-}
-```
-
-### 2.3 Registration (DI)
-
-```csharp
-// In Api/Program.cs or Application/DependencyInjection.cs
-builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationService>();
-```
-
-### 2.4 Internal Helper Methods
-
-To avoid repetition, the service has two key helper methods:
-
-```csharp
-/// <summary>
-/// Loads the SystemAccountMappings singleton with all navigation properties eagerly loaded.
-/// Throws Result.Failure if not found.
-/// </summary>
-private async Task<Result<SystemAccountMappings>> GetMappingsAsync(CancellationToken ct);
-
-/// <summary>
-/// Loads all accounts referenced in the mappings to get Code + NameAr for journal lines.
-/// </summary>
-private async Task<Dictionary<int, Account>> GetAccountsMapAsync(
-    SystemAccountMappings mappings, CancellationToken ct);
-
-/// <summary>
-/// Creates, validates, posts, and persists a journal entry in a single atomic operation.
-/// All callers use this method — handles number generation, balance check, fiscal year guard.
-/// </summary>
-private async Task<Result<int>> CreateAndPostEntryAsync(
-    JournalEntry entry, int userId, CancellationToken ct);
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 The `CreateAndPostEntryAsync` will call `entry.ValidateAndPost(userId)` before saving.
 
@@ -294,22 +181,7 @@ and `productUnit` = `item.Product.GetBaseUnit()` (base unit holds the current we
 
 Use the `SystemAccountMappings.GetPaymentAccountId()` method extended for Mixed:
 
-```csharp
-private (int cashAccountId, int arAccountId) GetSalesPaymentAccounts(
-    SystemAccountMappings mappings, SalesInvoice invoice)
-{
-    var cashId = mappings.DefaultCashAccountId;   // 1111
-    var arId = mappings.AccountsReceivableAccountId; // 1131
-
-    return invoice.PaymentType switch
-    {
-        PaymentType.Cash => (cashId, 0),       // all to cash
-        PaymentType.Credit => (0, arId),       // all to AR
-        PaymentType.Mixed => (cashId, arId),   // split
-        _ => (cashId, 0)
-    };
-}
-```
+> See `SalesSystem.Application/` for service implementation patterns.
 
 #### 3.3.3 Journal Entry — Single Compound Entry (5 lines)
 
@@ -423,22 +295,7 @@ IF Status == Draft (no journal entry to reverse):
 
 For purchases, the payment goes to either Cash or AP:
 
-```csharp
-private (int cashAccountId, int apAccountId) GetPurchasePaymentAccounts(
-    SystemAccountMappings mappings, PurchaseInvoice invoice)
-{
-    var cashId = mappings.DefaultCashAccountId;    // 1111
-    var apId = mappings.AccountsPayableAccountId;   // 1321
-
-    return invoice.PaymentType switch
-    {
-        PaymentType.Cash => (cashId, 0),
-        PaymentType.Credit => (0, apId),
-        PaymentType.Mixed => (cashId, apId),
-        _ => (cashId, 0)
-    };
-}
-```
+> See `SalesSystem.Application/` for service implementation patterns.
 
 #### 3.5.3 Journal Entry
 
@@ -626,41 +483,13 @@ Existing operations (in order):
 
 The `AccountingIntegrationService` needs a private helper to calculate COGS:
 
-```csharp
-private async Task<decimal> CalculateCOGSAsync(
-    SalesInvoice invoice, CancellationToken ct)
-{
-    decimal totalCogs = 0;
-
-    foreach (var item in invoice.Items)
-    {
-        if (item.Product == null) continue;
-
-        var baseUnit = item.Product.GetBaseUnit();
-        var retailQty = item.Product.GetRetailQuantityEquivalent(
-            item.Quantity, item.Mode);
-        var unitCost = baseUnit.PurchaseCost; // Current weighted avg cost
-
-        totalCogs += retailQty * unitCost;
-    }
-
-    return Math.Round(totalCogs, 2);
-}
-```
+> See `SalesSystem.Application/` for service implementation patterns.
 
 **Important caveat:** The `item.Product` navigation property must be eagerly loaded for COGS calculation. In `SalesService.PostAsync()`, line 221 shows `"Items.Product"` is already included in the query — so `item.Product` is available.
 
 ### 4.5 Fiscal Year Guard
 
-Every method in `AccountingIntegrationService` that creates a journal entry MUST call:
-
-```csharp
-var isFiscalYearClosed = await _uow.FiscalYearClosures.AnyAsync(
-    fyc => fyc.FiscalYear == transactionDate.Year, ct);
-if (isFiscalYearClosed)
-    return Result<int>.Failure(
-        $"السنة المالية {transactionDate.Year} مغلقة — لا يمكن إضافة قيود محاسبية");
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 This applies to ALL 8 methods.
 
@@ -734,40 +563,7 @@ No new tables are created. Only:
 - New seed account `1422` (idempotent — skipped if accounts already seeded)
 - New `OpeningBalanceEquityAccountId` column on `SystemAccountMappings` table
 
-**Migration SQL (for reference):**
-```sql
--- Add new account
-IF NOT EXISTS (SELECT 1 FROM Accounts WHERE AccountCode = '1422')
-BEGIN
-    DECLARE @parentId INT = (SELECT Id FROM Accounts WHERE AccountCode = '1420');
-    INSERT INTO Accounts (AccountCode, NameAr, NameEn, AccountType, Level, ParentAccountId,
-        IsSystemAccount, AllowTransactions, ColorCode, Description, Explanation, IsActive, CreatedAt)
-    VALUES ('1422', N'أرصدة افتتاحية', 'Opening Balance Equity', 3, 3, @parentId,
-        0, 1, '#4CAF50',
-        N'رصيد افتتاحي للعملاء والموردين — يتم إقفاله بعد تسوية الأرصدة الافتتاحية',
-        N'حساب مؤقت يستخدم لتسجيل الأرصدة الافتتاحية للعملاء والموردين عند بدء استخدام النظام',
-        1, GETUTCDATE());
-END
-GO
-
--- Add new column to SystemAccountMappings
-IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('SystemAccountMappings') AND name = 'OpeningBalanceEquityAccountId')
-BEGIN
-    ALTER TABLE SystemAccountMappings
-    ADD OpeningBalanceEquityAccountId INT NOT NULL DEFAULT 0;
-    
-    -- Update existing row with the new account
-    UPDATE SystemAccountMappings
-    SET OpeningBalanceEquityAccountId = (SELECT Id FROM Accounts WHERE AccountCode = '1422');
-    
-    -- Add FK constraint
-    ALTER TABLE SystemAccountMappings
-    ADD CONSTRAINT FK_SystemAccountMappings_OpeningBalanceEquityAccount
-    FOREIGN KEY (OpeningBalanceEquityAccountId) REFERENCES Accounts(Id)
-    ON DELETE NO ACTION;  -- Restrict
-END
-GO
-```
+> See `docs/database-schema.md` for the canonical table definitions and `Infrastructure/Data/Seeders/AccountingSeeder.cs` for seed patterns.
 
 ### 7.2 Rollback
 

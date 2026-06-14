@@ -23,20 +23,23 @@ public class CashBoxReportApiService : ApiServiceBase, ICashBoxReportApiService
             "CashBoxReportApiService.GetCashBoxSummaryAsync");
     }
 
-    public async Task<Result<List<DailyClosureReportDto>>> GetDailyClosureReportAsync(DateTime from, DateTime to, int? cashBoxId = null, CancellationToken ct = default)
+    public async Task<Result<List<ReceiptVoucherReportDto>>> GetReceiptVoucherReportAsync(DateTime from, DateTime to, int? cashBoxId = null, CancellationToken ct = default)
     {
-        var url = $"{BasePath}/daily-closures?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
+        var url = $"{BasePath}/receipt-vouchers?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
         if (cashBoxId.HasValue)
             url += $"&cashBoxId={cashBoxId.Value}";
-        return await ExecuteAsync<List<DailyClosureReportDto>>(
+        return await ExecuteAsync<List<ReceiptVoucherReportDto>>(
             () => _httpClient.GetAsync(url, ct),
-            "CashBoxReportApiService.GetDailyClosureReportAsync");
+            "CashBoxReportApiService.GetReceiptVoucherReportAsync");
     }
 
-    public async Task<Result<List<CashTransactionDetailDto>>> GetCashTransactionDetailsAsync(int cashBoxId, DateTime from, DateTime to, CancellationToken ct = default)
+    public async Task<Result<List<PaymentVoucherReportDto>>> GetPaymentVoucherReportAsync(DateTime from, DateTime to, int? cashBoxId = null, CancellationToken ct = default)
     {
-        return await ExecuteAsync<List<CashTransactionDetailDto>>(
-            () => _httpClient.GetAsync($"{BasePath}/{cashBoxId}/transactions?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", ct),
-            "CashBoxReportApiService.GetCashTransactionDetailsAsync");
+        var url = $"{BasePath}/payment-vouchers?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
+        if (cashBoxId.HasValue)
+            url += $"&cashBoxId={cashBoxId.Value}";
+        return await ExecuteAsync<List<PaymentVoucherReportDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "CashBoxReportApiService.GetPaymentVoucherReportAsync");
     }
 }

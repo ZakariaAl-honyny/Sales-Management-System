@@ -1,3 +1,12 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  LEGACY: StoreSettingsServiceTests relied on the StoreSettings entity which
+//  was REMOVED in the 65-table schema migration. Settings are now stored as
+//  key-value pairs via SystemSetting entity.
+//  The service (StoreSettingsService) still exists but uses ISystemSettingsRepository
+//  with SystemSetting key-value pattern internally.
+//  Preserved for reference — NOT included in build.
+// ═══════════════════════════════════════════════════════════════════════════
+#if false
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -205,7 +214,7 @@ public class StoreSettingsServiceTests : IDisposable
         public DbSet<StoreSettings> StoreSettings => Set<StoreSettings>();
     }
 
-    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity
+    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : Entity
     {
         private readonly DbContext _context;
 
@@ -290,3 +299,4 @@ public class StoreSettingsServiceTests : IDisposable
 
     #endregion
 }
+#endif

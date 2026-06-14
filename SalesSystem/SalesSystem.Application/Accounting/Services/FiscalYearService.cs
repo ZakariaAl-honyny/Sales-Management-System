@@ -90,7 +90,7 @@ public class FiscalYearService : IFiscalYearService
 
             // Check no active fiscal year with same year
             var existing = await _uow.FiscalYears.FirstOrDefaultAsync(
-                fy => fy.Year == request.Year && fy.IsActive, ct: ct);
+                fy => fy.Year == request.Year && fy.IsOpen, ct: ct);
             if (existing != null)
                 return Result<FiscalYearDto>.Failure(
                     $"السنة المالية {request.Year} موجودة بالفعل");

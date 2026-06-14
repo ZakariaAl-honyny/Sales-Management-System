@@ -43,14 +43,10 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private int? _returnId;
     private ReturnImpactSummary _impact = new();
 
-    // Currency & Discount fields
+    // Currency fields
     private int? _selectedCurrencyId;
     private decimal? _exchangeRate;
     private bool _isForeignCurrency;
-    private decimal _discountAmount;
-    private bool _isAmountDiscount = true;
-    private bool _isPercentageDiscount;
-    private decimal _discountRate;
     private ObservableCollection<CurrencyDto> _currencies = new();
 
 
@@ -230,57 +226,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         set => SetProperty(ref _isForeignCurrency, value);
     }
 
-    // Discount properties
-    public decimal DiscountAmount
-    {
-        get => _discountAmount;
-        set => SetProperty(ref _discountAmount, value);
-    }
-
-    public bool IsAmountDiscount
-    {
-        get => _isAmountDiscount;
-        set
-        {
-            if (SetProperty(ref _isAmountDiscount, value) && value)
-            {
-                IsPercentageDiscount = false;
-                DiscountRate = DiscountAmount;
-                OnPropertyChanged(nameof(IsPercentageDiscount));
-            }
-        }
-    }
-
-    public bool IsPercentageDiscount
-    {
-        get => _isPercentageDiscount;
-        set
-        {
-            if (SetProperty(ref _isPercentageDiscount, value) && value)
-            {
-                IsAmountDiscount = false;
-                DiscountRate = DiscountAmount > 0 && TotalAmount > 0
-                    ? Math.Round(DiscountAmount / TotalAmount * 100, 2)
-                    : 0;
-                OnPropertyChanged(nameof(IsAmountDiscount));
-            }
-        }
-    }
-
-    public decimal DiscountRate
-    {
-        get => _discountRate;
-        set
-        {
-            if (SetProperty(ref _discountRate, value))
-            {
-                if (IsPercentageDiscount)
-                    DiscountAmount = TotalAmount * value / 100;
-                else
-                    DiscountAmount = value;
-            }
-        }
-    }
     #endregion
 
     #region Commands
@@ -519,21 +464,14 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 ProductId: i.ProductId,
                 ProductUnitId: 1,
                 Quantity: i.ReturnQuantity,
-                UnitCost: i.UnitPrice,
-                DiscountAmount: i.DiscountAmount,
-                Mode: (byte)(i.Mode > 0 ? i.Mode : 1),
-                Notes: null
+                UnitCost: i.UnitPrice
             )).ToList();
 
             var request = new CreatePurchaseReturnRequest(
                 PurchaseInvoiceId: SelectedInvoice?.Id,
                 SupplierId: SelectedInvoice?.SupplierId ?? 0,
                 WarehouseId: SelectedWarehouseId,
-                LinkToInvoice: SelectedInvoice?.Id != null,
                 ReturnDate: ReturnDate,
-                DiscountAmount: DiscountAmount,
-                DiscountType: IsPercentageDiscount ? (byte?)1 : null,
-                DiscountRate: IsPercentageDiscount ? DiscountRate : null,
                 CurrencyId: SelectedCurrencyId,
                 ExchangeRate: ExchangeRate,
                 Notes: Notes,
@@ -696,17 +634,14 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
 public class PurchaseReturnItemViewModel : ViewModelBase
 {
     private decimal _returnQuantity;
-    private byte _mode = 1;
     private readonly ISoundService? _soundService;
 
     public int ProductId { get; }
     public string ProductName { get; }
     public decimal OriginalQuantity { get; }
     public decimal UnitPrice { get; }
-    public decimal DiscountAmount { get; }
-    public byte Mode => _mode;
 
-    public decimal LineTotal => ReturnQuantity * (UnitPrice - (OriginalQuantity > 0 ? DiscountAmount / OriginalQuantity : 0));
+    public decimal LineTotal => ReturnQuantity * UnitPrice;
 
     public decimal ReturnQuantity
     {
@@ -729,8 +664,6 @@ public class PurchaseReturnItemViewModel : ViewModelBase
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitCost;
-        DiscountAmount = item.DiscountAmount;
-        _mode = item.Mode;
         _returnQuantity = 0;
         _soundService = soundService;
     }
@@ -741,8 +674,6 @@ public class PurchaseReturnItemViewModel : ViewModelBase
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitCost;
-        DiscountAmount = item.DiscountAmount;
-        _mode = item.Mode;
         _returnQuantity = item.Quantity;
         _soundService = soundService;
     }

@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using System.Windows;
 using SalesSystem.Contracts.Common;
-using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Models;
@@ -123,7 +123,8 @@ public class LoginWindowViewModel : ViewModelBase
             response.Token,
             response.UserName,
             response.UserId,
-            (UserRole)response.Role);
+            new List<int> { response.Role },
+            GetRoleName(response.Role));
 
         var passwordChangeVm = new PasswordChangeViewModel(
             App.GetService<IAuthApiService>(),
@@ -212,7 +213,8 @@ public class LoginWindowViewModel : ViewModelBase
             response.Token,
             response.UserName,
             response.UserId,
-            (UserRole)response.Role);
+            new List<int> { response.Role },
+            GetRoleName(response.Role));
 
         NavigateToMainWindow();
     }
@@ -237,5 +239,18 @@ public class LoginWindowViewModel : ViewModelBase
                 }
             }
         });
+    }
+
+    private static string GetRoleName(byte roleId)
+    {
+        return roleId switch
+        {
+            1 => "مدير النظام",
+            2 => "مدير",
+            3 => "كاشير",
+            4 => "مراقب",
+            5 => "مدير فرع",
+            _ => "غير معروف"
+        };
     }
 }

@@ -6,22 +6,22 @@ using SalesSystem.Application.Updates.Models;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
-using SalesSystem.Contracts.Enums;
 using SalesSystem.DesktopPWF.ViewModels.Inventory;
 using SalesSystem.DesktopPWF.ViewModels.Updates;
 using SalesSystem.DesktopPWF.Views.Updates;
+using System.Collections.Generic;
 using SalesSystem.DesktopPWF.ViewModels.Products;
 using SalesSystem.DesktopPWF.ViewModels.Customers;
 using SalesSystem.DesktopPWF.ViewModels.Suppliers;
 using SalesSystem.DesktopPWF.ViewModels.Purchases;
 using SalesSystem.DesktopPWF.ViewModels.Returns;
-using SalesSystem.DesktopPWF.ViewModels.Payments;
 using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
 using SalesSystem.DesktopPWF.ViewModels.Sales;
 using SalesSystem.DesktopPWF.ViewModels.Users;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
+using SalesSystem.DesktopPWF.ViewModels.Payments;
 using SalesSystem.DesktopPWF.Messaging.Messages;
 
 namespace SalesSystem.DesktopPWF;
@@ -66,15 +66,18 @@ public partial class MainWindow : Window
     public void UpdateUserInfo()
     {
         TxtUserName.Text = _session.GetUserName() ?? "مستخدم";
-        var role = _session.GetUserRole();
-        TxtUserRole.Text = GetRoleDisplayName(role);
+        TxtUserRole.Text = _session.GetUserRoleName() ?? "غير معروف";
 
-        // Update role badge color
-        var badgeColor = role switch
+        // Update role badge color based on primary role ID
+        var roleIds = _session.GetUserRoleIds();
+        var primaryRoleId = roleIds?.Count > 0 ? roleIds[0] : 0;
+        var badgeColor = primaryRoleId switch
         {
-            UserRole.Admin => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"), // Green
-            UserRole.Manager => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#3B82F6"), // Blue
-            UserRole.Cashier => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#F59E0B"), // Amber
+            1 => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#10B981"), // Green - Admin
+            2 => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#3B82F6"), // Blue - Manager
+            3 => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#F59E0B"), // Amber - Cashier
+            4 => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#6B7280"), // Gray - Observer
+            5 => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#8B5CF6"), // Purple - BranchManager
             _ => (System.Windows.Media.Color?)System.Windows.Media.ColorConverter.ConvertFromString("#6B7280")
         };
         if (badgeColor.HasValue)
@@ -84,17 +87,6 @@ public partial class MainWindow : Window
         }
 
         CurrentDateText.Text = DateTime.Now.ToString("dddd, yyyy/MM/dd HH:mm");
-    }
-
-    private string GetRoleDisplayName(UserRole? role)
-    {
-        return role switch
-        {
-            UserRole.Admin => "مدير النظام",
-            UserRole.Manager => "مدير فرع",
-            UserRole.Cashier => "كاشير",
-            _ => "غير معروف"
-        };
     }
 
     private void BtnChangePassword_Click(object sender, RoutedEventArgs e)
@@ -122,14 +114,11 @@ public partial class MainWindow : Window
     private void SuppliersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SupplierListViewModel>();
     private void UsersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<UserListViewModel>();
     private void SalesInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesInvoiceListViewModel>();
-    private void SalesQuotationsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesQuotationListViewModel>();
     private void PurchaseInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseInvoiceListViewModel>();
-    private void PurchaseOrdersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseOrderListViewModel>();
     private void SalesReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesReturnListViewModel>();
     private void PurchaseReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseReturnListViewModel>();
     private void WarehousesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<WarehouseListViewModel>();
-    private void StockTransfersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<StockTransfersListViewModel>();
-    private void CustomerPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<CustomerPaymentsListViewModel>();
+    private void WarehouseTransfersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<WarehouseTransfersListViewModel>();
     private void SupplierPaymentsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SupplierPaymentsListViewModel>();
     private void InventoryStatusMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<InventoryViewModel>();
     private void TaxesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<TaxesListViewModel>();
@@ -243,9 +232,7 @@ public partial class MainWindow : Window
                 case "CashBoxSummary":
                     _mainViewModel.NavigateTo<CashBoxSummaryViewModel>();
                     break;
-                case "DailyClosure":
-                    _mainViewModel.NavigateTo<DailyClosureReportViewModel>();
-                    break;
+                // DailyClosure removed — schema migrated to ReceiptVoucher/PaymentVoucher
                 // Phase 31 — Activity Reports
                 case "UserActivity":
                     _mainViewModel.NavigateTo<UserActivityViewModel>();
@@ -266,7 +253,6 @@ public partial class MainWindow : Window
         {
             "Sales" => new Views.Sales.SalesInvoicesListView(),
             "Purchases" => new Views.Purchases.PurchaseInvoicesListView(),
-            "PurchaseOrders" => new Views.Purchases.PurchaseOrdersListView(),
             "Products" => new Views.Products.ProductsListView(),
             "Customers" => new Views.Customers.CustomersListView(),
             "Suppliers" => new Views.Suppliers.SuppliersListView(),
@@ -290,9 +276,18 @@ public partial class MainWindow : Window
 
     private void OpenNewSalesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المبيعات", "Sales");
     private void OpenNewPurchasesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المشتريات", "Purchases");
-    private void OpenNewPurchaseOrdersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("أوامر الشراء", "PurchaseOrders");
     private void OpenNewWarehousesWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المستودعات", "Warehouses");
     private void OpenNewProductsWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المنتجات", "Products");
     private void OpenNewCustomersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("العملاء", "Customers");
     private void OpenNewSuppliersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("الموردين", "Suppliers");
+
+    private async void PurchaseOrdersMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        await _dialogService.ShowInfoAsync("غير متاح", "شاشة أوامر الشراء غير متاحة في هذه النسخة");
+    }
+
+    private async void OpenNewPurchaseOrdersWindow_Click(object sender, RoutedEventArgs e)
+    {
+        await _dialogService.ShowInfoAsync("غير متاح", "شاشة أوامر الشراء غير متاحة في هذه النسخة");
+    }
 }

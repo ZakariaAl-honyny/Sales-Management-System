@@ -4,7 +4,7 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SupplierPayment : BaseEntity
+public class SupplierPayment : DocumentEntity
 {
     public string PaymentNo { get; private set; } = string.Empty;
     public int SupplierId { get; private set; }
@@ -13,7 +13,7 @@ public class SupplierPayment : BaseEntity
     public decimal Amount { get; private set; }
 
     /// <summary>
-    /// Payment method: Cash, Cheque, BankTransfer, or CreditCard.
+    /// Payment method: Cash, BankTransfer, or CreditCard.
     /// </summary>
     public PaymentMethod PaymentMethod { get; private set; }
 
@@ -22,27 +22,17 @@ public class SupplierPayment : BaseEntity
     /// </summary>
     public int? CashBoxId { get; private set; }
 
-    public int? CurrencyId { get; private set; }
+    public short? CurrencyId { get; private set; }
     public decimal? ExchangeRate { get; private set; }
     public Currency? Currency { get; private set; }
     public string? ReferenceNo { get; private set; }
     public string? Notes { get; private set; }
+    public InvoiceStatus Status { get; private set; }
 
     // Navigation
     public virtual Supplier? Supplier { get; private set; }
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
     public virtual CashBox? CashBox { get; private set; }
-
-    /// <summary>
-    /// The cheque associated with this payment (when PaymentMethod = Cheque).
-    /// </summary>
-    public virtual Cheque? Cheque { get; private set; }
-
-    /// <summary>
-    /// Allocations of this payment across multiple invoices.
-    /// </summary>
-    private readonly List<PaymentAllocation> _allocations = new();
-    public IReadOnlyCollection<PaymentAllocation> Allocations => _allocations.AsReadOnly();
 
     private SupplierPayment() { }
 
@@ -54,7 +44,7 @@ public class SupplierPayment : BaseEntity
         int? purchaseInvoiceId = null,
         string? referenceNo = null,
         string? notes = null,
-        int? currencyId = null,
+        short? currencyId = null,
         decimal? exchangeRate = null,
         int? cashBoxId = null,
         int? createdByUserId = null,
@@ -81,7 +71,8 @@ public class SupplierPayment : BaseEntity
             ReferenceNo = referenceNo,
             Notes = notes,
             CashBoxId = cashBoxId,
-            PaymentDate = paymentDate ?? DateTime.UtcNow
+            PaymentDate = paymentDate ?? DateTime.UtcNow,
+            Status = InvoiceStatus.Draft
         };
         payment.SetCreatedBy(createdByUserId);
         return payment;
@@ -105,16 +96,6 @@ public class SupplierPayment : BaseEntity
             PaymentDate = paymentDate.Value.Kind == DateTimeKind.Utc ? paymentDate.Value : paymentDate.Value.ToUniversalTime();
         if (notes != null) Notes = notes;
         SetUpdatedBy(updatedByUserId);
-        UpdateTimestamp();
-    }
-
-    /// <summary>
-    /// Replaces the current allocations with the given set.
-    /// </summary>
-    public void UpdateAllocations(IEnumerable<PaymentAllocation> newAllocations)
-    {
-        _allocations.Clear();
-        _allocations.AddRange(newAllocations);
         UpdateTimestamp();
     }
 }

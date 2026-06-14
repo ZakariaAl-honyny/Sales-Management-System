@@ -16,15 +16,11 @@ namespace SalesSystem.Api.Controllers;
 [Authorize]
 public class SupplierPaymentsController : ControllerBase
 {
-    private readonly IPaymentService _paymentService;
-    private readonly IChequeService _chequeService;
+    private readonly ISupplierPaymentService _paymentService;
 
-    public SupplierPaymentsController(
-        IPaymentService paymentService,
-        IChequeService chequeService)
+    public SupplierPaymentsController(ISupplierPaymentService paymentService)
     {
         _paymentService = paymentService;
-        _chequeService = chequeService;
     }
 
     /// <summary>
@@ -42,7 +38,7 @@ public class SupplierPaymentsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
-        var result = await _paymentService.CreateSupplierPaymentAsync(request, userId, ct);
+        var result = await _paymentService.CreateAsync(request, userId, ct);
         return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -60,7 +56,7 @@ public class SupplierPaymentsController : ControllerBase
         [FromQuery] int pageSize = 10,
         CancellationToken ct = default)
     {
-        var result = await _paymentService.GetSupplierPaymentsAsync(search, from, to, page, pageSize, ct);
+        var result = await _paymentService.GetAllAsync(search, from, to, page, pageSize, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -73,7 +69,7 @@ public class SupplierPaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
-        var result = await _paymentService.GetSupplierPaymentByIdAsync(id, ct);
+        var result = await _paymentService.GetByIdAsync(id, ct);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
     }
 
@@ -89,7 +85,7 @@ public class SupplierPaymentsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
-        var result = await _paymentService.UpdateSupplierPaymentAsync(id, request, userId, ct);
+        var result = await _paymentService.UpdateAsync(id, request, userId, ct);
         if (result.IsSuccess) return Ok(result.Value);
         if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
@@ -107,35 +103,10 @@ public class SupplierPaymentsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
-        var result = await _paymentService.DeleteSupplierPaymentAsync(id, userId, ct);
+        var result = await _paymentService.DeleteAsync(id, userId, ct);
         if (result.IsSuccess) return NoContent();
         if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Creates a cheque linked to a supplier payment (e.g., when PaymentMethod = Cheque).
-    /// </summary>
-    [HttpPost("{id:int}/cheque")]
-    [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(typeof(ChequeDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateCheque(int id, [FromBody] CreateChequeRequest request, CancellationToken ct)
-    {
-        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
-
-        // Ensure the cheque is linked to this supplier payment
-        var chequeRequest = request with { SupplierPaymentId = id };
-
-        var result = await _chequeService.CreateAsync(chequeRequest, userId, ct);
-        if (result.IsSuccess)
-            return CreatedAtAction(nameof(GetById), new { id }, new { chequeId = result.Value!.Id, cheque = result.Value });
-
-        if (result.ErrorCode == ErrorCodes.NotFound)
-            return NotFound(new { error = result.Error });
-
-        return BadRequest(new { error = result.Error });
-    }
 }

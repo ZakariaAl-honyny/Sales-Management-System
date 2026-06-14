@@ -47,7 +47,7 @@ public class AuditLogListViewModel : AdminOnlyViewModel
         EntityTypeFilters = new ObservableCollection<string>
         {
             "User", "SalesInvoice", "PurchaseInvoice", "Product", "Customer",
-            "Supplier", "Payment", "StockTransfer", "Currency", "Tax"
+            "Supplier", "Payment", "WarehouseTransfer", "Currency", "Tax"
         };
 
         InitializeCommands();

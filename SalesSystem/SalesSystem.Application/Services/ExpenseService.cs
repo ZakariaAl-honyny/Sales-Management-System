@@ -1,0 +1,280 @@
+using Microsoft.Extensions.Logging;
+using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Services;
+using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
+using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
+
+namespace SalesSystem.Application.Services;
+
+public class ExpenseService : IExpenseService
+{
+    private readonly IUnitOfWork _uow;
+    private readonly ILogger<ExpenseService> _logger;
+
+    public ExpenseService(IUnitOfWork uow, ILogger<ExpenseService> logger)
+    {
+        _uow = uow;
+        _logger = logger;
+    }
+
+    public async Task<Result<ExpenseDto>> CreateAsync(CreateExpenseRequest request, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var expenseNo = await GetNextExpenseNumberAsync(ct);
+
+            var expense = Expense.Create(
+                expenseNo,
+                request.ExpenseDate,
+                request.ExpenseAccountId,
+                request.CashBoxId,
+                (short)request.CurrencyId,
+                request.Amount,
+                request.Notes,
+                userId);
+
+            await _uow.Expenses.AddAsync(expense, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Expense created (No: {ExpenseNo}, ID: {Id}) by User {UserId}",
+                expense.ExpenseNo, expense.Id, userId);
+
+            // Reload with navigation properties for the response
+            var created = await _uow.Expenses.FirstOrDefaultAsync(
+                e => e.Id == expense.Id, ct, "ExpenseAccount", "CashBox", "Currency");
+            return Result<ExpenseDto>.Success(MapToDto(created!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation creating expense: {Message}", ex.Message);
+            return Result<ExpenseDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating expense");
+            return Result<ExpenseDto>.Failure("حدث خطأ أثناء إنشاء المصروف");
+        }
+    }
+
+    public async Task<Result<ExpenseDto>> GetByIdAsync(int id, CancellationToken ct)
+    {
+        try
+        {
+            var expense = await _uow.Expenses.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+            if (expense == null)
+                return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
+
+            return Result<ExpenseDto>.Success(MapToDto(expense));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving expense {Id}", id);
+            return Result<ExpenseDto>.Failure("حدث خطأ أثناء استرجاع بيانات المصروف");
+        }
+    }
+
+    public async Task<Result<PagedResult<ExpenseDto>>> GetAllAsync(
+        string? search, DateTime? from, DateTime? to, int page, int pageSize, CancellationToken ct)
+    {
+        try
+        {
+            // Build predicate
+            System.Linq.Expressions.Expression<Func<Expense, bool>>? predicate = null;
+
+            if (from.HasValue || to.HasValue || !string.IsNullOrWhiteSpace(search))
+            {
+                predicate = e =>
+                    (!from.HasValue || e.ExpenseDate >= from.Value) &&
+                    (!to.HasValue || e.ExpenseDate <= to.Value) &&
+                    (string.IsNullOrWhiteSpace(search) ||
+                     e.ExpenseNo.ToString().Contains(search) ||
+                     (e.Notes != null && e.Notes.Contains(search)));
+            }
+
+            var (items, totalCount) = await _uow.Expenses.GetPagedAsync(
+                predicate,
+                orderConfig: q => q.OrderByDescending(e => e.ExpenseDate).ThenByDescending(e => e.Id),
+                page,
+                pageSize,
+                ct,
+                includePaths: new[] { "ExpenseAccount", "CashBox", "Currency" });
+
+            var dtos = items.Select(MapToDto).ToList();
+            var result = PagedResult<ExpenseDto>.Create(dtos, totalCount, page, pageSize);
+
+            return Result<PagedResult<ExpenseDto>>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving expenses list");
+            return Result<PagedResult<ExpenseDto>>.Failure("حدث خطأ أثناء استرجاع قائمة المصروفات");
+        }
+    }
+
+    public async Task<Result<ExpenseDto>> UpdateAsync(int id, UpdateExpenseRequest request, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var expense = await _uow.Expenses.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+            if (expense == null)
+                return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
+
+            expense.Update(
+                request.ExpenseDate,
+                request.ExpenseAccountId,
+                request.CashBoxId,
+                (short)request.CurrencyId,
+                request.Amount,
+                request.Notes);
+
+            expense.SetUpdatedBy(userId);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Expense {Id} updated by User {UserId}", id, userId);
+
+            // Reload to get fresh navigation properties
+            var updated = await _uow.Expenses.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+            return Result<ExpenseDto>.Success(MapToDto(updated!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation updating expense {Id}: {Message}", id, ex.Message);
+            return Result<ExpenseDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating expense {Id}", id);
+            return Result<ExpenseDto>.Failure("حدث خطأ أثناء تحديث المصروف");
+        }
+    }
+
+    public async Task<Result> DeleteAsync(int id, CancellationToken ct)
+    {
+        try
+        {
+            var expense = await _uow.Expenses.GetByIdAsync(id, ct);
+            if (expense == null)
+                return Result.Failure("المصروف غير موجود", ErrorCodes.NotFound);
+
+            if (expense.Status == InvoiceStatus.Posted)
+                return Result.Failure("لا يمكن حذف مصروف مرحّل. قم بإلغائه أولاً.");
+
+            expense.Cancel();
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Expense {Id} cancelled (deleted)", id);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting expense {Id}", id);
+            return Result.Failure("حدث خطأ أثناء حذف المصروف");
+        }
+    }
+
+    public async Task<Result<ExpenseDto>> PostAsync(int id, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var expense = await _uow.Expenses.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+            if (expense == null)
+                return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
+
+            expense.Post();
+            expense.SetUpdatedBy(userId);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Expense {Id} posted by User {UserId}", id, userId);
+
+            var posted = await _uow.Expenses.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+            return Result<ExpenseDto>.Success(MapToDto(posted!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation posting expense {Id}: {Message}", id, ex.Message);
+            return Result<ExpenseDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error posting expense {Id}", id);
+            return Result<ExpenseDto>.Failure("حدث خطأ أثناء ترحيل المصروف");
+        }
+    }
+
+    public async Task<Result<ExpenseDto>> CancelAsync(int id, CancellationToken ct)
+    {
+        try
+        {
+            var expense = await _uow.Expenses.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+            if (expense == null)
+                return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
+
+            expense.Cancel();
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Expense {Id} cancelled", id);
+
+            var cancelled = await _uow.Expenses.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+            return Result<ExpenseDto>.Success(MapToDto(cancelled!));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation cancelling expense {Id}: {Message}", id, ex.Message);
+            return Result<ExpenseDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cancelling expense {Id}", id);
+            return Result<ExpenseDto>.Failure("حدث خطأ أثناء إلغاء المصروف");
+        }
+    }
+
+    // ─── Private Helpers ─────────────────────────────────
+
+    private async Task<int> GetNextExpenseNumberAsync(CancellationToken ct)
+    {
+        var all = await _uow.Expenses.ToListIgnoreFiltersAsync(ct);
+        if (all.Count == 0)
+            return 1;
+        return all.Max(e => e.ExpenseNo) + 1;
+    }
+
+    private static ExpenseDto MapToDto(Expense expense)
+    {
+        return new ExpenseDto(
+            expense.Id,
+            expense.ExpenseNo,
+            expense.ExpenseDate,
+            expense.ExpenseAccountId,
+            expense.ExpenseAccount?.NameAr,
+            expense.CashBoxId,
+            expense.CashBox?.BoxName,
+            expense.CurrencyId,
+            expense.Currency?.Name,
+            expense.Amount,
+            expense.Notes,
+            (byte)expense.Status,
+            GetStatusName(expense.Status),
+            expense.Status != InvoiceStatus.Cancelled
+        );
+    }
+
+    private static string? GetStatusName(InvoiceStatus status) => status switch
+    {
+        InvoiceStatus.Draft => "مسودة",
+        InvoiceStatus.Posted => "مرحّل",
+        InvoiceStatus.Cancelled => "ملغي",
+        _ => null
+    };
+}

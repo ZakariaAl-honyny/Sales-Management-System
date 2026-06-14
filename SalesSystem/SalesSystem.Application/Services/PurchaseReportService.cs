@@ -30,18 +30,18 @@ public class PurchaseReportService : IPurchaseReportService
 
             var invoices = await _uow.PurchaseInvoices.ToListAsync(
                 pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
-                q => q.Include(pi => pi.Supplier),
+                q => q.Include(pi => pi.Supplier).ThenInclude(s => s!.Party),
                 ct);
 
             var grouped = invoices
-                .GroupBy(pi => new { pi.SupplierId, pi.Supplier.Name })
+                .GroupBy(pi => new { pi.SupplierId, SupplierName = pi.Supplier?.Party?.Name ?? "مورد" })
                 .Select(g => new PurchasesBySupplierDto(
                     g.Key.SupplierId,
-                    g.Key.Name,
+                    g.Key.SupplierName,
                     g.Count(),
-                    g.Sum(pi => pi.TotalAmount),
+                    g.Sum(pi => pi.NetTotal),
                     g.Sum(pi => pi.PaidAmount),
-                    g.Sum(pi => pi.DueAmount)
+                    g.Sum(pi => pi.RemainingAmount)
                 ))
                 .OrderByDescending(dto => dto.TotalAmount)
                 .ToList();
@@ -65,9 +65,9 @@ public class PurchaseReportService : IPurchaseReportService
             _logger.LogInformation("Getting purchases by product from {From} to {To}", from, to);
 
             var invoiceItems = await _uow.PurchaseInvoiceItems.ToListAsync(
-                item => item.PurchaseInvoice.Status == InvoiceStatus.Posted
-                     && item.PurchaseInvoice.InvoiceDate >= from
-                     && item.PurchaseInvoice.InvoiceDate <= to,
+                item => item.PurchaseInvoice!.Status == InvoiceStatus.Posted
+                     && item.PurchaseInvoice!.InvoiceDate >= from
+                     && item.PurchaseInvoice!.InvoiceDate <= to,
                 q => q.Include(item => item.PurchaseInvoice).Include(item => item.Product),
                 ct);
 
@@ -116,8 +116,8 @@ public class PurchaseReportService : IPurchaseReportService
                 .GroupBy(pi => keySelector(pi.InvoiceDate))
                 .Select(g => new PurchaseTrendDto(
                     g.Key,
-                    g.Sum(pi => pi.TotalAmount),
-                    g.Sum(pi => pi.TotalAmount) // Using TotalAmount as TotalCost for purchases
+                    g.Sum(pi => pi.NetTotal),
+                    g.Sum(pi => pi.NetTotal) // Using NetTotal as TotalCost for purchases
                 ))
                 .OrderBy(dto => dto.Period)
                 .ToList();

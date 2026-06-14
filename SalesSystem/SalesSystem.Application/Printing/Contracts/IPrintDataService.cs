@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Printing.Contracts;
 
@@ -27,16 +26,11 @@ public interface IPrintDataService
     /// <summary>
     /// Gets the store settings for print header info.
     /// </summary>
-    Task<Result<StoreSettings>> GetStoreSettingsAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Gets the print system settings (LogoPath, TaxRate, StoreTaxNumber).
-    /// </summary>
-    Task<Result<List<SystemSetting>>> GetPrintSystemSettingsAsync(CancellationToken ct = default);
+    Task<Result<StoreSettingsDto>> GetStoreSettingsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Gets all print settings as a PrintSettingsDto.
-    /// Reads from SystemSettings (Category="Print") and StoreSettings.
+    /// Reads from SystemSettings (Category="Print").
     /// </summary>
     Task<Result<PrintSettingsDto>> GetPrintSettingsAsync(CancellationToken ct = default);
 

@@ -163,7 +163,6 @@ public class ProductPriceService : IProductPriceService
             var exactPrice = await _uow.ProductPrices.FirstOrDefaultAsync(
                 pp => pp.ProductUnitId == productUnitId
                    && pp.CurrencyId == currencyId
-                   && pp.IsActive
                    && pp.EffectiveFrom <= date
                    && (!pp.EffectiveTo.HasValue || pp.EffectiveTo.Value >= date),
                 ct, "ProductUnit", "Currency");
@@ -186,9 +185,8 @@ public class ProductPriceService : IProductPriceService
                 var basePrice = await _uow.ProductPrices.FirstOrDefaultAsync(
                     pp => pp.ProductUnitId == productUnitId
                        && pp.CurrencyId == baseCurrency.Id
-                       && pp.IsActive
-                       && pp.EffectiveFrom <= date
-                       && (!pp.EffectiveTo.HasValue || pp.EffectiveTo.Value >= date),
+                   && pp.EffectiveFrom <= date
+                   && (!pp.EffectiveTo.HasValue || pp.EffectiveTo.Value >= date),
                     ct, "Currency");
 
                 if (basePrice != null)
@@ -317,16 +315,6 @@ public class ProductPriceService : IProductPriceService
             await _uow.ProductPrices.AddAsync(productPrice, ct);
             await _uow.SaveChangesAsync(ct);
 
-            // ─── Record Price History ─────────────────────────────
-            await RecordPriceHistoryAsync(
-                productPrice.ProductUnitId,
-                "PriceCreated",
-                0,  // no old value
-                productPrice.Price,
-                $"تم إنشاء سعر بقيمة {productPrice.Price} {currency.Code}",
-                userId,
-                ct);
-
             _logger.LogInformation(
                 "Product price created: Unit={ProductUnitId}, Currency={CurrencyId}, Price={Price} by User {UserId}",
                 request.ProductUnitId, request.CurrencyId, request.Price, userId);
@@ -360,18 +348,6 @@ public class ProductPriceService : IProductPriceService
 
             await _uow.SaveChangesAsync(ct);
 
-            // ─── Record Price History ─────────────────────────────
-            var changeReason = $"تحديث السعر من {oldPrice} إلى {request.Price}";
-
-            await RecordPriceHistoryAsync(
-                price.ProductUnitId,
-                "PriceUpdated",
-                oldPrice,
-                request.Price,
-                changeReason,
-                userId,
-                ct);
-
             _logger.LogInformation(
                 "Product price {Id} updated: Price={Price} by User {UserId}",
                 id, request.Price, userId);
@@ -398,57 +374,16 @@ public class ProductPriceService : IProductPriceService
             if (price == null)
                 return Result.Failure("السعر غير موجود", ErrorCodes.NotFound);
 
-            price.MarkAsDeleted();
+            _uow.ProductPrices.DeleteRange(new[] { price });
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Product price {Id} deactivated", id);
+            _logger.LogInformation("Product price {Id} deleted", id);
             return Result.Success();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deactivating product price {Id}", id);
             return Result.Failure("حدث خطأ أثناء إلغاء تنشيط السعر");
-        }
-    }
-
-    // ═══════════════════════════════════════════
-    //  Price History Recording
-    // ═══════════════════════════════════════════
-
-    /// <summary>
-    /// Records a price change in ProductPriceHistory for audit trail.
-    /// </summary>
-    private async Task RecordPriceHistoryAsync(
-        int productUnitId,
-        string changeType,
-        decimal oldValue,
-        decimal newValue,
-        string changeReason,
-        int changedByUserId,
-        CancellationToken ct)
-    {
-        try
-        {
-            var history = ProductPriceHistory.CreateWithDetails(
-                productUnitId,
-                0, // OldRetailPrice — not tracked at ProductPrice granularity
-                0, // NewRetailPrice
-                0, // OldWholesalePrice
-                0, // NewWholesalePrice
-                oldValue,
-                newValue,
-                changeReason,
-                changedByUserId);
-
-            await _uow.ProductPriceHistory.AddAsync(history, ct);
-            await _uow.SaveChangesAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            // Price history recording is non-critical — log warning, don't fail the operation
-            _logger.LogWarning(ex,
-                "Failed to record price history for product unit {ProductUnitId}: {ChangeType}",
-                productUnitId, changeType);
         }
     }
 
@@ -464,7 +399,7 @@ public class ProductPriceService : IProductPriceService
         price.Price,
         price.EffectiveFrom,
         price.EffectiveTo,
-        price.IsActive);
+        false);
 
     private static EffectivePriceDto MapToEffectiveDto(ProductPrice price, string? fallbackDescription = null) => new(
         price.ProductUnitId,

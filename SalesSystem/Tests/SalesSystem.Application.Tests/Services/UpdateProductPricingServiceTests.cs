@@ -92,7 +92,7 @@ public class UpdateProductPricingServiceTests
         await Task.CompletedTask;
     }
 
-    private static Mock<IGenericRepository<T>> CreateMockRepo<T>(List<T> items) where T : BaseEntity
+    private static Mock<IGenericRepository<T>> CreateMockRepo<T>(List<T> items) where T : Entity
     {
         var mock = new Mock<IGenericRepository<T>>();
         mock.Setup(r => r.FirstOrDefaultAsync(

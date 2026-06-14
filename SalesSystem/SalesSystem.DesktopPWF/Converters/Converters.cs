@@ -265,6 +265,58 @@ public class StringListJoinConverter : IValueConverter
 }
 
 /// <summary>
+/// Converts bytes (long) to kilobytes (KB) string for file size display
+/// </summary>
+public class BytesToKbConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is long bytes)
+        {
+            decimal kb = bytes / 1024m;
+            return kb < 1024
+                ? $"{kb:N1} كيلوبايت"
+                : $"{kb / 1024:N2} ميجابايت";
+        }
+        if (value is int intBytes)
+        {
+            decimal kb = intBytes / 1024m;
+            return kb < 1024
+                ? $"{kb:N1} كيلوبايت"
+                : $"{kb / 1024:N2} ميجابايت";
+        }
+        return "0 كيلوبايت";
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+/// <summary>
+/// Converts a byte value to its 0-based index for ComboBox SelectedIndex binding (byte - 1)
+/// </summary>
+public class ByteToIndexConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is byte b)
+            return (int)(b - 1);
+        if (value is int i)
+            return i - 1;
+        return 0;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is int index)
+            return (byte)(index + 1);
+        return (byte)0;
+    }
+}
+
+/// <summary>
 /// Converts SaleMode byte to Arabic string
 /// </summary>
 public class SaleModeToStringConverter : IValueConverter

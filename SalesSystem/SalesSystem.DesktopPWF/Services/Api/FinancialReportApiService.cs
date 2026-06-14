@@ -85,4 +85,24 @@ public class FinancialReportApiService : ApiServiceBase, IFinancialReportApiServ
             () => _httpClient.GetAsync($"{BasePath}/general-ledger/{accountId}?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", ct),
             "FinancialReportApiService.GetGeneralLedgerAsync");
     }
+
+    public async Task<Result<WorkingCapitalSummaryDto>> GetWorkingCapitalAsync(DateTime asOfDate, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<WorkingCapitalSummaryDto>(
+            () => _httpClient.GetAsync($"{BasePath}/working-capital?asOfDate={asOfDate:yyyy-MM-dd}", ct),
+            "FinancialReportApiService.GetWorkingCapitalAsync");
+    }
+
+    public async Task<Result<List<AccountBalanceReportDto>>> GetAccountBalancesAsync(byte? accountType = null, string? search = null, CancellationToken ct = default)
+    {
+        var url = $"{BasePath}/account-balances";
+        var queryParams = new List<string>();
+        if (accountType.HasValue) queryParams.Add($"accountType={accountType}");
+        if (!string.IsNullOrEmpty(search)) queryParams.Add($"search={Uri.EscapeDataString(search)}");
+        if (queryParams.Count > 0) url += "?" + string.Join("&", queryParams);
+
+        return await ExecuteAsync<List<AccountBalanceReportDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "FinancialReportApiService.GetAccountBalancesAsync");
+    }
 }

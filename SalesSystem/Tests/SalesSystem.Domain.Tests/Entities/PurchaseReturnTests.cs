@@ -11,15 +11,15 @@ public class PurchaseReturnTests
     public void Create_GivenValidData_ShouldCreatePurchaseReturn()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 5,
             purchaseInvoiceId: 10,
             notes: "Supplier return",
             userId: 1
         );
 
-        pr.ReturnNo.Should().Be("PR-2026-000001");
+        pr.ReturnNo.Should().Be(1);
         pr.WarehouseId.Should().Be(1);
         pr.SupplierId.Should().Be(5);
         pr.PurchaseInvoiceId.Should().Be(10);
@@ -28,12 +28,11 @@ public class PurchaseReturnTests
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Create_GivenInvalidReturnNo_ShouldThrowDomainException(string? invalidReturnNo)
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Create_GivenInvalidReturnNo_ShouldThrowDomainException(int invalidReturnNo)
     {
-        var action = () => PurchaseReturn.Create(returnNo: invalidReturnNo!, warehouseId: 1, supplierId: 1);
+        var action = () => PurchaseReturn.Create(returnNo: invalidReturnNo, warehouseId: (short)1, supplierId: 1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("رقم الإرجاع مطلوب.");
@@ -42,7 +41,7 @@ public class PurchaseReturnTests
     [Fact]
     public void Create_GivenWarehouseIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => PurchaseReturn.Create(returnNo: "PR-001", warehouseId: 0, supplierId: 1);
+        var action = () => PurchaseReturn.Create(returnNo: 1, warehouseId: 0, supplierId: 1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("المستودع مطلوب.");
@@ -51,7 +50,7 @@ public class PurchaseReturnTests
     [Fact]
     public void Create_GivenSupplierIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => PurchaseReturn.Create(returnNo: "PR-001", warehouseId: 1, supplierId: 0);
+        var action = () => PurchaseReturn.Create(returnNo: 1, warehouseId: (short)1, supplierId: 0);
 
         action.Should().Throw<DomainException>()
             .WithMessage("المورد مطلوب.");
@@ -61,42 +60,42 @@ public class PurchaseReturnTests
     public void AddItem_GivenValidData_ShouldAddItemAndRecalculateTotals()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
 
-        pr.AddItem(productId: 1, productUnitId: 1, quantity: 2, unitCost: 100m, discountAmount: 10m);
+        pr.AddItem(productId: 1, productUnitId: 1, quantity: 2, unitCost: 100m);
 
         pr.Items.Should().HaveCount(1);
-        pr.SubTotal.Should().Be(190m); // (2 * 100) - 10
-        pr.TotalAmount.Should().Be(190m);
+        pr.SubTotal.Should().Be(200m); // 2 * 100
+        pr.TotalAmount.Should().Be(200m);
     }
 
     [Fact]
     public void AddItem_MultipleItems_ShouldSumLineTotalsCorrectly()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
 
         pr.AddItem(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
-        pr.AddItem(productId: 2, productUnitId: 1, quantity: 2, unitCost: 50m, discountAmount: 5m);
+        pr.AddItem(productId: 2, productUnitId: 1, quantity: 2, unitCost: 50m);
 
         pr.Items.Should().HaveCount(2);
-        pr.SubTotal.Should().Be(195m); // 100 + (2*50-5)
+        pr.SubTotal.Should().Be(200m); // 100 + (2*50)
     }
 
     [Fact]
     public void RecalculateTotals_EmptyItems_ShouldSetTotalsToZero()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
@@ -111,8 +110,8 @@ public class PurchaseReturnTests
     public void Post_GivenDraftReturn_ShouldTransitionToPosted()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
@@ -127,8 +126,8 @@ public class PurchaseReturnTests
     public void Post_GivenEmptyReturn_ShouldThrowDomainException()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
@@ -143,8 +142,8 @@ public class PurchaseReturnTests
     public void Post_GivenAlreadyPostedReturn_ShouldThrowDomainException()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
@@ -162,8 +161,8 @@ public class PurchaseReturnTests
     public void Cancel_GivenDraftReturn_ShouldTransitionToCancelled()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
@@ -177,8 +176,8 @@ public class PurchaseReturnTests
     public void Cancel_GivenPostedReturn_ShouldTransitionToCancelled()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
@@ -194,8 +193,8 @@ public class PurchaseReturnTests
     public void Cancel_GivenAlreadyCancelled_ShouldThrowDomainException()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             userId: 1
         );
@@ -212,8 +211,8 @@ public class PurchaseReturnTests
     public void Create_GivenNoPurchaseInvoiceId_ShouldBeNull()
     {
         var pr = PurchaseReturn.Create(
-            returnNo: "PR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            warehouseId: (short)1,
             supplierId: 1,
             purchaseInvoiceId: null,
             userId: 1
@@ -232,15 +231,13 @@ public class PurchaseReturnItemTests
             productId: 1,
             productUnitId: 1,
             quantity: 2,
-            unitCost: 100m,
-            discountAmount: 10m
+            unitCost: 100m
         );
 
         item.ProductId.Should().Be(1);
         item.Quantity.Should().Be(2);
         item.UnitCost.Should().Be(100m);
-        item.DiscountAmount.Should().Be(10m);
-        item.LineTotal.Should().Be(190m);
+        item.LineTotal.Should().Be(200m);
     }
 
     [Fact]
@@ -311,12 +308,11 @@ public class PurchaseReturnItemTests
             productId: 1,
             productUnitId: 1,
             quantity: 3,
-            unitCost: 50m,
-            discountAmount: 25m
+            unitCost: 50m
         );
 
         item.RecalculateLineTotal();
 
-        item.LineTotal.Should().Be(125m);
+        item.LineTotal.Should().Be(150m);
     }
 }

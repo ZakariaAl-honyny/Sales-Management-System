@@ -7,7 +7,6 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.Services.App.Toast;
-using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Products;
 

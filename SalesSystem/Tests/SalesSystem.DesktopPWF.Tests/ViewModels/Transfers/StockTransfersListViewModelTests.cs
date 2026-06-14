@@ -12,24 +12,24 @@ using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.ViewModels.Transfers;
 
 /// <summary>
-/// Tests for StockTransfersListViewModel
+/// Tests for WarehouseTransfersListViewModel
 /// </summary>
-public class StockTransfersListViewModelTests
+public class WarehouseTransfersListViewModelTests
 {
-    private readonly Mock<IStockTransferApiService> _mockTransferService;
+    private readonly Mock<IWarehouseTransferApiService> _mockTransferService;
     private readonly Mock<IDialogService> _mockDialogService;
     private readonly Mock<ITransferPrinter> _mockTransferPrinter;
     private readonly Mock<ISettingsApiService> _mockSettingsService;
-    private readonly StockTransfersListViewModel _viewModel;
+    private readonly WarehouseTransfersListViewModel _viewModel;
 
-    public StockTransfersListViewModelTests()
+    public WarehouseTransfersListViewModelTests()
     {
-        _mockTransferService = new Mock<IStockTransferApiService>();
+        _mockTransferService = new Mock<IWarehouseTransferApiService>();
         _mockDialogService = new Mock<IDialogService>();
         _mockTransferPrinter = new Mock<ITransferPrinter>();
         _mockSettingsService = new Mock<ISettingsApiService>();
 
-        _viewModel = new StockTransfersListViewModel();
+        _viewModel = new WarehouseTransfersListViewModel();
 
         SetField("_transferService", _mockTransferService.Object);
         SetField("_dialogService", _mockDialogService.Object);
@@ -39,14 +39,14 @@ public class StockTransfersListViewModelTests
 
     private void SetField(string fieldName, object value)
     {
-        var field = typeof(StockTransfersListViewModel).GetField(fieldName,
+        var field = typeof(WarehouseTransfersListViewModel).GetField(fieldName,
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         field?.SetValue(_viewModel, value);
     }
 
-    private static StockTransferDto CreateTransfer(int id, byte status)
+    private static WarehouseTransferDto CreateTransfer(int id, byte status)
     {
-        return new StockTransferDto(id, $"TRF-{id:000}", 1, "مستودع أ", 2, "مستودع ب", DateTime.Today, null, status, new List<StockTransferItemDto>());
+        return new WarehouseTransferDto(id, id, (short)1, "مستودع أ", (short)2, "مستودع ب", DateTime.Today, null, status, new List<WarehouseTransferLineDto>());
     }
 
     #region Property Tests
@@ -203,7 +203,7 @@ public class StockTransfersListViewModelTests
     [Fact]
     public async Task LoadTransfersAsync_WhenApiSucceeds_PopulatesTransfers()
     {
-        var transfers = new List<StockTransferDto>
+        var transfers = new List<WarehouseTransferDto>
         {
             CreateTransfer(1, (byte)InvoiceStatus.Draft),
             CreateTransfer(2, (byte)InvoiceStatus.Posted)
@@ -211,7 +211,7 @@ public class StockTransfersListViewModelTests
 
         _mockTransferService
             .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<byte?>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result<List<StockTransferDto>>.Success(transfers));
+            .ReturnsAsync(Result<List<WarehouseTransferDto>>.Success(transfers));
 
         await _viewModel.LoadTransfersAsync();
 
@@ -224,7 +224,7 @@ public class StockTransfersListViewModelTests
     {
         _mockTransferService
             .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<byte?>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result<List<StockTransferDto>>.Failure("فشل في الاتصال"));
+            .ReturnsAsync(Result<List<WarehouseTransferDto>>.Failure("فشل في الاتصال"));
 
         await _viewModel.LoadTransfersAsync();
 
@@ -235,7 +235,7 @@ public class StockTransfersListViewModelTests
     [Fact]
     public async Task LoadTransfersAsync_WhenLoading_SetsIsBusyTrue()
     {
-        var tcs = new TaskCompletionSource<Result<List<StockTransferDto>>>();
+        var tcs = new TaskCompletionSource<Result<List<WarehouseTransferDto>>>();
         _mockTransferService
             .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<byte?>(), It.IsAny<bool>()))
             .Returns(tcs.Task);
@@ -243,7 +243,7 @@ public class StockTransfersListViewModelTests
         var loadTask = _viewModel.LoadTransfersAsync();
         _viewModel.IsBusy.Should().BeTrue();
 
-        tcs.SetResult(Result<List<StockTransferDto>>.Success(new List<StockTransferDto>()));
+        tcs.SetResult(Result<List<WarehouseTransferDto>>.Success(new List<WarehouseTransferDto>()));
         await loadTask;
 
         _viewModel.IsBusy.Should().BeFalse();
@@ -252,11 +252,11 @@ public class StockTransfersListViewModelTests
     [Fact]
     public async Task LoadTransfersAsync_UpdatesTotalCount()
     {
-        var transfers = new List<StockTransferDto> { CreateTransfer(1, (byte)InvoiceStatus.Draft) };
+        var transfers = new List<WarehouseTransferDto> { CreateTransfer(1, (byte)InvoiceStatus.Draft) };
 
         _mockTransferService
             .Setup(s => s.GetAllAsync(It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<byte?>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result<List<StockTransferDto>>.Success(transfers));
+            .ReturnsAsync(Result<List<WarehouseTransferDto>>.Success(transfers));
 
         await _viewModel.LoadTransfersAsync();
 

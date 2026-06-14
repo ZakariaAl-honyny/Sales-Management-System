@@ -4,37 +4,32 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class PurchaseInvoice : BaseEntity
+/// <summary>
+/// فاتورة شراء — مع دعم العملات المتعددة
+/// </summary>
+public class PurchaseInvoice : DocumentEntity
 {
     public int SupplierId { get; private set; }
-    public int WarehouseId { get; private set; }
-    public int? CashBoxId { get; private set; }
-    public int? TaxId { get; private set; }
+    public short WarehouseId { get; private set; }
+    public short? TaxId { get; private set; }
     public DateTime InvoiceDate { get; private set; }
     public DateOnly? DueDate { get; private set; }
     public PaymentType PaymentType { get; private set; }
     public decimal SubTotal { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal TaxAmount { get; private set; }
-    public decimal TotalAmount { get; private set; }
+    public decimal NetTotal { get; private set; }
     public decimal PaidAmount { get; private set; }
-    public decimal DueAmount { get; private set; }
+    public decimal RemainingAmount { get; private set; }
     public int InvoiceNo { get; private set; }
-    public string? SupplierInvoiceNo { get; private set; }
-    public int? CurrencyId { get; private set; }
+    public short? CurrencyId { get; private set; }
     public decimal? ExchangeRate { get; private set; }
-    public decimal? CostInBaseCurrency { get; private set; }
-    public decimal AdditionalFeesTotal { get; private set; }
-    public DiscountType? DiscountType { get; private set; }
-    public decimal? DiscountRate { get; private set; }
     public string? AttachmentPath { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
-    public virtual List<AdditionalFee> AdditionalFees { get; private set; } = new();
 
     public virtual Supplier? Supplier { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
-    public virtual CashBox? CashBox { get; private set; }
     public virtual Currency? Currency { get; private set; }
     public virtual Tax? Tax { get; private set; }
     public virtual List<PurchaseInvoiceItem> Items { get; private set; } = new();
@@ -43,17 +38,15 @@ public class PurchaseInvoice : BaseEntity
 
     public static PurchaseInvoice Create(
         int supplierId,
-        int warehouseId,
+        short warehouseId,
         int invoiceNo,
         DateTime? invoiceDate = null,
         DateOnly? dueDate = null,
         PaymentType paymentType = PaymentType.Cash,
         decimal discountAmount = 0,
-        string? supplierInvoiceNo = null,
         string? notes = null,
-        int? cashBoxId = null,
-        int? taxId = null,
-        int? currencyId = null,
+        short? taxId = null,
+        short? currencyId = null,
         decimal? exchangeRate = null,
         int? createdByUserId = null)
     {
@@ -75,13 +68,11 @@ public class PurchaseInvoice : BaseEntity
             SupplierId = supplierId,
             WarehouseId = warehouseId,
             InvoiceNo = invoiceNo,
-            CashBoxId = cashBoxId,
             TaxId = taxId,
             InvoiceDate = invoiceDate ?? DateTime.UtcNow,
             DueDate = dueDate,
             PaymentType = paymentType,
             DiscountAmount = discountAmount,
-            SupplierInvoiceNo = supplierInvoiceNo,
             CurrencyId = currencyId,
             ExchangeRate = exchangeRate,
             Notes = notes,
@@ -116,23 +107,20 @@ public class PurchaseInvoice : BaseEntity
     public void RecalculateTotals()
     {
         SubTotal = Items.Sum(i => i.LineTotal);
-        var discount = DiscountType == Domain.Enums.DiscountType.Percentage
-            ? SubTotal * (DiscountRate ?? 0) / 100m
-            : DiscountAmount;
-        DiscountAmount = discount;
-        TotalAmount = SubTotal - discount + TaxAmount + AdditionalFeesTotal;
-        DueAmount = TotalAmount - PaidAmount;
+        NetTotal = SubTotal - DiscountAmount + TaxAmount;
+        RemainingAmount = NetTotal - PaidAmount;
     }
 
     public void SetPaidAmount(decimal amount)
     {
         if (amount < 0)
             throw new DomainException("المبلغ المدفوع لا يمكن أن يكون سالباً.");
-        if (amount > TotalAmount)
+        if (amount > NetTotal)
             throw new DomainException("المبلغ المدفوع أكبر من الإجمالي.");
 
         PaidAmount = amount;
         RecalculateTotals();
+        UpdateTimestamp();
     }
 
     public void SetTaxAmount(decimal taxAmount)
@@ -141,9 +129,10 @@ public class PurchaseInvoice : BaseEntity
             throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
         TaxAmount = taxAmount;
         RecalculateTotals();
+        UpdateTimestamp();
     }
 
-    public void SetTax(int? taxId, decimal taxAmount)
+    public void SetTax(short? taxId, decimal taxAmount)
     {
         if (taxAmount < 0)
             throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
@@ -161,6 +150,7 @@ public class PurchaseInvoice : BaseEntity
             throw new DomainException("لا يمكن ترحيل فاتورة بدون أصناف.");
 
         RecalculateTotals();
+        PostedAt = DateTime.UtcNow;
         Status = InvoiceStatus.Posted;
     }
 
@@ -172,6 +162,7 @@ public class PurchaseInvoice : BaseEntity
         if (PaidAmount > 0)
             throw new DomainException("لا يمكن إلغاء فاتورة مدفوعة مباشرة.");
 
+        CancelledAt = DateTime.UtcNow;
         Status = InvoiceStatus.Cancelled;
     }
 
@@ -185,40 +176,20 @@ public class PurchaseInvoice : BaseEntity
         DiscountAmount = discountAmount;
         TaxAmount = taxAmount;
         RecalculateTotals();
+        UpdateTimestamp();
     }
 
-    public void SetCurrency(int? currencyId, decimal? exchangeRate, decimal? costInBaseCurrency = null)
+    public void SetCurrency(short? currencyId, decimal? exchangeRate)
     {
         if (currencyId.HasValue && (!exchangeRate.HasValue || exchangeRate <= 0))
             throw new DomainException("سعر الصرف مطلوب عند اختيار عملة أجنبية.");
         CurrencyId = currencyId;
         ExchangeRate = exchangeRate;
-        CostInBaseCurrency = costInBaseCurrency;
-    }
-
-    public void SetDiscount(decimal discountAmount, DiscountType? discountType = null, decimal? discountRate = null)
-    {
-        if (discountAmount < 0)
-            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
-        if (discountType == Domain.Enums.DiscountType.Percentage && (!discountRate.HasValue || discountRate < 0 || discountRate > 100))
-            throw new DomainException("نسبة الخصم يجب أن تكون بين 0 و 100.");
-
-        DiscountAmount = discountAmount;
-        DiscountType = discountType;
-        DiscountRate = discountRate;
-        RecalculateTotals();
+        UpdateTimestamp();
     }
 
     public void SetAttachment(string? attachmentPath)
     {
         AttachmentPath = attachmentPath;
-    }
-
-    public void SetAdditionalFeesTotal(decimal additionalFeesTotal)
-    {
-        if (additionalFeesTotal < 0)
-            throw new DomainException("إجمالي الرسوم الإضافية لا يمكن أن يكون سالباً.");
-        AdditionalFeesTotal = additionalFeesTotal;
-        RecalculateTotals();
     }
 }

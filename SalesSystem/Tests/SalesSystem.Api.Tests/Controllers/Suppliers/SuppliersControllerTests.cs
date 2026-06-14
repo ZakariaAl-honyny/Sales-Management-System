@@ -74,7 +74,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task Create_WhenValidRequest_ReturnsCreatedAtAction()
     {
-        var request = new CreateSupplierRequest("مورد جديد", null, null, null, null, 0.00m);
+        var request = new CreateSupplierRequest("مورد جديد", null, null, null, null);
         var createdSupplier = CreateSupplierDto(1);
         SupplierServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(createdSupplier));
@@ -88,7 +88,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task Create_WhenServiceFails_ReturnsBadRequest()
     {
-        var request = new CreateSupplierRequest("مورد جديد", null, null, null, null, 0.00m);
+        var request = new CreateSupplierRequest("مورد جديد", null, null, null, null);
         SupplierServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<SupplierDto>("اسم المورد موجود مسبقاً"));
 
@@ -100,7 +100,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedSupplier()
     {
-        var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, 0.00m, true);
+        var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, true);
         var updatedSupplier = CreateSupplierDto(1);
         SupplierServiceMock.Setup(x => x.UpdateAsync(1, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(updatedSupplier));
@@ -113,7 +113,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task Update_WhenSupplierNotFound_ReturnsBadRequest()
     {
-        var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, 0.00m, true);
+        var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, true);
         SupplierServiceMock.Setup(x => x.UpdateAsync(999, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<SupplierDto>("المورد غير موجود"));
 
@@ -173,8 +173,7 @@ public class SuppliersControllerTests : ControllerTestBase
         Email: null,
         Address: null,
         TaxNumber: null,
-        OpeningBalance: 0.00m,
-        CurrentBalance: 0.00m,
-        CreditLimit: 0.00m,
-        IsActive: true);
+        IsActive: true,
+        AccountId: 1,
+        AccountName: null);
 }

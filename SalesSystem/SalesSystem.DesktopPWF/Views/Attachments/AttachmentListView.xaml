@@ -1,0 +1,64 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Attachments.AttachmentListView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Attachments"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance vm:AttachmentListViewModel}"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Loaded">
+            <i:InvokeCommandAction Command="{Binding RefreshCommand}" />
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
+
+    <Grid Style="{StaticResource PageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource PageHeaderBorderStyle}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="المرفقات" Style="{StaticResource PageHeaderTextStyle}"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource PageContentBorderStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Style="{StaticResource FilterBorderStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox x:Name="SearchTextBox"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource FilterTextBoxStyle}"
+                                 ToolTip="بحث في المرفقات"
+                                 KeyDown="SearchTextBox_KeyDown"/>
+                    </StackPanel>
+                </Border>
+
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding AttachmentsView}"
+                          SelectedItem="{Binding SelectedAttachment}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          Style="{StaticResource ModernDataGridStyle}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="اسم الملف" Binding="{Binding FileName}" Width="*"/>
+                        <DataGridTextColumn Header="النوع المرجعي" Binding="{Binding ReferenceType}" Width="120"/>
+                        <DataGridTextColumn Header="رقم المرجع" Binding="{Binding ReferenceId}" Width="100"/>
+                        <DataGridTextColumn Header="التاريخ" Binding="{Binding CreatedAt}" Width="150"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -16,11 +16,18 @@ public class SystemLogConfiguration : IEntityTypeConfiguration<SystemLog>
             .IsRequired()
             .HasMaxLength(20);
 
+        builder.Property(e => e.Level)
+            .IsRequired(false);
+
         builder.Property(e => e.Message)
-            .IsRequired();
+            .IsRequired()
+            .HasColumnType("nvarchar(max)");
+
+        builder.Property(e => e.Exception)
+            .HasColumnType("nvarchar(max)");
 
         builder.Property(e => e.Source)
-            .HasMaxLength(50);
+            .HasMaxLength(100);
 
         builder.Property(e => e.Context)
             .HasMaxLength(200);

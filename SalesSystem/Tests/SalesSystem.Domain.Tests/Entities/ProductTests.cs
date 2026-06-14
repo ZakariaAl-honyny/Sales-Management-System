@@ -1,6 +1,5 @@
 using FluentAssertions;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
@@ -12,14 +11,14 @@ public class ProductTests
     {
         var product = Product.Create(
             name: "Test Product",
-            minStockLevel: 10m,
             categoryId: 1,
             description: "Test description",
+            reorderLevel: 10m,
             createdByUserId: 1
         );
 
         product.Name.Should().Be("Test Product");
-        product.MinStockLevel.Should().Be(10m);
+        product.ReorderLevel.Should().Be(10m);
         product.CategoryId.Should().Be(1);
         product.Description.Should().Be("Test description");
     }
@@ -31,7 +30,8 @@ public class ProductTests
     public void Create_GivenInvalidName_ShouldThrowDomainException(string? invalidName)
     {
         var action = () => Product.Create(
-            name: invalidName!
+            name: invalidName!,
+            categoryId: 1
         );
 
         action.Should().Throw<DomainException>()
@@ -41,15 +41,16 @@ public class ProductTests
     [Theory]
     [InlineData(-1)]
     [InlineData(-100)]
-    public void Create_GivenNegativeMinStockLevel_ShouldThrowDomainException(decimal invalidMinStockLevel)
+    public void Create_GivenNegativeReorderLevel_ShouldThrowDomainException(decimal invalidReorderLevel)
     {
         var action = () => Product.Create(
             name: "Test Product",
-            minStockLevel: invalidMinStockLevel
+            categoryId: 1,
+            reorderLevel: invalidReorderLevel
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("*الحد الأدنى للمخزون لا يمكن أن يكون سالباً*");
+            .WithMessage("*مستوى إعادة الطلب لا يمكن أن يكون سالباً*");
     }
 
     [Fact]
@@ -57,24 +58,21 @@ public class ProductTests
     {
         var product = Product.Create(
             name: "Original Name",
-            minStockLevel: 10m,
             categoryId: 1,
+            reorderLevel: 10m,
             createdByUserId: 1
         );
 
         product.Update(
             name: "Updated Name",
             categoryId: 2,
-            minStockLevel: 20m,
-            reorderLevel: 0,
-            hasExpiry: false,
-            barcode: null,
             description: "Updated description",
+            reorderLevel: 20m,
             updatedByUserId: 1
         );
 
         product.Name.Should().Be("Updated Name");
-        product.MinStockLevel.Should().Be(20m);
+        product.ReorderLevel.Should().Be(20m);
         product.CategoryId.Should().Be(2);
         product.Description.Should().Be("Updated description");
     }
@@ -83,7 +81,6 @@ public class ProductTests
     public void AddPrice_ShouldCreateProductPrice()
     {
         // Pricing is now managed via the ProductPrices entity directly
-        // (not through Product.AddPrice). Verify that ProductPrice.Create works.
         var price = ProductPrice.Create(
             productUnitId: 1,
             currencyId: 1,
@@ -97,39 +94,20 @@ public class ProductTests
     }
 
     [Fact]
-    public void AddImage_ShouldAddToImagesCollection()
+    public void AddInventoryBatch_ShouldCreateBatch()
     {
-        var product = Product.Create("Test Product");
-
-        var image = ProductImage.Create(
-            productId: 1,
-            imagePath: "/images/test.jpg",
-            isPrimary: true,
-            sortOrder: 1,
-            createdByUserId: 1
-        );
-
-        product.AddImage(image);
-
-        product.Images.Should().HaveCount(1);
-    }
-
-    [Fact]
-    public void AddInventoryBatch_ShouldAddToBatchesCollection()
-    {
-        var product = Product.Create("Test Product");
-
         var batch = InventoryBatch.Create(
             productId: 1,
             warehouseId: 1,
             quantity: 100m,
             unitCost: 50m,
-            batchNo: "BATCH-001",
+            batchNo: "B-1001",
             createdByUserId: 1
         );
 
-        product.AddInventoryBatch(batch);
-
-        product.InventoryBatches.Should().HaveCount(1);
+        batch.Should().NotBeNull();
+        batch.Quantity.Should().Be(100m);
+        batch.UnitCost.Should().Be(50m);
+        batch.BatchNo.Should().Be("B-1001");
     }
 }

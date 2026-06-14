@@ -177,6 +177,59 @@ Verify no sensitive data in logs.
 3. **🔴 → ✅ Rate Limiting**: Added `AddRateLimiter` with `LoginPolicy` (5/15min) + global (100/min). Arabic 429 response. Middleware placed before `UseAuthentication()` (RULE-240-243).
 4. **🟡 SettingsController** still has class-level `[Authorize]` without policy — mitigated by explicit per-action policies.
 
+## 7. v4.10 — New Schema Security Checks
+
+### BaseCurrency Immutability
+- [ ] `Currency.IsBaseCurrency` can NEVER be changed after system setup
+- [ ] `Currency.SetAsBaseCurrency()` calls `UpdateTimestamp()` — check for missing timestamp update
+- [ ] Filtered unique index on `IsBaseCurrency` includes `AND [IsActive] = 1` (soft-deleted base currency must not block new)
+- [ ] Desktop UI does NOT expose "Set as base" toggle for any currency
+- [ ] `IsSystem = true` currencies cannot be deleted or deactivated
+
+### IsSystem Accounts Protection
+- [ ] `Account.IsSystemAccount = true` blocks `Update()` AND `MarkAsDeleted()` — check both guards
+- [ ] System accounts seeded with `IsSystemAccount = true` for L1-L2 only (L3-L4 are user-modifiable)
+- [ ] `OpeningBalanceEquityAccount` (1422) is a deliberate exception — IsSystemAccount=true even at L3
+- [ ] `Permission.IsSystem = true` blocks deletion AND modification
+- [ ] `Unit.IsSystem = true` protects seed units from deletion/deactivation
+
+### smallint FK Overflow Risks
+- [ ] All FK columns referencing lookup tables (Roles, Departments, Branches, Warehouses, Currencies, Taxes, Units, AccountCategories) use `smallint` type — NOT `int`
+- [ ] `smallint` range (-32,768 to 32,767) is sufficient for lookup tables (max a few hundred records)
+- [ ] Applications layer types match: C# `short` for smallint PK columns
+- [ ] Entity configurations use `.HasColumnType("smallint")` for smallint FKs — not `.HasMaxLength()`
+
+### Perpetual Inventory Integrity
+- [ ] NO "Purchases" clearing account referenced anywhere — inventory costs go directly to Inventory Asset
+- [ ] Purchase invoice posts: Dr Inventory / Cr Cash (not Dr Purchases / Cr Cash)
+- [ ] COGS computed from `InventoryBatches.UnitCost` at time of sale — not from product cost field
+- [ ] `WarehouseStocks.Quantity` has DB CHECK constraint `>= 0`
+- [ ] Every stock change has a corresponding `InventoryTransaction` + `InventoryTransactionLine`
+- [ ] NO inventory movement bypasses the transaction system (no direct WarehouseStock.Quantity updates)
+
+### Party Data Privacy
+- [ ] Parties table stores PII (name, phone, email, address, tax number)
+- [ ] Party data is NEVER exposed in logs or error messages
+- [ ] Party soft-delete cascades: deactivating a Party must deactivate linked Customer/Supplier
+- [ ] Contacts (CustomerContacts, SupplierContacts) share FK → Customers/Suppliers, NOT Parties
+
+### Removed Entity Detection
+- [ ] NO `InventoryMovement` references — replaced by `InventoryTransaction`/`InventoryTransactionLine`
+- [ ] NO `StockTransfer`/`StockTransferItem` — replaced by `WarehouseTransfer`/`WarehouseTransferLine`
+- [ ] NO `CustomerGroup` or `SupplierType` enums/entities — removed from V1
+- [ ] NO `SalesQuotation` or `PurchaseOrder` entities — removed from V1
+- [ ] NO `Cheque` or `DailyClosure` entities — removed from V1
+- [ ] NO `ProductBarcode` or `ProductCode` references — use `Id` + `UnitBarcode`
+- [ ] NO `CustomerPayment` table — replaced by `CustomerReceipt`
+- [ ] NO `CashTransaction` table — replaced by `ReceiptVoucher`/`PaymentVoucher`
+
+### AuditLog & SystemLog Checks
+- [ ] `AuditLog.Id` is `long` (bigint) — NOT `int`
+- [ ] `SystemLogs.Id` is `long` (bigint)
+- [ ] `SystemLogs.Level` is `tinyint` (1=Info, 2=Warning, 3=Error, 4=Critical) — NOT `nvarchar`
+- [ ] AuditLog has indexes on `(UserId, CreatedAt DESC)`, `(EntityName, EntityId)`, `(CreatedAt DESC)`
+- [ ] SystemLogs has index on `(Level, CreatedAt DESC)`
+
 ### Extra Audit Checks (v4.6.4)
 
 #### Rate Limiting
@@ -274,7 +327,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 
 1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
+3. Missing `CustomerGroupId` on Customer → REMOVED in V1 (deferred to V2). Do NOT add.
 4. Missing `CurrencyId` on financial entities → Add multi-currency support
 5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
 6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking

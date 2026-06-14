@@ -11,6 +11,7 @@ public class JournalEntryTests
     {
         return JournalEntry.Create(
             "JE-2026-000001",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -33,6 +34,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000001",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -59,6 +61,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -75,6 +78,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000002",
+            1,
             default,
             "اختبار",
             JournalEntryType.Manual,
@@ -91,6 +95,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000003",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             (JournalEntryType)99,
@@ -107,6 +112,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000004",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -123,6 +129,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000005",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -139,6 +146,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000006",
+            1,
             new DateTime(2026, 6, 1),
             "قيد يومية مبيعات",
             JournalEntryType.Sales,
@@ -154,6 +162,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000007",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Sales,
@@ -176,6 +185,7 @@ public class JournalEntryTests
         {
             var entry = JournalEntry.Create(
                 $"JE-{(int)entryType}",
+                (int)entryType,
                 new DateTime(2026, 6, 1),
                 "اختبار",
                 entryType,
@@ -191,6 +201,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "  JE-2026-000008  ",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -206,6 +217,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000009",
+            1,
             new DateTime(2026, 6, 1),
             "  وصف به مسافات  ",
             JournalEntryType.Manual,
@@ -221,6 +233,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000010",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -236,6 +249,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000011",
+            1,
             new DateTime(2026, 6, 1),
             "",
             JournalEntryType.Manual,
@@ -252,6 +266,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000012",
+            1,
             new DateTime(2026, 6, 1),
             "   ",
             JournalEntryType.Manual,
@@ -544,6 +559,7 @@ public class JournalEntryTests
         // Arrange: typical sales journal — Dr Cash 1150, Cr Revenue 1000, Cr VAT 150
         var entry = JournalEntry.Create(
             "JE-SALES-001",
+            1,
             new DateTime(2026, 6, 1),
             "قيد مبيعات",
             JournalEntryType.Sales,
@@ -567,6 +583,7 @@ public class JournalEntryTests
         // Arrange: typical purchase journal — Dr Inventory 500, Dr VAT Input 25, Cr Cash 525
         var entry = JournalEntry.Create(
             "JE-PUR-001",
+            1,
             new DateTime(2026, 6, 1),
             "قيد مشتريات",
             JournalEntryType.Purchase,

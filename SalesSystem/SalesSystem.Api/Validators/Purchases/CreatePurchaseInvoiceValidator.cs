@@ -4,7 +4,7 @@ using SalesSystem.Contracts.Requests;
 namespace SalesSystem.Api.Validators.Purchases;
 
 /// <summary>
-/// مدقق صحة طلب إنشاء فاتورة شراء — مع دعم العملات والخصم المتنوع والمرفقات والمصاريف الإضافية.
+/// مدقق صحة طلب إنشاء فاتورة شراء.
 /// </summary>
 public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseInvoiceRequest>
 {
@@ -40,10 +40,6 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
             .GreaterThanOrEqualTo(DateOnly.FromDateTime(DateTime.UtcNow)).When(x => x.DueDate.HasValue)
             .WithMessage("تاريخ الاستحقاق لا يمكن أن يكون في الماضي");
 
-        RuleFor(x => x.SupplierInvoiceNo)
-            .MaximumLength(100).When(x => x.SupplierInvoiceNo != null)
-            .WithMessage("رقم فاتورة المورد لا يمكن أن يتجاوز 100 حرف");
-
         RuleFor(x => x.Notes)
             .MaximumLength(500).When(x => x.Notes != null)
             .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
@@ -61,20 +57,6 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
             .NotNull().When(x => x.CurrencyId.HasValue)
             .WithMessage("يجب تحديد سعر الصرف عند اختيار عملة أجنبية");
 
-        // Discount type validation
-        RuleFor(x => x.DiscountRate)
-            .InclusiveBetween(0, 100).When(x => x.DiscountType.HasValue && x.DiscountType == (byte)1)
-            .WithMessage("نسبة الخصم يجب أن تكون بين 0 و 100");
-
-        RuleFor(x => x.DiscountRate)
-            .NotNull().When(x => x.DiscountType.HasValue && x.DiscountType == (byte)1)
-            .WithMessage("نسبة الخصم مطلوبة عند اختيار خصم نسبة مئوية");
-
-        // Business Rule: If paying, CashBoxId is required
-        RuleFor(x => x.CashBoxId)
-            .NotNull().When(x => x.PaidAmount > 0)
-            .WithMessage("يجب اختيار صندوق نقدي عند وجود مبلغ مدفوع");
-
         RuleFor(x => x.Items)
             .NotEmpty().WithMessage("يجب إضافة صنف واحد على الأقل");
 
@@ -91,35 +73,6 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
 
             item.RuleFor(i => i.UnitCost)
                 .GreaterThanOrEqualTo(0).WithMessage("التكلفة لا يمكن أن تكون سالبة");
-
-            item.RuleFor(i => i.DiscountAmount)
-                .GreaterThanOrEqualTo(0).WithMessage("الخصم لا يمكن أن يكون سالباً");
-
-            item.RuleFor(i => i.DiscountRate)
-                .InclusiveBetween(0, 100).When(i => i.DiscountType.HasValue && i.DiscountType == (byte)1)
-                .WithMessage("نسبة الخصم يجب أن تكون بين 0 و 100");
-
-            item.RuleFor(i => i.Notes)
-                .MaximumLength(200).When(i => i.Notes != null)
-                .WithMessage("ملاحظات الصنف لا يمكن أن تتجاوز 200 حرف");
-        });
-
-        // Validate AdditionalFees if provided
-        When(x => x.AdditionalFees != null && x.AdditionalFees.Any(), () =>
-        {
-            RuleForEach(x => x.AdditionalFees).ChildRules(fee =>
-            {
-                fee.RuleFor(f => f.FeeName)
-                    .NotEmpty().WithMessage("اسم الرسم الإضافي مطلوب")
-                    .MaximumLength(100).WithMessage("اسم الرسم الإضافي لا يتجاوز 100 حرف");
-
-                fee.RuleFor(f => f.FeeAmount)
-                    .GreaterThan(0).WithMessage("قيمة الرسم الإضافي يجب أن تكون أكبر من صفر");
-
-                fee.RuleFor(f => f.DistributionMethod)
-                    .InclusiveBetween((byte)0, (byte)1)
-                    .WithMessage("طريقة التوزيع غير صحيحة");
-            });
         });
     }
 }

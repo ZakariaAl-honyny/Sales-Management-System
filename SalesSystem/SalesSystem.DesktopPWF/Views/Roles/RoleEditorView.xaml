@@ -1,0 +1,118 @@
+<Window x:Class="SalesSystem.DesktopPWF.Views.Roles.RoleEditorView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="{Binding WindowTitle}"
+        Height="400" Width="500"
+        MinHeight="350" MinWidth="450"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="12,6">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0F172A" Offset="0"/>
+                    <GradientStop Color="#1E293B" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.2"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🎭 " FontSize="20" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding WindowTitle}" Style="{StaticResource HeaderStyle}" Foreground="White"/>
+                    </StackPanel>
+                    <TextBlock Text="يرجى إدخال بيانات الدور بدقة" FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Form Content -->
+        <Border Grid.Row="1" Padding="16">
+            <StackPanel>
+                <TextBlock Text="اسم الدور *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                         Style="{StaticResource ModernTextBox}"
+                         Tag="أدخل اسم الدور (مثلاً: مشرف مبيعات)"
+                         TabIndex="1"
+                         ToolTip="أدخل اسماً فريداً للدور (مثلاً: مدير، مشرف، كاشير) — هذا الحقل مطلوب"/>
+                <TextBlock Text="مثال: مدير مبيعات، مشرف مخازن، كاشير" Style="{StaticResource HelperTextStyle}"/>
+
+                <TextBlock Text="الوصف" Style="{StaticResource LabelStyle}" Margin="4,16,0,8"/>
+                <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource ModernTextBox}"
+                         Tag="أدخل وصفاً للدور"
+                         TabIndex="2"
+                         ToolTip="وصف اختياري للدور يوضح مهامه وصلاحياته"
+                         MinHeight="60"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="#F8FAFC" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Command="{Binding SaveCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            Width="150"
+                            IsDefault="True"
+                            TabIndex="3"
+                            Margin="0,0,12,0"
+                            ToolTip="حفظ البيانات المدخلة">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconSave}" Fill="White" Width="16" Height="16" Margin="0,0,10,0" Stretch="Uniform" VerticalAlignment="Center"/>
+                            <TextBlock Text="حفظ البيانات" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Content="إلغاء"
+                            Command="{Binding CancelCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="100"
+                            TabIndex="4"
+                            ToolTip="إلغاء وإغلاق النافذة"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="1" 
+                           Text="{Binding ErrorMessage}" 
+                           Foreground="{StaticResource ErrorBrush}" 
+                           FontWeight="SemiBold" 
+                           HorizontalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"
+                           Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}"/>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#CCFFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+                CornerRadius="0">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="180" Height="4" Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Text="جاري المعالجة..." FontSize="14" FontWeight="SemiBold" Margin="0,16,0,0" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

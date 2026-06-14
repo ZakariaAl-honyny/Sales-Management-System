@@ -4,7 +4,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
+using System.Collections.Generic;
+using System.Linq;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Infrastructure.Services;
@@ -59,6 +62,28 @@ public class LogService : ILogService
         {
             _logger.LogError(ex, "Failed to store client log");
             return Result.Failure("فشل تخزين السجل");
+        }
+    }
+
+    public async Task<Result<PagedResult<SystemLogDto>>> QueryLogsAsync(
+        int? level, string? source, string? search,
+        DateTime? from, DateTime? to,
+        int page, int pageSize, CancellationToken ct = default)
+    {
+        try
+        {
+            var (items, totalCount) = await _uow.SystemLogs.GetAllAsync(level, source, search, from, to, page, pageSize, ct);
+            var dtos = items.Select(x => new SystemLogDto(
+                x.Id, x.LogLevel, x.Level, x.Message, x.Exception,
+                x.StackTrace, x.Source, x.Context, x.MachineName, x.CreatedAt)).ToList();
+
+            return Result<PagedResult<SystemLogDto>>.Success(
+                new PagedResult<SystemLogDto> { Items = dtos, TotalCount = totalCount, Page = page, PageSize = pageSize });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to query system logs");
+            return Result<PagedResult<SystemLogDto>>.Failure("حدث خطأ أثناء استعلام سجلات النظام");
         }
     }
 }

@@ -66,7 +66,7 @@ public class AuthServiceTests
     {
         _output.WriteLine("[TEST] LoginAsync_ValidCredentials_ReturnsTokenAndUserInfo");
 
-        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User");
         user.Restore();
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
@@ -120,7 +120,7 @@ public class AuthServiceTests
     {
         _output.WriteLine("[TEST] LoginAsync_InvalidPassword_ReturnsUnauthorized");
 
-        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("correctpassword", workFactor: 12), "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("correctpassword", workFactor: 12), "Test User");
         user.Restore();
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
@@ -148,7 +148,7 @@ public class AuthServiceTests
     {
         _output.WriteLine("[TEST] LoginAsync_InactiveUser_ReturnsForbidden");
 
-        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User");
         user.MarkAsDeleted(); // Makes Status = Inactive
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
@@ -171,7 +171,7 @@ public class AuthServiceTests
     {
         _output.WriteLine("[TEST] LoginAsync_LockedUser_ReturnsAccountLocked");
 
-        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User");
         user.Lock();
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
@@ -199,7 +199,7 @@ public class AuthServiceTests
     {
         _output.WriteLine("[TEST] LoginAsync_NoPassword_ReturnsRequiresPasswordSetup");
 
-        var user = User.Create("testuser", "Test User", UserRole.Admin); // Passwordless
+        var user = User.Create("testuser", "Test User"); // Passwordless
         user.Restore();
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
@@ -222,7 +222,7 @@ public class AuthServiceTests
     {
         _output.WriteLine("[TEST] LoginAsync_CaseInsensitiveUsername_ReturnsSuccess");
 
-        var user = User.CreateWithPassword("TestUser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("TestUser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User");
         user.Restore();
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(
@@ -253,7 +253,7 @@ public class AuthServiceTests
     {
         _output.WriteLine("[TEST] LoginAsync_ExpirationTimeInResponse_IsCorrect");
 
-        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", BCrypt.Net.BCrypt.HashPassword("password123", workFactor: 12), "Test User");
         user.Restore();
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultAsync(

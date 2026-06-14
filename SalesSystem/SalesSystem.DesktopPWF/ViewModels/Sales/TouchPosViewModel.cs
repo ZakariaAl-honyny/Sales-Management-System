@@ -1,5 +1,6 @@
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
@@ -12,24 +13,24 @@ namespace SalesSystem.DesktopPWF.ViewModels.Sales;
 /// </summary>
 public class TouchPosViewModel : ViewModelBase
 {
-    private readonly ICategoryApiService _categoryService;
+    private readonly IProductCategoryApiService _categoryService;
     private readonly IProductApiService _productService;
     private readonly IInventoryApiService _inventoryService;
 
-    private ObservableCollection<CategoryDto> _categories = new();
+    private ObservableCollection<ProductCategoryDto> _categories = new();
     private ObservableCollection<ProductDto> _products = new();
-    private CategoryDto? _selectedCategory;
+    private ProductCategoryDto? _selectedCategory;
     private string? _errorMessage;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TouchPosViewModel"/> class.
     /// </summary>
-    /// <param name="categoryService">Service for category API operations.</param>
+    /// <param name="categoryService">Service for product category API operations.</param>
     /// <param name="productService">Service for product API operations.</param>
     /// <param name="inventoryService">Service for inventory API operations (stock lookups).</param>
     /// <exception cref="ArgumentNullException">Thrown when a required dependency is null.</exception>
     public TouchPosViewModel(
-        ICategoryApiService categoryService,
+        IProductCategoryApiService categoryService,
         IProductApiService productService,
         IInventoryApiService inventoryService)
     {
@@ -65,7 +66,7 @@ public class TouchPosViewModel : ViewModelBase
     /// <summary>
     /// Gets or sets the collection of product categories displayed in the touch panel.
     /// </summary>
-    public ObservableCollection<CategoryDto> Categories
+    public ObservableCollection<ProductCategoryDto> Categories
     {
         get => _categories;
         set => SetProperty(ref _categories, value);
@@ -84,7 +85,7 @@ public class TouchPosViewModel : ViewModelBase
     /// Gets or sets the currently selected category.
     /// When changed, products for this category are loaded automatically.
     /// </summary>
-    public CategoryDto? SelectedCategory
+    public ProductCategoryDto? SelectedCategory
     {
         get => _selectedCategory;
         set
@@ -135,7 +136,7 @@ public class TouchPosViewModel : ViewModelBase
 
     /// <summary>
     /// Gets the command to select a category and load its associated products.
-    /// Takes a <see cref="CategoryDto"/> as command parameter.
+    /// Takes a <see cref="ProductCategoryDto"/> as command parameter.
     /// </summary>
     public ICommand SelectCategoryCommand { get; }
 
@@ -152,7 +153,7 @@ public class TouchPosViewModel : ViewModelBase
 
     private void OnSelectCategory(object? param)
     {
-        if (param is CategoryDto category)
+        if (param is ProductCategoryDto category)
         {
             SelectedCategory = category;
             _ = ExecuteAsync(() => LoadProductsForCategoryOperationAsync(category.Id));
@@ -169,7 +170,7 @@ public class TouchPosViewModel : ViewModelBase
         var result = await _categoryService.GetAllAsync(includeInactive: false);
         if (result.IsSuccess && result.Value != null)
         {
-            Categories = new ObservableCollection<CategoryDto>(result.Value);
+            Categories = new ObservableCollection<ProductCategoryDto>(result.Value);
         }
         else
         {

@@ -32,8 +32,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<ICashBoxApiService> _cashBoxApiServiceMock;
     private readonly Mock<IPrintApiService> _printApiServiceMock;
     private readonly Mock<IToastNotificationService> _mockToastService;
-    private readonly Mock<ICategoryApiService> _mockCategoryService;
-
+    private readonly Mock<ICurrencyApiService> _mockCurrencyService;
     public SalesInvoiceEditorViewModelTests()
     {
         _mockInvoiceService = new Mock<ISalesInvoiceApiService>();
@@ -49,7 +48,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         _cashBoxApiServiceMock = new Mock<ICashBoxApiService>();
         _printApiServiceMock = new Mock<IPrintApiService>();
         _mockToastService = new Mock<IToastNotificationService>();
-        _mockCategoryService = new Mock<ICategoryApiService>();
+        _mockCurrencyService = new Mock<ICurrencyApiService>();
     }
 
     public void Dispose()
@@ -595,7 +594,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _cashBoxApiServiceMock.Object,
             _printApiServiceMock.Object,
             _mockToastService.Object,
-            _mockCategoryService.Object,
+            _mockCurrencyService.Object,
             invoiceId);
     }
 
@@ -604,11 +603,11 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         // Setup empty collections to avoid null references
         var customers = new List<CustomerDto>
         {
-            new CustomerDto(Id: 1, Name: "عميل 1", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true)
+            new CustomerDto(Id: 1, Name: "عميل 1", Phone: null, Email: null, Address: null, TaxNumber: null, CreditLimit: 0, IsActive: true, AccountId: 1)
         };
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Name: "مستودع 1", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
+            new WarehouseDto(Id: 1, Code: "", Name: "مستودع 1", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
         };
         var products = SetupProducts();
 
@@ -623,25 +622,27 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         {
             new ProductDto(
                 Id: 1,
-                Barcode: null,
                 Name: "منتج 1",
                 CategoryId: 1,
                 CategoryName: null,
-                MinStock: 10,
+                Barcode: null,
                 Description: null,
-                HasExpiry: false,
-                Cost: 50m,
+                ReorderLevel: 10,
+                TrackExpiry: false,
+                ImagePath: null,
+                Notes: null,
                 IsActive: true),
             new ProductDto(
                 Id: 2,
-                Barcode: null,
                 Name: "منتج 2",
                 CategoryId: 1,
                 CategoryName: null,
-                MinStock: 5,
+                Barcode: null,
                 Description: null,
-                HasExpiry: false,
-                Cost: 30m,
+                ReorderLevel: 5,
+                TrackExpiry: false,
+                ImagePath: null,
+                Notes: null,
                 IsActive: true)
         };
     }

@@ -4,6 +4,9 @@ using SalesSystem.Domain.Accounting.Entities;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
+/// <summary>
+/// EF Core configuration for the <see cref="FiscalYear"/> entity.
+/// </summary>
 public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
 {
     public void Configure(EntityTypeBuilder<FiscalYear> builder)
@@ -11,12 +14,14 @@ public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
         builder.ToTable("FiscalYears");
         builder.HasKey(x => x.Id);
 
+        // === Properties ===
+
         builder.Property(x => x.Year)
             .IsRequired();
 
-        builder.HasIndex(x => x.Year)
-            .IsUnique()
-            .HasFilter("[IsActive] = 1");
+        builder.Property(x => x.YearName)
+            .IsRequired()
+            .HasMaxLength(20);
 
         builder.Property(x => x.StartDate)
             .IsRequired();
@@ -28,17 +33,28 @@ public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
             .HasDefaultValue(true);
 
         builder.Property(x => x.OpenedAt)
-            .IsRequired();
+            .IsRequired(false);
 
-        builder.Property(x => x.OpenedByUserId);
+        builder.Property(x => x.OpenedByUserId)
+            .IsRequired(false);
 
-        builder.Property(x => x.ClosedAt);
+        builder.Property(x => x.ClosedAt)
+            .IsRequired(false);
 
-        builder.Property(x => x.ClosedByUserId);
+        builder.Property(x => x.ClosedByUserId)
+            .IsRequired(false);
 
-        builder.Property(x => x.IsActive)
-            .HasDefaultValue(true);
+        // === Indexes ===
 
-        builder.HasQueryFilter(x => x.IsActive);
+        builder.HasIndex(x => x.Year)
+            .IsUnique();
+
+        builder.HasIndex(x => x.YearName)
+            .IsUnique()
+            .HasDatabaseName("IX_FiscalYears_YearName");
+
+        // === Global query filter — only open years ===
+
+        builder.HasQueryFilter(x => x.IsOpen);
     }
 }

@@ -26,6 +26,7 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
         bool includeInactive = false,
         int page = 1,
         int pageSize = 100,
+        int? supplierId = null,
         CancellationToken ct = default)
     {
         var queryParams = new List<string>
@@ -44,6 +45,8 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
             queryParams.Add($"status={status.Value}");
         if (includeInactive)
             queryParams.Add($"includeInactive=true");
+        if (supplierId.HasValue)
+            queryParams.Add($"supplierId={supplierId.Value}");
 
         var query = string.Join("&", queryParams);
         return await ExecutePagedAsync<PurchaseInvoiceDto>(
@@ -84,5 +87,20 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
         return await ExecuteAsync<PurchaseInvoiceDto>(
             () => _httpClient.PostAsync($"{BasePath}/{id}/cancel", null, ct),
             "PurchaseInvoiceApiService.CancelAsync");
+    }
+
+    public async Task<Result<string>> UploadAttachmentAsync(int id, string base64Content, string fileName, CancellationToken ct = default)
+    {
+        var request = new { base64Content, fileName };
+        return await ExecuteAsync<string>(
+            () => _httpClient.PostAsJsonAsync($"{BasePath}/{id}/upload-attachment", request, ct),
+            "PurchaseInvoiceApiService.UploadAttachmentAsync");
+    }
+
+    public async Task<Result> DeleteAttachmentAsync(int id, CancellationToken ct = default)
+    {
+        return await ExecuteCommandAsync(
+            () => _httpClient.DeleteAsync($"{BasePath}/{id}/attachment", ct),
+            "PurchaseInvoiceApiService.DeleteAttachmentAsync");
     }
 }

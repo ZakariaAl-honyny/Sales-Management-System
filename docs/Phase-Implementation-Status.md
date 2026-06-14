@@ -1,7 +1,7 @@
 # Phase Implementation Status
 
 > **Last Updated**: June 8, 2026
-> **Current Version**: v4.9+ (Phases 18-24 Complete, CashBox COA Integration Done, Phases 25-32 Planned)
+> **Current Version**: v4.10 (Phases 18-25 Complete, Schema Refactored to 65 Tables, Phases 26-32 Updated)
 > **Source Analysis**: `docs/all new Anylysis for update system features/`
 
 ---
@@ -15,16 +15,56 @@
 | 💱 **20** | **Currencies Module** | ✅ Completed | ~1,800 | Currency entity, ExchangeRateHistory, Multi-currency invoice support, Desktop CRUD |
 | 👤 **21** | **Users & Permissions** | ✅ Completed | ~2,333 | 4 roles, 33 permissions, passwordless creation, AuditLog, lockout, session tracking |
 | 📒 **22** | **Chart of Accounts** | ✅ Completed | ~3,500 | 60-account hierarchy, 4 levels, dual-mode Desktop UI, SystemAccountMappings updated |
-| 👥 **23** | **Customers Module** | ✅ Completed | ~2,100 | CustomerGroup entity, Account linking, CheckCreditLimit, CustomerType removed |
-| 🤖 **24** | **Accounting Integration** | ✅ Completed | ~700 | IAccountingIntegrationService, auto journal entries for all money ops, payment reversals |
-| 📦 **25** | **Products Module** | 📝 Planned | — | Multi-currency pricing, FIFO batches (InventoryBatches), PriceLevel, BOM, images |
-| 🏭 **26** | **Warehouses Module** | 📝 Planned | — | Warehouse types, manager, AccountId FK, stock adjustments, physical count V2 |
-| 🛒 **27** | **Purchases Module** | 📝 Planned | — | Multi-currency, landed cost, Purchase Orders, standalone returns, attachments |
-| 💳 **28** | **Sales Module** | 📝 Planned | — | Multi-currency, profit display, quotations, barcode POS, credit limit enforcement |
-| 💰 **29** | **Receipts & Payments** | 🟡 Partial — CashBox ✅ | ~2,500 | CashBox refactored (AccountId FK, auto-account creation, RunningBalance, metadata fields, no balance fields); Cheques, PaymentAllocation, DailyClosure 📝 planned |
-| 📓 **30** | **Journal Entries** | 📝 Planned | — | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
+| 👥 **23** | **Customers Module** | ✅ Completed | ~2,100 | Party entity (shared contact data), AccountId mandatory (auto-created under 1210), CheckCreditLimit returns bool, NO CustomerGroup/SupplierType/CustomerType in V1 |
+| 🤖 **24** | **Accounting Integration** | ✅ Completed | ~700 | IAccountingIntegrationService, auto journal entries for all money ops, payment reversals, per-entity account routing (Customer.AccountId/Supplier.AccountId), PurchaseReturnAccountId, single Sales Revenue account |
+| 📦 **25** | **Products Module** | ✅ Completed | ~3,100 | Multi-currency pricing via ProductPrices per (ProductUnit × CurrencyId), FIFO batches (InventoryBatches), NO PriceLevel in V1, ProductImages, DefaultPurchaseUnitId/DefaultSalesUnitId |
+| 🏭 **26** | **Warehouses Module** | 📝 Planned | — | Warehouse types (Main/Store/Showroom), WarehouseTransfers replace StockTransfers, InventoryTransactions replace InventoryMovements, NO physical count in V1 |
+| 🛒 **27** | **Purchases Module** | 📝 Planned | — | Multi-currency via CurrencyId FK, landed cost via OtherCharges on invoice header, NO PurchaseOrders in V1, standalone returns with PurchaseInvoiceLineId link |
+| 💳 **28** | **Sales Module** | 📝 Planned | — | Multi-currency via CurrencyId FK, profit display per line, NO SalesQuotations in V1, barcode POS, credit limit enforcement (CheckCreditLimit returns bool) |
+| 💰 **29** | **Receipts & Payments** | 🟡 Partial — CashBox ✅ | ~2,500 | CustomerReceipts (سندات قبض) with multi-invoice allocation, SupplierPayments with multi-invoice allocation, ReceiptVouchers/PaymentVouchers replace CashTransactions, NO Cheques/DailyClosure in V1 |
+| 📓 **30** | **Journal Entries** | 📝 Planned | — | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing, ReceiptVouchers (سندات قبض) and PaymentVouchers (سندات صرف) for manual entries |
 | 📊 **31** | **Reports** | 📝 Planned | — | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
-| 👥 **32** | **Suppliers Module** | 📝 Planned | — | AccountId FK, SupplierType, CreditLimit, OpeningBalance journal entries, UI balance display |
+| 👥 **32** | **Suppliers Module** | 📝 Planned | — | Party entity with shared contact data, AccountId mandatory (auto-created under 2100), NO SupplierType in V1, CreditLimit, NO OpeningBalance on entity (journal entry is source of truth) |
+
+---
+
+## 🔄 v4.10 — Schema Refactoring (82 → 65 Tables)
+
+### Removed Tables (17)
+| Old Table | Replacement | Reason |
+|-----------|-------------|--------|
+| ProductBarcodes | — | Merged into Products.Barcode column |
+| ProductImages | — | Deferred to V2 |
+| BillOfMaterials | — | Deferred to V2 |
+| ProductPriceHistory | ProductPrices | New multi-currency model |
+| StoreSettings | CompanySettings | Renamed + simplified |
+| CustomerGroup | — | Not in V1 |
+| CustomerPayments | CustomerReceipts | Renamed for accounting clarity |
+| SupplierPayments | SupplierPayments (new) | Restructured with allocation |
+| CashTransactions | ReceiptVouchers/PaymentVouchers | Proper accounting vouchers |
+| DailyClosures | — | Deferred to V2 |
+| Cheques | — | Deferred to V2 |
+| PurchaseLots | InventoryBatches | Unified batch tracking |
+| InventoryMovements | InventoryTransactions | Structured with lines |
+| StockTransfers | WarehouseTransfers | Renamed for clarity |
+| StockTransferItems | WarehouseTransferLines | Renamed for clarity |
+| InventoryOperations | — | Merged into InventoryTransactions |
+| StockWriteOffs | — | Covered by InventoryAdjustments |
+
+### Added Tables (8)
+| New Table | Module | Purpose |
+|-----------|--------|---------|
+| Parties | Core | Shared contact data for Customers/Suppliers/Employees |
+| ProductPrices | Products | Multi-currency pricing per unit |
+| InventoryBatches | Inventory | FIFO/FEFO batch tracking |
+| InventoryTransactions | Inventory | Structured stock movement tracking |
+| InventoryTransactionLines | Inventory | Per-product transaction details |
+| WarehouseTransfers | Inventory | Warehouse-to-warehouse transfers |
+| WarehouseTransferLines | Inventory | Transfer line items with batch links |
+| CustomerReceipts | Sales | Customer payment receipts with invoice allocation |
+| CustomerReceiptApplications | Sales | Links receipts to specific invoices |
+| ReceiptVouchers | Accounting | Manual receipt vouchers (سندات قبض) |
+| PaymentVouchers | Accounting | Manual payment vouchers (سندات صرف) |
 
 ---
 

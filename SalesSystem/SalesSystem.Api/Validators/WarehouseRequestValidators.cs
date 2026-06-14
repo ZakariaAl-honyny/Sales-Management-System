@@ -16,7 +16,7 @@ public class CreateWarehouseRequestValidator : AbstractValidator<CreateWarehouse
             .WithMessage("نوع المخزن يجب أن يكون بين 1 و 4");
 
         RuleFor(x => x.Location)
-            .MaximumLength(200).WithMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
+            .MaximumLength(200).WithMessage("الموقع لا يمكن أن يتجاوز 200 حرف");
 
         RuleFor(x => x.Phone)
             .MaximumLength(20).WithMessage("رقم الهاتف لا يمكن أن يتجاوز 20 حرف");
@@ -26,13 +26,6 @@ public class CreateWarehouseRequestValidator : AbstractValidator<CreateWarehouse
 
         RuleFor(x => x.ManagerName)
             .MaximumLength(100).WithMessage("اسم المدير لا يمكن أن يتجاوز 100 حرف");
-
-        RuleFor(x => x.Notes)
-            .MaximumLength(500).WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
-
-        RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("رقم الحساب يجب أن يكون أكبر من صفر")
-            .When(x => x.AccountId.HasValue);
     }
 }
 
@@ -49,7 +42,7 @@ public class UpdateWarehouseRequestValidator : AbstractValidator<UpdateWarehouse
             .WithMessage("نوع المخزن يجب أن يكون بين 1 و 4");
 
         RuleFor(x => x.Location)
-            .MaximumLength(200).WithMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
+            .MaximumLength(200).WithMessage("الموقع لا يمكن أن يتجاوز 200 حرف");
 
         RuleFor(x => x.Phone)
             .MaximumLength(20).WithMessage("رقم الهاتف لا يمكن أن يتجاوز 20 حرف");
@@ -59,13 +52,5 @@ public class UpdateWarehouseRequestValidator : AbstractValidator<UpdateWarehouse
 
         RuleFor(x => x.ManagerName)
             .MaximumLength(100).WithMessage("اسم المدير لا يمكن أن يتجاوز 100 حرف");
-
-        RuleFor(x => x.Notes)
-            .MaximumLength(500).WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
-
-        RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("رقم الحساب يجب أن يكون أكبر من صفر")
-            .When(x => x.AccountId.HasValue);
     }
 }
-

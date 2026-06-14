@@ -228,40 +228,7 @@ FORBIDDEN:
 
 **Fix**: Add `int? CurrencyId` FK, `decimal(18,6)? ExchangeRate`, and `decimal(18,2)? CostInBaseCurrency` to both `PurchaseInvoice` and `PurchaseReturn` entities.
 
-```csharp
-// PurchaseInvoice.cs — add
-public int? CurrencyId { get; private set; }
-public decimal? ExchangeRate { get; private set; }
-public decimal? CostInBaseCurrency { get; private set; }
-public virtual Currency? Currency { get; private set; }
-
-// Update Create() factory method to accept optional currencyId + exchangeRate params
-public static PurchaseInvoice Create(
-    int supplierId, int warehouseId, int invoiceNo,
-    DateTime? invoiceDate = null, DateOnly? dueDate = null,
-    PaymentType paymentType = PaymentType.Cash,
-    decimal discountAmount = 0,
-    string? supplierInvoiceNo = null, string? notes = null,
-    int? cashBoxId = null, int? taxId = null,
-    int? currencyId = null, decimal? exchangeRate = null,
-    int? createdByUserId = null)
-{
-    if (supplierId <= 0)
-        throw new DomainException("المورد مطلوب");
-    if (warehouseId <= 0)
-        throw new DomainException("المستودع مطلوب");
-    if (invoiceNo <= 0)
-        throw new DomainException("رقم الفاتورة يجب أن يكون أكبر من الصفر");
-    if (currencyId.HasValue && (!exchangeRate.HasValue || exchangeRate <= 0))
-        throw new DomainException("سعر الصرف مطلوب عند اختيار عملة أجنبية");
-    if (!string.IsNullOrEmpty(supplierInvoiceNo) && supplierInvoiceNo.Length > 50)
-        throw new DomainException("رقم فاتورة المورد لا يتجاوز 50 حرف");
-    if (!string.IsNullOrEmpty(notes) && notes.Length > 500)
-        throw new DomainException("الملاحظات لا تتجاوز 500 حرف");
-    
-    // ... body
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). See `Domain/Entities/PurchaseInvoice.cs` for the canonical `Create()` factory method.
 
 **Files changed**: `PurchaseInvoice.cs`, `PurchaseInvoiceConfiguration.cs`, `PurchaseReturn.cs`, `PurchaseReturnConfiguration.cs`, migration, DTOs, services, ViewModels, Views
 
@@ -275,17 +242,7 @@ public static PurchaseInvoice Create(
 
 **Distribution Algorithm** — Two strategies (user-selectable):
 
-```csharp
-// Strategy 1: Proportional by Item Cost (default)
-// Fee distribution = (Item LineTotal / Invoice SubTotal) × Fee Amount
-var itemWeight = item.LineTotal / invoice.SubTotal; // decimal fraction
-var allocatedFee = itemWeight * fee.Amount;
-
-// Strategy 2: Proportional by Item Quantity
-// Fee distribution = (Item Quantity / Total Quantity) × Fee Amount
-var itemWeight = item.Quantity / invoice.Items.Sum(i => i.Quantity);
-var allocatedFee = itemWeight * fee.Amount;
-```
+> See `docs/AGENTS.md` for domain entity patterns and `docs/CONSTITUTION.md` for financial formulas. See `Application/Services/FeeDistributionService.cs` for the canonical fee distribution algorithm.
 
 **Files changed**: New entities (`AdditionalFee`, `AdditionalFeeAllocation`), new configurations, new migration, fee distribution service
 
@@ -311,21 +268,7 @@ var allocatedFee = itemWeight * fee.Amount;
 | Supplier (المورد) | — | TotalAmount (or DueAmount) | Always |
 | Cash/Bank (الصندوق/البنك) | — | PaidAmount | If cash/partial payment |
 
-```csharp
-// In PurchaseService.PostAsync(), AFTER stock update, BEFORE commit:
-if (_autoCreateJournalEntry)
-{
-    var journalResult = await _journalEntryService.CreateFromPurchaseAsync(
-        invoice, userId, ct);
-    if (!journalResult.IsSuccess)
-    {
-        await transaction.RollbackAsync(ct);
-        _logger.LogWarning("Journal entry creation failed for purchase invoice {Id}: {Error}",
-            invoice.Id, journalResult.Error);
-        return Result<PurchaseInvoiceDto>.Failure(journalResult.Error!);
-    }
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` §2.3 for the step-by-step transaction pattern. See `Application/Services/PurchaseService.cs` for the canonical post implementation.
 
 **Files changed**: `PurchaseService.cs`, new `IPurchaseJournalService` (or extend existing), config flag check
 
@@ -337,19 +280,7 @@ if (_autoCreateJournalEntry)
 
 **Fix**: Add `int ProductUnitId` FK to `PurchaseInvoiceItem`.
 
-```csharp
-// PurchaseInvoiceItem.cs — add
-public int ProductUnitId { get; private set; }
-public virtual ProductUnit? ProductUnit { get; private set; }
-
-// Update Create() factory method
-public static PurchaseInvoiceItem Create(
-    int productId, int productUnitId,
-    decimal quantity, decimal unitCost,
-    decimal discountAmount = 0,
-    SaleMode mode = SaleMode.Retail,
-    string? notes = null)
-```
+> See `docs/AGENTS.md` for domain entity patterns. See `Domain/Entities/PurchaseInvoiceItem.cs` for the canonical entity definition.
 
 **Files changed**: `PurchaseInvoiceItem.cs`, `PurchaseInvoiceItemConfiguration.cs`, DTOs, services, migration
 
@@ -391,57 +322,11 @@ public static PurchaseInvoiceItem Create(
 
 **Domain methods to add/update**:
 
-```csharp
-// Set currency for multi-currency purchase
-public void SetCurrency(int currencyId, decimal exchangeRate)
-{
-    if (exchangeRate <= 0)
-        throw new DomainException("سعر الصرف يجب أن يكون أكبر من الصفر");
-    CurrencyId = currencyId;
-    ExchangeRate = exchangeRate;
-}
-
-// Set attachment
-public void SetAttachment(string? attachmentPath)
-{
-    AttachmentPath = attachmentPath;
-}
-
-// Enhanced discount: support percentage
-public void SetDiscount(decimal discountAmount, DiscountType discountType = DiscountType.Amount, decimal? discountRate = null)
-{
-    if (discountAmount < 0)
-        throw new DomainException("الخصم لا يمكن أن يكون سالباً");
-    if (discountType == DiscountType.Percentage && (!discountRate.HasValue || discountRate < 0 || discountRate > 100))
-        throw new DomainException("نسبة الخصم يجب أن تكون بين 0 و 100");
-    DiscountAmount = discountAmount;
-    DiscountType = discountType;
-    DiscountRate = discountRate;
-    RecalculateTotals();
-}
-
-// Recalculate totals with enhanced discount
-public void RecalculateTotals()
-{
-    SubTotal = Items.Sum(i => i.LineTotal);
-    var discount = DiscountType == DiscountType.Percentage
-        ? SubTotal * (DiscountRate ?? 0) / 100m
-        : DiscountAmount;
-    DiscountAmount = discount; // Store computed amount
-    TotalAmount = SubTotal - discount + TaxAmount + AdditionalFeesTotal;
-    DueAmount = TotalAmount - PaidAmount;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/AGENTS.md` §2.2 for financial formulas. See `Domain/Entities/PurchaseInvoice.cs` for the canonical domain methods.
 
 **DiscountType enum** (add to Domain/Enums):
 
-```csharp
-public enum DiscountType : byte
-{
-    Amount = 0,
-    Percentage = 1
-}
-```
+> See `Domain/Enums/DiscountType.cs` for the canonical enum definition.
 
 ### 4.2 PurchaseInvoiceItem — Enhanced Entity
 
@@ -464,63 +349,7 @@ public enum DiscountType : byte
 
 **Updated domain method**:
 
-```csharp
-public static PurchaseInvoiceItem Create(
-    int productId,
-    int productUnitId,       // NEW
-    decimal quantity,
-    decimal unitCost,
-    decimal discountAmount = 0,
-    DiscountType discountType = DiscountType.Amount,
-    decimal? discountRate = null,
-    SaleMode mode = SaleMode.Retail,
-    string? notes = null)
-{
-    if (productId <= 0)
-        throw new DomainException("المنتج مطلوب.");
-    if (productUnitId <= 0)
-        throw new DomainException("الوحدة مطلوبة.");
-    if (quantity <= 0)
-        throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
-    if (unitCost < 0)
-        throw new DomainException("تكلفة الوحدة لا يمكن أن تكون سالبة.");
-    if (discountAmount < 0)
-        throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
-    if (discountType == DiscountType.Percentage && (!discountRate.HasValue || discountRate < 0 || discountRate > 100))
-        throw new DomainException("نسبة الخصم يجب أن تكون بين 0 و 100.");
-
-    var item = new PurchaseInvoiceItem
-    {
-        ProductId = productId,
-        ProductUnitId = productUnitId,
-        Quantity = quantity,
-        UnitCost = unitCost,
-        DiscountAmount = discountAmount,
-        DiscountType = discountType,
-        DiscountRate = discountRate,
-        Mode = mode,
-        Notes = notes
-    };
-    item.RecalculateLineTotal();
-    return item;
-}
-
-public void RecalculateLineTotal()
-{
-    var discount = DiscountType == DiscountType.Percentage
-        ? (Quantity * UnitCost) * (DiscountRate ?? 0) / 100m
-        : DiscountAmount;
-    DiscountAmount = discount;
-    LineTotal = (Quantity * UnitCost) - DiscountAmount;
-}
-
-public void SetAdditionalFeesAllocation(decimal allocatedAmount)
-{
-    if (allocatedAmount < 0)
-        throw new DomainException("مبلغ الرسوم الإضافية لا يمكن أن يكون سالباً");
-    AdditionalFeesAmount = allocatedAmount;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/AGENTS.md` §2.2 for financial formulas. See `Domain/Entities/PurchaseInvoiceItem.cs` for the canonical definition.
 
 ### 4.3 AdditionalFee — NEW Entity
 
@@ -533,57 +362,7 @@ public void SetAdditionalFeesAllocation(decimal allocatedAmount)
 | 5 | `DistributionMethod` | `DistributionMethod` (byte) | `ByCost=0` | ✅ | `ByCost=0`, `ByQuantity=1` |
 | 6 | `AccountId` | `int? FK` | `null` | ❌ | **NEW** — Chart of Accounts entry for auto-journal credit side |
 
-```csharp
-public class AdditionalFee : BaseEntity
-{
-    public int PurchaseInvoiceId { get; private set; }
-    public string FeeName { get; private set; } = null!;
-    public decimal FeeAmount { get; private set; }
-    public DistributionMethod DistributionMethod { get; private set; }
-    public int? AccountId { get; private set; }          // NEW — FK to Chart of Accounts
-
-    public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
-    public virtual Account? Account { get; private set; } // NEW — nav property
-
-    private AdditionalFee() { }
-
-    public static AdditionalFee Create(int purchaseInvoiceId, string feeName, decimal feeAmount,
-        DistributionMethod distributionMethod = DistributionMethod.ByCost,
-        int? accountId = null)                           // NEW parameter
-    {
-        if (string.IsNullOrWhiteSpace(feeName))
-            throw new DomainException("اسم الرسوم مطلوب");
-        if (feeAmount <= 0)
-            throw new DomainException("قيمة الرسوم يجب أن تكون أكبر من الصفر");
-
-        return new AdditionalFee
-        {
-            PurchaseInvoiceId = purchaseInvoiceId,
-            FeeName = feeName.Trim(),
-            FeeAmount = feeAmount,
-            DistributionMethod = distributionMethod,
-            AccountId = accountId,
-            IsActive = true
-        };
-    }
-
-    public void SetAccount(int accountId)                // NEW domain method
-    {
-        if (accountId <= 0)
-            throw new DomainException("الحساب المحاسبي غير صحيح");
-        AccountId = accountId;
-    }
-}
-
-// Fluent API configuration (AdditionalFeeConfiguration.cs):
-// HasForeignKey(af => af.AccountId).OnDelete(DeleteBehavior.Restrict);
-
-public enum DistributionMethod : byte
-{
-    ByCost = 0,      // Proportional to item cost (default)
-    ByQuantity = 1   // Proportional to item quantity
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions. See `Domain/Entities/AdditionalFee.cs`, `Domain/Enums/DistributionMethod.cs`, and `Infrastructure/Data/Configurations/AdditionalFeeConfiguration.cs` for canonical definitions.
 
 ### 4.4 AdditionalFeeAllocation — NEW Entity
 
@@ -594,33 +373,7 @@ public enum DistributionMethod : byte
 | 3 | `PurchaseInvoiceItemId` | `int FK` | — | ✅ | Links to invoice item |
 | 4 | `AllocatedAmount` | `decimal(18,2)` | — | ✅ | Computed allocation |
 
-```csharp
-public class AdditionalFeeAllocation : BaseEntity
-{
-    public int AdditionalFeeId { get; private set; }
-    public int PurchaseInvoiceItemId { get; private set; }
-    public decimal AllocatedAmount { get; private set; }
-
-    public virtual AdditionalFee? AdditionalFee { get; private set; }
-    public virtual PurchaseInvoiceItem? PurchaseInvoiceItem { get; private set; }
-
-    private AdditionalFeeAllocation() { }
-
-    public static AdditionalFeeAllocation Create(int additionalFeeId, int purchaseInvoiceItemId, decimal allocatedAmount)
-    {
-        if (allocatedAmount < 0)
-            throw new DomainException("المبلغ الموزع لا يمكن أن يكون سالباً");
-
-        return new AdditionalFeeAllocation
-        {
-            AdditionalFeeId = additionalFeeId,
-            PurchaseInvoiceItemId = purchaseInvoiceItemId,
-            AllocatedAmount = allocatedAmount,
-            IsActive = true
-        };
-    }
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns. See `Domain/Entities/AdditionalFeeAllocation.cs` for the canonical definition.
 
 ### 4.5 PurchaseOrder — NEW Entity
 
@@ -644,16 +397,7 @@ public class AdditionalFeeAllocation : BaseEntity
 
 **PurchaseOrderStatus enum** (add to Domain/Enums):
 
-```csharp
-public enum PurchaseOrderStatus : byte
-{
-    Draft = 1,
-    Approved = 2,
-    PartiallyReceived = 3,  // Partial invoice created, pending receive > 0
-    Received = 4,           // Fully converted to purchase invoice
-    Cancelled = 5
-}
-```
+> See `Domain/Enums/PurchaseOrderStatus.cs` for the canonical enum definition.
 
 ### 4.6 PurchaseOrderItem — NEW Entity
 
@@ -670,64 +414,7 @@ public enum PurchaseOrderStatus : byte
 | 9 | `LineTotal` | `decimal(18,2)` | — | ✅ | Computed |
 | 10 | `Notes` | `nvarchar(250)?` | `null` | ❌ | |
 
-**PurchaseOrderItem entity with guard clauses**:
-```csharp
-public class PurchaseOrderItem : BaseEntity
-{
-    public int PurchaseOrderId { get; private set; }
-    public int ProductId { get; private set; }
-    public int ProductUnitId { get; private set; }
-    public decimal Quantity { get; private set; }
-    public decimal ReceivedQuantity { get; private set; }
-    public decimal PendingReceiveQuantity => Quantity - ReceivedQuantity;
-    public decimal UnitCost { get; private set; }
-    public decimal LineTotal { get; private set; }
-    public string? Notes { get; private set; }
-
-    public virtual PurchaseOrder? PurchaseOrder { get; private set; }
-    public virtual Product? Product { get; private set; }
-    public virtual ProductUnit? ProductUnit { get; private set; }
-
-    private PurchaseOrderItem() { }
-
-    public static PurchaseOrderItem Create(int productId, int productUnitId,
-        decimal quantity, decimal unitCost, string? notes = null)
-    {
-        if (productId <= 0)
-            throw new DomainException("المنتج مطلوب");
-        if (productUnitId <= 0)
-            throw new DomainException("الوحدة مطلوبة");
-        if (quantity <= 0)
-            throw new DomainException("الكمية يجب أن تكون أكبر من الصفر");
-        if (unitCost < 0)
-            throw new DomainException("التكلفة لا يمكن أن تكون سالبة");
-        if (!string.IsNullOrEmpty(notes) && notes.Length > 250)
-            throw new DomainException("ملاحظات الصنف لا تتجاوز 250 حرف");
-
-        var item = new PurchaseOrderItem
-        {
-            ProductId = productId,
-            ProductUnitId = productUnitId,
-            Quantity = quantity,
-            UnitCost = unitCost,
-            ReceivedQuantity = 0,
-            LineTotal = quantity * unitCost,
-            Notes = notes,
-            IsActive = true
-        };
-        return item;
-    }
-
-    public void AddReceivedQuantity(decimal quantity)
-    {
-        if (quantity <= 0)
-            throw new DomainException("الكمية المستلمة يجب أن تكون أكبر من الصفر");
-        if (quantity > PendingReceiveQuantity)
-            throw new DomainException("الكمية المستلمة أكبر من الكمية المطلوبة المتبقية");
-        ReceivedQuantity += quantity;
-    }
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). See `Domain/Entities/PurchaseOrderItem.cs` for the canonical definition.
 
 ### 4.7 PurchaseReturn — Enhanced Entity
 
@@ -749,75 +436,7 @@ public class PurchaseOrderItem : BaseEntity
 | 14 | `TotalAmount` | `decimal(18,2)` | `0` | ✅ | Existing |
 | 15 | `Status` | `InvoiceStatus` | `Draft=1` | ✅ | Existing |
 
-**Domain behavior for "without reference" mode**:
-```csharp
-// In PurchaseReturn entity
-public bool IsStandaloneReturn => !LinkToInvoice && !PurchaseInvoiceId.HasValue;
-
-public static PurchaseReturn Create(int supplierId, int warehouseId,
-    DateTime? returnDate = null, string? notes = null,
-    int? currencyId = null, decimal? exchangeRate = null,
-    int? createdByUserId = null)
-{
-    if (supplierId <= 0)
-        throw new DomainException("المورد مطلوب");
-    if (warehouseId <= 0)
-        throw new DomainException("المستودع مطلوب");
-    if (currencyId.HasValue && (!exchangeRate.HasValue || exchangeRate <= 0))
-        throw new DomainException("سعر الصرف مطلوب عند اختيار عملة أجنبية");
-    if (!string.IsNullOrEmpty(notes) && notes.Length > 500)
-        throw new DomainException("الملاحظات لا تتجاوز 500 حرف");
-
-    return new PurchaseReturn
-    {
-        LinkToInvoice = true,
-        SupplierId = supplierId,
-        WarehouseId = warehouseId,
-        ReturnDate = returnDate ?? DateTime.UtcNow,
-        Notes = notes,
-        CurrencyId = currencyId,
-        ExchangeRate = exchangeRate,
-        Status = InvoiceStatus.Draft,
-        SubTotal = 0,
-        TotalAmount = 0,
-        IsActive = true,
-        CreatedByUserId = createdByUserId,
-        CreatedAt = DateTime.UtcNow
-    };
-}
-
-public static PurchaseReturn CreateStandalone(int supplierId, int warehouseId,
-    DateTime? returnDate = null, string? notes = null, int? createdByUserId = null)
-{
-    if (supplierId <= 0)
-        throw new DomainException("المورد مطلوب");
-    if (warehouseId <= 0)
-        throw new DomainException("المستودع مطلوب");
-    if (!string.IsNullOrEmpty(notes) && notes.Length > 500)
-        throw new DomainException("الملاحظات لا تتجاوز 500 حرف");
-
-    return new PurchaseReturn
-    {
-        LinkToInvoice = false,
-        PurchaseInvoiceId = null,
-        SupplierId = supplierId,
-        WarehouseId = warehouseId,
-        ReturnDate = returnDate ?? DateTime.UtcNow,
-        Notes = notes,
-        Status = InvoiceStatus.Draft,
-        SubTotal = 0,
-        TotalAmount = 0,
-        IsActive = true,
-        CreatedByUserId = createdByUserId,
-        CreatedAt = DateTime.UtcNow
-    };
-}
-
-// In PurchaseReturnService:
-// If LinkToInvoice = false: user selects items manually (no invoice pre-population)
-// Stock return uses current AvgCost (not batch-specific):
-//   Log.Warning("Standalone return — no original batch found, using AvgCost")
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). See `Domain/Entities/PurchaseReturn.cs` for the canonical factory methods (`Create()` and `CreateStandalone()`).
 
 ### 4.8 PurchaseReturnItem — Enhanced Entity
 
@@ -839,184 +458,19 @@ public static PurchaseReturn CreateStandalone(int supplierId, int warehouseId,
 
 **New DTOs**:
 
-```csharp
-// Purchase Order DTOs
-public record PurchaseOrderDto(int Id, int OrderNo, int SupplierId, string SupplierName,
-    int WarehouseId, string WarehouseName, DateTime OrderDate, DateOnly? ExpectedDate,
-    byte Status, decimal SubTotal, decimal DiscountAmount, decimal TaxAmount,
-    decimal TotalAmount, string? Notes, List<PurchaseOrderItemDto> Items);
-
-public record PurchaseOrderItemDto(int Id, int ProductId, string ProductName,
-    int ProductUnitId, string ProductUnitName, decimal Quantity, decimal ReceivedQuantity,
-    decimal PendingReceiveQuantity, decimal UnitCost, decimal LineTotal, string? Notes);
-
-// Additional Fee DTOs
-public record AdditionalFeeDto(int Id, string FeeName, decimal FeeAmount, byte DistributionMethod, int? AccountId);
-public record AdditionalFeeAllocationDto(int FeeId, string FeeName, decimal FeeAmount, decimal AllocatedAmount);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions, including `PurchaseOrderDto`, `PurchaseOrderItemDto`, `AdditionalFeeDto`, and `AdditionalFeeAllocationDto`.
 
 **Updated DTOs**:
 
-```csharp
-// Updated PurchaseInvoiceDto — add fields
-public record PurchaseInvoiceDto(
-    int Id, int InvoiceNo,
-    int SupplierId, string SupplierName,
-    int WarehouseId, string WarehouseName,
-    DateTime InvoiceDate, DateOnly? DueDate,
-    byte PaymentType,
-    decimal SubTotal, decimal DiscountAmount, decimal TaxAmount,
-    decimal TotalAmount, decimal PaidAmount, decimal DueAmount,
-    string? SupplierInvoiceNo, string? Notes, byte Status,
-    int? TaxId, string? TaxName, decimal? TaxRate,
-    int? CurrencyId, string? CurrencyCode, decimal? ExchangeRate,   // NEW
-    decimal? CostInBaseCurrency,                                    // NEW
-    decimal AdditionalFeesTotal,                                    // NEW
-    string? AttachmentPath,                                         // NEW
-    byte? DiscountType, decimal? DiscountRate,                      // NEW
-    List<PurchaseInvoiceItemDto> Items,
-    List<AdditionalFeeDto> AdditionalFees                           // NEW
-);
-
-// Updated PurchaseInvoiceItemDto
-public record PurchaseInvoiceItemDto(
-    int Id, int ProductId, string ProductName,
-    int ProductUnitId, string ProductUnitName,                      // NEW
-    decimal Quantity, decimal UnitCost,
-    decimal DiscountAmount, decimal LineTotal, byte Mode,
-    byte? DiscountType, decimal? DiscountRate,                      // NEW
-    decimal? CostInBaseCurrency,                                    // NEW
-    decimal AdditionalFeesAmount,                                   // NEW
-    string? Notes
-);
-
-// Updated PurchaseReturnDto
-public record PurchaseReturnDto(
-    int Id, string ReturnNo,
-    int? PurchaseInvoiceId, bool LinkToInvoice,                     // UPDATED
-    int SupplierId, string SupplierName,
-    int WarehouseId, string WarehouseName,
-    DateTime ReturnDate, string? Notes,
-    decimal SubTotal, decimal TotalAmount, byte Status,
-    int? CurrencyId, string? CurrencyCode, decimal? ExchangeRate,   // NEW
-    decimal DiscountAmount, byte? DiscountType, decimal? DiscountRate, // NEW
-    List<PurchaseReturnItemDto> Items
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions, including `PurchaseInvoiceDto`, `PurchaseInvoiceItemDto`, and `PurchaseReturnDto`.
 
 ### 4.10 Requests — New and Updated
 
-```csharp
-// Updated CreatePurchaseInvoiceRequest
-public record CreatePurchaseInvoiceRequest(
-    int SupplierId, int WarehouseId, int? CashBoxId,
-    int? TaxId, int? CurrencyId, decimal? ExchangeRate,             // NEW
-    int? InvoiceNo,
-    DateTime? InvoiceDate, DateOnly? DueDate,
-    byte PaymentType,
-    decimal DiscountAmount,
-    byte? DiscountType, decimal? DiscountRate,                      // NEW
-    decimal TaxAmount,
-    decimal PaidAmount,
-    string? SupplierInvoiceNo,
-    string? Notes,
-    string? AttachmentBase64, string? AttachmentFileName,           // NEW
-    List<CreatePurchaseInvoiceItemRequest> Items,
-    List<CreateAdditionalFeeRequest> AdditionalFees                 // NEW
-);
-
-// Updated CreatePurchaseInvoiceItemRequest
-public record CreatePurchaseInvoiceItemRequest(
-    int ProductId, int ProductUnitId,                               // NEW
-    decimal Quantity, decimal UnitCost,
-    decimal DiscountAmount,
-    byte? DiscountType, decimal? DiscountRate,                      // NEW
-    byte Mode,
-    string? Notes
-);
-
-// New: CreateAdditionalFeeRequest
-public record CreateAdditionalFeeRequest(
-    string FeeName, decimal FeeAmount, byte DistributionMethod, int? AccountId
-);
-
-// New: CreatePurchaseOrderRequest
-public record CreatePurchaseOrderRequest(
-    int SupplierId, int WarehouseId, int? CurrencyId, decimal? ExchangeRate,
-    int? OrderNo, DateTime? OrderDate, DateOnly? ExpectedDate,
-    string? Notes, List<CreatePurchaseOrderItemRequest> Items
-);
-public record CreatePurchaseOrderItemRequest(
-    int ProductId, int ProductUnitId, decimal Quantity,
-    decimal UnitCost, string? Notes
-);
-
-// New: UpdatePurchaseOrderRequest
-public record UpdatePurchaseOrderRequest(
-    int SupplierId, int WarehouseId, int? CurrencyId, decimal? ExchangeRate,
-    DateOnly? ExpectedDate, string? Notes, List<CreatePurchaseOrderItemRequest> Items
-);
-```
+> See `SalesSystem.Contracts/` and `Contracts/Requests/` for canonical request definitions.
 
 ### 4.11 FluentValidation Rules
 
-```csharp
-// CreatePurchaseInvoiceRequestValidator — extended
-public class CreatePurchaseInvoiceRequestValidator : AbstractValidator<CreatePurchaseInvoiceRequest>
-{
-    public CreatePurchaseInvoiceRequestValidator()
-    {
-        RuleFor(x => x.SupplierId).GreaterThan(0).WithMessage("المورد مطلوب");
-        RuleFor(x => x.WarehouseId).GreaterThan(0).WithMessage("المستودع مطلوب");
-        RuleFor(x => x.Items).NotEmpty().WithMessage("يجب إضافة صنف واحد على الأقل");
-        RuleFor(x => x.PaymentType).InclusiveBetween(1, 3).WithMessage("نوع الدفع غير صحيح");
-        RuleFor(x => x.PaidAmount).GreaterThanOrEqualTo(0).WithMessage("المبلغ المدفوع لا يمكن أن يكون سالباً");
-        RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0).WithMessage("الخصم لا يمكن أن يكون سالباً");
-        RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0).WithMessage("الضريبة لا يمكن أن تكون سالبة");
-        
-        // NEW: Currency validation
-        When(x => x.CurrencyId.HasValue, () => {
-            RuleFor(x => x.ExchangeRate).NotNull().GreaterThan(0)
-                .WithMessage("سعر الصرف مطلوب عند اختيار عملة أجنبية");
-        });
-        
-        // NEW: Discount percentage validation
-        When(x => x.DiscountType == (byte)DiscountType.Percentage, () => {
-            RuleFor(x => x.DiscountRate).NotNull().InclusiveBetween(0, 100)
-                .WithMessage("نسبة الخصم يجب أن تكون بين 0 و 100");
-        });
-        
-        // NEW: Fee validation
-        RuleForEach(x => x.AdditionalFees).ChildRules(fee => {
-            fee.RuleFor(f => f.FeeName).NotEmpty().MaximumLength(100)
-                .WithMessage("اسم الرسوم مطلوب");
-            fee.RuleFor(f => f.FeeAmount).GreaterThan(0)
-                .WithMessage("قيمة الرسوم يجب أن تكون أكبر من صفر");
-            fee.When(f => f.AccountId.HasValue, () => {
-                fee.RuleFor(f => f.AccountId).GreaterThan(0)
-                    .WithMessage("الحساب المحاسبي غير صحيح");
-            });
-        });
-    }
-}
-
-// CreatePurchaseOrderRequestValidator — NEW
-public class CreatePurchaseOrderRequestValidator : AbstractValidator<CreatePurchaseOrderRequest>
-{
-    public CreatePurchaseOrderRequestValidator()
-    {
-        RuleFor(x => x.SupplierId).GreaterThan(0).WithMessage("المورد مطلوب");
-        RuleFor(x => x.WarehouseId).GreaterThan(0).WithMessage("المستودع مطلوب");
-        RuleFor(x => x.Items).NotEmpty().WithMessage("يجب إضافة صنف واحد على الأقل");
-        RuleForEach(x => x.Items).ChildRules(item => {
-            item.RuleFor(i => i.ProductId).GreaterThan(0).WithMessage("المنتج مطلوب");
-            item.RuleFor(i => i.ProductUnitId).GreaterThan(0).WithMessage("الوحدة مطلوبة");
-            item.RuleFor(i => i.Quantity).GreaterThan(0).WithMessage("الكمية يجب أن تكون أكبر من صفر");
-            item.RuleFor(i => i.UnitCost).GreaterThanOrEqualTo(0).WithMessage("التكلفة لا يمكن أن تكون سالبة");
-        });
-    }
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns. See `Api/Validators/` for canonical FluentValidation definitions.
 
 ---
 
@@ -1103,25 +557,7 @@ public class CreatePurchaseOrderRequestValidator : AbstractValidator<CreatePurch
 
 **Fix**: Integrate with the `PurchaseLot` entity from Phase 25 (ProductLot system). On purchase invoice post, each line item creates or updates a `PurchaseLot` record.
 
-```csharp
-// In PurchaseService.PostAsync(), after stock increase, before transaction.Commit:
-foreach (var item in invoice.Items)
-{
-    var lot = PurchaseLot.Create(
-        productId: item.ProductId,
-        productUnitId: item.ProductUnitId,
-        purchaseInvoiceId: invoice.Id,
-        purchaseInvoiceItemId: item.Id,
-        quantity: item.Quantity,           // decimal(18,3)
-        unitCost: item.UnitCost,           // decimal(18,2) — cost in invoice currency
-        costInBaseCurrency: item.CostInBaseCurrency ?? item.UnitCost,
-        receivedDate: invoice.InvoiceDate,
-        warehouseId: invoice.WarehouseId,
-        supplierId: invoice.SupplierId
-    );
-    await _uow.PurchaseLots.AddAsync(lot, ct);
-}
-```
+> See `docs/AGENTS.md` §2.7 for stock integrity patterns (InventoryBatches/FIFO). See `Application/Services/PurchaseService.cs` for the canonical batch creation in PostAsync.
 
 **Cost allocation on lot creation**:
 ```
@@ -1130,19 +566,7 @@ Lot.CostInBaseCurrency = converted using invoice.ExchangeRate
 ```
 
 **Integration with UpdateProductPricingService**:
-```csharp
-// The new lot cost feeds into weighted average recalculation
-if (lot.UnitCost.HasValue)
-{
-    var weightedAvgCost = costingService.CalculateWeightedAverage(
-        oldStock: currentStock.Quantity - item.Quantity,   // stock before this purchase
-        oldAvgCost: currentStock.AvgCost,
-        newQty: item.Quantity,
-        newUnitCost: lot.UnitCost.Value
-    );
-    currentStock.UpdateAvgCost(weightedAvgCost);
-}
-```
+> See `docs/AGENTS.md` §2.25 for the costing strategy (WeightedAverage formula) and `Application/Services/UpdateProductPricingService.cs` for the canonical implementation.
 
 **Changes required**:
 
@@ -1185,27 +609,7 @@ if (lot.UnitCost.HasValue)
 
 **Decision for V1**: Keep simple 5-state lifecycle: Draft → Approved (auto on save) → PartiallyReceived (partial receipt) → Received (fully received) → Cancelled. No multi-level approval workflow.
 
-**Partial receive algorithm (in PurchaseOrder entity)**:
-```csharp
-// When a purchase invoice is created from a PO:
-public void ReceiveItems(List<(int productId, int productUnitId, decimal qtyReceived)> receivedItems)
-{
-    foreach (var (productId, productUnitId, qty) in receivedItems)
-    {
-        var item = Items.SingleOrDefault(i => i.ProductId == productId && i.ProductUnitId == productUnitId);
-        if (item == null)
-            throw new DomainException("الصنف غير موجود في أمر الشراء");
-            
-        item.AddReceivedQuantity(qty);
-    }
-    
-    // Determine overall status
-    if (Items.All(i => i.PendingReceiveQuantity == 0))
-        Status = PurchaseOrderStatus.Received;
-    else if (Items.Any(i => i.ReceivedQuantity > 0))
-        Status = PurchaseOrderStatus.PartiallyReceived;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, domain methods). See `Domain/Entities/PurchaseOrder.cs` for the canonical `ReceiveItems()` method.
 
 ### 6.3 Auto-Journal Entry Trigger Point
 
@@ -1294,15 +698,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | `Desktop/Views/Purchases/PurchaseInvoiceEditorView.xaml` | Add Currency combo box + ExchangeRate field (compact style) |
 
 **Domain method**:
-```csharp
-public void SetCurrency(int? currencyId, decimal? exchangeRate)
-{
-    if (currencyId.HasValue && (!exchangeRate.HasValue || exchangeRate <= 0))
-        throw new DomainException("سعر الصرف مطلوب عند اختيار عملة أجنبية");
-    CurrencyId = currencyId;
-    ExchangeRate = exchangeRate;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). See `Domain/Entities/PurchaseInvoice.cs` for the canonical `SetCurrency()` method.
 
 **Logging**: `Log.Information("Purchase Invoice {Id} set to currency {CurrencyId} @ rate {ExchangeRate}", id, currencyId, exchangeRate)`
 
@@ -1356,43 +752,7 @@ public void SetCurrency(int? currencyId, decimal? exchangeRate)
 | `Application/Services/AdditionalFeeService.cs` | NEW — CRUD + distribution logic |
 | `Application/Services/FeeDistributionService.cs` | NEW — Distribution algorithm service |
 
-**FeeDistributionService algorithm**:
-```csharp
-public class FeeDistributionService : IFeeDistributionService
-{
-    public List<AdditionalFeeAllocation> DistributeFee(
-        AdditionalFee fee,
-        List<PurchaseInvoiceItem> items)
-    {
-        var allocations = new List<AdditionalFeeAllocation>();
-        
-        if (fee.DistributionMethod == DistributionMethod.ByCost)
-        {
-            var totalCost = items.Sum(i => i.LineTotal);
-            foreach (var item in items)
-            {
-                var weight = totalCost > 0 ? item.LineTotal / totalCost : 0;
-                var allocated = weight * fee.FeeAmount;
-                allocations.Add(AdditionalFeeAllocation.Create(fee.Id, item.Id, allocated));
-                item.SetAdditionalFeesAllocation(item.AdditionalFeesAmount + allocated);
-            }
-        }
-        else // ByQuantity
-        {
-            var totalQty = items.Sum(i => i.Quantity);
-            foreach (var item in items)
-            {
-                var weight = totalQty > 0 ? item.Quantity / totalQty : 0;
-                var allocated = weight * fee.FeeAmount;
-                allocations.Add(AdditionalFeeAllocation.Create(fee.Id, item.Id, allocated));
-                item.SetAdditionalFeesAllocation(item.AdditionalFeesAmount + allocated);
-            }
-        }
-        
-        return allocations;
-    }
-}
-```
+> See `docs/AGENTS.md` for service layer patterns and `docs/CONSTITUTION.md` for the Result<T> pattern. See `Application/Services/FeeDistributionService.cs` for the canonical implementation.
 
 **Validation** (RULE-044):
 - `CreateAdditionalFeeRequestValidator`: FeeName required (max 100), FeeAmount > 0, DistributionMethod 0-1
@@ -1424,14 +784,7 @@ public class FeeDistributionService : IFeeDistributionService
 | All ViewModels and Views | Add UI for discount type selection (radio: مبلغ/نسبة) + rate field |
 
 **Validation** (RULE-044):
-```csharp
-When(x => x.DiscountType == (byte)DiscountType.Percentage, () => {
-    RuleFor(x => x.DiscountRate).NotNull().InclusiveBetween(0, 100)
-        .WithMessage("نسبة الخصم يجب أن تكون بين 0 و 100");
-    RuleFor(x => x.DiscountAmount).Equal(0) // Amount computed from rate
-        .WithMessage("عند اختيار خصم نسبة، سيتم حساب المبلغ تلقائياً");
-});
-```
+> See `Api/Validators/CreatePurchaseInvoiceRequestValidator.cs` for the canonical FluentValidation rules including discount percentage validation.
 
 **ToolTips** (RULE-185-190):
 - Discount type radio: `"نوع الخصم: مبلغ ثابت أو نسبة مئوية"`
@@ -1477,94 +830,7 @@ When(x => x.DiscountType == (byte)DiscountType.Percentage, () => {
 
 **Files**: `Domain/Entities/PurchaseOrder.cs`, `Domain/Entities/PurchaseOrderItem.cs`, `Domain/Enums/PurchaseOrderStatus.cs`
 
-```csharp
-// PurchaseOrder.cs
-public class PurchaseOrder : BaseEntity
-{
-    public int OrderNo { get; private set; }
-    public int SupplierId { get; private set; }
-    public int WarehouseId { get; private set; }
-    public int? CurrencyId { get; private set; }
-    public decimal? ExchangeRate { get; private set; }
-    public DateTime OrderDate { get; private set; }
-    public DateOnly? ExpectedDate { get; private set; }
-    public PurchaseOrderStatus Status { get; private set; }
-    public decimal SubTotal { get; private set; }
-    public decimal DiscountAmount { get; private set; }
-    public decimal TaxAmount { get; private set; }
-    public decimal TotalAmount { get; private set; }
-    public string? Notes { get; private set; }
-
-    public virtual Supplier? Supplier { get; private set; }
-    public virtual Warehouse? Warehouse { get; private set; }
-    public virtual Currency? Currency { get; private set; }
-    public virtual List<PurchaseOrderItem> Items { get; private set; } = new();
-
-    private PurchaseOrder() { }
-
-    public static PurchaseOrder Create(int supplierId, int warehouseId, int orderNo,
-        DateTime? orderDate = null, DateOnly? expectedDate = null,
-        int? currencyId = null, decimal? exchangeRate = null,
-        string? notes = null, int? createdByUserId = null)
-    {
-        if (supplierId <= 0)
-            throw new DomainException("المورد مطلوب");
-        if (warehouseId <= 0)
-            throw new DomainException("المستودع مطلوب");
-        if (orderNo <= 0)
-            throw new DomainException("رقم الأمر يجب أن يكون أكبر من الصفر");
-        if (currencyId.HasValue && (!exchangeRate.HasValue || exchangeRate <= 0))
-            throw new DomainException("سعر الصرف مطلوب عند اختيار عملة أجنبية");
-        if (!string.IsNullOrEmpty(notes) && notes.Length > 500)
-            throw new DomainException("الملاحظات لا تتجاوز 500 حرف");
-
-        var order = new PurchaseOrder { ... };
-        order.SetCreatedBy(createdByUserId);
-        return order;
-    }
-
-    public void AddItem(PurchaseOrderItem item)
-    {
-        if (item == null)
-            throw new DomainException("الصنف مطلوب");
-        if (Items.Any(i => i.ProductId == item.ProductId && i.ProductUnitId == item.ProductUnitId))
-            throw new DomainException("الصنف مضاف مسبقاً — استخدم تعديل الكمية بدلاً من الإضافة المكررة");
-        Items.Add(item);
-        RecalculateTotals();
-    }
-
-    public void Approve()
-    {
-        if (Status != PurchaseOrderStatus.Draft)
-            throw new DomainException("يمكن اعتماد أوامر الشراء بحالة مسودة فقط");
-        Status = PurchaseOrderStatus.Approved;
-    }
-
-    public void MarkReceived()
-    {
-        if (Status != PurchaseOrderStatus.Approved && Status != PurchaseOrderStatus.PartiallyReceived)
-            throw new DomainException("يمكن استلام أوامر الشراء بحالة معتمدة أو مستلمة جزئياً فقط");
-        if (Items.Any(i => i.PendingReceiveQuantity > 0))
-            throw new DomainException("لا يمكن تعيين الحالة إلى مستلم بالكامل — يوجد أصناف لم يتم استلامها بالكامل");
-        Status = PurchaseOrderStatus.Received;
-    }
-
-    public void Cancel()
-    {
-        if (Status == PurchaseOrderStatus.Received || Status == PurchaseOrderStatus.Cancelled)
-            throw new DomainException("لا يمكن إلغاء أمر شراء تم استلامه أو إلغاؤه مسبقاً");
-        Status = PurchaseOrderStatus.Cancelled;
-    }
-
-    public void AddItem(PurchaseOrderItem item) { ... }
-    public void RemoveItem(PurchaseOrderItem item) { ... }
-    public void Approve() { ... }  // Draft → Approved
-    public void MarkReceived() { ... }  // Approved → Received (all items)
-    public void Cancel() { ... }
-    public void UpdateReceivedQuantity(int productId, int productUnitId, decimal qty) { ... }
-    public void RecalculateTotals() { ... }
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). See `Domain/Entities/PurchaseOrder.cs` for the canonical definition.
 
 #### 6.2 Infrastructure Layer
 
@@ -1582,20 +848,7 @@ public class PurchaseOrder : BaseEntity
 - `Application/Services/PurchaseOrderService.cs` — NEW: CRUD + status transitions
 
 **Service methods**:
-```csharp
-public interface IPurchaseOrderService
-{
-    Task<Result<PurchaseOrderDto>> GetByIdAsync(int id, CancellationToken ct);
-    Task<Result<List<PurchaseOrderDto>>> GetAllAsync(int? supplierId, int? status,
-        string? search, DateTime? from, DateTime? to, CancellationToken ct);
-    Task<Result<PurchaseOrderDto>> CreateAsync(CreatePurchaseOrderRequest request,
-        int userId, CancellationToken ct);
-    Task<Result<PurchaseOrderDto>> UpdateAsync(int id, UpdatePurchaseOrderRequest request,
-        int userId, CancellationToken ct);
-    Task<Result> CancelAsync(int id, int userId, CancellationToken ct);
-    Task<Result<List<PurchaseOrderDto>>> GetPendingOrdersAsync(CancellationToken ct);
-}
-```
+> See `docs/AGENTS.md` for service layer patterns and `docs/CONSTITUTION.md` for the Result<T> pattern. See `Application/Interfaces/Services/IPurchaseOrderService.cs` for the canonical interface.
 
 #### 6.5 API Layer
 
@@ -1689,40 +942,7 @@ public interface IPurchaseOrderService
 
 **Journal entry mapping for purchases**:
 
-```csharp
-public async Task<Result> CreateFromPurchaseAsync(PurchaseInvoice invoice, int userId, CancellationToken ct)
-{
-    var entries = new List<JournalEntryLine>();
-    
-    // 1. Debit: Inventory (Stock) — sum of all item line totals + allocated fees
-    entries.Add(new JournalEntryLine(/* Inventory Account */, invoice.SubTotal + invoice.AdditionalFeesTotal, 0));
-    
-    // 2. Debit: Purchase VAT (if applicable)
-    if (invoice.TaxAmount > 0 && invoice.TaxId.HasValue)
-    {
-        entries.Add(new JournalEntryLine(/* VAT Account */, invoice.TaxAmount, 0));
-    }
-    
-    // 3. Credit: Supplier (Accounts Payable)
-    entries.Add(new JournalEntryLine(/* Supplier Account */, 0, invoice.TotalAmount));
-    
-    // 4. Credit: Cash/Bank (if paid)
-    if (invoice.PaidAmount > 0 && invoice.CashBoxId.HasValue)
-    {
-        entries.Add(new JournalEntryLine(/* Cash Account */, 0, invoice.PaidAmount));
-        // Adjust supplier credit to only DueAmount
-        // entries[2] should be TotalAmount - PaidAmount instead...
-    }
-    
-    return await CreateAsync(JournalEntry.Create(
-        referenceType: "PurchaseInvoice",
-        referenceId: invoice.Id,
-        description: $"فاتورة مشتريات رقم {invoice.InvoiceNo}",
-        lines: entries,
-        createdByUserId: userId
-    ), ct);
-}
-```
+> See `docs/AGENTS.md` §2.76 (Phase 24 — Accounting Integration Rules, RULE-373/374) for journal entry mapping patterns. See `Application/Services/AccountingIntegrationService.cs` for the canonical `CreateFromPurchaseAsync()` implementation.
 
 **Note**: The exact account mapping depends on the Chart of Accounts structure (Phase 22). Default accounts must be configured in `SystemSettings` with keys like `Account.PurchaseInventory`, `Account.PurchaseVat`, `Account.SupplierPayable`.
 
@@ -1746,25 +966,7 @@ public async Task<Result> CreateFromPurchaseAsync(PurchaseInvoice invoice, int u
 | `Application/Services/SupplierPaymentService.cs` | Add `CreateFromPurchaseAsync()` method |
 
 **Logic**:
-```csharp
-// In PurchaseService.PostAsync(), after stock update and before transaction.Commit:
-if (invoice.PaymentType == PaymentType.Cash && invoice.PaidAmount > 0)
-{
-    var paymentResult = await _supplierPaymentService.CreateFromPurchaseAsync(
-        supplierId: invoice.SupplierId,
-        amount: invoice.PaidAmount,
-        invoiceId: invoice.Id,
-        userId: userId,
-        ct: ct);
-
-    if (!paymentResult.IsSuccess)
-    {
-        await transaction.RollbackAsync(ct);
-        _logger.LogWarning("Supplier payment creation failed for purchase invoice {Id}", invoice.Id);
-        return Result<PurchaseInvoiceDto>.Failure(paymentResult.Error!);
-    }
-}
-```
+> See `docs/AGENTS.md` for transaction patterns (RULE-003/RULE-005) and service layer patterns. See `Application/Services/PurchaseService.cs` for the canonical PostAsync() implementation.
 
 **Logging**: `Log.Information("Auto supplier payment of {Amount} created for purchase invoice {Id}", paidAmount, invoice.Id)`
 
@@ -1786,41 +988,7 @@ if (invoice.PaymentType == PaymentType.Cash && invoice.PaidAmount > 0)
 | `Desktop/ViewModels/Purchases/PurchaseInvoiceEditorViewModel.cs` | Update: `LoadInvoiceAsync()` to restore new fields |
 
 **ViewModel properties to add**:
-```csharp
-private ObservableCollection<CurrencyDto> _currencies = new();
-public ObservableCollection<CurrencyDto> Currencies { get => _currencies; set => SetProperty(ref _currencies, value); }
-
-private int? _selectedCurrencyId;
-public int? SelectedCurrencyId
-{
-    get => _selectedCurrencyId;
-    set
-    {
-        if (SetProperty(ref _selectedCurrencyId, value))
-        {
-            OnPropertyChanged(nameof(IsForeignCurrency));
-            if (!value.HasValue) ExchangeRate = null;
-        }
-    }
-}
-
-public bool IsForeignCurrency => SelectedCurrencyId.HasValue && SelectedCurrencyId != _baseCurrencyId;
-
-private decimal? _exchangeRate;
-public decimal? ExchangeRate { get => _exchangeRate; set => SetProperty(ref _exchangeRate, value); }
-
-private byte _discountType; // 0 = Amount, 1 = Percentage
-public byte DiscountType { get => _discountType; set => SetProperty(ref _discountType, value); }
-
-private decimal? _discountRate;
-public decimal? DiscountRate { get => _discountRate; set => SetProperty(ref _discountRate, value); }
-
-private string? _attachmentPath;
-public string? AttachmentPath { get => _attachmentPath; set => SetProperty(ref _attachmentPath, value); }
-
-private ObservableCollection<AdditionalFeeLineViewModel> _additionalFees = new();
-public ObservableCollection<AdditionalFeeLineViewModel> AdditionalFees { get; set; }
-```
+> See `docs/AGENTS.md` for ViewModel patterns (RULE-141: ExecuteAsync wrapper, INotifyDataErrorInfo). See `Desktop/ViewModels/Purchases/PurchaseInvoiceEditorViewModel.cs` for the canonical implementation.
 
 **Estimate**: ~3 hours
 
@@ -1838,84 +1006,7 @@ public ObservableCollection<AdditionalFeeLineViewModel> AdditionalFees { get; se
 5. Apply UI Compact rules (RULE-262-274) across entire view
 
 **XAML structure for new fields**:
-```xml
-<!-- Currency Section (compact) -->
-<Border Background="{StaticResource CardBackground}" Padding="12,6" Margin="0,0,0,6">
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto" MinWidth="16"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0">
-            <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
-            <ComboBox ItemsSource="{Binding Currencies}" SelectedValue="{Binding SelectedCurrencyId}"
-                      DisplayMemberPath="Code" SelectedValuePath="Id"
-                      ToolTip="اختيار عملة الفاتورة — العملة الأساسية هي الافتراضية"
-                      Style="{StaticResource ModernComboBox}" MinWidth="120"/>
-        </StackPanel>
-        <StackPanel Grid.Column="2" Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Text="سعر الصرف" Style="{StaticResource LabelStyle}"/>
-            <TextBox Text="{Binding ExchangeRate, StringFormat=N4}" Style="{StaticResource ModernTextBox}"
-                     ToolTip="سعر صرف العملة مقابل العملة الأساسية — مطلوب عند اختيار عملة أجنبية"/>
-        </StackPanel>
-    </Grid>
-</Border>
-
-<!-- Discount Section (compact) -->
-<Border Background="{StaticResource CardBackground}" Padding="12,6" Margin="0,0,0,6">
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto" MinWidth="12"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto" MinWidth="16"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-        <StackPanel Orientation="Horizontal" Grid.Column="0">
-            <RadioButton Content="مبلغ" IsChecked="{Binding IsAmountDiscount}" GroupName="InvoiceDiscount"
-                         ToolTip="خصم بمبلغ ثابت على الفاتورة"/>
-            <RadioButton Content="نسبة %" IsChecked="{Binding IsPercentageDiscount}" GroupName="InvoiceDiscount"
-                         Margin="8,0,0,0"
-                         ToolTip="خصم بنسبة مئوية على الفاتورة"/>
-        </StackPanel>
-        <StackPanel Grid.Column="2">
-            <TextBox Text="{Binding DiscountAmount, StringFormat=N2}" Style="{StaticResource ModernTextBox}"
-                     ToolTip="مبلغ الخصم — أدخل القيمة مباشرة"/>
-        </StackPanel>
-        <StackPanel Grid.Column="4" Visibility="{Binding IsPercentageDiscount, Converter={StaticResource BoolToVisibility}}">
-            <TextBox Text="{Binding DiscountRate, StringFormat=N2}" Style="{StaticResource ModernTextBox}"
-                     ToolTip="نسبة الخصم — مثال: 10 تعني 10%"/>
-        </StackPanel>
-    </Grid>
-</Border>
-
-<!-- Additional Fees Section (compact) -->
-<Border Background="{StaticResource CardBackground}" Padding="12,6" Margin="0,0,0,6">
-    <StackPanel>
-        <Grid>
-            <TextBlock Text="ℹ️ الرسوم الإضافية" FontWeight="Bold" FontSize="14"/>
-            <Button Content="+ إضافة رسم" Command="{Binding AddFeeCommand}" HorizontalAlignment="Left"
-                    Style="{StaticResource SmallButton}" Margin="100,0,0,0"
-                    ToolTip="إضافة رسم إضافي (نقل، جمارك، تخليص)"/>
-        </Grid>
-        <DataGrid ItemsSource="{Binding AdditionalFees}" ... Style="{StaticResource CompactDataGrid}"/>
-    </StackPanel>
-</Border>
-
-<!-- Attachment Section -->
-<Border Background="{StaticResource CardBackground}" Padding="12,6" Margin="0,0,0,6">
-    <StackPanel Orientation="Horizontal">
-        <Button Content="📷 إرفاق صورة" Command="{Binding BrowseAttachmentCommand}"
-                Style="{StaticResource SecondaryButton}"
-                ToolTip="📷 إرفاق صورة فاتورة المورد — اختياري"/>
-        <TextBlock Text="{Binding AttachmentFileName}" Margin="8,0,0,0" VerticalAlignment="Center"/>
-        <Button Content="✕" Command="{Binding RemoveAttachmentCommand}" Visibility="{Binding HasAttachment, Converter={StaticResource BoolToVisibility}}"
-                Style="{StaticResource SmallButton}" Margin="4,0,0,0"
-                ToolTip="إزالة الصورة المرفقة"/>
-    </StackPanel>
-</Border>
-```
+> See `docs/AGENTS.md` §2.64 (UI Compacting Rules RULE-262-274) and §2.43 (UI ToolTips RULE-185-190). See `Desktop/Views/Purchases/PurchaseInvoiceEditorView.xaml` for the canonical XAML.
 
 **Estimate**: ~3 hours
 
@@ -1938,19 +1029,7 @@ public ObservableCollection<AdditionalFeeLineViewModel> AdditionalFees { get; se
 | GET | `/api/v1/purchase-invoices/{id}/attachment` | **NEW** — download attachment |
 
 **File upload endpoint**:
-```csharp
-[HttpPost("{id:int}/upload-attachment")]
-[ProducesResponseType(200)]
-[ProducesResponseType(404)]
-public async Task<IActionResult> UploadAttachment(int id, IFormFile file, CancellationToken ct)
-{
-    if (file == null || file.Length == 0)
-        return BadRequest(new { error = "الملف مطلوب" });
-
-    var result = await _purchaseService.UploadAttachmentAsync(id, file, ct);
-    return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-}
-```
+> See `docs/AGENTS.md` §2.47 for Controller purity rules (RULE-202/203). See `Api/Controllers/PurchaseInvoicesController.cs` for the canonical attachment endpoint.
 
 **New PurchaseOrdersController endpoints**:
 

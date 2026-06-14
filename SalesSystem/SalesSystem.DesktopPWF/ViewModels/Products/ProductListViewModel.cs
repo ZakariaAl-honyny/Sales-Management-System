@@ -302,8 +302,8 @@ public async Task DeleteProductAsync()
             Name: SelectedProduct!.Name,
             Barcode: SelectedProduct.Barcode,
             CategoryId: SelectedProduct.CategoryId,
-            MinStock: SelectedProduct.MinStock,
             Description: SelectedProduct.Description,
+            ReorderLevel: SelectedProduct.ReorderLevel,
             IsActive: true
         );
 

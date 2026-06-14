@@ -1,0 +1,88 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Branch.BranchEditorView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+        mc:Ignorable="d"
+        Background="{StaticResource BackgroundBrush}"
+        FlowDirection="RightToLeft">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Title}" Style="{StaticResource HeaderStyle}" Foreground="White" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Form Content -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Border Padding="16">
+                <StackPanel>
+                    <!-- Name -->
+                    <TextBlock Text="اسم الفرع *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                             Style="{StaticResource ModernTextBox}"
+                             Tag="أدخل اسم الفرع"
+                             TabIndex="1"
+                             helpers:FocusHelper.AdvanceOnEnter="True"
+                             ToolTip="أدخل اسم الفرع — هذا الحقل إلزامي"/>
+
+                    <!-- Code -->
+                    <TextBlock Text="الكود" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
+                    <TextBox Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBox}"
+                             Tag="رمز الفرع (اختياري)"
+                             TabIndex="2"
+                             ToolTip="رمز الفرع — اختياري"/>
+
+                    <!-- IsActive -->
+                    <CheckBox Content="نشط" 
+                              IsChecked="{Binding IsActive}"
+                              Margin="4,16,0,0"
+                              TabIndex="3"
+                              ToolTip="تفعيل أو إيقاف الفرع"/>
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="#F8FAFC" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Command="{Binding SaveCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        Width="120"
+                        IsDefault="True"
+                        TabIndex="4"
+                        Margin="0,0,12,0"
+                        ToolTip="حفظ بيانات الفرع">
+                    <TextBlock Text="حفظ" VerticalAlignment="Center"/>
+                </Button>
+                <Button Content="إلغاء"
+                        Command="{Binding CancelCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Width="100"
+                        TabIndex="5"
+                        ToolTip="إلغاء والعودة"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#CCFFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="180" Height="4" Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Text="جاري المعالجة..." FontSize="14" FontWeight="SemiBold" Margin="0,16,0,0" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

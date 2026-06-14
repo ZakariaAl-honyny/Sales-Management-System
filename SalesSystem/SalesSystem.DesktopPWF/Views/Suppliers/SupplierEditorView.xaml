@@ -106,19 +106,6 @@
                         </Grid>
                         <Border Height="12"/>
 
-                        <!-- Opening Balance -->
-                        <StackPanel Visibility="{Binding IsEditMode, Converter={StaticResource InverseBoolToVisibility}}">
-                            <TextBlock Text="الرصيد الافتتاحي (رصيد سابق)" Style="{StaticResource LabelStyle}"/>
-<TextBox Text="{Binding OpeningBalance, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
-                                      Style="{StaticResource ModernTextBox}" 
-                                      TabIndex="7"
-                                      helpers:FocusHelper.AdvanceOnEnter="True"
-                                      AutomationProperties.AutomationId="TxtSupplierOpeningBalance"
-                                      ToolTip="الرصيد السابق للمورد — المبلغ المستحق له (موجب) أو المستحق عليه (سالب)"/>
-                            <TextBlock Text="المبلغ المستحق للمورد (بالموجب) أو المستحق عليه (بالسالب) قبل استخدام النظام" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                            <Border Height="12"/>
-                        </StackPanel>
-
                         <!-- Account - Auto-created by system -->
                         <Border Height="12"/>
                         <Border Background="#FFEBEE" CornerRadius="6" Padding="12,8">
@@ -133,7 +120,7 @@
                         <Border Height="12"/>
                         <CheckBox Content="مورد نشط" IsChecked="{Binding IsActive}" FontSize="14" 
                                   Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}" 
-                                  TabIndex="9"
+                                  TabIndex="7"
                                   AutomationProperties.AutomationId="ChkSupplierActive"/>
                     </StackPanel>
                 </Border>
@@ -154,7 +141,7 @@
                             Width="140"
                             Margin="0,0,12,0"
                             IsDefault="True"
-                            TabIndex="10"
+                            TabIndex="8"
                             AutomationProperties.AutomationId="BtnSaveSupplier"
                             ToolTip="حفظ البيانات المدخلة">
                         <StackPanel Orientation="Horizontal">
@@ -162,11 +149,21 @@
                             <TextBlock Text="حفظ البيانات"/>
                         </StackPanel>
                     </Button>
+                    <Button Command="{Binding ManageContactsCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="140"
+                            Margin="0,0,12,0"
+                            TabIndex="9"
+                            ToolTip="إدارة جهات اتصال المورد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="جهات الاتصال"/>
+                        </StackPanel>
+                    </Button>
                     <Button Content="إلغاء"
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
-                            TabIndex="11"
+                            TabIndex="10"
                             AutomationProperties.AutomationId="BtnCancelSupplier"
                             ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>

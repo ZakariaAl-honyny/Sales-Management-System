@@ -53,30 +53,30 @@ public class CreateProductRequestValidatorTests
     #region Stock Validation
 
     [Fact]
-    public void GivenZeroMinStock_WhenValidating_ThenPasses()
+    public void GivenZeroReorderLevel_WhenValidating_ThenPasses()
     {
         // Arrange
-        var request = CreateValidRequest() with { MinStock = 0 };
+        var request = CreateValidRequest() with { ReorderLevel = 0 };
 
         // Act
         var result = _validator.TestValidate(request);
 
         // Assert
-        result.ShouldNotHaveValidationErrorFor(x => x.MinStock);
+        result.ShouldNotHaveValidationErrorFor(x => x.ReorderLevel);
     }
 
     [Fact]
-    public void GivenNegativeMinStock_WhenValidating_ThenFails()
+    public void GivenNegativeReorderLevel_WhenValidating_ThenFails()
     {
         // Arrange
-        var request = CreateValidRequest() with { MinStock = -1 };
+        var request = CreateValidRequest() with { ReorderLevel = -1 };
 
         // Act
         var result = _validator.TestValidate(request);
 
         // Assert
-        result.ShouldHaveValidationErrorFor(x => x.MinStock)
-            .WithErrorMessage("الحد الأدنى للمخزون لا يمكن أن يكون سالباً");
+        result.ShouldHaveValidationErrorFor(x => x.ReorderLevel)
+            .WithErrorMessage("مستوى إعادة الطلب لا يمكن أن يكون سالباً");
     }
 
     #endregion
@@ -88,7 +88,7 @@ public class CreateProductRequestValidatorTests
     [InlineData(100, true)]
     [InlineData(0, false)]
     [InlineData(-1, false)]
-    public void GivenCategoryId_WhenValidating_ThenCorrectResult(int? categoryId, bool isValid)
+    public void GivenCategoryId_WhenValidating_ThenCorrectResult(int categoryId, bool isValid)
     {
         // Arrange
         var request = CreateValidRequest() with { CategoryId = categoryId };
@@ -101,7 +101,7 @@ public class CreateProductRequestValidatorTests
             result.ShouldNotHaveValidationErrorFor(x => x.CategoryId);
         else
             result.ShouldHaveValidationErrorFor(x => x.CategoryId)
-                .WithErrorMessage("يجب اختيار تصنيف صحيح");
+                .WithErrorMessage("التصنيف مطلوب");
     }
 
     #endregion
@@ -124,10 +124,10 @@ public class CreateProductRequestValidatorTests
     #endregion
 
     private static CreateProductRequest CreateValidRequest() => new(
-        Barcode: "123456789",
         Name: "Valid Product",
         CategoryId: 1,
-        MinStock: 10,
-        Description: "Test description"
+        Description: "Test description",
+        Barcode: "123456789",
+        ReorderLevel: 10
     );
 }

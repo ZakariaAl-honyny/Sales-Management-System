@@ -39,6 +39,20 @@
                             <TextBlock Text="عرض التقرير" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+                    <Button Command="{Binding ExportExcelCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" TabIndex="4"
+                            ToolTip="تصدير تقرير المبيعات حسب التصنيف إلى ملف Excel">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Excel" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ExportPdfCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" TabIndex="5"
+                            ToolTip="تصدير تقرير المبيعات حسب التصنيف إلى ملف PDF">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="PDF" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </StackPanel>
         </Border>

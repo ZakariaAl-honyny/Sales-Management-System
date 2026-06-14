@@ -85,8 +85,6 @@
                                             ToolTipService.ToolTip="تاريخ الإغلاق"/>
                         <DataGridTextColumn Header="اسم الصندوق" Binding="{Binding CashBoxName}" Width="2*"
                                             ToolTipService.ToolTip="اسم الصندوق"/>
-                        <DataGridTextColumn Header="الرصيد الافتتاحي" Binding="{Binding OpeningBalance, StringFormat={}{0:N2}}" Width="1.5*"
-                                            ToolTipService.ToolTip="الرصيد الافتتاحي في بداية اليوم"/>
                         <DataGridTextColumn Header="إجمالي الإيرادات" Binding="{Binding TotalIncome, StringFormat={}{0:N2}}" Width="1.5*"
                                             ToolTipService.ToolTip="إجمالي الإيرادات خلال اليوم">
                             <DataGridTextColumn.ElementStyle>
@@ -105,8 +103,8 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="الرصيد الختامي" Binding="{Binding ClosingBalance, StringFormat={}{0:N2}}" Width="1.5*"
-                                            ToolTipService.ToolTip="الرصيد الختامي في نهاية اليوم">
+                        <DataGridTextColumn Header="صافي الرصيد" Binding="{Binding NetBalance, StringFormat={}{0:N2}}" Width="1.5*"
+                                            ToolTipService.ToolTip="صافي الرصيد = الإيرادات - المصروفات">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                                     <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
@@ -166,11 +164,6 @@
                 Visibility="{Binding HasData, Converter={StaticResource BoolToVisibility}}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Margin="0,0,20,0">
-                    <TextBlock Text="إجمالي الرصيد الافتتاحي:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
-                    <TextBlock Text="{Binding FormattedTotalOpening}" Style="{StaticResource FooterBarTextStyle}" FontSize="15" FontWeight="Bold" Margin="6,0,4,0"/>
-                    <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,20,0">
                     <TextBlock Text="الإيرادات:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
                     <TextBlock Text="{Binding FormattedTotalIncome}" Style="{StaticResource FooterBarTextStyle}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" Margin="6,0,4,0"/>
                     <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
@@ -181,8 +174,8 @@
                     <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="الرصيد الختامي:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
-                    <TextBlock Text="{Binding FormattedTotalClosing}" Style="{StaticResource FooterBarTextStyle}" FontSize="17" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="6,0,4,0"/>
+                    <TextBlock Text="صافي الرصيد:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                    <TextBlock Text="{Binding FormattedTotalNetBalance}" Style="{StaticResource FooterBarTextStyle}" FontSize="17" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="6,0,4,0"/>
                     <TextBlock Text="ريال" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
                 </StackPanel>
             </StackPanel>

@@ -19,11 +19,10 @@ namespace SalesSystem.DesktopPWF.ViewModels.Products;
 public class ProductEditorViewModel : ViewModelBase
 {
     private readonly IProductApiService _productService;
-    private readonly ICategoryApiService _categoryService;
+    private readonly IProductCategoryApiService _categoryService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IProductPriceApiService? _priceService;
-    private readonly IProductImageApiService? _imageService;
     private readonly IInventoryBatchApiService? _batchService;
     private readonly IScreenWindowService? _screenWindowService;
     private readonly IToastNotificationService? _toastService;
@@ -32,21 +31,23 @@ public class ProductEditorViewModel : ViewModelBase
     private string _barcode = string.Empty;
     private string _name = string.Empty;
     private int? _categoryId;
-    private decimal _minStock;
+    private decimal _reorderLevel;
     private string _description = string.Empty;
     private bool _isActive = true;
     private bool _isEditMode;
+    private bool _trackExpiry;
+    private decimal? _openingQuantity;
+    private decimal? _openingUnitCost;
+    private DateTime? _openingExpiryDate;
     private string? _errorMessage;
 
-    private CategoryDto? _selectedCategory;
+    private ProductCategoryDto? _selectedCategory;
 
     // Tab-specific fields
     private int _selectedTabIndex;
     private int _productUnitId;
     private ObservableCollection<ProductPriceDto> _prices = new();
     private ProductPriceDto? _selectedPrice;
-    private ObservableCollection<ProductImageDto> _images = new();
-    private ProductImageDto? _selectedImage;
     private ObservableCollection<InventoryBatchDto> _batches = new();
     private InventoryBatchDto? _selectedBatch;
 
@@ -54,11 +55,10 @@ public class ProductEditorViewModel : ViewModelBase
     public ProductEditorViewModel()
     {
         _productService = App.GetService<IProductApiService>();
-        _categoryService = App.GetService<ICategoryApiService>();
+        _categoryService = App.GetService<IProductCategoryApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
         _priceService = App.GetService<IProductPriceApiService>();
-        _imageService = App.GetService<IProductImageApiService>();
         _batchService = App.GetService<IInventoryBatchApiService>();
         _screenWindowService = App.GetService<IScreenWindowService>();
         _toastService = App.GetService<IToastNotificationService>();
@@ -70,11 +70,10 @@ public class ProductEditorViewModel : ViewModelBase
 
     public ProductEditorViewModel(
         IProductApiService productService,
-        ICategoryApiService categoryService,
+        IProductCategoryApiService categoryService,
         IEventBus eventBus,
         IDialogService dialogService,
         IProductPriceApiService? priceService = null,
-        IProductImageApiService? imageService = null,
         IInventoryBatchApiService? batchService = null,
         IScreenWindowService? screenWindowService = null,
         IToastNotificationService? toastService = null)
@@ -84,7 +83,6 @@ public class ProductEditorViewModel : ViewModelBase
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _priceService = priceService ?? App.GetService<IProductPriceApiService>();
-        _imageService = imageService ?? App.GetService<IProductImageApiService>();
         _batchService = batchService ?? App.GetService<IInventoryBatchApiService>();
         _screenWindowService = screenWindowService ?? App.GetService<IScreenWindowService>();
         _toastService = toastService ?? App.GetService<IToastNotificationService>();
@@ -97,11 +95,10 @@ public class ProductEditorViewModel : ViewModelBase
     public ProductEditorViewModel(ProductDto product)
         : this(
             App.GetService<IProductApiService>(),
-            App.GetService<ICategoryApiService>(),
+            App.GetService<IProductCategoryApiService>(),
             App.GetService<IEventBus>(),
             App.GetService<IDialogService>(),
             priceService: App.GetService<IProductPriceApiService>(),
-            imageService: App.GetService<IProductImageApiService>(),
             batchService: App.GetService<IInventoryBatchApiService>(),
             screenWindowService: App.GetService<IScreenWindowService>(),
             toastService: App.GetService<IToastNotificationService>())
@@ -110,34 +107,35 @@ public class ProductEditorViewModel : ViewModelBase
         _barcode = product.Barcode ?? string.Empty;
         _name = product.Name;
         _categoryId = product.CategoryId;
-        _minStock = product.MinStock;
+        _reorderLevel = product.ReorderLevel;
         _description = product.Description ?? string.Empty;
         _isActive = product.IsActive;
         _isEditMode = true;
+        _trackExpiry = product.TrackExpiry;
     }
 
     public ProductEditorViewModel(
         ProductDto product,
         IProductApiService productService,
-        ICategoryApiService categoryService,
+        IProductCategoryApiService categoryService,
         IEventBus eventBus,
         IDialogService dialogService,
         IProductPriceApiService? priceService = null,
-        IProductImageApiService? imageService = null,
         IInventoryBatchApiService? batchService = null,
         IScreenWindowService? screenWindowService = null,
         IToastNotificationService? toastService = null)
         : this(productService, categoryService, eventBus, dialogService,
-              priceService, imageService, batchService, screenWindowService, toastService)
+              priceService, batchService, screenWindowService, toastService)
     {
         _productId = product.Id;
         _barcode = product.Barcode ?? string.Empty;
         _name = product.Name;
         _categoryId = product.CategoryId;
-        _minStock = product.MinStock;
+        _reorderLevel = product.ReorderLevel;
         _description = product.Description ?? string.Empty;
         _isActive = product.IsActive;
         _isEditMode = true;
+        _trackExpiry = product.TrackExpiry;
     }
 
     #region Properties
@@ -185,10 +183,10 @@ public class ProductEditorViewModel : ViewModelBase
         }
     }
 
-    public decimal MinStock
+    public decimal ReorderLevel
     {
-        get => _minStock;
-        set => SetProperty(ref _minStock, value);
+        get => _reorderLevel;
+        set => SetProperty(ref _reorderLevel, value);
     }
 
     public string Description
@@ -209,9 +207,9 @@ public class ProductEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
-    public ObservableCollection<CategoryDto> Categories { get; } = new();
+    public ObservableCollection<ProductCategoryDto> Categories { get; } = new();
 
-    public CategoryDto? SelectedCategory
+    public ProductCategoryDto? SelectedCategory
     {
         get => _selectedCategory;
         set
@@ -222,6 +220,50 @@ public class ProductEditorViewModel : ViewModelBase
             }
         }
     }
+
+    // ── Opening Stock Fields ──
+
+    /// <summary>
+    /// True when the product tracks expiry dates — shown as a checkbox in the editor.
+    /// </summary>
+    public bool TrackExpiry
+    {
+        get => _trackExpiry;
+        set => SetProperty(ref _trackExpiry, value);
+    }
+
+    /// <summary>
+    /// Optional opening quantity when creating a new product.
+    /// </summary>
+    public decimal? OpeningQuantity
+    {
+        get => _openingQuantity;
+        set => SetProperty(ref _openingQuantity, value);
+    }
+
+    /// <summary>
+    /// Optional unit cost for the opening stock.
+    /// </summary>
+    public decimal? OpeningUnitCost
+    {
+        get => _openingUnitCost;
+        set => SetProperty(ref _openingUnitCost, value);
+    }
+
+    /// <summary>
+    /// Optional expiry date for the opening stock batch.
+    /// Required if TrackExpiry is true and OpeningQuantity > 0.
+    /// </summary>
+    public DateTime? OpeningExpiryDate
+    {
+        get => _openingExpiryDate;
+        set => SetProperty(ref _openingExpiryDate, value);
+    }
+
+    /// <summary>
+    /// True when opening stock fields should be visible (create mode only).
+    /// </summary>
+    public bool ShowOpeningFields => !IsEditMode;
 
     // ── Tab-specific Properties ──
 
@@ -266,19 +308,6 @@ public class ProductEditorViewModel : ViewModelBase
         set => SetProperty(ref _selectedPrice, value);
     }
 
-    // Images
-    public ObservableCollection<ProductImageDto> Images
-    {
-        get => _images;
-        set => SetProperty(ref _images, value);
-    }
-
-    public ProductImageDto? SelectedImage
-    {
-        get => _selectedImage;
-        set => SetProperty(ref _selectedImage, value);
-    }
-
     // Batches
     public ObservableCollection<InventoryBatchDto> Batches
     {
@@ -302,10 +331,6 @@ public class ProductEditorViewModel : ViewModelBase
     public ICommand AddPriceCommand { get; private set; } = null!;
     public ICommand EditPriceCommand { get; private set; } = null!;
     public ICommand RefreshPricesCommand { get; private set; } = null!;
-    public ICommand AddImageCommand { get; private set; } = null!;
-    public ICommand SetPrimaryImageCommand { get; private set; } = null!;
-    public ICommand DeleteImageCommand { get; private set; } = null!;
-    public ICommand RefreshImagesCommand { get; private set; } = null!;
     public ICommand RefreshBatchesCommand { get; private set; } = null!;
     #endregion
 
@@ -320,12 +345,6 @@ public class ProductEditorViewModel : ViewModelBase
         AddPriceCommand = new RelayCommand(AddPrice);
         EditPriceCommand = new RelayCommand(EditPrice);
         RefreshPricesCommand = new AsyncRelayCommand(LoadPricesAsync);
-
-        // Images tab commands
-        AddImageCommand = new AsyncRelayCommand(AddImageAsync);
-        SetPrimaryImageCommand = new AsyncRelayCommand(SetPrimaryImageAsync);
-        DeleteImageCommand = new AsyncRelayCommand(DeleteImageAsync);
-        RefreshImagesCommand = new AsyncRelayCommand(LoadImagesAsync);
 
         // Batches tab commands
         RefreshBatchesCommand = new AsyncRelayCommand(LoadBatchesAsync);
@@ -369,6 +388,17 @@ public class ProductEditorViewModel : ViewModelBase
         if (!CategoryId.HasValue || CategoryId.Value <= 0)
             AddError(nameof(CategoryId), "يجب اختيار فئة");
 
+        // Opening stock validation (create mode only)
+        if (ShowOpeningFields)
+        {
+            if (OpeningQuantity.HasValue && OpeningQuantity.Value <= 0)
+                AddError(nameof(OpeningQuantity), "الكمية الافتتاحية يجب أن تكون أكبر من صفر");
+            if (OpeningUnitCost.HasValue && OpeningUnitCost.Value < 0)
+                AddError(nameof(OpeningUnitCost), "تكلفة الوحدة لا يمكن أن تكون سالبة");
+            if (TrackExpiry && OpeningQuantity.HasValue && OpeningQuantity.Value > 0 && !OpeningExpiryDate.HasValue)
+                AddError(nameof(OpeningExpiryDate), "تاريخ الانتهاء مطلوب عند تفعيل تتبع الصلاحية وإدخال كمية افتتاحية");
+        }
+
         return await ValidateAllAsync();
     }
 
@@ -388,9 +418,9 @@ public class ProductEditorViewModel : ViewModelBase
             var updateRequest = new UpdateProductRequest(
                 Name: Name,
                 Barcode: string.IsNullOrWhiteSpace(Barcode) ? null : Barcode,
-                CategoryId: CategoryId,
-                MinStock: MinStock,
+                CategoryId: CategoryId ?? 0,
                 Description: string.IsNullOrWhiteSpace(Description) ? null : Description,
+                ReorderLevel: ReorderLevel,
                 IsActive: IsActive);
 
             result = await _productService.UpdateAsync(_productId, updateRequest);
@@ -400,9 +430,13 @@ public class ProductEditorViewModel : ViewModelBase
             var createRequest = new CreateProductRequest(
                 Name: Name,
                 Barcode: string.IsNullOrWhiteSpace(Barcode) ? null : Barcode,
-                CategoryId: CategoryId,
-                MinStock: MinStock,
-                Description: string.IsNullOrWhiteSpace(Description) ? null : Description);
+                CategoryId: CategoryId ?? 0,
+                Description: string.IsNullOrWhiteSpace(Description) ? null : Description,
+                ReorderLevel: ReorderLevel,
+                TrackExpiry: TrackExpiry,
+                OpeningQuantity: OpeningQuantity,
+                OpeningUnitCost: OpeningUnitCost,
+                OpeningExpiryDate: OpeningExpiryDate);
 
             result = await _productService.CreateAsync(createRequest);
         }
@@ -440,9 +474,6 @@ public class ProductEditorViewModel : ViewModelBase
                 await LoadPricesAsync();
                 break;
             case 2:
-                await LoadImagesAsync();
-                break;
-            case 3:
                 await LoadBatchesAsync();
                 break;
         }
@@ -476,37 +507,6 @@ public class ProductEditorViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الأسعار", "ProductEditorViewModel.LoadPricesOperationAsync", "[ProductEditorViewModel.LoadPricesOperationAsync] Failed to load product prices from API.");
-        }
-    }
-
-    /// <summary>
-    /// Loads images for the current product (available for existing products only).
-    /// Triggered when the Images tab is selected.
-    /// </summary>
-    public async Task LoadImagesAsync()
-    {
-        if (!IsExistingProduct || ProductId <= 0) return;
-        await ExecuteAsync(LoadImagesOperationAsync);
-    }
-
-    private async Task LoadImagesOperationAsync()
-    {
-        ErrorMessage = null;
-        var result = await _imageService!.GetByProductAsync(ProductId);
-        if (result.IsSuccess && result.Value != null)
-        {
-            InvokeOnUIThread(() =>
-            {
-                Images.Clear();
-                foreach (var item in result.Value.OrderBy(x => x.SortOrder))
-                {
-                    Images.Add(item);
-                }
-            });
-        }
-        else
-        {
-            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الصور", "ProductEditorViewModel.LoadImagesOperationAsync", "[ProductEditorViewModel.LoadImagesOperationAsync] Failed to load product images from API.");
         }
     }
 
@@ -578,113 +578,6 @@ public class ProductEditorViewModel : ViewModelBase
                 System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadPricesAsync());
             }
         });
-    }
-
-    // ── Images Tab Commands ──
-
-    private async Task AddImageAsync()
-    {
-        if (_imageService == null || _toastService == null) return;
-        await ExecuteAsync(AddImageOperationAsync);
-    }
-
-    private async Task AddImageOperationAsync()
-    {
-        if (!IsExistingProduct || ProductId <= 0) return;
-        ErrorMessage = null;
-
-        string? filePath = null;
-        InvokeOnUIThread(() =>
-        {
-            var dialog = new Microsoft.Win32.OpenFileDialog
-            {
-                Title = "اختيار صورة للمنتج",
-                Filter = "صور (PNG, JPG, JPEG, GIF, BMP)|*.png;*.jpg;*.jpeg;*.gif;*.bmp|كل الملفات|*.*",
-                Multiselect = false,
-                CheckFileExists = true
-            };
-
-            if (dialog.ShowDialog() == true)
-                filePath = dialog.FileName;
-        });
-
-        if (string.IsNullOrEmpty(filePath))
-            return;
-
-        var request = new CreateProductImageRequest(
-            ProductId: ProductId,
-            ImagePath: filePath,
-            IsPrimary: false,
-            SortOrder: 0);
-
-        var result = await _imageService!.CreateAsync(request);
-
-        if (result.IsSuccess)
-        {
-            _toastService!.ShowSuccess("تمت إضافة الصورة بنجاح");
-            await LoadImagesAsync();
-        }
-        else
-        {
-            var error = result.Error ?? "فشل في إضافة الصورة";
-            ErrorMessage = HandleFailure(error, "ProductEditorViewModel.AddImageOperationAsync", "[ProductEditorViewModel.AddImageOperationAsync] Failed to create product image.");
-            await _dialogService.ShowErrorAsync("خطأ في إضافة الصورة", ErrorMessage);
-        }
-    }
-
-    private async Task SetPrimaryImageAsync()
-    {
-        if (_imageService == null || _toastService == null || SelectedImage == null) return;
-
-        var imageId = SelectedImage.Id;
-        await ExecuteAsync(() => SetPrimaryImageOperationAsync(imageId));
-    }
-
-    private async Task SetPrimaryImageOperationAsync(int imageId)
-    {
-        ErrorMessage = null;
-        var result = await _imageService!.SetPrimaryAsync(ProductId, imageId);
-
-        if (result.IsSuccess)
-        {
-            _toastService!.ShowSuccess("تم تعيين الصورة كصورة رئيسية");
-            await LoadImagesAsync();
-        }
-        else
-        {
-            var error = result.Error ?? "فشل في تعيين الصورة الرئيسية";
-            ErrorMessage = HandleFailure(error, "ProductEditorViewModel.SetPrimaryImageOperationAsync", "[ProductEditorViewModel.SetPrimaryImageOperationAsync] Failed to set primary image.");
-            await _dialogService.ShowErrorAsync("خطأ في تعيين الصورة", ErrorMessage);
-        }
-    }
-
-    private async Task DeleteImageAsync()
-    {
-        if (_imageService == null || _toastService == null || SelectedImage == null) return;
-
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync("حذف الصورة");
-        if (strategy == DeleteStrategy.Cancel) return;
-
-        var imageId = SelectedImage.Id;
-        await ExecuteAsync(() => DeleteImageOperationAsync(imageId));
-    }
-
-    private async Task DeleteImageOperationAsync(int imageId)
-    {
-        ErrorMessage = null;
-        var result = await _imageService!.DeactivateAsync(imageId);
-
-        if (result.IsSuccess)
-        {
-            _toastService!.ShowSuccess("تم حذف الصورة بنجاح");
-            await LoadImagesAsync();
-        }
-        else
-        {
-            var error = result.Error ?? "فشل في حذف الصورة";
-            ErrorMessage = HandleFailure(error, "ProductEditorViewModel.DeleteImageOperationAsync", "[ProductEditorViewModel.DeleteImageOperationAsync] Failed to delete product image.");
-            await _dialogService.ShowErrorAsync("خطأ في حذف الصورة", ErrorMessage);
-        }
     }
 
     #endregion

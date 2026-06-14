@@ -7,14 +7,17 @@ namespace SalesSystem.Domain.Entities;
 /// Represents a unit of measure for a product (e.g., "حبة", "طبق", "كرتون").
 /// Each product has one base unit (factor = 1) and optionally multiple derived units.
 /// Unit names come from the referenced <see cref="Unit"/> entity (not embedded as a string).
+/// Maps to "ProductUnits" table in the new schema — pure junction table (ProductId, UnitId, Factor, IsBaseUnit).
+/// No prices or barcodes stored here — pricing via ProductPrices table, barcode via Product.Barcode.
 /// </summary>
-public class ProductUnit : BaseEntity
+public class ProductUnit : ActivatableEntity
 {
     // ─── Properties ───────────────────────────────
     public int ProductId { get; private set; }
 
     /// <summary>
     /// FK to the Units table — the canonical unit definition (name, symbol).
+    /// smallint in DB.
     /// </summary>
     public int UnitId { get; private set; }
 
@@ -26,8 +29,9 @@ public class ProductUnit : BaseEntity
     /// <summary>
     /// How many BASE UNITS does this unit contain?
     /// Base unit itself = 1. Box of 12 = 12. Pallet of 360 = 360.
+    /// decimal(18,3) in DB.
     /// </summary>
-    public decimal BaseConversionFactor { get; private set; }
+    public decimal Factor { get; private set; }
 
     public bool IsBaseUnit { get; private set; }
 
@@ -53,9 +57,8 @@ public class ProductUnit : BaseEntity
         {
             ProductId = productId,
             UnitId = unitId,
-            BaseConversionFactor = 1,
-            IsBaseUnit = true,
-            IsActive = true
+            Factor = 1,
+            IsBaseUnit = true
         };
     }
 
@@ -65,13 +68,13 @@ public class ProductUnit : BaseEntity
     public static ProductUnit CreateDerivedUnit(
         int productId,
         int unitId,
-        decimal baseConversionFactor,
+        decimal factor,
         int sortOrder = 1)
     {
         if (unitId <= 0)
             throw new DomainException("معرف الوحدة مطلوب.");
 
-        if (baseConversionFactor <= 1)
+        if (factor <= 1)
             throw new DomainException(
                 $"الوحدة يجب أن تحتوي على أكثر من وحدة صغرى واحدة. " +
                 $"أدخل كم وحدة صغرى بداخلها (مثال: الكرتون يحتوي على 12 حبة، ادخل 12).");
@@ -80,9 +83,8 @@ public class ProductUnit : BaseEntity
         {
             ProductId = productId,
             UnitId = unitId,
-            BaseConversionFactor = baseConversionFactor,
-            IsBaseUnit = false,
-            IsActive = true
+            Factor = factor,
+            IsBaseUnit = false
         };
     }
 
@@ -93,7 +95,13 @@ public class ProductUnit : BaseEntity
     /// ALWAYS use this before touching stock calculations.
     /// </summary>
     public decimal ToBaseUnitQuantity(decimal quantity)
-        => quantity * BaseConversionFactor;
+        => quantity * Factor;
+
+    /// <summary>
+    /// Converts a base unit quantity to THIS unit's quantity.
+    /// </summary>
+    public decimal FromBaseUnitQuantity(decimal baseQuantity)
+        => Factor > 0 ? baseQuantity / Factor : 0;
 
     /// <summary>
     /// Updates the UnitId this ProductUnit points to.

@@ -47,4 +47,33 @@ public class SalesReportApiService : ApiServiceBase, ISalesReportApiService
             () => _httpClient.GetAsync($"{BasePath}/trends?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&groupBy={groupBy}", ct),
             "SalesReportApiService.GetSalesTrendsAsync");
     }
+
+    public async Task<Result<List<ProductProfitabilityDto>>> GetProductProfitabilityAsync(int? productId = null, int? categoryId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
+    {
+        var url = $"{BasePath}/product-profitability";
+        var queryParams = new List<string>();
+        if (productId.HasValue) queryParams.Add($"productId={productId}");
+        if (categoryId.HasValue) queryParams.Add($"categoryId={categoryId}");
+        if (from.HasValue) queryParams.Add($"from={from.Value:yyyy-MM-dd}");
+        if (to.HasValue) queryParams.Add($"to={to.Value:yyyy-MM-dd}");
+        if (queryParams.Count > 0) url += "?" + string.Join("&", queryParams);
+
+        return await ExecuteAsync<List<ProductProfitabilityDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "SalesReportApiService.GetProductProfitabilityAsync");
+    }
+
+    public async Task<Result<List<ProfitByCustomerDto>>> GetProfitByCustomerAsync(int? customerId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
+    {
+        var url = $"{BasePath}/profit-by-customer";
+        var queryParams = new List<string>();
+        if (customerId.HasValue) queryParams.Add($"customerId={customerId}");
+        if (from.HasValue) queryParams.Add($"from={from.Value:yyyy-MM-dd}");
+        if (to.HasValue) queryParams.Add($"to={to.Value:yyyy-MM-dd}");
+        if (queryParams.Count > 0) url += "?" + string.Join("&", queryParams);
+
+        return await ExecuteAsync<List<ProfitByCustomerDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "SalesReportApiService.GetProfitByCustomerAsync");
+    }
 }

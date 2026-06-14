@@ -412,46 +412,65 @@ These items MUST be checked for any code touching Chart of Accounts or Account e
 - [ ] Service tests: CreateAsync (success, parent not found, duplicate code), DeleteAsync (children guard, not found), PermanentDeleteAsync (hard delete guard)?
 - [ ] Controller integration tests: all CRUD endpoints, auth policies (AllStaff vs ManagerAndAbove vs AdminOnly)?
 
-### Phase 23 — Customers Module Checklist
+### Phase 23 — Customers Module Checklist (65-table schema: Parties-based, No CustomerGroup)
 
-- [ ] CustomerType stored as byte (not int/string)?
-- [ ] CustomerGroup soft-deletable with child reference guard?
-- [ ] Customer.CheckCreditLimit() returns bool (never throws)?
-- [ ] AccountId/CustomerType/CustomerGroupId optional on Customer entity?
-- [ ] CustomerGroupsController uses `:int:min(1)` (not `:byte`) route constraint?
-- [ ] CustomerGroups read = AllStaff, write = ManagerAndAbove?
-- [ ] Desktop Editor loads AvailableGroups/AvailableAccounts lookup data?
-- [ ] Seeder seeds "عام" group + "عميل نقدي" with Cash type?
-- [ ] CustomerGroup DTO includes Id, Name, Description, IsActive?
-- [ ] CustomerEditorViewModel has CustomerType dropdown with Cash/Credit options?
-- [ ] CustomerEditorViewModel has CustomerGroup dropdown for group assignment?
-- [ ] CustomerEditorViewModel has Account lookup for account linking?
-- [ ] New Customer.Create() overload accepts accountId/customerType/customerGroupId?
-- [ ] New Customer.Update() overload accepts accountId/customerType/customerGroupId?
-- [ ] CustomerDto includes AccountId, AccountName, CustomerType, CustomerGroupId, CustomerGroupName?
-- [ ] CustomerGroup entity has Create()/Update() domain methods with guard clauses?
-- [ ] CustomerGroup configuration uses nvarchar(100) for Name and nvarchar(250) for Description?
-- [ ] API route uses kebab-case `api/v1/customer-groups` (not `customergroups`)?
-- [ ] Route constraints use `:int:min(1)` (not `:byte`)?
-- [ ] All endpoints use proper HTTP status codes (201 Created, 404 vs 400)?
-- [ ] No hardcoded heights/padding on new XAML views (compact styles)?
-- [ ] Save buttons always enabled — validate on click with warning dialog?
-- [ ] All FK relationships use DeleteBehavior.Restrict?
+- [ ] Customer has `PartyId` (int, non-nullable FK to Parties) — mandatory, NOT optional?
+- [ ] Customer has `AccountId` (int, non-nullable FK to Account) — mandatory, auto-created by service?
+- [ ] Customer has NO `CustomerGroupId`, NO `CustomerType`, NO `OpeningBalance`, NO `CurrentBalance`, NO `CurrencyId`?
+- [ ] Supplier follows same pattern: `PartyId` mandatory, `AccountId` mandatory, no balance/type fields?
+- [ ] `Party` entity exists with `Name`, `Phone`, `Email`, `Address`, `TaxNumber`, `Notes`?
+- [ ] `Party` is `ActivatableEntity` with `.HasQueryFilter(x => x.IsActive)`?
+- [ ] `Customer.CheckCreditLimit()` returns bool (never throws)?
+- [ ] Service auto-creates Level-4 account under `"1210 — العملاء"` for customers?
+- [ ] Service auto-creates Level-4 account under `"2100 — حسابات الموردين"` for suppliers?
+- [ ] Account auto-creation uses `GetByCodeAsync("1210")` / `GetByCodeAsync("2100")` for parent lookup?
+- [ ] Account code auto-increments: `(int.Parse(maxCode ?? "1210") + 1).ToString()`?
+- [ ] Seeder creates default "عميل نقدي" with Party + Account under 1210?
+- [ ] Seeder creates default "مورد نقدي" with Party + Account under 2100?
+- [ ] Desktop Editor has NO CustomerGroup dropdown, CustomerType radio, AccountId selector, OpeningBalance input?
+- [ ] Desktop Editor has Party fields: Name, Phone, Email, Address, TaxNumber (editable)?
+- [ ] Desktop Editor has AccountName display-only label?
+- [ ] Desktop List has NO group filter, NO CustomerType filter?
+- [ ] API routes use `api/v1/customers` (no customer-groups endpoints)?
+- [ ] NO CustomerGroup controller, service, or repository exists in V1?
+- [ ] NO CustomerType enum exists in the codebase?
+- [ ] All FK relationships use `DeleteBehavior.Restrict`?
+- [ ] CustomerDto has `AccountId`, `AccountName`, `PartyId`, `PartyName` — NO `CustomerGroupId`, `CustomerType`?
+- [ ] Phone regex `^05\d{8}$` + Email `.EmailAddress()` in validators?
 - [ ] ComboBox uses `ModernComboBox` style (NOT `ModernTextBox`)?
 - [ ] ComboBox does NOT have both `DisplayMemberPath` and `ItemTemplate` set?
-- [ ] CustomerType NOT used to gate business logic (informational only)?
-- [ ] CreditLimit enforcement checks `CreditLimit > 0` (not CustomerType)?
-- [ ] Phone regex `^05\d{8}$` + Email `.EmailAddress()` in validators?
-- [ ] Report endpoints exist (by-group, balance, aging)?
-- [ ] All async operations use ExecuteAsync wrapper (no manual try/catch)?
 
-### FORBIDDEN Patterns (Customers Module)
-- ❌ CustomerType stored as int or string in DB
-- ❌ Hard-deleting CustomerGroup when customers reference it
-- ❌ CustomerGroup route without kebab-case
-- ❌ CustomerGroup Editor/List without proper group management UI
+### 65-Table Schema Checks (New Entity Patterns)
+- [ ] `ProductPrices` table exists with `ProductUnitId`, `CurrencyId`, `Price` decimal(18,2), `EffectiveFrom`, `EffectiveTo`?
+- [ ] `InventoryBatches` table exists with `ProductId`, `WarehouseId`, `BatchNo`, `ExpiryDate`, `QuantityReceived/Remaining` decimal(18,3), `UnitCost` decimal(18,2)?
+- [ ] `Units` table uses `smallint` PK (not `int`) — `.HasColumnType("smallint")`?
+- [ ] `Units` is an independent table with seed data (not embedded in ProductUnit)?
+- [ ] `ProductUnit` has `UnitId` FK (FK to Units table), `Factor`, `IsBaseUnit`, `DefaultPurchaseUnit`, `DefaultSalesUnit` flags?
+- [ ] `WarehouseTransfer`/`WarehouseTransferLine` replaces `StockTransfer`/`StockTransferItem`?
+- [ ] `InventoryTransaction`/`InventoryTransactionLine` replaces `InventoryMovement`?
+- [ ] `AuditLog` uses `long Id` (bigint) — `.HasColumnType("bigint")`?
+- [ ] `ImportLog` uses `long Id` (bigint) for high-volume data?
+- [ ] `SystemLog.Level` uses `tinyint` (not string)?
+- [ ] `Currency.IsBaseCurrency` is IMMUTABLE — no public setter or domain method to change after creation?
+- [ ] `Currency` entity has `IsSystem` flag protecting seed currencies from deletion?
+- [ ] `Currency` entity has `FractionName` field for sub-currency display?
+- [ ] All lookup tables (Units, Roles, Departments, Currencies, Branches, Taxes) use `smallint` PK?
+- [ ] Perpetual Inventory: NO `Purchases` account — all inventory costs go direct to Inventory Asset?
+- [ ] Purchase return reversal credits `PurchaseReturnAccountId` (not InventoryAsset directly)?
+
+### FORBIDDEN Patterns (Customers + Schema)
+- ❌ `CustomerGroupId`, `CustomerGroupName`, `CustomerType` in any V1 Customer entity, DTO, request, or service
+- ❌ `SupplierType` in any V1 Supplier entity, DTO, request, or service
+- ❌ `OpeningBalance`/`CurrentBalance`/`CurrencyId` on Customer or Supplier entity
+- ❌ User-supplied AccountId in customer/supplier Create/Update requests (auto-created by service)
+- ❌ CustomerGroupController, service, repository, or Desktop UI in V1 codebase
 - ❌ `ModernTextBox` style on `ComboBox` elements (use `ModernComboBox`)
 - ❌ `DisplayMemberPath` and `ItemTemplate` on same `ComboBox`
+- ❌ `:byte` route constraint on any controller
+- ❌ `StockTransfer`/`StockTransferItem` (use `WarehouseTransfer`/`WarehouseTransferLine`)
+- ❌ `InventoryMovement` (use `InventoryTransaction`/`InventoryTransactionLine`)
+- ❌ `decimal(18,4)` for any money/quantity field (use 18,2 or 18,3)
+- ❌ `int` PK for AuditLog or ImportLog (use `long`/bigint)
 
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`
@@ -464,15 +483,15 @@ The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-3
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
-| 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
-| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
+| 23 — Customers Module | ✅ Completed | Parties-based (Party entity), no CustomerGroup/SupplierType, Account auto-created under 1210/2100, no balance fields on Customer/Supplier |
+| 24 — Accounting Integration | ✅ Completed | Auto journal entries, COGS (AverageCost), Payment reversals, per-entity account routing |
+| 25 — Products Module | 📝 Planned | ProductPrices (per unit×currency×effective dates), Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, InventoryBatches (FIFO), Perpetual Inventory, product images, opening stock |
+| 26 — Warehouses Module | 📝 Planned | WarehouseTransfer/WarehouseTransferLine (replaces StockTransfer), InventoryTransaction/InventoryTransactionLine (replaces InventoryMovement), warehouse types, AccountId FK |
+| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns |
 | 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
-| 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
-| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
-| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
+| 29 — Receipts & Payments | 🟡 Partial — CashBox ✅ | CashBox refactored (no balance fields, AccountId FK, RunningBalance); Cheques, PaymentAllocation, DailyClosure planned |
+| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency (CurrencyId + ExchangeRate), attachments, FiscalYear, Annual Closing |
+| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML |
 
 ### Key Architecture Rules for Subagents
 
@@ -528,15 +547,22 @@ When you encounter any code related to these areas, apply fixes automatically:
 3. CashTransaction.Create() internal → CHANGE to public
 4. Deposit()/Withdraw() methods on CashBox → REMOVE
 5. Client-side balance validation → REMOVE (server validates via Account)
-6. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1110 — النقدية"
-7. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
-4. Missing `CurrencyId` on financial entities → Add multi-currency support
-5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
-6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
-7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
-8. Missing journal entry on cash operations → Call AccountingIntegrationService
-9. Missing Excel export on report → Add ClosedXML worksheet generation
-10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
-11. Payment without allocation → Add PaymentAllocation tracking
-12. Missing reversal entries on payment update/delete → Add reversal journal entries
+6. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record
+7. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1110 — النقدية"
+8. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
+9. Missing `ProductPrices` table → Add per-unit pricing replacing SalePrice/RetailPrice on Product
+10. Missing `InventoryBatches` → Add FIFO batch tracking on purchase
+11. Missing `AdditionalCharges` table → Add landed cost allocation on purchase
+12. Missing journal entry on cash operations → Call AccountingIntegrationService
+13. Missing Excel export on report → Add ClosedXML worksheet generation
+14. COGS using PurchaseCost → Change to AverageCost from ProductUnit
+15. Payment without allocation → Add PaymentAllocation tracking
+16. Missing reversal entries on payment update/delete → Add reversal journal entries
+17. Old `StockTransfer`/`StockTransferItem` → Replace with `WarehouseTransfer`/`WarehouseTransferLine`
+18. Old `InventoryMovement` → Replace with `InventoryTransaction`/`InventoryTransactionLine`
+19. CustomerGroup/SupplierType references → Remove (deferred to V2)
+20. OpeningBalance/CurrentBalance on Customer/Supplier/CashBox → Remove (balance on linked Account)
+21. PriceLevel/RetailPrice/WholesalePrice on Product → Replace with ProductPrices per-unit pricing
+22. NON-smallint PK on lookup tables → Change to smallint with `.HasColumnType("smallint")`
+23. NON-bigint PK on AuditLog → Change to bigint with `.HasColumnType("bigint")`
+24. Missing filtered unique indexes → Add `.HasFilter("[IsActive] = 1")`

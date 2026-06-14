@@ -12,39 +12,32 @@ public record CreateSalesReturnRequest(
 );
 
 /// <summary>
-/// طلب إنشاء مرتجع شراء — مع دعم الربط بالفاتورة والخصم متعدد الأنواع.
+/// طلب إنشاء مرتجع شراء — مع دعم الربط بالفاتورة والعملات.
 /// </summary>
 public record CreatePurchaseReturnRequest(
     int? PurchaseInvoiceId,
     int SupplierId,
     int WarehouseId,
-    bool? LinkToInvoice,
     DateTime? ReturnDate,
-    decimal DiscountAmount,
-    byte? DiscountType,
-    decimal? DiscountRate,
     int? CurrencyId,
     decimal? ExchangeRate,
     string? Notes,
     List<CreatePurchaseReturnItemRequest> Items);
 
 /// <summary>
-/// طلب إنشاء بند في مرتجع الشراء — مع معرف الوحدة.
+/// طلب إنشاء بند في مرتجع الشراء.
 /// </summary>
 public record CreatePurchaseReturnItemRequest(
     int ProductId,
     int ProductUnitId,
     decimal Quantity,
-    decimal UnitCost,
-    decimal DiscountAmount = 0,
-    byte Mode = 1,
-    string? Notes = null);
+    decimal UnitCost);
 
 public record ReturnItemRequest(
     int ProductId,
     decimal Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
-    byte Mode = 1, // Retail by default
+    byte Mode = 1,
     string? Notes = null
 );

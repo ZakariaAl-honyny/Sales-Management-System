@@ -4,9 +4,8 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
-using SalesSystem.Domain.Accounting.Enums;
+using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Services;
 
@@ -90,7 +89,7 @@ public class SalesReturnService : ISalesReturnService
 
                 var salesReturn = SalesReturn.Create(
                     returnNoResult.Value!,
-                    request.WarehouseId,
+                    (short)request.WarehouseId,
                     request.CustomerId,
                     request.SalesInvoiceId,
                     request.ReturnDate,
@@ -159,39 +158,29 @@ public class SalesReturnService : ISalesReturnService
                         item.ProductId,
                         sr.WarehouseId,
                         item.Quantity,
-                        MovementType.SaleReturnIn,
-                        "SalesReturn",
-                        sr.Id,
-                        item.UnitPrice,
-                        userId,
-                        ct);
+                        unitCost: item.UnitPrice,
+                        userId: userId,
+                        ct: ct);
                 }
 
-                // Update Customer Balance
-                if (sr.TotalAmount > 0 && sr.CustomerId.HasValue)
-                {
-                    var customer = await _uow.Customers.GetByIdAsync(sr.CustomerId.Value, ct);
-                    if (customer != null)
-                    {
-                        customer.DecreaseBalance(sr.TotalAmount);
-                    }
-                }
-
-                // Create CashTransaction for refund if CashBoxId is set
+                // Create payment voucher (سند صرف) for refund if CashBoxId is set
+                // TODO: Use proper currencyId and accountId when available
                 if (sr.CashBoxId.HasValue && sr.RefundAmount > 0)
                 {
                     var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
                         sr.CashBoxId.Value,
+                        currencyId: 1, // Default SAR
                         sr.RefundAmount,
-                        CashTransactionType.RefundOut,
-                        "SalesReturn",
-                        sr.Id,
-                        userId,
-                        ct);
+                        accountId: 1, // Default cash account
+                        notes: "مردود مبيعات",
+                        sourceDocumentId: sr.Id,
+                        sourceDocumentType: "SalesReturn",
+                        userId: userId,
+                        ct: ct);
 
                     if (!cashResult.IsSuccess)
                     {
-                        _logger.LogWarning("Cash transaction recording failed for sales return {Id}: {Error}",
+                        _logger.LogWarning("Payment voucher recording failed for sales return {Id}: {Error}",
                             sr.Id, cashResult.Error);
                     }
                 }
@@ -241,23 +230,11 @@ public class SalesReturnService : ISalesReturnService
                             item.ProductId,
                             sr.WarehouseId,
                             item.Quantity,
-                            MovementType.SaleOut, // Opposite of SaleReturnIn
-                            "SalesReturnCancel",
-                            sr.Id,
-                            item.UnitPrice,
-                            userId,
-                            ct);
+                            unitCost: item.UnitPrice,
+                            userId: userId,
+                            ct: ct);
                     }
 
-                    // Reverse Customer Balance
-                    if (sr.TotalAmount > 0 && sr.CustomerId.HasValue)
-                    {
-                        var customer = await _uow.Customers.GetByIdAsync(sr.CustomerId.Value, ct);
-                        if (customer != null)
-                        {
-                            customer.IncreaseBalance(sr.TotalAmount);
-                        }
-                    }
                 }
 
                 sr.Cancel();
@@ -290,7 +267,7 @@ public class SalesReturnService : ISalesReturnService
             r.WarehouseId,
             r.Warehouse?.Name ?? "غير معروف",
             r.CustomerId,
-            r.Customer?.Name ?? "غير معروف",
+            r.Customer?.Party?.Name ?? "غير معروف",
             r.SalesInvoiceId,
             r.ReturnDate,
             r.SubTotal,

@@ -213,7 +213,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
             var searchLower = SearchText.Trim().ToLower();
-            return returnItem.ReturnNo.ToLower().Contains(searchLower) ||
+            return returnItem.ReturnNo.ToString().Contains(searchLower) ||
                    returnItem.SupplierName.ToLower().Contains(searchLower);
         }
 

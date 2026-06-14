@@ -3,7 +3,7 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class DocumentSequence : BaseEntity
+public class DocumentSequence : AuditableEntity
 {
     public string DocumentType { get; private set; } = string.Empty;
     public string Prefix { get; private set; } = string.Empty;
@@ -45,5 +45,18 @@ public class DocumentSequence : BaseEntity
     public void Increment()
     {
         LastNumber++;
+    }
+
+    /// <summary>
+    /// Resets the last number to a new value (e.g., during year rollover or manual correction).
+    /// </summary>
+    /// <param name="newNumber">The new last number (must be >= 0).</param>
+    /// <exception cref="DomainException">If newNumber is negative.</exception>
+    public void SetLastNumber(int newNumber)
+    {
+        if (newNumber < 0)
+            throw new DomainException("الرقم التسلسلي لا يمكن أن يكون سالباً.");
+        LastNumber = newNumber;
+        UpdateTimestamp();
     }
 }

@@ -34,8 +34,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly ICashBoxApiService _cashBoxService;
     private readonly IPrintApiService _printApiService;
     private readonly IToastNotificationService _toastService;
-    private readonly ICategoryApiService _categoryService;
-
+    private readonly ICurrencyApiService _currencyService;
     private int? _invoiceId;
     private int _invoiceNo;
     private int _selectedWarehouseId;
@@ -47,6 +46,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private decimal _taxRate = 15;
     private bool _isTaxInclusive;
     private decimal _paidAmount;
+    private decimal _otherCharges;
     private string? _notes;
     private string _barcodeSearchText = string.Empty;
     private bool _isEditMode;
@@ -55,6 +55,12 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private byte _status = (byte)InvoiceStatus.Draft;
     public bool IsReadOnly { get; private set; }
 
+    // Currency fields
+    private int? _selectedCurrencyId;
+    private decimal? _exchangeRate;
+    private bool _isForeignCurrency;
+
+    private ObservableCollection<CurrencyDto> _currencies = new();
     private ObservableCollection<InvoiceLineViewModel> _items = new();
     private ObservableCollection<CustomerDto> _customers = new();
     private ObservableCollection<WarehouseDto> _warehouses = new();
@@ -92,7 +98,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         ICashBoxApiService cashBoxService,
         IPrintApiService printApiService,
         IToastNotificationService toastService,
-        ICategoryApiService categoryService,
+        ICurrencyApiService currencyService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -110,7 +116,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _cashBoxService = cashBoxService;
         _printApiService = printApiService;
         _toastService = toastService;
-        _categoryService = categoryService;
+        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
 
@@ -144,7 +150,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         StartContinuousScanCommand = new AsyncRelayCommand(StartContinuousScanAsync);
 
         // --- Touch POS ViewModels ---
-        TouchPosVM = new TouchPosViewModel(_categoryService, _productService, _inventoryService);
+        TouchPosVM = new TouchPosViewModel(App.GetService<IProductCategoryApiService>(), _productService, _inventoryService);
         TouchPosCartVM = new TouchPosCartViewModel(Items, RecalculateTotals);
 
         // Wire: when a product is selected in Touch POS, validate stock then add to cart
@@ -186,9 +192,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 if (existingLine != null)
                 {
                     existingLine.Quantity += 1m;
-                    if (!existingLine.CostInBaseCurrency.HasValue && product.Cost > 0)
+                    if (!existingLine.CostInBaseCurrency.HasValue)
                     {
-                        existingLine.CostInBaseCurrency = product.Cost;
+                        existingLine.CostInBaseCurrency = 0m;
                     }
                     _soundService.PlaySuccess();
                 }
@@ -267,7 +273,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             // Select default warehouse before adding line
             if (Warehouses.Any())
             {
-                var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
+                var defaultWarehouse = Warehouses.FirstOrDefault() ?? Warehouses.First();
                 SelectedWarehouseId = defaultWarehouse.Id;
             }
             AddLine();
@@ -325,7 +331,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             App.GetService<ICashBoxApiService>(),
             App.GetService<IPrintApiService>(),
             App.GetService<IToastNotificationService>(),
-            App.GetService<ICategoryApiService>(),
+            App.GetService<ICurrencyApiService>(),
             invoiceId,
             isReadOnly)
     {
@@ -489,6 +495,18 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         }
     }
 
+    public decimal OtherCharges
+    {
+        get => _otherCharges;
+        set
+        {
+            if (SetProperty(ref _otherCharges, value))
+            {
+                RecalculateTotals();
+            }
+        }
+    }
+
     public string? Notes
     {
         get => _notes;
@@ -557,6 +575,42 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     };
 
     public List<EnumDisplayItem> SaleModeOptions { get; }
+
+    // Currency properties
+    public ObservableCollection<CurrencyDto> Currencies
+    {
+        get => _currencies;
+        set => SetProperty(ref _currencies, value);
+    }
+
+    public int? SelectedCurrencyId
+    {
+        get => _selectedCurrencyId;
+        set
+        {
+            if (SetProperty(ref _selectedCurrencyId, value))
+            {
+                IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
+                OnPropertyChanged(nameof(IsForeignCurrency));
+            }
+        }
+    }
+
+    public decimal? ExchangeRate
+    {
+        get => _exchangeRate;
+        set
+        {
+            if (SetProperty(ref _exchangeRate, value))
+                RecalculateTotals();
+        }
+    }
+
+    public bool IsForeignCurrency
+    {
+        get => _isForeignCurrency;
+        set => SetProperty(ref _isForeignCurrency, value);
+    }
     #endregion
 
     #region Commands
@@ -604,7 +658,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 Warehouses = new ObservableCollection<WarehouseDto>(warehousesResult.Value);
                 if (Warehouses.Any() && SelectedWarehouseId == 0)
                 {
-                    var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
+                    var defaultWarehouse = Warehouses.FirstOrDefault() ?? Warehouses.First();
                     SelectedWarehouseId = defaultWarehouse.Id;
                 }
             }
@@ -627,6 +681,18 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 if (settingsResult.Value.IsTaxEnabled)
                 {
                     TaxRate = settingsResult.Value.DefaultTaxRate;
+                }
+            }
+
+            var currenciesResult = await _currencyService.GetAllAsync();
+            if (currenciesResult.IsSuccess && currenciesResult.Value != null)
+            {
+                Currencies = new ObservableCollection<CurrencyDto>(currenciesResult.Value);
+                if (!_isEditMode)
+                {
+                    var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+                    if (baseCurrency != null)
+                        SelectedCurrencyId = baseCurrency.Id;
                 }
             }
         });
@@ -673,9 +739,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     
                     // Set cost from product's Cost for profit display
                     var product = Products.FirstOrDefault(p => p.Id == item.ProductId);
-                    if (product != null && product.Cost > 0)
+                    if (product != null)
                     {
-                        lineVm.CostInBaseCurrency = product.Cost;
+                        lineVm.CostInBaseCurrency = 0m;
                     }
                     
                     lineVm.PropertyChanged += (s, e) =>
@@ -689,7 +755,20 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     Items.Add(lineVm);
                 }
 
-                // TODO: Restore CashBoxId when DTO supports it
+                // Restore currency
+                SelectedCurrencyId = invoice.CurrencyId;
+                ExchangeRate = invoice.ExchangeRate;
+
+                OtherCharges = invoice.OtherCharges;
+
+                // Restore CashBoxId selection
+                if (invoice.CashBoxId.HasValue)
+                {
+                    var cashBox = CashBoxes.FirstOrDefault(cb => cb.Id == invoice.CashBoxId.Value);
+                    if (cashBox != null)
+                        SelectedCashBox = cashBox;
+                }
+
                 RecalculateTotals();
             }
             else
@@ -719,15 +798,15 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             ErrorMessage = null;
-            var request = BuildRequest();
-
             Result<SalesInvoiceDto> result;
             if (_isEditMode)
             {
+                var request = BuildUpdateRequest();
                 result = await _invoiceService.UpdateAsync(_invoiceId!.Value, request);
             }
             else
             {
+                var request = BuildRequest();
                 result = await _invoiceService.CreateAsync(request);
             }
 
@@ -1001,12 +1080,45 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
             TaxAmount,
+            OtherCharges,
             PaidAmount,
             Notes,
-            QuotationId: null,
-            CurrencyId: null,
-            ExchangeRate: null,
-            TaxId: null,
+            SelectedCurrencyId,
+            ExchangeRate,
+            null,        // TaxId
+            items);
+    }
+
+    private UpdateSalesInvoiceRequest BuildUpdateRequest()
+    {
+        var items = Items
+            .Where(i => i.SelectedProduct != null && i.Quantity > 0)
+            .Select(i => new CreateSalesInvoiceItemRequest(
+                i.SelectedProduct!.Id,
+                i.Quantity,
+                i.UnitPrice,
+                i.DiscountAmount,
+                (SaleMode)i.Mode,
+                null,
+                ProductUnitId: i.ProductUnitId,
+                IsPriceOverridden: i.IsPriceOverridden))
+            .ToList();
+
+        return new UpdateSalesInvoiceRequest(
+            SelectedWarehouseId,
+            SelectedCustomerId,
+            InvoiceDate,
+            null,
+            (PaymentType)SelectedPaymentType,
+            InvoiceDiscount,
+            TaxAmount,
+            OtherCharges,
+            PaidAmount,
+            SelectedCashBox?.Id,
+            Notes,
+            SelectedCurrencyId,
+            ExchangeRate,
+            null,        // TaxId
             items);
     }
 
@@ -1024,7 +1136,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         else
         {
             TaxAmount = netAmount * (TaxRate / 100);
-            TotalAmount = netAmount + TaxAmount;
+            TotalAmount = netAmount + TaxAmount + OtherCharges;
         }
 
         if (SelectedPaymentType == (byte)PaymentType.Cash)
@@ -1094,9 +1206,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         {
             existingLine.Quantity += 1;
             // Ensure CostInBaseCurrency is set (should have been set on first creation)
-            if (!existingLine.CostInBaseCurrency.HasValue && product.Cost > 0)
+            if (!existingLine.CostInBaseCurrency.HasValue)
             {
-                existingLine.CostInBaseCurrency = product.Cost;
+                existingLine.CostInBaseCurrency = 0m;
             }
             _soundService.PlaySuccess();
         }
@@ -1401,6 +1513,12 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             : $"• {ProductName}: الكمية المطلوبة {RequiredQty:N0} لكن المتوفر {AvailableStock:N0}";
     }
 
+    private int GetBaseCurrencyId()
+    {
+        var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+        return baseCurrency?.Id ?? 0;
+    }
+
     #endregion
 }
 
@@ -1479,7 +1597,7 @@ public class InvoiceLineViewModel : ViewModelBase
                 ClearErrors(nameof(ProductName));
 
                 // Set cost from product's Cost
-                CostInBaseCurrency = value.Cost > 0 ? value.Cost : null;
+                CostInBaseCurrency = null;
 
                 // Set ProductUnitId — TODO: Phase 25 — derive from ProductPrices table
                 ProductUnitId = 1;
@@ -1578,7 +1696,7 @@ public class InvoiceLineViewModel : ViewModelBase
         {
             UnitPrice = GetDefaultPrice(product);
             ProductUnitId = 1; // TODO: Phase 25 — derive from ProductPrices table
-            CostInBaseCurrency = product.Cost > 0 ? product.Cost : null;
+            CostInBaseCurrency = null;
             IsPriceOverridden = false;
         }
     }
@@ -1589,7 +1707,7 @@ public class InvoiceLineViewModel : ViewModelBase
     /// </summary>
     private decimal GetDefaultPrice(ProductDto product)
     {
-        return product.Cost; // Temporary: use Cost as default price placeholder
+        return 0m; // Temporary: default price placeholder
     }
 
     /// <summary>

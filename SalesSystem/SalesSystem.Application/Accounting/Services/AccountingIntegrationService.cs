@@ -2,7 +2,9 @@
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
@@ -34,12 +36,87 @@ public class AccountingIntegrationService : IAccountingIntegrationService
         _logger = logger;
     }
 
+    // ─── Helper: Fetch multiple system accounts in parallel ─────────
+    private async Task<Result<Dictionary<SystemAccountKey, int>>> GetAccountIdDictionaryAsync(
+        int? branchId, IEnumerable<SystemAccountKey> keys, CancellationToken ct)
+    {
+        var tasks = keys.Select(async key =>
+        {
+            var result = await _systemAccountService.GetMappingAsync(key, branchId, ct);
+            return (Key: key, Result: result);
+        });
+
+        var results = await Task.WhenAll(tasks);
+        var dict = new Dictionary<SystemAccountKey, int>();
+        foreach (var (key, result) in results)
+        {
+            if (!result.IsSuccess || result.Value == null)
+                return Result<Dictionary<SystemAccountKey, int>>.Failure(
+                    $"الحساب النظامي غير مهيأ: {key}");
+            if (result.Value.AccountId <= 0)
+                return Result<Dictionary<SystemAccountKey, int>>.Failure(
+                    $"الحساب النظامي غير مهيأ: {key}");
+            dict[key] = result.Value.AccountId;
+        }
+        return Result<Dictionary<SystemAccountKey, int>>.Success(dict);
+    }
+
+    private static string GetAccountName(SystemAccountKey key) => key switch
+    {
+        SystemAccountKey.DefaultCash => "حساب الصندوق النقدي",
+        SystemAccountKey.DefaultBank => "الحساب البنكي",
+        SystemAccountKey.AccountsReceivable => "حساب الذمم المدينة",
+        SystemAccountKey.AccountsPayable => "حساب الذمم الدائنة",
+        SystemAccountKey.Inventory => "حساب أصل المخزون",
+        SystemAccountKey.CostOfGoodsSold => "حساب تكلفة البضاعة المباعة",
+        SystemAccountKey.SalesRevenue => "حساب إيرادات المبيعات",
+        SystemAccountKey.SalesReturns => "حساب مردودات المبيعات",
+        SystemAccountKey.PurchaseReturns => "حساب مردودات المشتريات",
+        SystemAccountKey.VatOutput => "حساب ضريبة المخرجات",
+        SystemAccountKey.VatInput => "حساب ضريبة المدخلات",
+        SystemAccountKey.Capital => "حساب رأس المال",
+        SystemAccountKey.OpeningBalanceEquity => "حساب حقوق الملكية للرصيد الافتتاحي",
+        SystemAccountKey.RetainedEarnings => "حساب الأرباح المحتجزة",
+        SystemAccountKey.UndistributedProfits => "حساب الأرباح وفاق",
+        SystemAccountKey.InventoryShortage => "حساب عجز المخزون",
+        SystemAccountKey.InventorySurplus => "حساب زيادة المخزون",
+        _ => key.ToString()
+    };
+
+    // ─── Helper: Fetch a single system account ──────────────────────
+    private async Task<Result<int>> GetAccountIdAsync(SystemAccountKey key,
+        int? branchId, CancellationToken ct)
+    {
+        var result = await _systemAccountService.GetMappingAsync(key, branchId, ct);
+        if (!result.IsSuccess || result.Value == null)
+            return Result<int>.Failure($"الحساب النظامي غير مهيأ: {GetAccountName(key)}");
+        if (result.Value.AccountId <= 0)
+            return Result<int>.Failure($"الحساب النظامي غير مهيأ: {GetAccountName(key)}");
+        return Result<int>.Success(result.Value.AccountId);
+    }
+
+    // ─── Helpers: Get per-entity account IDs ────────────────────────
+    private static int GetCustomerAccountId(SalesInvoice invoice, Dictionary<SystemAccountKey, int> m)
+    {
+        return invoice.Customer?.Party?.AccountId > 0
+            ? invoice.Customer.Party.AccountId
+            : m.GetValueOrDefault(SystemAccountKey.AccountsReceivable, 0);
+    }
+
+    private static int GetSupplierAccountId(PurchaseInvoice invoice, Dictionary<SystemAccountKey, int> m)
+    {
+        return invoice.Supplier?.Party?.AccountId > 0
+            ? invoice.Supplier.Party.AccountId
+            : m.GetValueOrDefault(SystemAccountKey.AccountsPayable, 0);
+    }
+
     // ────────────────────────────────────────────────────────────────
     //  A. Customer Opening Entry
     // ────────────────────────────────────────────────────────────────
     public async Task<Result<int>> CreateCustomerOpeningEntryAsync(
         int customerId,
         string customerName,
+        int customerAccountId,
         decimal openingBalance,
         int createdByUserId,
         DateTime transactionDate,
@@ -50,17 +127,12 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
         try
         {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
+            var openingEquityResult = await GetAccountIdAsync(
+                SystemAccountKey.OpeningBalanceEquity, null, ct);
+            if (!openingEquityResult.IsSuccess)
+                return Result<int>.Failure(openingEquityResult.Error!);
 
-            var m = mappings.Value!;
-
-            // Validate required accounts
-            if (m.AccountsReceivableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم المدينة");
-            if (!m.OpeningBalanceEquityAccountId.HasValue || m.OpeningBalanceEquityAccountId.Value <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب حقوق الملكية للرصيد الافتتاحي");
+            var openingBalanceEquityAccountId = openingEquityResult.Value;
 
             var request = new CreateJournalEntryRequest(
                 TransactionDate: transactionDate,
@@ -71,15 +143,14 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 ReferenceNumber: customerId.ToString(),
                 Lines: new List<JournalEntryLineRequest>
                 {
-                    new(m.AccountsReceivableAccountId, openingBalance, 0, "رصيد افتتاحي للعميل"),
-                    new(m.OpeningBalanceEquityAccountId.Value, 0, openingBalance, "رصيد افتتاحي للعميل")
+                    new(customerAccountId, openingBalance, 0, "رصيد افتتاحي للعميل"),
+                    new(openingBalanceEquityAccountId, 0, openingBalance, "رصيد افتتاحي للعميل")
                 }
             );
 
             var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
             if (!createResult.IsSuccess) return createResult;
 
-            // Post the entry (transition from Draft to Posted)
             var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
             if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
 
@@ -98,6 +169,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     public async Task<Result<int>> CreateSupplierOpeningEntryAsync(
         int supplierId,
         string supplierName,
+        int supplierAccountId,
         decimal openingBalance,
         int createdByUserId,
         DateTime transactionDate,
@@ -108,17 +180,12 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
         try
         {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
+            var openingEquityResult = await GetAccountIdAsync(
+                SystemAccountKey.OpeningBalanceEquity, null, ct);
+            if (!openingEquityResult.IsSuccess)
+                return Result<int>.Failure(openingEquityResult.Error!);
 
-            var m = mappings.Value!;
-
-            // Validate required accounts
-            if (m.AccountsPayableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم الدائنة");
-            if (!m.OpeningBalanceEquityAccountId.HasValue || m.OpeningBalanceEquityAccountId.Value <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب حقوق الملكية للرصيد الافتتاحي");
+            var openingBalanceEquityAccountId = openingEquityResult.Value;
 
             var request = new CreateJournalEntryRequest(
                 TransactionDate: transactionDate,
@@ -129,8 +196,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 ReferenceNumber: supplierId.ToString(),
                 Lines: new List<JournalEntryLineRequest>
                 {
-                    new(m.OpeningBalanceEquityAccountId.Value, openingBalance, 0, "رصيد افتتاحي للمورد"),
-                    new(m.AccountsPayableAccountId, 0, openingBalance, "رصيد افتتاحي للمورد")
+                    new(openingBalanceEquityAccountId, openingBalance, 0, "رصيد افتتاحي للمورد"),
+                    new(supplierAccountId, 0, openingBalance, "رصيد افتتاحي للمورد")
                 }
             );
 
@@ -150,6 +217,65 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     }
 
     // ────────────────────────────────────────────────────────────────
+    //  B5. Product Opening Entry (Opening Stock)
+    // ────────────────────────────────────────────────────────────────
+    public async Task<Result<int>> CreateProductOpeningEntryAsync(
+        int productId,
+        string productName,
+        decimal totalOpeningValue,
+        int createdByUserId,
+        DateTime transactionDate,
+        CancellationToken ct = default)
+    {
+        if (totalOpeningValue <= 0)
+            return Result<int>.Success(0); // No entry needed for zero-value stock
+
+        try
+        {
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.Inventory,
+                SystemAccountKey.OpeningBalanceEquity
+            };
+
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
+
+            var m = dictResult.Value!;
+
+            var request = new CreateJournalEntryRequest(
+                TransactionDate: transactionDate,
+                Description: $"قيد افتتاحي — رصيد افتتاحي للمنتج: {productName}",
+                EntryType: JournalEntryType.OpeningBalance,
+                ReferenceType: "Product",
+                ReferenceId: productId,
+                ReferenceNumber: productId.ToString(),
+                Lines: new List<JournalEntryLineRequest>
+                {
+                    new(m[SystemAccountKey.Inventory], totalOpeningValue, 0,
+                        "رصيد افتتاحي للمخزون"),
+                    new(m[SystemAccountKey.OpeningBalanceEquity], 0, totalOpeningValue,
+                        "رصيد افتتاحي للمخزون")
+                }
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating product opening entry for product {ProductId}", productId);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء القيد الافتتاحي للمنتج");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
     //  C. Sales Invoice Post Entry
     // ────────────────────────────────────────────────────────────────
     public async Task<Result<int>> CreateSalesPostEntryAsync(
@@ -160,25 +286,21 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     {
         try
         {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.DefaultCash,
+                SystemAccountKey.AccountsReceivable,
+                SystemAccountKey.SalesRevenue,
+                SystemAccountKey.VatOutput,
+                SystemAccountKey.CostOfGoodsSold,
+                SystemAccountKey.Inventory
+            };
 
-            var m = mappings.Value!;
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
 
-            // Validate required accounts
-            if (m.DefaultCashAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الصندوق النقدي");
-            if (m.AccountsReceivableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم المدينة");
-            if (m.SalesRevenueAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب إيرادات المبيعات");
-            if (m.VatOutputAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب ضريبة المخرجات");
-            if (m.CogsAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب تكلفة البضاعة المباعة");
-            if (m.InventoryAssetAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب أصل المخزون");
+            var m = dictResult.Value!;
 
             // Validate: discount cannot exceed subtotal
             if (invoice.DiscountAmount > invoice.SubTotal)
@@ -194,15 +316,16 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (invoice.PaymentType == PaymentType.Cash)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.DefaultCashAccountId,
+                    m[SystemAccountKey.DefaultCash],
                     invoice.TotalAmount,
                     0,
                     "الجزء النقدي من فاتورة البيع"));
             }
             else if (invoice.PaymentType == PaymentType.Credit)
             {
+                var customerAccountId = GetCustomerAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
-                    m.AccountsReceivableAccountId,
+                    customerAccountId,
                     invoice.TotalAmount,
                     0,
                     "الجزء الآجل من فاتورة البيع"));
@@ -210,12 +333,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             else if (invoice.PaymentType == PaymentType.Mixed)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.DefaultCashAccountId,
+                    m[SystemAccountKey.DefaultCash],
                     invoice.PaidAmount,
                     0,
                     "الجزء النقدي من فاتورة البيع (مختلط)"));
+                var customerAccountId = GetCustomerAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
-                    m.AccountsReceivableAccountId,
+                    customerAccountId,
                     invoice.DueAmount,
                     0,
                     "الجزء الآجل من فاتورة البيع (مختلط)"));
@@ -223,7 +347,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
             // Credit side - Sales Revenue (net after discount)
             lines.Add(new JournalEntryLineRequest(
-                m.SalesRevenueAccountId,
+                m[SystemAccountKey.SalesRevenue],
                 0,
                 netRevenue,
                 "إيراد المبيعات (صافي بعد الخصم)"));
@@ -232,7 +356,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (invoice.TaxAmount > 0)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.VatOutputAccountId,
+                    m[SystemAccountKey.VatOutput],
                     0,
                     invoice.TaxAmount,
                     "ضريبة المخرجات"));
@@ -242,12 +366,12 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (totalCost > 0)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.CogsAccountId,
+                    m[SystemAccountKey.CostOfGoodsSold],
                     totalCost,
                     0,
                     "تكلفة البضاعة المباعة"));
                 lines.Add(new JournalEntryLineRequest(
-                    m.InventoryAssetAccountId,
+                    m[SystemAccountKey.Inventory],
                     0,
                     totalCost,
                     "تخفيض المخزون"));
@@ -288,25 +412,21 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     {
         try
         {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.DefaultCash,
+                SystemAccountKey.AccountsReceivable,
+                SystemAccountKey.SalesRevenue,
+                SystemAccountKey.VatOutput,
+                SystemAccountKey.CostOfGoodsSold,
+                SystemAccountKey.Inventory
+            };
 
-            var m = mappings.Value!;
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
 
-            // Validate required accounts (same as create)
-            if (m.DefaultCashAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الصندوق النقدي");
-            if (m.AccountsReceivableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم المدينة");
-            if (m.SalesRevenueAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب إيرادات المبيعات");
-            if (m.VatOutputAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب ضريبة المخرجات");
-            if (m.CogsAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب تكلفة البضاعة المباعة");
-            if (m.InventoryAssetAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب أصل المخزون");
+            var m = dictResult.Value!;
 
             var netRevenue = invoice.SubTotal - invoice.DiscountAmount;
             if (netRevenue < 0)
@@ -318,7 +438,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             // Original: Cr SalesRevenue, Cr VatOutput
             // Reverse:  Dr SalesRevenue, Dr VatOutput
             lines.Add(new JournalEntryLineRequest(
-                m.SalesRevenueAccountId,
+                m[SystemAccountKey.SalesRevenue],
                 netRevenue,
                 0,
                 "عكس إيراد المبيعات"));
@@ -326,7 +446,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (invoice.TaxAmount > 0)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.VatOutputAccountId,
+                    m[SystemAccountKey.VatOutput],
                     invoice.TaxAmount,
                     0,
                     "عكس ضريبة المخرجات"));
@@ -337,15 +457,16 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (invoice.PaymentType == PaymentType.Cash)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.DefaultCashAccountId,
+                    m[SystemAccountKey.DefaultCash],
                     0,
                     invoice.TotalAmount,
                     "عكس الجزء النقدي من فاتورة البيع"));
             }
             else if (invoice.PaymentType == PaymentType.Credit)
             {
+                var customerAccountId = GetCustomerAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
-                    m.AccountsReceivableAccountId,
+                    customerAccountId,
                     0,
                     invoice.TotalAmount,
                     "عكس الجزء الآجل من فاتورة البيع"));
@@ -353,12 +474,13 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             else if (invoice.PaymentType == PaymentType.Mixed)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.DefaultCashAccountId,
+                    m[SystemAccountKey.DefaultCash],
                     0,
                     invoice.PaidAmount,
                     "عكس الجزء النقدي من فاتورة البيع (مختلط)"));
+                var customerAccountId = GetCustomerAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
-                    m.AccountsReceivableAccountId,
+                    customerAccountId,
                     0,
                     invoice.DueAmount,
                     "عكس الجزء الآجل من فاتورة البيع (مختلط)"));
@@ -368,7 +490,6 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             // Original: Dr COGS, Cr Inventory
             // Reverse:  Cr COGS, Dr Inventory
             // We don't have totalCost here, so we need to query the original entry.
-            // Primary lookup by ReferenceId; fallback by ReferenceNumber (defensive).
             var originalEntry = await _uow.JournalEntries.FirstOrDefaultAsync(
                 je => je.ReferenceType == "SalesInvoice"
                     && je.ReferenceId == invoice.Id
@@ -384,19 +505,19 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             {
                 var cogsLines = await _uow.JournalEntryLines.ToListAsync(
                     jel => jel.JournalEntryId == originalEntry.Id
-                        && jel.AccountId == m.CogsAccountId
+                        && jel.AccountId == m[SystemAccountKey.CostOfGoodsSold]
                         && jel.Debit > 0,
                     ct: ct);
 
                 foreach (var cogsLine in cogsLines)
                 {
                     lines.Add(new JournalEntryLineRequest(
-                        m.InventoryAssetAccountId,
+                        m[SystemAccountKey.Inventory],
                         cogsLine.Debit,
                         0,
                         "عكس تكلفة البضاعة المباعة — إعادة المخزون"));
                     lines.Add(new JournalEntryLineRequest(
-                        m.CogsAccountId,
+                        m[SystemAccountKey.CostOfGoodsSold],
                         0,
                         cogsLine.Debit,
                         "عكس تكلفة البضاعة المباعة"));
@@ -408,22 +529,20 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 _logger.LogWarning(
                     "Original journal entry not found for SalesInvoice {Id} ({InvoiceNo}), computing COGS from items",
                     invoice.Id, invoice.InvoiceNo);
-                // Phase 25: GetRetailQuantityEquivalent, AverageCost, and PurchaseCost removed.
-                // Quantity is now always in base units since UnitType/SaleMode distinction was simplified.
+
                 var computedCost = invoice.Items.Sum(item =>
                 {
-                    if (item.Product == null) return 0m;
-                    return item.Quantity * item.Product.Cost;
+                    return item.Quantity * (item.CostInBaseCurrency ?? 0m);
                 });
                 if (computedCost > 0)
                 {
                     lines.Add(new JournalEntryLineRequest(
-                        m.InventoryAssetAccountId,
+                        m[SystemAccountKey.Inventory],
                         computedCost,
                         0,
                         "عكس تكلفة البضاعة المباعة — إعادة المخزون (تقديري)"));
                     lines.Add(new JournalEntryLineRequest(
-                        m.CogsAccountId,
+                        m[SystemAccountKey.CostOfGoodsSold],
                         0,
                         computedCost,
                         "عكس تكلفة البضاعة المباعة (تقديري)"));
@@ -465,21 +584,19 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     {
         try
         {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.Inventory,
+                SystemAccountKey.VatInput,
+                SystemAccountKey.DefaultCash,
+                SystemAccountKey.AccountsPayable
+            };
 
-            var m = mappings.Value!;
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
 
-            // Validate required accounts
-            if (m.InventoryAssetAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب أصل المخزون");
-            if (m.VatInputAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب ضريبة المدخلات");
-            if (m.DefaultCashAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الصندوق النقدي");
-            if (m.AccountsPayableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم الدائنة");
+            var m = dictResult.Value!;
 
             // Validate: discount cannot exceed subtotal
             if (invoice.DiscountAmount > invoice.SubTotal)
@@ -492,7 +609,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
             // Dr Inventory Asset (net cost after discount)
             lines.Add(new JournalEntryLineRequest(
-                m.InventoryAssetAccountId,
+                m[SystemAccountKey.Inventory],
                 netInventoryCost,
                 0,
                 "تكلفة المشتريات (صافي بعد الخصم)"));
@@ -501,7 +618,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (invoice.TaxAmount > 0)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.VatInputAccountId,
+                    m[SystemAccountKey.VatInput],
                     invoice.TaxAmount,
                     0,
                     "ضريبة المدخلات"));
@@ -511,30 +628,32 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (invoice.PaymentType == PaymentType.Cash)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.DefaultCashAccountId,
+                    m[SystemAccountKey.DefaultCash],
                     0,
-                    invoice.TotalAmount,
+                    invoice.NetTotal,
                     "الجزء النقدي من فاتورة الشراء"));
             }
             else if (invoice.PaymentType == PaymentType.Credit)
             {
+                var supplierAccountId = GetSupplierAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
-                    m.AccountsPayableAccountId,
+                    supplierAccountId,
                     0,
-                    invoice.TotalAmount,
+                    invoice.NetTotal,
                     "الجزء الآجل من فاتورة الشراء"));
             }
             else if (invoice.PaymentType == PaymentType.Mixed)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.DefaultCashAccountId,
+                    m[SystemAccountKey.DefaultCash],
                     0,
                     invoice.PaidAmount,
                     "الجزء النقدي من فاتورة الشراء (مختلط)"));
+                var supplierAccountId = GetSupplierAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
-                    m.AccountsPayableAccountId,
+                    supplierAccountId,
                     0,
-                    invoice.DueAmount,
+                    invoice.RemainingAmount,
                     "الجزء الآجل من فاتورة الشراء (مختلط)"));
             }
 
@@ -573,21 +692,20 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     {
         try
         {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.Inventory,
+                SystemAccountKey.VatInput,
+                SystemAccountKey.DefaultCash,
+                SystemAccountKey.AccountsPayable,
+                SystemAccountKey.PurchaseReturns
+            };
 
-            var m = mappings.Value!;
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
 
-            // Validate required accounts
-            if (m.InventoryAssetAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب أصل المخزون");
-            if (m.VatInputAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب ضريبة المدخلات");
-            if (m.DefaultCashAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الصندوق النقدي");
-            if (m.AccountsPayableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم الدائنة");
+            var m = dictResult.Value!;
 
             var netInventoryCost = invoice.SubTotal - invoice.DiscountAmount;
             if (netInventoryCost < 0)
@@ -595,19 +713,19 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
             var lines = new List<JournalEntryLineRequest>();
 
-            // ── Reverse: Cr Inventory, Cr VatInput (swap Dr ↔ Cr) ─
+            // ── Reverse: Cr PurchaseReturn, Cr VatInput (swap Dr ↔ Cr) ─
             // Original: Dr Inventory, Dr VatInput
-            // Reverse:  Cr Inventory, Cr VatInput
+            // Reverse:  Cr PurchaseReturn, Cr VatInput
             lines.Add(new JournalEntryLineRequest(
-                m.InventoryAssetAccountId,
+                m[SystemAccountKey.PurchaseReturns],
                 0,
                 netInventoryCost,
-                "عكس تكلفة المشتريات"));
+                "عكس تكلفة المشتريات - مردودات مشتريات"));
 
             if (invoice.TaxAmount > 0)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.VatInputAccountId,
+                    m[SystemAccountKey.VatInput],
                     0,
                     invoice.TaxAmount,
                     "عكس ضريبة المدخلات"));
@@ -618,29 +736,31 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             if (invoice.PaymentType == PaymentType.Cash)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.DefaultCashAccountId,
-                    invoice.TotalAmount,
+                    m[SystemAccountKey.DefaultCash],
+                    invoice.NetTotal,
                     0,
                     "عكس الجزء النقدي من فاتورة الشراء"));
             }
             else if (invoice.PaymentType == PaymentType.Credit)
             {
+                var supplierAccountId = GetSupplierAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
-                    m.AccountsPayableAccountId,
-                    invoice.TotalAmount,
+                    supplierAccountId,
+                    invoice.NetTotal,
                     0,
                     "عكس الجزء الآجل من فاتورة الشراء"));
             }
             else if (invoice.PaymentType == PaymentType.Mixed)
             {
                 lines.Add(new JournalEntryLineRequest(
-                    m.DefaultCashAccountId,
+                    m[SystemAccountKey.DefaultCash],
                     invoice.PaidAmount,
                     0,
                     "عكس الجزء النقدي من فاتورة الشراء (مختلط)"));
+                var supplierAccountId = GetSupplierAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
-                    m.AccountsPayableAccountId,
-                    invoice.DueAmount,
+                    supplierAccountId,
+                    invoice.RemainingAmount,
                     0,
                     "عكس الجزء الآجل من فاتورة الشراء (مختلط)"));
             }
@@ -671,59 +791,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     }
 
     // ────────────────────────────────────────────────────────────────
-    //  G. Customer Payment Entry (Receipt)
-    // ────────────────────────────────────────────────────────────────
-    public async Task<Result<int>> CreateCustomerPaymentEntryAsync(
-        CustomerPayment payment,
-        string customerName,
-        int createdByUserId,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
-
-            var m = mappings.Value!;
-
-            // Validate required accounts
-            if (m.DefaultCashAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الصندوق النقدي");
-            if (m.AccountsReceivableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم المدينة");
-
-            var request = new CreateJournalEntryRequest(
-                TransactionDate: payment.PaymentDate,
-                Description: $"قيد سند قبض من العميل: {customerName}",
-                EntryType: JournalEntryType.CustomerReceipt,
-                ReferenceType: "CustomerPayment",
-                ReferenceId: payment.Id,
-                ReferenceNumber: payment.Id.ToString(),
-                Lines: new List<JournalEntryLineRequest>
-                {
-                    new(m.DefaultCashAccountId, payment.Amount, 0, "سند قبض من العميل"),
-                    new(m.AccountsReceivableAccountId, 0, payment.Amount, "سند قبض من العميل")
-                }
-            );
-
-            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
-            if (!createResult.IsSuccess) return createResult;
-
-            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
-            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
-
-            return Result<int>.Success(createResult.Value);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating customer payment entry for payment {PaymentId}", payment.Id);
-            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد سند القبض");
-        }
-    }
-
-    // ────────────────────────────────────────────────────────────────
-    //  H. Supplier Payment Entry
+    //  G. Supplier Payment Entry
     // ────────────────────────────────────────────────────────────────
     public async Task<Result<int>> CreateSupplierPaymentEntryAsync(
         SupplierPayment payment,
@@ -733,17 +801,17 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     {
         try
         {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.DefaultCash,
+                SystemAccountKey.AccountsPayable
+            };
 
-            var m = mappings.Value!;
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
 
-            // Validate required accounts
-            if (m.DefaultCashAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الصندوق النقدي");
-            if (m.AccountsPayableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم الدائنة");
+            var m = dictResult.Value!;
 
             var request = new CreateJournalEntryRequest(
                 TransactionDate: payment.PaymentDate,
@@ -754,8 +822,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 ReferenceNumber: payment.Id.ToString(),
                 Lines: new List<JournalEntryLineRequest>
                 {
-                    new(m.AccountsPayableAccountId, payment.Amount, 0, "سند دفع للمورد"),
-                    new(m.DefaultCashAccountId, 0, payment.Amount, "سند دفع للمورد")
+                    new(payment.Supplier?.Party?.AccountId ?? m[SystemAccountKey.AccountsPayable], payment.Amount, 0, "سند دفع للمورد"),
+                    new(m[SystemAccountKey.DefaultCash], 0, payment.Amount, "سند دفع للمورد")
                 }
             );
 
@@ -775,82 +843,23 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     }
 
     // ────────────────────────────────────────────────────────────────
-    //  I. Reverse Customer Payment Entry
-    // ────────────────────────────────────────────────────────────────
-    public async Task<Result<int>> ReverseCustomerPaymentEntryAsync(
-        int paymentId,
-        decimal amount,
-        string customerName,
-        int reversedByUserId,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
-
-            var m = mappings.Value!;
-
-            // Validate required accounts
-            if (m.DefaultCashAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الصندوق النقدي");
-            if (m.AccountsReceivableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم المدينة");
-
-            // Reverse: Dr AR / Cr Cash (mirror of original Dr Cash / Cr AR)
-            var request = new CreateJournalEntryRequest(
-                TransactionDate: DateTime.UtcNow,
-                Description: $"قيد عكس سند قبض من العميل: {customerName}",
-                EntryType: JournalEntryType.Manual,
-                ReferenceType: "CustomerPayment",
-                ReferenceId: paymentId,
-                ReferenceNumber: $"{paymentId}-REV",
-                Lines: new List<JournalEntryLineRequest>
-                {
-                    new(m.AccountsReceivableAccountId, amount, 0, "عكس سند قبض من العميل"),
-                    new(m.DefaultCashAccountId, 0, amount, "عكس سند قبض من العميل")
-                }
-            );
-
-            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
-            if (!createResult.IsSuccess) return createResult;
-
-            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
-            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
-
-            return Result<int>.Success(createResult.Value);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error reversing customer payment entry for payment {PaymentId}", paymentId);
-            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد عكس سند القبض");
-        }
-    }
-
-    // ────────────────────────────────────────────────────────────────
-    //  J. Reverse Supplier Payment Entry
+    //  H. Reverse Supplier Payment Entry
     // ────────────────────────────────────────────────────────────────
     public async Task<Result<int>> ReverseSupplierPaymentEntryAsync(
         int paymentId,
         decimal amount,
         string supplierName,
+        int supplierAccountId,
         int reversedByUserId,
         CancellationToken ct = default)
     {
         try
         {
-            var mappings = await _systemAccountService.GetMappingsAsync(null, ct);
-            if (!mappings.IsSuccess)
-                return Result<int>.Failure(mappings.Error!);
+            var cashResult = await GetAccountIdAsync(SystemAccountKey.DefaultCash, null, ct);
+            if (!cashResult.IsSuccess)
+                return Result<int>.Failure(cashResult.Error!);
 
-            var m = mappings.Value!;
-
-            // Validate required accounts
-            if (m.DefaultCashAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الصندوق النقدي");
-            if (m.AccountsPayableAccountId <= 0)
-                return Result<int>.Failure("الحساب النظامي غير مهيأ: حساب الذمم الدائنة");
+            var defaultCashAccountId = cashResult.Value;
 
             // Reverse: Dr Cash / Cr AP (mirror of original Dr AP / Cr Cash)
             var request = new CreateJournalEntryRequest(
@@ -862,8 +871,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 ReferenceNumber: $"{paymentId}-REV",
                 Lines: new List<JournalEntryLineRequest>
                 {
-                    new(m.DefaultCashAccountId, amount, 0, "عكس سند دفع للمورد"),
-                    new(m.AccountsPayableAccountId, 0, amount, "عكس سند دفع للمورد")
+                    new(defaultCashAccountId, amount, 0, "عكس سند دفع للمورد"),
+                    new(supplierAccountId, 0, amount, "عكس سند دفع للمورد")
                 }
             );
 

@@ -1,6 +1,6 @@
+using System.Collections.Generic;
 using System.Windows;
 using SalesSystem.Contracts;
-using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
@@ -85,7 +85,8 @@ public class LoginViewModel : ViewModelBase
                 response.Token,
                 response.UserName,
                 response.UserId,
-                (UserRole)response.Role);
+                new List<int> { response.Role },
+                GetRoleName(response.Role));
 
             // Navigate to main window
             await InvokeOnUIThreadAsync(() =>
@@ -109,5 +110,18 @@ public class LoginViewModel : ViewModelBase
         {
             ErrorMessage = HandleFailure(result.Error ?? "اسم المستخدم أو كلمة المرور غير صحيحة", "LoginViewModel.LoginAsync");
         }
+    }
+
+    private static string GetRoleName(byte roleId)
+    {
+        return roleId switch
+        {
+            1 => "مدير النظام",
+            2 => "مدير",
+            3 => "كاشير",
+            4 => "مراقب",
+            5 => "مدير فرع",
+            _ => "غير معروف"
+        };
     }
 }

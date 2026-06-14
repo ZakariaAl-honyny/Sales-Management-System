@@ -260,6 +260,42 @@ Phase 24: Accounting Engine Automation + CashBox Refactoring (v4.6.9+) → Autom
 - [ ] Build: 0 errors, 0 warnings across all 7+5 projects
 - [ ] Tests: 1,906 pass, 0 failures
 
+## v4.10 — Schema Restructuring (65 Tables)
+
+### Removed Entities (17 tables consolidated/removed)
+- `InventoryMovement` → replaced by `InventoryTransaction` + `InventoryTransactionLine`
+- `StockTransfer` / `StockTransferItem` → renamed to `WarehouseTransfer` / `WarehouseTransferLine`
+- `InventoryOperation` → merged into `InventoryTransactions` with TransactionType enum
+- `StockWriteOff` → covered by `InventoryAdjustments` with AdjustmentType=Damage
+- `CustomerGroup` → NOT in V1 (deferred to V2)
+- `SupplierType` → NOT in V1 (deferred to V2)
+- `SalesQuotation` → NOT in V1
+- `PurchaseOrder` → NOT in V1
+- `Cheque` → NOT in V1
+- `DailyClosure` → NOT in V1
+- `ProductBarcode` → replaced by `UnitBarcode`
+- `CustomerPayment` / `SupplierPayment` → replaced by `CustomerReceipt` / `SupplierPayment`
+- `CashTransaction` → replaced by `ReceiptVoucher` / `PaymentVoucher`
+
+### Added Entities (8 tables added)
+- `Parties` — shared contact data for Customers, Suppliers, Employees
+- `Units` — independent table (not embedded in ProductUnit)
+- `ProductPrices` — multi-currency pricing per (ProductUnit + Currency)
+- `InventoryBatches` — FIFO/FEFO batch tracking
+- `InventoryTransactions` / `InventoryTransactionLines` — replaces InventoryMovement
+- `WarehouseTransfers` / `WarehouseTransferLines` — replaces StockTransfer
+- `InventoryCounts` / `InventoryCountLines` — physical count (V2)
+- `InventoryAdjustments` / `InventoryAdjustmentLines` — stock adjustments
+
+### Key Changes
+- **Party consolidation**: Customers/Suppliers now share `PartyId` FK → `Parties` for name, phone, email, address, tax number
+- **Units independent**: `Units` table (smallint PK, Name, Symbol, IsSystem, IsActive) — user-addable, not hardcoded strings
+- **Perpetual Inventory**: ALL inventory costs go DIRECTLY to Inventory Asset account. No Purchases clearing account. COGS computed from InventoryBatches at sale time.
+- **65 tables total**: Up from 48 previous schema
+- **smallint PKs**: Roles, Departments, Branches, Warehouses, Currencies, Taxes, Units, AccountCategories all use smallint PK
+- **AuditLogs/SystemLogs**: bigint PK for high-volume logging
+- **SystemLogs.Level**: tinyint (1=Info, 2=Warning, 3=Error, 4=Critical) — not nvarchar
+
 ## v4.6.9 — Phase 19 Settings Module Remediations
 
 When reviewing Settings Module code, enforce these 7 rules:
@@ -303,8 +339,8 @@ The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-3
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
-| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
+| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), Unit independent table, Party entity, opening stock via InventoryBatches |
+| 26 — Warehouses Module | 📝 Planned | Warehouse types (Main/Store/Showroom), Transfer/WarehouseTransferLine replaces StockTransfer, InventoryCount V2 deferred, Perpetual Inventory |
 | 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
 | 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
 | 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
@@ -350,7 +386,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 
 1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
+3. Missing `CustomerGroupId` on Customer → REMOVED in V1 (deferred to V2). Do NOT add this field.
 4. Missing `CurrencyId` on financial entities → Add multi-currency support
 5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
 6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking

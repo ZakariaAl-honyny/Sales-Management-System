@@ -231,20 +231,17 @@ public class PrintController : ControllerBase
         // This is the ONLY place that still directly accesses store data.
         // The PrintDataService handles store info for all invoice-based endpoints.
         var settingsResult = await _printDataService.GetStoreSettingsAsync(ct);
-        var sysSettingsResult = await _printDataService.GetPrintSystemSettingsAsync(ct);
+        var printSettingsResult = await _printDataService.GetPrintSettingsAsync(ct);
 
         var settings = settingsResult.IsSuccess ? settingsResult.Value : null;
-        var sysSettings = sysSettingsResult.IsSuccess && sysSettingsResult.Value != null ? sysSettingsResult.Value : new List<SystemSetting>();
+        var printSettings = printSettingsResult.IsSuccess ? printSettingsResult.Value : null;
 
         var storeName = settings?.StoreName ?? "متجري";
         var storePhone = settings?.Phone ?? string.Empty;
         var storeAddress = settings?.Address ?? string.Empty;
-        var storeTaxNumber = sysSettings
-            .FirstOrDefault(s => s.SettingKey == "StoreTaxNumber")?.SettingValue ?? string.Empty;
-        var logoPath = sysSettings
-            .FirstOrDefault(s => s.SettingKey == "LogoPath")?.SettingValue;
-        var taxRateStr = sysSettings
-            .FirstOrDefault(s => s.SettingKey == "TaxRate")?.SettingValue ?? "15";
+        var storeTaxNumber = printSettings?.StoreTaxNumber ?? string.Empty;
+        var logoPath = printSettings?.LogoPath;
+        var taxRateStr = printSettings?.TaxRate.ToString() ?? "15";
 
         byte[]? logoBytes = null;
         if (!string.IsNullOrWhiteSpace(logoPath) && System.IO.File.Exists(logoPath))

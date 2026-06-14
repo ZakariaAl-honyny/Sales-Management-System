@@ -36,6 +36,13 @@
                             <TextBlock Text="عرض الملخص" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+                    <Button Command="{Binding ExportExcelCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" TabIndex="3"
+                            ToolTip="تصدير ملخص أرصدة الصناديق إلى ملف Excel">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Excel" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -73,8 +80,6 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="اسم الصندوق" Binding="{Binding CashBoxName}" Width="2*"
                                             ToolTipService.ToolTip="اسم الصندوق أو الخزينة"/>
-                        <DataGridTextColumn Header="الرصيد الافتتاحي" Binding="{Binding OpeningBalance, StringFormat={}{0:N2}}" Width="1.5*"
-                                            ToolTipService.ToolTip="الرصيد الافتتاحي للصندوق"/>
                         <DataGridTextColumn Header="إجمالي الإيرادات" Binding="{Binding TotalIncome, StringFormat={}{0:N2}}" Width="1.5*"
                                             ToolTipService.ToolTip="إجمالي الإيرادات المسجلة على الصندوق">
                             <DataGridTextColumn.ElementStyle>
@@ -93,8 +98,8 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="الرصيد الختامي" Binding="{Binding ClosingBalance, StringFormat={}{0:N2}}" Width="1.5*"
-                                            ToolTipService.ToolTip="الرصيد الختامي للصندوق">
+                        <DataGridTextColumn Header="صافي الرصيد" Binding="{Binding NetBalance, StringFormat={}{0:N2}}" Width="1.5*"
+                                            ToolTipService.ToolTip="صافي الرصيد = الإيرادات - المصروفات">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                                     <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>

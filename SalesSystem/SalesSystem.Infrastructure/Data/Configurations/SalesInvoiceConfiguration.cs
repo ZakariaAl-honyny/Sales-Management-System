@@ -10,9 +10,11 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
     {
         builder.ToTable("SalesInvoices");
         builder.HasKey(si => si.Id);
+        builder.HasIndex(si => si.InvoiceNo).IsUnique();
         builder.Property(si => si.SubTotal).HasPrecision(18, 2);
         builder.Property(si => si.DiscountAmount).HasPrecision(18, 2);
         builder.Property(si => si.TaxAmount).HasPrecision(18, 2);
+        builder.Property(si => si.OtherCharges).HasPrecision(18, 2);
         builder.Property(si => si.TotalAmount).HasPrecision(18, 2);
         builder.Property(si => si.PaidAmount).HasPrecision(18, 2);
         builder.Property(si => si.DueAmount).HasPrecision(18, 2);
@@ -47,14 +49,13 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
 
         builder.Property(si => si.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
         builder.Property(si => si.TotalCost).HasPrecision(18, 2);
-        builder.Property(si => si.QuotationId);
 
         builder.HasMany(si => si.Items)
             .WithOne(i => i.SalesInvoice)
             .HasForeignKey(i => i.SalesInvoiceId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(si => si.IsActive);
+        builder.HasQueryFilter(si => si.Status != SalesSystem.Domain.Enums.InvoiceStatus.Cancelled);
 
         builder.ToTable(t => t.HasCheckConstraint("CHK_SalesInvoices_PaidAmount", "[PaidAmount] >= 0 AND [PaidAmount] <= [TotalAmount]"));
     }
@@ -81,6 +82,5 @@ public class SalesInvoiceItemConfiguration : IEntityTypeConfiguration<SalesInvoi
             .HasForeignKey(sii => sii.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(sii => sii.IsActive);
     }
 }

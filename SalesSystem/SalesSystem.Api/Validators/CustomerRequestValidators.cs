@@ -25,19 +25,12 @@ public class CreateCustomerRequestValidator : AbstractValidator<CreateCustomerRe
             .MaximumLength(20).WithMessage("الرقم الضريبي لا يمكن أن يتجاوز 20 حرف")
             .When(x => !string.IsNullOrEmpty(x.TaxNumber));
 
-        RuleFor(x => x.OpeningBalance)
-            .GreaterThanOrEqualTo(0).WithMessage("الرصيد الافتتاحي لا يمكن أن يكون سالباً");
-
         RuleFor(x => x.CreditLimit)
             .GreaterThanOrEqualTo(0).WithMessage("حد الائتمان لا يمكن أن يكون سالباً");
 
-        RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("رقم الحساب غير صحيح")
-            .When(x => x.AccountId.HasValue);
-
-        RuleFor(x => x.CustomerGroupId)
-            .GreaterThan(0).WithMessage("مجموعة العملاء غير صحيحة")
-            .When(x => x.CustomerGroupId.HasValue);
+        RuleFor(x => x.PriceLevel)
+            .InclusiveBetween((byte)1, (byte)4).WithMessage("مستوى السعر يجب أن يكون بين 1 و 4")
+            .When(x => x.PriceLevel.HasValue);
     }
 }
 
@@ -66,47 +59,11 @@ public class UpdateCustomerRequestValidator : AbstractValidator<UpdateCustomerRe
         RuleFor(x => x.CreditLimit)
             .GreaterThanOrEqualTo(0).WithMessage("حد الائتمان لا يمكن أن يكون سالباً");
 
-        RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("رقم الحساب غير صحيح")
-            .When(x => x.AccountId.HasValue);
-
-        RuleFor(x => x.CustomerGroupId)
-            .GreaterThan(0).WithMessage("مجموعة العملاء غير صحيحة")
-            .When(x => x.CustomerGroupId.HasValue);
-
         RuleFor(x => x.IsActive)
             .NotNull().WithMessage("حالة التفعيل مطلوبة");
+
+        RuleFor(x => x.PriceLevel)
+            .InclusiveBetween((byte)1, (byte)4).WithMessage("مستوى السعر يجب أن يكون بين 1 و 4")
+            .When(x => x.PriceLevel.HasValue);
     }
 }
-
-public class CreateCustomerGroupRequestValidator : AbstractValidator<CreateCustomerGroupRequest>
-{
-    public CreateCustomerGroupRequestValidator()
-    {
-        RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("اسم المجموعة مطلوب")
-            .MaximumLength(100).WithMessage("اسم المجموعة لا يمكن أن يتجاوز 100 حرف");
-
-        RuleFor(x => x.Description)
-            .MaximumLength(250).WithMessage("الوصف لا يمكن أن يتجاوز 250 حرف")
-            .When(x => !string.IsNullOrEmpty(x.Description));
-    }
-}
-
-public class UpdateCustomerGroupRequestValidator : AbstractValidator<UpdateCustomerGroupRequest>
-{
-    public UpdateCustomerGroupRequestValidator()
-    {
-        RuleFor(x => x.Name)
-            .NotEmpty().WithMessage("اسم المجموعة مطلوب")
-            .MaximumLength(100).WithMessage("اسم المجموعة لا يمكن أن يتجاوز 100 حرف");
-
-        RuleFor(x => x.Description)
-            .MaximumLength(250).WithMessage("الوصف لا يمكن أن يتجاوز 250 حرف")
-            .When(x => !string.IsNullOrEmpty(x.Description));
-
-        RuleFor(x => x.IsActive)
-            .NotNull().WithMessage("حالة التفعيل مطلوبة");
-    }
-}
-

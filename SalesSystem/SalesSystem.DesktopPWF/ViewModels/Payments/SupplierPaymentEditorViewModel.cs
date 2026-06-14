@@ -8,22 +8,24 @@ using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.Helpers;
+using SalesSystem.DesktopPWF.Models;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Payments;
 
 /// <summary>
-/// ViewModel for Supplier Payment Editor (Phase 29 — Cheque support).
+/// ViewModel for Supplier Payment Editor.
+/// Enhanced with multi-invoice allocation grid for settling unpaid purchase invoices.
 /// </summary>
 public class SupplierPaymentEditorViewModel : ViewModelBase
 {
     private readonly ISupplierPaymentApiService _paymentService;
     private readonly ISupplierApiService _supplierService;
+    private readonly IPurchaseInvoiceApiService _invoiceService;
+    private readonly ISupplierPaymentApplicationApiService _applicationService;
     private readonly IEventBus _eventBus;
     private readonly IPaymentPrinter _paymentPrinter;
     private readonly ISettingsApiService _settingsService;
     private readonly IDialogService _dialogService;
-    private readonly IChequeApiService _chequeService;
-
     private readonly int? _paymentId;
     private readonly bool _isReadOnly;
 
@@ -33,18 +35,15 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     private PaymentMethod _paymentMethod = PaymentMethod.Cash;
     private string _notes = string.Empty;
     private string _errorMessage = string.Empty;
-
-    // Cheque-specific fields
-    private string _chequeNumber = string.Empty;
-    private string _chequeBankName = string.Empty;
-    private DateTime? _chequeIssueDate = DateTime.Today;
-    private DateTime? _chequeMaturityDate = DateTime.Today.AddDays(30);
+    private decimal _totalAllocated;
 
     private ObservableCollection<SupplierDto> _suppliers = new();
 
     public SupplierPaymentEditorViewModel(
         ISupplierPaymentApiService paymentService,
         ISupplierApiService supplierService,
+        IPurchaseInvoiceApiService invoiceService,
+        ISupplierPaymentApplicationApiService applicationService,
         IEventBus eventBus,
         IDialogService dialogService,
         int? paymentId = null,
@@ -54,17 +53,19 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         _isReadOnly = isReadOnly;
         _paymentService = paymentService;
         _supplierService = supplierService;
+        _invoiceService = invoiceService;
+        _applicationService = applicationService;
         _eventBus = eventBus;
         _paymentPrinter = App.GetService<IPaymentPrinter>();
         _settingsService = App.GetService<ISettingsApiService>();
         _dialogService = dialogService;
-        _chequeService = App.GetService<IChequeApiService>();
         SetDialogService(dialogService);
 
         SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ السداد...")));
         CancelCommand = new RelayCommand(OnCancel);
         PrintCommand = new AsyncRelayCommand(OnPrint, () => _paymentId.HasValue);
         SearchSupplierCommand = new RelayCommand(SearchSupplier, () => !_isReadOnly);
+        LoadUnpaidInvoicesCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadUnpaidInvoicesAsync, "جاري تحميل الفواتير...")));
 
         InitializeAsync();
     }
@@ -90,6 +91,8 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         : this(
             App.GetService<ISupplierPaymentApiService>(),
             App.GetService<ISupplierApiService>(),
+            App.GetService<IPurchaseInvoiceApiService>(),
+            App.GetService<ISupplierPaymentApplicationApiService>(),
             App.GetService<IEventBus>(),
             App.GetService<IDialogService>(),
             paymentId,
@@ -106,7 +109,13 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     public int SelectedSupplierId
     {
         get => _selectedSupplierId;
-        set => SetProperty(ref _selectedSupplierId, value);
+        set
+        {
+            if (SetProperty(ref _selectedSupplierId, value))
+            {
+                ClearErrors(nameof(SelectedSupplierId));
+            }
+        }
     }
 
     public DateTime PaymentDate
@@ -118,7 +127,13 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     public decimal Amount
     {
         get => _amount;
-        set => SetProperty(ref _amount, value);
+        set
+        {
+            if (SetProperty(ref _amount, value))
+            {
+                OnPropertyChanged(nameof(RemainingToAllocate));
+            }
+        }
     }
 
     public PaymentMethod PaymentMethod
@@ -126,37 +141,8 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         get => _paymentMethod;
         set
         {
-            if (SetProperty(ref _paymentMethod, value))
-            {
-                OnPropertyChanged(nameof(ShowChequeFields));
-            }
+            SetProperty(ref _paymentMethod, value);
         }
-    }
-
-    public bool ShowChequeFields => PaymentMethod == PaymentMethod.Cheque;
-
-    public string ChequeNumber
-    {
-        get => _chequeNumber;
-        set => SetProperty(ref _chequeNumber, value);
-    }
-
-    public string ChequeBankName
-    {
-        get => _chequeBankName;
-        set => SetProperty(ref _chequeBankName, value);
-    }
-
-    public DateTime? ChequeIssueDate
-    {
-        get => _chequeIssueDate;
-        set => SetProperty(ref _chequeIssueDate, value);
-    }
-
-    public DateTime? ChequeMaturityDate
-    {
-        get => _chequeMaturityDate;
-        set => SetProperty(ref _chequeMaturityDate, value);
     }
 
     public string Notes
@@ -180,16 +166,39 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     public ObservableCollection<PaymentMethodOption> PaymentMethodOptions { get; } = new()
     {
         new PaymentMethodOption(PaymentMethod.Cash, "نقدي"),
-        new PaymentMethodOption(PaymentMethod.Cheque, "شيك"),
         new PaymentMethodOption(PaymentMethod.BankTransfer, "تحويل بنكي"),
         new PaymentMethodOption(PaymentMethod.CreditCard, "بطاقة ائتمان")
     };
+
+    /// <summary>
+    /// Unpaid purchase invoices for the selected supplier, available for allocation
+    /// </summary>
+    public ObservableCollection<UnpaidPurchaseInvoiceItem> UnpaidInvoices { get; } = new();
+
+    /// <summary>
+    /// Total amount allocated across all invoices
+    /// </summary>
+    public decimal TotalAllocated
+    {
+        get => _totalAllocated;
+        private set => SetProperty(ref _totalAllocated, value);
+    }
+
+    /// <summary>
+    /// Remaining payment amount after deducting allocations
+    /// </summary>
+    public decimal RemainingToAllocate => Amount - TotalAllocated;
+
+    /// <summary>
+    /// True when at least one invoice has allocation
+    /// </summary>
+    public bool HasAllocations => TotalAllocated > 0;
 
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand PrintCommand { get; }
     public ICommand SearchSupplierCommand { get; }
-
+    public ICommand LoadUnpaidInvoicesCommand { get; }
 
     private void SearchSupplier()
     {
@@ -233,12 +242,6 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
                 Amount = payment.Amount;
                 PaymentMethod = (PaymentMethod)payment.PaymentMethod;
                 Notes = payment.Notes ?? string.Empty;
-
-                // Load associated cheque if payment method is Cheque
-                if (PaymentMethod == PaymentMethod.Cheque)
-                {
-                    await LoadChequeDataAsync(_paymentId.Value);
-                }
             }
             else
             {
@@ -258,26 +261,57 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Loads cheque data linked to this payment.
+    /// Loads unpaid purchase invoices for the selected supplier.
     /// </summary>
-    private async Task LoadChequeDataAsync(int paymentId)
+    public async Task LoadUnpaidInvoicesAsync()
     {
-        try
+        if (SelectedSupplierId <= 0)
         {
-            var chequesResult = await _chequeService.GetAllAsync(paymentId: paymentId);
-            if (chequesResult.IsSuccess && chequesResult.Value != null && chequesResult.Value.Count > 0)
+            UnpaidInvoices.Clear();
+            TotalAllocated = 0;
+            return;
+        }
+
+        var result = await _invoiceService.GetAllAsync(supplierId: SelectedSupplierId, pageSize: 200);
+        if (!result.IsSuccess || result.Value == null) return;
+
+        var unpaid = result.Value
+            .Where(inv => inv.Status == 2 && inv.NetTotal > inv.PaidAmount) // Posted + outstanding
+            .Select(inv => new UnpaidPurchaseInvoiceItem
             {
-                var cheque = chequesResult.Value[0];
-                ChequeNumber = cheque.ChequeNumber;
-                ChequeBankName = cheque.BankName;
-                ChequeIssueDate = cheque.IssueDate;
-                ChequeMaturityDate = cheque.MaturityDate;
-            }
-        }
-        catch (Exception ex)
+                InvoiceId = inv.Id,
+                InvoiceNo = inv.InvoiceNo,
+                InvoiceDate = inv.InvoiceDate.ToString("yyyy-MM-dd"),
+                TotalAmount = inv.NetTotal,
+                PaidAmount = inv.PaidAmount,
+                AllocatedAmount = 0
+            })
+            .OrderByDescending(i => i.InvoiceNo)
+            .ToList();
+
+        UnpaidInvoices.Clear();
+        foreach (var item in unpaid)
         {
-            Serilog.Log.Warning(ex, "Failed to load cheque data for payment {PaymentId}", paymentId);
+            item.PropertyChanged += OnAllocationItemChanged;
+            UnpaidInvoices.Add(item);
         }
+
+        RecalculateAllocations();
+    }
+
+    private void OnAllocationItemChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(UnpaidInvoiceAllocationItem.AllocatedAmount))
+        {
+            RecalculateAllocations();
+        }
+    }
+
+    private void RecalculateAllocations()
+    {
+        TotalAllocated = UnpaidInvoices.Sum(i => i.AllocatedAmount);
+        OnPropertyChanged(nameof(RemainingToAllocate));
+        OnPropertyChanged(nameof(HasAllocations));
     }
 
     /// <summary>
@@ -291,21 +325,8 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
             AddError(nameof(SelectedSupplierId), "المورد مطلوب");
         if (Amount <= 0)
             AddError(nameof(Amount), "يجب إدخال المبلغ بشكل صحيح (أكبر من 0)");
-
-        // Cheque validation
-        if (PaymentMethod == PaymentMethod.Cheque)
-        {
-            if (string.IsNullOrWhiteSpace(ChequeNumber))
-                AddError(nameof(ChequeNumber), "رقم الشيك مطلوب");
-            if (string.IsNullOrWhiteSpace(ChequeBankName))
-                AddError(nameof(ChequeBankName), "اسم البنك مطلوب");
-            if (ChequeIssueDate == null)
-                AddError(nameof(ChequeIssueDate), "تاريخ إصدار الشيك مطلوب");
-            if (ChequeMaturityDate == null)
-                AddError(nameof(ChequeMaturityDate), "تاريخ استحقاق الشيك مطلوب");
-            if (ChequeMaturityDate.HasValue && ChequeIssueDate.HasValue && ChequeMaturityDate < ChequeIssueDate)
-                AddError(nameof(ChequeMaturityDate), "تاريخ الاستحقاق يجب أن يكون بعد تاريخ الإصدار");
-        }
+        if (RemainingToAllocate < 0)
+            AddError(nameof(Amount), "المبلغ المخصص أكبر من قيمة سند الدفع");
 
         return await ValidateAllAsync();
     }
@@ -329,12 +350,6 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
 
             if (result.IsSuccess)
             {
-                // Create or update cheque if payment method is Cheque
-                if (PaymentMethod == PaymentMethod.Cheque)
-                {
-                    await CreateChequeRecordAsync(result.Value!.Id, forCustomer: false);
-                }
-
                 _eventBus.Publish(new SupplierPaymentChangedMessage(result.Value!.Id));
                 RequestClose();
             }
@@ -353,18 +368,26 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
                 PaymentMethod: PaymentMethod,
                 PaymentDate: PaymentDate,
                 PurchaseInvoiceId: null,
+                CashBoxId: null,
                 Notes: Notes);
             var result = await _paymentService.CreateAsync(request);
 
             if (result.IsSuccess)
             {
-                // Create cheque if payment method is Cheque
-                if (PaymentMethod == PaymentMethod.Cheque)
+                var paymentId = result.Value!.Id;
+
+                // Create allocations for each invoice with an allocated amount
+                foreach (var allocation in UnpaidInvoices.Where(a => a.AllocatedAmount > 0))
                 {
-                    await CreateChequeRecordAsync(result.Value!.Id, forCustomer: false);
+                    var appRequest = new CreateSupplierPaymentApplicationRequest(
+                        paymentId,
+                        allocation.InvoiceId,
+                        allocation.AllocatedAmount);
+
+                    await _applicationService.CreateAsync(appRequest);
                 }
 
-                _eventBus.Publish(new SupplierPaymentChangedMessage(result.Value!.Id));
+                _eventBus.Publish(new SupplierPaymentChangedMessage(paymentId));
                 RequestClose();
             }
             else
@@ -372,36 +395,6 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
                 ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
                 await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
             }
-        }
-    }
-
-    /// <summary>
-    /// Creates a cheque record linked to a payment.
-    /// </summary>
-    private async Task CreateChequeRecordAsync(int paymentId, bool forCustomer)
-    {
-        try
-        {
-            var chequeRequest = new CreateChequeRequest(
-                ChequeNumber: ChequeNumber,
-                BankName: ChequeBankName,
-                IssueDate: ChequeIssueDate ?? DateTime.Now,
-                MaturityDate: ChequeMaturityDate ?? DateTime.Now.AddDays(30),
-                Amount: Amount,
-                CustomerPaymentId: forCustomer ? paymentId : null,
-                SupplierPaymentId: !forCustomer ? paymentId : null,
-                Notes: Notes);
-
-            var chequeResult = await _chequeService.CreateAsync(chequeRequest);
-            if (!chequeResult.IsSuccess)
-            {
-                Serilog.Log.Warning("Cheque creation logged but payment already saved for PaymentId={PaymentId}: {Error}",
-                    paymentId, chequeResult.Error);
-            }
-        }
-        catch (Exception ex)
-        {
-            Serilog.Log.Error(ex, "Failed to create cheque record for payment {PaymentId}", paymentId);
         }
     }
 
@@ -434,5 +427,15 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    public override void Cleanup()
+    {
+        foreach (var item in UnpaidInvoices)
+        {
+            item.PropertyChanged -= OnAllocationItemChanged;
+        }
+        UnpaidInvoices.Clear();
+        base.Cleanup();
     }
 }

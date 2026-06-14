@@ -194,7 +194,6 @@ public class CreateCustomerRequestValidatorTests
         Email: "customer@example.com",
         Address: "Test Address",
         TaxNumber: null,
-        OpeningBalance: 0,
         CreditLimit: 1000
     );
 }

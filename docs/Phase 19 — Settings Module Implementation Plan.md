@@ -92,15 +92,8 @@ Based on full codebase audit + user requirements from reference images, system s
 - `ISystemSettingsRepository` / `SystemSettingsRepository` — with `GetCostingMethodAsync()`, `SetCostingMethodAsync()`, `GetStringAsync()`, `SetStringAsync()`
 
 **🔴 BLOCKER — Repository bypasses IUnitOfWork:**
-```csharp
-// SystemSettingsRepository.cs lines 39-40 — CURRENT (WRONG)
-setting.UpdateValue(method.ToString());
-await _context.SaveChangesAsync(ct);  // Direct SaveChanges, NOT through UoW
 
-// FIX: Remove SaveChangesAsync from repository, let service call _uow.SaveChangesAsync()
-setting.UpdateValue(method.ToString());
-// Repository does NOT save — service handles transaction
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 This causes **two separate commits** when mixing StoreSettings and SystemSettings writes in one operation (e.g., `StoreSettingsService.UpdateSettingsAsync`). See [Section 3 — Blocker 1](#31-blocker-1-systemsettingsrepository-bypasses-iunitofwork).
 
@@ -180,53 +173,11 @@ These 3 issues were identified by the Backend Architect as **blocking** — they
 2. Add `SaveBatchAsync()` or have callers use `_uow.SaveChangesAsync()`
 3. Add `ISystemSettingsService` in Application layer that manages the transactional boundary
 
-```csharp
-// FIXED — SystemSettingsRepository.cs
-public async Task SetStringAsync(string key, string value, int? updatedBy = null, CancellationToken ct = default)
-{
-    var setting = await _context.SystemSettings
-        .FirstOrDefaultAsync(s => s.SettingKey == key && s.IsActive, ct);
-    if (setting != null)
-    {
-        setting.UpdateValue(value, updatedBy);
-        // NO SaveChangesAsync here — let service call _uow.SaveChangesAsync()
-    }
-}
-
-// FIXED — StoreSettingsService.cs (using transaction for mixed writes)
-public async Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, CancellationToken ct)
-{
-    await using var tx = await _uow.BeginTransactionAsync(ct);
-    try
-    {
-        // 1. Update StoreSettings
-        settings.Update(/*...*/);
-        await _uow.SaveChangesAsync(ct);  // Single commit for StoreSettings
-        
-        // 2. Update SystemSettings via repository (no SaveChanges inside)
-        await _systemSettingsRepo.SetStringAsync("CostingMethod", request.CostingMethod.ToString(), ct: ct);
-        await _systemSettingsRepo.SetStringAsync("Backup.RetentionDays", request.BackupRetentionDays.ToString(), ct: ct);
-        
-        // 3. Commit SystemSettings changes
-        await _uow.SaveChangesAsync(ct);  // Second commit in same transaction
-        
-        await tx.CommitAsync(ct);
-        return Result<StoreSettingsDto>.Success(dto);
-    }
-    catch
-    {
-        await tx.RollbackAsync(ct);
-        throw;
-    }
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Also needed**: Add typed accessor extension methods to `ISystemSettingsRepository`:
-```csharp
-Task<bool> GetBoolAsync(string key, bool defaultValue = false, CancellationToken ct = default);
-Task<int> GetIntAsync(string key, int defaultValue = 0, CancellationToken ct = default);
-Task<decimal> GetDecimalAsync(string key, decimal defaultValue = 0, CancellationToken ct = default);
-```
+
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Files changed**: `SystemSettingsRepository.cs`, `ISystemSettingsRepository.cs`, `StoreSettingsService.cs`
 
@@ -241,21 +192,7 @@ Task<decimal> GetDecimalAsync(string key, decimal defaultValue = 0, Cancellation
 
 **Fix**: Add `int? TaxId` FK to both invoice entities.
 
-```csharp
-// SalesInvoice.cs — add
-public int? TaxId { get; private set; }
-public Tax? Tax { get; private set; }
-
-public void SetTax(Tax tax, decimal taxAmount)
-{
-    TaxId = tax.Id;
-    TaxAmount = taxAmount;  // Computed as: Tax.Rate × (SubTotal - InvoiceDiscount)
-}
-
-// PurchaseInvoice.cs — same pattern
-public int? TaxId { get; private set; }
-public Tax? Tax { get; private set; }
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for the table definition.
 
 **Files changed**: `SalesInvoice.cs`, `PurchaseInvoice.cs`, `SalesInvoiceConfiguration.cs`, `PurchaseInvoiceConfiguration.cs`, `SalesInvoiceDto.cs`, `PurchaseInvoiceDto.cs`, invoice services, migration
 
@@ -604,14 +541,8 @@ If FIFO: requires Constitution amendment (RULE-068/069/071) + UpdateProductPrici
 | Desktop invoice ViewModels | Show Tax name in invoice header |
 
 **Domain method** (RULE-042):
-```csharp
-public void SetTax(Tax tax, decimal taxAmount)
-{
-    if (tax == null) throw new DomainException("الضريبة مطلوبة");
-    TaxId = tax.Id;
-    TaxAmount = taxAmount;
-}
-```
+
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for the table definition.
 
 **Logging**: `Log.Information("Tax {TaxId} applied to Invoice {InvoiceId}, Amount: {Amount}", taxId, id, taxAmount)`
 
@@ -675,98 +606,8 @@ public void SetTax(Tax tax, decimal taxAmount)
 
 Add AFTER the accounting seed block, with **independent `AnyAsync()` guard** (NOT relying on Users guard):
 
-```csharp
-// ═══════════════════════════════════════════
-// Seed SystemSettings (key-value pairs)
-// ═══════════════════════════════════════════
-if (!await db.SystemSettings.AnyAsync())
-{
-    var settings = new List<SystemSetting>
-    {
-        // ── Inventory ──
-        SystemSetting.Create("CostingMethod", "1", "int", "Inventory",
-            "طريقة تقييم المخزون", "1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice"),
-        SystemSetting.Create("AllowNegativeStock", "false", "bool", "Inventory",
-            "السماح بالمخزون السالب", "السماح بجعل كمية المخزون أقل من صفر"),
-        SystemSetting.Create("EnableFefo", "false", "bool", "Inventory",
-            "استخدام FEFO", "استخدام طريقة الصادر أولاً حسب تاريخ الانتهاء"),
-        SystemSetting.Create("StockAlertDays", "5", "int", "Inventory",
-            "تحذير المخزون (أيام)", "عدد الأيام للتحذير قبل نفاد المخزون"),
-        
-        // ── Sales ──
-        SystemSetting.Create("AutoPostInvoices", "true", "bool", "Sales",
-            "الترحيل التلقائي", "ترحيل فاتورة البيع مباشرة عند الحفظ"),
-        SystemSetting.Create("AllowDrafts", "true", "bool", "Sales",
-            "السماح بالمسودات", "السماح بحفظ فاتورة البيع كمسودة"),
-        SystemSetting.Create("ShowProfitInInvoice", "true", "bool", "Sales",
-            "إظهار الربح", "إظهار هامش الربح في شاشة البيع"),
-        SystemSetting.Create("PreventBelowRetailPrice", "false", "bool", "Sales",
-            "منع البيع أقل من السعر", "منع البيع بسعر أقل من السعر الرسمي"),
-        SystemSetting.Create("AllowBelowCostSale", "false", "bool", "Sales",
-            "البيع أقل من التكلفة", "السماح بالبيع بسعر أقل من التكلفة مع تحذير"),
-        SystemSetting.Create("HideTaxInSales", "false", "bool", "Sales",
-            "إخفاء الضريبة في المبيعات", "إخفاء أعمدة وحقول الضريبة في شاشات البيع"),
-        SystemSetting.Create("ShowExpiryInInvoices", "false", "bool", "Sales",
-            "إظهار تاريخ الانتهاء", "عرض عمود تاريخ الانتهاء في فواتير البيع"),
-        SystemSetting.Create("DefaultCashCustomerId", "1", "int", "Sales",
-            "العميل النقدي", "العميل الافتراضي لمبيعات النقد"),
-        
-        // ── Purchases ──
-        SystemSetting.Create("PurchaseAutoPost", "true", "bool", "Purchases",
-            "ترحيل المشتريات تلقائياً", "ترحيل فاتورة الشراء مباشرة عند الحفظ"),
-        SystemSetting.Create("HideTaxInPurchases", "false", "bool", "Purchases",
-            "إخفاء الضريبة في المشتريات", "إخفاء أعمدة وحقول الضريبة في شاشات الشراء"),
-        SystemSetting.Create("DefaultCashSupplierId", "1", "int", "Purchases",
-            "المورد النقدي", "المورد الافتراضي لمشتريات النقد"),
-        
-        // ── Barcode ──
-        SystemSetting.Create("EnableBarcode", "true", "bool", "Barcode",
-            "تفعيل الباركود", "تفعيل الباركود في النظام بالكامل"),
-        SystemSetting.Create("BarcodeInputType", "Scanner", "string", "Barcode",
-            "نوع إدخال الباركود", "Scanner أو Camera"),
-        SystemSetting.Create("AutoGenerateBarcode", "true", "bool", "Barcode",
-            "توليد باركود تلقائي", "توليد باركود تلقائي للمنتجات الجديدة"),
-        
-        // ── Accounting ──
-        SystemSetting.Create("AutoCreateJournalEntry", "true", "bool", "Accounting",
-            "إنشاء قيود محاسبية", "إنشاء قيد محاسبي عند ترحيل كل فاتورة"),
-        
-        // ── General ──
-        SystemSetting.Create("DecimalPlaces", "2", "int", "General",
-            "الكسور العشرية", "عدد الخانات العشرية للأسعار والمبالغ"),
-        SystemSetting.Create("Language", "ar", "string", "General",
-            "لغة النظام", "اللغة الافتراضية للنظام"),
-        SystemSetting.Create("DateFormat", "dd/MM/yyyy", "string", "General",
-            "تنسيق التاريخ", "تنسيق عرض التواريخ في النظام"),
-        
-        // ── Print (new keys added to existing print set) ──
-        SystemSetting.Create("PaperSize", "A4", "string", "Print",
-            "حجم الورق", "حجم الورق الافتراضي للطباعة (A4 أو 80mm)"),
-        SystemSetting.Create("PrintCopies", "1", "int", "Print",
-            "عدد النسخ", "عدد نسخ الطباعة الافتراضية"),
-        SystemSetting.Create("ShowLogo", "true", "bool", "Print",
-            "إظهار الشعار", "طباعة شعار المتجر على الفواتير"),
-        SystemSetting.Create("ShowBalanceOnPrint", "true", "bool", "Print",
-            "إظهار الرصيد", "إظهار رصيد الحساب في الفاتورة المطبوعة"),
-        SystemSetting.Create("PrintSignature", "false", "bool", "Print",
-            "طباعة التوقيع", "طباعة التوقيع في أسفل الفاتورة"),
-        SystemSetting.Create("FooterNote", "", "string", "Print",
-            "ملاحظة أسفل الفاتورة", "نص يظهر في أسفل جميع الفواتير المطبوعة"),
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
 
-        // ── Notifications ──
-        SystemSetting.Create("LowStockAlert", "true", "bool", "Notifications",
-            "تنبيه المخزون المنخفض", "تنبيه عند انخفاض المخزون عن الحد الأدنى"),
-        SystemSetting.Create("ExpiryAlert", "true", "bool", "Notifications",
-            "تنبيه انتهاء الصلاحية", "تنبيه عند قرب انتهاء صلاحية الأصناف"),
-        SystemSetting.Create("ExpiryAlertDays", "30", "int", "Notifications",
-            "أيام تنبيه الصلاحية", "عدد الأيام للتنبيه قبل انتهاء الصلاحية"),
-        SystemSetting.Create("CreditLimitAlert", "true", "bool", "Notifications",
-            "تنبيه الحد الائتماني", "تنبيه عند تجاوز السقف الائتماني"),
-    };
-    db.SystemSettings.AddRange(settings);
-    logger?.LogInformation("Seeded {Count} SystemSettings key-value pairs.", settings.Count);
-}
-```
 
 **Logging** (RULE-035):
 - `Log.Information("Seeded {Count} SystemSettings key-value pairs.", settings.Count)` on success
@@ -782,107 +623,7 @@ if (!await db.SystemSettings.AnyAsync())
 
 Add AFTER the SystemSettings seed block (Task 5), with **independent `AnyAsync()` guards** for each entity type:
 
-```csharp
-// ═══════════════════════════════════════════
-// Seed Default Warehouse
-// ═══════════════════════════════════════════
-if (!await db.Set<Warehouse>().AnyAsync())
-{
-    var warehouse = Warehouse.Create("المخزن الرئيسي");
-    db.Set<Warehouse>().Add(warehouse);
-    logger?.LogInformation("Seeded default warehouse: المخزن الرئيسي");
-}
-
-// ═══════════════════════════════════════════
-// Seed Default CashBox
-// ═══════════════════════════════════════════
-if (!await db.Set<CashBox>().AnyAsync())
-{
-    var cashBox = CashBox.Create("الصندوق الرئيسي");
-    db.Set<CashBox>().Add(cashBox);
-    logger?.LogInformation("Seeded default cashbox: الصندوق الرئيسي");
-}
-
-// ═══════════════════════════════════════════
-// Seed Default Category
-// ═══════════════════════════════════════════
-if (!await db.Set<Category>().AnyAsync())
-{
-    var category = Category.Create("عام");
-    db.Set<Category>().Add(category);
-    logger?.LogInformation("Seeded default category: عام");
-}
-
-// ═══════════════════════════════════════════
-// Seed Default Cash Customer ("عميل نقدي")
-// ═══════════════════════════════════════════
-if (!await db.Set<Customer>().AnyAsync())
-{
-    var cashCustomer = Customer.Create(
-        name: "عميل نقدي",
-        phone: null,
-        address: null,
-        creditLimit: 0,
-        createdByUserId: null);
-    db.Set<Customer>().Add(cashCustomer);
-    logger?.LogInformation("Seeded default cash customer: عميل نقدي");
-}
-
-// ═══════════════════════════════════════════
-// Seed Default Cash Supplier ("مورد نقدي")
-// ═══════════════════════════════════════════
-if (!await db.Set<Supplier>().AnyAsync())
-{
-    var cashSupplier = Supplier.Create(
-        name: "مورد نقدي",
-        phone: null,
-        address: null,
-        creditLimit: 0,
-        createdByUserId: null);
-    db.Set<Supplier>().Add(cashSupplier);
-    logger?.LogInformation("Seeded default cash supplier: مورد نقدي");
-}
-
-// ═══════════════════════════════════════════
-// Seed Default Units (7 base units)
-// ═══════════════════════════════════════════
-if (!await db.Set<Unit>().AnyAsync())
-{
-    var units = new List<Unit>
-    {
-        Unit.Create("حبة"),   // Piece
-        Unit.Create("كرتون"), // Carton
-        Unit.Create("علبة"),  // Box/Can
-        Unit.Create("كيلو"),  // Kilogram
-        Unit.Create("جرام"),  // Gram
-        Unit.Create("لتر"),   // Liter
-        Unit.Create("متر"),   // Meter
-    };
-    db.Set<Unit>().AddRange(units);
-    logger?.LogInformation("Seeded {Count} default units.", units.Count);
-}
-
-// ═══════════════════════════════════════════
-// Seed Document Types (9 system document types)
-// ═══════════════════════════════════════════
-if (!await db.Set<DocumentType>().AnyAsync())
-{
-    var docTypes = new List<DocumentType>
-    {
-        DocumentType.Create("فاتورة بيع"),         // Sales Invoice
-        DocumentType.Create("فاتورة شراء"),        // Purchase Invoice
-        DocumentType.Create("مرتجع بيع"),           // Sales Return
-        DocumentType.Create("مرتجع شراء"),          // Purchase Return
-        DocumentType.Create("سند قبض"),             // Payment Receipt
-        DocumentType.Create("سند صرف"),             // Payment Voucher
-        DocumentType.Create("تحويل مخزني"),         // Stock Transfer
-        DocumentType.Create("تسوية مخزنية"),        // Stock Adjustment
-        DocumentType.Create("قيد يومية"),           // Journal Entry
-    };
-    db.Set<DocumentType>().AddRange(docTypes);
-    logger?.LogInformation("Seeded {Count} document types.", docTypes.Count);
-}
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
 
 **IMPORTANT — Seed Order**: These seeds must run BEFORE `SystemSettings` seed if `DefaultCashCustomerId` and `DefaultCashSupplierId` reference them. The Customer/Supplier seeds set Id=1 (first record). The SystemSettings seed references `DefaultCashCustomerId = "1"` and `DefaultCashSupplierId = "1"`.
 
@@ -917,22 +658,8 @@ if (!await db.Set<DocumentType>().AnyAsync())
 | `Contracts/Requests/MiscRequests.cs` — `UpdateSettingsRequest` | Add `CostingMethod` field |
 
 **XAML Pattern**:
-```xml
-<!-- Costing Method RadioButton Group -->
-<TextBlock Text="طريقة تقييم المخزون" Style="{StaticResource LabelStyle}"/>
-<RadioButton Content="المتوسط المرجح (Weighted Average)" 
-             IsChecked="{Binding IsWeightedAverageSelected}"
-             ToolTip="المتوسط المرجح — طريقة تقييم المخزون الافتراضية" 
-             GroupName="CostingMethod" Margin="0,4,0,2"/>
-<RadioButton Content="آخر سعر شراء (Last Purchase Price)" 
-             IsChecked="{Binding IsLastPriceSelected}"
-             ToolTip="استخدام آخر سعر شراء كتكلفة للمخزون"
-             GroupName="CostingMethod" Margin="0,2,0,2"/>
-<RadioButton Content="سعر المورد (Supplier Price)" 
-             IsChecked="{Binding IsSupplierPriceSelected}"
-             ToolTip="استخدام سعر المورد المدرج في كرت الصنف"
-             GroupName="CostingMethod" Margin="0,2,0,6"/>
-```
+
+> See `docs/ui-screens.md` for WPF UI patterns and `docs/AGENTS.md` for ViewModel patterns.
 
 **ToolTips** (RULE-185-190):
 - WeightedAverage: `"المتوسط المرجح — طريقة تقييم المخزون الافتراضية"`
@@ -951,9 +678,7 @@ if (!await db.Set<DocumentType>().AnyAsync())
 
 **File**: `DesktopPWF/Messaging/Messages/AppMessages.cs`
 
-```csharp
-public record StoreSettingsChangedMessage;
-```
+> See `docs/AGENTS.md` for DTO patterns and `SalesSystem.Contracts/` for canonical DTO definitions.
 
 This is a forward-looking addition. Currently no code publishes it, but it completes the convention of 18 existing EventBus message types. Future subscribers (Dashboard, MainWindow) can react to settings changes.
 
@@ -967,136 +692,26 @@ This is a forward-looking addition. Currently no code publishes it, but it compl
 
 **File**: `Domain/Entities/Tax.cs`
 
-```csharp
-public class Tax : BaseEntity
-{
-    public string Name { get; private set; } = null!;
-    public decimal Rate { get; private set; }
-    public bool IsDefault { get; private set; }
-
-    private Tax() { } // EF Core
-
-    public static Tax Create(string name, decimal rate, bool isDefault = false)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم الضريبة مطلوب");
-        if (rate < 0)
-            throw new DomainException("نسبة الضريبة لا يمكن أن تكون سالبة");
-        if (rate > 100)
-            throw new DomainException("نسبة الضريبة لا يمكن أن تتجاوز 100%");
-        
-        return new Tax
-        {
-            Name = name.Trim(),
-            Rate = rate,
-            IsDefault = isDefault,
-            IsActive = true
-        };
-    }
-
-    public void Update(string name, decimal rate, bool isDefault)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم الضريبة مطلوب");
-        if (rate < 0)
-            throw new DomainException("نسبة الضريبة لا يمكن أن تكون سالبة");
-        if (rate > 100)
-            throw new DomainException("نسبة الضريبة لا يمكن أن تتجاوز 100%");
-        Name = name.Trim();
-        Rate = rate;
-        IsDefault = isDefault;
-    }
-
-    public void MarkAsDeleted() => IsActive = false; // Soft delete
-}
-```
+> See `docs/database-schema.md` Module 2.5 (Taxes table) for the canonical Tax definition and `docs/AGENTS.md`/`CONSTITUTION.md` for entity patterns (private set, Guard Clauses, domain methods).
 
 **DeleteStrategy** (RULE-050): Three options when deleting:
 - **Cancel** (`DeleteStrategy.Cancel`) — abort, do nothing
 - **Deactivate** (`DeleteStrategy.Deactivate`) — `MarkAsDeleted()` → `IsActive = false`
 - **Permanent** (`DeleteStrategy.Permanent`) — physical removal; **must catch `DbUpdateException`** if Tax is referenced by invoices (RULE-200)
 
-#### 9.2 Infrastructure Layer
-
-**File**: `Infrastructure/Data/Configurations/TaxConfiguration.cs`
-
-```csharp
-public class TaxConfiguration : IEntityTypeConfiguration<Tax>
-{
-    public void Configure(EntityTypeBuilder<Tax> builder)
-    {
-        builder.ToTable("Taxes");
-        builder.HasKey(t => t.Id);
-        builder.Property(t => t.Name).IsRequired().HasMaxLength(100);
-        builder.Property(t => t.Rate).HasPrecision(18, 2);
-        builder.HasIndex(t => t.Name).IsUnique();  // DB Engineer: prevent duplicate names
-        builder.HasQueryFilter(t => t.IsActive);
-
-        // CHECK constraint: Rate between 0 and 100 (DB Engineer req.)
-        builder.ToTable(t => t.HasCheckConstraint("CHK_Taxes_Rate_Range", "[Rate] >= 0 AND [Rate] <= 100"));
-
-        // Filtered unique index: only one default allowed (DB Engineer req.)
-        builder.HasIndex(t => t.IsDefault)
-            .IsUnique()
-            .HasFilter("[IsDefault] = 1");
-    }
-}
-```
-
-**Migration**: `20260605000000_AddTaxTable.sql`
-```sql
-CREATE TABLE Taxes (
-    Id int IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    Name nvarchar(100) NOT NULL,
-    Rate decimal(18,2) NOT NULL,
-    IsDefault bit NOT NULL DEFAULT 0,
-    IsActive bit NOT NULL DEFAULT 1,
-    CreatedAt datetime2 NOT NULL DEFAULT GETUTCDATE(),
-    UpdatedAt datetime2 NULL,
-    CreatedByUserId int NULL,
-    UpdatedByUserId int NULL
-);
-CREATE UNIQUE INDEX IX_Taxes_Name ON Taxes(Name);
-CREATE UNIQUE INDEX IX_Taxes_IsDefault ON Taxes(IsDefault) WHERE IsDefault = 1;
-ALTER TABLE Taxes ADD CONSTRAINT CHK_Taxes_Rate_Range CHECK (Rate >= 0 AND Rate <= 100);
-```
+> See `docs/database-schema.md` Module 2.5 for the TaxConfiguration (Fluent API) and canonical SQL CREATE TABLE definition.
 
 #### 9.3 Seed Data
 
 **File**: `Infrastructure/Data/DbSeeder.cs`
 
-```csharp
-// ═══════════════════════════════════════════
-// Seed Taxes
-// ═══════════════════════════════════════════
-if (!await db.Set<Tax>().AnyAsync())
-{
-    var taxes = new List<Tax>
-    {
-        Tax.Create("بدون ضريبة", 0m, isDefault: true),
-        Tax.Create("ضريبة القيمة المضافة 5%", 5m),
-        Tax.Create("ضريبة القيمة المضافة 15%", 15m),
-    };
-    db.Set<Tax>().AddRange(taxes);
-    logger?.LogInformation("Seeded {Count} tax records.", taxes.Count);
-}
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
 
 #### 9.4 Application Layer
 
 **File**: `Application/Interfaces/Services/ITaxService.cs`
 
-```csharp
-public interface ITaxService
-{
-    Task<Result<List<TaxDto>>> GetAllAsync(CancellationToken ct = default);
-    Task<Result<TaxDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<TaxDto>> CreateAsync(CreateTaxRequest request, CancellationToken ct = default);
-    Task<Result<TaxDto>> UpdateAsync(int id, UpdateTaxRequest request, CancellationToken ct = default);
-    Task<Result> DeleteAsync(int id, CancellationToken ct = default);  // Soft delete (IsActive = false)
-    Task<Result> DeletePermanentlyAsync(int id, CancellationToken ct = default);  // With DbUpdateException catch
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **File**: `Application/Services/TaxService.cs`
 
@@ -1109,15 +724,12 @@ public interface ITaxService
 #### 9.5 Contracts Layer
 
 **File**: `Contracts/DTOs/AllDtos.cs`
-```csharp
-public record TaxDto(int Id, string Name, decimal Rate, bool IsDefault, bool IsActive);
-```
+
+> See `docs/AGENTS.md` for DTO patterns and `SalesSystem.Contracts/` for canonical DTO definitions.
 
 **File**: `Contracts/Requests/TaxRequests.cs`
-```csharp
-public record CreateTaxRequest(string Name, decimal Rate, bool IsDefault = false);
-public record UpdateTaxRequest(string Name, decimal Rate, bool IsDefault);
-```
+
+> See `docs/AGENTS.md` for DTO patterns and `SalesSystem.Contracts/` for canonical DTO definitions.
 
 #### 9.6 API Layer
 
@@ -1386,127 +998,11 @@ public record UpdateTaxRequest(string Name, decimal Rate, bool IsDefault);
 
 #### Tax Entity (`TaxTests.cs`)
 
-```csharp
-[Fact]
-public void Create_ValidInput_CreatesTaxCorrectly()
-{
-    var tax = Tax.Create("ضريبة القيمة المضافة", 15m, TaxType.Percentage);
-    Assert.Equal("ضريبة القيمة المضافة", tax.Name);
-    Assert.Equal(15m, tax.Rate);
-    Assert.True(tax.IsActive);
-}
-
-[Fact]
-public void Create_EmptyName_ThrowsDomainException()
-{
-    var ex = Assert.Throws<DomainException>(() =>
-        Tax.Create("", 15m, TaxType.Percentage));
-    Assert.Contains("مطلوب", ex.Message);
-}
-
-[Fact]
-public void Create_NegativeRate_ThrowsDomainException()
-{
-    var ex = Assert.Throws<DomainException>(() =>
-        Tax.Create("VAT", -5m, TaxType.Percentage));
-    Assert.Contains("أكبر من", ex.Message);
-}
-
-[Fact]
-public void Create_RateExceeds100_ThrowsDomainException()
-{
-    var ex = Assert.Throws<DomainException>(() =>
-        Tax.Create("VAT", 150m, TaxType.Percentage));
-    Assert.Contains("100%", ex.Message);
-}
-
-[Fact]
-public void Update_ValidInput_UpdatesCorrectly()
-{
-    var tax = Tax.Create("ضريبة", 15m, TaxType.Percentage);
-    tax.Update("ضريبة القيمة المضافة", 15m);
-    Assert.Equal("ضريبة القيمة المضافة", tax.Name);
-}
-
-[Fact]
-public void MarkAsDeleted_SetsIsActiveFalse()
-{
-    var tax = Tax.Create("ضريبة", 15m, TaxType.Percentage);
-    tax.MarkAsDeleted();
-    Assert.False(tax.IsActive);
-}
-
-[Fact]
-public void SetDefault_MakesTaxDefault()
-{
-    var tax = Tax.Create("ضريبة", 15m, TaxType.Percentage);
-    tax.SetDefault();
-    Assert.True(tax.IsDefault);
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 #### SystemSetting Entity (`SystemSettingTests.cs`)
 
-```csharp
-[Fact]
-public void Create_ValidKeyValue_CreatesSetting()
-{
-    var setting = SystemSetting.Create("CostingMethod", "1", "Settings");
-    Assert.Equal("CostingMethod", setting.Key);
-    Assert.Equal("1", setting.Value);
-    Assert.Equal("Settings", setting.Category);
-}
-
-[Fact]
-public void Create_EmptyKey_ThrowsDomainException()
-{
-    var ex = Assert.Throws<DomainException>(() =>
-        SystemSetting.Create("", "1", "Settings"));
-    Assert.Contains("مطلوب", ex.Message);
-}
-
-[Fact]
-public void Create_EmptyCategory_ThrowsDomainException()
-{
-    var ex = Assert.Throws<DomainException>(() =>
-        SystemSetting.Create("Key", "1", ""));
-    Assert.Contains("مطلوب", ex.Message);
-}
-
-[Fact]
-public void UpdateValue_ChangesValue()
-{
-    var setting = SystemSetting.Create("CostingMethod", "1", "Settings");
-    setting.UpdateValue("2");
-    Assert.Equal("2", setting.Value);
-}
-
-[Fact]
-public void GetBoolAsync_ValidBool_ReturnsSuccess()
-{
-    var setting = SystemSetting.Create("IsTaxEnabled", "true", "Settings");
-    var result = setting.GetBoolValue();
-    Assert.True(result.IsSuccess);
-    Assert.True(result.Value);
-}
-
-[Fact]
-public void GetIntAsync_ValidInt_ReturnsSuccess()
-{
-    var setting = SystemSetting.Create("BackupRetentionDays", "30", "Settings");
-    var result = setting.GetIntValue();
-    Assert.True(result.IsSuccess);
-    Assert.Equal(30, result.Value);
-}
-
-[Fact]
-public void GetIntAsync_InvalidInt_ReturnsFailure()
-{
-    var setting = SystemSetting.Create("BackupRetentionDays", "not-a-number", "Settings");
-    var result = setting.GetIntValue();
-    Assert.False(result.IsSuccess);
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 ---
 
@@ -1514,393 +1010,33 @@ public void GetIntAsync_InvalidInt_ReturnsFailure()
 
 #### TaxServiceTests.cs
 
-```csharp
-public class TaxServiceTests
-{
-    private readonly Mock<IUnitOfWork> _uowMock;
-    private readonly Mock<ITaxRepository> _repoMock;
-    private readonly TaxService _service;
-
-    public TaxServiceTests()
-    {
-        _uowMock = new Mock<IUnitOfWork>();
-        _repoMock = new Mock<ITaxRepository>();
-        _uowMock.Setup(x => x.Taxes).Returns(_repoMock.Object);
-        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-        _service = new TaxService(_uowMock.Object, Mock.Of<ILogger<TaxService>>());
-    }
-
-    [Fact]
-    public async Task CreateAsync_ValidRequest_ReturnsSuccess()
-    {
-        var result = await _service.CreateAsync(
-            new CreateTaxRequest { Name = "VAT", Rate = 15m, Type = TaxType.Percentage },
-            CancellationToken.None);
-        Assert.True(result.IsSuccess);
-        _repoMock.Verify(x => x.AddAsync(It.IsAny<Tax>(), It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task CreateAsync_InvalidRequest_ReturnsFailure()
-    {
-        var result = await _service.CreateAsync(
-            new CreateTaxRequest { Name = "", Rate = -5m, Type = TaxType.Percentage },
-            CancellationToken.None);
-        Assert.False(result.IsSuccess);
-    }
-
-    [Fact]
-    public async Task GetByIdAsync_ExistingTax_ReturnsDto()
-    {
-        var tax = Tax.Create("VAT", 15m, TaxType.Percentage);
-        _repoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(tax);
-        var result = await _service.GetByIdAsync(1, CancellationToken.None);
-        Assert.True(result.IsSuccess);
-        Assert.Equal("VAT", result.Value.Name);
-    }
-
-    [Fact]
-    public async Task GetByIdAsync_NotFound_ReturnsFailure()
-    {
-        _repoMock.Setup(x => x.GetByIdAsync(99, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Tax?)null);
-        var result = await _service.GetByIdAsync(99, CancellationToken.None);
-        Assert.False(result.IsSuccess);
-        Assert.Equal(ErrorCodes.NotFound, result.Error);
-    }
-
-    [Fact]
-    public async Task DeleteAsync_Permanent_TaxReferenced_ReturnsFailure()
-    {
-        _repoMock.Setup(x => x.IsReferencedByInvoices(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
-        var result = await _service.DeletePermanentlyAsync(1, CancellationToken.None);
-        Assert.False(result.IsSuccess);
-    }
-
-    [Fact]
-    public async Task SetDefault_UnsetsPreviousDefault()
-    {
-        var oldDefault = Tax.Create("Old", 5m, TaxType.Percentage);
-        oldDefault.SetDefault();
-        var newDefault = Tax.Create("VAT", 15m, TaxType.Percentage);
-        _repoMock.Setup(x => x.GetDefaultAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(oldDefault);
-        _repoMock.Setup(x => x.GetByIdAsync(2, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(newDefault);
-        var result = await _service.SetDefaultAsync(2, CancellationToken.None);
-        Assert.True(result.IsSuccess);
-        Assert.True(newDefault.IsDefault);
-        Assert.False(oldDefault.IsDefault);
-    }
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 #### SystemSettingsServiceTests.cs
 
-```csharp
-[Fact]
-public async Task GetSettingAsync_ExistingKey_ReturnsValue()
-{
-    var setting = SystemSetting.Create("CostingMethod", "1", "Settings");
-    _repoMock.Setup(x => x.GetByKeyAsync("CostingMethod", It.IsAny<CancellationToken>()))
-        .ReturnsAsync(setting);
-    var result = await _service.GetSettingAsync("CostingMethod", CancellationToken.None);
-    Assert.True(result.IsSuccess);
-    Assert.Equal("1", result.Value);
-}
-
-[Fact]
-public async Task GetSettingAsync_NonExistentKey_ReturnsFailure()
-{
-    _repoMock.Setup(x => x.GetByKeyAsync("NonExistent", It.IsAny<CancellationToken>()))
-        .ReturnsAsync((SystemSetting?)null);
-    var result = await _service.GetSettingAsync("NonExistent", CancellationToken.None);
-    Assert.False(result.IsSuccess);
-}
-
-[Fact]
-public async Task SetSettingAsync_CreateNew_SavesCorrectly()
-{
-    _repoMock.Setup(x => x.GetByKeyAsync("NewKey", It.IsAny<CancellationToken>()))
-        .ReturnsAsync((SystemSetting?)null);
-    var result = await _service.SetSettingAsync("NewKey", "value", "Category", CancellationToken.None);
-    Assert.True(result.IsSuccess);
-    _repoMock.Verify(x => x.AddAsync(It.IsAny<SystemSetting>(), It.IsAny<CancellationToken>()), Times.Once);
-}
-
-[Fact]
-public async Task SetSettingAsync_UpdateExisting_ModifiesValue()
-{
-    var setting = SystemSetting.Create("ExistingKey", "old", "Category");
-    _repoMock.Setup(x => x.GetByKeyAsync("ExistingKey", It.IsAny<CancellationToken>()))
-        .ReturnsAsync(setting);
-    var result = await _service.SetSettingAsync("ExistingKey", "new", "Category", CancellationToken.None);
-    Assert.True(result.IsSuccess);
-    Assert.Equal("new", setting.Value);
-}
-
-[Fact]
-public async Task GetAllByCategoryAsync_ReturnsFilteredResults()
-{
-    var settings = new List<SystemSetting>
-    {
-        SystemSetting.Create("Key1", "val1", "Print"),
-        SystemSetting.Create("Key2", "val2", "Print")
-    };
-    _repoMock.Setup(x => x.GetAllByCategoryAsync("Print", It.IsAny<CancellationToken>()))
-        .ReturnsAsync(settings);
-    var result = await _service.GetAllByCategoryAsync("Print", CancellationToken.None);
-    Assert.True(result.IsSuccess);
-    Assert.Equal(2, result.Value.Count());
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 #### StoreSettingsServiceTests.cs
 
-```csharp
-[Fact]
-public async Task GetAsync_ExistingStore_ReturnsDto()
-{
-    var store = CreateStoreSettings();
-    _repoMock.Setup(x => x.GetFirstAsync(It.IsAny<CancellationToken>()))
-        .ReturnsAsync(store);
-    var result = await _service.GetAsync(CancellationToken.None);
-    Assert.True(result.IsSuccess);
-    Assert.NotNull(result.Value);
-}
-
-[Fact]
-public async Task UpdateAsync_ValidRequest_UpdatesAndSaves()
-{
-    var store = CreateStoreSettings();
-    _repoMock.Setup(x => x.GetFirstAsync(It.IsAny<CancellationToken>()))
-        .ReturnsAsync(store);
-    var request = new UpdateStoreSettingsRequest { StoreName = "متجري الجديد", Address = "عنوان جديد" };
-    var result = await _service.UpdateAsync(request, CancellationToken.None);
-    Assert.True(result.IsSuccess);
-    Assert.Equal("متجري الجديد", store.StoreName);
-    _uowMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 ---
 
 ### 3. FluentValidation Tests
 
-```csharp
-public class CreateTaxRequestValidatorTests
-{
-    private readonly CreateTaxRequestValidator _validator = new();
-
-    [Fact]
-    public void ValidRequest_Passes()
-    {
-        var request = new CreateTaxRequest { Name = "VAT", Rate = 15m, Type = TaxType.Percentage };
-        var result = _validator.Validate(request);
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
-    public void EmptyName_Fails()
-    {
-        var result = _validator.Validate(new CreateTaxRequest { Name = "", Rate = 15m, Type = TaxType.Percentage });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Name");
-    }
-
-    [Fact]
-    public void RateExceeds100_Fails()
-    {
-        var result = _validator.Validate(new CreateTaxRequest { Name = "VAT", Rate = 150m, Type = TaxType.Percentage });
-        Assert.False(result.IsValid);
-    }
-
-    [Fact]
-    public void RateZero_Fails()
-    {
-        var result = _validator.Validate(new CreateTaxRequest { Name = "VAT", Rate = 0m, Type = TaxType.Percentage });
-        Assert.False(result.IsValid);
-    }
-}
-
-public class UpdateSettingsRequestValidatorTests
-{
-    private readonly UpdateSettingsRequestValidator _validator = new();
-
-    [Fact]
-    public void ValidRequest_Passes()
-    {
-        var request = new UpdateSettingsRequest { CostingMethod = 1, StoreName = "متجر" };
-        var result = _validator.Validate(request);
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
-    public void InvalidCostingMethod_Fails()
-    {
-        var request = new UpdateSettingsRequest { CostingMethod = 99, StoreName = "متجر" };
-        var result = _validator.Validate(request);
-        Assert.False(result.IsValid);
-    }
-
-    [Fact]
-    public void EmptyStoreName_Fails()
-    {
-        var request = new UpdateSettingsRequest { CostingMethod = 1, StoreName = "" };
-        var result = _validator.Validate(request);
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "StoreName");
-    }
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 ---
 
 ### 4. API Controller Tests (Integration)
 
-```csharp
-public class SettingsControllerTests : IClassFixture<WebApplicationFactory<Program>>
-{
-    private readonly HttpClient _client;
-
-    [Fact]
-    public async Task GetSettings_Returns200()
-    {
-        var response = await _client.GetAsync("/api/v1/settings");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetCostingMethod_ReturnsValue()
-    {
-        var response = await _client.GetAsync("/api/v1/settings/costing-method");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("value", content);
-    }
-
-    [Fact]
-    public async Task UpdateCostingMethod_ValidValue_Returns200()
-    {
-        var request = new { costingMethod = 2 };
-        var json = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-        var response = await _client.PutAsync("/api/v1/settings/costing-method", json);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task UpdateCostingMethod_InvalidValue_Returns400()
-    {
-        var request = new { costingMethod = 99 };
-        var json = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-        var response = await _client.PutAsync("/api/v1/settings/costing-method", json);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task TaxesController_Create_Returns201()
-    {
-        var request = new { name = "VAT", rate = 15m, type = 1 };
-        var json = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync("/api/v1/taxes", json);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task TaxesController_GetAll_Returns200()
-    {
-        var response = await _client.GetAsync("/api/v1/taxes");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task TaxesController_Delete_Returns204()
-    {
-        var response = await _client.DeleteAsync("/api/v1/taxes/1");
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Unauthorized_Returns401()
-    {
-        _client.DefaultRequestHeaders.Authorization = null;
-        var response = await _client.GetAsync("/api/v1/settings");
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Forbidden_Returns403()
-    {
-        // Cashier role cannot access settings
-        var response = await _client.GetAsync("/api/v1/settings");
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 ---
 
 ### 5. Database Configuration Tests
 
-```csharp
-public class TaxConfigurationTests
-{
-    [Fact]
-    public void TaxConfiguration_RatePrecision_18_2()
-    {
-        var builder = new ModelBuilder();
-        builder.ApplyConfiguration(new TaxConfiguration());
-        var entity = builder.Entity<Tax>();
-        var rateProp = entity.Metadata.FindProperty(nameof(Tax.Rate));
-        Assert.Equal("decimal(18,2)", rateProp.GetColumnType());
-    }
-
-    [Fact]
-    public void TaxConfiguration_NameRequired()
-    {
-        var builder = new ModelBuilder();
-        builder.ApplyConfiguration(new TaxConfiguration());
-        var entity = builder.Entity<Tax>();
-        var nameProp = entity.Metadata.FindProperty(nameof(Tax.Name));
-        Assert.False(nameProp.IsNullable);
-        Assert.Equal(100, nameProp.GetMaxLength());
-    }
-
-    [Fact]
-    public void TaxConfiguration_ForeignKeysUseRestrict()
-    {
-        var builder = new ModelBuilder();
-        builder.ApplyConfiguration(new TaxConfiguration());
-        var entity = builder.Entity<Tax>();
-        var foreignKeys = entity.Metadata.GetForeignKeys();
-        foreach (var fk in foreignKeys)
-            Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior);
-    }
-
-    [Fact]
-    public void SystemSettingConfiguration_KeyRequired()
-    {
-        var builder = new ModelBuilder();
-        builder.ApplyConfiguration(new SystemSettingConfiguration());
-        var entity = builder.Entity<SystemSetting>();
-        var keyProp = entity.Metadata.FindProperty(nameof(SystemSetting.Key));
-        Assert.False(keyProp.IsNullable);
-    }
-
-    [Fact]
-    public void SystemSettingConfiguration_CategoryRequired()
-    {
-        var builder = new ModelBuilder();
-        builder.ApplyConfiguration(new SystemSettingConfiguration());
-        var entity = builder.Entity<SystemSetting>();
-        var catProp = entity.Metadata.FindProperty(nameof(SystemSetting.Category));
-        Assert.False(catProp.IsNullable);
-    }
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 ---
 
@@ -1908,115 +1044,23 @@ public class TaxConfigurationTests
 
 #### Seed Data: 8 Entities Created Correctly
 
-```csharp
-[Fact]
-public async Task Seed_AllRequiredEntities_ExistAfterSeed()
-{
-    var warehouse = await _warehouseRepo.GetByIdAsync(1, CancellationToken.None);
-    Assert.NotNull(warehouse);
-    Assert.Equal("المستودع الرئيسي", warehouse.Name);
-
-    var cashBox = await _cashBoxRepo.GetByIdAsync(1, CancellationToken.None);
-    Assert.NotNull(cashBox);
-
-    var units = await _unitRepo.GetAllAsync(CancellationToken.None);
-    Assert.NotEmpty(units);
-
-    var categories = await _categoryRepo.GetAllAsync(CancellationToken.None);
-    Assert.NotEmpty(categories);
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 #### SystemSetting CRUD — 22 Key-Value Pairs
 
-```csharp
-[Fact]
-public async Task Seed_All22SystemSettings_ExistAfterSeed()
-{
-    var expectedKeys = new[]
-    {
-        "CostingMethod", "IsTaxEnabled", "DefaultTaxRate", /* ... etc 22 keys */
-    };
-    var all = await _service.GetAllAsync(CancellationToken.None);
-    foreach (var key in expectedKeys)
-    {
-        var result = await _service.GetSettingAsync(key, CancellationToken.None);
-        Assert.True(result.IsSuccess, $"Missing setting: {key}");
-    }
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 #### CostingMethod RadioButton Binding
 
-```csharp
-[Fact]
-public void SettingsViewModel_CostingMethodRadioButton_BindsToEnum()
-{
-    var vm = new SettingsViewModel(Mock.Of<ISettingsService>(), Mock.Of<IDialogService>());
-    vm.CostingMethod = 1;
-    Assert.True(vm.IsWeightedAverageSelected);
-    Assert.False(vm.IsLastPriceSelected);
-    Assert.False(vm.IsSupplierPriceSelected);
-    
-    vm.CostingMethod = 2;
-    Assert.False(vm.IsWeightedAverageSelected);
-    Assert.True(vm.IsLastPriceSelected);
-    Assert.False(vm.IsSupplierPriceSelected);
-
-    vm.CostingMethod = 3;
-    Assert.False(vm.IsWeightedAverageSelected);
-    Assert.False(vm.IsLastPriceSelected);
-    Assert.True(vm.IsSupplierPriceSelected);
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 #### Settings ViewModel: Save Validates Required Fields
 
-```csharp
-[Fact]
-public async Task SettingsViewModel_Save_ValidatesRequiredFields()
-{
-    var vm = new SettingsViewModel(Mock.Of<ISettingsService>(), Mock.Of<IDialogService>());
-    vm.StoreName = "";
-    vm.Address = "";
-    await vm.SaveCommand.ExecuteAsync(null);
-    // Dialog service should have been called with warning
-    Mock.Get(vm.DialogService).Verify(x => x.ShowWarningAsync(It.IsAny<string>(), It.IsAny<string>()), Times.AtLeastOnce);
-}
-
-[Fact]
-public async Task SettingsViewModel_Save_ValidInput_CallsService()
-{
-    var serviceMock = new Mock<ISettingsService>();
-    serviceMock.Setup(x => x.UpdateAsync(It.IsAny<UpdateSettingsRequest>(), It.IsAny<CancellationToken>()))
-        .ReturnsAsync(Result<StoreSettingsDto>.Success(new StoreSettingsDto()));
-    var vm = new SettingsViewModel(serviceMock.Object, Mock.Of<IDialogService>());
-    vm.StoreName = "متجري";
-    vm.Address = "عنوان";
-    await vm.SaveCommand.ExecuteAsync(null);
-    serviceMock.Verify(x => x.UpdateAsync(It.IsAny<UpdateSettingsRequest>(), It.IsAny<CancellationToken>()), Times.Once);
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 #### SettingsController: Get/Update CostingMethod
 
-```csharp
-[Fact]
-public async Task SettingsController_GetCostingMethod_ReturnsCurrentValue()
-{
-    var response = await _client.GetAsync("/api/v1/settings/costing-method");
-    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-}
-
-[Fact]
-public async Task SettingsController_UpdateCostingMethod_ValidatesEnum()
-{
-    var request = new { costingMethod = 0 }; // Invalid — no enum value 0
-    var json = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-    var response = await _client.PutAsync("/api/v1/settings/costing-method", json);
-    Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-}
-```
+> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
 
 ---
 
@@ -2040,14 +1084,8 @@ Section 4.2 updated with rows:
 #### Seed Data (Already Applied in Task 5)
 
 Added to DbSeeder SystemSettings block:
-```csharp
-SystemSetting.Create("HideTaxInSales", "false", "bool", "Sales",
-    "إخفاء الضريبة في المبيعات", "إخفاء أعمدة وحقول الضريبة في شاشات البيع"),
-SystemSetting.Create("ShowExpiryInInvoices", "false", "bool", "Sales",
-    "إظهار تاريخ الانتهاء", "عرض عمود تاريخ الانتهاء في فواتير البيع"),
-SystemSetting.Create("HideTaxInPurchases", "false", "bool", "Purchases",
-    "إخفاء الضريبة في المشتريات", "إخفاء أعمدة وحقول الضريبة في شاشات الشراء"),
-```
+
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
 
 #### DTO + ViewModel Wiring
 
@@ -2087,12 +1125,8 @@ Section 4.3 updated with rows:
 #### Seed Data (Already Applied in Task 5)
 
 Added to DbSeeder:
-```csharp
-SystemSetting.Create("ShowLogo", "true", "bool", "Print",
-    "إظهار الشعار", "طباعة شعار المتجر على الفواتير"),
-SystemSetting.Create("FooterNote", "", "string", "Print",
-    "ملاحظة أسفل الفاتورة", "نص يظهر في أسفل جميع الفواتير المطبوعة"),
-```
+
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
 
 #### DTO + Service Wiring (Updated Task 11)
 
@@ -2139,16 +1173,9 @@ PrintSettingsDto now includes:
 #### Seed Data (Already Applied in Task 5)
 
 Added to DbSeeder SystemSettings block:
-```csharp
-SystemSetting.Create("LowStockAlert", "true", "bool", "Notifications",
-    "تنبيه المخزون المنخفض", "تنبيه عند انخفاض المخزون عن الحد الأدنى"),
-SystemSetting.Create("ExpiryAlert", "true", "bool", "Notifications",
-    "تنبيه انتهاء الصلاحية", "تنبيه عند قرب انتهاء صلاحية الأصناف"),
-SystemSetting.Create("ExpiryAlertDays", "30", "int", "Notifications",
-    "أيام تنبيه الصلاحية", "عدد الأيام للتنبيه قبل انتهاء الصلاحية"),
-SystemSetting.Create("CreditLimitAlert", "true", "bool", "Notifications",
-    "تنبيه الحد الائتماني", "تنبيه عند تجاوز السقف الائتماني"),
-```
+
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
+
 
 #### Service Wiring
 

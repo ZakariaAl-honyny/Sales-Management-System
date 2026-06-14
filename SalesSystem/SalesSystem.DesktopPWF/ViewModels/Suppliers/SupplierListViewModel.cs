@@ -316,7 +316,6 @@ public class SupplierListViewModel : ViewModelBase
                 Email: SelectedSupplier.Email,
                 Address: SelectedSupplier.Address,
                 TaxNumber: SelectedSupplier.TaxNumber,
-                CreditLimit: SelectedSupplier.CreditLimit,
                 IsActive: true
             );
 

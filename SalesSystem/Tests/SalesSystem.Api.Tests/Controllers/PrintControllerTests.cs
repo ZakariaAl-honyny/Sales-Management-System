@@ -7,7 +7,7 @@ using SalesSystem.Api.Controllers;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Contracts.Common;
-using SalesSystem.Domain.Entities;
+using SalesSystem.Contracts.DTOs;
 
 namespace SalesSystem.Api.Tests.Controllers;
 
@@ -262,10 +262,14 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
+            .ReturnsAsync(Result<StoreSettingsDto>.Failure("No store settings"));
         _printDataServiceMock
-            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
+            .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PrintSettingsDto>.Success(new PrintSettingsDto(
+                ThermalPrinterName: "", A4PrinterName: "", LogoPath: "",
+                StoreTaxNumber: "", TaxRate: 15, AutoPrintOnPost: false,
+                ReceiptHeader: "", ReceiptFooter: "", EscPosCodePage: 0,
+                PaperSize: "", PrintCopies: 1, ShowBalanceOnPrint: false, PrintSignature: false)));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Success());
@@ -280,10 +284,14 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
+            .ReturnsAsync(Result<StoreSettingsDto>.Failure("No store settings"));
         _printDataServiceMock
-            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
+            .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PrintSettingsDto>.Success(new PrintSettingsDto(
+                ThermalPrinterName: "", A4PrinterName: "", LogoPath: "",
+                StoreTaxNumber: "", TaxRate: 15, AutoPrintOnPost: false,
+                ReceiptHeader: "", ReceiptFooter: "", EscPosCodePage: 0,
+                PaperSize: "", PrintCopies: 1, ShowBalanceOnPrint: false, PrintSignature: false)));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("A4 error"));
@@ -301,10 +309,14 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StoreSettings>.Failure("No store settings"));
+            .ReturnsAsync(Result<StoreSettingsDto>.Failure("No store settings"));
         _printDataServiceMock
-            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
+            .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PrintSettingsDto>.Success(new PrintSettingsDto(
+                ThermalPrinterName: "", A4PrinterName: "", LogoPath: "",
+                StoreTaxNumber: "", TaxRate: 15, AutoPrintOnPost: false,
+                ReceiptHeader: "", ReceiptFooter: "", EscPosCodePage: 0,
+                PaperSize: "", PrintCopies: 1, ShowBalanceOnPrint: false, PrintSignature: false)));
         _printServiceMock
             .Setup(x => x.PrintA4Async(It.IsAny<InvoicePrintDto>()))
             .ReturnsAsync(PrintResult.Failure("A4 error"));
@@ -322,13 +334,20 @@ public class PrintControllerTests
     [Fact]
     public async Task LoadStoreInfoAsync_WhenStoreSettingsExist_UsesStoreSettings()
     {
-        var settings = StoreSettings.Create("متجر الاختبار", phone: "0111111111", address: "الرياض");
+        var settings = new StoreSettingsDto(Id: 0, StoreName: "متجر الاختبار", Phone: "0111111111",
+            Address: "الرياض", LogoPath: null, Email: null, CurrencyCode: "YER",
+            DefaultTaxRate: 0, IsTaxEnabled: false, TaxNumber: null,
+            EnableStockAlerts: false, AllowNegativeStock: false, AutoUpdatePrices: false, InvoicePrefix: "INV");
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StoreSettings>.Success(settings));
+            .ReturnsAsync(Result<StoreSettingsDto>.Success(settings));
         _printDataServiceMock
-            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
+            .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PrintSettingsDto>.Success(new PrintSettingsDto(
+                ThermalPrinterName: "", A4PrinterName: "", LogoPath: "",
+                StoreTaxNumber: "", TaxRate: 15, AutoPrintOnPost: false,
+                ReceiptHeader: "", ReceiptFooter: "", EscPosCodePage: 0,
+                PaperSize: "", PrintCopies: 1, ShowBalanceOnPrint: false, PrintSignature: false)));
 
         InvoicePrintDto? captured = null;
         _printServiceMock
@@ -349,10 +368,14 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StoreSettings>.Failure("No settings"));
+            .ReturnsAsync(Result<StoreSettingsDto>.Failure("No settings"));
         _printDataServiceMock
-            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
+            .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PrintSettingsDto>.Success(new PrintSettingsDto(
+                ThermalPrinterName: "", A4PrinterName: "", LogoPath: "",
+                StoreTaxNumber: "", TaxRate: 15, AutoPrintOnPost: false,
+                ReceiptHeader: "", ReceiptFooter: "", EscPosCodePage: 0,
+                PaperSize: "", PrintCopies: 1, ShowBalanceOnPrint: false, PrintSignature: false)));
 
         InvoicePrintDto? captured = null;
         _printServiceMock
@@ -376,18 +399,22 @@ public class PrintControllerTests
         {
             await File.WriteAllBytesAsync(tempFile, [0x89, 0x50, 0x4E, 0x47]);
 
-            var sysSettings = new List<SystemSetting>
-            {
-                SystemSetting.Create("LogoPath", tempFile,
-                    dataType: "string", category: "Print", displayName: "شعار المتجر")
-            };
+            var printSettings = new PrintSettingsDto(
+                ThermalPrinterName: "", A4PrinterName: "", LogoPath: tempFile,
+                StoreTaxNumber: "", TaxRate: 15, AutoPrintOnPost: false,
+                ReceiptHeader: "", ReceiptFooter: "", EscPosCodePage: 0,
+                PaperSize: "", PrintCopies: 1, ShowBalanceOnPrint: false, PrintSignature: false);
 
             _printDataServiceMock
                 .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
+                .ReturnsAsync(Result<StoreSettingsDto>.Success(new StoreSettingsDto(
+                    Id: 0, StoreName: "متجري", Phone: null, Address: null,
+                    LogoPath: null, Email: null, CurrencyCode: "YER",
+                    DefaultTaxRate: 0, IsTaxEnabled: false, TaxNumber: null,
+                    EnableStockAlerts: false, AllowNegativeStock: false, AutoUpdatePrices: false, InvoicePrefix: "INV")));
             _printDataServiceMock
-                .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(Result<List<SystemSetting>>.Success(sysSettings));
+                .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result<PrintSettingsDto>.Success(printSettings));
 
             InvoicePrintDto? captured = null;
             _printServiceMock
@@ -413,10 +440,18 @@ public class PrintControllerTests
     {
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
+            .ReturnsAsync(Result<StoreSettingsDto>.Success(new StoreSettingsDto(
+                Id: 0, StoreName: "متجري", Phone: null, Address: null,
+                LogoPath: null, Email: null, CurrencyCode: "YER",
+                DefaultTaxRate: 0, IsTaxEnabled: false, TaxNumber: null,
+                EnableStockAlerts: false, AllowNegativeStock: false, AutoUpdatePrices: false, InvoicePrefix: "INV")));
         _printDataServiceMock
-            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SystemSetting>>.Success(new List<SystemSetting>()));
+            .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PrintSettingsDto>.Success(new PrintSettingsDto(
+                ThermalPrinterName: "", A4PrinterName: "", LogoPath: "",
+                StoreTaxNumber: "", TaxRate: 15, AutoPrintOnPost: false,
+                ReceiptHeader: "", ReceiptFooter: "", EscPosCodePage: 0,
+                PaperSize: "", PrintCopies: 1, ShowBalanceOnPrint: false, PrintSignature: false)));
 
         InvoicePrintDto? captured = null;
         _printServiceMock
@@ -433,18 +468,22 @@ public class PrintControllerTests
     [Fact]
     public async Task LoadStoreInfoAsync_WhenCustomTaxRateSet_UsesCustomRate()
     {
-        var sysSettings = new List<SystemSetting>
-        {
-            SystemSetting.Create("TaxRate", "10",
-                dataType: "decimal", category: "Print", displayName: "نسبة الضريبة")
-        };
+        var printSettings = new PrintSettingsDto(
+            ThermalPrinterName: "", A4PrinterName: "", LogoPath: "",
+            StoreTaxNumber: "", TaxRate: 10, AutoPrintOnPost: false,
+            ReceiptHeader: "", ReceiptFooter: "", EscPosCodePage: 0,
+            PaperSize: "", PrintCopies: 1, ShowBalanceOnPrint: false, PrintSignature: false);
 
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<StoreSettings>.Success(StoreSettings.Create("متجري")));
+            .ReturnsAsync(Result<StoreSettingsDto>.Success(new StoreSettingsDto(
+                Id: 0, StoreName: "متجري", Phone: null, Address: null,
+                LogoPath: null, Email: null, CurrencyCode: "YER",
+                DefaultTaxRate: 0, IsTaxEnabled: false, TaxNumber: null,
+                EnableStockAlerts: false, AllowNegativeStock: false, AutoUpdatePrices: false, InvoicePrefix: "INV")));
         _printDataServiceMock
-            .Setup(x => x.GetPrintSystemSettingsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<SystemSetting>>.Success(sysSettings));
+            .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<PrintSettingsDto>.Success(printSettings));
 
         InvoicePrintDto? captured = null;
         _printServiceMock

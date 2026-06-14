@@ -1,0 +1,118 @@
+using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
+
+namespace SalesSystem.Domain.Entities;
+
+/// <summary>
+/// Represents a receipt collected from a customer against one or more sales invoices.
+/// The receipt can be posted (confirmed) or cancelled, and its amount can be
+/// allocated across multiple invoices via CustomerReceiptApplication records.
+/// </summary>
+public class CustomerReceipt : DocumentEntity
+{
+    public int ReceiptNo { get; private set; }
+    public DateTime ReceiptDate { get; private set; }
+    public int CustomerId { get; private set; }
+    public int CashBoxId { get; private set; }
+    public short CurrencyId { get; private set; }
+    public decimal Amount { get; private set; }
+    public string? Notes { get; private set; }
+    public InvoiceStatus Status { get; private set; }
+
+    // Navigation properties
+    public virtual Customer? Customer { get; private set; }
+    public virtual CashBox? CashBox { get; private set; }
+    public virtual Currency? Currency { get; private set; }
+
+    /// <summary>
+    /// Allocations of this receipt across multiple sales invoices.
+    /// </summary>
+    private readonly List<CustomerReceiptApplication> _applications = new();
+    public IReadOnlyCollection<CustomerReceiptApplication> Applications => _applications.AsReadOnly();
+
+    private CustomerReceipt() { } // EF Core
+
+    /// <summary>
+    /// Creates a new customer receipt in Draft status.
+    /// </summary>
+    public static CustomerReceipt Create(
+        int receiptNo,
+        DateTime receiptDate,
+        int customerId,
+        int cashBoxId,
+        short currencyId,
+        decimal amount,
+        string? notes = null,
+        int? createdByUserId = null)
+    {
+        if (receiptNo <= 0)
+            throw new DomainException("رقم السند يجب أن يكون أكبر من الصفر.");
+        if (customerId <= 0)
+            throw new DomainException("العميل مطلوب.");
+        if (cashBoxId <= 0)
+            throw new DomainException("الصندوق مطلوب.");
+        if (currencyId <= 0)
+            throw new DomainException("العملة مطلوبة.");
+        if (amount <= 0)
+            throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
+
+        var receipt = new CustomerReceipt
+        {
+            ReceiptNo = receiptNo,
+            ReceiptDate = receiptDate.Kind == DateTimeKind.Utc
+                ? receiptDate
+                : receiptDate.ToUniversalTime(),
+            CustomerId = customerId,
+            CashBoxId = cashBoxId,
+            CurrencyId = currencyId,
+            Amount = amount,
+            Notes = notes,
+            Status = InvoiceStatus.Draft
+        };
+        receipt.SetCreatedBy(createdByUserId);
+        return receipt;
+    }
+
+    /// <summary>
+    /// Posts the receipt — confirms the collection and records the timestamp.
+    /// Only drafts can be posted.
+    /// </summary>
+    public void Post(DateTime? postedAt = null)
+    {
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("فقط السندات المسودة يمكن ترحيلها.");
+
+        Status = InvoiceStatus.Posted;
+        PostedAt = postedAt ?? DateTime.UtcNow;
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Cancels the receipt. Only drafts and posted (un-cancelled) receipts can be cancelled.
+    /// Once cancelled, the receipt cannot be modified or re-posted.
+    /// </summary>
+    public void Cancel()
+    {
+        if (Status == InvoiceStatus.Cancelled)
+            throw new DomainException("السند ملغي بالفعل.");
+
+        Status = InvoiceStatus.Cancelled;
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Adds an application of this receipt amount to a specific sales invoice.
+    /// Only allowed while the receipt is in Draft status.
+    /// </summary>
+    public void AddApplication(CustomerReceiptApplication application)
+    {
+        if (application == null)
+            throw new DomainException("التخصيص مطلوب.");
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("لا يمكن إضافة تخصيصات لسند غير مسود.");
+
+        _applications.Add(application);
+        UpdateTimestamp();
+    }
+}

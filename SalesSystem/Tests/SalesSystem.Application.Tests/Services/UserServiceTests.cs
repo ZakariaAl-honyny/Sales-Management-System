@@ -46,7 +46,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingUser_ReturnsDto");
 
-        var user = User.CreateWithPassword("testuser", "hash123", "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", "hash123", "Test User");
 
         _mockUow.Setup(u => u.Users.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
@@ -96,7 +96,7 @@ public class UserServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        var request = new CreateUserRequest("newuser", "New User", (byte)UserRole.Admin);
+        var request = new CreateUserRequest("newuser", "New User", (byte)1);
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -117,14 +117,14 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] CreateAsync_DuplicateUsername_ReturnsFailure");
 
-        var existingUser = User.CreateWithPassword("existinguser", "hash123", "Existing User", UserRole.Admin);
+        var existingUser = User.CreateWithPassword("existinguser", "hash123", "Existing User");
 
         _mockUow.Setup(u => u.Users.AnyIgnoreFiltersAsync(
                 It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var request = new CreateUserRequest("existinguser", "New User", (byte)UserRole.Admin); // Duplicate (case-insensitive)
+        var request = new CreateUserRequest("existinguser", "New User", (byte)1); // Duplicate (case-insensitive)
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -139,14 +139,14 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] CreateAsync_CaseInsensitiveDuplicate_ReturnsFailure");
 
-        var existingUser = User.CreateWithPassword("TestUser", "hash123", "Test User", UserRole.Admin);
+        var existingUser = User.CreateWithPassword("TestUser", "hash123", "Test User");
 
         _mockUow.Setup(u => u.Users.AnyIgnoreFiltersAsync(
                 It.IsAny<System.Linq.Expressions.Expression<System.Func<User, bool>>>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var request = new CreateUserRequest("TESTUSER", "Another User", (byte)UserRole.Admin); // Same name different case
+        var request = new CreateUserRequest("TESTUSER", "Another User", (byte)1); // Same name different case
 
         var result = await _sut.CreateAsync(request, CancellationToken.None);
 
@@ -165,7 +165,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesUser");
 
-        var user = User.CreateWithPassword("testuser", "hash123", "Original Name", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", "hash123", "Original Name");
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync(user);
@@ -173,7 +173,7 @@ public class UserServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        var request = new UpdateUserRequest("Updated Name", (byte)UserRole.Manager, (byte)UserStatus.Active, null);
+        var request = new UpdateUserRequest("Updated Name", (byte)2, (byte)UserStatus.Active, null);
 
         var result = await _sut.UpdateAsync(1, request, CancellationToken.None);
 
@@ -188,7 +188,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] UpdateAsync_WithPasswordChange_UpdatesHashedPassword");
 
-        var user = User.CreateWithPassword("testuser", "oldhash", "Test User", UserRole.Admin);
+        var user = User.CreateWithPassword("testuser", "oldhash", "Test User");
 
         _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync(user);
@@ -196,7 +196,7 @@ public class UserServiceTests
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        var request = new UpdateUserRequest("Test User", (byte)UserRole.Admin, (byte)UserStatus.Active, "newpassword123");
+        var request = new UpdateUserRequest("Test User", (byte)1, (byte)UserStatus.Active, "newpassword123");
 
         var result = await _sut.UpdateAsync(1, request, CancellationToken.None);
 
@@ -215,7 +215,7 @@ public class UserServiceTests
         _mockUow.Setup(u => u.Users.FirstOrDefaultIgnoreFiltersAsync(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<CancellationToken>(), It.IsAny<string[]>()))
             .ReturnsAsync((User?)null);
 
-        var request = new UpdateUserRequest("Updated", (byte)UserRole.Admin, (byte)UserStatus.Active, null);
+        var request = new UpdateUserRequest("Updated", (byte)1, (byte)UserStatus.Active, null);
 
         var result = await _sut.UpdateAsync(999, request, CancellationToken.None);
 
@@ -234,7 +234,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] DeleteAsync_ExistingUser_SoftDeletes");
 
-        var user = User.CreateWithPassword("testuser", "hash123", "Test User", UserRole.Manager);
+        var user = User.CreateWithPassword("testuser", "hash123", "Test User");
         user.Restore();
 
         _mockUow.Setup(u => u.Users.GetByIdAsync(1, It.IsAny<CancellationToken>()))
@@ -258,7 +258,7 @@ public class UserServiceTests
     {
         _output.WriteLine("[TEST] DeleteAsync_LastActiveAdmin_ReturnsFailure");
 
-        var admin = User.CreateWithPassword("admin", "hash123", "Admin User", UserRole.Admin);
+        var admin = User.CreateWithPassword("admin", "hash123", "Admin User");
         admin.Restore();
 
         var users = new List<User> { admin };
@@ -306,9 +306,9 @@ public class UserServiceTests
 
         var users = new List<User>
         {
-            User.CreateWithPassword("user1", "hash1", "User One", UserRole.Admin),
-            User.CreateWithPassword("user2", "hash2", "User Two", UserRole.Manager),
-            User.CreateWithPassword("user3", "hash3", "User Three", UserRole.Cashier)
+            User.CreateWithPassword("user1", "hash1", "User One"),
+            User.CreateWithPassword("user2", "hash2", "User Two"),
+            User.CreateWithPassword("user3", "hash3", "User Three")
         };
 
         _mockUow.Setup(u => u.Users.ToListAsync(It.IsAny<CancellationToken>(), It.IsAny<string[]>()))

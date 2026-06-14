@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Infrastructure.Data;
 using SalesSystem.Infrastructure.Repositories;
 
@@ -25,7 +26,8 @@ public class GenericRepositoryTests
         var repository = new GenericRepository<Product>(context);
 
         var product = Product.Create(
-            name: "Test Product"
+            name: "Test Product",
+            categoryId: 1
         );
 
         // Act
@@ -45,7 +47,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb2");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "Product to Find");
+        var product = Product.Create(name: "Product to Find", categoryId: 1);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
@@ -64,9 +66,9 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb3");
         var repository = new GenericRepository<Product>(context);
 
-        var product1 = Product.Create(name: "Product 1");
-        var product2 = Product.Create(name: "Product 2");
-        var product3 = Product.Create(name: "Product 3");
+        var product1 = Product.Create(name: "Product 1", categoryId: 1);
+        var product2 = Product.Create(name: "Product 2", categoryId: 1);
+        var product3 = Product.Create(name: "Product 3", categoryId: 1);
 
         await repository.AddAsync(product1);
         await repository.AddAsync(product2);
@@ -87,19 +89,17 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb4");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "Original Name", minStockLevel: 10m);
+        var product = Product.Create(name: "Original Name", categoryId: 1, reorderLevel: 10m);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
         // Act - use the Update method with all required parameters
         product.Update(
             name: "Updated Name",
-            categoryId: null,
-            minStockLevel: 20m,
-            reorderLevel: 0,
-            hasExpiry: false,
-            barcode: null,
+            categoryId: 1,
             description: null,
+            reorderLevel: 20m,
+            trackExpiry: false,
             updatedByUserId: 1
         );
         await repository.UpdateAsync(product);
@@ -118,7 +118,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb5");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "To Delete");
+        var product = Product.Create(name: "To Delete", categoryId: 1);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
@@ -138,9 +138,9 @@ public class GenericRepositoryTests
         await using var context = CreateContext("ProductDb6");
         var repository = new GenericRepository<Product>(context);
 
-        var product1 = Product.Create(name: "Alpha");
-        var product2 = Product.Create(name: "Beta");
-        var product3 = Product.Create(name: "Gamma");
+        var product1 = Product.Create(name: "Alpha", categoryId: 1);
+        var product2 = Product.Create(name: "Beta", categoryId: 1);
+        var product3 = Product.Create(name: "Gamma", categoryId: 1);
 
         await repository.AddAsync(product1);
         await repository.AddAsync(product2);
@@ -167,7 +167,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb1");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse = Warehouse.Create(name: "Main Warehouse");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", code: "WH-MAIN");
 
         // Act
         await repository.AddAsync(warehouse);
@@ -185,7 +185,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb2");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse = Warehouse.Create(name: "Test Warehouse");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse", code: "WH-TEST");
         await repository.AddAsync(warehouse);
         await context.SaveChangesAsync();
 
@@ -204,8 +204,8 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb3");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse1 = Warehouse.Create(name: "Warehouse 1");
-        var warehouse2 = Warehouse.Create(name: "Warehouse 2");
+        var warehouse1 = Warehouse.Create(branchId: 1, name: "Warehouse 1", code: "WH-01");
+        var warehouse2 = Warehouse.Create(branchId: 1, name: "Warehouse 2", code: "WH-02");
 
         await repository.AddAsync(warehouse1);
         await repository.AddAsync(warehouse2);
@@ -225,13 +225,13 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb4");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse = Warehouse.Create(name: "Original Name", location: "Old Location");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Original Name", code: "WH-ORIG", location: "Old Location");
         warehouse.SetCreatedBy(1);
         await repository.AddAsync(warehouse);
         await context.SaveChangesAsync();
 
         // Act
-        warehouse.Update(name: "Updated Warehouse", type: Domain.Enums.WarehouseType.Main, location: "New Location", isDefault: false, updatedByUserId: 1);
+        warehouse.Update(branchId: 1, name: "Updated Warehouse", code: "WH-ORIG", type: Domain.Enums.WarehouseType.Main, location: "New Location", updatedByUserId: 1);
         await repository.UpdateAsync(warehouse);
         await context.SaveChangesAsync();
 
@@ -248,7 +248,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb5");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse = Warehouse.Create(name: "To Delete");
+        var warehouse = Warehouse.Create(branchId: 1, name: "To Delete", code: "WH-DEL");
         await repository.AddAsync(warehouse);
         await context.SaveChangesAsync();
 
@@ -272,20 +272,22 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb1");
         var repository = new GenericRepository<Supplier>(context);
 
-        var supplier = Supplier.Create(
-            name: "Test Supplier",
-            phone: "0123456789",
-            openingBalance: 500m
-        );
+        var party = Party.Create("Test Supplier", PartyType.Supplier, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+
+        var supplier = Supplier.Create(partyId: party.Id);
 
         // Act
         await repository.AddAsync(supplier);
         await context.SaveChangesAsync();
 
         // Assert
-        var saved = await context.Suppliers.FirstOrDefaultAsync(s => s.Name == "Test Supplier");
+        var saved = await context.Suppliers
+            .Include(s => s.Party)
+            .FirstOrDefaultAsync(s => s.Party.Name == "Test Supplier");
         saved.Should().NotBeNull();
-        saved!.CurrentBalance.Should().Be(500m);
+        /* CurrentBalance removed — balance lives on linked Account */
     }
 
     [Fact]
@@ -295,7 +297,11 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb2");
         var repository = new GenericRepository<Supplier>(context);
 
-        var supplier = Supplier.Create(name: "Supplier to Find");
+        var party = Party.Create("Supplier to Find", PartyType.Supplier, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+
+        var supplier = Supplier.Create(partyId: party.Id);
         await repository.AddAsync(supplier);
         await context.SaveChangesAsync();
 
@@ -304,7 +310,7 @@ public class GenericRepositoryTests
 
         // Assert
         result.Should().NotBeNull();
-        result!.Name.Should().Be("Supplier to Find");
+        result!.Party.Name.Should().Be("Supplier to Find");
     }
 
     [Fact]
@@ -314,64 +320,28 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb3");
         var repository = new GenericRepository<Supplier>(context);
 
-        var supplier = Supplier.Create(name: "Test Supplier", openingBalance: 1000m);
+        var party = Party.Create("Test Supplier", PartyType.Supplier, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+
+        var supplier = Supplier.Create(partyId: party.Id);
         await repository.AddAsync(supplier);
         await context.SaveChangesAsync();
 
         // Act
-        supplier.IncreaseBalance(500m);
+        /* IncreaseBalance removed — balance lives on linked Account */
         await repository.UpdateAsync(supplier);
         await context.SaveChangesAsync();
 
         // Assert
         var updated = await context.Suppliers.FirstOrDefaultAsync(s => s.Id == supplier.Id);
-        updated!.CurrentBalance.Should().Be(1500m);
+        updated.Should().NotBeNull();
+        /* CurrentBalance removed — balance lives on linked Account */
     }
 
     #endregion
 
-    #region Category Repository Tests
 
-    [Fact]
-    public async Task AddAsync_Category_AddsToDatabase()
-    {
-        // Arrange
-        await using var context = CreateContext("CategoryDb1");
-        var repository = new GenericRepository<Category>(context);
-
-        var category = Category.Create(name: "Electronics");
-
-        // Act
-        await repository.AddAsync(category);
-        await context.SaveChangesAsync();
-
-        // Assert
-        var saved = await context.Categories.FirstOrDefaultAsync(c => c.Name == "Electronics");
-        saved.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task GetAllAsync_MultipleCategories_ReturnsAll()
-    {
-        // Arrange
-        await using var context = CreateContext("CategoryDb2");
-        var repository = new GenericRepository<Category>(context);
-
-        var category1 = Category.Create(name: "Category 1");
-        var category2 = Category.Create(name: "Category 2");
-
-        await repository.AddAsync(category1);
-        await repository.AddAsync(category2);
-        await context.SaveChangesAsync();
-
-        // Act
-        var result = await repository.GetAllAsync();
-
-        // Assert
-        result.Should().HaveCount(2);
-    }
-
-    #endregion
 
     #region Edge Cases and Error Handling
 
@@ -396,7 +366,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("EdgeDb2");
         var repository = new GenericRepository<Product>(context);
 
-        var product = Product.Create(name: "Original", minStockLevel: 5m);
+        var product = Product.Create(name: "Original", categoryId: 1, reorderLevel: 5m);
         await repository.AddAsync(product);
         await context.SaveChangesAsync();
 
@@ -406,12 +376,10 @@ public class GenericRepositoryTests
         // Act - now update using the Update method
         product.Update(
             name: "Updated",
-            categoryId: null,
-            minStockLevel: 10m,
-            reorderLevel: 0,
-            hasExpiry: false,
-            barcode: null,
+            categoryId: 1,
             description: null,
+            reorderLevel: 10m,
+            trackExpiry: false,
             updatedByUserId: 1
         );
         await repository.UpdateAsync(product);

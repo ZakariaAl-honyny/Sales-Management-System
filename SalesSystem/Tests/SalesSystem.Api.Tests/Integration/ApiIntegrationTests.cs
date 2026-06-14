@@ -86,25 +86,6 @@ public class ApiIntegrationTests : IAsyncLifetime
 
     #endregion
 
-    #region Categories Tests
-
-    [Fact(Skip = SkipReason)]
-    public async Task Categories_GetAll_ReturnsCategories()
-    {
-        var response = await _httpClient.GetAsync("/api/v1/categories");
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Unauthorized);
-    }
-
-    [Fact(Skip = SkipReason)]
-    public async Task Categories_Create_ReturnsCreated()
-    {
-        var request = new CreateCategoryRequest("Test Category", "Test Description");
-        var response = await _httpClient.PostAsJsonAsync("/api/v1/categories", request);
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
-    }
-
-    #endregion
-
     #region Products Tests
 
     [Fact(Skip = SkipReason)]
@@ -121,7 +102,7 @@ public class ApiIntegrationTests : IAsyncLifetime
             Barcode: "TEST123",
             Name: "Test Product",
             CategoryId: 1,
-            MinStock: 10,
+            ReorderLevel: 10,
             Description: "Test Description"
         );
         var response = await _httpClient.PostAsJsonAsync("/api/v1/products", request);
@@ -148,7 +129,6 @@ public class ApiIntegrationTests : IAsyncLifetime
             Email: "test@test.com",
             Address: "Test Address",
             TaxNumber: null,
-            OpeningBalance: 0,
             CreditLimit: 1000
         );
         var response = await _httpClient.PostAsJsonAsync("/api/v1/customers", request);

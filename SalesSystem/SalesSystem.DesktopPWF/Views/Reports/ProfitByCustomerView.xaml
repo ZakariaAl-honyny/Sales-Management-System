@@ -1,0 +1,160 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Reports.ProfitByCustomerView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
+      mc:Ignorable="d"
+      d:DesignHeight="700" d:DesignWidth="1000"
+     
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Style="{StaticResource PageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="👤 الربح حسب العميل"
+                   Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="ProfitByCustomerPageTitle"/>
+
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="العميل:" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox Width="180"
+                              ItemsSource="{Binding Customers}"
+                              SelectedValue="{Binding SelectedCustomerId}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="Name"
+                              ToolTip="تصفية حسب العميل"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="من:" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <DatePicker Width="120" SelectedDate="{Binding FromDate}" ToolTip="تاريخ البداية"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="إلى:" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <DatePicker Width="120" SelectedDate="{Binding ToDate}" ToolTip="تاريخ النهاية"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            ToolTip="تصدير بيانات التقرير إلى ملف Excel">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تصدير Excel" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding LoadCommand}" Style="{StaticResource PrimaryButton}"
+                            ToolTip="تحديث بيانات التقرير">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تحديث" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <Border Background="{StaticResource ErrorLightBrush}"
+                        Padding="10,6" Margin="0,0,0,0" VerticalAlignment="Top"
+                        Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <Button Grid.Column="2" Command="{Binding LoadCommand}" Style="{StaticResource SecondaryButton}" Height="28" Padding="12,0" FontSize="11"
+                                ToolTip="إعادة المحاولة">
+                            <TextBlock Text="إعادة المحاولة"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <DataGrid ItemsSource="{Binding ReportData}"
+                          AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
+                    <DataGrid.Style>
+                        <Style TargetType="DataGrid" BasedOn="{StaticResource ModernDataGrid}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Style>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="العميل" Binding="{Binding CustomerName}" Width="2*"
+                                            ToolTipService.ToolTip="اسم العميل"/>
+                        <DataGridTextColumn Header="إجمالي المبيعات" Binding="{Binding TotalSales, StringFormat={}{0:N2}}" Width="120"
+                                            ToolTipService.ToolTip="إجمالي قيمة مبيعات العميل"/>
+                        <DataGridTextColumn Header="إجمالي التكلفة" Binding="{Binding TotalCost, StringFormat={}{0:N2}}" Width="120"
+                                            ToolTipService.ToolTip="إجمالي تكلفة البضاعة"/>
+                        <DataGridTextColumn Header="صافي الربح" Binding="{Binding GrossProfit, StringFormat={}{0:N2}}" Width="120"
+                                            ToolTipService.ToolTip="صافي الربح من مبيعات العميل">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                    <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="نسبة الربح" Binding="{Binding ProfitMargin, StringFormat={}{0:P1}}" Width="100"
+                                            ToolTipService.ToolTip="نسبة الربح من المبيعات"/>
+                        <DataGridTextColumn Header="عدد الفواتير" Binding="{Binding InvoiceCount}" Width="100"
+                                            ToolTipService.ToolTip="عدد فواتير العميل"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,0">
+                        <TextBlock Text="👤" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
+                        <TextBlock Text="لا توجد بيانات" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="اختر الفترة الزمنية ثم اضغط على 'تحديث'"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border Background="#CCFFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="240" Height="6" Background="#E2E8F0" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="جاري تحميل البيانات..." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="3" Style="{StaticResource FooterBarStyle}" Padding="12,8"
+                Visibility="{Binding HasData, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="📊 الملخص:" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding SummaryText}" FontSize="13" VerticalAlignment="Center"
+                           ToolTip="ملخص التقرير — إجمالي المبيعات والربح"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

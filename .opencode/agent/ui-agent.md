@@ -1039,30 +1039,42 @@ NavigateToChartOfAccountsCommand = new AsyncRelayCommand(async () =>
 
 ### Phase 23 â€” Customers Module
 
-#### Desktop UI Changes
+#### Desktop UI Changes (65-table schema: Parties-based, No CustomerGroup)
 
 **CustomerEditorViewModel:**
-- New dependency: IAccountApiService
-- New properties: CustomerType (byte?), AvailableGroups, SelectedGroup, AvailableAccounts, SelectedAccount
-- Loads AvailableGroups from API on init via GetAllGroupsAsync()
-- Loads AvailableAccounts from AccountApiService
-- CustomerType dropdown with Cash/Credit options
-- CustomerGroup dropdown bound to AvailableGroups
-- Account lookup bound to AvailableAccounts
+- REMOVED: CustomerGroupId, CustomerType, OpeningBalance, AccountId selector
+- NEW: Party-based editing — Name, Phone, Email, Address, TaxNumber edit Party fields
+- AccountName display-only label (auto-created by service)
+- CategoryId dropdown (optional) — ModernComboBox style
+- CreditLimit numeric field (0 = no limit)
+
+**CustomerEditorViewModel Properties:**
+```csharp
+public string Name { get; set; }              // Party.Name
+public string? Phone { get; set; }             // Party.Phone
+public string? Email { get; set; }             // Party.Email
+public string? Address { get; set; }           // Party.Address
+public string? TaxNumber { get; set; }         // Party.TaxNumber
+public int? CategoryId { get; set; }           // CategoryId (optional)
+public decimal CreditLimit { get; set; }       // CreditLimit (decimal 18,2)
+public string? AccountName { get; set; }       // Display-only — auto-created by service
+// NO CustomerGroupId, NO CustomerType, NO OpeningBalance, NO AccountId selector
+```
 
 **CustomerListViewModel:**
-- Added AvailableGroups ObservableCollection
-- Added SelectedGroupFilter for group filtering
-- Loads groups on init, applies group filter in FilterCustomers
+- REMOVED: AvailableGroups, SelectedGroupFilter, group filtering
+- Search by: Name, Phone, or Id
+- Sort by Id descending (newest first)
 
-**CustomerGroup Management:**
-- CustomerGroupDto: Id, Name, Description, IsActive
-- Future: CustomerGroupManagementView (dedicated CRUD screen)
+**Supplier List/Editor — same pattern:**
+- No SupplierType, no OpeningBalance, no AccountId selector
+- Account auto-created under parent "2100 — حسابات الموردين"
+- Party fields editable inline
 
 #### Rules
 - Editor opens non-modally via IScreenWindowService (RULE-161)
 - Editor VM calls SetDialogService() in constructor (RULE-227)
-- Save buttons always enabled â€” validate on click (RULE-229)
+- Save buttons always enabled — validate on click (RULE-229)
 - Lists sorted newest-first (RULE-220)
 - Compact XAML styles (RULE-262-274)
 
@@ -1072,8 +1084,77 @@ NavigateToChartOfAccountsCommand = new AsyncRelayCommand(async () =>
 - ❌ NEVER hardcode `Height="36"` or `Height="40"` on Button/TextBox/ComboBox — let Styles.xaml handle sizing via compact global styles (RULE-262).
 - ❌ NEVER use `Width="120"` on dialog buttons — use `MinWidth="80"` or `MinWidth="100"` (RULE-272).
 - ❌ NEVER use `FontSize="20"` or larger for dialog titles — use `FontSize="16"` (RULE-266).
-- ❌ NEVER make CustomerType a required field on customer creation — it's informational only. The Cash/Credit decision belongs on the Sales Invoice (`PaymentType`), not on the Customer.
 
+```
+
+### Products Module UI (65-table schema — per-unit pricing, no Retail/Wholesale on Product)
+
+**ProductEditorViewModel — No price/cost/barcode on Product entity:**
+```csharp
+public string Name { get; set; }
+public int CategoryId { get; set; }
+public string? Description { get; set; }
+public bool TrackExpiry { get; set; }
+public int? DefaultPurchaseUnitId { get; set; }  // Pre-select in purchase screens
+public int? DefaultSalesUnitId { get; set; }     // Pre-select in sales screens
+// NO PurchasePrice, SalePrice, WholesalePrice, RetailPrice, Barcode, AvgCost
+```
+
+**Sub-forms managed by the editor:**
+- **Units tab**: Add/remove ProductUnits with Unit dropdown, Factor, IsBaseUnit flag
+  ```xml
+  <ComboBox ItemsSource="{Binding AvailableUnits}" DisplayMemberPath="Name"
+            SelectedValue="{Binding NewUnitId}" SelectedValuePath="Id"
+            Style="{StaticResource ModernComboBox}"/>
+  ```
+- **Prices tab**: ProductPrices per unit × currency (DataGrid with Price, Currency, EffectiveFrom/To)
+- **Barcodes tab**: UnitBarcode per unit (DataGrid: Unit selector + Barcode text)
+- **Batches tab (read-only)**: InventoryBatches per warehouse (DataGrid: BatchNo, ExpiryDate, QtyRemaining, UnitCost)
+- **Opening Stock tab**: On first creation — Warehouse selector, Quantity, UnitCost, ExpiryDate
+
+**Product List ViewModel — Search by Name or Barcode search:**
+```csharp
+// Search across Product.Name and UnitBarcode values
+query = query.Where(p => p.Name.Contains(search) ||
+    p.Units.Any(u => u.Barcodes.Any(b => b.Barcode.Contains(search))));
+```
+
+### Warehouse Transfer UI (replaces StockTransfer)
+
+```xml
+<!-- Source/Destination warehouse selectors -->
+<ComboBox ItemsSource="{Binding Warehouses}" DisplayMemberPath="Name"
+          SelectedItem="{Binding SelectedSourceWarehouse}" .../>
+<ComboBox ItemsSource="{Binding Warehouses}" DisplayMemberPath="Name"
+          SelectedItem="{Binding SelectedDestinationWarehouse}" .../>
+
+<!-- Multi-item DataGrid: ProductUnit selector, Quantity, BatchNo -->
+<DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False">
+    <DataGrid.Columns>
+        <DataGridTemplateColumn Header="المنتج">
+            <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                    <ComboBox ItemsSource="{Binding AvailableProducts}"
+                              DisplayMemberPath="ProductName" .../>
+                </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+        </DataGridTemplateColumn>
+        <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, StringFormat=N3}"/>
+        <DataGridTextColumn Header="رقم الدفعة" Binding="{Binding BatchNo}"/>
+    </DataGrid.Columns>
+</DataGrid>
+```
+
+### Currency Display Pattern
+
+```csharp
+// In ViewModel:
+public string CurrencyDisplay => $"{CurrencyCode} — {CurrencyName}";
+public string FormattedAmount => Amount.ToString("N2") + " " + CurrencyCode;
+public string FormattedExchangeRate => ExchangeRate.ToString("N6");  // N6 not N2
+
+// Exchange rate numeric input:
+<TextBox Text="{Binding ExchangeRate, StringFormat=N6}" Style="{StaticResource ModernTextBox}"/>
 ```
 
 ## Phase Awareness — Phases 23–31 Feature Scope
@@ -1081,13 +1162,13 @@ NavigateToChartOfAccountsCommand = new AsyncRelayCommand(async () =>
 ### Phase Table
 | Phase | Focus | Key Files |
 |-------|-------|-----------|
-| 23 | Customers Module (CRUD, groups, credit limits) | Desktop/CustomersListView.xaml, Desktop/CustomerEditorView.xaml |
+| 23 | Customers Module (Parties-based, no CustomerGroup/SupplierType, Account auto-create) | Desktop/CustomersListView.xaml, Desktop/CustomerEditorView.xaml, Desktop/PartiesLookup.xaml |
 | 24 | Accounting Integration (auto journal entries) | — (backend-only, no new UI screens) |
-| 25 | Products Module v2 (ProductPrices, multi-currency pricing) | Desktop/ProductsListView.xaml, Desktop/ProductEditorView.xaml |
-| 26 | Warehouses Module (type, manager, stock adjustments) | Desktop/WarehousesListView.xaml, Desktop/WarehouseEditorView.xaml |
-| 27 | Purchases Module v2 (PO, landed cost) | Desktop/PurchaseOrdersListView.xaml, Desktop/PurchaseOrderEditorView.xaml |
+| 25 | Products Module v2 (ProductPrices per unit×currency, Units independent table, InventoryBatches) | Desktop/ProductsListView.xaml, Desktop/ProductEditorView.xaml |
+| 26 | Warehouses Module (type, manager, WarehouseTransfer, InventoryTransaction) | Desktop/WarehousesListView.xaml, Desktop/WarehouseEditorView.xaml |
+| 27 | Purchases Module v2 (PO, landed cost via AdditionalCharges) | Desktop/PurchaseOrdersListView.xaml, Desktop/PurchaseOrderEditorView.xaml |
 | 28 | Sales Module v2 (quotes, POS, credit check) | Desktop/SalesQuotationsListView.xaml, Desktop/SalesPOSView.xaml |
-| 29 | Receipts & Payments (cheques, allocation) | Desktop/ChequesListView.xaml, Desktop/PaymentAllocationView.xaml |
+| 29 | Receipts & Payments (cheques, allocation, CashBox.AccountId) | Desktop/ChequesListView.xaml, Desktop/PaymentAllocationView.xaml |
 | 30 | Journal Entries (manual entries, fiscal year) | Desktop/JournalEntriesListView.xaml, Desktop/FiscalYearView.xaml |
 | 31 | Reports (financial, inventory, sales, Excel export) | Desktop/ReportsView.xaml, Desktop/ReportViewer.xaml |
 
@@ -1177,3 +1258,7 @@ if (SelectedSourceCashBox.CurrentBalance < Amount) // ❌ removed
 10. Add `SetDialogService()` in Editor ViewModel constructors
 11. Add Arabic ToolTips to ALL interactive controls missing them
 12. Add `*` to required field labels + helper text for unique fields
+13. Remove `CustomerGroup` dropdown from Customer Editor (deferred to V2)
+14. Remove `CustomerType`/`SupplierType` radio from Customer/Supplier Editor
+15. Remove `OpeningBalance` field from Customer/Supplier/CashBox editors (balance on Account)
+16. Remove `CurrencyId` field from Customer/Supplier editors (per-transaction, not per-entity)

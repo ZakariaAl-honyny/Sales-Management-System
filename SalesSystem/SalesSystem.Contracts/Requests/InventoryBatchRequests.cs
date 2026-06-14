@@ -1,10 +1,15 @@
 namespace SalesSystem.Contracts.Requests;
 
+/// <summary>
+/// Request to create a new inventory batch.
+/// WarehouseId is smallint (short).
+/// </summary>
 public record CreateInventoryBatchRequest(
     int ProductId,
-    int WarehouseId,
+    short WarehouseId,
     decimal Quantity,
     decimal UnitCost,
     string BatchNo,
-    DateTime? ManufactureDate = null,
-    DateTime? ExpiryDate = null);
+    int? PurchaseInvoiceId = null,
+    DateTime? ExpiryDate = null,
+    DateTime? ManufactureDate = null);

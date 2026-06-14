@@ -6,10 +6,9 @@ namespace SalesSystem.Infrastructure.Data;
 
 public class SalesDbContext : DbContext
 {
-    // DbSets
+    // Core DbSets
     public DbSet<User> Users => Set<User>();
     public DbSet<Unit> Units => Set<Unit>();
-    public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<WarehouseStock> WarehouseStocks => Set<WarehouseStock>();
@@ -23,49 +22,60 @@ public class SalesDbContext : DbContext
     public DbSet<SalesReturnItem> SalesReturnItems => Set<SalesReturnItem>();
     public DbSet<PurchaseReturn> PurchaseReturns => Set<PurchaseReturn>();
     public DbSet<PurchaseReturnItem> PurchaseReturnItems => Set<PurchaseReturnItem>();
-    public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
-    public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
-    public DbSet<CustomerPayment> CustomerPayments => Set<CustomerPayment>();
     public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
-    public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
-    public DbSet<StoreSettings> StoreSettings => Set<StoreSettings>();
+    public DbSet<CurrencyRate> CurrencyRates => Set<CurrencyRate>();
     public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
-    public DbSet<ProductBarcode> ProductBarcodes => Set<ProductBarcode>();
     public DbSet<ProductUnit> ProductUnits => Set<ProductUnit>();
     public DbSet<CashBox> CashBoxes => Set<CashBox>();
-    public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
-    public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<ProductPrice> ProductPrices => Set<ProductPrice>();
-    public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
-    public DbSet<StockWriteOff> StockWriteOffs => Set<StockWriteOff>();
     public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
-    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
-    public DbSet<SystemAccountMappings> SystemAccountMappings => Set<SystemAccountMappings>();
+    public DbSet<SystemAccountMapping> SystemAccountMappings => Set<SystemAccountMapping>();
     public DbSet<Tax> Taxes => Set<Tax>();
     public DbSet<Currency> Currencies => Set<Currency>();
-    public DbSet<ExchangeRateHistory> ExchangeRateHistories => Set<ExchangeRateHistory>();
-    public DbSet<FiscalYearClosure> FiscalYearClosures => Set<FiscalYearClosure>();
     public DbSet<FiscalYear> FiscalYears => Set<FiscalYear>();
     public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<UserBranch> UserBranches => Set<UserBranch>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
-    public DbSet<InventoryOperation> InventoryOperations => Set<InventoryOperation>();
-    public DbSet<InventoryOperationItem> InventoryOperationItems => Set<InventoryOperationItem>();
-    public DbSet<BillOfMaterials> BillOfMaterials => Set<BillOfMaterials>();
-    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
-    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
-    public DbSet<AdditionalFee> AdditionalFees => Set<AdditionalFee>();
-    public DbSet<AdditionalFeeAllocation> AdditionalFeeAllocations => Set<AdditionalFeeAllocation>();
-    public DbSet<SalesQuotation> SalesQuotations => Set<SalesQuotation>();
-    public DbSet<SalesQuotationItem> SalesQuotationItems => Set<SalesQuotationItem>();
-    public DbSet<Cheque> Cheques => Set<Cheque>();
-    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+
+
+    // v4.7+ New entities
+    public DbSet<ReceiptVoucher> ReceiptVouchers => Set<ReceiptVoucher>();
+    public DbSet<PaymentVoucher> PaymentVouchers => Set<PaymentVoucher>();
+    public DbSet<Party> Parties => Set<Party>();
+    public DbSet<Attachment> Attachments => Set<Attachment>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<Department> Departments => Set<Department>();
+    public DbSet<Bank> Banks => Set<Bank>();
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
+    public DbSet<InventoryCountLine> InventoryCountLines => Set<InventoryCountLine>();
+    public DbSet<InventoryAdjustment> InventoryAdjustments => Set<InventoryAdjustment>();
+    public DbSet<InventoryAdjustmentLine> InventoryAdjustmentLines => Set<InventoryAdjustmentLine>();
+    public DbSet<Expense> Expenses => Set<Expense>();
+    public DbSet<CustomerReceipt> CustomerReceipts => Set<CustomerReceipt>();
+    public DbSet<CustomerReceiptApplication> CustomerReceiptApplications => Set<CustomerReceiptApplication>();
+    public DbSet<SupplierPaymentApplication> SupplierPaymentApplications => Set<SupplierPaymentApplication>();
+    public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<CustomerContact> CustomerContacts => Set<CustomerContact>();
+    public DbSet<SupplierContact> SupplierContacts => Set<SupplierContact>();
+    public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
+    public DbSet<AccountCategory> AccountCategories => Set<AccountCategory>();
+
+    // === New Inventory Module (v4.10+) ===
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<InventoryTransactionLine> InventoryTransactionLines => Set<InventoryTransactionLine>();
+    public DbSet<WarehouseTransfer> WarehouseTransfers => Set<WarehouseTransfer>();
+    public DbSet<WarehouseTransferLine> WarehouseTransferLines => Set<WarehouseTransferLine>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 

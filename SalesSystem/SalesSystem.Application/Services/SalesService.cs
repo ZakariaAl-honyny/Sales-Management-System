@@ -1,13 +1,15 @@
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Printing;
 using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Application.Services;
@@ -21,6 +23,8 @@ public class SalesService : ISalesService
     private readonly IPrintService _printService;
     private readonly IAccountingIntegrationService _accountingService;
     private readonly IDocumentSequenceService _documentSequenceService;
+    private readonly ISystemSettingsRepository _systemSettingsRepo;
+    private readonly IProductCostService _productCostService;
     private readonly ILogger<SalesService> _logger;
 
     public SalesService(
@@ -31,6 +35,8 @@ public class SalesService : ISalesService
         IPrintService printService,
         IAccountingIntegrationService accountingService,
         IDocumentSequenceService documentSequenceService,
+        ISystemSettingsRepository systemSettingsRepo,
+        IProductCostService productCostService,
         ILogger<SalesService> logger)
     {
         _uow = uow;
@@ -40,6 +46,8 @@ public class SalesService : ISalesService
         _printService = printService;
         _accountingService = accountingService;
         _documentSequenceService = documentSequenceService;
+        _systemSettingsRepo = systemSettingsRepo;
+        _productCostService = productCostService;
         _logger = logger;
     }
 
@@ -79,13 +87,13 @@ public class SalesService : ISalesService
             (!to.HasValue || i.InvoiceDate <= to.Value) &&
             (searchLower == null ||
              (searchId.HasValue && i.Id == searchId.Value) ||
-             (i.Customer != null && i.Customer.Name.ToLower().Contains(searchLower)) ||
+             (i.Customer != null && i.Customer.Party.Name.ToLower().Contains(searchLower)) ||
              (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
              i.Items.Any(item =>
                  item.Product != null &&
                  item.Product.Name.ToLower().Contains(searchLower)));
 
-        var includes = new[] { "Customer", "Warehouse", "Items.Product" };
+        var includes = new[] { "Customer.Party", "Warehouse", "Items.Product" };
 
         var (items, total) = await _uow.SalesInvoices.GetPagedAsync(
             predicate, q => q.OrderByDescending(i => i.InvoiceDate), page, pageSize, ct, includeInactive, includes);
@@ -97,16 +105,6 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, int userId, CancellationToken ct)
     {
-        // Validate quotation reference if provided
-        if (request.QuotationId.HasValue)
-        {
-            var quotation = await _uow.SalesQuotations.GetByIdAsync(request.QuotationId.Value, ct);
-            if (quotation == null)
-                return Result<SalesInvoiceDto>.Failure("عرض السعر غير موجود");
-            if (quotation.Status != QuotationStatus.Confirmed)
-                return Result<SalesInvoiceDto>.Failure("يمكن الربط بعروض الأسعار المؤكدة فقط");
-        }
-
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
@@ -134,47 +132,29 @@ public class SalesService : ISalesService
             }
 
             var invoice = SalesInvoice.Create(
-                request.WarehouseId,
+                (short)request.WarehouseId,
                 invoiceNo,
                 request.CustomerId,
                 request.InvoiceDate,
                 request.DueDate,
-                (Domain.Enums.PaymentType)request.PaymentType,
+                (PaymentType)request.PaymentType,
                 request.DiscountAmount,
-                request.Notes,
+                otherCharges: request.OtherCharges,
+                notes: request.Notes,
                 cashBoxId: request.CashBoxId,
-                taxId: request.TaxId,
-                currencyId: request.CurrencyId,
+                taxId: (short?)request.TaxId,
+                currencyId: (short?)request.CurrencyId,
                 exchangeRate: request.ExchangeRate,
                 createdByUserId: userId
             );
-
-            // Set quotation reference if provided
-            if (request.QuotationId.HasValue)
-            {
-                invoice.SetQuotationReference(request.QuotationId.Value);
-            }
-
             foreach (var item in request.Items)
             {
-                // Phase 25: Use Product.Cost (calculated from InventoryBatches).
+                // Phase 25: Get cost from InventoryBatches via ProductCostService
                 decimal? costInBaseCurrency = null;
-                if (item.ProductUnitId.HasValue)
+                var costResult = await _productCostService.GetAverageCostAsync(item.ProductId, ct);
+                if (costResult.IsSuccess)
                 {
-                    var productUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
-                        pu => pu.Id == item.ProductUnitId.Value, ct, "Product");
-                    if (productUnit?.Product != null)
-                    {
-                        costInBaseCurrency = productUnit.Product.Cost;
-                    }
-                }
-                else
-                {
-                    var product = await _uow.Products.GetByIdAsync(item.ProductId, ct);
-                    if (product != null)
-                    {
-                        costInBaseCurrency = product.Cost;
-                    }
+                    costInBaseCurrency = costResult.Value;
                 }
 
                 var invoiceItem = SalesInvoiceItem.Create(
@@ -303,8 +283,7 @@ public class SalesService : ISalesService
             return Result<SalesInvoiceDto>.Failure("يمكن فقط ترحيل الفواتير المسودة");
         }
 
-        var settings = await _uow.StoreSettings.FirstOrDefaultAsync(s => true, ct);
-        bool allowNegativeStock = settings?.AllowNegativeStock ?? false;
+        var allowNegativeStock = await _systemSettingsRepo.GetBoolAsync("AllowNegativeStock", false, ct);
 
         // 1. Validate Stock BEFORE Transaction
         foreach (var item in invoice.Items)
@@ -332,12 +311,9 @@ public class SalesService : ISalesService
                         item.ProductId,
                         invoice.WarehouseId,
                         item.Quantity,
-                        MovementType.SaleOut,
-                        "SalesInvoice",
-                        invoice.Id,
-                        item.UnitPrice,
-                        userId,
-                        ct);
+                        unitCost: item.UnitPrice,
+                        userId: userId,
+                        ct: ct);
 
                     if (!stockResult.IsSuccess)
                     {
@@ -365,37 +341,42 @@ public class SalesService : ISalesService
                         return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
                     }
 
-                    // Credit limit enforcement — check if customer has a credit limit set
+                    // Credit limit enforcement — soft check only (balance tracked on linked Account via journal entries)
                     if (customer.CreditLimit > 0 && invoice.DueAmount > 0)
                     {
                         if (!customer.CheckCreditLimit(invoice.DueAmount))
                         {
                             await transaction.RollbackAsync(ct);
                             _logger.LogWarning(
-                                "Customer {CustomerId} credit limit exceeded. Balance: {Balance}, Limit: {Limit}, Due: {Due}",
-                                customer.Id, customer.CurrentBalance, customer.CreditLimit, invoice.DueAmount);
+                                "Customer {CustomerId} credit limit exceeded. Limit: {Limit}, Due: {Due}",
+                                customer.Id, customer.CreditLimit, invoice.DueAmount);
                             return Result<SalesInvoiceDto>.Failure("تجاوز الحد الائتماني للعميل");
                         }
                     }
 
-                    customer.IncreaseBalance(invoice.DueAmount);
+                    // Balance is tracked on the linked Account via journal entries (AccountingIntegrationService).
+                    // Direct In-memory balance tracking on Customer entity is removed — use Account balance instead.
                 }
 
-                // 5. Record cash transaction if payment is linked to a cash box
+                // 5. Record payment voucher (سند صرف) if payment is linked to a cash box
                 if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
                 {
+                    var paymentCurrencyId = await GetCurrencyIdAsync(invoice, ct);
+                    var paymentAccountId = await GetCashAccountIdAsync(ct);
                     var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
                         invoice.CashBoxId.Value,
+                        paymentCurrencyId,
                         invoice.PaidAmount,
-                        CashTransactionType.SalesIncome,
-                        "SalesInvoice",
-                        invoice.Id,
-                        userId,
-                        ct);
+                        paymentAccountId,
+                        notes: null,
+                        sourceDocumentId: invoice.Id,
+                        sourceDocumentType: "SalesInvoice",
+                        userId: userId,
+                        ct: ct);
 
                     if (!cashResult.IsSuccess)
                     {
-                        _logger.LogWarning("Cash transaction recording failed for invoice {Id}: {Error}",
+                        _logger.LogWarning("Payment voucher recording failed for invoice {Id}: {Error}",
                             invoice.Id, cashResult.Error);
                     }
                 }
@@ -403,12 +384,21 @@ public class SalesService : ISalesService
                 await _uow.SaveChangesAsync(ct);
 
                 // 6. Create journal entry for sales posting (revenue + COGS)
-                // Phase 25: Unit conversion methods and PurchaseCost removed.
-                // Use Product.Cost directly (quantity is in base units).
-                var totalCost = invoice.Items.Sum(item =>
+                // Phase 25: Get cost from InventoryBatches via ProductCostService.
+                var totalCost = 0m;
+                var distinctProductIds = invoice.Items
+                    .Select(item => item.ProductId)
+                    .Distinct()
+                    .ToList();
+                foreach (var productId in distinctProductIds)
                 {
-                    return item.Quantity * item.Product!.Cost;
-                });
+                    var costResult = await _productCostService.GetAverageCostAsync(productId, ct);
+                    var avgCost = costResult.IsSuccess ? costResult.Value : 0m;
+                    var productQty = invoice.Items
+                        .Where(item => item.ProductId == productId)
+                        .Sum(item => item.Quantity);
+                    totalCost += productQty * avgCost;
+                }
                 var entryResult = await _accountingService.CreateSalesPostEntryAsync(invoice, userId, totalCost, ct);
                 if (!entryResult.IsSuccess)
                 {
@@ -495,12 +485,9 @@ public class SalesService : ISalesService
                             item.ProductId,
                             invoice.WarehouseId,
                             item.Quantity,
-                            MovementType.SaleReturnIn,
-                            "SalesInvoiceCancel",
-                            invoice.Id,
-                            item.UnitPrice,
-                            userId,
-                            ct);
+                            unitCost: item.UnitPrice,
+                            userId: userId,
+                            ct: ct);
 
                         if (!stockResult.IsSuccess)
                         {
@@ -510,31 +497,25 @@ public class SalesService : ISalesService
                         }
                     }
 
-                    // Reverse Customer Balance
-                    if (invoice.DueAmount > 0 && invoice.CustomerId.HasValue)
-                    {
-                        var customer = await _uow.Customers.GetByIdAsync(invoice.CustomerId.Value, ct);
-                        if (customer != null)
-                        {
-                            customer.DecreaseBalance(invoice.DueAmount);
-                        }
-                    }
-
-                    // Create offsetting cash transaction if invoice had cash box
+                    // Create offsetting payment voucher if invoice had cash box
                     if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
                     {
+                        var reversalCurrencyId = await GetCurrencyIdAsync(invoice, ct);
+                        var reversalAccountId = await GetCashAccountIdAsync(ct);
                         var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
                             invoice.CashBoxId.Value,
+                            reversalCurrencyId,
                             invoice.PaidAmount,
-                            CashTransactionType.RefundOut,
-                            "SalesInvoiceCancel",
-                            invoice.Id,
-                            userId,
-                            ct);
+                            reversalAccountId,
+                            notes: "إلغاء فاتورة - مردود مدفوعات",
+                            sourceDocumentId: invoice.Id,
+                            sourceDocumentType: "SalesInvoiceCancel",
+                            userId: userId,
+                            ct: ct);
 
                         if (!cashResult.IsSuccess)
                         {
-                            _logger.LogWarning("Cash transaction recording failed during cancellation of invoice {Id}: {Error}",
+                            _logger.LogWarning("Payment voucher recording failed during cancellation of invoice {Id}: {Error}",
                                 invoice.Id, cashResult.Error);
                         }
                     }
@@ -576,13 +557,38 @@ public class SalesService : ISalesService
         }, ct);
     }
 
+    /// <summary>
+    /// Gets the currency ID for the payment voucher: uses the invoice's own currency if set,
+    /// otherwise falls back to the system's base currency.
+    /// </summary>
+    private async Task<short> GetCurrencyIdAsync(SalesInvoice invoice, CancellationToken ct)
+    {
+        if (invoice.CurrencyId.HasValue)
+            return invoice.CurrencyId.Value;
+
+        var currencies = await _uow.Currencies.ToListAsync(ct);
+        var baseCurrency = currencies.FirstOrDefault(c => c.IsBaseCurrency);
+        return (short)(baseCurrency?.Id ?? 1);
+    }
+
+    /// <summary>
+    /// Gets the default cash account ID from SystemAccountMappings for payment voucher recording.
+    /// Falls back to 1 if no mapping is configured.
+    /// </summary>
+    private async Task<int> GetCashAccountIdAsync(CancellationToken ct)
+    {
+        var mapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
+            m => m.MappingKey == SystemAccountKey.DefaultCash, ct);
+        return mapping?.AccountId ?? 1;
+    }
+
     private static SalesInvoiceDto MapToDto(SalesInvoice i)
     {
         return new SalesInvoiceDto(
             i.Id,
             i.InvoiceNo,
             i.CustomerId,
-            i.Customer?.Name ?? "عميل نقدي",
+            i.Customer?.Party?.Name ?? "عميل نقدي",
             i.WarehouseId,
             i.Warehouse?.Name ?? "غير معروف",
             i.InvoiceDate,
@@ -591,6 +597,7 @@ public class SalesService : ISalesService
             i.SubTotal,
             i.DiscountAmount,
             i.TaxAmount,
+            i.OtherCharges,
             i.TotalAmount,
             i.PaidAmount,
             i.DueAmount,
@@ -601,9 +608,10 @@ public class SalesService : ISalesService
             (decimal?)i.Tax?.Rate,
             i.CurrencyId,
             i.ExchangeRate,
+            i.CashBoxId,
+            i.CashBox?.BoxName,
             i.TotalCost,
             i.TotalProfit,
-            i.QuotationId,
             i.Items.Select(it => new SalesInvoiceItemDto(
                 it.Id,
                 it.ProductId,

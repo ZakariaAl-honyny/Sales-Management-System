@@ -4,9 +4,9 @@ public record ProductResponse(
     int Id,
     string Name,
     string? Barcode,
-    int? CategoryId,
+    int CategoryId,
     string? CategoryName,
-    decimal MinStock,
+    decimal ReorderLevel,
     string? Description,
     bool IsActive
 );

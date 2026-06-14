@@ -1,124 +1,85 @@
-using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class Supplier : BaseEntity
+/// <summary>
+/// Supplier entity. Contact information (Name, Phone, Email, Address, TaxNumber, Notes)
+/// lives on the referenced <see cref="Party"/> record with which it shares its Id (PK = FK).
+/// Supplier adds business-specific fields (PaymentTerms, Notes).
+/// </summary>
+public class Supplier : ActivatableEntity
 {
-    public string Name { get; private set; } = string.Empty;
-    public string? Phone { get; private set; }
-    public string? Email { get; private set; }
-    public string? Address { get; private set; }
-    public decimal OpeningBalance { get; private set; }
-    public decimal CurrentBalance { get; private set; }
-    public decimal CreditLimit { get; private set; }
-    public string? TaxNumber { get; private set; }
-
-    // ─── Phase 32: FK to Account (Chart of Accounts) ─────────────────
     /// <summary>
-    /// FK to Chart of Accounts. Links this supplier to an Account for financial reporting.
+    /// Id is BOTH the primary key AND the foreign key to Parties(Id).
+    /// This enforces a 1:1 relationship: one Party → one Supplier.
     /// </summary>
-    public int? AccountId { get; private set; }
 
-    // ─── Navigation Properties ─────────────────────────────────────
     /// <summary>
-    /// Navigation property to the linked Account (Chart of Accounts).
+    /// Navigation property to the Party record (shared contact data).
     /// </summary>
-    public virtual Account? Account { get; private set; }
+    public virtual Party Party { get; private set; } = null!;
 
-    private Supplier() { }
+    /// <summary>
+    /// Payment terms for this supplier (e.g. "صافي 30 يوم", "نقداً").
+    /// </summary>
+    public string? PaymentTerms { get; private set; }
 
+    /// <summary>
+    /// Free-text notes for this supplier.
+    /// </summary>
+    public string? Notes { get; private set; }
+
+    private Supplier() { } // EF Core
+
+    /// <summary>
+    /// Factory method to create a new supplier.
+    /// The supplier's Id will be set to the same value as the referenced Party.Id
+    /// (shared primary key pattern). Contact data lives on the Party record.
+    /// </summary>
+    /// <param name="partyId">FK to the Party record — also becomes this supplier's Id (must be > 0).</param>
+    /// <param name="paymentTerms">Optional payment terms text.</param>
+    /// <param name="notes">Optional free-text notes.</param>
+    /// <param name="createdByUserId">ID of the user creating this supplier.</param>
+    /// <returns>A new Supplier instance.</returns>
+    /// <exception cref="DomainException">If any guard clause fails.</exception>
     public static Supplier Create(
-        string name,
-        decimal openingBalance = 0,
-        string? phone = null,
-        string? email = null,
-        string? address = null,
-        string? taxNumber = null,
-        decimal creditLimit = 0,
-        int? createdByUserId = null,
-        int? accountId = null)
+        int partyId,
+        string? paymentTerms = null,
+        string? notes = null,
+        int? createdByUserId = null)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المورد مطلوب.");
-        if (openingBalance < 0)
-            throw new DomainException("الرصيد الافتتاحي لا يمكن أن يكون سالباً.");
-        if (creditLimit < 0)
-            throw new DomainException("حد الائتمان لا يمكن أن يكون سالباً.");
+        if (partyId <= 0)
+            throw new DomainException("معرّف الطرف غير صالح.");
 
         var supplier = new Supplier
         {
-            Name = name,
-            OpeningBalance = openingBalance,
-            CurrentBalance = openingBalance,
-            Phone = phone,
-            Email = email,
-            Address = address,
-            TaxNumber = taxNumber,
-            CreditLimit = creditLimit,
-            AccountId = accountId
+            Id = partyId,
+            PaymentTerms = paymentTerms?.Trim(),
+            Notes = notes?.Trim(),
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
         };
         supplier.SetCreatedBy(createdByUserId);
         return supplier;
     }
 
-    public void IncreaseBalance(decimal amount)
-    {
-        if (amount <= 0)
-            throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
-        CurrentBalance += amount;
-    }
-
-    public void DecreaseBalance(decimal amount)
-    {
-        if (amount <= 0)
-            throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
-        CurrentBalance -= amount;
-    }
-
     /// <summary>
-    /// Links the supplier to an Account in the Chart of Accounts.
+    /// Updates the supplier-specific fields.
+    /// Contact data is updated on the linked <see cref="Party"/> record separately.
     /// </summary>
-    public void LinkToAccount(int accountId)
-    {
-        if (accountId <= 0)
-            throw new DomainException("معرّف الحساب غير صالح.");
-
-        AccountId = accountId;
-        UpdateTimestamp();
-    }
-
-    /// <summary>
-    /// Removes the link to the Chart of Accounts.
-    /// </summary>
-    public void UnlinkAccount()
-    {
-        AccountId = null;
-        UpdateTimestamp();
-    }
-
+    /// <param name="paymentTerms">New payment terms (null = keep current).</param>
+    /// <param name="notes">New notes (null = keep current).</param>
+    /// <param name="updatedByUserId">ID of the user performing the update.</param>
     public void Update(
-        string name,
-        string? phone,
-        string? email,
-        string? address,
-        string? taxNumber,
-        decimal creditLimit,
-        int? updatedByUserId,
-        int? accountId = null)
+        string? paymentTerms = null,
+        string? notes = null,
+        int? updatedByUserId = null)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المورد مطلوب.");
-        if (creditLimit < 0)
-            throw new DomainException("حد الائتمان لا يمكن أن يكون سالباً.");
-        Name = name;
-        Phone = phone;
-        Email = email;
-        Address = address;
-        TaxNumber = taxNumber;
-        CreditLimit = creditLimit;
-        AccountId = accountId;
+        if (paymentTerms != null)
+            PaymentTerms = paymentTerms.Trim();
+        if (notes != null)
+            Notes = notes.Trim();
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }

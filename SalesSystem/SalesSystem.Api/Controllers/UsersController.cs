@@ -2,11 +2,13 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
+using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -22,10 +24,12 @@ namespace SalesSystem.Api.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IUnitOfWork _uow;
 
-    public UsersController(IUserService userService)
+    public UsersController(IUserService userService, IUnitOfWork uow)
     {
         _userService = userService;
+        _uow = uow;
     }
 
     /// <summary>
@@ -176,5 +180,105 @@ public class UsersController : ControllerBase
         if (result.ErrorCode == ErrorCodes.NotFound)
             return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // User Role Management
+    // ═══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Gets the roles assigned to a user.
+    /// </summary>
+    [HttpGet("{id:int}/roles")]
+    [ProducesResponseType(typeof(List<UserRoleDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUserRoles(int id, CancellationToken ct)
+    {
+        var userRoles = await _uow.UserRoles.ToListAsync(
+            ur => ur.UserId == id, null, ct, ignoreQueryFilters: true, "Role");
+
+        var dtos = userRoles.Select(ur => new UserRoleDto(
+            ur.UserId, ur.RoleId, ur.Role?.Name)).ToList();
+
+        return Ok(dtos);
+    }
+
+    /// <summary>
+    /// Updates the roles assigned to a user.
+    /// </summary>
+    [HttpPut("{id:int}/roles")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateUserRoles(int id, [FromBody] List<int> roleIds, CancellationToken ct)
+    {
+        try
+        {
+            var existingRoles = await _uow.UserRoles.ToListAsync(
+                ur => ur.UserId == id, null, ct, ignoreQueryFilters: true);
+            _uow.UserRoles.DeleteRange(existingRoles);
+
+            foreach (var roleId in roleIds)
+            {
+                var userRole = UserRole.Create(id, roleId);
+                await _uow.UserRoles.AddAsync(userRole, ct);
+            }
+
+            await _uow.SaveChangesAsync(ct);
+            return Ok(new { message = "تم تحديث أدوار المستخدم بنجاح" });
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Error updating roles for user {UserId}", id);
+            return BadRequest(new { error = "حدث خطأ أثناء تحديث أدوار المستخدم" });
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // User Branch Management
+    // ═══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Gets the branches assigned to a user.
+    /// </summary>
+    [HttpGet("{id:int}/branches")]
+    [ProducesResponseType(typeof(List<UserBranchDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUserBranches(int id, CancellationToken ct)
+    {
+        var userBranches = await _uow.UserBranches.ToListAsync(
+            ub => ub.UserId == id, null, ct, ignoreQueryFilters: true, "Branch");
+
+        var dtos = userBranches.Select(ub => new UserBranchDto(
+            ub.UserId, ub.BranchId, ub.Branch?.Name)).ToList();
+
+        return Ok(dtos);
+    }
+
+    /// <summary>
+    /// Updates the branches assigned to a user.
+    /// </summary>
+    [HttpPut("{id:int}/branches")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateUserBranches(int id, [FromBody] List<short> branchIds, CancellationToken ct)
+    {
+        try
+        {
+            var existingBranches = await _uow.UserBranches.ToListAsync(
+                ub => ub.UserId == id, null, ct, ignoreQueryFilters: true);
+            _uow.UserBranches.DeleteRange(existingBranches);
+
+            foreach (var branchId in branchIds)
+            {
+                var userBranch = UserBranch.Create(id, branchId);
+                await _uow.UserBranches.AddAsync(userBranch, ct);
+            }
+
+            await _uow.SaveChangesAsync(ct);
+            return Ok(new { message = "تم تحديث فروع المستخدم بنجاح" });
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "Error updating branches for user {UserId}", id);
+            return BadRequest(new { error = "حدث خطأ أثناء تحديث فروع المستخدم" });
+        }
     }
 }

@@ -201,11 +201,9 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
     #region Methods
     public async Task LoadInvoicesAsync()
     {
-        IsBusy = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var result = await _invoiceService.GetAllAsync(
                 search: string.IsNullOrWhiteSpace(SearchText) ? null : SearchText,
                 from: DateFrom,
@@ -231,15 +229,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل فواتير الشراء", "PurchaseInvoiceListViewModel.LoadInvoicesAsync", "[PurchaseInvoiceListViewModel.LoadInvoicesAsync] Failed to load purchase invoices list.");
                 IsEmpty = Invoices.Count == 0;
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "PurchaseInvoiceListViewModel.LoadInvoicesAsync", "[PurchaseInvoiceListViewModel.LoadInvoicesAsync] Failed to load purchase invoices list.");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     private void SetupCollectionView()
@@ -322,35 +312,23 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
 
         if (!result) return;
 
-        IsBusy = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var postResult = await _invoiceService.PostAsync(SelectedInvoice.Id);
 
             if (postResult.IsSuccess)
             {
-                IsBusy = false;
                 await _dialogService.ShowSuccessAsync("نجاح", "تم ترحيل الفاتورة بنجاح");
                 _eventBus.Publish(new PurchaseInvoiceChangedMessage(SelectedInvoice.Id));
                 await LoadInvoicesAsync();
             }
             else
             {
-                IsBusy = false;
                 ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "PurchaseInvoiceListViewModel.PostInvoiceAsync", $"[PurchaseInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm purchase invoice ID {SelectedInvoice.Id}.");
                 await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "PurchaseInvoiceListViewModel.PostInvoiceAsync", $"[PurchaseInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm purchase invoice ID {SelectedInvoice.Id}.");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     private async Task CancelInvoiceAsync()
@@ -361,35 +339,23 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
 
         if (!result) return;
 
-        IsBusy = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var cancelResult = await _invoiceService.CancelAsync(SelectedInvoice.Id);
 
             if (cancelResult.IsSuccess)
             {
-                IsBusy = false;
                 await _dialogService.ShowSuccessAsync("نجاح", "تم إلغاء الفاتورة بنجاح");
                 _eventBus.Publish(new PurchaseInvoiceChangedMessage(SelectedInvoice.Id));
                 await LoadInvoicesAsync();
             }
             else
             {
-                IsBusy = false;
                 ErrorMessage = HandleFailure(cancelResult.Error ?? "فشل في إلغاء الفاتورة", "PurchaseInvoiceListViewModel.CancelInvoiceAsync", $"[PurchaseInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel purchase invoice ID {SelectedInvoice.Id}.");
                 await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "PurchaseInvoiceListViewModel.CancelInvoiceAsync", $"[PurchaseInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel purchase invoice ID {SelectedInvoice.Id}.");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     // ─── Print Methods ──────────────────────────────────────────────────────

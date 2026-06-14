@@ -12,10 +12,9 @@ public record BarcodeSearchResult(
     string ProductName,
     int ProductUnitId,
     string UnitName,
-    decimal BaseConversionFactor,
+    decimal ConversionFactor,
     bool IsBaseUnit,
     decimal SalesPrice,
-    decimal PurchaseCost,
     decimal CurrentStockInBaseUnits
 )
 {

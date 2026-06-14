@@ -12,14 +12,13 @@ public enum Permission : int
     SalesInvoice = 1 << 0,          // Sales Invoice CRUD
     SalesReturn = 1 << 1,          // Sales Return
     CustomerView = 1 << 2,          // View Customers (Read-only for Cashier)
-    CustomerPayment = 1 << 3,       // Customer Payments
 
     // Manager and above
-    PurchaseInvoice = 1 << 4,       // Purchase Invoice CRUD
+    PurchaseInvoice = 1 << 3,       // Purchase Invoice CRUD
     PurchaseReturn = 1 << 5,        // Purchase Return
     ProductManagement = 1 << 6,     // Products CRUD
     SupplierManagement = 1 << 7,    // Suppliers CRUD
-    StockTransfer = 1 << 8,         // Stock Transfer
+    WarehouseTransfer = 1 << 8,         // Warehouse Transfer
     Reports = 1 << 9,              // Reports access
 
     // Admin only
@@ -35,42 +34,52 @@ public enum Permission : int
 public static class PermissionExtensions
 {
     /// <summary>
-    /// Get all permissions for a specific role
+    /// Get all permissions for a specific role ID
     /// </summary>
-    public static Permission GetPermissionsForRole(this Contracts.Enums.UserRole role)
+    public static Permission GetPermissionsForRole(this int roleId)
     {
-        return role switch
+        return roleId switch
         {
-            Contracts.Enums.UserRole.Admin => Permission.SalesInvoice
+            1 => Permission.SalesInvoice          // Admin
                 | Permission.SalesReturn
                 | Permission.CustomerView
-                | Permission.CustomerPayment
                 | Permission.PurchaseInvoice
                 | Permission.PurchaseReturn
                 | Permission.ProductManagement
                 | Permission.SupplierManagement
-                | Permission.StockTransfer
+                | Permission.WarehouseTransfer
                 | Permission.Reports
                 | Permission.WarehouseManagement
                 | Permission.Settings
                 | Permission.UserManagement
                 | Permission.Backup,
 
-            Contracts.Enums.UserRole.Manager => Permission.SalesInvoice
+            2 => Permission.SalesInvoice          // Manager
                 | Permission.SalesReturn
                 | Permission.CustomerView
-                | Permission.CustomerPayment
                 | Permission.PurchaseInvoice
                 | Permission.PurchaseReturn
                 | Permission.ProductManagement
                 | Permission.SupplierManagement
-                | Permission.StockTransfer
+                | Permission.WarehouseTransfer
                 | Permission.Reports,
 
-            Contracts.Enums.UserRole.Cashier => Permission.SalesInvoice
+            3 => Permission.SalesInvoice          // Cashier
+                | Permission.SalesReturn
+                | Permission.CustomerView,
+
+            4 => Permission.SalesInvoice          // Observer (view only)
+                | Permission.SalesReturn
+                | Permission.CustomerView,
+
+            5 => Permission.SalesInvoice          // BranchManager
                 | Permission.SalesReturn
                 | Permission.CustomerView
-                | Permission.CustomerPayment,
+                | Permission.PurchaseInvoice
+                | Permission.PurchaseReturn
+                | Permission.ProductManagement
+                | Permission.SupplierManagement
+                | Permission.Reports,
 
             _ => Permission.None
         };
