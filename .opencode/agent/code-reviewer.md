@@ -477,18 +477,18 @@ For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`
 
 ---
 
-## 📋 Phase Awareness (Phases 23-31)
+## 📋 Phase Awareness (Phases 18-31)
 
-The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+The system is currently at **v4.10.1 with Phases 18-25 completed and Phases 26-31 planned**. Phase 27 (Purchases) and Phase 28 (Sales) analysis gaps have been implemented: OtherCharges landed cost for purchases, delivery charges revenue separation, price enforcement in sales, purchase return standalone mode, and flexible input (any 2 of qty/price/total calculates the third).
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Parties-based (Party entity), no CustomerGroup/SupplierType, Account auto-created under 1210/2100, no balance fields on Customer/Supplier |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries, COGS (AverageCost), Payment reversals, per-entity account routing |
-| 25 — Products Module | 📝 Planned | ProductPrices (per unit×currency×effective dates), Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, InventoryBatches (FIFO), Perpetual Inventory, product images, opening stock |
+| 25 — Products Module | ✅ Completed | ProductPrices (per unit×currency×effective dates), Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, InventoryBatches (FIFO), Perpetual Inventory, product images, opening stock |
 | 26 — Warehouses Module | 📝 Planned | WarehouseTransfer/WarehouseTransferLine (replaces StockTransfer), InventoryTransaction/InventoryTransactionLine (replaces InventoryMovement), warehouse types, AccountId FK |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns |
-| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 27 — Purchases Module | 🟡 Partial — OtherCharges ✅ | Multi-currency, landed cost (OtherCharges distributed proportionally), Purchase Orders, standalone returns |
+| 28 — Sales Module | 🟡 Partial — PriceEnforcement+FlexibleInput ✅ | Multi-currency, profit display, price enforcement (PreventBelowRetailPrice/AllowBelowCostSale), DeliveryChargesRevenue account, flexible input (any 2 of qty/price/total), Sales Quotations, barcode POS, credit limit enforcement |
 | 29 — Receipts & Payments | 🟡 Partial — CashBox ✅ | CashBox refactored (no balance fields, AccountId FK, RunningBalance); Cheques, PaymentAllocation, DailyClosure planned |
 | 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency (CurrencyId + ExchangeRate), attachments, FiscalYear, Annual Closing |
 | 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML |
@@ -538,6 +538,35 @@ When writing or reviewing code in ANY layer, check these:
 - [ ] CashBoxDto has NO balance fields?
 - [ ] DbSeeder does NOT create default cash box (accounts not yet seeded)?
 
+### Phases 27-28 — Sales/Purchases Analysis Gaps (v4.10.1)
+
+- [ ] PurchaseInvoice has `OtherCharges` (decimal) property with guard `otherCharges < 0`?
+- [ ] `RecalculateTotals()` includes `+ OtherCharges` for purchase invoices?
+- [ ] `AllocateAdditionalCharges()` called in `PurchaseService.PostAsync()` — landed cost distributed proportionally by line total?
+- [ ] `OtherCharges` in `CreatePurchaseInvoiceRequest`/`UpdatePurchaseInvoiceRequest`/`PurchaseInvoiceDto`?
+- [ ] `OtherCharges` in Desktop VM `RecalculateTotals()`/`BuildRequest()`/`LoadInvoiceAsync()`?
+- [ ] `SubTotal - Discount + OtherCharges` used in `AccountingIntegrationService.CreatePurchasePostEntryAsync()`?
+- [ ] `SalesService.PostAsync()` checks `PreventBelowRetailPrice` (items below registered price rejected)?
+- [ ] `SalesService.PostAsync()` checks `AllowBelowCostSale` (items below cost rejected when disabled)?
+- [ ] `IProductPriceService` injected into `SalesService` for effective price lookups?
+- [ ] Desktop VM `GetDefaultPrice()` returns actual price (not `0m` stub)?
+- [ ] `CostInBaseCurrency` loads from invoice DTO (not hardcoded `0m`)?
+- [ ] `SystemAccountKey.DeliveryChargesRevenue = 21` exists?
+- [ ] Account `1533 — إيرادات التوصيل` seeded under parent `1530 — إيرادات أخرى`?
+- [ ] `CreateSalesPostEntryAsync()` credits DeliveryChargesRevenue separately from SalesRevenue?
+- [ ] `ReverseSalesPostEntryAsync()` mirrors the split?
+- [ ] Purchase Return validates standalone mode (allows `PurchaseInvoiceId = null`)?
+- [ ] `SelectedSupplierId`/`SelectedSupplierName`/`IsLinkedToInvoice` properties in Desktop VM?
+- [ ] `ProductUnitId` NOT hardcoded to `1` in Purchase Return editor?
+- [ ] `CreatePurchaseReturnEntryAsync()` and `ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService?
+- [ ] `GET /api/v1/purchase-returns/returned-quantities/{invoiceId}` endpoint exists?
+- [ ] `PostedAt`/`CancelledAt` set in `PurchaseReturn.Post()`/`Cancel()`?
+- [ ] `FlexibleInputCalculator` helper class exists with `CalculationField` enum?
+- [ ] `LineTotalInput` editable property in line ViewModels?
+- [ ] `_lastModifiedField` and `_isRecalculating` guard flag in line ViewModels?
+- [ ] `RecalculateFromFlexibleInput()` calls `FlexibleInputCalculator.Calculate()`?
+- [ ] LineTotal column NOT `IsReadOnly` in Sales/Purchase DataGrids?
+
 ### Features to Fix By Default
 
 When you encounter any code related to these areas, apply fixes automatically:
@@ -566,3 +595,8 @@ When you encounter any code related to these areas, apply fixes automatically:
 22. NON-smallint PK on lookup tables → Change to smallint with `.HasColumnType("smallint")`
 23. NON-bigint PK on AuditLog → Change to bigint with `.HasColumnType("bigint")`
 24. Missing filtered unique indexes → Add `.HasFilter("[IsActive] = 1")`
+25. PurchaseInvoice without OtherCharges → ADD `OtherCharges` decimal, guard, RecalculateTotals, EF config, DTOs, Desktop VM, AccountingIntegrationService landed cost.
+26. Sales without price enforcement → ADD `IProductPriceService`, enforce PreventBelowRetailPrice/AllowBelowCostSale in PostAsync, fix GetDefaultPrice/CostInBaseCurrency.
+27. DeliveryCharges in wrong account → ADD `SystemAccountKey.DeliveryChargesRevenue = 21`, seed account 1533, credit DeliveryChargesRevenue separately.
+28. Purchase Return blocking standalone → ALLOW null PurchaseInvoiceId, fix ProductUnitId hardcode, add journal entry methods, add returned-quantities endpoint.
+29. No flexible input → CREATE FlexibleInputCalculator, add LineTotalInput/guards/RecalculateFromFlexibleInput, make LineTotal editable.

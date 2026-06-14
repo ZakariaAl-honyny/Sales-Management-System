@@ -2506,18 +2506,18 @@ if (!entryResult.IsSuccess)
 
 ---
 
-## 📋 Phase Awareness (Phases 23-31)
+## 📋 Phase Awareness (Phases 23-31 + Purchases/Sales Analysis Gaps)
 
-The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+The system is currently at **v4.10.1+ with Phases 18-25 + Purchases/Sales Analysis Gaps Implemented: OtherCharges Landed Cost, Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone, Flexible Input**:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices — per unit × currency × effective dates), FIFO batches (InventoryBatches), product images, opening stock, Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, Perpetual Inventory (no Purchases account) |
+| 25 — Products Module | ✅ Completed | Multi-currency pricing (ProductPrices — per unit × currency × effective dates), FIFO batches (InventoryBatches), product images, opening stock, Units independent table, ProductUnit with Factor/IsBaseUnit, Perpetual Inventory (no Purchases account) |
 | 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
-| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 27 — Purchases Module | ✅ Completed | Multi-currency, landed cost via OtherCharges (AllocateAdditionalCharges), Purchase Orders, standalone returns, attachments |
+| 28 — Sales Module | ✅ Completed | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement, price enforcement (PreventBelowRetailPrice, AllowBelowCostSale), DeliveryChargesRevenue account, flexible input |
 | 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
 | 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
 | 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
@@ -2668,3 +2668,8 @@ When you encounter any code related to these areas, apply fixes automatically:
 23. Old `InventoryMovement` → Replace with `InventoryTransaction`/`InventoryTransactionLine`
 24. CustomerGroup/SupplierType references in V1 → Remove (deferred to V2)
 25. OpeningBalance/CurrentBalance on Customer/Supplier/CashBox → Remove (balance on linked Account)
+26. PurchaseInvoice without `OtherCharges` → ADD `OtherCharges` property (decimal) with guard `otherCharges < 0`, update `RecalculateTotals()` to include `+ OtherCharges`, update EF config with `.HasPrecision(18, 2)`, update DTOs/Requests/Desktop VM/XAML, and update `AccountingIntegrationService.CreatePurchasePostEntryAsync()` to use `SubTotal - Discount + OtherCharges`.
+27. Sales without price enforcement → ADD `IProductPriceService` to `SalesService`, enforce `PreventBelowRetailPrice` and `AllowBelowCostSale` settings in `PostAsync()`, fix Desktop VM `GetDefaultPrice()` to use actual price lookup, fix `CostInBaseCurrency` to load from invoice DTO.
+28. DeliveryCharges NOT in separate account → ADD `SystemAccountKey.DeliveryChargesRevenue = 21`, seed account `1533 — إيرادات التوصيل` under parent `1530 — إيرادات أخرى`, update `CreateSalesPostEntryAsync()` to credit DeliveryChargesRevenue separately from SalesRevenue, mirror in `ReverseSalesPostEntryAsync()`.
+29. Purchase Return blocking standalone mode → FIX `Validate()` to allow `PurchaseInvoiceId = null` when supplier selected and items entered, add `SelectedSupplierId`/`IsLinkedToInvoice` properties, fix hardcoded `ProductUnitId: 1` to use actual ProductUnitId, add `CreatePurchaseReturnEntryAsync()`/`ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService, fix `PostedAt`/`CancelledAt` in `Post()`/`Cancel()`.
+30. Fixed-price input (no flexible input) → CREATE `FlexibleInputCalculator` helper class with `CalculationField` enum (Quantity/Price/Total) and `Calculate()`, add `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` to line ViewModels, make LineTotal column editable (not `IsReadOnly`), implement `RecalculateFromFlexibleInput()`.

@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.10+ — Phases 18-25 Complete, Accounting Integration Post-Analysis Remediations Done, Phases 26-31 Updated with Per-Unit Pricing & Immutable Base Currency)
+# AGENTS.md — Sales Management System (v4.10.2+ — Accounts.md Analysis Complete: Bank Auto-Account Creation, Employee Auto-Account Endpoint, Customer/Supplier Parent Code Fixes, FlexibleInputCalculator Bug Fix)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -1460,7 +1460,56 @@ The following rules codify the bugs found and fixed during Phase 22 code review.
 | RULE-351 | `nameof` operator MUST be used for validator property names instead of string literals — e.g., `RuleFor(x => x.NameAr)` NOT `RuleFor("NameAr")`. String literals for property names cause silent validator failures when properties are renamed. |
 | RULE-352 | Desktop health check MUST use `SecureDbContextFactory.GetDecryptedConnectionString()` as the single source of truth for connection strings — NEVER inject raw `IConfiguration` into health check services. The health check bypass must still go through DPAPI decryption to avoid false "connection refused" errors. |
 
-### 2.75 Phase 23 — Customers Module Rules (v4.6.9+ — Updated: كل عميل = حساب, No Balance on Entity)
+### 2.86 Phase 28 — Sales Price Enforcement Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-475 | `SalesService.PostAsync()` MUST enforce `PreventBelowRetailPrice` setting — before posting, look up `ProductPrices` for each item and reject if `item.UnitPrice < effectivePrice`. Return `Result.Failure("سعر البيع أقل من السعر الرسمي للمنتج: {name}")`. |
+| RULE-476 | `SalesService.PostAsync()` MUST enforce `AllowBelowCostSale` setting — if disabled, compare each item's `UnitPrice` against `CostInBaseCurrency` and reject if below cost. Return `Result.Failure("سعر البيع أقل من تكلفة المنتج: {name}")`. |
+| RULE-477 | `IProductPriceService` MUST be injected into `SalesService` for price lookups — use `GetEffectivePriceForInvoiceAsync()` to find the registered price for a ProductUnitId + CurrencyId combination. |
+| RULE-478 | Price override within invoice (`IsPriceOverridden`) MUST NOT change the base price in `ProductPrices` table — override is recorded only on the invoice line, not propagated to catalog. Discount is the CORRECT way to give price reductions, not price modification below default. |
+| RULE-479 | `Desktop InvoiceLineViewModel.GetDefaultPrice()` MUST NOT return `0m` stub — use actual price lookup from API (ProductPrices or ProductDto price field) to enable correct `IsPriceOverridden` detection. |
+
+### 2.87 Phase 27 — Purchase Invoice OtherCharges (Landed Cost) Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-480 | `PurchaseInvoice` entity MUST have `OtherCharges` property (decimal) with guard clause `otherCharges < 0` — included in `RecalculateTotals()` as `NetTotal = SubTotal - DiscountAmount + TaxAmount + OtherCharges`. |
+| RULE-481 | `AllocateAdditionalCharges()` MUST be called in `PurchaseService.PostAsync()` — distribute `OtherCharges` proportionally by line total: `lineShare = (LineTotal / SubTotal) × OtherCharges`, then `landedUnitCost = UnitCost + (lineShare / Quantity)`. |
+| RULE-482 | Inventory stock increase and batch creation MUST use `landedUnitCost` (unit cost plus distributed other charges share) — NEVER use raw `UnitCost` alone when `OtherCharges > 0`. |
+| RULE-483 | `CreatePurchaseInvoiceRequest`, `UpdatePurchaseInvoiceRequest`, and `PurchaseInvoiceDto` MUST include `OtherCharges` field (decimal) — mirroring `SalesInvoice` which already has it. |
+| RULE-484 | `PurchaseInvoiceConfiguration` MUST map `.Property(pi => pi.OtherCharges).HasPrecision(18, 2)` — the DB column already exists from `InitialCreate` migration. |
+| RULE-485 | Desktop `PurchaseInvoiceEditorViewModel` MUST have `OtherCharges` property included in `RecalculateTotals()`, `BuildRequest()`, `BuildUpdateRequest()`, and `LoadInvoiceAsync()` — XAML must show "مصاريف إضافية" input field. |
+| RULE-486 | `AccountingIntegrationService.CreatePurchasePostEntryAsync()` MUST use `SubTotal - DiscountAmount + OtherCharges` as `netInventoryCost` for the Dr Inventory line — NOT just `SubTotal - DiscountAmount`. |
+
+### 2.88 Phase 27 — Purchase Return Standalone Mode Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-487 | Purchase Return MUST support BOTH linked-to-invoice (`PurchaseInvoiceId` set) AND standalone mode (`PurchaseInvoiceId = null`) — Desktop editor MUST NOT block standalone returns with "يرجى اختيار فاتورة" validation when supplier is selected and items are entered. |
+| RULE-488 | `PurchaseReturnService.PostAsync()` MUST create journal entries via `CreatePurchaseReturnEntryAsync()` — Dr Supplier Account / Cr PurchaseReturnAccount — with per-entity account routing (`Supplier.Party.AccountId` fallback to `AccountsPayable`). |
+| RULE-489 | `PurchaseReturn.Post()` and `Cancel()` MUST set `PostedAt = DateTime.UtcNow` and `CancelledAt = DateTime.UtcNow` respectively — these were missing from `DocumentEntity` lifecycle. |
+| RULE-490 | `GET /api/v1/purchase-returns/returned-quantities/{invoiceId:int}` endpoint MUST exist for querying previously returned quantities — returns `Dictionary<ProductId, TotalReturnedQuantity>` from posted returns linked to the invoice. |
+| RULE-491 | `PurchaseReturnEditorViewModel` MUST NOT hardcode `ProductUnitId: 1` — use the actual `ProductUnitId` from the return line item's invoice item or input. |
+| RULE-492 | `AccountingIntegrationService` MUST have `ReversePurchaseReturnEntryAsync()` for cancelling posted purchase returns — Dr PurchaseReturnAccount / Cr Supplier Account (reversal of Dr↔Cr). |
+
+### 2.89 Phase 28 — Sales DeliveryChargesRevenue Account Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-493 | Sales OtherCharges (delivery, service fees) MUST be credited to a separate revenue account `DeliveryChargesRevenue` — NOT lumped into SalesRevenue. Journal entry must be: Dr Cash/AR = TotalAmount, Cr SalesRevenue = SubTotal - Discount, Cr DeliveryChargesRevenue = OtherCharges, Cr VatOutput = TaxAmount. |
+| RULE-494 | `SystemAccountKey` MUST have `DeliveryChargesRevenue = 21` enum value — mapped to account `1533 — إيرادات التوصيل` in `AccountingSeeder` under parent `1530 — إيرادات أخرى`. |
+| RULE-495 | `ReverseSalesPostEntryAsync()` MUST mirror the split — Dr SalesRevenue + Dr DeliveryChargesRevenue + Dr VatOutput / Cr Cash/AR — with `DeliveryChargesRevenue` included when `invoice.OtherCharges > 0`. |
+
+### 2.90 Phase 28 — Flexible Input Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-496 | Sales and Purchase line items MUST support Flexible Input — user enters ANY TWO of (Quantity, UnitPrice/UnitCost, LineTotal) and the system calculates the third automatically. Use `FlexibleInputCalculator` helper with `CalculationField` enum (Quantity/Price/Total). |
+| RULE-497 | LineTotal column in Sales and Purchase DataGrids MUST be editable (NOT `IsReadOnly`) — bind to `LineTotalInput` property. When user edits LineTotal, the system recalculates Quantity or UnitPrice based on which field was `_lastModifiedField`. Use `_isRecalculating` guard flag to prevent infinite recursion. |
+| RULE-498 | `InvoiceLineViewModel` and `PurchaseInvoiceLineViewModel` MUST have `LineTotalInput`, `_lastModifiedField`, and `_isRecalculating` fields. `RecalculateFromFlexibleInput()` MUST only call `FlexibleInputCalculator.Calculate()` when `_lastModifiedField == CalculationField.Total` (user explicitly edited LineTotal). When user edits Quantity or UnitPrice/UnitCost, `_lineTotalInput` MUST be recomputed directly as `_quantity * _unitPrice` WITHOUT using the calculator — otherwise the calculator incorrectly treats the auto-computed total as a user-entered anchor and recalculates Price/Quantity instead. |
+
+### 2.91 Phase 23 — Customers Module Rules (v4.6.9+ — Updated: كل عميل = حساب, No Balance on Entity)
 
 | RULE | DIRECTIVE |
 |------|-----------|
@@ -1480,6 +1529,15 @@ The following rules codify the bugs found and fixed during Phase 22 code review.
 | RULE-439 | Phone number validation in customer FluentValidators MUST use regex `^05\d{8}$` with Arabic error message — NEVER only `MaxLength` check. Email MUST use `.EmailAddress()` validation. |
 | RULE-440 | `ModernTextBox` style MUST NOT be used on `ComboBox` elements — `ModernTextBox` has `TargetType="TextBox"` and causes `XamlParseException`. Use `ModernComboBox` style instead. |
 | RULE-441 | `ComboBox` elements MUST NOT have both `DisplayMemberPath` and `ItemTemplate` set simultaneously — WPF throws `InvalidOperationException`. Use one or the other exclusively. |
+
+### 2.92 Accounts.md Analysis — Bank Auto-Account, Employee Endpoint, & Parent Code Fixes (v4.10.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-502 | `Bank` entity MUST follow the same pattern as `CashBox`: `AccountId` is `int?` (nullable), with a `SetAccountId(int)` domain method. When `AccountId` is null at creation, `BankService` MUST auto-create a Level-4 detail account under parent `"1120 — البنوك"` (Bank Accounts) — mirroring `CashBoxService` auto-creation under `"1110 — النقدية"`. Account code auto-increments from existing child codes. |
+| RULE-503 | `EmployeesController` MUST expose `POST /api/v1/employees/{id}/auto-create-account` endpoint that calls `EmployeeService.AutoCreateEmployeeAccountAsync()` — creates a Level-4 detail account under parent `"1170 — عهد الموظفين"` (Employee Custody). This endpoint is needed because custody/advance/lone workflows need accounts created before transaction processing. |
+| RULE-504 | `CustomerService.AutoCreateCustomerAccountAsync()` MUST look up parent account by code `"1130"` (Accounts Receivable/العملاء) — NOT `"1210"` (Fixed Assets). `SupplierService.AutoCreateSupplierAccountAsync()` MUST look up parent account by code `"1320"` (Accounts Payable/الموردون) — NOT `"2100"` (doesn't exist). These parent codes were discovered during Accounts.md analysis and are CRITICAL for correct COA linking. |
+| RULE-505 | `RecalculateFromFlexibleInput()` in `InvoiceLineViewModel` and `PurchaseInvoiceLineViewModel` MUST ONLY call `FlexibleInputCalculator.Calculate()` when `_lastModifiedField == CalculationField.Total` — when user edited Quantity or UnitPrice/UnitCost, `_lineTotalInput` MUST be recomputed directly as `_quantity * _unitPrice` (or `_quantity * _unitCost`). NEVER pass Quantity or Price as `lastModifiedField` to the calculator because the auto-computed total is treated as a user-entered anchor, causing incorrect recalculation. |
 
 Phase 24: Accounting Engine Automation → Automatic journal entries for all money operations
 Phase 25: Payment Update/Delete Reversal Entries → Fix C-2/C-3: Reversal entries for payment update/delete
@@ -1820,6 +1878,28 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ Products without a second unit (must have at least base unit + one additional unit)
 ❌ ProductPrices without EffectiveFrom/EffectiveTo date ranges (pricing must have date tracking)
 ❌ InventoryMovement without ProductUnitId (use ProductUnitId instead of raw ProductId)
+❌ PurchaseInvoice without `OtherCharges` property (must match SalesInvoice for landed cost consistency)
+❌ `AllocateAdditionalCharges()` missing from `PurchaseService.PostAsync()` — landed cost MUST be distributed proportionally
+❌ `OtherCharges` missing from `CreatePurchaseInvoiceRequest`/`UpdatePurchaseInvoiceRequest`/`PurchaseInvoiceDto`
+❌ `OtherCharges` missing from Desktop VM `RecalculateTotals()`/`BuildRequest()`/`LoadInvoiceAsync()`
+❌ Sales Price Enforcement NOT wired — `SalesService.PostAsync()` MUST check `PreventBelowRetailPrice` and `AllowBelowCostSale`
+❌ `IProductPriceService` NOT injected into `SalesService` (price enforcement requires it)
+❌ `GetDefaultPrice()` returning `0m` stub in Editor VM (breaks `IsPriceOverridden` detection)
+❌ `CostInBaseCurrency` hardcoded to `0m` on load (must use actual cost from invoice DTO)
+❌ DeliveryCharges NOT in separate revenue account (OtherCharges credited to SalesRevenue instead of `DeliveryChargesRevenue`)
+❌ `DeliveryChargesRevenueAccountId` missing from `SystemAccountKey` enum and `AccountingSeeder`
+❌ Purchase Return VALIDATION requiring invoice (standalone mode must be allowed)
+❌ Purchase Return without journal entries (`AccountingIntegrationService` MUST have `CreatePurchaseReturnEntryAsync`/`ReversePurchaseReturnEntryAsync`)
+❌ `ProductUnitId` hardcoded to `1` in Purchase Return editor
+❌ `PostedAt`/`CancelledAt` NOT set in `PurchaseReturn.Post()`/`Cancel()` methods
+❌ Flexible Input missing — LineTotal column MUST be editable (not `IsReadOnly`)
+❌ `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` NOT implemented in line ViewModels
+❌ `FlexibleInputCalculator` helper class missing
+❌ `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator must ONLY be called when `_lastModifiedField == Total` — Quantity/Price changes should directly compute `_lineTotalInput = _quantity * _unitPrice`)
+❌ `Bank.AccountId` as non-nullable `int` (use `int?` with `SetAccountId()` for auto-creation support)
+❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1130"` (العملاء)
+❌ `SupplierService` looking up AP parent by code `"2100"` (doesn't exist) instead of `"1320"` (الموردون)
+❌ Missing `POST /api/v1/employees/{id}/auto-create-account` endpoint (Employee custody workflow needs it)
 ```
 
 
@@ -2147,5 +2227,25 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] PDF export (QuestPDF) is first-choice export for ALL 27+ report ViewModels?
 - [ ] Multi-currency (SelectedCurrencyId, ExchangeRate) wired in SalesInvoiceEditorViewModel?
 - [ ] CompanySettings.DefaultCurrencyId typed as `short` (not int) across all layers?
+- [ ] PurchaseInvoice has `OtherCharges` (decimal) property with guard clause `otherCharges < 0`?
+- [ ] `AllocateAdditionalCharges()` called in `PurchaseService.PostAsync()` — landed cost distributed proportionally?
+- [ ] `OtherCharges` included in Create/Update/Desktop/Accounting for purchase invoices?
+- [ ] `SalesService.PostAsync()` checks `PreventBelowRetailPrice` and `AllowBelowCostSale` settings?
+- [ ] `IProductPriceService` injected into `SalesService` for price enforcement lookups?
+- [ ] `DeliveryChargesRevenueAccountId` in `SystemAccountKey` (21) and seeded in COA?
+- [ ] DeliveryCharges credited to separate `DeliveryChargesRevenue` account (not SalesRevenue)?
+- [ ] Purchase Return supports standalone mode (`PurchaseInvoiceId = null` allowed)?
+- [ ] `CreatePurchaseReturnEntryAsync()` / `ReversePurchaseReturnEntryAsync()` exist in `AccountingIntegrationService`?
+- [ ] `PostedAt`/`CancelledAt` set in `PurchaseReturn.Post()`/`Cancel()`?
+- [ ] `FlexibleInputCalculator` helper class exists with `CalculationField` enum?
+- [ ] LineTotal column editable in Sales/Purchase DataGrids (not `IsReadOnly`)?
+- [ ] `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` in line ViewModels?
+- [ ] `RecalculateFromFlexibleInput()` ONLY calls `FlexibleInputCalculator` when Total is modified (NOT for Quantity/Price)?
+- [ ] `Bank.AccountId` is `int?` (nullable) with `SetAccountId()` domain method?
+- [ ] `BankService` auto-creates sub-account under parent "1120 — البنوك" when AccountId is null?
+- [ ] `BankConfiguration` makes AccountId FK optional (`.IsRequired(false)`)?
+- [ ] `EmployeesController` has `POST /api/v1/employees/{id}/auto-create-account` endpoint?
+- [ ] `CustomerService.AutoCreateCustomerAccountAsync()` uses parent code `"1130"` (NOT `"1210"`)?
+- [ ] `SupplierService.AutoCreateSupplierAccountAsync()` uses parent code `"1320"` (NOT `"2100"`)?
 - [ ] All stale navigation menu items guarded with "تحت التطوير" dialog (no NullReferenceException)?
 - [ ] All 2,083+ tests pass?

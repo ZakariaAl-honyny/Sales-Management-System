@@ -1159,15 +1159,17 @@ public string FormattedExchangeRate => ExchangeRate.ToString("N6");  // N6 not N
 
 ## Phase Awareness — Phases 23–31 Feature Scope
 
+The system is currently at **v4.10.1+ with Phases 18-24 completed and Phases 25-31 in progress**:
+
 ### Phase Table
 | Phase | Focus | Key Files |
 |-------|-------|-----------|
 | 23 | Customers Module (Parties-based, no CustomerGroup/SupplierType, Account auto-create) | Desktop/CustomersListView.xaml, Desktop/CustomerEditorView.xaml, Desktop/PartiesLookup.xaml |
 | 24 | Accounting Integration (auto journal entries) | — (backend-only, no new UI screens) |
-| 25 | Products Module v2 (ProductPrices per unit×currency, Units independent table, InventoryBatches) | Desktop/ProductsListView.xaml, Desktop/ProductEditorView.xaml |
+| 25 | Products Module v2 — **✅ COMPLETED** (ProductPrices per unit×currency, Units independent table, InventoryBatches) | Desktop/ProductsListView.xaml, Desktop/ProductEditorView.xaml |
 | 26 | Warehouses Module (type, manager, WarehouseTransfer, InventoryTransaction) | Desktop/WarehousesListView.xaml, Desktop/WarehouseEditorView.xaml |
-| 27 | Purchases Module v2 (PO, landed cost via AdditionalCharges) | Desktop/PurchaseOrdersListView.xaml, Desktop/PurchaseOrderEditorView.xaml |
-| 28 | Sales Module v2 (quotes, POS, credit check) | Desktop/SalesQuotationsListView.xaml, Desktop/SalesPOSView.xaml |
+| 27 | Purchases Module v2 — **🟡 PARTIAL**: OtherCharges Landed Cost, Purchase Return Standalone implemented; PO planned | Desktop/PurchaseOrdersListView.xaml, Desktop/PurchaseOrderEditorView.xaml |
+| 28 | Sales Module v2 — **🟡 PARTIAL**: Price Enforcement, DeliveryChargesRevenue, Flexible Input implemented; quotes, POS, credit check planned | Desktop/SalesQuotationsListView.xaml, Desktop/SalesPOSView.xaml |
 | 29 | Receipts & Payments (cheques, allocation, CashBox.AccountId) | Desktop/ChequesListView.xaml, Desktop/PaymentAllocationView.xaml |
 | 30 | Journal Entries (manual entries, fiscal year) | Desktop/JournalEntriesListView.xaml, Desktop/FiscalYearView.xaml |
 | 31 | Reports (financial, inventory, sales, Excel export) | Desktop/ReportsView.xaml, Desktop/ReportViewer.xaml |

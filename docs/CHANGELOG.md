@@ -2,6 +2,83 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.10.2 — Accounts.md Analysis: Bank Auto-Account, Employee Endpoint, Parent Code Fixes & FlexibleInputCalculator Bug Fix (2026-06-15)
+
+### ✨ Feature: Bank Auto-Account Creation
+- `Bank` entity: `AccountId` changed from `int` to `int?` with `SetAccountId()` domain method (follows `CashBox` pattern)
+- `BankConfiguration`: AccountId FK made optional (`.IsRequired(false)`)
+- `BankDto` / `CreateBankRequest`: AccountId changed to `int?`
+- `CreateBankRequestValidator`: AccountId optional (only validates when non-null)
+- `BankService.CreateAsync()`: Auto-creates Level-4 detail account under parent `"1120 — البنوك"` when no AccountId provided (mirrors CashBoxService auto-creation under `"1110 — النقدية"`)
+- `BankService.AutoCreateBankAccountAsync()`: Finds parent 1120, auto-increments child code, creates Asset account with color #2196F3
+- `BankEditorView.xaml`: Updated labels and helper text explaining auto-creation
+
+### ✨ Feature: Employee Auto-Account Endpoint
+- `POST /api/v1/employees/{id}/auto-create-account` endpoint on `EmployeesController`
+- Calls `EmployeeService.AutoCreateEmployeeAccountAsync()` with userId from JWT
+- Creates Level-4 detail account under parent `"1170 — عهد الموظفين"` for custody/advance tracking
+
+### 🐛 Bug Fix: CustomerService/SupplierService Account Parent Codes
+- `CustomerService.AutoCreateCustomerAccountAsync()`: Fixed AR parent lookup from `"1210"` (Fixed Assets) to `"1130"` (العملاء/Accounts Receivable)
+- `SupplierService.AutoCreateSupplierAccountAsync()`: Fixed AP parent lookup from `"2100"` (doesn't exist) to `"1320"` (الموردون/Accounts Payable)
+
+### 🐛 Bug Fix: FlexibleInputCalculator — RecalculateFromFlexibleInput Logic
+- Fixed `RecalculateFromFlexibleInput()` in BOTH `SalesInvoiceEditorViewModel` and `PurchaseInvoiceEditorViewModel`
+- The method now ONLY calls `FlexibleInputCalculator.Calculate()` when `_lastModifiedField == CalculationField.Total` (user explicitly edited LineTotal)
+- When user edits Quantity or UnitPrice/UnitCost, `_lineTotalInput` is computed directly as `_quantity * _unitPrice` (or `_quantity * _unitCost`)
+- This prevents the calculator from treating the auto-computed total as a user-entered anchor, which caused incorrect Price/Quantity recalculation
+- All 449 DesktopPWF tests pass (0 failures)
+
+### 🔧 Maintenance
+- AGENTS.md updated with RULE-502 through RULE-505 (Accounts.md analysis)
+- AGENTS.md forbidden patterns updated with 5 new entries (Bank nullable AccountId, parent code fixes, flexible input fix, employee endpoint)
+- AGENTS.md checklist updated with 7 new items
+
+## v4.10.1 — Purchase Invoice OtherCharges, Sales Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone & Flexible Input (2026-06-15)
+
+### ✨ Feature: PurchaseInvoice OtherCharges (Landed Cost)
+- Added `OtherCharges` decimal property to `PurchaseInvoice` entity with `otherCharges < 0` guard clause
+- Updated `RecalculateTotals()` to include `+ OtherCharges`
+- Created `AllocateAdditionalCharges()` in `PurchaseService.PostAsync()` — distributes proportionally by line total
+- Adjusted landed unit cost per item before inventory batch creation
+- Updated EF config, Create/Update DTOs/Requests, and Desktop ViewModel/XAML
+- Updated `AccountingIntegrationService.CreatePurchasePostEntryAsync()` to use `SubTotal - Discount + OtherCharges`
+
+### ✨ Feature: Sales Price Enforcement
+- Injected `IProductPriceService` into `SalesService` for price enforcement lookups
+- `PostAsync()` rejects items when `UnitPrice < effectivePrice` (if `PreventBelowRetailPrice` enabled)
+- `PostAsync()` rejects items sold below `CostInBaseCurrency` (if `AllowBelowCostSale` disabled)
+- Desktop VM `GetDefaultPrice()` uses actual price lookup (not `0m` stub)
+- `CostInBaseCurrency` loads from `ProductDto.Cost` (not hardcoded `0m`)
+
+### ✨ Feature: DeliveryChargesRevenue Account
+- Added `SystemAccountKey.DeliveryChargesRevenue = 21` enum value
+- Seeded COA account `1533 — إيرادات التوصيل` under parent `1530 — إيرادات أخرى` (total 74 accounts)
+- `CreateSalesPostEntryAsync()` credits DeliveryChargesRevenue separately from SalesRevenue
+- `ReverseSalesPostEntryAsync()` mirrors the split
+- Proper accounting separation — delivery fees not lumped with product sales
+
+### ✨ Feature: Purchase Return Standalone Mode
+- Desktop editor allows standalone returns (`PurchaseInvoiceId = null`) with supplier + items
+- Added `SelectedSupplierId`, `SelectedSupplierName`, `IsLinkedToInvoice` properties
+- Fixed hardcoded `ProductUnitId: 1` to use actual ProductUnitId from input
+- Added `CreatePurchaseReturnEntryAsync()` and `ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService
+- Added `GET /api/v1/purchase-returns/returned-quantities/{invoiceId}` endpoint
+- Fixed `PostedAt`/`CancelledAt` not set in `Post()`/`Cancel()` methods
+
+### ✨ Feature: Flexible Input (Sales + Purchases)
+- Created `FlexibleInputCalculator` helper class with `CalculationField` enum
+- User enters ANY TWO of (Quantity, UnitPrice/UnitCost, LineTotal) — third auto-calculated
+- LineTotal column editable in Sales and Purchase DataGrids (not `IsReadOnly`)
+- `LineTotalInput`, `_lastModifiedField`, `_isRecalculating` in both line ViewModels
+- `_isRecalculating` guard flag prevents infinite recursion loops
+
+### 🔧 Maintenance
+- All Phase 18 post-analysis remediations verified
+- AGENTS.md updated with RULE-475 through RULE-498 (5 new sections)
+- Forbidden patterns updated for all 5 features
+- Checklist updated with 13 new items
+
 ## v4.10 — 65-Table Schema Refactoring & Docs Cleanup (2026-06-13)
 
 ### ✨ Major Architecture Changes

@@ -505,16 +505,16 @@ Key test pattern: All service tests verify Result<T>.IsSuccess/IsFailure — nev
 
 ## 📋 Phase Awareness (Phases 23-31)
 
-The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+The system is currently at **v4.10.1+ with Phases 18-24 completed and Phases 25-31 in progress**:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Parties-based (Party entity), no CustomerGroup/SupplierType, Account auto-created under 1210/2100, no balance fields on Customer/Supplier |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries, COGS (AverageCost), Payment reversals, per-entity account routing |
-| 25 — Products Module | 📝 Planned | ProductPrices (per unit×currency×effective dates), Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, InventoryBatches (FIFO), Perpetual Inventory, product images, opening stock |
+| 25 — Products Module | ✅ Completed | ProductPrices (per unit×currency×effective dates), Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, InventoryBatches (FIFO), Perpetual Inventory, product images, opening stock |
 | 26 — Warehouses Module | 📝 Planned | WarehouseTransfer/WarehouseTransferLine (replaces StockTransfer), InventoryTransaction/InventoryTransactionLine (replaces InventoryMovement), warehouse types, AccountId FK |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns |
-| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 27 — Purchases Module | 🟡 Partial — OtherCharges Landed Cost, Purchase Return Standalone ✅ | Multi-currency, landed cost via OtherCharges (AdditionalCharge), Purchase Orders, standalone returns (+ OtherCharges Landed Cost, Purchase Return Standalone) |
+| 28 — Sales Module | 🟡 Partial — Price Enforcement, DeliveryChargesRevenue, Flexible Input ✅ | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement, Price Enforcement, DeliveryChargesRevenue, Flexible Input |
 | 29 — Receipts & Payments | 🟡 Partial — CashBox ✅ | CashBox refactored (no balance fields, AccountId FK, RunningBalance); Cheques, PaymentAllocation, DailyClosure planned |
 | 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency (CurrencyId + ExchangeRate), attachments, FiscalYear, Annual Closing |
 | 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML |

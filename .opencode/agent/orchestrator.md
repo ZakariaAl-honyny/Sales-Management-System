@@ -333,16 +333,16 @@ Run through AGENTS.md Section 9 checklist. If ANY item fails, reject the code.
 
 ## 📋 Phase Awareness (Phases 23-31)
 
-The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+The system is currently at **v4.10.1+ with Phases 18-25 + Purchases/Sales Analysis Gaps Implemented: OtherCharges Landed Cost, Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone, Flexible Input completed and Phases 26-31 planned**:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), Unit independent table, Party entity, opening stock via InventoryBatches |
+| 25 — Products Module | ✅ Completed | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), Unit independent table, Party entity, opening stock via InventoryBatches |
 | 26 — Warehouses Module | 📝 Planned | Warehouse types (Main/Store/Showroom), Transfer/WarehouseTransferLine replaces StockTransfer, InventoryCount V2 deferred, Perpetual Inventory |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
-| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 27 — Purchases Module | 🟡 Partial — OtherCharges ✅ | Multi-currency, landed cost (OtherCharges), Purchase Orders, standalone returns, attachments |
+| 28 — Sales Module | 🟡 Partial — PriceEnforcement+DeliveryChargesRevenue+FlexibleInput ✅ | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
 | 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
 | 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
 | 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
@@ -361,6 +361,11 @@ When implementing or reviewing code, ALWAYS enforce these rules:
 8. **Passwordless Users**: User.Create() NEVER accepts a password — MustChangePassword=true is the default
 9. **ReferenceId over ReferenceNumber**: Journal entry lookups use int FK (ReferenceId), not string matching
 10. **AvgCost for COGS**: COGS uses ProductUnit.AverageCost (weighted average), never PurchaseCost
+11. **Landed Cost**: Purchase invoices MUST include OtherCharges distribution — distribute proportionally by line total before batch creation. NEVER record purchase cost without transport/customs allocation.
+12. **Sales Price Enforcement**: Sales posting MUST check PreventBelowRetailPrice and AllowBelowCostSale settings — NEVER allow under-retail sales when blocked, or below-cost sales when prohibited.
+13. **DeliveryCharges Revenue**: Delivery/service fees on sales invoices MUST be credited to separate DeliveryChargesRevenue account — NOT lumped into SalesRevenue.
+14. **Purchase Return Standalone**: Purchase return MUST support BOTH linked-to-invoice and standalone mode — NEVER block returns without an invoice when supplier and items are provided.
+15. **Flexible Input**: Sales/Purchase line items MUST support entering ANY TWO of (Quantity, Price, LineTotal) — the third auto-calculates. NEVER force users to enter all three.
 
 ### 💡 Bug Prevention Checklist
 

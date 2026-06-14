@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.10%2B%20Complete%20(Phases%2018-25)%20—%20Phases%2026-32%20Planned-2ECC71?style=for-the-badge" 
+  <img src="https://img.shields.io/badge/Status-v4.10.2%2B%20Complete%20(Phases%2018-25)%20—%20Phases%2026-32%20Planned-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.10%2B%20%7C%20Phases%2026-32%20Planned-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.10.2%2B%20%7C%20Phases%2026-32%20Planned-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -59,7 +59,16 @@ The API-first architecture is designed to support **future web and mobile client
   - Smart low-stock reporting (e.g., "1 box + 3 pieces")
 - 📒 **Accounting Foundation (Phases 18-25)**: Chart of Accounts (60 accounts), Journal Entries, Fiscal Years, Annual Closing, Per-Entity Account Routing, Purchase Returns Account (1632), Single Revenue Account (1520)
 - 💱 **Multi-Currency (Phase 20)**: YER/USD/SAR support with exchange rates, FractionName, IsSystem guard
-- 📒 **Accounting Integration Remediations (Phase 18 v4.10)**: Per-entity account routing for all customer/supplier transactions, Purchase Returns account (1632) for accurate financial reporting, consolidated single Sales Revenue account (1520)
+- 📒 **Accounting Integration Remediations (Phase 18 v4.10 / v4.10.1)**: Per-entity account routing for all customer/supplier transactions, Purchase Returns account (1632) for accurate financial reporting, consolidated single Sales Revenue account (1520)
+- 💰 **Purchase Landed Cost (v4.10.1)**: `OtherCharges` decimal property on `PurchaseInvoice` with guard clause, `AllocateAdditionalCharges()` distributing costs proportionally by line total, landed unit cost used in inventory batch creation
+- 🚫 **Sales Price Enforcement (v4.10.1)**: `PreventBelowRetailPrice` setting rejects items below registered price; `AllowBelowCostSale` setting blocks sales below cost — `IProductPriceService` injected for price lookups
+- 🚚 **DeliveryChargesRevenue Account (v4.10.1)**: Separate revenue account `1533 — إيرادات التوصيل` for delivery/service fees — credited separately from SalesRevenue in journal entries
+- 🔄 **Purchase Return Standalone Mode (v4.10.1)**: Return without linked invoice (`PurchaseInvoiceId = null`), `CreatePurchaseReturnEntryAsync()`/`ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService, `GET returned-quantities/{invoiceId}` endpoint
+- ⌨️ **Flexible Input (v4.10.1)**: Users enter ANY TWO of (Quantity, UnitPrice, LineTotal) — system calculates the third via `FlexibleInputCalculator`. LineTotal column editable in DataGrids with `_lastModifiedField` tracking
+- 🏦 **Bank Auto-Account Creation (v4.10.2)**: `Bank` entity follows `CashBox` pattern — `AccountId` is `int?` with `SetAccountId()` method. Auto-creates Level-4 sub-account under `"1120 — البنوك"` when no AccountId provided (mirrors CashBox under `"1110 — النقدية"`)
+- 👤 **Employee Auto-Account Endpoint (v4.10.2)**: `POST /api/v1/employees/{id}/auto-create-account` endpoint for custody/advance workflows — creates Level-4 sub-account under `"1170 — عهد الموظفين"`
+- 🐛 **Parent Code Fixes (v4.10.2)**: CustomerService AR parent lookup `"1210"→"1130"`, SupplierService AP parent lookup `"2100"→"1320"` — critical for correct COA linking
+- 🐛 **FlexibleInputCalculator Fix (v4.10.2)**: `RecalculateFromFlexibleInput()` no longer calls `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (only for explicit LineTotal edits) — fixes incorrect auto-recalculation
 - 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Accountant/Cashier/Observer), 33 permission codes, MustChangePassword, lockout
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
 - 🎯 **Touch POS (Phase 15)**: Dual-mode toggle (Cart/QuickSale) with tile grid, category filtering, numeric keypad, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search
@@ -630,10 +639,10 @@ dotnet run
 | Phase 21 | **Users & Permissions Module** — 4 roles, 33 permissions, passwordless creation, lockout, AuditLog, Permission management UI | ✅ **Completed** |
 | **v4.6.8** | **Currency Module Stabilization & EF Core Transaction Strategy** — Fixed BeginTransactionAsync conflict (3 methods). ExchangeRate precision (18,2). JournalEntry shadow FK. CurrencyEditorViewModel: RULE-229 validation, toast, dual constructor. Deep code review: fixed 14 bugs + 3 enhancements across Domain, API, Infrastructure, Desktop — including isSystem param, MarkAsDeleted guard, GetByCode/GetBaseCurrency endpoints, includeInactive passthrough, controller 404/400, filtered indexes, OldRate validation, UpdateExchangeRateRequestValidator, IDisposable, CanExecute removal, composite index, AllStaff policy, N6 display | ✅ **Completed** |
 | **v4.6.6** | **UI Compacting — Mobile-Ready Density** — Global UI resize (63 views) for more content per screen: Styles.xaml compact tokens (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted by ~25-30%, PurchaseInvoiceEditorView size reduction, MainWindow sidebar 220→200, touch control sizes preserved. Future mobile-ready foundation | ✅ **Completed** |
-| Phase 25 | **Products Module** — Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (Retail/Wholesale/VIP/Distributor), product images, opening stock on creation | 📝 Planned |
+| Phase 25 | **Products Module** — Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (Retail/Wholesale/VIP/Distributor), product images, opening stock on creation | ✅ **Completed** |
 | Phase 26 | **Warehouses Module** — Warehouse type (Main/Store/Showroom), manager tracking, AccountId FK, stock adjustments (Addition/Deduction/Correction), stock issue (Damage/Expiry/InternalUse), physical count deferred to V2 | 📝 Planned |
-| Phase 27 | **Purchases Module** — Multi-currency purchases, AdditionalCharge with landed cost distribution, Purchase Order (PO) with Draft/Approved/Received/Cancelled, standalone returns, invoice attachments | 📝 Planned |
-| Phase 28 | **Sales Module** — Multi-currency sales, profit display per line, price override, Sales Quotation with expiry, continuous barcode POS mode, credit limit enforcement | 📝 Planned |
+| Phase 27 | **Purchases Module** — Multi-currency purchases, AdditionalCharge with landed cost distribution, Purchase Order (PO) with Draft/Approved/Received/Cancelled, standalone returns, invoice attachments | ⏳ **Partial (v4.10.1)** — OtherCharges landed cost + Purchase Return Standalone Mode implemented |
+| Phase 28 | **Sales Module** — Multi-currency sales, profit display per line, price override, Sales Quotation with expiry, continuous barcode POS mode, credit limit enforcement | ⏳ **Partial (v4.10.1)** — Sales Price Enforcement + DeliveryChargesRevenue + Flexible Input implemented |
 | Phase 29 | **Receipts & Payments Module** — Multi-invoice payment distribution, Cheque management (Pending/Cleared/Bounced), PaymentAllocation entity, CashBox.AccountId FK, DailyClosure with ActualCashCount | 📝 Planned |
 | Phase 30 | **Journal Entries Module** — 3-state lifecycle (Draft/Posted/Cancelled), multi-currency support, attachments, FiscalYear entity, Annual Closing (revenue/expense → RetainedEarnings) | 📝 Planned |
 | Phase 31 | **Reports Module** — 35+ DTOs across 7 categories (Financial, Inventory, Sales, Purchases, Cash/Box, Transactions, Users), Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML | 📝 Planned |
@@ -1080,20 +1089,30 @@ dotnet run
 
 ---
 
-## 📋 What's Coming — Phases 25-32
+## 📋 What's Coming — Phases 26-32
 
 The following modules are planned for future development based on the comprehensive analysis in `docs/all new Anylysis for update system features/`:
 
 | Phase | Module | Key Features | Status |
-|-------|--------|-------------|--------|
-| **25** | **Products Module** | Multi-currency pricing (ProductPrices table with CurrencyId + effective dates), FIFO/FEFO batch tracking (InventoryBatches), PriceLevel enum (4 levels: Retail/Wholesale/VIP/Distributor), BillOfMaterials for assemblies, ProductImages (multiple per product), opening stock per warehouse on creation, DefaultPurchaseUnitId/DefaultSalesUnitId on Product | 📝 Planned |
+|-------|-------|-------------|--------|
 | **26** | **Warehouses Module** | Warehouse Type (Main/Store/Showroom), ManagerName, AccountId FK, Address, Phone, StockAdjustmentType (Addition/Deduction/Correction), StockIssueReason (Damage/Expiry/InternalUse), physical count deferred to V2 | 📝 Planned |
-| **27** | **Purchases Module** | Multi-currency (CurrencyId + ExchangeRate), landed cost distribution (AdditionalCharge entity), Purchase Orders (Draft/Approved/Received/Cancelled), standalone returns, PurchaseCost distribution via AllocateAdditionalCharges service | 📝 Planned |
+| **27** | **Purchases Module** | Multi-currency (CurrencyId + ExchangeRate), full landed cost via AdditionalCharge entity, Purchase Orders (Draft/Approved/Received/Cancelled), invoice attachments | 📝 Planned |
 | **28** | **Sales Module** | Multi-currency with profit display per line, Sales Quotations (with expiry, convertible to invoice), continuous barcode scanning POS mode, credit limit check on post, automatic refund on sales return | 📝 Planned |
 | **29** | **Receipts & Payments** | Multi-invoice payment distribution (PaymentAllocation), Cheque management (Pending/Cleared/Bounced/Cancelled), Cash/Bank/Cheque payment methods, DailyClosure with ActualCashCount reconciliation | 📝 Planned |
 | **30** | **Journal Entries** | 3-state lifecycle (Draft→Posted→Cancelled), multi-currency (CurrencyId + ExchangeRate), attachments support, FiscalYear entity with open/close lifecycle, Annual Closing automation | 📝 Planned |
 | **31** | **Reports** | 35+ report DTOs across 7 categories (Financial, Inventory, Sales, Purchases, Cash/Box, Transactions, Users), Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML for ALL reports, report column customization (hide/show/reorder) | 📝 Planned |
 | **32** | **Suppliers Module** | AccountId MANDATORY auto-created under 2100 parent, No SupplierType in V1, Party entity for shared contact data, phone validation regex `^05\d{8}$` | 📝 Planned |
+
+### Gap Implementations in v4.10.1
+The following gaps in Phases 27 and 28 were implemented in v4.10.1 ahead of full module delivery:
+
+| Gap | Phase | Description |
+|-----|-------|-------------|
+| **PurchaseInvoice OtherCharges (Landed Cost)** | 27 | `OtherCharges` decimal property + guard clause, `AllocateAdditionalCharges()` proportional distribution, landed unit cost for inventory batches |
+| **Purchase Return Standalone Mode** | 27 | Unlinked returns (`PurchaseInvoiceId = null`), `CreatePurchaseReturnEntryAsync()`/`ReversePurchaseReturnEntryAsync()`, `GET returned-quantities/{invoiceId}` |
+| **Sales Price Enforcement** | 28 | `PreventBelowRetailPrice` + `AllowBelowCostSale` checks via `IProductPriceService`, Desktop VM `GetDefaultPrice()` real price lookup |
+| **DeliveryChargesRevenue Account** | 28 | `SystemAccountKey.DeliveryChargesRevenue = 21`, account `1533 — إيرادات التوصيل`, separate credit in journal entries |
+| **Flexible Input** | 28 | `FlexibleInputCalculator` with `CalculationField` enum, editable LineTotal column, `_lastModifiedField` + `_isRecalculating` guard |
 
 ### Analysis-Driven Design Decisions
 
@@ -1108,26 +1127,30 @@ These architecture decisions come from the comprehensive system analysis:
 
 ---
 
+## 🆕 What's New in v4.10.1 — Purchases/Sales Gap Implementations
+
+| Feature | Description |
+|---------|-------------|
+| **💰 PurchaseInvoice OtherCharges (Landed Cost)** | `PurchaseInvoice` now has `OtherCharges` decimal property with guard clause (`otherCharges < 0`), included in `RecalculateTotals()` as `NetTotal = SubTotal - DiscountAmount + TaxAmount + OtherCharges`. `PurchaseService.PostAsync()` calls `AllocateAdditionalCharges()` which distributes OtherCharges proportionally by line total and adjusts landed unit cost before inventory batch creation. EF config maps `.HasPrecision(18, 2)`, DTOs/Requests include `OtherCharges` field, Desktop VM includes in `RecalculateTotals()`/`BuildRequest()`/`LoadInvoiceAsync()`, and `AccountingIntegrationService.CreatePurchasePostEntryAsync()` uses `SubTotal - DiscountAmount + OtherCharges` as `netInventoryCost` |
+| **🚫 Sales Price Enforcement** | `SalesService.PostAsync()` enforces `PreventBelowRetailPrice` setting — looks up `ProductPrices` for each item and rejects if `item.UnitPrice < effectivePrice`. Enforces `AllowBelowCostSale` setting — compares each item's `UnitPrice` against `CostInBaseCurrency` and rejects if below cost. `IProductPriceService` injected for price lookups via `GetEffectivePriceForInvoiceAsync()`. Price overrides are recorded on invoice lines only — NOT propagated to catalog (discount is the correct mechanism for price reductions). Desktop VM `GetDefaultPrice()` uses actual price from API, not `0m` stub |
+| **🚚 DeliveryChargesRevenue Account** | `SystemAccountKey` extended with `DeliveryChargesRevenue = 21` enum value. Account `1533 — إيرادات التوصيل` seeded under parent `1530 — إيرادات أخرى` (74 total accounts). `CreateSalesPostEntryAsync()` now credits DeliveryChargesRevenue separately from SalesRevenue: Dr Cash/AR = TotalAmount, Cr SalesRevenue = SubTotal - Discount, Cr DeliveryChargesRevenue = OtherCharges, Cr VatOutput = TaxAmount. `ReverseSalesPostEntryAsync()` mirrors the split for cancellations |
+| **🔄 Purchase Return Standalone Mode** | Desktop editor allows standalone returns (`PurchaseInvoiceId = null`) when supplier selected and items entered — no more blocking validation. Fixed hardcoded `ProductUnitId: 1` to use actual ProductUnitId from return line items. `AccountingIntegrationService` has `CreatePurchaseReturnEntryAsync()` — Dr Supplier Account / Cr PurchaseReturnAccount — and `ReversePurchaseReturnEntryAsync()` for cancellations. New `GET /api/v1/purchase-returns/returned-quantities/{invoiceId:int}` endpoint querying previously returned quantities. `PostedAt`/`CancelledAt` now properly set in `Post()`/`Cancel()` |
+| **⌨️ Flexible Input** | New `FlexibleInputCalculator` helper class with `CalculationField` enum (`Quantity`/`Price`/`Total`) and `Calculate()` method — given any two of (Quantity, UnitPrice/UnitCost, LineTotal), computes the third. Sales and Purchase line ViewModels have `LineTotalInput` editable property, `_lastModifiedField` tracking, `_isRecalculating` guard flag, and `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()`. LineTotal column editable in DataGrids (not `IsReadOnly`) |
+| **🏗️ Build & Tests** | **0 errors, 0 warnings** across all 6 production projects. **2,083+ tests** total — all pass. **74 total seeded COA accounts** (up from 73). AGENTS.md updated with 15+ new FORBIDDEN items covering landed cost, price enforcement, delivery charges, standalone returns, and flexible input |
+
+---
+
 ## 📜 Version History
 
-### v4.6.9 — Phase 21 Users & Permissions Complete (Current)
-- **Tax Module**: Full `Tax` entity (name, rate, type percentage/fixed, `IsDefault`) with CRUD service, API controller, WPF Desktop UI (list + editor views)
-- **Tax on Invoices**: `TaxId` FK on `SalesInvoice`/`PurchaseInvoice` with `DeleteBehavior.Restrict`, `SetTax()` domain method, `GetTaxAmount()` computation
-- **Memory Caching**: `IMemoryCache` + `ConcurrentDictionary` key tracker for SystemSettings — 5-minute sliding expiration with `PostEvictionCallback` auto-cleanup
-- **29 System Settings seeded** across 8 categories via `DbSeeder`
-- **Typed helpers**: `SetStringAsync(category, key, value)`, `SetIntAsync()`, `SetBoolAsync()`, `SetDecimalAsync()` with auto-create
-- **SystemSetting guard clauses**: `Create()` validates `Category` (not empty) and `DataType` (must be string/int/bool/decimal)
-- **Filtered unique index IsActive guard**: All filtered indexes on soft-deletable entities include `AND [IsActive] = 1`
-- **StoreSettings deprecation**: `DefaultTaxRate`, `IsTaxEnabled`, `InvoicePrefix`, `CurrencyCode` deprecated — Tax entity is source of truth
-- **SystemSettingsViewModel expanded**: Added 14 missing properties — `HideTaxInSales`, `ShowExpiryInInvoices` (Sales), `HideTaxInPurchases` (Purchases), `ShowLogo`, `FooterNote`, `ThermalPrinterName`, `A4PrinterName`, `LogoPath`, `StoreTaxNumber` (Print), `LowStockAlert`, `ExpiryAlert`, `ExpiryAlertDays`, `CreditLimitAlert` (Notifications)
-- **Service-level validation**: `StoreSettingsService.ValidateSystemSettings()` validates 19 bool keys + 6 int keys with ranges (CostingMethod 1-3, DecimalPlaces 0-6, StockAlertDays 1-365)
-- **Tax domain methods**: Added `SetDefault()` and `ClearDefault()` with `UpdateTimestamp()` audit trail
-- **Phase 18 review doc updated**: All 12 bugs marked `[FIXED]` with post-review fix table
-- **RULE-291 to RULE-301**: 7 settings + 3 enhancement rules for settings module integrity
-- **Build**: 0 errors, 0 warnings across all 9 projects
-- **Phase 21 Users & Permissions**: 16 tasks implemented — User entity rebuild (UserStatus, passwordless creation, lockout 5 attempts, Phone/Email/Avatar/DefaultCashBoxId), Permission+RolePermission DB-backed system (33 permissions, 4 roles), AuditLog (long Id, 3 indexes, paginated browser), UserSession, AuthService (SetPassword/ChangePassword/audit trail), 10 API endpoints, 5 Desktop screens, EF Migration Phase21_UsersAndPermissions
-- **RULE-305 to RULE-320**: 16 new rules covering Phase 21 Users & Permissions module
-- **Tests**: 1,887 passed, 5 pre-existing failures, 70 skipped
+### v4.10.1 — Purchases/Sales Gap Implementations (Current)
+- **PurchaseInvoice OtherCharges (Landed Cost)**: `OtherCharges` decimal property on `PurchaseInvoice` with `otherCharges < 0` guard, included in `RecalculateTotals()`. `AllocateAdditionalCharges()` distributes proportionally by line total, adjusts landed unit cost before inventory batch creation. EF config, DTOs/Requests, Desktop VM/XAML, AccountingIntegrationService all updated
+- **Sales Price Enforcement**: `SalesService.PostAsync()` enforces `PreventBelowRetailPrice` (rejects below registered price) and `AllowBelowCostSale` (rejects below cost). `IProductPriceService` injected for price lookups. Desktop `GetDefaultPrice()` uses real price lookup instead of `0m` stub
+- **DeliveryChargesRevenue Account**: `SystemAccountKey.DeliveryChargesRevenue = 21`, account `1533 — إيرادات التوصيل` seeded under parent `1530 — إيرادات أخرى`. Journal entries credit DeliveryChargesRevenue separately from SalesRevenue
+- **Purchase Return Standalone Mode**: Standalone returns (`PurchaseInvoiceId = null`) allowed. Fixed hardcoded `ProductUnitId: 1`. Added `CreatePurchaseReturnEntryAsync()`/`ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService. New `GET returned-quantities/{invoiceId}` endpoint. Fixed `PostedAt`/`CancelledAt` in `Post()`/`Cancel()`
+- **Flexible Input**: `FlexibleInputCalculator` with `CalculationField` enum (Quantity/Price/Total) and `Calculate()` method. Sales/Purchase line ViewModels have `LineTotalInput`, `_lastModifiedField`, `_isRecalculating`, and `RecalculateFromFlexibleInput()`. LineTotal column editable in DataGrids
+- **Build**: 0 errors, 0 warnings across all 6 production projects
+- **Tests**: 2,083+ tests total — all pass
+- **COA accounts**: 74 total (up from 73 — added DeliveryChargesRevenue=1533)
 
 ### v4.6.8 — Currency Module Stabilization & EF Core Transaction Strategy
 - **BeginTransactionAsync removed**: Removed manual transactions from CurrencyService (3 methods)
@@ -1393,7 +1416,7 @@ Phase 21 added RULE-305 through RULE-320 covering:
 
 This project uses AI-assisted development with strict architectural rules. Before contributing:
 
-1. Read [`AGENTS.md`](AGENTS.md) — all 460+ non-negotiable rules (RULE-001 to RULE-463+)
+1. Read [`AGENTS.md`](AGENTS.md) — all 460+ non-negotiable rules (RULE-001 to RULE-498+)
 2. Read [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) — financial and transaction rules
 3. Follow the pre-submission checklist in AGENTS.md §9
 
