@@ -80,6 +80,10 @@ var jwtSecret = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_SECRET")
     ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
         ? "ThisIsASecretKeyThatIsLongEnoughForHS256Algorithm!"
         : throw new InvalidOperationException("SALESSYSTEM_JWT_SECRET is required in production"));
+
+if (string.IsNullOrEmpty(jwtSecret) || jwtSecret.Length < 32)
+    throw new InvalidOperationException("JWT secret must be at least 32 characters");
+
 var jwtIssuer = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_ISSUER") ?? "SalesSystem";
 var jwtAudience = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_AUDIENCE") ?? "SalesSystem";
 var jwtExpirationHours = int.TryParse(Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_EXPIRATION_HOURS"), out var hours) ? hours : 8;

@@ -31,6 +31,7 @@ public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEnt
         // Indexes
         builder.HasIndex(x => x.JournalEntryId);
         builder.HasIndex(x => x.AccountId);
+        builder.HasIndex(x => new { x.JournalEntryId, x.AccountId });
 
     }
 }

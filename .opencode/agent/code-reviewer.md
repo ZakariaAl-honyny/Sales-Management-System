@@ -255,6 +255,14 @@ Code quality and convention enforcement for the Sales Management System.
 | CHECK-025 | Does `AccountingIntegrationService` have `CreateSalesReturnEntryAsync()` for standalone sales returns? (Must Dr SalesReturnsAccount / Cr CustomerAccount for revenue side + Dr InventoryAccount / Cr COGSAccount for cost side.) |
 | CHECK-026 | Do ALL report services return real data (not hardcoded failure stubs)? (Check `FinancialReportService.GetCashFlowReportAsync()` — was returning `"تحت التطوير"` stub instead of computing from ReceiptVoucher/PaymentVoucher data.) |
 | CHECK-027 | Do ALL financial report ViewModels have Excel (ClosedXML) export? (Check `AccountStatementViewModel` — was missing `ExportExcelCommand` while PDF export existed.) |
+| CHECK-028 | Does `ReportExportController.Export()` delegate to `IReportExportService.ExportAsync()` instead of returning `BadRequest`? (Every report type must build an Arabic-column DataTable and export via ClosedXML (Excel) or QuestPDF (PDF).) |
+| CHECK-029 | Does `Permission.cs` define ALL 21 permission flags matching the AGENTS.md Section 6 matrix? (Missing: SalesInvoice, SalesReturn, CustomerView, CustomerManagement, PurchaseInvoice, PurchaseReturn, ProductManagement, SupplierManagement, WarehouseTransfer, Reports, WarehouseManagement, Settings, UserManagement, Backup, ChartOfAccounts, JournalEntries, CashBoxes, Currencies, FiscalYear, Employees, Banks.) |
+| CHECK-030 | Does `CanNavigate()` use `_ => false` deny-by-default with EVERY screen tag explicitly listed? (The old `_ => true` allowed unauthorized users to access Manager/Admin screens through navigation.) |
+| CHECK-031 | Do Organization Management screens (Branches, Departments, Employees, Banks, Parties, Expenses) and accounting screens (ReceiptVouchers, PaymentVouchers) have `Visibility="{Binding IsAdvancedMode, Converter=...}"` to hide from Basic users? |
+| CHECK-032 | Are keyboard shortcuts defined via `<Window.InputBindings>` at minimum F3 (Products), F4 (Customers), F5 (Purchases), F8 (Reports)? |
+| CHECK-033 | Does `InvoicePrintDto` have `OtherCharges` and `FooterNote` properties? (OtherCharges must appear in A4/thermal prints; FooterNote from PrintSettings must replace the hardcoded footer.) |
+| CHECK-034 | Does `PrintController` have return print endpoints (`GET/POST /api/v1/print/sales-returns/{id}/...` and `.../purchase-returns/{id}/...`)? |
+| CHECK-035 | Do JWT tokens include a `jti` (JWT ID) claim and is the JWT secret validated for minimum 32 characters? |
 
 ## v4.6.9 — Phase 19 Settings Module Remediations
 
@@ -574,6 +582,11 @@ When writing or reviewing code in ANY layer, check these:
 - [ ] `CreatePurchaseReturnEntryAsync()` and `ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService?
 - [ ] `GET /api/v1/purchase-returns/returned-quantities/{invoiceId}` endpoint exists?
 - [ ] `PostedAt`/`CancelledAt` set in `PurchaseReturn.Post()`/`Cancel()`?
+- [ ] `SalesReturn.Post()` sets `PostedAt = DateTime.UtcNow` and `SalesReturn.Cancel()` sets `CancelledAt = DateTime.UtcNow`?
+- [ ] `SalesReturnService` injects `IAccountingIntegrationService` and creates journal entries on Post/Cancel?
+- [ ] `CreateSalesReturnEntryAsync`/`ReverseSalesReturnEntryAsync` exist in `AccountingIntegrationService`?
+- [ ] `ProductUnitId` NOT hardcoded to `1` in ANY ViewModel (use DefaultPurchaseUnitId/DefaultSalesUnitId)?
+- [ ] `AllocateAdditionalCharges()` extracted to standalone `AdditionalChargeAllocator` helper class?
 - [ ] `FlexibleInputCalculator` helper class exists with `CalculationField` enum?
 - [ ] `LineTotalInput` editable property in line ViewModels?
 - [ ] `_lastModifiedField` and `_isRecalculating` guard flag in line ViewModels?
@@ -628,3 +641,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 42. Payment UpdateAsync without journal entry reversal for posted amounts → SupplierPaymentService AND CustomerReceiptService must reverse + re-create journal entries when posted payment amount changes.
 43. Standalone sales return missing `CreateSalesReturnEntryAsync()` in AccountingIntegrationService → Must Dr SalesReturnsAccount/Cr CustomerAccount (revenue side) + Dr InventoryAccount/Cr COGSAccount (cost side).
 44. Report service returning hardcoded stub failure instead of actual data → Check CashFlowReport, replace `"قيد إعادة البناء"` stub with real implementation from ReceiptVoucher/PaymentVoucher.
+45. `SalesReturn.Post()` without `PostedAt` / `SalesReturn.Cancel()` without `CancelledAt` → ADD `PostedAt = DateTime.UtcNow` / `CancelledAt = DateTime.UtcNow` — matches RULE-489 pattern for PurchaseReturn.
+46. `SalesReturnService` not injecting `IAccountingIntegrationService` → ADD DI injection, call `CreateSalesReturnEntryAsync()` on Post, call `ReverseSalesReturnEntryAsync()` on Cancel.
+47. `ProductUnitId` hardcoded to `1` in Desktop ViewModels → REPLACE with `product.DefaultPurchaseUnitId` (purchase/inventory screens) or `product.DefaultSalesUnitId` (sales screens). Fallback to `0` (service auto-determines).
+48. `AllocateAdditionalCharges` inline in `PurchaseService.PostAsync()` → EXTRACT to standalone `AdditionalChargeAllocator` static helper class in `Helpers/` for DRY compliance + unit testability.

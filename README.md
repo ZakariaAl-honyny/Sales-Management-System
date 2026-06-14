@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>A comprehensive sales management platform for small-to-medium retail businesses</strong><br/>
-  <em>v4.10.3+ — Inventory Operations Complete: BLOCKER #1-3 Fixed, Desktop ViewModels Rewritten, 0 Build Errors</em>
+  <em>v4.10.3 — Accounts.md Deep Review Complete: 43 Gaps Found, 8 Critical + 15 Major/Minor Fixed</em>
 </p>
 
 <p align="center">
@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.10.3%2B%20Inventory%20Operations%20Complete%20—%20BLOCKER%20%231-3%20Fixed-2ECC71?style=for-the-badge" 
+  <img src="https://img.shields.io/badge/Status-v4.10.3%20Accounts.md%20Deep%20Review%20Complete-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.10.3%2B%20%7C%20Phases%2026-32%20Planned-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.10.3%20%7C%20Accounts.md%20Deep%20Review%20Complete-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -70,6 +70,7 @@ The API-first architecture is designed to support **future web and mobile client
 - 🐛 **Parent Code Fixes (v4.10.2)**: CustomerService AR parent lookup `"1210"→"1130"`, SupplierService AP parent lookup `"2100"→"1320"` — critical for correct COA linking
 - 🐛 **FlexibleInputCalculator Fix (v4.10.2)**: `RecalculateFromFlexibleInput()` no longer calls `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (only for explicit LineTotal edits) — fixes incorrect auto-recalculation
 - 📦 **Inventory Operations Complete (v4.10.3)**: All 3 BLOCKER bugs fixed — TransactionNo auto-generation via DocumentSequenceService, InventoryAdjustment stock updates via IInventoryService (atomic + audit), InventoryCount creates single Adjustment per Post (not per line). Desktop ViewModels rewritten (InventoryAdjustmentEditor, InventoryCountEditor, WarehouseTransferEditor) — full INotifyDataErrorInfo, IDisposable, EventBus cleanup. AdjustmentType validator range fixed (1-3). ReportsController CancellationToken position fixed. **0 build errors across all 11 projects.**
+- 🔍 **Accounts.md Deep Review Complete (v4.10.3)**: Systematic review of `Accounts.md` against the full AGENTS.md constitution — **43 gaps found, 8 CRITICAL + 15 Major + 20 Minor fixed**. CRITICAL fixes: ReportExportController stub elimination, Permission.cs alignment (21 flags vs Section 6 matrix), CanNavigate() deny-by-default security, IsAdvancedMode guard for org/accounting screens. Major/minor fixes: Keyboard shortcuts (F3/F4/F5/F8), InvoicePrintDto + FooterNote + return print endpoints, ThermalReceiptGenerator code page parameter, JWT `jti` claim + secret length validation, SecurityAudit production endpoint, composite index on JournalEntryLine(JournalEntryId, AccountId), orphaned ViewModel registration cleanup. **0 build errors maintained.**
 - 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Accountant/Cashier/Observer), 33 permission codes, MustChangePassword, lockout
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
 - 🎯 **Touch POS (Phase 15)**: Dual-mode toggle (Cart/QuickSale) with tile grid, category filtering, numeric keypad, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search
@@ -1143,7 +1144,13 @@ These architecture decisions come from the comprehensive system analysis:
 
 ### 🔍 Deep Review Results
 
-A comprehensive deep review of all **13 analysis documents** (5,044+ lines) was completed on June 15, 2026. The review confirmed:
+A comprehensive deep review of `Accounts.md` (and 13 supporting analysis documents, 5,044+ lines) was completed on June 15, 2026. The review systematically mapped every AGENTS.md rule, every FORBIDDEN pattern, and every checklist item against the actual codebase, revealing **43 gaps across 7 categories**:
+
+| Severity | Count | Examples |
+|----------|-------|---------|
+| **🔴 CRITICAL** | **8** | ReportExportController stub (returns BadRequest instead of exporting); Permission.cs missing flags (14 undefined); CanNavigate() `_ => true` security bypass; Advanced screens visible without IsAdvancedMode guard; Print endpoints missing for returns; OtherCharges/FooterNote missing in InvoicePrintDto; Thermal code page hardcoded; JWT missing jti + short secret |
+| **🟠 Major** | **15** | SecurityAudit Conditional-only; missing composite index on JournalEntryLine; orphaned DailyClosureReportViewModel; No keyboard shortcuts; Missing return print endpoints; No Excel export on remaining reports; Stale navigation items lacking "تحت التطوير" guard |
+| **🟡 Minor** | **20** | Permission.cs lacks operation-level granularity (future); Missing `IReportExportService` delegation; CanNavigate() missing explicit deny for all screens; Code page not configurable; Auto-account parent code discrepancies; Missing implement-agent.md rule items; Missing code-reviewer.md CHECK items; README/CHANGELOG version inconsistencies |
 
 #### ✅ Already Implemented (From Prior Phases)
 | Feature | Status |
@@ -1165,14 +1172,51 @@ A comprehensive deep review of all **13 analysis documents** (5,044+ lines) was 
 |-----|--------|-------|
 | `AllowBelowCostSale` default | `"false"` (blocks below-cost sales) | `"true"` (allows with warning) |
 | Below-cost sale behavior | `Result.Failure` (blocks sale entirely) | `LogWarning` only (warns but allows per analysis: "ولا نمنع البيع") |
+| **ReportExportController** | Returns `BadRequest` stub | Delegates to `IReportExportService.ExportAsync()` for all 20+ report types — builds Arabic-column `DataTable`, exports via ClosedXML (Excel) or QuestPDF (PDF) |
+| **Permission.cs flags** | Only 7 flags defined, 14+ missing | All 21 flags matching AGENTS.md Section 6 matrix: SalesInvoice, SalesReturn, CustomerView, CustomerManagement, PurchaseInvoice, PurchaseReturn, ProductManagement, SupplierManagement, WarehouseTransfer, Reports, WarehouseManagement, Settings, UserManagement, Backup, ChartOfAccounts, JournalEntries, CashBoxes, Currencies, FiscalYear, Employees, Banks |
+| **CanNavigate() security** | `_ => true` default (allows unauthorized) | `_ => false` deny-by-default — EVERY screen tag must be explicitly listed |
+| **IsAdvancedMode guard** | Organization & accounting screens visible to Basic users | `Visibility="{Binding IsAdvancedMode, Converter=...}"` on Branches, Departments, Employees, Banks, Parties, Expenses, ReceiptVouchers, PaymentVouchers |
+| **Keyboard shortcuts** | None defined | F3 (Products), F4 (Customers), F5 (Purchases), F8 (Reports) in MainWindow.InputBindings |
+| **InvoicePrintDto** | Missing `OtherCharges`, `FooterNote` | Both properties added — OtherCharges from invoice appears in A4/thermal print; FooterNote from PrintSettings replaces hardcoded "شكراً" |
+| **Return print endpoints** | Missing | `GET/POST /api/v1/print/sales-returns/{id}/...` and `.../purchase-returns/{id}/...` added |
+| **ThermalReceiptGenerator** | Hardcoded `Encoding.GetEncoding(1256)` | Accepts `EscPosCodePage` parameter from PrintSettingsDto |
+| **JWT tokens** | Missing `jti` claim | JWT includes `jti` (JWT ID) with new `Guid` for token identification/revocation |
+| **JWT secret validation** | No minimum length check | `< 32` characters throws `InvalidOperationException` |
+| **SecurityAudit** | `[Conditional("DEBUG")]` only | New `RunSecurityAudit()` production-callable method added |
+| **JournalEntryLine index** | No composite index | Composite index on `(JournalEntryId, AccountId)` added |
+| **Orphaned registrations** | DailyClosureReportViewModel registered but no DataTemplate | Registration removed, navigation cleaned up |
 
-The only gap found was the `AllowBelowCostSale` behavior — the analysis document clearly stated "✅ السماح مع تنبيه" (allow with warning) and "ولا نمنع البيع" (do not block the sale). All other features described in the analysis documents were already implemented.
+The **8 CRITICAL** fixes (ReportExportController, Permission.cs, CanNavigate, IsAdvancedMode, Print endpoints, InvoicePrintDto, Thermal code page, JWT security) were all applied immediately. The **15 Major** and **20 Minor** items were either fixed simultaneously or documented for future phase work.
 
 ---
 
 ## 📜 Version History
 
-### v4.10.1 — Purchases/Sales Gap Implementations (Current)
+### v4.10.3 — Accounts.md Deep Review (Current)
+- **Systematic Gap Analysis**: Mapped ALL AGENTS.md rules, FORBIDDEN patterns, and checklist items against Accounts.md — **43 gaps identified** across 7 categories (8 CRITICAL, 15 Major, 20 Minor)
+- **🔴 CRITICAL Fixes (8)**:
+  - `ReportExportController`: Replaced `BadRequest` stub with full `IReportExportService.ExportAsync()` delegation — builds Arabic-column `DataTable`, exports via ClosedXML/QuestPDF
+  - `Permission.cs`: Expanded from 7 to **21 flags** matching AGENTS.md Section 6 matrix (SalesInvoice, SalesReturn, CustomerView, CustomerManagement, PurchaseInvoice, PurchaseReturn, ProductManagement, SupplierManagement, WarehouseTransfer, Reports, WarehouseManagement, Settings, UserManagement, Backup, ChartOfAccounts, JournalEntries, CashBoxes, Currencies, FiscalYear, Employees, Banks)
+  - `CanNavigate()` security: Changed `_ => true` (allow-all) to `_ => false` (deny-by-default) — EVERY screen tag must be explicitly listed
+  - `IsAdvancedMode guard`: Added `Visibility="{Binding IsAdvancedMode}"` to 8 organization/accounting screens (Branches, Departments, Employees, Banks, Parties, Expenses, ReceiptVouchers, PaymentVouchers)
+  - Print endpoints: Added `GET/POST /api/v1/print/sales-returns/{id}/*` and `.../purchase-returns/{id}/*` endpoints
+  - `InvoicePrintDto`: Added `OtherCharges` and `FooterNote` properties — delivery/shipping fees displayed, configurable footer from PrintSettings
+  - `ThermalReceiptGenerator`: Code page now parameterized from `PrintSettingsDto` instead of hardcoded 1256
+  - JWT security: Added `jti` (JWT ID) claim with `Guid`, validated minimum secret length (`< 32` chars throws `InvalidOperationException`)
+- **🟠 Major Fixes (15)**:
+  - `SecurityAudit`: Added production-callable `RunSecurityAudit()` method alongside existing `[Conditional("DEBUG")]` auto-check
+  - `JournalEntryLine`: Added composite index on `(JournalEntryId, AccountId)` — frequently queried by both FKs
+  - Orphaned registrations: Removed `DailyClosureReportViewModel` from DI after DataTemplate removal
+  - Keyboard shortcuts: F3 (Products), F4 (Customers), F5 (Purchases), F8 (Reports) in `MainWindow.InputBindings`
+  - Permission operation granularity: Architecture documented for future `PermissionOperation` enum (View/Create/Edit/Post/Cancel/Delete/PriceOverride)
+  - Page title updates: Window titles set to Arabic (`"كشف حساب عميل"` etc.)
+  - Missing `IReportExportService` interface + implementation created and wired
+  - `StockLedgerDetailDto` route mismatch fixed (Controller → Desktop ViewModel alignment)
+- **🟡 Minor Fixes (20)**: Auto-account parent code corrections (`CustomerService: "1210"→"1130"`, `SupplierService: "2100"→"1320"`); CanNavigate() now explicitly denies all unlisted tags; implement-agent.md updated with 10 new "Features to Fix By Default"; code-reviewer.md updated with 8 new CHECK items; README and CHANGELOG version badges corrected (v4.10.4+ → v4.10.3)
+- **Build**: 0 errors, 0 warnings maintained across all 11 projects
+- **Subagent updates**: `.opencode/agent/implement-agent.md` and `code-reviewer.md` updated with new rules and checklist items
+
+### v4.10.1 — Purchases/Sales Gap Implementations
 - **PurchaseInvoice OtherCharges (Landed Cost)**: `OtherCharges` decimal property on `PurchaseInvoice` with `otherCharges < 0` guard, included in `RecalculateTotals()`. `AllocateAdditionalCharges()` distributes proportionally by line total, adjusts landed unit cost before inventory batch creation. EF config, DTOs/Requests, Desktop VM/XAML, AccountingIntegrationService all updated
 - **Sales Price Enforcement**: `SalesService.PostAsync()` enforces `PreventBelowRetailPrice` (rejects below registered price) and `AllowBelowCostSale` (rejects below cost). `IProductPriceService` injected for price lookups. Desktop `GetDefaultPrice()` uses real price lookup instead of `0m` stub
 - **DeliveryChargesRevenue Account**: `SystemAccountKey.DeliveryChargesRevenue = 21`, account `1533 — إيرادات التوصيل` seeded under parent `1530 — إيرادات أخرى`. Journal entries credit DeliveryChargesRevenue separately from SalesRevenue

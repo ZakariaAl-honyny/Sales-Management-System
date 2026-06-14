@@ -1561,6 +1561,68 @@ The following rules codify the bugs found and fixed during Phase 22 code review.
 | RULE-514 | `ReportsController` MUST place `CancellationToken` parameter BEFORE any optional parameters — ASP.NET Core model binding requires cancellation tokens to precede optional params to avoid binding errors. |
 | RULE-515 | `InventoryCountService.PostAsync()` MUST compute `Difference` for each line as `(ActualQuantity - ExpectedQuantity)` — positive difference = surplus (stock increase), negative difference = shortage (stock decrease). Apply increase or decrease via `IInventoryService` based on sign. |
 | RULE-516 | All Inventory Operations ViewModels (InventoryAdjustmentEditorViewModel, InventoryCountEditorViewModel, WarehouseTransferEditorViewModel) MUST implement `IDisposable` and call `Cleanup()` in `Dispose()` to unsubscribe EventBus subscriptions — same pattern as RULE-289. MUST use `IToastNotificationService` for minor success messages, not modal dialogs. |
+| RULE-517 | `SalesReturn.Post()` MUST set `PostedAt = DateTime.UtcNow` and `SalesReturn.Cancel()` MUST set `CancelledAt = DateTime.UtcNow` — these timestamps are required for audit trail compliance per DocumentEntity lifecycle (RULE-489). |
+| RULE-518 | `SalesReturnService` MUST inject `IAccountingIntegrationService` and call `CreateSalesReturnEntryAsync()` on Post AND `ReverseSalesReturnEntryAsync()` (or equivalent reversal) on Cancel — sales returns WITHOUT journal entries leave the general ledger out of sync. `AccountingIntegrationService` MUST have BOTH `CreateSalesReturnEntryAsync()` and `ReverseSalesReturnEntryAsync()` methods. |
+| RULE-519 | `ProductUnitId` MUST NEVER be hardcoded to `1` in any ViewModel — use the product's `DefaultPurchaseUnitId` (for purchase/inventory screens) or `DefaultSalesUnitId` (for sales screens) when creating line items. Fallback to `0` (let service determine) rather than hardcoding `1`. |
+| RULE-520 | `AllocateAdditionalCharges()` MUST be extracted to a standalone static helper class (`AdditionalChargeAllocator`) rather than being inline in `PurchaseService.PostAsync()` — enables DRY compliance (RULE-041) and unit testability. |
+
+### 2.94 Accounts.md Deep Review Rules (v4.10.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-521 | `ReportExportController.Export()` MUST delegate to `IReportExportService.ExportAsync()` for ALL 20+ report types — NEVER return a `BadRequest` stub. Each report type builds an Arabic-column `DataTable` and exports via ClosedXML (Excel) or QuestPDF (PDF). |
+| RULE-522 | `Permission.cs` MUST have ALL permission flags matching the AGENTS.md Section 6 matrix: SalesInvoice, SalesReturn, CustomerView, CustomerManagement, PurchaseInvoice, PurchaseReturn, ProductManagement, SupplierManagement, WarehouseTransfer, Reports, WarehouseManagement, Settings, UserManagement, Backup, ChartOfAccounts, JournalEntries, CashBoxes, Currencies, FiscalYear. Missing flags cause permission bypass or blocked access. |
+| RULE-523 | `CanNavigate()` in `MainViewModel` MUST use `_ => false` as the default (deny-by-default) — EVERY screen tag must be explicitly listed. The old `_ => true` pattern allowed unauthorized users to access Manager/Admin screens through navigation. |
+| RULE-524 | Organization Management screens (Branches, Departments, Employees, Banks, Parties, Expenses) and accounting screens (ReceiptVouchers, PaymentVouchers, سندات القبض المحاسبية, سندات الصرف) MUST have `Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"` to hide them from Basic users per the Accounts.md UI separation pattern. |
+| RULE-525 | ALL XAML windows SHOULD have keyboard shortcuts defined via `<Window.InputBindings>` — at minimum F3 (Products), F4 (Customers), F5 (Purchases), F8 (Reports). Keyboard shortcuts improve operational efficiency per Accounts.md Phase 5 UI analysis. |
+| RULE-526 | `InvoicePrintDto` MUST have `OtherCharges` and `FooterNote` properties — OtherCharges from the invoice (delivery/shipping fees) must appear in both A4 and thermal print. FooterNote from PrintSettings replaces the hardcoded "شكراً لتعاملكم معنا". |
+| RULE-527 | `PrintController` MUST have return print endpoints (`GET/POST /api/v1/print/sales-returns/{id}/...` and `GET/POST /api/v1/print/purchase-returns/{id}/...`) — the builder already has `BuildFromSalesReturnAsync()`/`BuildFromPurchaseReturnAsync()` methods. |
+| RULE-528 | `ThermalReceiptGenerator` MUST accept `EscPosCodePage` as a parameter instead of hardcoding `Encoding.GetEncoding(1256)` — the code page should come from `PrintSettingsDto`. |
+| RULE-529 | JWT tokens MUST include a `jti` (JWT ID) claim with a new `Guid` — this enables individual token identification and future revocation support. |
+| RULE-530 | JWT secret from environment variable MUST be validated for minimum length (`< 32` characters throws `InvalidOperationException`) — a short secret creates an HS256 security vulnerability. |
+| RULE-531 | `SecurityAudit` class MUST expose a non-conditional `RunSecurityAudit()` method callable from production — the `[Conditional("DEBUG")]` automatic check is kept for dev builds but a production endpoint can call the new method. |
+| RULE-532 | `JournalEntryLine` entity MUST have a composite index on `(JournalEntryId, AccountId)` in addition to the individual indexes — the accounting integration service frequently queries by both foreign keys simultaneously. |
+| RULE-533 | `DailyClosureReportViewModel` MUST be removed from DI and MainViewModel when its DataTemplate is removed — orphaned registrations waste resources and orphaned commands cause navigation to blank screens. |
+| RULE-534 | Permission system SHOULD support operation-level granularity (`PermissionOperation` enum: View, Create, Edit, Post, Cancel, Delete, PriceOverride) for future separation of duties — feature-level flags alone are insufficient for enterprise deployments. |
+
+### 2.95 Section 4 FORBIDDEN Updates (add these to the forbidden list)
+
+Add these NEW forbidden patterns:
+
+```text
+❌ ReportExportController returning BadRequest stub instead of routing to export service
+❌ CanNavigate() with _ => true fallback (must use _ => false deny-by-default)
+❌ Missing permission flags in Permission.cs (must match AGENTS.md Section 6)
+❌ Advanced-only screens visible to Basic users without IsAdvancedMode guard
+❌ Print endpoints missing for returns (sales-returns, purchase-returns)
+❌ OtherCharges missing from InvoicePrintDto and print templates
+❌ FooterNote missing from InvoicePrintDto (must display configurable footer from settings)
+❌ ThermalReceiptGenerator hardcoding code page 1256 (accept from settings)
+❌ JWT tokens without jti claim (breaks token identification)
+❌ JWT secret without minimum length validation (< 32 chars)
+❌ [Conditional("DEBUG")] as sole SecurityAudit access (add production endpoint)
+❌ Missing composite index on JournalEntryLine(JournalEntryId, AccountId)
+❌ Orphaned ViewModel registrations after DataTemplate removal (DailyClosureReportViewModel)
+❌ Feature-level-only permissions without operation-level granularity
+```
+
+### 2.96 Section 9 Pre-Submission Checklist Updates
+
+Add these NEW checklist items at the end of the existing checklist:
+
+- [ ] ReportExportController properly delegates to export service (no stub)?
+- [ ] All Permission.cs flags match AGENTS.md Section 6 matrix?
+- [ ] CanNavigate() uses _ => false deny-by-default with all screens explicit?
+- [ ] Organization Management and accounting screens have IsAdvancedMode guards?
+- [ ] Keyboard shortcuts (F3/F4/F5/F8) defined in MainWindow.InputBindings?
+- [ ] InvoicePrintDto has OtherCharges + FooterNote properties?
+- [ ] PrintController has returns endpoints (sales-returns, purchase-returns)?
+- [ ] ThermalReceiptGenerator accepts code page parameter?
+- [ ] JWT tokens include jti claim?
+- [ ] JWT secret validated for minimum 32 characters?
+- [ ] SecurityAudit has production-callable method?
+- [ ] Composite index on JournalEntryLine(JournalEntryId, AccountId) exists?
+- [ ] No orphaned ViewModel DI registrations after UI removal?
 
 Phase 24: Accounting Engine Automation → Automatic journal entries for all money operations
 Phase 25: Payment Update/Delete Reversal Entries → Fix C-2/C-3: Reversal entries for payment update/delete
@@ -1941,6 +2003,25 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ `ReportsController` with `CancellationToken` AFTER optional parameters (MUST precede optional params)
 ❌ Inventory Operations ViewModels NOT implementing `IDisposable` (EventBus subscriptions MUST be disposed)
 ❌ `InvoiceLineViewModel`/`PurchaseInvoiceLineViewModel` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator MUST only be called when `_lastModifiedField == Total`)
+❌ `SalesReturn.Post()` without `PostedAt = DateTime.UtcNow` (missing audit trail timestamp — same issue as RULE-489 for PurchaseReturn)
+❌ `SalesReturn.Cancel()` without `CancelledAt = DateTime.UtcNow` (missing audit trail timestamp)
+❌ `SalesReturnService` NOT creating journal entries on Post/Cancel (general ledger out of sync — MUST inject IAccountingIntegrationService)
+❌ `ProductUnitId` hardcoded to `1` in ANY ViewModel (breaks inventory tracking — use DefaultPurchaseUnitId/DefaultSalesUnitId instead)
+❌ `AllocateAdditionalCharges()` logic inline in `PurchaseService.PostAsync()` (MUST extract to standalone `AdditionalChargeAllocator` helper)
+❌ ReportExportController returning BadRequest stub instead of routing to export service
+❌ CanNavigate() with _ => true fallback (must use _ => false deny-by-default)
+❌ Missing permission flags in Permission.cs (must match AGENTS.md Section 6)
+❌ Advanced-only screens visible to Basic users without IsAdvancedMode guard
+❌ Print endpoints missing for returns (sales-returns, purchase-returns)
+❌ OtherCharges missing from InvoicePrintDto and print templates
+❌ FooterNote missing from InvoicePrintDto (must display configurable footer from settings)
+❌ ThermalReceiptGenerator hardcoding code page 1256 (accept from settings)
+❌ JWT tokens without jti claim (breaks token identification)
+❌ JWT secret without minimum length validation (< 32 chars)
+❌ [Conditional("DEBUG")] as sole SecurityAudit access (add production endpoint)
+❌ Missing composite index on JournalEntryLine(JournalEntryId, AccountId)
+❌ Orphaned ViewModel registrations after DataTemplate removal (DailyClosureReportViewModel)
+❌ Feature-level-only permissions without operation-level granularity
 ```
 
 
@@ -2297,9 +2378,26 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] AccountStatementViewModel has Excel export?
 - [ ] All stale navigation menu items guarded with "تحت التطوير" dialog (no NullReferenceException)?
 - [ ] All 2,083+ tests pass?
+- [ ] `SalesReturn.Post()` sets `PostedAt = DateTime.UtcNow` and `SalesReturn.Cancel()` sets `CancelledAt = DateTime.UtcNow`?
+- [ ] `SalesReturnService` injects `IAccountingIntegrationService` and creates journal entries on Post (CreateSalesReturnEntryAsync) + Cancel (ReverseSalesReturnEntryAsync)?
+- [ ] `ProductUnitId` NOT hardcoded to `1` anywhere in Desktop ViewModels (use product.DefaultPurchaseUnitId / DefaultSalesUnitId)?
+- [ ] `AllocateAdditionalCharges()` extracted to standalone `AdditionalChargeAllocator` helper class (not inline in PurchaseService.PostAsync)?
 - [ ] `InventoryService.CreateTransactionAsync()` uses `_sequenceService.GetNextIntAsync()` when `TransactionNo <= 0` — NEVER require Desktop to provide TransactionNo?
 - [ ] `InventoryAdjustmentService.PostAsync()` updates stock via `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` — NEVER direct `WarehouseStock.Quantity` assignment?
 - [ ] `InventoryCountService.PostAsync()` creates ONE `InventoryAdjustment` per Post with `ReferenceType = "InventoryCount"` — NOT one per line?
 - [ ] InventoryAdjustmentRequestValidator validates `AdjustmentType` with `InclusiveBetween(1, 3)` — NOT `(1, 2)`?
 - [ ] `ReportsController` places `CancellationToken` BEFORE optional parameters?
 - [ ] All Inventory Operations ViewModels implement `IDisposable` and dispose EventBus subscriptions in `Cleanup()`?
+- [ ] ReportExportController properly delegates to export service (no stub)?
+- [ ] All Permission.cs flags match AGENTS.md Section 6 matrix?
+- [ ] CanNavigate() uses _ => false deny-by-default with all screens explicit?
+- [ ] Organization Management and accounting screens have IsAdvancedMode guards?
+- [ ] Keyboard shortcuts (F3/F4/F5/F8) defined in MainWindow.InputBindings?
+- [ ] InvoicePrintDto has OtherCharges + FooterNote properties?
+- [ ] PrintController has returns endpoints (sales-returns, purchase-returns)?
+- [ ] ThermalReceiptGenerator accepts code page parameter?
+- [ ] JWT tokens include jti claim?
+- [ ] JWT secret validated for minimum 32 characters?
+- [ ] SecurityAudit has production-callable method?
+- [ ] Composite index on JournalEntryLine(JournalEntryId, AccountId) exists?
+- [ ] No orphaned ViewModel DI registrations after UI removal?

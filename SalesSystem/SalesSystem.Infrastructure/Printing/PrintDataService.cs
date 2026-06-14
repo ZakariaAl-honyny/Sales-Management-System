@@ -50,8 +50,10 @@ public class PrintDataService : IPrintDataService
         if (invoice == null)
             return Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة");
 
-        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
         var dto = await _builder.BuildFromSalesAsync(invoice, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
         return Result<InvoicePrintDto>.Success(dto);
     }
 
@@ -66,9 +68,64 @@ public class PrintDataService : IPrintDataService
         if (invoice == null)
             return Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة");
 
-        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
         var dto = await _builder.BuildFromPurchaseAsync(invoice, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
         return Result<InvoicePrintDto>.Success(dto);
+    }
+
+    public async Task<Result<InvoicePrintDto>> GetSalesReturnPrintDataAsync(int returnId, CancellationToken ct = default)
+    {
+        var returnEntity = await _uow.SalesReturns.Query()
+            .Include(r => r.Customer).ThenInclude(c => c!.Party)
+            .Include(r => r.Items).ThenInclude(it => it.Product)
+            .FirstOrDefaultAsync(r => r.Id == returnId, ct);
+
+        if (returnEntity == null)
+            return Result<InvoicePrintDto>.Failure("مرتجع المبيعات غير موجود");
+
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
+        var dto = await _builder.BuildFromSalesReturnAsync(returnEntity, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
+        return Result<InvoicePrintDto>.Success(dto);
+    }
+
+    public async Task<Result<InvoicePrintDto>> GetPurchaseReturnPrintDataAsync(int returnId, CancellationToken ct = default)
+    {
+        var returnEntity = await _uow.PurchaseReturns.Query()
+            .Include(r => r.Supplier).ThenInclude(s => s!.Party)
+            .Include(r => r.Items).ThenInclude(it => it.Product)
+            .Include(r => r.Items).ThenInclude(it => it.ProductUnit).ThenInclude(pu => pu.Unit)
+            .FirstOrDefaultAsync(r => r.Id == returnId, ct);
+
+        if (returnEntity == null)
+            return Result<InvoicePrintDto>.Failure("مرتجع المشتريات غير موجود");
+
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
+        var dto = await _builder.BuildFromPurchaseReturnAsync(returnEntity, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
+        return Result<InvoicePrintDto>.Success(dto);
+    }
+
+    /// <summary>
+    /// Loads store info PLUS FooterNote from print settings.
+    /// Returns 7-tuple: name, phone, address, taxNumber, logoBytes, taxRate, footerNote.
+    /// </summary>
+    private async Task<(string name, string phone, string address, string taxNumber,
+        byte[]? logoBytes, decimal taxRate, string? footerNote)> LoadAllStoreInfoAsync(CancellationToken ct)
+    {
+        var (name, phone, address, taxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
+        var footerNote = string.Empty;
+        var sysSettingsResult = await GetPrintSystemSettingsAsync(ct);
+        if (sysSettingsResult.IsSuccess && sysSettingsResult.Value != null)
+        {
+            footerNote = sysSettingsResult.Value
+                .FirstOrDefault(s => s.SettingKey == "FooterNote")?.SettingValue ?? string.Empty;
+        }
+        return (name, phone, address, taxNumber, logoBytes, taxRate, footerNote);
     }
 
     private async Task<(string name, string phone, string address, string taxNumber,

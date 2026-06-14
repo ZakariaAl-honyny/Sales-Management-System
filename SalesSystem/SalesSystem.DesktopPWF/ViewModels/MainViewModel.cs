@@ -155,7 +155,6 @@ public class MainViewModel : ViewModelBase
         NavigateToBalanceSheetCommand = new RelayCommand(() => NavigateTo<BalanceSheetViewModel>());
         NavigateToTrialBalanceCommand = new RelayCommand(() => NavigateTo<TrialBalanceViewModel>());
         NavigateToGeneralLedgerCommand = new RelayCommand(() => NavigateTo<GeneralLedgerViewModel>());
-        NavigateToDailyClosureReportCommand = new RelayCommand(() => NavigateTo<DailyClosureReportViewModel>());
         NavigateToCashBoxSummaryCommand = new RelayCommand(() => NavigateTo<CashBoxSummaryViewModel>());
         NavigateToDailySalesCommand = new RelayCommand(() => NavigateTo<DailySalesViewModel>());
         NavigateToSalesByCategoryCommand = new RelayCommand(() => NavigateTo<SalesByCategoryViewModel>());
@@ -405,9 +404,6 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى دفتر الأستاذ العام — عرض حركات الحسابات التفصيلية مع الأرصدة</summary>
     public ICommand NavigateToGeneralLedgerCommand { get; }
-
-    /// <summary>نقل إلى تقرير الإغلاق اليومي — عرض ملخص المعاملات النقدية والبنكية لكل يوم</summary>
-    public ICommand NavigateToDailyClosureReportCommand { get; }
 
     /// <summary>نقل إلى ملخص الخزينة — عرض حركات الصندوق والإيرادات والمصروفات والأرصدة</summary>
     public ICommand NavigateToCashBoxSummaryCommand { get; }
@@ -845,7 +841,6 @@ public class MainViewModel : ViewModelBase
             nameof(PurchasesBySupplierViewModel)    => "Reports",
             nameof(PurchasesByProductViewModel)     => "Reports",
             nameof(CashBoxSummaryViewModel)         => "Reports",
-            nameof(DailyClosureReportViewModel)     => "Reports",
             nameof(UserActivityViewModel)           => "Reports",
             nameof(LoginHistoryViewModel)           => "Reports",
             _                                        => viewModelType.Name

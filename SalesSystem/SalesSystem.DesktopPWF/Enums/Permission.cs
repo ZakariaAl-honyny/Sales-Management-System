@@ -39,6 +39,21 @@ public enum Permission : int
 }
 
 /// <summary>
+/// Granular operation-level permission control
+/// Separates "create invoice", "cancel invoice", "post invoice", "modify price" within a feature.
+/// </summary>
+public enum PermissionOperation : byte
+{
+    View = 1,
+    Create = 2,
+    Edit = 3,
+    Post = 4,
+    Cancel = 5,
+    Delete = 6,
+    PriceOverride = 7
+}
+
+/// <summary>
 /// Extension methods for Permission checks
 /// </summary>
 public static class PermissionExtensions
@@ -121,5 +136,32 @@ public static class PermissionExtensions
     public static bool HasPermission(this Permission permissions, Permission required)
     {
         return (permissions & required) == required;
+    }
+
+    /// <summary>
+    /// Check if the user has the base permission feature AND optionally validates the specific operation.
+    /// In V1, this is a permission-gate check only — operation-level enforcement (e.g., "can cancel")
+    /// is implemented via API service validation. This method provides the Desktop-side entry point
+    /// for future operation-level separation of duties.
+    /// </summary>
+    public static bool CanPerform(this Permission permissions, Permission feature, PermissionOperation operation)
+    {
+        // First check that the user has the feature-level permission
+        if (!permissions.HasPermission(feature))
+            return false;
+
+        // In V1, View operation is always allowed when the feature is granted
+        // Future: additional operation-level checks can be added here
+        return operation switch
+        {
+            PermissionOperation.View => true,                     // Viewing is always allowed with the feature
+            PermissionOperation.Create => true,                   // Create is allowed with the feature
+            PermissionOperation.Edit => true,                     // Edit is allowed with the feature
+            PermissionOperation.Post => true,                     // Post is allowed with the feature
+            PermissionOperation.Cancel => true,                   // Cancel is allowed with the feature
+            PermissionOperation.Delete => permissions.HasPermission(Permission.UserManagement), // Delete requires admin-level
+            PermissionOperation.PriceOverride => permissions.HasPermission(Permission.Settings), // Price override needs higher privilege
+            _ => true
+        };
     }
 }

@@ -281,6 +281,15 @@ public class A4InvoiceDocument : IDocument
                     .Text($"- {_data.DiscountAmount:N2} ر.س").FontColor("#F44336");
             }
 
+            // Other Charges (delivery, shipping — only if exists)
+            if (_data.OtherCharges > 0)
+            {
+                table.Cell().Padding(6).AlignRight()
+                    .Text("مصاريف إضافية:").FontColor("#FF9800");
+                table.Cell().Padding(6).AlignLeft()
+                    .Text($"+ {_data.OtherCharges:N2} ر.س").FontColor("#FF9800");
+            }
+
             // Tax
             var taxLabel = _data.IsTaxInclusive
                 ? $"ضريبة القيمة المضافة ({_data.TaxRate:N0}%) - شاملة:"
@@ -326,7 +335,9 @@ public class A4InvoiceDocument : IDocument
                     });
 
                 row.RelativeItem().AlignCenter()
-                    .Text("شكراً لتعاملكم معنا")
+                    .Text(string.IsNullOrWhiteSpace(_data.FooterNote)
+                        ? "شكراً لتعاملكم معنا"
+                        : _data.FooterNote)
                     .FontSize(SmallFontSize).FontColor(MutedColor).Italic();
 
                 row.RelativeItem().AlignLeft()

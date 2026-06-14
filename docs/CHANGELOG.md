@@ -2,7 +2,64 @@
 
 All notable changes to this project will be documented in this file.
 
-## v4.10.3 — Inventory Operations Complete: BLOCKER #1-3 Fixed, Desktop ViewModels Rewritten, 0 Build Errors (2026-06-15)
+## v4.10.4 — SalesReturn Audit Fixes & Phase 27-28 Gaps Closed (2026-06-15)
+
+### 🐛 Bug Fix: SalesReturn.Post()/Cancel() Timestamps
+- `SalesReturn.Post()`: Added `PostedAt = DateTime.UtcNow` (fixes RULE-489 compliance for audit trail)
+- `SalesReturn.Cancel()`: Added `CancelledAt = DateTime.UtcNow`
+- Both now match `PurchaseReturn.Post()`/`Cancel()` pattern for DocumentEntity lifecycle
+
+### 🐛 Bug Fix: SalesReturn Service Accounting Entries
+- `SalesReturnService` now injects `IAccountingIntegrationService`
+- On Post: calls `CreateSalesReturnEntryAsync()` — Dr SalesReturnsAccount / Cr CustomerAccount (revenue), Dr InventoryAccount / Cr COGSAccount (cost)
+- On Cancel: calls `ReverseSalesReturnEntryAsync()` — reverses both revenue and cost entries
+- New method: `ReverseSalesReturnEntryAsync()` added to `IAccountingIntegrationService` interface + implementation
+- Eager loading: queries now `.Include(sr => sr.Customer)` for per-entity account routing
+
+### 🐛 Bug Fix: ProductUnitId Hardcoding (8 occurrences across 6 ViewModels)
+- `SalesInvoiceEditorViewModel`: 3 fixes — line creation uses `product.DefaultSalesUnitId` (fallback `0`)
+- `PurchaseInvoiceEditorViewModel`: 1 fix — line creation uses `product.DefaultPurchaseUnitId`
+- `InventoryAdjustmentEditorViewModel`: 1 fix — uses `product.DefaultPurchaseUnitId`
+- `InventoryTransactionEditorViewModel`: 1 fix — uses `product.DefaultPurchaseUnitId`
+- `WarehouseTransferEditorViewModel`: 1 fix — uses `product.DefaultPurchaseUnitId`
+- `InventoryCountEditorViewModel`: 1 fix — uses `product.DefaultPurchaseUnitId`
+- Fallback `0` lets service auto-determine rather than hardcoding wrong unit
+
+### 🐛 Bug Fix: AdditionalChargeAllocator Extraction
+- Inline landed-cost logic extracted from `PurchaseService.PostAsync()` to standalone `AdditionalChargeAllocator.Allocate()` static method
+- New file: `SalesSystem.Application/Helpers/AdditionalChargeAllocator.cs`
+- Returns `Dictionary<int, decimal>` keyed by line index (not ProductId — prevents duplicate-product collision)
+- Enables DRY compliance (RULE-041) and unit testability
+
+### ✨ Feature: Documentation & Subagent Updates
+- Updated `AGENTS.md` (v4.10.3→v4.10.4): New §2.93 (RULE-517→520), 6 new FORBIDDEN patterns, 5 new checklist items
+- Updated `README.md` (version bump to v4.10.4+, status banner reflects new fixes)
+- Updated `code-reviewer.md`: 3 new checklist items, 4 new default fix items (45–48)
+- Updated `implement-agent.md`: 4 new default fix items (39–42)
+- Updated `orchestrator.md`: 4 new checklist items, 4 new default fix items (19–22)
+
+### ✅ Build Quality
+- **0 errors, 0 warnings** across all 11 production projects
+- **1,600+ tests passed**, 71 skipped (pre-existing E2E integration tests), **0 failed**
+
+---
+
+## v4.10.3 — Accounts.md Deep Review + Inventory Operations Complete (2026-06-15)
+
+### 🔍 System Audit: Accounts.md Deep Review — 43 Gaps Found, 8 Critical + 15 Major/Minor Fixed
+- **Comprehensive gap analysis**: Systematically mapped ALL AGENTS.md rules, FORBIDDEN patterns, and checklist items against Accounts.md
+- **8 CRITICAL gaps fixed**:
+  - **ReportExportController stub**: Replaced `BadRequest` return with `IReportExportService.ExportAsync()` delegation — exports all 20+ report types via ClosedXML (Excel) and QuestPDF (PDF) with Arabic-column `DataTable`s
+  - **Permission.cs completeness**: Expanded from 7 to **21 permission flags** matching AGENTS.md §6 matrix — added SalesInvoice, SalesReturn, CustomerView, CustomerManagement, PurchaseInvoice, PurchaseReturn, ProductManagement, SupplierManagement, WarehouseTransfer, Reports, WarehouseManagement, Settings, UserManagement, Backup, ChartOfAccounts, JournalEntries, CashBoxes, Currencies, FiscalYear, Employees, Banks
+  - **CanNavigate() security**: Changed `_ => true` (allow-all default) → `_ => false` (deny-by-default) — every screen tag must be explicitly listed for authorization
+  - **IsAdvancedMode guard**: Added `Visibility="{Binding IsAdvancedMode, Converter=...}"` to 8 screens — Branches, Departments, Employees, Banks, Parties, Expenses, ReceiptVouchers, PaymentVouchers now hidden from Basic users
+  - **Return print endpoints**: Added `GET/POST /api/v1/print/sales-returns/{id}/...` and `.../purchase-returns/{id}/...` endpoints with A4 preview, thermal print, PDF save
+  - **InvoicePrintDto completeness**: Added `OtherCharges` (delivery/shipping fees) and `FooterNote` (configurable from PrintSettings) properties
+  - **ThermalReceiptGenerator code page**: Changed from hardcoded `Encoding.GetEncoding(1256)` to parameterized `EscPosCodePage` from PrintSettingsDto
+  - **JWT security hardening**: Added `jti` (JWT ID) claim with unique `Guid` for token identification; validated minimum secret length (`< 32` chars throws `InvalidOperationException`)
+- **15 Major gaps fixed**: `SecurityAudit` production endpoint (`RunSecurityAudit()`), composite index on `JournalEntryLine(JournalEntryId, AccountId)`, removed orphaned `DailyClosureReportViewModel` registration, keyboard shortcuts (F3/F4/F5/F8) in `MainWindow.InputBindings`, operation-level granularity documented for future `PermissionOperation` enum, page titles set to Arabic, `IReportExportService` interface + implementation created, route mismatches fixed (`detailed-stock-ledger`, `reports/returns`, `reports/aging`), payment update/delete reversal entries for posted amounts, `CreateSalesReturnEntryAsync()` for standalone returns, `CashBoxReportService` implementation completed
+- **20 Minor gaps fixed**: Auto-account parent code corrections (`CustomerService: "1210"→"1130"`, `SupplierService: "2100"→"1320"`), CanNavigate() now explicitly denies all unlisted tags, `implement-agent.md` updated with 10 new "Features to Fix By Default" items (33-42), `code-reviewer.md` updated with 8 new CHECK items (CHECK-028 through CHECK-035)
+- **All 8 CRITICAL fixes applied in this session** — 0 build errors maintained
 
 ### 🐛 Bug Fix: BLOCKER #1 — InventoryService TransactionNo Auto-Generation
 - `InventoryService.CreateTransactionAsync()`: Auto-generates `TransactionNo` via `_sequenceService.GetNextIntAsync("InventoryTransaction", ct)` when the provided `TransactionNo <= 0`

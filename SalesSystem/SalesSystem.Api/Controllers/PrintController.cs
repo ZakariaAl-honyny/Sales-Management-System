@@ -135,6 +135,92 @@ public class PrintController : ControllerBase
     }
 
     // ═══════════════════════════════════════════════
+    // SALES RETURNS
+    // ═══════════════════════════════════════════════
+
+    [HttpPost("preview/sales-returns/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
+    public async Task<IActionResult> PreviewSalesReturn(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetSalesReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var previewResult = await _printService.PreviewA4Async(result.Value!);
+        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
+    }
+
+    [HttpPost("a4/sales-returns/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
+    public async Task<IActionResult> PrintSalesReturnA4(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetSalesReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var printResult = await _printService.PrintA4Async(result.Value!);
+        return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
+    }
+
+    [HttpGet("generate-a4/sales-returns/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
+    public async Task<IActionResult> GenerateSalesReturnA4Pdf(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetSalesReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var pdfResult = await _printService.GenerateA4PdfBytesAsync(result.Value!);
+        if (!pdfResult.IsSuccess)
+            return BadRequest(new { error = pdfResult.Error });
+
+        return File(pdfResult.Value!, "application/pdf", $"SalesReturn_{id}.pdf");
+    }
+
+    // ═══════════════════════════════════════════════
+    // PURCHASE RETURNS
+    // ═══════════════════════════════════════════════
+
+    [HttpPost("preview/purchase-returns/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> PreviewPurchaseReturn(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetPurchaseReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var previewResult = await _printService.PreviewA4Async(result.Value!);
+        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
+    }
+
+    [HttpPost("a4/purchase-returns/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> PrintPurchaseReturnA4(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetPurchaseReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var printResult = await _printService.PrintA4Async(result.Value!);
+        return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
+    }
+
+    [HttpGet("generate-a4/purchase-returns/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> GeneratePurchaseReturnA4Pdf(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetPurchaseReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var pdfResult = await _printService.GenerateA4PdfBytesAsync(result.Value!);
+        if (!pdfResult.IsSuccess)
+            return BadRequest(new { error = pdfResult.Error });
+
+        return File(pdfResult.Value!, "application/pdf", $"PurchaseReturn_{id}.pdf");
+    }
+
+    // ═══════════════════════════════════════════════
     // GENERATE A4 PDF (Returns raw PDF bytes)
     // ═══════════════════════════════════════════════
 
