@@ -6,5 +6,6 @@ namespace SalesSystem.Contracts.Requests;
 public record ReportExportRequest(
     string ReportType,
     string Format,
-    string? ReportName = null
+    string? ReportName = null,
+    Dictionary<string, string>? Filters = null
 );

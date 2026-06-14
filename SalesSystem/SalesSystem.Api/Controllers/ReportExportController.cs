@@ -42,9 +42,16 @@ public class ReportExportController : ControllerBase
         if (format != "excel" && format != "pdf")
             return BadRequest(new { error = "صيغة التصدير غير مدعومة. استخدم Excel أو PDF" });
 
-        // The actual data population and export is handled by specific report services.
-        // This endpoint provides a unified export mechanism.
-        // For structured export, callers should use specific report endpoints with Accept headers.
-        return BadRequest(new { error = "يرجى استخدام نقاط النهاية المحددة للتقرير مع تحديد صيغة التصدير" });
+        var result = await _reportExportService.ExportAsync(
+            request.ReportType,
+            format,
+            request.Filters,
+            request.ReportName,
+            ct);
+
+        if (!result.IsSuccess)
+            return BadRequest(new { error = result.Error });
+
+        return File(result.Value!.FileContent, result.Value.ContentType, result.Value.FileName);
     }
 }

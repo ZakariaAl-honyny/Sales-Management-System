@@ -90,6 +90,13 @@
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}">
 
+    <Window.InputBindings>
+        <KeyBinding Key="F3" Command="{Binding NavigateToProductsCommand}"/>
+        <KeyBinding Key="F4" Command="{Binding NavigateToCustomersCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding NavigateToPurchasesCommand}"/>
+        <KeyBinding Key="F8" Command="{Binding NavigateToReportsCommand}"/>
+    </Window.InputBindings>
+
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -406,15 +413,20 @@
                 <Separator/>
                 <MenuItem Header="المنتجات المنتهية" ToolTip="إدارة وترحيل المنتجات المنتهية الصلاحية" Tag="ExpiredProducts" Click="ReportMenuItem_Click"/>
                 <Separator/>
-                <MenuItem Header="قائمة الدخل" ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح" Tag="Reports" Click="ReportMenuItem_Click"/>
-                <MenuItem Header="التدفق النقدي" ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة" Tag="Reports" Click="ReportMenuItem_Click"/>
-                <MenuItem Header="ضريبة القيمة المضافة" ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة" Tag="Reports" Click="ReportMenuItem_Click"/>
-                <MenuItem Header="كشف حساب" ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة" Tag="Reports" Click="ReportMenuItem_Click"/>
+                <MenuItem Header="قائمة الدخل" ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح" Tag="Reports" Click="ReportMenuItem_Click"
+                          Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
+                <MenuItem Header="التدفق النقدي" ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة" Tag="Reports" Click="ReportMenuItem_Click"
+                          Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
+                <MenuItem Header="ضريبة القيمة المضافة" ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة" Tag="Reports" Click="ReportMenuItem_Click"
+                          Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
+                <MenuItem Header="كشف حساب" ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة" Tag="Reports" Click="ReportMenuItem_Click"
+                          Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                 <Separator/>
                 <MenuItem Header="كشف رصيد المخازن" Command="{Binding NavigateToStockBalanceReportCommand}" ToolTip="عرض المخزون الحالي والقيمة الإجمالية لكل منتج في المستودعات"/>
                 <MenuItem Header="حركة المخازن" Command="{Binding NavigateToWarehouseMovementReportCommand}" ToolTip="عرض تاريخ حركات المخزون مع التصفية حسب المستودع والفترة"/>
                 <Separator/>
-                <MenuItem Header="التقارير المالية" ToolTip="التقارير المالية — الميزانية وميزان المراجعة وكشف الحساب">
+                <MenuItem Header="التقارير المالية" ToolTip="التقارير المالية — الميزانية وميزان المراجعة وكشف الحساب"
+                          Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}">
                     <MenuItem Header="الميزانية العمومية" ToolTip="عرض الميزانية العمومية — الأصول والخصوم وحقوق الملكية" Tag="BalanceSheet" Click="ReportMenuItem_Click"/>
                     <MenuItem Header="ميزان المراجعة" ToolTip="عرض ميزان المراجعة — أرصدة الحسابات مدينة/دائنة" Tag="TrialBalance" Click="ReportMenuItem_Click"/>
                     <MenuItem Header="كشف حساب عام" ToolTip="عرض كشف حساب عام معاملات قيد يومية تفصيلية" Tag="GeneralLedger" Click="ReportMenuItem_Click"/>
@@ -457,9 +469,12 @@
                 <Separator/>
                 <MenuItem Header="الضرائب" ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة" Click="TaxesMenuItem_Click"/>
                 <MenuItem Header="العملات" Command="{Binding NavigateToCurrenciesCommand}" ToolTip="إدارة العملات وأسعار الصرف"/>
-                <MenuItem Header="دليل الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}" ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
-                <MenuItem Header="القيود اليومية" Command="{Binding NavigateToJournalEntriesCommand}" ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"/>
-                <MenuItem Header="السنوات المالية" Command="{Binding NavigateToFiscalYearsCommand}" ToolTip="إدارة السنوات المالية — إنشاء وفتح وإغلاق السنوات"/>
+                <MenuItem Header="دليل الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}" ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"
+                          Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
+                <MenuItem Header="القيود اليومية" Command="{Binding NavigateToJournalEntriesCommand}" ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"
+                          Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
+                <MenuItem Header="السنوات المالية" Command="{Binding NavigateToFiscalYearsCommand}" ToolTip="إدارة السنوات المالية — إنشاء وفتح وإغلاق السنوات"
+                          Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                 <MenuItem Header="النسخ الاحتياطي" 
                           Command="{Binding NavigateToBackupCommand}"
                           ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
@@ -581,22 +596,26 @@
                                             Command="{Binding NavigateToReceiptVouchersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavReceiptVouchers"
-                                            ToolTip="إدارة سندات القبض المحاسبية — تسجيل القيود المحاسبية للمبالغ الواردة"/>
+                                            ToolTip="إدارة سندات القبض المحاسبية — تسجيل القيود المحاسبية للمبالغ الواردة"
+                                            Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="سندات الصرف" 
                                             Command="{Binding NavigateToPaymentVouchersCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavPaymentVouchers"
-                                            ToolTip="إدارة سندات الصرف — تسجيل المبالغ النقدية والبنكية المدفوعة"/>
+                                            ToolTip="إدارة سندات الصرف — تسجيل المبالغ النقدية والبنكية المدفوعة"
+                                            Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="القيود اليومية" 
                                             Command="{Binding NavigateToJournalEntriesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavJournalEntries"
-                                            ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"/>
+                                            ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"
+                                            Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="السنوات المالية"
                                             Command="{Binding NavigateToFiscalYearsCommand}"
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavFiscalYears"
-                                            ToolTip="إدارة السنوات المالية — إنشاء وفتح وإغلاق السنوات"/>
+                                            ToolTip="إدارة السنوات المالية — إنشاء وفتح وإغلاق السنوات"
+                                            Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                 </StackPanel>
                             </Expander>
 
@@ -624,22 +643,26 @@
                                             Command="{Binding NavigateToIncomeStatementCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavIncomeStatement"
-                                            ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح"/>
+                                            ToolTip="عرض قائمة الدخل — الإيرادات والتكاليف وصافي الربح"
+                                            Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="التدفق النقدي" 
                                             Command="{Binding NavigateToCashFlowReportCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavCashFlow"
-                                            ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة"/>
+                                            ToolTip="عرض تقرير التدفق النقدي — الإيرادات والمصروفات والأرصدة"
+                                            Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="ضريبة القيمة المضافة" 
                                             Command="{Binding NavigateToVatReportCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavVatReport"
-                                            ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة"/>
+                                            ToolTip="عرض تقرير ضريبة القيمة المضافة — تفصيل الفواتير والضريبة"
+                                            Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="كشف حساب" 
                                             Command="{Binding NavigateToAccountStatementCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavAccountStatement"
-                                            ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة"/>
+                                            ToolTip="عرض كشف حساب عميل أو مورد — الحركات المدينة والدائنة"
+                                            Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Separator Margin="16,4"/>
                                     <Button Content="كشف رصيد المخازن" 
                                             Command="{Binding NavigateToStockBalanceReportCommand}" 
@@ -681,29 +704,34 @@
                                              Command="{Binding NavigateToWorkingCapitalCommand}"
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavWorkingCapital"
-                                             ToolTip="عرض تقرير رأس المال العامل — الأصول المتداولة والخصوم المتداولة والنسبة الحالية"/>
+                                             ToolTip="عرض تقرير رأس المال العامل — الأصول المتداولة والخصوم المتداولة والنسبة الحالية"
+                                             Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="أرصدة الحسابات"
                                              Command="{Binding NavigateToAccountBalancesCommand}"
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavAccountBalances"
-                                             ToolTip="عرض تقرير أرصدة الحسابات — الأرصدة المدينة والدائنة وصافي الرصيد لكل حساب"/>
+                                             ToolTip="عرض تقرير أرصدة الحسابات — الأرصدة المدينة والدائنة وصافي الرصيد لكل حساب"
+                                             Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Separator Margin="16,4"/>
                                     <!-- Financial Reports -->
                                     <Button Content="الميزانية العمومية"
                                              Command="{Binding NavigateToBalanceSheetCommand}"
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavBalanceSheet"
-                                             ToolTip="عرض الميزانية العمومية — الأصول والخصوم وحقوق الملكية في تاريخ محدد"/>
+                                             ToolTip="عرض الميزانية العمومية — الأصول والخصوم وحقوق الملكية في تاريخ محدد"
+                                             Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="ميزان المراجعة"
                                              Command="{Binding NavigateToTrialBalanceCommand}"
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavTrialBalance"
-                                             ToolTip="عرض ميزان المراجعة — جميع الأرصدة المدينة والدائنة للحسابات"/>
+                                             ToolTip="عرض ميزان المراجعة — جميع الأرصدة المدينة والدائنة للحسابات"
+                                             Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="دفتر الأستاذ العام"
                                              Command="{Binding NavigateToGeneralLedgerCommand}"
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavGeneralLedger"
-                                             ToolTip="عرض دفتر الأستاذ العام — حركات الحسابات التفصيلية مع الأرصدة"/>
+                                             ToolTip="عرض دفتر الأستاذ العام — حركات الحسابات التفصيلية مع الأرصدة"
+                                             Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Separator Margin="16,4"/>
                                     <!-- Sales Reports -->
                                     <Button Content="المبيعات اليومية"
@@ -745,11 +773,6 @@
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavCashBoxSummary"
                                              ToolTip="عرض ملخص الخزينة — حركات الصندوق والإيرادات والمصروفات والأرصدة"/>
-                                    <Button Content="الإغلاق اليومي"
-                                             Command="{Binding NavigateToDailyClosureReportCommand}"
-                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                             AutomationProperties.AutomationId="NavDailyClosureReport"
-                                             ToolTip="عرض تقرير الإغلاق اليومي — ملخص المعاملات النقدية والبنكية ونسبة الاختلاف"/>
                                     <Separator Margin="16,4"/>
                                     <!-- Activity Reports -->
                                     <Button Content="سجل الدخول"
@@ -856,17 +879,20 @@
                                              Command="{Binding NavigateToChartOfAccountsCommand}" 
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavChartOfAccounts"
-                                             ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"/>
+                                             ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"
+                                             Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="حسابات النظام" 
                                              Command="{Binding NavigateToSystemAccountMappingsCommand}" 
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavSystemAccountMappings"
-                                             ToolTip="ربط العمليات التجارية بالحسابات المحاسبية — تعيين الحسابات الافتراضية للمبيعات والمشتريات والنقد"/>
+                                             ToolTip="ربط العمليات التجارية بالحسابات المحاسبية — تعيين الحسابات الافتراضية للمبيعات والمشتريات والنقد"
+                                             Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Button Content="التصنيفات المحاسبية" 
                                              Command="{Binding NavigateToAccountCategoriesCommand}" 
                                              Style="{StaticResource SidebarSubMenuButtonStyle}"
                                              AutomationProperties.AutomationId="NavAccountCategories"
-                                             ToolTip="إدارة تصنيفات دليل الحسابات — تصنيف الحسابات حسب طبيعة النشاط"/>
+                                             ToolTip="إدارة تصنيفات دليل الحسابات — تصنيف الحسابات حسب طبيعة النشاط"
+                                             Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                                     <Separator Margin="16,4"/>
                                     <Button Content="إعدادات الشركة" 
                                              Command="{Binding NavigateToCompanySettingsCommand}" 
@@ -919,7 +945,8 @@
 
                             <!-- Organization Management Expander -->
                             <Expander Header="إدارة المنشأة" Style="{StaticResource SidebarExpanderStyle}"
-                                      AutomationProperties.AutomationId="SidebarExpanderOrgMgmt">
+                                      AutomationProperties.AutomationId="SidebarExpanderOrgMgmt"
+                                      Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <Button Content="الفروع" 
                                             Command="{Binding NavigateToBranchesCommand}" 

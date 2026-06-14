@@ -44,7 +44,7 @@ public class InvoicePrintDtoBuilder
             CustomerAddress = invoice.Customer?.Party?.Address,
             Items = invoice.Items.Select(item => new InvoiceItemPrintDto(
                 item.Product?.Name ?? $"منتج #{item.ProductId}",
-                string.Empty,
+                item.ProductUnit?.Unit?.Name ?? string.Empty,
                 item.Quantity,
                 item.UnitPrice,
                 item.DiscountAmount,
@@ -96,7 +96,7 @@ public class InvoicePrintDtoBuilder
             CustomerAddress = invoice.Supplier?.Party?.Address,
             Items = invoice.Items.Select(item => new InvoiceItemPrintDto(
                 item.Product?.Name ?? $"منتج #{item.ProductId}",
-                string.Empty,
+                item.ProductUnit?.Unit?.Name ?? string.Empty,
                 item.Quantity,
                 item.UnitCost,
                 0m,
@@ -148,6 +148,7 @@ public class InvoicePrintDtoBuilder
             CustomerAddress = returnEntity.Customer?.Party?.Address,
             Items = returnEntity.Items.Select(item => new InvoiceItemPrintDto(
                 item.Product?.Name ?? $"منتج #{item.ProductId}",
+                // SalesReturnItem has no ProductUnitId — unit not tracked on sales returns
                 string.Empty,
                 item.Quantity,
                 item.UnitPrice,
@@ -194,7 +195,7 @@ public class InvoicePrintDtoBuilder
             CustomerAddress = returnEntity.Supplier?.Party?.Address,
             Items = returnEntity.Items.Select(item => new InvoiceItemPrintDto(
                 item.Product?.Name ?? $"منتج #{item.ProductId}",
-                string.Empty,
+                item.ProductUnit?.Unit?.Name ?? string.Empty,
                 item.Quantity,
                 item.UnitCost,
                 0m,

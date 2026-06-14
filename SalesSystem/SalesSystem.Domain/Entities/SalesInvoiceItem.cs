@@ -39,6 +39,7 @@ public class SalesInvoiceItem : Entity
 
     public virtual SalesInvoice? SalesInvoice { get; private set; }
     public virtual Product? Product { get; private set; }
+    public virtual ProductUnit? ProductUnit { get; private set; }
 
     private SalesInvoiceItem() { }
 

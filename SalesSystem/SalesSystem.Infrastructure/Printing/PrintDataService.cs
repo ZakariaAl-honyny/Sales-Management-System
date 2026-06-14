@@ -44,6 +44,7 @@ public class PrintDataService : IPrintDataService
         var invoice = await _uow.SalesInvoices.Query()
             .Include(i => i.Customer)
             .Include(i => i.Items).ThenInclude(it => it.Product)
+            .Include(i => i.Items).ThenInclude(it => it.ProductUnit).ThenInclude(pu => pu.Unit)
             .FirstOrDefaultAsync(i => i.Id == invoiceId, ct);
 
         if (invoice == null)
@@ -59,6 +60,7 @@ public class PrintDataService : IPrintDataService
         var invoice = await _uow.PurchaseInvoices.Query()
             .Include(i => i.Supplier)
             .Include(i => i.Items).ThenInclude(it => it.Product)
+            .Include(i => i.Items).ThenInclude(it => it.ProductUnit).ThenInclude(pu => pu.Unit)
             .FirstOrDefaultAsync(i => i.Id == invoiceId, ct);
 
         if (invoice == null)

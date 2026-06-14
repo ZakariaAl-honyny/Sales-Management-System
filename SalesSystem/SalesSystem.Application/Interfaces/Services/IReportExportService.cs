@@ -25,4 +25,16 @@ public interface IReportExportService
         System.Data.DataTable data,
         string title,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Unified export endpoint that routes by report type.
+    /// Accepts a report type identifier, target format, and optional filters.
+    /// Delegates to the appropriate data-fetching service and export method.
+    /// </summary>
+    Task<Result<ReportExportResult>> ExportAsync(
+        string reportType,
+        string format,
+        Dictionary<string, string>? filters = null,
+        string? reportName = null,
+        CancellationToken ct = default);
 }

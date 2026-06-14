@@ -277,6 +277,24 @@ public class MainViewModel : ViewModelBase
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // View Mode Properties
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Returns true when the user has Advanced mode (Admin/Manager roles).
+    /// Advanced mode shows accounting screens (دليل الحسابات, قيود يومية, سنوات مالية, تقارير مالية).
+    /// Determined from the user's role at login time via <see cref="ISessionService.GetViewMode"/>.
+    /// </summary>
+    public bool IsAdvancedMode => _sessionService.GetViewMode() == Enums.ViewMode.Advanced;
+
+    /// <summary>
+    /// Returns true when the user has Basic mode (Cashier/Observer/other roles).
+    /// Basic mode shows only operational screens (مبيعات, مشتريات, أصناف, عملاء, موردون, مخزون).
+    /// This is the inverse of <see cref="IsAdvancedMode"/>.
+    /// </summary>
+    public bool IsBasicMode => !IsAdvancedMode;
+
+    // ═══════════════════════════════════════════════════════════════
     // Dashboard Command
     // ═══════════════════════════════════════════════════════════════
 
@@ -711,8 +729,17 @@ public class MainViewModel : ViewModelBase
             "ProductUnits"     => _sessionService.CanAccess(Permission.ProductManagement),
             "ProductImport"    => _sessionService.CanAccess(Permission.ProductManagement),
             "Taxes"            => _sessionService.CanAccess(Permission.Settings),
-            "Currencies"       => _sessionService.CanAccess(Permission.Settings),
-            _ => true // Dashboard, Sales, SalesReturns, Customers, POS, CashBoxes, Inventory
+            "Currencies"       => _sessionService.CanAccess(Permission.Currencies),
+            "Dashboard"        => true,  // Everyone can see dashboard
+            "Sales"            => _sessionService.CanAccess(Permission.SalesInvoice),
+            "SalesReturns"     => _sessionService.CanAccess(Permission.SalesReturn),
+            "Customers"        => _sessionService.CanAccess(Permission.CustomerView),
+            "CashBoxes"        => _sessionService.CanAccess(Permission.CashBoxes),
+            "Inventory"        => _sessionService.CanAccess(Permission.ProductManagement),
+            "InventoryActivity" => _sessionService.CanAccess(Permission.ProductManagement),
+            "Pos"              => _sessionService.CanAccess(Permission.SalesInvoice),
+            "CustomerPayments" => _sessionService.CanAccess(Permission.CustomerView),
+            _ => false // Deny by default — unknown screens require explicit permission
         };
     }
 

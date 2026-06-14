@@ -21,6 +21,16 @@ public enum Permission : int
     WarehouseTransfer = 1 << 8,         // Warehouse Transfer
     Reports = 1 << 9,              // Reports access
 
+    // Manager and above - extended
+    CustomerManagement = 1 << 4,   // Customers CRUD (full, vs CustomerView read-only)
+
+    // Accounting access (Manager and above)
+    ChartOfAccounts = 1 << 14,     // Chart of Accounts CRUD
+    JournalEntries = 1 << 15,      // Journal Entries
+    CashBoxes = 1 << 16,           // Cash Boxes access
+    Currencies = 1 << 17,          // Currencies (view-only for Cashier/Observer)
+    FiscalYear = 1 << 18,          // Fiscal Year management
+
     // Admin only
     WarehouseManagement = 1 << 10,  // Warehouses CRUD
     Settings = 1 << 11,            // Settings
@@ -43,12 +53,18 @@ public static class PermissionExtensions
             1 => Permission.SalesInvoice          // Admin
                 | Permission.SalesReturn
                 | Permission.CustomerView
+                | Permission.CustomerManagement
                 | Permission.PurchaseInvoice
                 | Permission.PurchaseReturn
                 | Permission.ProductManagement
                 | Permission.SupplierManagement
                 | Permission.WarehouseTransfer
                 | Permission.Reports
+                | Permission.ChartOfAccounts
+                | Permission.JournalEntries
+                | Permission.CashBoxes
+                | Permission.Currencies
+                | Permission.FiscalYear
                 | Permission.WarehouseManagement
                 | Permission.Settings
                 | Permission.UserManagement
@@ -57,29 +73,43 @@ public static class PermissionExtensions
             2 => Permission.SalesInvoice          // Manager
                 | Permission.SalesReturn
                 | Permission.CustomerView
+                | Permission.CustomerManagement
                 | Permission.PurchaseInvoice
                 | Permission.PurchaseReturn
                 | Permission.ProductManagement
                 | Permission.SupplierManagement
                 | Permission.WarehouseTransfer
-                | Permission.Reports,
+                | Permission.Reports
+                | Permission.ChartOfAccounts
+                | Permission.JournalEntries
+                | Permission.CashBoxes
+                | Permission.Currencies,
 
             3 => Permission.SalesInvoice          // Cashier
                 | Permission.SalesReturn
-                | Permission.CustomerView,
+                | Permission.CustomerView
+                | Permission.CashBoxes
+                | Permission.Currencies,
 
             4 => Permission.SalesInvoice          // Observer (view only)
                 | Permission.SalesReturn
-                | Permission.CustomerView,
+                | Permission.CustomerView
+                | Permission.CashBoxes
+                | Permission.Currencies,
 
             5 => Permission.SalesInvoice          // BranchManager
                 | Permission.SalesReturn
                 | Permission.CustomerView
+                | Permission.CustomerManagement
                 | Permission.PurchaseInvoice
                 | Permission.PurchaseReturn
                 | Permission.ProductManagement
                 | Permission.SupplierManagement
-                | Permission.Reports,
+                | Permission.Reports
+                | Permission.ChartOfAccounts
+                | Permission.JournalEntries
+                | Permission.CashBoxes
+                | Permission.Currencies,
 
             _ => Permission.None
         };
