@@ -347,6 +347,19 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         private set => SetProperty(ref _taxAmount, value);
     }
 
+    private decimal _otherCharges;
+    public decimal OtherCharges
+    {
+        get => _otherCharges;
+        set
+        {
+            if (SetProperty(ref _otherCharges, value))
+            {
+                RecalculateTotals();
+            }
+        }
+    }
+
     private decimal _netTotal;
     public decimal NetTotal
     {
@@ -540,6 +553,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 InvoiceDate = invoice.InvoiceDate;
                 SelectedPaymentType = (byte)invoice.PaymentType;
                 InvoiceDiscount = invoice.DiscountAmount;
+                OtherCharges = invoice.OtherCharges;
                 PaidAmount = invoice.PaidAmount;
                 Notes = invoice.Notes;
                 Status = invoice.Status;
@@ -825,6 +839,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
             TaxAmount,
+            OtherCharges,
             PaidAmount,
             SelectedCurrencyId,
             ExchangeRate,
@@ -852,6 +867,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
             TaxAmount,
+            OtherCharges,
             PaidAmount,
             SelectedCurrencyId,
             ExchangeRate,
@@ -869,12 +885,12 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         if (IsTaxInclusive)
         {
             TaxAmount = netAmount > 0 ? Math.Round((netAmount * TaxRate) / (100 + TaxRate), 2) : 0;
-            NetTotal = netAmount;
+            NetTotal = netAmount + OtherCharges;
         }
         else
         {
             TaxAmount = netAmount > 0 ? Math.Round(netAmount * (TaxRate / 100), 2) : 0;
-            NetTotal = netAmount + TaxAmount;
+            NetTotal = netAmount + TaxAmount + OtherCharges;
         }
 
         if (SelectedPaymentType == (byte)PaymentType.Cash)
@@ -1131,6 +1147,9 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
     private decimal _quantity = 1;
     private decimal _unitCost;
     private decimal _oldCostInDatabase;
+    private decimal _lineTotalInput;  // Editable gross total (Qty × UnitCost), before discount
+    private FlexibleInputCalculator.CalculationField? _lastModifiedField;
+    private bool _isRecalculating;
 
     public bool CostChangedFromDatabase =>
         _oldCostInDatabase > 0 &&
@@ -1154,6 +1173,7 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
     {
         AvailableProducts = products;
         _soundService = soundService;
+        _lineTotalInput = _quantity * _unitCost;  // Initialize: Qty (1) × Cost (0) = 0
     }
 
     public int ProductId
@@ -1178,7 +1198,7 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
                 ProductId = value.Id;
                 ClearErrors(nameof(ProductName));
                 _oldCostInDatabase = 0m;
-                ProductUnitId = 1; // Phase 25: TODO — replace with ProductDto.DefaultPurchaseUnitId when added to DTO
+                ProductUnitId = value.DefaultPurchaseUnitId ?? 0; // DefaultPurchaseUnitId is on ProductDto; fallback 0 = service auto-determines
                 OnPropertyChanged(nameof(CostChangedFromDatabase));
                 OnPropertyChanged(nameof(PriceDifferenceIndicator));
                 // Phase 25: TODO — set UnitCost from ProductDto.AverageCost when added to DTO
@@ -1196,7 +1216,8 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
             if (SetProperty(ref _quantity, value))
             {
                 ValidateQuantity();
-                OnPropertyChanged(nameof(LineTotal));
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Quantity;
+                RecalculateFromFlexibleInput();
                 _soundService?.PlaySuccess();
             }
         }
@@ -1210,7 +1231,8 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
             if (SetProperty(ref _unitCost, value))
             {
                 ValidateUnitCost();
-                OnPropertyChanged(nameof(LineTotal));
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Price;
+                RecalculateFromFlexibleInput();
                 OnPropertyChanged(nameof(CostChangedFromDatabase));
                 OnPropertyChanged(nameof(PriceDifferenceIndicator));
             }
@@ -1218,6 +1240,77 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
     }
 
     public decimal LineTotal => Quantity * UnitCost;
+
+    /// <summary>
+    /// Editable gross total (Quantity × UnitCost).
+    /// When user edits this field, the system recalculates either Quantity or UnitCost
+    /// depending on which was last modified.
+    /// </summary>
+    public decimal LineTotalInput
+    {
+        get => _lineTotalInput;
+        set
+        {
+            if (SetProperty(ref _lineTotalInput, value))
+            {
+                ValidateLineTotalInput();
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Total;
+                RecalculateFromFlexibleInput();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Recalculates the third field based on which two fields the user has entered.
+    /// Uses <see cref="FlexibleInputCalculator"/> to determine the missing value.
+    /// A guard flag (<c>_isRecalculating</c>) prevents infinite recursion when
+    /// setting computed values triggers property-changed callbacks.
+    /// </summary>
+    private void RecalculateFromFlexibleInput()
+    {
+        if (_isRecalculating) return;
+        _isRecalculating = true;
+        try
+        {
+            if (_lastModifiedField == FlexibleInputCalculator.CalculationField.Total)
+            {
+                // User explicitly edited LineTotalInput — use the calculator
+                // to determine Quantity or UnitPrice from the two known values.
+                var result = FlexibleInputCalculator.Calculate(
+                    _quantity, _unitCost, _lineTotalInput,
+                    FlexibleInputCalculator.CalculationField.Total);
+
+                _quantity = result.quantity;
+                _unitCost = result.price;
+                _lineTotalInput = result.total;
+
+                OnPropertyChanged(nameof(Quantity));
+                OnPropertyChanged(nameof(UnitCost));
+                OnPropertyChanged(nameof(LineTotalInput));
+            }
+            else
+            {
+                // User edited Quantity or UnitCost — just recompute the total.
+                _lineTotalInput = _quantity * _unitCost;
+                OnPropertyChanged(nameof(LineTotalInput));
+            }
+
+            OnPropertyChanged(nameof(LineTotal));
+        }
+        finally
+        {
+            _isRecalculating = false;
+        }
+    }
+
+    private void ValidateLineTotalInput()
+    {
+        ClearErrors(nameof(LineTotalInput));
+        if (LineTotalInput < 0)
+        {
+            AddError(nameof(LineTotalInput), "الإجمالي لا يمكن أن يكون سالباً");
+        }
+    }
 
     private void ValidateProductId()
     {

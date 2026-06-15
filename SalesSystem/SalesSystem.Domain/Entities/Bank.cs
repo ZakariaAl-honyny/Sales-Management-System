@@ -12,14 +12,15 @@ namespace SalesSystem.Domain.Entities;
 public class Bank : ActivatableEntity
 {
     /// <summary>
-    /// FK to the linked chart-of-accounts account (required).
+    /// FK to the linked chart-of-accounts account.
+    /// If null at creation time, the service layer auto-creates a sub-account under "1120 — البنوك".
     /// </summary>
-    public int AccountId { get; private set; }
+    public int? AccountId { get; private set; }
 
     /// <summary>
     /// The linked chart-of-accounts account navigation property.
     /// </summary>
-    public Account Account { get; private set; } = null!;
+    public Account? Account { get; private set; }
 
     /// <summary>
     /// Bank name (e.g. "البنك الأهلي").
@@ -71,10 +72,28 @@ public class Bank : ActivatableEntity
     /// </summary>
     private Bank() { }
 
+    // ─── Domain Methods ───────────────────────────
+
+    /// <summary>
+    /// Sets the Chart of Accounts AccountId for this bank.
+    /// Called by the service layer after auto-creating a sub-account under "1120 — البنوك".
+    /// Only allowed when the current AccountId is null (not yet set).
+    /// </summary>
+    public void SetAccountId(int accountId)
+    {
+        if (accountId <= 0)
+            throw new DomainException("معرف الحساب غير صالح");
+        if (AccountId.HasValue)
+            throw new DomainException("لا يمكن تغيير الحساب المحاسبي للبنك بعد تعيينه");
+
+        AccountId = accountId;
+        UpdateTimestamp();
+    }
+
     /// <summary>
     /// Factory method to create a new bank record.
     /// </summary>
-    /// <param name="accountId">FK to the chart-of-accounts account (required).</param>
+    /// <param name="accountId">FK to the chart-of-accounts account (optional — service auto-creates if null).</param>
     /// <param name="name">Bank name (required).</param>
     /// <param name="currencyId">FK to the currency (required).</param>
     /// <param name="accountName">Optional account holder name.</param>
@@ -86,7 +105,7 @@ public class Bank : ActivatableEntity
     /// <param name="createdByUserId">ID of the creating user.</param>
     /// <returns>A new Bank instance.</returns>
     public static Bank Create(
-        int accountId,
+        int? accountId,
         string name,
         short currencyId,
         string? accountName = null,
@@ -97,9 +116,6 @@ public class Bank : ActivatableEntity
         string? notes = null,
         int? createdByUserId = null)
     {
-        if (accountId <= 0)
-            throw new DomainException("معرّف الحساب غير صالح.");
-
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم البنك مطلوب.");
 

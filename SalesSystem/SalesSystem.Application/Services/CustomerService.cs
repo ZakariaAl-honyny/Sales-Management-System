@@ -55,7 +55,7 @@ public class CustomerService : ICustomerService
     {
         try
         {
-            // Step 1: Auto-create account under AR parent (1210 — العملاء)
+            // Step 1: Auto-create account under AR parent (1130 — العملاء)
             var accountResult = await AutoCreateCustomerAccountAsync(request.Name, userId, ct);
             if (!accountResult.IsSuccess)
                 return Result<CustomerDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
@@ -260,16 +260,16 @@ public class CustomerService : ICustomerService
 
     /// <summary>
     /// Auto-creates a Level 4 detail account under the AR parent account for this customer.
-    /// Uses the parent account at code "1210 — العملاء" (Accounts Receivable).
-    /// Falls back to SystemAccountMappings.AccountsReceivableAccountId if 1210 not found.
+    /// Uses the parent account at code "1130 — العملاء" (Accounts Receivable).
+    /// Falls back to SystemAccountMappings.AccountsReceivableAccountId if 1130 not found.
     /// </summary>
     private async Task<Result<int>> AutoCreateCustomerAccountAsync(string customerName, int userId, CancellationToken ct)
     {
         try
         {
-            // Try to find parent account "1210 — العملاء" by code
+            // Try to find parent account "1130 — العملاء" by code
             var arParentAccount = await _uow.Accounts.FirstOrDefaultAsync(
-                a => a.AccountCode == "1210" && a.IsActive, ct);
+                a => a.AccountCode == "1130" && a.IsActive, ct);
 
             // Fallback: use SystemAccountMappings.AccountsReceivableAccountId parent
             if (arParentAccount == null)
@@ -324,7 +324,7 @@ public class CustomerService : ICustomerService
 
     /// <summary>
     /// Generates the next available account code under a parent account.
-    /// For example, under parent "1210", existing children "1211","1212" produce "1213".
+        /// For example, under parent "1130", existing children "1131","1132" produce "1133".
     /// </summary>
     private async Task<string> GenerateNextAccountCodeAsync(int parentAccountId, string parentCode, CancellationToken ct)
     {

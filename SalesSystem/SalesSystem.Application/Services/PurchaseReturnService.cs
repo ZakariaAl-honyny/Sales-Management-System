@@ -21,6 +21,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     private readonly IInventoryService _inventoryService;
     private readonly IDocumentSequenceService _sequenceService;
     private readonly ISystemSettingsRepository _systemSettingsRepo;
+    private readonly IAccountingIntegrationService _accountingService;
     private readonly ILogger<PurchaseReturnService> _logger;
 
     public PurchaseReturnService(
@@ -28,12 +29,14 @@ public class PurchaseReturnService : IPurchaseReturnService
         IInventoryService inventoryService,
         IDocumentSequenceService sequenceService,
         ISystemSettingsRepository systemSettingsRepo,
+        IAccountingIntegrationService accountingService,
         ILogger<PurchaseReturnService> logger)
     {
         _uow = uow;
         _inventoryService = inventoryService;
         _sequenceService = sequenceService;
         _systemSettingsRepo = systemSettingsRepo;
+        _accountingService = accountingService;
         _logger = logger;
     }
 
@@ -153,7 +156,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     public async Task<Result<PurchaseReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Items.Product");
+            r => r.Id == id, ct, "Items.Product", "Supplier.Party");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
@@ -191,7 +194,16 @@ public class PurchaseReturnService : IPurchaseReturnService
 
                 await _uow.SaveChangesAsync(ct);
 
-                _logger.LogInformation("تم ترحيل مرتجع المشتريات: {ReturnNo} (المعرف {Id})", pr.ReturnNo, pr.Id);
+                // Create accounting entry for the purchase return
+                var entryResult = await _accountingService.CreatePurchaseReturnEntryAsync(pr, userId, ct);
+                if (!entryResult.IsSuccess)
+                {
+                    _logger.LogWarning("فشل إنشاء القيد المحاسبي لمردود المشتريات {Id}: {Error}", id, entryResult.Error);
+                    return Result<PurchaseReturnDto>.Failure(entryResult.Error!);
+                }
+
+                _logger.LogInformation("تم ترحيل مرتجع المشتريات: {ReturnNo} (المعرف {Id}) — القيد المحاسبي {EntryId}",
+                    pr.ReturnNo, pr.Id, entryResult.Value);
                 return await GetByIdAsync(pr.Id, ct);
             }
             catch (DomainException ex)
@@ -205,7 +217,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     public async Task<Result<PurchaseReturnDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Items.Product");
+            r => r.Id == id, ct, "Items.Product", "Supplier.Party");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
@@ -229,6 +241,14 @@ public class PurchaseReturnService : IPurchaseReturnService
                             userId: userId,
                             ct: ct);
                     }
+
+                    // Reverse the accounting entry for the posted purchase return
+                    var entryResult = await _accountingService.ReversePurchaseReturnEntryAsync(pr, userId, ct);
+                    if (!entryResult.IsSuccess)
+                    {
+                        _logger.LogWarning("فشل إنشاء قيد عكس المحاسبة لمردود المشتريات {Id}: {Error}", id, entryResult.Error);
+                        return Result<PurchaseReturnDto>.Failure(entryResult.Error!);
+                    }
                 }
 
                 pr.Cancel();
@@ -243,6 +263,40 @@ public class PurchaseReturnService : IPurchaseReturnService
                 return Result<PurchaseReturnDto>.Failure(ex.Message);
             }
         }, ct);
+    }
+
+    public async Task<Result<Dictionary<int, decimal>>> GetReturnedQuantitiesByInvoiceAsync(int invoiceId, CancellationToken ct)
+    {
+        try
+        {
+            // Query all POSTED purchase returns linked to this invoice
+            var returns = await _uow.PurchaseReturns.ToListAsync(
+                r => r.PurchaseInvoiceId == invoiceId && r.Status == InvoiceStatus.Posted,
+                null,
+                ct,
+                false,
+                "Items");
+
+            // Aggregate quantities returned per product
+            var result = new Dictionary<int, decimal>();
+            foreach (var pr in returns)
+            {
+                foreach (var item in pr.Items)
+                {
+                    if (result.ContainsKey(item.ProductId))
+                        result[item.ProductId] += item.Quantity;
+                    else
+                        result[item.ProductId] = item.Quantity;
+                }
+            }
+
+            return Result<Dictionary<int, decimal>>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting returned quantities for invoice {InvoiceId}", invoiceId);
+            return Result<Dictionary<int, decimal>>.Failure("حدث خطأ أثناء جلب كميات المرتجعات");
+        }
     }
 
     private static PurchaseReturnDto MapToDto(PurchaseReturn r)

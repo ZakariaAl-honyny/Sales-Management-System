@@ -11,4 +11,5 @@ public interface IEmployeeService
     Task<Result<EmployeeDto>> CreateAsync(CreateEmployeeRequest request, CancellationToken ct);
     Task<Result<EmployeeDto>> UpdateAsync(int id, UpdateEmployeeRequest request, CancellationToken ct);
     Task<Result> DeactivateAsync(int id, CancellationToken ct);
+    Task<Result<int>> AutoCreateEmployeeAccountAsync(int employeeId, int? createdByUserId, CancellationToken ct);
 }

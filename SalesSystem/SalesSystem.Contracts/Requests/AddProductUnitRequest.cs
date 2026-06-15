@@ -1,7 +1,7 @@
 namespace SalesSystem.Contracts.Requests;
 
 public record AddProductUnitRequest(
-    int UnitId,
+    short UnitId,
     decimal Factor,
     bool IsBaseUnit
 );

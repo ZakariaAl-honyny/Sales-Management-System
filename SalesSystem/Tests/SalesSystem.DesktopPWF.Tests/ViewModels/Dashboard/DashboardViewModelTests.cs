@@ -451,6 +451,8 @@ public class DashboardViewModelTests : IDisposable
             TrackExpiry: false,
             ImagePath: null,
             Notes: null,
+            DefaultPurchaseUnitId: null,
+            DefaultSalesUnitId: null,
             IsActive: isActive);
     }
 

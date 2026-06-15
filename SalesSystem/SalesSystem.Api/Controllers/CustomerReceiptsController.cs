@@ -86,7 +86,11 @@ public class CustomerReceiptsController : ControllerBase
     [Authorize(Policy = "ManagerAndAbove")]
     public async Task<IActionResult> Cancel(int id, CancellationToken ct)
     {
-        var result = await _service.CancelAsync(id, ct);
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized();
+
+        var result = await _service.CancelAsync(id, userId, ct);
         if (result.IsSuccess) return Ok();
         if (result.ErrorCode == ErrorCodes.NotFound)
             return NotFound(new { error = result.Error });

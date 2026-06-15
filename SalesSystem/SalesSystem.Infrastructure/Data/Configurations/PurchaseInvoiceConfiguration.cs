@@ -14,6 +14,7 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
         builder.Property(pi => pi.SubTotal).HasPrecision(18, 2);
         builder.Property(pi => pi.DiscountAmount).HasPrecision(18, 2);
         builder.Property(pi => pi.TaxAmount).HasPrecision(18, 2);
+        builder.Property(pi => pi.OtherCharges).HasPrecision(18, 2);
         builder.Property(pi => pi.NetTotal).HasPrecision(18, 2);
         builder.Property(pi => pi.PaidAmount).HasPrecision(18, 2);
         builder.Property(pi => pi.RemainingAmount).HasPrecision(18, 2);

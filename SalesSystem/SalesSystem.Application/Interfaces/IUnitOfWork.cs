@@ -66,6 +66,9 @@ public interface IUnitOfWork
     IGenericRepository<AccountCategory> AccountCategories { get; }
     IGenericRepository<CompanySettings> CompanySettings { get; }
 
+    // Cheque repository
+    IGenericRepository<Cheque> Cheques { get; }
+
     // Customer/Supplier Contact repositories
     IGenericRepository<CustomerContact> CustomerContacts { get; }
     IGenericRepository<SupplierContact> SupplierContacts { get; }

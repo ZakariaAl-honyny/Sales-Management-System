@@ -21,4 +21,5 @@ public interface IPurchaseReturnService
     Task<Result<PagedResult<PurchaseReturnDto>>> GetAllAsync(int? supplierId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default);
     Task<Result<PurchaseReturnDto>> PostAsync(int id, int userId, CancellationToken ct);
     Task<Result<PurchaseReturnDto>> CancelAsync(int id, int userId, CancellationToken ct);
+    Task<Result<Dictionary<int, decimal>>> GetReturnedQuantitiesByInvoiceAsync(int invoiceId, CancellationToken ct);
 }

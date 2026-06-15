@@ -464,6 +464,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             SubTotal: totalAmount,
             DiscountAmount: 0,
             TaxAmount: 0,
+            OtherCharges: 0,
             NetTotal: totalAmount,
             PaidAmount: totalAmount,
             RemainingAmount: 0,

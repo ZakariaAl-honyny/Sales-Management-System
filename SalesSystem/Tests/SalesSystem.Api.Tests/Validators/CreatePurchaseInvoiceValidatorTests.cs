@@ -575,6 +575,7 @@ public class CreatePurchaseInvoiceValidatorTests
         PaymentType: PaymentType.Cash,
         DiscountAmount: 0,
         TaxAmount: 0,
+        OtherCharges: 0,
         PaidAmount: 100m,
         CurrencyId: null,
         ExchangeRate: null,

@@ -51,12 +51,14 @@ public class BankConfiguration : IEntityTypeConfiguration<Bank>
             .HasDefaultValue(true);
 
         // === FK: AccountId → Accounts ===
+        // AccountId can be null at creation — the service layer auto-creates
+        // a sub-account under "1120 — البنوك" and sets it via SetAccountId().
 
         builder.HasOne(b => b.Account)
             .WithMany()
             .HasForeignKey(b => b.AccountId)
             .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
+            .IsRequired(false);
 
         // === FK: CurrencyId → Currencies ===
 

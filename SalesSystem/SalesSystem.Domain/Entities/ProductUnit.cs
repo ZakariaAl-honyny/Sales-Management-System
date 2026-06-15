@@ -19,7 +19,7 @@ public class ProductUnit : ActivatableEntity
     /// FK to the Units table — the canonical unit definition (name, symbol).
     /// smallint in DB.
     /// </summary>
-    public int UnitId { get; private set; }
+    public short UnitId { get; private set; }
 
     /// <summary>
     /// Navigation property to the canonical Unit.
@@ -48,7 +48,7 @@ public class ProductUnit : ActivatableEntity
     /// </summary>
     public static ProductUnit CreateBaseUnit(
         int productId,
-        int unitId)
+        short unitId)
     {
         if (unitId <= 0)
             throw new DomainException("معرف الوحدة مطلوب.");
@@ -67,7 +67,7 @@ public class ProductUnit : ActivatableEntity
     /// </summary>
     public static ProductUnit CreateDerivedUnit(
         int productId,
-        int unitId,
+        short unitId,
         decimal factor,
         int sortOrder = 1)
     {
@@ -106,7 +106,7 @@ public class ProductUnit : ActivatableEntity
     /// <summary>
     /// Updates the UnitId this ProductUnit points to.
     /// </summary>
-    public void ChangeUnit(int newUnitId)
+    public void ChangeUnit(short newUnitId)
     {
         if (newUnitId <= 0)
             throw new DomainException("معرف الوحدة مطلوب.");

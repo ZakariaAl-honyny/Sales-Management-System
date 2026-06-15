@@ -57,4 +57,16 @@ public enum SystemAccountKey : byte
 
     /// <summary>Inventory Surplus / زيادة مخزون (revenue for physical count surpluses).</summary>
     InventorySurplus = 17,
+
+    /// <summary>General Expense / مصروفات عمومية (general & admin expenses).</summary>
+    GeneralExpense = 18,
+
+    /// <summary>Spoilage Loss / هالك المخزون (inventory spoilage loss).</summary>
+    SpoilageLoss = 19,
+
+    /// <summary>Employee Custody / عهد الموظفين (tracking employees' custody/advance).</summary>
+    EmployeeCustody = 20,
+
+    /// <summary>Delivery Charges Revenue / إيرادات التوصيل (separate from SalesRevenue).</summary>
+    DeliveryChargesRevenue = 21,
 }

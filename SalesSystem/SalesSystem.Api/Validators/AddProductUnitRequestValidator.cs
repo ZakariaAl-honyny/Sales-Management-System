@@ -8,7 +8,7 @@ public class AddProductUnitRequestValidator : AbstractValidator<AddProductUnitRe
     public AddProductUnitRequestValidator()
     {
         RuleFor(x => x.UnitId)
-            .GreaterThan(0).WithMessage("يجب اختيار وحدة قياس صحيحة");
+            .GreaterThan((short)0).WithMessage("يجب اختيار وحدة قياس صحيحة");
 
         RuleFor(x => x.Factor)
             .GreaterThan(0).WithMessage("معامل التحويل يجب أن يكون أكبر من صفر");

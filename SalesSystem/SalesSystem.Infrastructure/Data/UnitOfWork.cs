@@ -78,6 +78,10 @@ public class UnitOfWork : IUnitOfWork
     // Customer/Supplier Contact repositories
     private IGenericRepository<CustomerContact>? _customerContacts;
     private IGenericRepository<SupplierContact>? _supplierContacts;
+
+    // Cheque repository
+    private IGenericRepository<Cheque>? _cheques;
+
     // === New Inventory Module (v4.10+) ===
     private IGenericRepository<InventoryTransaction>? _inventoryTransactions;
     private IGenericRepository<InventoryTransactionLine>? _inventoryTransactionLines;
@@ -150,6 +154,9 @@ public class UnitOfWork : IUnitOfWork
     // Customer/Supplier Contact repositories
     public IGenericRepository<CustomerContact> CustomerContacts => _customerContacts ??= new GenericRepository<CustomerContact>(_context);
     public IGenericRepository<SupplierContact> SupplierContacts => _supplierContacts ??= new GenericRepository<SupplierContact>(_context);
+
+    // Cheque repository
+    public IGenericRepository<Cheque> Cheques => _cheques ??= new GenericRepository<Cheque>(_context);
 
     // === New Inventory Module (v4.10+) ===
     public IGenericRepository<InventoryTransaction> InventoryTransactions => _inventoryTransactions ??= new GenericRepository<InventoryTransaction>(_context);

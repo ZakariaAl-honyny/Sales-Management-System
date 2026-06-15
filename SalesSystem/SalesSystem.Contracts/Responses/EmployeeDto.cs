@@ -9,6 +9,8 @@ public record EmployeeDto(
     int? DepartmentId,
     string? DepartmentName,
     decimal Salary,
+    int? AccountId,
+    string? AccountName,
     string? Notes,
     bool IsActive
 );

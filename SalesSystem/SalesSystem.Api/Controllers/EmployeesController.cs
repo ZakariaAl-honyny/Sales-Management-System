@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
@@ -47,6 +48,24 @@ public class EmployeesController : ControllerBase
         var result = await _service.CreateAsync(request, ct);
         if (result.IsSuccess)
             return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Auto-creates a Chart of Accounts account for an employee (for custody/advance tracking).
+    /// Creates a Level 4 detail account under parent "1170 — عهد الموظفين".
+    /// </summary>
+    [HttpPost("{id:int}/auto-create-account")]
+    public async Task<IActionResult> AutoCreateAccount(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int.TryParse(userIdStr, out var userId);
+
+        var result = await _service.AutoCreateEmployeeAccountAsync(id, userId, ct);
+        if (result.IsSuccess)
+            return Ok(new { accountId = result.Value });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 

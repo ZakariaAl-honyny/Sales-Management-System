@@ -35,6 +35,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly IPrintApiService _printApiService;
     private readonly IToastNotificationService _toastService;
     private readonly ICurrencyApiService _currencyService;
+    private readonly IProductCategoryApiService _productCategoryService;
     private int? _invoiceId;
     private int _invoiceNo;
     private int _selectedWarehouseId;
@@ -99,6 +100,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         IPrintApiService printApiService,
         IToastNotificationService toastService,
         ICurrencyApiService currencyService,
+        IProductCategoryApiService productCategoryService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -117,6 +119,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _printApiService = printApiService;
         _toastService = toastService;
         _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
+        _productCategoryService = productCategoryService ?? throw new ArgumentNullException(nameof(productCategoryService));
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
 
@@ -150,7 +153,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         StartContinuousScanCommand = new AsyncRelayCommand(StartContinuousScanAsync);
 
         // --- Touch POS ViewModels ---
-        TouchPosVM = new TouchPosViewModel(App.GetService<IProductCategoryApiService>(), _productService, _inventoryService);
+        TouchPosVM = new TouchPosViewModel(_productCategoryService, _productService, _inventoryService);
         TouchPosCartVM = new TouchPosCartViewModel(Items, RecalculateTotals);
 
         // Wire: when a product is selected in Touch POS, validate stock then add to cart
@@ -332,6 +335,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             App.GetService<IPrintApiService>(),
             App.GetService<IToastNotificationService>(),
             App.GetService<ICurrencyApiService>(),
+            App.GetService<IProductCategoryApiService>(),
             invoiceId,
             isReadOnly)
     {
@@ -737,11 +741,11 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     lineVm.DiscountAmount = item.DiscountAmount;
                     lineVm.SelectedProduct = Products.FirstOrDefault(p => p.Id == item.ProductId);
                     
-                    // Set cost from product's Cost for profit display
+                    // Set cost from the invoice item's loaded cost for profit display
                     var product = Products.FirstOrDefault(p => p.Id == item.ProductId);
                     if (product != null)
                     {
-                        lineVm.CostInBaseCurrency = 0m;
+                        lineVm.CostInBaseCurrency = item.CostInBaseCurrency;
                     }
                     
                     lineVm.PropertyChanged += (s, e) =>
@@ -1529,6 +1533,9 @@ public class InvoiceLineViewModel : ViewModelBase
     private decimal _quantity = 1;
     private decimal _unitPrice;
     private decimal _discountAmount;
+    private decimal _lineTotalInput;  // Editable gross total (Qty × Price), before discount
+    private FlexibleInputCalculator.CalculationField? _lastModifiedField;
+    private bool _isRecalculating;
     private byte _mode = (byte)SaleMode.Retail;
     private decimal? _costInBaseCurrency;
     private bool _isPriceOverridden;
@@ -1541,6 +1548,7 @@ public class InvoiceLineViewModel : ViewModelBase
     {
         AvailableProducts = products;
         _soundService = soundService;
+        _lineTotalInput = _quantity * _unitPrice;  // Initialize: Qty (1) × Price (0) = 0
     }
 
     public int ProductId
@@ -1599,8 +1607,8 @@ public class InvoiceLineViewModel : ViewModelBase
                 // Set cost from product's Cost
                 CostInBaseCurrency = null;
 
-                // Set ProductUnitId — TODO: Phase 25 — derive from ProductPrices table
-                ProductUnitId = 1;
+                // Set ProductUnitId from product's default sales unit (or 0 for service auto-determination)
+                ProductUnitId = value.DefaultSalesUnitId ?? 0;
 
                 // Reset price override flag
                 IsPriceOverridden = false;
@@ -1628,7 +1636,7 @@ public class InvoiceLineViewModel : ViewModelBase
                 if (SelectedProduct != null)
                 {
                     UnitPrice = GetDefaultPrice(SelectedProduct);
-                    ProductUnitId = 1; // TODO: Phase 25 — derive from ProductPrices table
+                    ProductUnitId = SelectedProduct.DefaultSalesUnitId ?? 0; // From product's default sales unit
                     IsPriceOverridden = false;
                 }
                 OnPropertyChanged(nameof(LineTotal));
@@ -1644,7 +1652,8 @@ public class InvoiceLineViewModel : ViewModelBase
             if (SetProperty(ref _quantity, value))
             {
                 ValidateQuantity();
-                OnPropertyChanged(nameof(LineTotal));
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Quantity;
+                RecalculateFromFlexibleInput();
                 OnPropertyChanged(nameof(Profit));
                 _soundService?.PlaySuccess();
             }
@@ -1659,7 +1668,8 @@ public class InvoiceLineViewModel : ViewModelBase
             if (SetProperty(ref _unitPrice, value))
             {
                 ValidateUnitPrice();
-                OnPropertyChanged(nameof(LineTotal));
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Price;
+                RecalculateFromFlexibleInput();
                 OnPropertyChanged(nameof(Profit));
 
                 // Check if price was overridden from default
@@ -1687,6 +1697,25 @@ public class InvoiceLineViewModel : ViewModelBase
     public decimal LineTotal => (Quantity * UnitPrice) - DiscountAmount;
 
     /// <summary>
+    /// Editable gross total (Quantity × UnitPrice), before discount.
+    /// When user edits this field, the system recalculates either Quantity or UnitPrice
+    /// depending on which was last modified.
+    /// </summary>
+    public decimal LineTotalInput
+    {
+        get => _lineTotalInput;
+        set
+        {
+            if (SetProperty(ref _lineTotalInput, value))
+            {
+                ValidateLineTotalInput();
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Total;
+                RecalculateFromFlexibleInput();
+            }
+        }
+    }
+
+    /// <summary>
     /// Sets the price from a product based on the given sale mode (retail/wholesale).
     /// </summary>
     public void SetPriceFromProduct(ProductDto product, byte mode)
@@ -1695,19 +1724,80 @@ public class InvoiceLineViewModel : ViewModelBase
         if (product != null)
         {
             UnitPrice = GetDefaultPrice(product);
-            ProductUnitId = 1; // TODO: Phase 25 — derive from ProductPrices table
+            ProductUnitId = product.DefaultSalesUnitId ?? 0; // From product's default sales unit
             CostInBaseCurrency = null;
             IsPriceOverridden = false;
         }
     }
 
     /// <summary>
+    /// Recalculates based on user input.
+    /// When the user explicitly edits the LineTotal (Total) column, the
+    /// <see cref="FlexibleInputCalculator"/> determines whether to compute
+    /// Quantity or UnitPrice using the two entered values.
+    /// When the user edits Quantity or UnitPrice, the LineTotal is simply
+    /// recalculated as Quantity × UnitPrice (the total column is NOT used as
+    /// an anchor — it was only auto-set from a prior field edit, not user-entered).
+    /// A guard flag (<c>_isRecalculating</c>) prevents infinite recursion.
+    /// </summary>
+    private void RecalculateFromFlexibleInput()
+    {
+        if (_isRecalculating) return;
+        _isRecalculating = true;
+        try
+        {
+            if (_lastModifiedField == FlexibleInputCalculator.CalculationField.Total)
+            {
+                // User explicitly edited LineTotalInput — use the calculator
+                // to determine Quantity or UnitPrice from the two known values.
+                var result = FlexibleInputCalculator.Calculate(
+                    _quantity, _unitPrice, _lineTotalInput,
+                    FlexibleInputCalculator.CalculationField.Total);
+
+                _quantity = result.quantity;
+                _unitPrice = result.price;
+                _lineTotalInput = result.total;
+
+                OnPropertyChanged(nameof(Quantity));
+                OnPropertyChanged(nameof(UnitPrice));
+                OnPropertyChanged(nameof(LineTotalInput));
+            }
+            else
+            {
+                // User edited Quantity or UnitPrice — just recompute the total.
+                // Do NOT treat the current LineTotalInput as a user-entered anchor.
+                _lineTotalInput = _quantity * _unitPrice;
+                OnPropertyChanged(nameof(LineTotalInput));
+            }
+
+            OnPropertyChanged(nameof(LineTotal));
+        }
+        finally
+        {
+            _isRecalculating = false;
+        }
+    }
+
+    private void ValidateLineTotalInput()
+    {
+        ClearErrors(nameof(LineTotalInput));
+        if (LineTotalInput < 0)
+        {
+            AddError(nameof(LineTotalInput), "الإجمالي لا يمكن أن يكون سالباً");
+        }
+    }
+
+    /// <summary>
     /// Gets the default unit price for a product.
-    /// TODO: Phase 25 — retrieve price from ProductPrices table based on PriceLevel.
+    /// Returns 0m when no price data is available (user enters price manually).
+    /// Server-side enforcement in SalesService.PostAsync prevents selling below registered prices.
+    /// Phase 25 (ProductPrices table) will populate this via effective price lookup per unit + currency.
     /// </summary>
     private decimal GetDefaultPrice(ProductDto product)
     {
-        return 0m; // Temporary: default price placeholder
+        // V1: ProductDto has no price fields — prices come from ProductPrices table (Phase 25).
+        // Server validates via SalesService.PostAsync → PreventBelowRetailPrice setting.
+        return 0m;
     }
 
     /// <summary>

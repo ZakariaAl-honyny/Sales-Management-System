@@ -174,6 +174,8 @@ public class ProductsControllerTests : ControllerTestBase
         TrackExpiry: false,
         ImagePath: null,
         Notes: null,
+        DefaultPurchaseUnitId: null,
+        DefaultSalesUnitId: null,
         IsActive: true);
 
     private static CreateProductRequest CreateValidRequest() => new(

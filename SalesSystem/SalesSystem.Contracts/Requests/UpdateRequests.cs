@@ -21,6 +21,7 @@ public record UpdatePurchaseInvoiceRequest(
     PaymentType PaymentType,
     decimal DiscountAmount,
     decimal TaxAmount,
+    decimal OtherCharges,
     decimal PaidAmount,
     int? CurrencyId,
     decimal? ExchangeRate,

@@ -13,11 +13,19 @@ namespace SalesSystem.Application.Services;
 public class InventoryAdjustmentService : IInventoryAdjustmentService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IInventoryService _inventoryService;
+    private readonly IDocumentSequenceService _sequenceService;
     private readonly ILogger<InventoryAdjustmentService> _logger;
 
-    public InventoryAdjustmentService(IUnitOfWork uow, ILogger<InventoryAdjustmentService> logger)
+    public InventoryAdjustmentService(
+        IUnitOfWork uow,
+        IInventoryService inventoryService,
+        IDocumentSequenceService sequenceService,
+        ILogger<InventoryAdjustmentService> logger)
     {
         _uow = uow;
+        _inventoryService = inventoryService;
+        _sequenceService = sequenceService;
         _logger = logger;
     }
 
@@ -58,8 +66,11 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
     {
         try
         {
-            // Compute next adjustment number (temporary — in production, use DocumentSequenceService)
-            var adjustmentNo = await GetNextAdjustmentNumberAsync(ct);
+            // Generate adjustment number via DocumentSequenceService (thread-safe)
+            var seqResult = await _sequenceService.GetNextIntAsync("InventoryAdjustment", ct);
+            if (!seqResult.IsSuccess)
+                return Result<InventoryAdjustmentDto>.Failure(seqResult.Error!);
+            var adjustmentNo = seqResult.Value;
 
             var adjustment = InventoryAdjustment.Create(
                 adjustmentNo,
@@ -133,6 +144,42 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
                 return Result.Failure("التسوية غير موجودة", ErrorCodes.NotFound);
 
             adjustment.Post(userId);
+
+            // Update stock levels based on adjustment type
+            foreach (var line in adjustment.Lines)
+            {
+                switch (adjustment.AdjustmentType)
+                {
+                    case InventoryAdjustmentType.Addition:
+                        await _inventoryService.IncreaseStockAsync(
+                            line.ProductId, adjustment.WarehouseId, line.Quantity, line.UnitCost, userId, ct);
+                        break;
+
+                    case InventoryAdjustmentType.Deduction:
+                        await _inventoryService.DecreaseStockAsync(
+                            line.ProductId, adjustment.WarehouseId, line.Quantity, line.UnitCost, userId, ct);
+                        break;
+
+                    case InventoryAdjustmentType.Correction:
+                        // Correction = set quantity to target level: compute delta, then adjust
+                        var stockResult = await _inventoryService.GetStockAsync(
+                            line.ProductId, adjustment.WarehouseId, ct);
+                        if (stockResult.IsSuccess)
+                        {
+                            var currentQty = stockResult.Value;
+                            if (line.Quantity > currentQty)
+                                await _inventoryService.IncreaseStockAsync(
+                                    line.ProductId, adjustment.WarehouseId,
+                                    line.Quantity - currentQty, line.UnitCost, userId, ct);
+                            else if (line.Quantity < currentQty)
+                                await _inventoryService.DecreaseStockAsync(
+                                    line.ProductId, adjustment.WarehouseId,
+                                    currentQty - line.Quantity, line.UnitCost, userId, ct);
+                        }
+                        break;
+                }
+            }
+
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Inventory adjustment {Id} posted by User {UserId}", id, userId);
@@ -177,18 +224,6 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
     }
 
     // ─── Private Helpers ─────────────────────────────────
-
-    /// <summary>
-    /// Computes the next adjustment number as (max existing AdjustmentNo) + 1.
-    /// Temporary — in production, use IDocumentSequenceService.GetNextIntAsync().
-    /// </summary>
-    private async Task<int> GetNextAdjustmentNumberAsync(CancellationToken ct)
-    {
-        var allAdjustments = await _uow.InventoryAdjustments.ToListIgnoreFiltersAsync(ct);
-        if (allAdjustments.Count == 0)
-            return 1;
-        return allAdjustments.Max(a => a.AdjustmentNo) + 1;
-    }
 
     private static InventoryAdjustmentDto MapToDto(InventoryAdjustment adjustment)
     {

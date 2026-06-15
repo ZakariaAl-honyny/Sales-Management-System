@@ -8,6 +8,6 @@ public class UpdateProductUnitRequestValidator : AbstractValidator<UpdateProduct
     public UpdateProductUnitRequestValidator()
     {
         RuleFor(x => x.UnitId)
-            .GreaterThan(0).WithMessage("يجب اختيار وحدة قياس صحيحة");
+            .GreaterThan((short)0).WithMessage("يجب اختيار وحدة قياس صحيحة");
     }
 }

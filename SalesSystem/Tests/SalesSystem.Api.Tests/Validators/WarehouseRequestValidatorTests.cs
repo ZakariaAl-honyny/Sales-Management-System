@@ -102,7 +102,7 @@ public class WarehouseRequestValidatorTests
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Location)
-                .WithErrorMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
+                .WithErrorMessage("الموقع لا يمكن أن يتجاوز 200 حرف");
         }
 
         #endregion
@@ -230,7 +230,7 @@ public class WarehouseRequestValidatorTests
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Location)
-                .WithErrorMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
+                .WithErrorMessage("الموقع لا يمكن أن يتجاوز 200 حرف");
         }
 
         #endregion

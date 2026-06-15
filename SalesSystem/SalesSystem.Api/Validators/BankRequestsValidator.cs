@@ -8,7 +8,12 @@ public class CreateBankRequestValidator : AbstractValidator<CreateBankRequest>
     public CreateBankRequestValidator()
     {
         RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("معرف الحساب المحاسبي مطلوب");
+            .GreaterThan(0)
+            .When(x => x.AccountId.HasValue)
+            .WithMessage("معرف الحساب المحاسبي غير صالح");
+
+        RuleFor(x => x.CurrencyId)
+            .GreaterThan((short)0).WithMessage("معرف العملة مطلوب");
 
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("اسم البنك مطلوب")

@@ -300,7 +300,7 @@ public class ProductPriceEditorViewModel : ViewModelBase
     {
         var request = new CreateProductPriceRequest(
             ProductUnitId,
-            CurrencyId,
+            (short)CurrencyId,
             PriceValue,
             EffectiveFrom,
             HasEffectiveTo ? EffectiveTo : null);

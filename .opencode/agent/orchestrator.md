@@ -333,7 +333,7 @@ Run through AGENTS.md Section 9 checklist. If ANY item fails, reject the code.
 
 ## 📋 Phase Awareness (Phases 23-31)
 
-The system is currently at **v4.10.1+ with Phases 18-25 + Purchases/Sales Analysis Gaps Implemented: OtherCharges Landed Cost, Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone, Flexible Input completed and Phases 26-31 planned**:
+The system is currently at **v4.10.2+ — Deep Review Complete: All 13 Analysis Documents Reviewed, All Sales/Purchases Gaps Implemented, AllowBelowCostSale Fixed to WARNING**:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
@@ -367,6 +367,13 @@ When implementing or reviewing code, ALWAYS enforce these rules:
 14. **Purchase Return Standalone**: Purchase return MUST support BOTH linked-to-invoice and standalone mode — NEVER block returns without an invoice when supplier and items are provided.
 15. **Flexible Input**: Sales/Purchase line items MUST support entering ANY TWO of (Quantity, Price, LineTotal) — the third auto-calculates. NEVER force users to enter all three.
 
+16. **AllowBelowCostSale = WARNING not BLOCK**: Below-cost sales MUST warn via `LogWarning` but NEVER block with `Result.Failure`. The analysis document explicitly states "ولا نمنع البيع" (do not block the sale). The `PreventBelowRetailPrice` setting is the OPPOSITE — it DOES block (correct). These two settings have fundamentally different behaviors.
+17. **InventoryOps TransactionNo Auto-Generation**: `InventoryService.CreateTransactionAsync()` MUST auto-generate TransactionNo via `_sequenceService.GetNextIntAsync("InventoryTransaction", ct)` when `<= 0` — NEVER require Desktop to provide it. Same pattern as InvoiceNo (RULE-255).
+18. **Atomic Stock Updates via IInventoryService**: Stock operations in Adjustment/Count services MUST use `IInventoryService.IncreaseStockAsync()`/`DecreaseStockAsync()` — NEVER directly assign `WarehouseStock.Quantity` (bypasses audit trail).
+19. **Count Creates Single Adjustment**: `InventoryCountService.PostAsync()` MUST create ONE `InventoryAdjustment` per Post with `ReferenceType = "InventoryCount"` — NOT one per line (creates cleaner audit trail).
+20. **AdjustmentType Validator Range**: `InventoryAdjustmentRequestValidator` MUST use `InclusiveBetween(1, 3)` — NOT `(1, 2)` which excludes Correction=3.
+21. **CancellationToken Before Optional Parameters**: `ReportsController` and all controllers MUST place `CancellationToken` parameter BEFORE any optional parameters — ASP.NET Core model binding requires this order.
+
 ### 💡 Bug Prevention Checklist
 
 When writing or reviewing code in ANY layer, check these:
@@ -384,6 +391,16 @@ When writing or reviewing code in ANY layer, check these:
 - [ ] Are Arabic messages properly UTF-8 encoded?
 - [ ] Does the list display newest-first (OrderByDescending)?
 - [ ] Are EventBus subscriptions disposed in `Cleanup()`?
+- [ ] Does `InventoryService.CreateTransactionAsync()` auto-generate TransactionNo via DocumentSequenceService when `<= 0`?
+- [ ] Does `InventoryAdjustmentService.PostAsync()` use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` (not direct assignment)?
+- [ ] Does `InventoryCountService.PostAsync()` create ONE Adjustment per Post (not per line)?
+- [ ] Does `AdjustmentType` validator use `InclusiveBetween(1, 3)` (not `(1, 2)`)?
+- [ ] Does `ReportsController` place `CancellationToken` BEFORE optional parameters?
+- [ ] Do all Inventory Operations ViewModels implement `IDisposable`?
+- [ ] Does `SalesReturn.Post()` set `PostedAt = DateTime.UtcNow` and `SalesReturn.Cancel()` set `CancelledAt = DateTime.UtcNow`?
+- [ ] Does `SalesReturnService` inject `IAccountingIntegrationService` and call `CreateSalesReturnEntryAsync()` on Post/Cancel?
+- [ ] Is `ProductUnitId` NEVER hardcoded to `1` in ANY ViewModel (use DefaultPurchaseUnitId/DefaultSalesUnitId)?
+- [ ] Is `AllocateAdditionalCharges()` extracted to standalone `AdditionalChargeAllocator` helper?
 
 ### Features to Fix By Default
 
@@ -401,3 +418,13 @@ When you encounter any code related to these areas, apply fixes automatically:
 10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
 11. Payment without allocation → Add PaymentAllocation tracking
 12. Missing reversal entries on payment update/delete → Add reversal journal entries
+13. `InventoryService.CreateTransactionAsync()` without auto-generation → ADD `_sequenceService.GetNextIntAsync()` when `TransactionNo <= 0`
+14. Direct `WarehouseStock.Quantity` assignment in Adjustment/Count services → CHANGE to use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync`
+15. InventoryCount creating one Adjustment per line → CHANGE to ONE per Post with `ReferenceType = "InventoryCount"`
+16. `AdjustmentType` validator range `(1,2)` → CHANGE to `InclusiveBetween(1, 3)`
+17. `CancellationToken` after optional params → MOVE before optional params
+18. Inventory Operations ViewModels missing `IDisposable` → ADD `IDisposable` with `Cleanup()` in `Dispose()`
+19. `SalesReturn.Post()`/`Cancel()` missing timestamps → ADD `PostedAt = DateTime.UtcNow`/`CancelledAt = DateTime.UtcNow` — matches RULE-489 for PurchaseReturn.
+20. `SalesReturnService` missing journal entries → ADD `IAccountingIntegrationService` DI, call `CreateSalesReturnEntryAsync()` on Post and `ReverseSalesReturnEntryAsync()` on Cancel.
+21. `ProductUnitId` hardcoded to `1` → REPLACE with `product.DefaultPurchaseUnitId`/`DefaultSalesUnitId` in all ViewModels. Fallback to `0`.
+22. `AllocateAdditionalCharges` inline → EXTRACT to standalone `AdditionalChargeAllocator` static helper.

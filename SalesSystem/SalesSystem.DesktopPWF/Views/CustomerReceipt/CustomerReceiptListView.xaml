@@ -148,8 +148,35 @@
                         <DataGridTemplateColumn Header="الحالة" Width="100" CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Border Background="{StaticResource InfoLightBrush}" CornerRadius="4" Padding="6,2">
-                                        <TextBlock Text="{Binding StatusName}" Foreground="{StaticResource InfoTextBrush}" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                                    <Border CornerRadius="4" Padding="6,2">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{StaticResource WarningLightBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}" Value="2">
+                                                        <Setter Property="Background" Value="{StaticResource InfoLightBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="3">
+                                                        <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding StatusName}" FontWeight="SemiBold" HorizontalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource StatusBadgeTextStyle}">
+                                                    <Setter Property="Foreground" Value="{StaticResource WarningTextBrush}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Status}" Value="2">
+                                                            <Setter Property="Foreground" Value="{StaticResource InfoTextBrush}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="3">
+                                                            <Setter Property="Foreground" Value="{StaticResource ErrorTextBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </Border>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>

@@ -74,4 +74,11 @@ public class PurchaseReturnApiService : ApiServiceBase, IPurchaseReturnApiServic
             () => _httpClient.PostAsync($"{BasePath}/{id}/cancel", null, ct),
             "PurchaseReturnApiService.CancelAsync");
     }
+
+    public async Task<Result<Dictionary<int, decimal>>> GetReturnedQuantitiesByInvoiceAsync(int invoiceId, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<Dictionary<int, decimal>>(
+            () => _httpClient.GetAsync($"{BasePath}/returned-quantities/{invoiceId}", ct),
+            "PurchaseReturnApiService.GetReturnedQuantitiesByInvoiceAsync");
+    }
 }

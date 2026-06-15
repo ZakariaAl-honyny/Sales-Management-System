@@ -25,6 +25,7 @@ public class SalesService : ISalesService
     private readonly IDocumentSequenceService _documentSequenceService;
     private readonly ISystemSettingsRepository _systemSettingsRepo;
     private readonly IProductCostService _productCostService;
+    private readonly IProductPriceService _productPriceService;
     private readonly ILogger<SalesService> _logger;
 
     public SalesService(
@@ -37,6 +38,7 @@ public class SalesService : ISalesService
         IDocumentSequenceService documentSequenceService,
         ISystemSettingsRepository systemSettingsRepo,
         IProductCostService productCostService,
+        IProductPriceService productPriceService,
         ILogger<SalesService> logger)
     {
         _uow = uow;
@@ -48,6 +50,7 @@ public class SalesService : ISalesService
         _documentSequenceService = documentSequenceService;
         _systemSettingsRepo = systemSettingsRepo;
         _productCostService = productCostService;
+        _productPriceService = productPriceService;
         _logger = logger;
     }
 
@@ -174,6 +177,28 @@ public class SalesService : ISalesService
             invoice.SetTaxAmount(request.TaxAmount);
             invoice.SetPaidAmount(request.PaidAmount);
 
+            // ── Price Enforcement (server-side) ─────────────────────
+            var preventBelowRetailPrice = await _systemSettingsRepo.GetBoolAsync("PreventBelowRetailPrice", false, ct);
+            if (preventBelowRetailPrice)
+            {
+                var effectiveCurrencyId = request.CurrencyId ?? (await GetBaseCurrencyIdAsync(ct));
+                foreach (var item in request.Items)
+                {
+                    if (!item.ProductUnitId.HasValue) continue;
+                    var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
+                        item.ProductUnitId.Value, effectiveCurrencyId, ct);
+                    if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
+                    {
+                        await transaction.RollbackAsync(ct);
+                        _logger.LogWarning(
+                            "Price enforcement: Item ProductId={ProductId}, unit price {UnitPrice} < registered price {RegisteredPrice}",
+                            item.ProductId, item.UnitPrice, priceResult.Value.Price);
+                        return Result<SalesInvoiceDto>.Failure(
+                            $"سعر البيع أقل من السعر الرسمي للمنتج (معرف المنتج: {item.ProductId})");
+                    }
+                }
+            }
+
             await _uow.SalesInvoices.AddAsync(invoice, ct);
             await _uow.SaveChangesAsync(ct);
 
@@ -284,6 +309,46 @@ public class SalesService : ISalesService
         }
 
         var allowNegativeStock = await _systemSettingsRepo.GetBoolAsync("AllowNegativeStock", false, ct);
+
+        // ── 0. Price Enforcement (BEFORE Transaction) ──────────────
+        var preventBelowRetailPrice = await _systemSettingsRepo.GetBoolAsync("PreventBelowRetailPrice", false, ct);
+        var allowBelowCostSale = await _systemSettingsRepo.GetBoolAsync("AllowBelowCostSale", true, ct);
+
+        if (preventBelowRetailPrice)
+        {
+            var effectiveCurrencyId = await GetCurrencyIdAsync(invoice, ct);
+            foreach (var item in invoice.Items)
+            {
+                if (!item.ProductUnitId.HasValue) continue;
+                var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
+                    item.ProductUnitId.Value, effectiveCurrencyId, ct);
+                if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
+                {
+                    var productName = item.Product?.Name ?? $"معرف {item.ProductId}";
+                    _logger.LogWarning(
+                        "Price enforcement on post: Product '{Product}' unit price {UnitPrice} < registered price {RegisteredPrice}",
+                        productName, item.UnitPrice, priceResult.Value.Price);
+                    return Result<SalesInvoiceDto>.Failure(
+                        $"سعر البيع أقل من السعر الرسمي للمنتج: {productName}");
+                }
+            }
+        }
+
+        if (!allowBelowCostSale)
+        {
+            foreach (var item in invoice.Items)
+            {
+                if (item.CostInBaseCurrency.HasValue && item.CostInBaseCurrency.Value > 0
+                    && item.UnitPrice < item.CostInBaseCurrency.Value)
+                {
+                    var productName = item.Product?.Name ?? $"معرف {item.ProductId}";
+                    _logger.LogWarning(
+                        "Sale below cost: Product '{Product}' (unit price {UnitPrice} < cost {Cost}) for invoice #{InvoiceNo} — warning only, sale allowed",
+                        productName, item.UnitPrice, item.CostInBaseCurrency.Value, invoice.InvoiceNo);
+                    // Per analysis: warning only, do not block — user can proceed
+                }
+            }
+        }
 
         // 1. Validate Stock BEFORE Transaction
         foreach (var item in invoice.Items)
@@ -580,6 +645,16 @@ public class SalesService : ISalesService
         var mapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
             m => m.MappingKey == SystemAccountKey.DefaultCash, ct);
         return mapping?.AccountId ?? 1;
+    }
+
+    /// <summary>
+    /// Gets the system's base currency ID for price lookups when invoice has no explicit currency.
+    /// </summary>
+    private async Task<short> GetBaseCurrencyIdAsync(CancellationToken ct)
+    {
+        var currencies = await _uow.Currencies.ToListAsync(ct);
+        var baseCurrency = currencies.FirstOrDefault(c => c.IsBaseCurrency);
+        return (short)(baseCurrency?.Id ?? 1);
     }
 
     private static SalesInvoiceDto MapToDto(SalesInvoice i)

@@ -52,8 +52,8 @@ public class ProductUnitService : IProductUnitService
             // Phase 28: Prices managed via ProductPrices entity (not on ProductUnit).
             // Barcodes managed via Product.Barcode column (single source of truth).
             var unit = req.IsBaseUnit
-                ? ProductUnit.CreateBaseUnit(productId, req.UnitId)
-                : ProductUnit.CreateDerivedUnit(productId, req.UnitId, req.Factor);
+                ? ProductUnit.CreateBaseUnit(productId, (short)req.UnitId)
+                : ProductUnit.CreateDerivedUnit(productId, (short)req.UnitId, req.Factor);
 
             product.AddUnit(unit);
             await _uow.ProductUnits.AddAsync(unit, ct);
@@ -93,7 +93,7 @@ public class ProductUnitService : IProductUnitService
             if (unit == null)
                 return Result<ProductUnitDto>.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-            unit.ChangeUnit(req.UnitId);
+            unit.ChangeUnit((short)req.UnitId);
 
             await _uow.ProductUnits.UpdateAsync(unit, ct);
             await _uow.SaveChangesAsync(ct);

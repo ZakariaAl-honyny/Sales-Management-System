@@ -15,7 +15,7 @@ public class CreateProductPriceRequestValidator : AbstractValidator<CreateProduc
             .GreaterThan(0).WithMessage("معرف وحدة المنتج مطلوب");
 
         RuleFor(x => x.CurrencyId)
-            .GreaterThan(0).WithMessage("معرف العملة مطلوب");
+            .GreaterThan((short)0).WithMessage("معرف العملة مطلوب");
 
         RuleFor(x => x.Price)
             .GreaterThan(0).WithMessage("السعر يجب أن يكون أكبر من الصفر")

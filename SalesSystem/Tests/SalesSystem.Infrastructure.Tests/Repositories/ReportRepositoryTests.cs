@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Infrastructure.Data;
@@ -31,9 +33,27 @@ public class ReportRepositoryTests
         await context.SaveChangesAsync();
     }
 
+    private async Task<int> SeedAccount(SalesDbContext context, string nameAr)
+    {
+        var account = Account.Create(
+            accountCode: "9999",
+            nameAr: nameAr,
+            nameEn: nameAr,
+            accountType: AccountType.Asset,
+            level: 4,
+            isSystemAccount: false,
+            allowTransactions: true,
+            openingBalance: 0
+        );
+        context.Accounts.Add(account);
+        await context.SaveChangesAsync();
+        return account.Id;
+    }
+
     private async Task<int> SeedCustomer(SalesDbContext context, string name)
     {
-        var party = Party.Create(name, PartyType.Customer, 1);
+        var accountId = await SeedAccount(context, $"حساب {name}");
+        var party = Party.Create(name, PartyType.Customer, accountId);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
         var customer = Customer.Create(partyId: party.Id);
@@ -44,7 +64,8 @@ public class ReportRepositoryTests
 
     private async Task<int> SeedSupplier(SalesDbContext context, string name)
     {
-        var party = Party.Create(name, PartyType.Supplier, 1);
+        var accountId = await SeedAccount(context, $"حساب {name}");
+        var party = Party.Create(name, PartyType.Supplier, accountId);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
         var supplier = Supplier.Create(partyId: party.Id);
@@ -419,9 +440,8 @@ public class ReportRepositoryTests
             transactionDate: DateTime.UtcNow,
             createdByUserId: 1
         );
-        transaction.Post();
         context.InventoryTransactions.Add(transaction);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(); // Save first to get transaction.Id
 
         var line = InventoryTransactionLine.Create(
             inventoryTransactionId: transaction.Id,
@@ -430,7 +450,8 @@ public class ReportRepositoryTests
             quantity: 100m,
             unitCost: 10m
         );
-        context.InventoryTransactionLines.Add(line);
+        transaction.AddLine(line);
+        transaction.Post();
         await context.SaveChangesAsync();
 
         // Act
@@ -475,9 +496,8 @@ public class ReportRepositoryTests
             transactionDate: DateTime.UtcNow,
             createdByUserId: 1
         );
-        transactionInRange.Post();
         context.InventoryTransactions.Add(transactionInRange);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(); // Save first to get transaction.Id
 
         var lineInRange = InventoryTransactionLine.Create(
             inventoryTransactionId: transactionInRange.Id,
@@ -486,7 +506,9 @@ public class ReportRepositoryTests
             quantity: 100m,
             unitCost: 10m
         );
-        context.InventoryTransactionLines.Add(lineInRange);
+        transactionInRange.AddLine(lineInRange);
+        transactionInRange.Post();
+        await context.SaveChangesAsync();
 
         // Movement outside range - different type (SaleOut)
         var transactionOutOfRange = InventoryTransaction.Create(
@@ -496,9 +518,8 @@ public class ReportRepositoryTests
             transactionDate: DateTime.UtcNow.AddDays(-10),
             createdByUserId: 1
         );
-        transactionOutOfRange.Post();
         context.InventoryTransactions.Add(transactionOutOfRange);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(); // Save first to get transaction.Id
 
         var lineOutOfRange = InventoryTransactionLine.Create(
             inventoryTransactionId: transactionOutOfRange.Id,
@@ -507,7 +528,8 @@ public class ReportRepositoryTests
             quantity: 10m,
             unitCost: 10m
         );
-        context.InventoryTransactionLines.Add(lineOutOfRange);
+        transactionOutOfRange.AddLine(lineOutOfRange);
+        transactionOutOfRange.Post();
         await context.SaveChangesAsync();
 
         // Act

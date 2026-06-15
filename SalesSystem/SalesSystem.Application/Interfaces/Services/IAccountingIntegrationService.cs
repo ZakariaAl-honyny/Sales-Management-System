@@ -141,6 +141,20 @@ public interface IAccountingIntegrationService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Reverses a posted sales return journal entry (cancellation of return).
+    /// Re-creates the original sale effect:
+    /// Dr: CustomerAccount = TotalAmount
+    /// Cr: SalesReturnsAccount = TotalAmount
+    /// Dr: COGSAccount = totalCost
+    /// Cr: InventoryAccount = totalCost
+    /// </summary>
+    Task<Result<int>> ReverseSalesReturnEntryAsync(
+        SalesReturn salesReturn,
+        decimal totalCost,
+        int reversedByUserId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Creates journal entry for a posted purchase return.
     /// Reverses the original purchase entry:
     /// Dr: AccountsPayable (supplier account) = TotalAmount

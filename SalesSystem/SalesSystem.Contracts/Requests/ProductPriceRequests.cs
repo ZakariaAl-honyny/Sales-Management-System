@@ -2,7 +2,7 @@ namespace SalesSystem.Contracts.Requests;
 
 public record CreateProductPriceRequest(
     int ProductUnitId,
-    int CurrencyId,
+    short CurrencyId,
     decimal Price,
     DateTime EffectiveFrom,
     DateTime? EffectiveTo = null);

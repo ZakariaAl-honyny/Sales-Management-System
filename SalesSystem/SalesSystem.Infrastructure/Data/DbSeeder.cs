@@ -81,7 +81,7 @@ public static class DbSeeder
                 SystemSetting.Create("AllowDrafts", "true", "bool", "Sales", "السماح بالمسودات", "السماح بحفظ فاتورة البيع كمسودة"),
                 SystemSetting.Create("ShowProfitInInvoice", "true", "bool", "Sales", "إظهار الربح", "إظهار هامش الربح في شاشة البيع"),
                 SystemSetting.Create("PreventBelowRetailPrice", "false", "bool", "Sales", "منع البيع أقل من السعر", "منع البيع بسعر أقل من السعر الرسمي"),
-                SystemSetting.Create("AllowBelowCostSale", "false", "bool", "Sales", "البيع أقل من التكلفة", "السماح بالبيع بسعر أقل من التكلفة مع تحذير"),
+                SystemSetting.Create("AllowBelowCostSale", "true", "bool", "Sales", "البيع أقل من التكلفة", "السماح بالبيع بسعر أقل من التكلفة مع تحذير"),
                 SystemSetting.Create("DefaultCashCustomerId", "1", "int", "Sales", "العميل النقدي", "العميل الافتراضي لمبيعات النقد"),
                 SystemSetting.Create("PurchaseAutoPost", "true", "bool", "Purchases", "ترحيل المشتريات تلقائياً", "ترحيل فاتورة الشراء مباشرة عند الحفظ"),
                 SystemSetting.Create("DefaultCashSupplierId", "1", "int", "Purchases", "المورد النقدي", "المورد الافتراضي لمشتريات النقد"),

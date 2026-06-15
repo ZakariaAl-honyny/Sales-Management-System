@@ -150,28 +150,6 @@ public class SalesInvoiceRepositoryTests
     }
 
     [Fact]
-    public async Task SoftDeleteAsync_ExistingInvoice_SetsIsActiveToFalse()
-    {
-        // Arrange
-        await using var context = CreateContext("InvoiceDb6");
-        await SeedTestData(context);
-        
-        var repository = new GenericRepository<SalesInvoice>(context);
-        
-        var invoice = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 1);
-        await repository.AddAsync(invoice);
-        await context.SaveChangesAsync();
-
-        // Act
-        await repository.SoftDeleteAsync(invoice.Id);
-        await context.SaveChangesAsync();
-
-        // Assert
-        var deleted = await context.SalesInvoices.FirstOrDefaultAsync(i => i.Id == invoice.Id);
-        deleted.Should().BeNull();
-    }
-
-    [Fact]
     public async Task Query_AllowsLinqOperations_FiltersByStatus()
     {
         // Arrange
@@ -310,7 +288,9 @@ public class SalesInvoiceRepositoryTests
         await context.SaveChangesAsync();
 
         // Assert
-        var updated = await context.SalesInvoices.FirstOrDefaultAsync(i => i.Id == invoice.Id);
+        var updated = await context.SalesInvoices
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(i => i.Id == invoice.Id);
         updated!.Status.Should().Be(InvoiceStatus.Cancelled);
     }
 

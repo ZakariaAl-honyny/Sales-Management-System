@@ -127,6 +127,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             SubTotal: 1000m,
             DiscountAmount: 0,
             TaxAmount: 0,
+            OtherCharges: 0,
             NetTotal: 1000m,
             PaidAmount: 1000m,
             RemainingAmount: 0,
@@ -190,6 +191,6 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
     private static ProductDto CreateProductDto(int id, string name, decimal salePrice, decimal purchasePrice)
     {
-        return new ProductDto(Id: id, Name: name, CategoryId: 1, CategoryName: null, Barcode: null, Description: null, ReorderLevel: 0m, TrackExpiry: false, ImagePath: null, Notes: null, IsActive: true);
+        return new ProductDto(Id: id, Name: name, CategoryId: 1, CategoryName: null, Barcode: null, Description: null, ReorderLevel: 0m, TrackExpiry: false, ImagePath: null, Notes: null, DefaultPurchaseUnitId: null, DefaultSalesUnitId: null, IsActive: true);
     }
 }

@@ -197,6 +197,13 @@ public interface ISessionService
     bool IsAuthenticated { get; }
     bool CanAccess(Permission permission);
     Permission GetPermissions();
+
+    /// <summary>
+    /// Gets the current UI view mode (Basic vs Advanced).
+    /// Basic = operational screens only; Advanced = operational + accounting.
+    /// Determined by user role at login time.
+    /// </summary>
+    ViewMode GetViewMode();
 }
 
 public interface ILogsApiService
@@ -362,6 +369,7 @@ public interface IPurchaseReturnApiService
     Task<Result<PurchaseReturnDto>> CreateAsync(CreatePurchaseReturnRequest request, CancellationToken ct = default);
     Task<Result<PurchaseReturnDto>> PostAsync(int id, CancellationToken ct = default);
     Task<Result<PurchaseReturnDto>> CancelAsync(int id, CancellationToken ct = default);
+    Task<Result<Dictionary<int, decimal>>> GetReturnedQuantitiesByInvoiceAsync(int invoiceId, CancellationToken ct = default);
 }
 
 public interface IWarehouseTransferApiService

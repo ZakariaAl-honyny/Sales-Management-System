@@ -15,7 +15,7 @@ public class BankEditorViewModel : ViewModelBase
     private readonly IToastNotificationService _toastService;
 
     private int _bankId;
-    private int _accountId;
+    private int? _accountId;
     private string _name = string.Empty;
     private string? _accountName;
     private bool _isActive = true;
@@ -58,7 +58,7 @@ public class BankEditorViewModel : ViewModelBase
         }
     }
 
-    public int AccountId
+    public int? AccountId
     {
         get => _accountId;
         set => SetProperty(ref _accountId, value);
@@ -109,8 +109,6 @@ public class BankEditorViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(Name))
             AddError(nameof(Name), "اسم البنك مطلوب");
-        if (_accountId <= 0)
-            AddError(nameof(AccountId), "يجب اختيار حساب");
 
         return await ValidateAllAsync();
     }

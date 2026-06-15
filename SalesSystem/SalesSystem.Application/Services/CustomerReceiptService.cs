@@ -13,15 +13,18 @@ namespace SalesSystem.Application.Services;
 public class CustomerReceiptService : ICustomerReceiptService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IDocumentSequenceService _sequenceService;
     private readonly IAccountingIntegrationService _accountingService;
     private readonly ILogger<CustomerReceiptService> _logger;
 
     public CustomerReceiptService(
         IUnitOfWork uow,
+        IDocumentSequenceService sequenceService,
         IAccountingIntegrationService accountingService,
         ILogger<CustomerReceiptService> logger)
     {
         _uow = uow;
+        _sequenceService = sequenceService;
         _accountingService = accountingService;
         _logger = logger;
     }
@@ -63,11 +66,13 @@ public class CustomerReceiptService : ICustomerReceiptService
     {
         try
         {
-            // Compute next receipt number (temporary — in production, use DocumentSequenceService)
-            var receiptNo = await GetNextReceiptNumberAsync(ct);
+            // Generate receipt number via thread-safe DocumentSequenceService
+            var seqResult = await _sequenceService.GetNextIntAsync("CustomerReceipt", ct);
+            if (!seqResult.IsSuccess)
+                return Result<CustomerReceiptDto>.Failure(seqResult.Error ?? "فشل في توليد رقم السند");
 
             var receipt = CustomerReceipt.Create(
-                receiptNo,
+                seqResult.Value,
                 DateTime.UtcNow,
                 request.CustomerId,
                 request.CashBoxId,
@@ -256,18 +261,6 @@ public class CustomerReceiptService : ICustomerReceiptService
     }
 
     // ─── Private Helpers ─────────────────────────────────
-
-    /// <summary>
-    /// Computes the next receipt number as (max existing ReceiptNo) + 1.
-    /// Temporary — in production, use IDocumentSequenceService.GetNextIntAsync().
-    /// </summary>
-    private async Task<int> GetNextReceiptNumberAsync(CancellationToken ct)
-    {
-        var allReceipts = await _uow.CustomerReceipts.ToListIgnoreFiltersAsync(ct);
-        if (allReceipts.Count == 0)
-            return 1;
-        return allReceipts.Max(r => r.ReceiptNo) + 1;
-    }
 
     private static CustomerReceiptDto MapToDto(CustomerReceipt receipt)
     {

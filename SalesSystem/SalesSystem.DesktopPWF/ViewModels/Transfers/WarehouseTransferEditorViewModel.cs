@@ -1,133 +1,152 @@
-using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
-using System.Windows;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Contracts.Enums;
+using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
-
-using SalesSystem.DesktopPWF.Helpers;
+using SalesSystem.DesktopPWF.Services.App.Toast;
+using SalesSystem.DesktopPWF.ViewModels.Products;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Transfers;
 
 /// <summary>
-/// ViewModel for Warehouse Transfer Editor
+/// ViewModel for creating, editing, and posting warehouse transfers.
+/// Follows the InventoryTransactionEditorViewModel pattern exactly.
 /// </summary>
 public class WarehouseTransferEditorViewModel : ViewModelBase
 {
     private readonly IWarehouseTransferApiService _transferService;
     private readonly IWarehouseApiService _warehouseService;
-    private readonly IProductApiService _productService;
-    private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
-    private readonly ISoundService _soundService;
-    private readonly IInventoryApiService _inventoryService;
-    private readonly IBarcodeInputService _barcodeService;
-    private readonly ISettingsApiService _settingsService;
-    private readonly ITransferPrinter _transferPrinter;
+    private readonly IEventBus _eventBus;
+    private readonly IToastNotificationService _toast;
 
     private int? _transferId;
-    private readonly bool _isReadOnly;
-
-    private int _sourceWarehouseId;
-    private int _destinationWarehouseId;
+    private bool _isReadOnly;
+    private short _sourceWarehouseId;
+    private short _destinationWarehouseId;
     private DateTime _transferDate = DateTime.Today;
-    private string _notes = string.Empty;
-    private string _errorMessage = string.Empty;
-    private string _quickSearchText = string.Empty;
-    private InvoiceStatus _status = InvoiceStatus.Draft;
+    private string? _notes;
+    private string? _errorMessage;
+    private byte _status = 1; // Draft
 
-    private ObservableCollection<WarehouseDto> _warehouses = new();
-    private ObservableCollection<ProductDto> _products = new();
-    private ObservableCollection<TransferItemViewModel> _items = new();
+    private ObservableCollection<WarehouseDto> _sourceWarehouses = new();
+    private ObservableCollection<WarehouseDto> _destinationWarehouses = new();
+    private ObservableCollection<WarehouseTransferLineItem> _lines = new();
 
+    /// <summary>
+    /// Primary constructor — DI resolved. Used by App.GetService for creating new transfers.
+    /// </summary>
     public WarehouseTransferEditorViewModel(
         IWarehouseTransferApiService transferService,
         IWarehouseApiService warehouseService,
-        IProductApiService productService,
-        IEventBus eventBus,
         IDialogService dialogService,
-        ISoundService soundService,
-        IInventoryApiService inventoryService,
-        IBarcodeInputService barcodeService,
-        ISettingsApiService settingsService,
-        ITransferPrinter transferPrinter,
+        IEventBus eventBus,
+        IToastNotificationService toast)
+        : this(transferService, warehouseService, dialogService, eventBus, toast, null, false)
+    {
+    }
+
+    /// <summary>
+    /// Full constructor with all services plus optional transferId and isReadOnly.
+    /// </summary>
+    public WarehouseTransferEditorViewModel(
+        IWarehouseTransferApiService transferService,
+        IWarehouseApiService warehouseService,
+        IDialogService dialogService,
+        IEventBus eventBus,
+        IToastNotificationService toast,
         int? transferId = null,
         bool isReadOnly = false)
     {
-        _transferId = transferId;
-        _isReadOnly = isReadOnly;
         _transferService = transferService;
         _warehouseService = warehouseService;
-        _productService = productService;
-        _eventBus = eventBus;
         _dialogService = dialogService;
+        _eventBus = eventBus;
+        _toast = toast;
+        _transferId = transferId;
+        _isReadOnly = isReadOnly;
+
         SetDialogService(dialogService);
-        _soundService = soundService;
-        _inventoryService = inventoryService;
-        _barcodeService = barcodeService;
-        _settingsService = settingsService;
-        _transferPrinter = transferPrinter;
 
-        AddItemCommand = new RelayCommand(_ => OnAddItem());
-        RemoveItemCommand = new RelayCommand(p => OnRemoveItem(p as TransferItemViewModel));
         SaveCommand = new AsyncRelayCommand(SaveAsync);
-        CancelCommand = new RelayCommand(_ => OnCancel());
         PostCommand = new AsyncRelayCommand(PostAsync);
-        CancelTransferCommand = new AsyncRelayCommand(CancelTransferAsync);
-        SearchProductCommand = new RelayCommand(SearchProduct);
-        SearchProductSingleCommand = new RelayCommand(SearchProductSingle);
-        QuickAddProductCommand = new AsyncRelayCommand(QuickAddProductAsync);
-        PrintA4Command = new AsyncRelayCommand(PrintA4Async);
+        CancelCommand = new RelayCommand(_ => RequestClose());
+        AddLineCommand = new AsyncRelayCommand(AddLineAsync);
+        RemoveLineCommand = new RelayCommand(p => RemoveLine(p as WarehouseTransferLineItem));
 
-        InitializeAsync();
+        _ = LoadAsync();
     }
 
-    private async void InitializeAsync()
-    {
-        try
-        {
-            await LoadWarehousesAsync();
-            await LoadProductsAsync();
-            if (_transferId.HasValue)
-            {
-                await LoadTransferAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            Serilog.Log.Error(ex, "Error in {Method}", nameof(InitializeAsync));
-            await _dialogService.ShowErrorAsync("خطأ", "حدث خطأ أثناء تحميل بيانات التحويل");
-        }
-    }
-
-    public WarehouseTransferEditorViewModel(int? transferId = null, bool isReadOnly = false)
+    /// <summary>
+    /// Parameterless constructor for XAML designer / service locator support.
+    /// </summary>
+    public WarehouseTransferEditorViewModel()
         : this(
             App.GetService<IWarehouseTransferApiService>(),
             App.GetService<IWarehouseApiService>(),
-            App.GetService<IProductApiService>(),
-            App.GetService<IEventBus>(),
             App.GetService<IDialogService>(),
-            App.GetService<ISoundService>(),
-            App.GetService<IInventoryApiService>(),
-            App.GetService<IBarcodeInputService>(),
-            App.GetService<ISettingsApiService>(),
-            App.GetService<ITransferPrinter>(),
+            App.GetService<IEventBus>(),
+            App.GetService<IToastNotificationService>(),
+            null,
+            false)
+    {
+    }
+
+    /// <summary>
+    /// Convenience constructor for editing an existing transfer.
+    /// Used by e.g. WarehouseTransfersListViewModel.OnEdit().
+    /// </summary>
+    public WarehouseTransferEditorViewModel(int transferId)
+        : this(
+            App.GetService<IWarehouseTransferApiService>(),
+            App.GetService<IWarehouseApiService>(),
+            App.GetService<IDialogService>(),
+            App.GetService<IEventBus>(),
+            App.GetService<IToastNotificationService>(),
+            transferId,
+            false)
+    {
+    }
+
+    /// <summary>
+    /// Convenience constructor for view-only mode.
+    /// Used by e.g. WarehouseTransfersListViewModel.OnView().
+    /// </summary>
+    public WarehouseTransferEditorViewModel(int transferId, bool isReadOnly)
+        : this(
+            App.GetService<IWarehouseTransferApiService>(),
+            App.GetService<IWarehouseApiService>(),
+            App.GetService<IDialogService>(),
+            App.GetService<IEventBus>(),
+            App.GetService<IToastNotificationService>(),
             transferId,
             isReadOnly)
     {
     }
 
-    public int SourceWarehouseId
+    // ── Properties ────────────────────────────────────────────────────────────────
+
+    public int? TransferId => _transferId;
+
+    public bool IsReadOnly => _isReadOnly;
+    public bool IsEdit => _transferId.HasValue;
+
+    public string Title => _isReadOnly
+        ? "عرض نقل مخزون"
+        : _transferId.HasValue
+            ? "تعديل نقل مخزون"
+            : "نقل مخزون جديد";
+
+    public short SourceWarehouseId
     {
         get => _sourceWarehouseId;
         set => SetProperty(ref _sourceWarehouseId, value);
     }
 
-    public int DestinationWarehouseId
+    public short DestinationWarehouseId
     {
         get => _destinationWarehouseId;
         set => SetProperty(ref _destinationWarehouseId, value);
@@ -139,105 +158,85 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
         set => SetProperty(ref _transferDate, value);
     }
 
-    public string Notes
+    public string? Notes
     {
         get => _notes;
         set => SetProperty(ref _notes, value);
     }
 
-    public string QuickSearchText
-    {
-        get => _quickSearchText;
-        set => SetProperty(ref _quickSearchText, value);
-    }
-
-    public string ErrorMessage
+    public string? ErrorMessage
     {
         get => _errorMessage;
         set => SetProperty(ref _errorMessage, value);
     }
 
-    public bool IsReadOnly => _isReadOnly;
-    public bool IsEdit => _transferId.HasValue;
-
-    public string WindowTitle => _isReadOnly ? "عرض تحويل المخزون" :
-                                 _transferId.HasValue ? "تعديل تحويل المخزون" : "إضافة تحويل مخزون جديد";
-
-    public ObservableCollection<WarehouseDto> Warehouses
-    {
-        get => _warehouses;
-        set => SetProperty(ref _warehouses, value);
-    }
-
-    public ObservableCollection<ProductDto> Products
-    {
-        get => _products;
-        set => SetProperty(ref _products, value);
-    }
-
-    public ObservableCollection<TransferItemViewModel> Items
-    {
-        get => _items;
-        set => SetProperty(ref _items, value);
-    }
-
-    public InvoiceStatus Status
+    public byte Status
     {
         get => _status;
         set => SetProperty(ref _status, value);
     }
 
-    public ICommand AddItemCommand { get; }
-    public ICommand RemoveItemCommand { get; }
-    public ICommand SaveCommand { get; }
-    public ICommand CancelCommand { get; }
-    public ICommand PostCommand { get; }
-    public ICommand CancelTransferCommand { get; }
-    public ICommand SearchProductCommand { get; }
-    public ICommand SearchProductSingleCommand { get; }
-    public ICommand QuickAddProductCommand { get; }
-    public ICommand PrintA4Command { get; }
+    /// <summary>True when there is at least one line item.</summary>
+    public bool HasLines => _lines.Count > 0;
 
-    public async Task HandleBarcodeInput(Key key, string? keyText = null)
+    public ObservableCollection<WarehouseDto> SourceWarehouses
     {
-        var barcode = _barcodeService.ProcessKey(key, keyText);
-        if (barcode != null)
+        get => _sourceWarehouses;
+        set => SetProperty(ref _sourceWarehouses, value);
+    }
+
+    public ObservableCollection<WarehouseDto> DestinationWarehouses
+    {
+        get => _destinationWarehouses;
+        set => SetProperty(ref _destinationWarehouses, value);
+    }
+
+    public ObservableCollection<WarehouseTransferLineItem> Lines
+    {
+        get => _lines;
+        set
         {
-            QuickSearchText = barcode;
-            await QuickAddProductAsync();
+            if (SetProperty(ref _lines, value))
+                OnPropertyChanged(nameof(HasLines));
         }
     }
 
+    // ── Commands ──────────────────────────────────────────────────────────────────
+
+    public ICommand SaveCommand { get; }
+    public ICommand PostCommand { get; }
+    public ICommand CancelCommand { get; }
+    public ICommand AddLineCommand { get; }
+    public ICommand RemoveLineCommand { get; }
+
+    // ── Initialization ────────────────────────────────────────────────────────────
+
+    private async Task LoadAsync()
+    {
+        await ExecuteAsync(async () =>
+        {
+            await LoadWarehousesAsync();
+            if (_transferId.HasValue)
+            {
+                await LoadTransferAsync();
+            }
+        });
+    }
 
     private async Task LoadWarehousesAsync()
     {
-        try
+        ErrorMessage = null;
+        var result = await _warehouseService.GetAllAsync();
+        if (result.IsSuccess && result.Value != null)
         {
-            var result = await _warehouseService.GetAllAsync();
-            if (result.IsSuccess)
-            {
-                Warehouses = new ObservableCollection<WarehouseDto>(result.Value ?? new List<WarehouseDto>());
-            }
+            var warehouses = result.Value;
+            SourceWarehouses = new ObservableCollection<WarehouseDto>(warehouses);
+            DestinationWarehouses = new ObservableCollection<WarehouseDto>(warehouses);
         }
-        catch (Exception ex)
+        else
         {
-            HandleException(ex, "WarehouseTransferEditorViewModel.LoadWarehousesAsync", "[WarehouseTransferEditorViewModel.LoadWarehousesAsync] Failed to load warehouses.");
-        }
-    }
-
-    private async Task LoadProductsAsync()
-    {
-        try
-        {
-            var result = await _productService.GetAllAsync();
-            if (result.IsSuccess)
-            {
-                Products = new ObservableCollection<ProductDto>(result.Value ?? new List<ProductDto>());
-            }
-        }
-        catch (Exception ex)
-        {
-            HandleException(ex, "WarehouseTransferEditorViewModel.LoadProductsAsync", "[WarehouseTransferEditorViewModel.LoadProductsAsync] Failed to load products.");
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستودعات",
+                "WarehouseTransferEditorViewModel.LoadWarehousesAsync");
         }
     }
 
@@ -245,314 +244,103 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
     {
         if (!_transferId.HasValue) return;
 
-        await ExecuteAsync(async () =>
+        ErrorMessage = null;
+        var result = await _transferService.GetByIdAsync(_transferId.Value);
+        if (result.IsSuccess && result.Value != null)
         {
-            ErrorMessage = string.Empty;
-            var result = await _transferService.GetByIdAsync(_transferId.Value);
-            if (result.IsSuccess)
-            {
-                var transfer = result.Value!;
-                SourceWarehouseId = transfer.SourceWarehouseId;
-                DestinationWarehouseId = transfer.DestinationWarehouseId;
-                TransferDate = transfer.TransferDate;
-                Notes = transfer.Notes ?? string.Empty;
-                Status = (InvoiceStatus)transfer.Status;
+            var transfer = result.Value;
+            SourceWarehouseId = transfer.SourceWarehouseId;
+            DestinationWarehouseId = transfer.DestinationWarehouseId;
+            TransferDate = transfer.TransferDate;
+            Notes = transfer.Notes;
+            Status = transfer.Status;
 
-                Items.Clear();
-                foreach (var item in transfer.Lines)
+            Lines.Clear();
+            foreach (var line in transfer.Lines)
+            {
+                Lines.Add(new WarehouseTransferLineItem
                 {
-                    Items.Add(new TransferItemViewModel
-                    {
-                        Products = Products,
-                        ProductId = item.ProductId,
-                        ProductName = item.ProductName ?? string.Empty,
-                        Quantity = item.Quantity
-                    });
-                }
-            }
-            else
-            {
-                ErrorMessage = result.Error ?? "حدث خطأ غير معروف";
-            }
-        });
-    }
-
-    private void OnAddItem()
-    {
-        var item = new TransferItemViewModel(_soundService) { Products = this.Products };
-        item.PropertyChanged += async (s, e) =>
-        {
-            if (e.PropertyName == nameof(TransferItemViewModel.ProductId) || e.PropertyName == nameof(TransferItemViewModel.Quantity))
-            {
-                if (item.ProductId > 0 && SourceWarehouseId > 0)
-                {
-                    var stockResult = await _inventoryService.GetStockAsync(item.ProductId, SourceWarehouseId);
-                    if (stockResult.IsSuccess && stockResult.Value < item.Quantity)
-                    {
-                        await _dialogService.ShowWarningAsync("تنبيه", $"المخزون غير كافٍ في المستودع المصدر. المتوفر: {stockResult.Value}");
-                    }
-                }
-            }
-        };
-        Items.Add(item);
-    }
-
-    private void OnRemoveItem(TransferItemViewModel? item)
-    {
-        if (item != null)
-        {
-            Items.Remove(item);
-        }
-    }
-
-    private async Task QuickAddProductAsync()
-    {
-        if (string.IsNullOrWhiteSpace(QuickSearchText)) return;
-
-        var searchText = QuickSearchText.Trim();
-        QuickSearchText = string.Empty; // Clear immediately for responsiveness
-        
-        // Find product by barcode or code or name locally first
-        var product = Products.FirstOrDefault(p => 
-            p.Barcode == searchText || 
-            p.Name.Equals(searchText, StringComparison.OrdinalIgnoreCase));
-
-        if (product == null)
-        {
-            // Fallback to API if not found locally (RULE-041 / SPEC-010)
-            var apiResult = await _productService.GetByBarcodeAsync(searchText);
-            if (apiResult.IsSuccess && apiResult.Value != null)
-            {
-                product = apiResult.Value;
-            }
-        }
-
-        if (product != null)
-        {
-            // ... (rest of the logic)
-            if (SourceWarehouseId <= 0)
-            {
-                await _dialogService.ShowWarningAsync("تنبيه", "يجب اختيار المستودع المصدر أولاً");
-                return;
-            }
-
-            var stockResult = await _inventoryService.GetStockAsync(product.Id, SourceWarehouseId);
-            decimal currentStock = stockResult.IsSuccess ? stockResult.Value : 0;
-
-            var existingItem = Items.FirstOrDefault(i => i.ProductId == product.Id);
-            decimal neededQuantity = (existingItem?.Quantity ?? 0) + 1;
-
-            if (currentStock < neededQuantity)
-            {
-                await _dialogService.ShowWarningAsync("تنبيه", $"المخزون غير كافٍ في المستودع المصدر. المتوفر: {currentStock}");
-                return;
-            }
-
-            if (existingItem != null)
-            {
-                existingItem.Quantity += 1;
-            }
-            else
-            {
-                Items.Add(new TransferItemViewModel(_soundService)
-                {
-                    Products = this.Products,
-                    ProductId = product.Id,
-                    ProductName = product.Name,
-                    Quantity = 1,
-                    Mode = 1 // Retail by default
+                    ProductId = line.ProductId,
+                    ProductName = line.ProductName ?? string.Empty,
+                    ProductUnitId = line.ProductUnitId,
+                    ProductUnitName = line.ProductUnitName ?? "حبة",
+                    Quantity = line.Quantity,
+                    UnitCost = line.UnitCost
                 });
             }
-            _soundService.PlaySuccess();
+            OnPropertyChanged(nameof(HasLines));
         }
         else
         {
-            _soundService.PlayError();
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل بيانات التحويل",
+                "WarehouseTransferEditorViewModel.LoadTransferAsync");
         }
     }
 
-    private void SearchProduct(object? parameter)
+    // ── Line Management ───────────────────────────────────────────────────────────
+
+    private async Task AddLineAsync()
     {
-        var vm = new ViewModels.Products.ProductSelectionViewModel(SourceWarehouseId);
-        
-        vm.OnProductSelected += async (product) => 
+        var vm = new ProductSelectionViewModel(0); // No stock display needed for transfer
+        vm.OnProductSelected += product =>
         {
-            if (SourceWarehouseId <= 0)
+            var existing = Lines.FirstOrDefault(l => l.ProductId == product.Id);
+            if (existing != null)
             {
-                await _dialogService.ShowWarningAsync("تنبيه", "يجب اختيار المستودع المصدر أولاً");
-                return;
-            }
-
-            var stockResult = await _inventoryService.GetStockAsync(product.Id, SourceWarehouseId);
-            decimal currentStock = stockResult.IsSuccess ? stockResult.Value : 0;
-
-            var existingItem = Items.FirstOrDefault(i => i.ProductId == product.Id);
-            decimal neededQuantity = (existingItem?.Quantity ?? 0) + 1;
-
-            if (currentStock < neededQuantity)
-            {
-                await _dialogService.ShowWarningAsync("تنبيه", $"المخزون غير كافٍ في المستودع المصدر. المتوفر: {currentStock}");
-                _soundService.PlayError();
-                return;
-            }
-
-            if (existingItem != null)
-            {
-                existingItem.Quantity += 1;
+                existing.Quantity += 1;
             }
             else
             {
-                // Remove empty lines
-                var emptyLine = Items.FirstOrDefault(i => i.ProductId == 0);
-                if (emptyLine != null)
+                Lines.Add(new WarehouseTransferLineItem
                 {
-                    Items.Remove(emptyLine);
-                }
-
-                Items.Add(new TransferItemViewModel(_soundService)
-                {
-                    Products = this.Products,
                     ProductId = product.Id,
                     ProductName = product.Name,
+                    ProductUnitId = product.DefaultPurchaseUnitId ?? 0, // Use purchase unit for transfers; 0 = service auto
+                    ProductUnitName = "حبة",
                     Quantity = 1,
-                    Mode = 1 // Retail by default
+                    UnitCost = 0m
                 });
             }
-            _soundService.PlaySuccess();
+            OnPropertyChanged(nameof(HasLines));
+            vm.CloseDialog();
         };
 
         _dialogService.ShowDialog(vm);
+    }
 
-        // After dialog closes, ensure there is an empty line if needed
-        if (Items.All(i => i.ProductId != 0))
+    private void RemoveLine(WarehouseTransferLineItem? line)
+    {
+        if (line != null)
         {
-            OnAddItem();
+            Lines.Remove(line);
+            OnPropertyChanged(nameof(HasLines));
         }
     }
 
-    private void SearchProductSingle(object? parameter)
-    {
-        var targetLine = parameter as TransferItemViewModel;
-        var vm = new ViewModels.Products.ProductSelectionViewModel(SourceWarehouseId);
-        bool picked = false;
-
-        vm.OnProductSelected += async (product) =>
-        {
-            if (picked) return;
-            picked = true;
-
-            if (SourceWarehouseId <= 0)
-            {
-                await _dialogService.ShowWarningAsync("تنبيه", "يجب اختيار المستودع المصدر أولاً");
-                return;
-            }
-
-            var stockResult = await _inventoryService.GetStockAsync(product.Id, SourceWarehouseId);
-            decimal currentStock = stockResult.IsSuccess ? stockResult.Value : 0;
-
-            if (targetLine != null)
-            {
-                if (currentStock < 1)
-                {
-                    await _dialogService.ShowWarningAsync("خطأ في المخزون", $"المخزون غير كافٍ. المتوفر: {currentStock}");
-                    _soundService.PlayError();
-                }
-                else
-                {
-                    targetLine.ProductId = product.Id;
-                    targetLine.ProductName = product.Name;
-                    targetLine.Quantity = 1;
-                    targetLine.Mode = 1;
-                    _soundService.PlaySuccess();
-                }
-            }
-            else
-            {
-                var existingItem = Items.FirstOrDefault(i => i.ProductId == product.Id);
-                decimal neededQuantity = (existingItem?.Quantity ?? 0) + 1;
-
-                if (currentStock < neededQuantity)
-                {
-                    await _dialogService.ShowWarningAsync("خطأ في المخزون", $"المخزون غير كافٍ. المتوفر: {currentStock}");
-                    _soundService.PlayError();
-                }
-                else if (existingItem != null)
-                {
-                    existingItem.Quantity += 1;
-                    _soundService.PlaySuccess();
-                }
-                else
-                {
-                    var emptyLine = Items.FirstOrDefault(i => i.ProductId == 0);
-                    if (emptyLine != null) Items.Remove(emptyLine);
-
-                    Items.Add(new TransferItemViewModel(_soundService)
-                    {
-                        Products = this.Products,
-                        ProductId = product.Id,
-                        ProductName = product.Name,
-                        Quantity = 1,
-                        Mode = 1
-                    });
-                    _soundService.PlaySuccess();
-                }
-            }
-
-            System.Windows.Application.Current.Dispatcher.Invoke(() => vm.CloseDialog());
-        };
-
-        _dialogService.ShowDialog(vm);
-    }
+    // ── Save ──────────────────────────────────────────────────────────────────────
 
     private async Task SaveAsync()
     {
-        var errors = new List<string>();
-
-        if (SourceWarehouseId == 0)
-            errors.Add("• يرجى اختيار المستودع المصدر");
-
-        if (DestinationWarehouseId == 0)
-            errors.Add("• يرجى اختيار المستودع المستهدف");
-
-        if (SourceWarehouseId != 0 && DestinationWarehouseId != 0 && SourceWarehouseId == DestinationWarehouseId)
-            errors.Add("• لا يمكن التحويل إلى نفس المستودع");
-
-        if (Items.Count == 0)
-            errors.Add("• يرجى إضافة صنف واحد على الأقل");
-
-        if (Items.Any(i => i.ProductId == 0))
-            errors.Add("• يرجى اختيار منتج لكل صنف مضاف");
-
-        if (Items.Any(i => i.Quantity <= 0))
-            errors.Add("• يرجى إدخال كمية صحيحة (أكبر من 0) لكل صنف");
-
-        if (errors.Any())
-        {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-            RequestFocusFirstInvalidField();
-            return;
-        }
+        if (!await ValidateAsync()) return;
 
         await ExecuteAsync(async () =>
         {
-            ErrorMessage = string.Empty;
+            ErrorMessage = null;
 
-            var lines = Items.Select(i => new CreateWarehouseTransferLineRequest(
-                i.ProductId,
-                1,
-                i.Quantity,
-                0m
-            )).ToList();
-
-            Result<WarehouseTransferDto> result;
             var request = new CreateWarehouseTransferRequest(
                 0,
-                (short)SourceWarehouseId,
-                (short)DestinationWarehouseId,
+                SourceWarehouseId,
+                DestinationWarehouseId,
                 TransferDate,
                 Notes,
-                lines);
+                Lines.Select(l => new CreateWarehouseTransferLineRequest(
+                    l.ProductId,
+                    l.ProductUnitId,
+                    l.Quantity,
+                    l.UnitCost,
+                    null)).ToList());
 
+            Result<WarehouseTransferDto> result;
             if (_transferId.HasValue)
             {
                 result = await _transferService.UpdateAsync(_transferId.Value, request);
@@ -565,126 +353,150 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
             if (result.IsSuccess)
             {
                 _transferId = result.Value!.Id;
-                Status = (InvoiceStatus)result.Value.Status;
+                Status = result.Value.Status;
                 _eventBus.Publish(new WarehouseTransferChangedMessage(_transferId.Value));
-                
-                OnPropertyChanged(nameof(IsEdit));
-                OnPropertyChanged(nameof(WindowTitle));
-                
-                await _dialogService.ShowSuccessAsync("نجاح", "تم حفظ المسودة بنجاح. يمكنك الآن الترحيل النهائي إذا أردت.");
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "WarehouseTransferEditorViewModel.SaveAsync", "[WarehouseTransferEditorViewModel.SaveAsync] Failed to save warehouse transfer.");
-                await _dialogService.ShowErrorAsync("خطأ في حفظ التحويل", ErrorMessage);
-            }
-        });
-    }
-
-    private void OnCancel()
-    {
-        RequestClose();
-    }
-
-    private async Task PostAsync()
-    {
-        if (!_transferId.HasValue) return;
-
-        await ExecuteAsync(async () =>
-        {
-            ErrorMessage = string.Empty;
-            var result = await _transferService.PostAsync(_transferId.Value);
-
-            if (result.IsSuccess)
-            {
-                _eventBus.Publish(new WarehouseTransferChangedMessage(result.Value!.Id));
+                OnPropertyChanged(nameof(Title));
+                _toast.ShowSuccess("تم حفظ المسودة بنجاح");
                 RequestClose();
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "WarehouseTransferEditorViewModel.PostAsync", "[WarehouseTransferEditorViewModel.PostAsync] Failed to post warehouse transfer.");
+                ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ أثناء الحفظ",
+                    "WarehouseTransferEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage);
+            }
+        });
+    }
+
+    // ── Post ──────────────────────────────────────────────────────────────────────
+
+    private async Task PostAsync()
+    {
+        if (!await ValidateAsync()) return;
+
+        await ExecuteAsync(async () =>
+        {
+            ErrorMessage = null;
+
+            // Save first if draft (no ID yet)
+            if (!_transferId.HasValue)
+            {
+                var createRequest = new CreateWarehouseTransferRequest(
+                    0,
+                    SourceWarehouseId,
+                    DestinationWarehouseId,
+                    TransferDate,
+                    Notes,
+                    Lines.Select(l => new CreateWarehouseTransferLineRequest(
+                        l.ProductId,
+                        l.ProductUnitId,
+                        l.Quantity,
+                        l.UnitCost,
+                        null)).ToList());
+
+                var createResult = await _transferService.CreateAsync(createRequest);
+                if (!createResult.IsSuccess)
+                {
+                    ErrorMessage = HandleFailure(createResult.Error ?? "حدث خطأ أثناء الحفظ",
+                        "WarehouseTransferEditorViewModel.PostAsync");
+                    await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
+                    return;
+                }
+                _transferId = createResult.Value!.Id;
+            }
+
+            var postResult = await _transferService.PostAsync(_transferId.Value);
+            if (postResult.IsSuccess)
+            {
+                _eventBus.Publish(new WarehouseTransferChangedMessage(_transferId.Value));
+                _toast.ShowSuccess("تم الترحيل بنجاح");
+                RequestClose();
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(postResult.Error ?? "حدث خطأ أثناء الترحيل",
+                    "WarehouseTransferEditorViewModel.PostAsync");
                 await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
         });
     }
 
-    private async Task CancelTransferAsync()
+    // ── Validation ────────────────────────────────────────────────────────────────
+
+    private async Task<bool> ValidateAsync()
     {
-        if (!_transferId.HasValue) return;
+        ClearAllErrors();
 
-        await ExecuteAsync(async () =>
-        {
-            ErrorMessage = string.Empty;
-            var result = await _transferService.CancelAsync(_transferId.Value);
+        if (SourceWarehouseId <= 0)
+            AddError(nameof(SourceWarehouseId), "يجب اختيار المستودع المصدر");
 
-            if (result.IsSuccess)
-            {
-                _eventBus.Publish(new WarehouseTransferChangedMessage(result.Value!.Id));
-                RequestClose();
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "WarehouseTransferEditorViewModel.CancelTransferAsync", "[WarehouseTransferEditorViewModel.CancelTransferAsync] Failed to cancel warehouse transfer.");
-                await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
-            }
-        });
+        if (DestinationWarehouseId <= 0)
+            AddError(nameof(DestinationWarehouseId), "يجب اختيار المستودع الهدف");
+
+        if (SourceWarehouseId > 0 && DestinationWarehouseId > 0 && SourceWarehouseId == DestinationWarehouseId)
+            AddError(nameof(DestinationWarehouseId), "لا يمكن التحويل إلى نفس المستودع");
+
+        if (Lines.Count == 0)
+            AddError(nameof(Lines), "يجب إضافة صنف واحد على الأقل");
+
+        var invalidProductLines = Lines.Where(l => l.ProductId <= 0).ToList();
+        if (invalidProductLines.Any())
+            AddError(nameof(Lines), $"يجب اختيار منتج لكل صنف (الأصناف غير الصالحة: {invalidProductLines.Count})");
+
+        var invalidQtyLines = Lines.Where(l => l.Quantity <= 0).ToList();
+        if (invalidQtyLines.Any())
+            AddError(nameof(Lines), $"الكمية يجب أن تكون أكبر من صفر (الأصناف غير الصحيحة: {invalidQtyLines.Count})");
+
+        var negativeCostLines = Lines.Where(l => l.UnitCost < 0).ToList();
+        if (negativeCostLines.Any())
+            AddError(nameof(Lines), "تكلفة الوحدة لا يمكن أن تكون سالبة");
+
+        return await ValidateAllAsync();
     }
 
-    private async Task PrintA4Async()
-    {
-        if (!_transferId.HasValue) return;
+    // ── Cleanup ───────────────────────────────────────────────────────────────────
 
-        await ExecuteAsync(async () =>
-        {
-            var settingsResult = await _settingsService.GetSettingsAsync();
-            if (settingsResult.IsSuccess && settingsResult.Value != null)
-            {
-                var transferResult = await _transferService.GetByIdAsync(_transferId.Value);
-                if (transferResult.IsSuccess && transferResult.Value != null)
-                {
-                    _transferPrinter.PrintPreview(
-                        transferResult.Value.ToPrintDto(),
-                        transferResult.Value.Lines.ToPrintDtos(),
-                        settingsResult.Value.ToPrintDto());
-                }
-            }
-        });
+    public override void Cleanup()
+    {
+        base.Cleanup();
     }
 }
 
 /// <summary>
-/// ViewModel for a single transfer item
+/// Represents a single line item in a warehouse transfer.
+/// Simple ViewModel with computed TotalCost.
 /// </summary>
-public class TransferItemViewModel : ViewModelBase
+public class WarehouseTransferLineItem : ViewModelBase
 {
-    private readonly ISoundService? _soundService;
     private int _productId;
-    private string _productName = string.Empty;
+    private string? _productName;
+    private int _productUnitId;
+    private string? _productUnitName;
     private decimal _quantity;
-    private byte _mode = 1;
-
-    public TransferItemViewModel(ISoundService? soundService = null)
-    {
-        _soundService = soundService;
-    }
+    private decimal _unitCost;
 
     public int ProductId
     {
         get => _productId;
-        set
-        {
-            SetProperty(ref _productId, value);
-            if (Products?.Any(p => p.Id == value) == true)
-            {
-                ProductName = Products?.First(p => p.Id == value).Name ?? string.Empty;
-            }
-        }
+        set => SetProperty(ref _productId, value);
     }
 
-    public string ProductName
+    public string? ProductName
     {
         get => _productName;
         set => SetProperty(ref _productName, value);
+    }
+
+    public int ProductUnitId
+    {
+        get => _productUnitId;
+        set => SetProperty(ref _productUnitId, value);
+    }
+
+    public string? ProductUnitName
+    {
+        get => _productUnitName;
+        set => SetProperty(ref _productUnitName, value);
     }
 
     public decimal Quantity
@@ -693,17 +505,19 @@ public class TransferItemViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _quantity, value))
-            {
-                _soundService?.PlaySuccess();
-            }
+                OnPropertyChanged(nameof(TotalCost));
         }
     }
 
-    public byte Mode
+    public decimal UnitCost
     {
-        get => _mode;
-        set => SetProperty(ref _mode, value);
+        get => _unitCost;
+        set
+        {
+            if (SetProperty(ref _unitCost, value))
+                OnPropertyChanged(nameof(TotalCost));
+        }
     }
 
-    public ObservableCollection<ProductDto>? Products { get; set; }
+    public decimal TotalCost => Quantity * UnitCost;
 }

@@ -92,6 +92,7 @@ public class CashBoxService : ICashBoxService
                 (short)request.CurrencyId.Value,
                 accountId: request.AccountId,
                 branchId: request.BranchId.HasValue ? (short)request.BranchId.Value : null,
+                categoryId: request.CategoryId,
                 assignedUserId: request.AssignedUserId,
                 phoneNumber: request.PhoneNumber,
                 taxNumber: request.TaxNumber,
@@ -157,7 +158,8 @@ public class CashBoxService : ICashBoxService
                 request.Notes,
                 request.BranchId.HasValue ? (short)request.BranchId.Value : null,
                 request.AssignedUserId,
-                (short)request.CurrencyId.Value);
+                (short)request.CurrencyId.Value,
+                categoryId: request.CategoryId);
             box.SetUpdatedBy(userId);
 
             await _uow.SaveChangesAsync(ct);
@@ -918,7 +920,7 @@ public class CashBoxService : ICashBoxService
             box.BoxName,
             box.AccountId,
             box.Account?.NameAr,
-            null,   // CategoryId — not currently tracked on CashBox entity
+            box.CategoryId,
             null,   // CategoryName
             box.BranchId.HasValue ? (int)box.BranchId.Value : null,
             box.CurrencyId,

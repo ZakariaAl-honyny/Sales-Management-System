@@ -69,7 +69,11 @@ public class SalesDbContext : DbContext
     public DbSet<CustomerContact> CustomerContacts => Set<CustomerContact>();
     public DbSet<SupplierContact> SupplierContacts => Set<SupplierContact>();
     public DbSet<CompanySettings> CompanySettings => Set<CompanySettings>();
+    public DbSet<Cheque> Cheques => Set<Cheque>();
     public DbSet<AccountCategory> AccountCategories => Set<AccountCategory>();
+
+    // === Phase 29 — Daily Closure ===
+    public DbSet<DailyClosure> DailyClosures => Set<DailyClosure>();
 
     // === New Inventory Module (v4.10+) ===
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();

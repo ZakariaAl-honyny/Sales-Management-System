@@ -78,6 +78,25 @@ public class SupplierPayment : DocumentEntity
         return payment;
     }
 
+    public void Post(DateTime? postedAt = null)
+    {
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("فقط سندات الصرف المسودة يمكن ترحيلها.");
+
+        Status = InvoiceStatus.Posted;
+        PostedAt = postedAt ?? DateTime.UtcNow;
+        UpdateTimestamp();
+    }
+
+    public void Cancel()
+    {
+        if (Status == InvoiceStatus.Cancelled)
+            throw new DomainException("سند الصرف ملغي بالفعل.");
+
+        Status = InvoiceStatus.Cancelled;
+        UpdateTimestamp();
+    }
+
     public void Update(
         decimal amount,
         PaymentMethod paymentMethod,

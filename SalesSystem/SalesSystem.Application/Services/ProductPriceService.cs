@@ -306,7 +306,7 @@ public class ProductPriceService : IProductPriceService
 
             var productPrice = ProductPrice.Create(
                 request.ProductUnitId,
-                request.CurrencyId,
+                (short)request.CurrencyId,
                 request.Price,
                 request.EffectiveFrom,
                 request.EffectiveTo,

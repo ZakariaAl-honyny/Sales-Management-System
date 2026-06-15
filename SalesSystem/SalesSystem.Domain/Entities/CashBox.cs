@@ -28,6 +28,7 @@ public class CashBox : ActivatableEntity
     /// </summary>
     public short CurrencyId { get; private set; }
     public Currency? Currency { get; private set; }
+    public int? CategoryId { get; private set; }  // FK to Categories — optional metadata
     public int? AssignedUserId { get; private set; } // NULL = shared box
     public string? PhoneNumber { get; private set; }
     public string? TaxNumber { get; private set; }
@@ -46,6 +47,7 @@ public class CashBox : ActivatableEntity
         short currencyId,
         int? accountId = null,
         short? branchId = null,
+        int? categoryId = null,
         int? assignedUserId = null,
         string? phoneNumber = null,
         string? taxNumber = null,
@@ -63,6 +65,7 @@ public class CashBox : ActivatableEntity
             BoxName = boxName.Trim(),
             AccountId = accountId,
             BranchId = branchId,
+            CategoryId = categoryId,
             AssignedUserId = assignedUserId,
             CurrencyId = currencyId,
             PhoneNumber = phoneNumber?.Trim(),
@@ -125,7 +128,8 @@ public class CashBox : ActivatableEntity
         string? notes,
         short? branchId,
         int? assignedUserId,
-        short currencyId)
+        short currencyId,
+        int? categoryId = null)
     {
         if (boxName != null)
         {
@@ -151,6 +155,9 @@ public class CashBox : ActivatableEntity
 
         if (assignedUserId.HasValue)
             AssignedUserId = assignedUserId.Value > 0 ? assignedUserId : null;
+
+        if (categoryId.HasValue)
+            CategoryId = categoryId.Value > 0 ? categoryId : null;
 
         if (currencyId <= 0)
             throw new DomainException("عملة الصندوق مطلوبة");

@@ -24,15 +24,19 @@ public class CashBoxTests
     }
 
     [Fact]
-    public void Create_AccountIdZero_ShouldThrow()
+    public void Create_AccountIdZero_ShouldSucceed_ValidationDeferredToSetAccountId()
     {
-        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", accountId: 0, currencyId: 1));
+        // AccountId is nullable during creation — validation happens in SetAccountId
+        var box = CashBox.Create("Test Box", currencyId: 1, accountId: 0);
+        Assert.NotNull(box);
+        Assert.Equal(0, box.AccountId);
     }
 
     [Fact]
-    public void Create_AccountIdNegative_ShouldThrow()
+    public void SetAccountId_Zero_ShouldThrow()
     {
-        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", accountId: -1, currencyId: 1));
+        var box = CashBox.Create("Test Box", currencyId: 1);
+        Assert.Throws<DomainException>(() => box.SetAccountId(0));
     }
 
     [Fact]

@@ -29,6 +29,9 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
         RuleFor(x => x.TaxAmount)
             .GreaterThanOrEqualTo(0).WithMessage("الضريبة لا يمكن أن تكون سالبة");
 
+        RuleFor(x => x.OtherCharges)
+            .GreaterThanOrEqualTo(0).WithMessage("مصاريف إضافية لا يمكن أن تكون سالبة");
+
         RuleFor(x => x.PaymentType)
             .IsInEnum().WithMessage("نوع الدفع غير صحيح");
 

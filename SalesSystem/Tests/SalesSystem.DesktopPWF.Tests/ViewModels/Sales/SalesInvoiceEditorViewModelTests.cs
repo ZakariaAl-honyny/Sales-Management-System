@@ -33,6 +33,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<IPrintApiService> _printApiServiceMock;
     private readonly Mock<IToastNotificationService> _mockToastService;
     private readonly Mock<ICurrencyApiService> _mockCurrencyService;
+    private readonly Mock<IProductCategoryApiService> _mockProductCategoryService;
     public SalesInvoiceEditorViewModelTests()
     {
         _mockInvoiceService = new Mock<ISalesInvoiceApiService>();
@@ -49,6 +50,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         _printApiServiceMock = new Mock<IPrintApiService>();
         _mockToastService = new Mock<IToastNotificationService>();
         _mockCurrencyService = new Mock<ICurrencyApiService>();
+        _mockProductCategoryService = new Mock<IProductCategoryApiService>();
     }
 
     public void Dispose()
@@ -595,6 +597,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _printApiServiceMock.Object,
             _mockToastService.Object,
             _mockCurrencyService.Object,
+            _mockProductCategoryService.Object,
             invoiceId);
     }
 
@@ -631,6 +634,8 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 TrackExpiry: false,
                 ImagePath: null,
                 Notes: null,
+                DefaultPurchaseUnitId: null,
+                DefaultSalesUnitId: null,
                 IsActive: true),
             new ProductDto(
                 Id: 2,
@@ -643,6 +648,8 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 TrackExpiry: false,
                 ImagePath: null,
                 Notes: null,
+                DefaultPurchaseUnitId: null,
+                DefaultSalesUnitId: null,
                 IsActive: true)
         };
     }

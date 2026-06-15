@@ -22,6 +22,9 @@ public class UpdatePurchaseInvoiceValidator : AbstractValidator<UpdatePurchaseIn
         RuleFor(x => x.TaxAmount)
             .GreaterThanOrEqualTo(0).WithMessage("الضريبة لا يمكن أن تكون سالبة");
 
+        RuleFor(x => x.OtherCharges)
+            .GreaterThanOrEqualTo(0).WithMessage("مصاريف إضافية لا يمكن أن تكون سالبة");
+
         RuleFor(x => x.CurrencyId)
             .GreaterThan(0).When(x => x.CurrencyId.HasValue)
             .WithMessage("العملة غير صحيحة");

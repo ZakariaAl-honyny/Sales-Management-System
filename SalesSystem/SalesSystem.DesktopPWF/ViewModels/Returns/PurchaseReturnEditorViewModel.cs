@@ -34,6 +34,9 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private string _notes = string.Empty;
     private int _selectedWarehouseId;
     private PurchaseInvoiceDto? _selectedInvoice;
+    private int _selectedSupplierId;
+    private string _selectedSupplierName = string.Empty;
+    private bool _isLinkedToInvoice = true;
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ObservableCollection<PurchaseReturnItemViewModel> _items = new();
     private string _searchText = string.Empty;
@@ -76,6 +79,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         CancelReturnCommand = new AsyncRelayCommand(CancelReturnAsync);
         CancelCommand = new RelayCommand(() => RequestClose());
         SearchInvoiceCommand = new AsyncRelayCommand(SearchInvoiceAsync);
+        SearchSupplierCommand = new AsyncRelayCommand(SearchSupplierAsync);
         PrintA4Command = new AsyncRelayCommand(PrintA4Async);
         ProcessBarcodeCommand = new AsyncRelayCommand(async () => 
         {
@@ -126,10 +130,34 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedInvoice, value))
             {
-                if (value != null) SearchText = value.Id.ToString();
+                if (value != null)
+                {
+                    SearchText = value.Id.ToString();
+                    IsLinkedToInvoice = true;
+                    SelectedSupplierId = value.SupplierId;
+                    SelectedSupplierName = value.SupplierName;
+                }
                 UpdateItemsFromInvoice();
             }
         }
+    }
+
+    public int SelectedSupplierId
+    {
+        get => _selectedSupplierId;
+        set => SetProperty(ref _selectedSupplierId, value);
+    }
+
+    public string SelectedSupplierName
+    {
+        get => _selectedSupplierName;
+        set => SetProperty(ref _selectedSupplierName, value);
+    }
+
+    public bool IsLinkedToInvoice
+    {
+        get => _isLinkedToInvoice;
+        set => SetProperty(ref _isLinkedToInvoice, value);
     }
 
     public ObservableCollection<WarehouseDto> Warehouses
@@ -234,6 +262,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     public ICommand CancelReturnCommand { get; private set; } = null!;
     public ICommand CancelCommand { get; private set; } = null!;
     public ICommand SearchInvoiceCommand { get; private set; } = null!;
+    public ICommand SearchSupplierCommand { get; private set; } = null!;
     public ICommand PrintA4Command { get; private set; } = null!;
     public ICommand ProcessBarcodeCommand { get; private set; } = null!;
     #endregion
@@ -268,6 +297,70 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         });
 
         ShowInvoiceSelectionDialog();
+    }
+
+    private async Task SearchSupplierAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            await _dialogService.ShowWarningAsync("بحث عن مورد", "يرجى إدخال اسم المورد أو رقمه في حقل البحث");
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            ErrorMessage = null;
+            var supplierService = App.GetService<ISupplierApiService>();
+            var result = await supplierService.GetAllAsync();
+
+            if (result.IsSuccess && result.Value != null)
+            {
+                var search = SearchText.Trim().ToLowerInvariant();
+                var matches = result.Value
+                    .Where(s => s.Name.ToLowerInvariant().Contains(search) || s.Id.ToString() == search)
+                    .ToList();
+
+                if (matches.Count == 1)
+                {
+                    var supplier = matches[0];
+                    InvokeOnUIThread(() =>
+                    {
+                        SelectedSupplierId = supplier.Id;
+                        SelectedSupplierName = supplier.Name;
+                        SearchText = string.Empty;
+                        if (SelectedInvoice != null && SelectedInvoice.SupplierId != supplier.Id)
+                        {
+                            SelectedInvoice = null; // Clear invoice if supplier changed
+                        }
+                    });
+                }
+                else if (matches.Count > 1)
+                {
+                    // Multiple matches — show first match
+                    var supplier = matches.First();
+                    InvokeOnUIThread(() =>
+                    {
+                        SelectedSupplierId = supplier.Id;
+                        SelectedSupplierName = supplier.Name;
+                        SearchText = string.Empty;
+                    });
+                }
+                else
+                {
+                    InvokeOnUIThread(() =>
+                    {
+                        ErrorMessage = $"لم يتم العثور على مورد: {SearchText}";
+                    });
+                }
+            }
+            else
+            {
+                InvokeOnUIThread(() =>
+                {
+                    ErrorMessage = result.Error ?? "فشل في البحث عن المورد";
+                });
+            }
+        });
     }
 
     private void ShowInvoiceSelectionDialog()
@@ -333,6 +426,13 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 {
                     var invResult = await _invoiceService.GetByIdAsync(dto.PurchaseInvoiceId.Value);
                     if (invResult.IsSuccess) SelectedInvoice = invResult.Value;
+                }
+                else
+                {
+                    // Standalone return — set supplier from DTO
+                    SelectedSupplierId = dto.SupplierId;
+                    SelectedSupplierName = dto.SupplierName;
+                    IsLinkedToInvoice = false;
                 }
 
                 Items.Clear();
@@ -412,7 +512,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             TotalReturnAmount = TotalAmount,
             StockQuantityImpact = Items.Sum(i => i.ReturnQuantity),
             WarehouseName = warehouse?.Name ?? "غير محدد",
-            CounterpartyName = SelectedInvoice?.SupplierName ?? "غير محدد",
+            CounterpartyName = SelectedInvoice?.SupplierName ?? SelectedSupplierName,
             CounterpartyType = "المورد",
             BalanceImpact = TotalAmount,
             TaxImpact = Items.Sum(i => {
@@ -432,21 +532,22 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             RequestFocusFirstInvalidField();
             return false;
         }
-        if (SelectedInvoice == null)
+        var errors = new List<string>();
+        if (SelectedInvoice == null && SelectedSupplierId <= 0)
         {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى اختيار فاتورة المشتريات أولاً" });
-            RequestFocusFirstInvalidField();
-            return false;
+            errors.Add("يرجى اختيار فاتورة المشتريات أو اختيار المورد للمرتجع المستقل");
         }
         if (SelectedWarehouseId <= 0)
         {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى اختيار المستودع" });
-            RequestFocusFirstInvalidField();
-            return false;
+            errors.Add("يرجى اختيار المستودع");
         }
         if (!Items.Any(i => i.ReturnQuantity > 0))
         {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى إدخال كميات المرتجع" });
+            errors.Add("يرجى إدخال كميات المرتجع");
+        }
+        if (errors.Any())
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
             RequestFocusFirstInvalidField();
             return false;
         }
@@ -462,14 +563,22 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             ErrorMessage = null;
             var returnItems = Items.Where(i => i.ReturnQuantity > 0).Select(i => new CreatePurchaseReturnItemRequest(
                 ProductId: i.ProductId,
-                ProductUnitId: 1,
+                ProductUnitId: i.ProductUnitId,
                 Quantity: i.ReturnQuantity,
                 UnitCost: i.UnitPrice
             )).ToList();
 
+            var supplierId = SelectedInvoice?.SupplierId ?? SelectedSupplierId;
+            if (supplierId <= 0)
+            {
+                ErrorMessage = "يرجى اختيار المورد";
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage);
+                return;
+            }
+
             var request = new CreatePurchaseReturnRequest(
                 PurchaseInvoiceId: SelectedInvoice?.Id,
-                SupplierId: SelectedInvoice?.SupplierId ?? 0,
+                SupplierId: supplierId,
                 WarehouseId: SelectedWarehouseId,
                 ReturnDate: ReturnDate,
                 CurrencyId: SelectedCurrencyId,
@@ -637,6 +746,7 @@ public class PurchaseReturnItemViewModel : ViewModelBase
     private readonly ISoundService? _soundService;
 
     public int ProductId { get; }
+    public int ProductUnitId { get; }
     public string ProductName { get; }
     public decimal OriginalQuantity { get; }
     public decimal UnitPrice { get; }
@@ -661,6 +771,7 @@ public class PurchaseReturnItemViewModel : ViewModelBase
     public PurchaseReturnItemViewModel(PurchaseInvoiceItemDto item, ISoundService? soundService = null)
     {
         ProductId = item.ProductId;
+        ProductUnitId = item.ProductUnitId;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitCost;
@@ -671,6 +782,7 @@ public class PurchaseReturnItemViewModel : ViewModelBase
     public PurchaseReturnItemViewModel(PurchaseReturnItemDto item, ISoundService? soundService = null)
     {
         ProductId = item.ProductId;
+        ProductUnitId = item.ProductUnitId;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitCost;

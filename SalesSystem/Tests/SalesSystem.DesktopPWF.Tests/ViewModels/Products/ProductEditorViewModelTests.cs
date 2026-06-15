@@ -116,6 +116,8 @@ public class ProductEditorViewModelTests : IDisposable
             TrackExpiry: false,
             ImagePath: null,
             Notes: null,
+            DefaultPurchaseUnitId: null,
+            DefaultSalesUnitId: null,
             IsActive: true);
 
         // Act - Use the constructor that accepts ProductDto and services
@@ -165,6 +167,8 @@ public class ProductEditorViewModelTests : IDisposable
             TrackExpiry: false,
             ImagePath: null,
             Notes: null,
+            DefaultPurchaseUnitId: null,
+            DefaultSalesUnitId: null,
             IsActive: true);
 
         var viewModel = CreateViewModel(product);
@@ -342,6 +346,8 @@ public class ProductEditorViewModelTests : IDisposable
             TrackExpiry: false,
             ImagePath: null,
             Notes: null,
+            DefaultPurchaseUnitId: null,
+            DefaultSalesUnitId: null,
             IsActive: true);
     }
 

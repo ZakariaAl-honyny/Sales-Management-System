@@ -217,7 +217,15 @@
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="الخصم" Binding="{Binding DiscountAmount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="80"/>
-                                    <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotal, StringFormat=N2}" Width="100" IsReadOnly="True" FontWeight="Bold"/>
+                                    <DataGridTemplateColumn Header="الإجمالي" Width="100">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBox Text="{Binding LineTotalInput, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
+                                                         Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"
+                                                         ToolTip="يمكنك تعديل الإجمالي مباشرة — سيتم إعادة حساب السعر أو الكمية تلقائياً"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTemplateColumn Width="40">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>

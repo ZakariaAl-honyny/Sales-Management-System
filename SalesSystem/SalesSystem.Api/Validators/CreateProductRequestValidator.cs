@@ -21,7 +21,7 @@ public class CreateProductRequestValidator : AbstractValidator<CreateProductRequ
             .GreaterThanOrEqualTo(0).WithMessage("مستوى إعادة الطلب لا يمكن أن يكون سالباً");
 
         RuleFor(x => x.TaxId)
-            .GreaterThan(0).WithMessage("معرف الضريبة يجب أن يكون أكبر من صفر")
+            .Must(taxId => taxId > 0).WithMessage("معرف الضريبة يجب أن يكون أكبر من صفر")
             .When(x => x.TaxId.HasValue);
 
         RuleFor(x => x.Description)

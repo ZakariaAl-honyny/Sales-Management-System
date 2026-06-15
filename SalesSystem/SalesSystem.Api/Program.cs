@@ -216,6 +216,9 @@ builder.Services.AddScoped<IReceiptVoucherService, ReceiptVoucherService>();
 builder.Services.AddScoped<IPaymentVoucherService, PaymentVoucherService>();
 builder.Services.AddScoped<IWarehouseTransferService, WarehouseTransferService>();
 
+// ─── Cheque Service (Phase 29) ───────────────────────────────
+builder.Services.AddScoped<IChequeService, ChequeService>();
+
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================

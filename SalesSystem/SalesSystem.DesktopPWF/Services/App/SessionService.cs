@@ -15,6 +15,7 @@ public class SessionService : ISessionService
     private List<int> _roleIds = new();
     private string? _roleName;
     private Permission _permissions = Permission.None;
+    private ViewMode _viewMode = ViewMode.Basic;
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_token);
 
@@ -30,6 +31,8 @@ public class SessionService : ISessionService
 
     public bool IsManagerOrAbove => HasRole(1) || HasRole(2);
 
+    public ViewMode GetViewMode() => _viewMode;
+
     public void SetSession(string token, string userName, int userId, List<int> roleIds, string roleName)
     {
         _token = token;
@@ -40,6 +43,13 @@ public class SessionService : ISessionService
         // Calculate permissions based on primary role
         var primaryRoleId = _roleIds.Count > 0 ? _roleIds[0] : 0;
         _permissions = primaryRoleId.GetPermissionsForRole();
+        // Determine view mode based on role: Admin(1) and Manager(2) get Advanced, others get Basic
+        _viewMode = primaryRoleId switch
+        {
+            1 => ViewMode.Advanced,  // Admin
+            2 => ViewMode.Advanced,  // Manager
+            _ => ViewMode.Basic      // Cashier, Observer, BranchManager
+        };
     }
 
     public void ClearSession()
@@ -50,6 +60,7 @@ public class SessionService : ISessionService
         _roleIds = new List<int>();
         _roleName = null;
         _permissions = Permission.None;
+        _viewMode = ViewMode.Basic;
     }
 
     /// <summary>

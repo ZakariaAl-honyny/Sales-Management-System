@@ -15,7 +15,7 @@ public class ProductImportRowDtoValidator : AbstractValidator<ProductImportRowDt
             .MaximumLength(200).WithMessage("اسم المنتج لا يمكن أن يتجاوز 200 حرف");
 
         RuleFor(x => x.BaseUnitId)
-            .GreaterThan(0).WithMessage("الوحدة الأساسية مطلوبة")
+            .Must(id => id > 0).WithMessage("الوحدة الأساسية مطلوبة")
             .When(x => x.BaseUnitId.HasValue);
 
         RuleFor(x => x.Barcode)

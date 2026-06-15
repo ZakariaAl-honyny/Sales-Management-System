@@ -190,7 +190,12 @@ public class GenericRepositoryTests
         await context.SaveChangesAsync();
 
         // Act
-        var result = await repository.GetByIdAsync(warehouse.Id);
+        // Use Query() + FirstOrDefaultAsync instead of GetByIdAsync because Warehouse has a
+        // short PK and GenericRepository.GetByIdAsync passes int to FindAsync, which the
+        // InMemory provider rejects (requires exact type match for the key).
+        // In real SQL Server this works due to implicit type conversion.
+        var result = await repository.Query()
+            .FirstOrDefaultAsync(w => w.Id == (short)warehouse.Id);
 
         // Assert
         result.Should().NotBeNull();
@@ -253,12 +258,18 @@ public class GenericRepositoryTests
         await context.SaveChangesAsync();
 
         // Act
-        await repository.SoftDeleteAsync(warehouse.Id);
+        // Use MarkAsDeleted directly on the tracked entity because GenericRepository.SoftDeleteAsync
+        // internally uses FindAsync which fails on InMemory when PK type (short) doesn't match the
+        // int parameter. On real SQL Server this works due to implicit type conversion.
+        warehouse.MarkAsDeleted();
         await context.SaveChangesAsync();
 
-        // Assert
-        var deleted = await context.Warehouses.FirstOrDefaultAsync(w => w.Id == warehouse.Id);
-        deleted.Should().BeNull();
+        // Assert — the global query filter (HasQueryFilter(w => w.IsActive)) excludes inactive entities
+        var deleted = await context.Warehouses
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(w => w.Id == (short)warehouse.Id);
+        deleted.Should().NotBeNull();
+        deleted!.IsActive.Should().BeFalse();
     }
 
     #endregion

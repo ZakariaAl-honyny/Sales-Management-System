@@ -4,6 +4,7 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
@@ -13,11 +14,22 @@ namespace SalesSystem.Application.Services;
 public class InventoryCountService : IInventoryCountService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IInventoryService _inventoryService;
+    private readonly IDocumentSequenceService _sequenceService;
+    private readonly ISystemAccountService _systemAccountService;
     private readonly ILogger<InventoryCountService> _logger;
 
-    public InventoryCountService(IUnitOfWork uow, ILogger<InventoryCountService> logger)
+    public InventoryCountService(
+        IUnitOfWork uow,
+        IInventoryService inventoryService,
+        IDocumentSequenceService sequenceService,
+        ISystemAccountService systemAccountService,
+        ILogger<InventoryCountService> logger)
     {
         _uow = uow;
+        _inventoryService = inventoryService;
+        _sequenceService = sequenceService;
+        _systemAccountService = systemAccountService;
         _logger = logger;
     }
 
@@ -58,8 +70,11 @@ public class InventoryCountService : IInventoryCountService
     {
         try
         {
-            // Compute next count number (temporary — in production, use DocumentSequenceService)
-            var countNo = await GetNextCountNumberAsync(ct);
+            // Generate count number via DocumentSequenceService (thread-safe)
+            var countNoResult = await _sequenceService.GetNextIntAsync("InventoryCount", ct);
+            if (!countNoResult.IsSuccess)
+                return Result<InventoryCountDto>.Failure("فشل في توليد رقم الجرد");
+            var countNo = countNoResult.Value;
 
             var count = InventoryCount.Create(countNo, (short)request.WarehouseId, request.CountDate, userId);
             if (!string.IsNullOrWhiteSpace(request.Notes))
@@ -126,10 +141,71 @@ public class InventoryCountService : IInventoryCountService
             if (count == null)
                 return Result.Failure("الجرد غير موجود", ErrorCodes.NotFound);
 
+            // Domain validation + status transition
             count.Post(userId);
+
+            // Identify lines with non-zero differences (surplus or shortage)
+            var linesNeedingAdjustment = count.Lines.Where(l => l.Difference != 0).ToList();
+            if (linesNeedingAdjustment.Any())
+            {
+                // Generate an adjustment document number
+                var adjustmentNoResult = await _sequenceService.GetNextIntAsync("InventoryCountAdjustment", ct);
+                if (!adjustmentNoResult.IsSuccess)
+                    return Result.Failure("فشل في توليد رقم تسوية الجرد");
+                var adjustmentNo = adjustmentNoResult.Value;
+
+                // Resolve the offset account for inventory adjustments from system mappings
+                var shortageMapping = await _systemAccountService.GetMappingAsync(
+                    SystemAccountKey.InventoryShortage, ct: ct);
+                var accountId = shortageMapping.IsSuccess ? (shortageMapping.Value?.AccountId ?? 0) : 0;
+
+                // Create the InventoryAdjustment document to record the count results
+                var adjustment = InventoryAdjustment.Create(
+                    adjustmentNo,
+                    (short)count.WarehouseId,
+                    count.CountDate,
+                    InventoryAdjustmentType.Correction,
+                    accountId > 0 ? accountId : 0,
+                    userId,
+                    referenceType: "InventoryCount",
+                    referenceId: count.Id,
+                    notes: $"تسوية جرد رقم {count.CountNo}");
+
+                foreach (var line in linesNeedingAdjustment)
+                {
+                    // Create adjustment line (quantity must be positive — direction is handled by the adjustment type)
+                    var adjLine = InventoryAdjustmentLine.Create(
+                        adjustment.Id,
+                        line.ProductId,
+                        line.ProductUnitId,
+                        Math.Abs(line.Difference), // InventoryAdjustmentLine requires quantity > 0
+                        0m); // UnitCost — use average cost from stock when available
+                    adjustment.AddLine(adjLine);
+
+                    // Update stock: positive difference = surplus (increase), negative = shortage (decrease)
+                    if (line.Difference > 0)
+                    {
+                        await _inventoryService.IncreaseStockAsync(
+                            line.ProductId, (int)count.WarehouseId, line.Difference, null, userId, ct);
+                    }
+                    else
+                    {
+                        await _inventoryService.DecreaseStockAsync(
+                            line.ProductId, (int)count.WarehouseId, Math.Abs(line.Difference), null, userId, ct);
+                    }
+                }
+
+                await _uow.InventoryAdjustments.AddAsync(adjustment, ct);
+                _logger.LogInformation(
+                    "Created inventory adjustment {AdjustmentNo} for count {CountId} — {LineCount} lines adjusted",
+                    adjustmentNo, id, linesNeedingAdjustment.Count);
+            }
+
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Inventory count {Id} posted by User {UserId}", id, userId);
+            _logger.LogInformation(
+                "Inventory count {Id} posted by User {UserId} — {LineCount} adjustments created",
+                id, userId, linesNeedingAdjustment.Count);
             return Result.Success();
         }
         catch (DomainException ex)
@@ -171,18 +247,6 @@ public class InventoryCountService : IInventoryCountService
     }
 
     // ─── Private Helpers ─────────────────────────────────
-
-    /// <summary>
-    /// Computes the next count number as (max existing CountNo) + 1.
-    /// Temporary — in production, use IDocumentSequenceService.GetNextIntAsync().
-    /// </summary>
-    private async Task<int> GetNextCountNumberAsync(CancellationToken ct)
-    {
-        var allCounts = await _uow.InventoryCounts.ToListIgnoreFiltersAsync(ct);
-        if (allCounts.Count == 0)
-            return 1;
-        return allCounts.Max(c => c.CountNo) + 1;
-    }
 
     private static InventoryCountDto MapToDto(InventoryCount count)
     {

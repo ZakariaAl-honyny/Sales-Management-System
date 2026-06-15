@@ -14,7 +14,7 @@ public class CreateInventoryAdjustmentRequestValidator : AbstractValidator<Creat
             .NotEmpty().WithMessage("تاريخ التسوية مطلوب");
 
         RuleFor(x => x.AdjustmentType)
-            .InclusiveBetween((byte)1, (byte)2).WithMessage("نوع التسوية غير صالح");
+            .InclusiveBetween((byte)1, (byte)3).WithMessage("نوع التسوية غير صالح");
 
         RuleFor(x => x.AccountId)
             .GreaterThan(0).WithMessage("معرف الحساب المحاسبي مطلوب");

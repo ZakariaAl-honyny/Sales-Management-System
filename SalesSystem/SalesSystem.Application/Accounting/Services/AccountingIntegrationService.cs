@@ -908,6 +908,98 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     }
 
     // ────────────────────────────────────────────────────────────────
+    //  F4b. Reverse Sales Return Entry (cancellation of return)
+    // ────────────────────────────────────────────────────────────────
+    /// <inheritdoc/>
+    public async Task<Result<int>> ReverseSalesReturnEntryAsync(
+        SalesReturn salesReturn,
+        decimal totalCost,
+        int reversedByUserId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var requiredKeys = new[]
+            {
+                SystemAccountKey.SalesReturns,
+                SystemAccountKey.AccountsReceivable,
+                SystemAccountKey.Inventory,
+                SystemAccountKey.CostOfGoodsSold
+            };
+
+            var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+            if (!dictResult.IsSuccess)
+                return Result<int>.Failure(dictResult.Error!);
+
+            var m = dictResult.Value!;
+
+            // Get customer account ID (per-entity account routing)
+            var customerAccountId = salesReturn.Customer?.Party?.AccountId > 0
+                ? salesReturn.Customer.Party.AccountId
+                : m[SystemAccountKey.AccountsReceivable];
+
+            var lines = new List<JournalEntryLineRequest>();
+
+            // ── Reverse revenue reversal ─────────────────────────────
+            // Reverse of create: swap Dr ↔ Cr
+            // Dr: CustomerAccount (re-instate AR) = return amount
+            // Cr: SalesReturnsAccount (reduce contra-revenue) = return amount
+            lines.Add(new JournalEntryLineRequest(
+                customerAccountId,
+                salesReturn.TotalAmount,
+                0,
+                "عكس مردود مبيعات — إعادة ذمّة العميل"));
+
+            lines.Add(new JournalEntryLineRequest(
+                m[SystemAccountKey.SalesReturns],
+                0,
+                salesReturn.TotalAmount,
+                "عكس مردود مبيعات — إعادة الإيراد"));
+
+            // ── Reverse COGS reversal (if cost was tracked) ──────────
+            if (totalCost > 0)
+            {
+                // Dr: COGSAccount (re-instate COGS)
+                // Cr: InventoryAccount (remove stock value from inventory)
+                lines.Add(new JournalEntryLineRequest(
+                    m[SystemAccountKey.CostOfGoodsSold],
+                    totalCost,
+                    0,
+                    "عكس مردود مبيعات — إعادة التكلفة"));
+
+                lines.Add(new JournalEntryLineRequest(
+                    m[SystemAccountKey.Inventory],
+                    0,
+                    totalCost,
+                    "عكس مردود مبيعات — تخفيض المخزون"));
+            }
+
+            var request = new CreateJournalEntryRequest(
+                TransactionDate: DateTime.UtcNow,
+                Description: $"قيد عكس ترحيل مردود مبيعات رقم {salesReturn.ReturnNo}",
+                EntryType: JournalEntryType.SalesReturn,
+                ReferenceType: "SalesReturn",
+                ReferenceId: salesReturn.Id,
+                ReferenceNumber: $"{salesReturn.ReturnNo}-REV",
+                Lines: lines
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reversing sales return entry for return #{ReturnNo}", salesReturn.ReturnNo);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد عكس مردود المبيعات");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
     //  F5. Purchase Return Entry
     // ────────────────────────────────────────────────────────────────
     public async Task<Result<int>> CreatePurchaseReturnEntryAsync(

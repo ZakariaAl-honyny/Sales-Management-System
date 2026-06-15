@@ -33,10 +33,12 @@ public class SupplierPaymentService : ISupplierPaymentService
     {
         try
         {
-            // Generate payment number
-            var paymentNoResult = await _sequenceService.GetNextNumberAsync("SP", ct);
-            if (!paymentNoResult.IsSuccess)
-                return Result<SupplierPaymentDto>.Failure(paymentNoResult.Error ?? "فشل في توليد رقم السداد");
+            // Generate payment number via thread-safe DocumentSequenceService
+            var seqResult = await _sequenceService.GetNextIntAsync("SupplierPayment", ct);
+            if (!seqResult.IsSuccess)
+                return Result<SupplierPaymentDto>.Failure(seqResult.Error ?? "فشل في توليد رقم السداد");
+
+            var paymentNo = seqResult.Value.ToString();
 
             // Validate supplier exists
             var supplier = await _uow.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId, ct, "Party");
@@ -44,7 +46,7 @@ public class SupplierPaymentService : ISupplierPaymentService
                 return Result<SupplierPaymentDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
             var payment = SupplierPayment.Create(
-                paymentNo: paymentNoResult.Value!,
+                paymentNo: paymentNo,
                 supplierId: request.SupplierId,
                 amount: request.Amount,
                 paymentMethod: (PaymentMethod)request.PaymentMethod,

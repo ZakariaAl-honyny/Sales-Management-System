@@ -122,6 +122,7 @@ public class PurchaseReturn : DocumentEntity
         if (!Items.Any())
             throw new DomainException("لا يمكن ترحيل مرتجع بدون أصناف.");
 
+        PostedAt = DateTime.UtcNow;
         Status = InvoiceStatus.Posted;
     }
 
@@ -129,6 +130,7 @@ public class PurchaseReturn : DocumentEntity
     {
         if (Status == InvoiceStatus.Cancelled)
             throw new DomainException("المرتجع ملغى بالفعل.");
+        CancelledAt = DateTime.UtcNow;
         Status = InvoiceStatus.Cancelled;
     }
 }

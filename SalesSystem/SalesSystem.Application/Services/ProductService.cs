@@ -89,11 +89,13 @@ public class ProductService : IProductService
                 categoryId: request.CategoryId,
                 description: request.Description,
                 barcode: request.Barcode,
-                taxId: request.TaxId,
+                taxId: (short?)request.TaxId,
                 reorderLevel: request.ReorderLevel,
                 trackExpiry: request.TrackExpiry,
                 imagePath: request.ImagePath,
-                notes: request.Notes
+                notes: request.Notes,
+                defaultPurchaseUnitId: request.DefaultPurchaseUnitId,
+                defaultSalesUnitId: request.DefaultSalesUnitId
             );
 
             // ─── Execute everything inside a transaction ───────────────────
@@ -130,7 +132,7 @@ public class ProductService : IProductService
                     // ── Create InventoryBatch (OPENING) ────────────────
                     var batch = InventoryBatch.Create(
                         productId: product.Id,
-                        warehouseId: warehouse.Id,
+                        warehouseId: (short)warehouse.Id,
                         quantity: openingQuantity,
                         unitCost: openingUnitCost,
                         batchNo: "OPENING",
@@ -148,7 +150,7 @@ public class ProductService : IProductService
                     else
                     {
                         var newStock = WarehouseStock.Create(
-                            warehouseId: warehouse.Id,
+                            warehouseId: (short)warehouse.Id,
                             productId: product.Id,
                             quantity: openingQuantity,
                             avgCost: openingUnitCost);
@@ -165,7 +167,7 @@ public class ProductService : IProductService
                     var invTx = InventoryTransaction.Create(
                         transactionNo: seqResult.Value,
                         transactionType: InventoryTransactionType.OpeningBalance,
-                        warehouseId: warehouse.Id,
+                        warehouseId: (short)warehouse.Id,
                         referenceType: null,
                         referenceId: null,
                         notes: $"الرصيد الافتتاحي للمنتج: {product.Name}");
@@ -244,11 +246,13 @@ public class ProductService : IProductService
                 categoryId: request.CategoryId,
                 description: request.Description,
                 barcode: request.Barcode,
-                taxId: request.TaxId,
+                taxId: (short?)request.TaxId,
                 reorderLevel: request.ReorderLevel,
                 trackExpiry: request.TrackExpiry,
                 imagePath: request.ImagePath,
-                notes: request.Notes
+                notes: request.Notes,
+                defaultPurchaseUnitId: request.DefaultPurchaseUnitId,
+                defaultSalesUnitId: request.DefaultSalesUnitId
             );
 
             if (request.IsActive != product.IsActive)
@@ -362,6 +366,8 @@ public class ProductService : IProductService
             p.TrackExpiry,
             p.ImagePath,
             p.Notes,
+            p.DefaultPurchaseUnitId,
+            p.DefaultSalesUnitId,
             p.IsActive
         );
     }

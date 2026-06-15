@@ -216,7 +216,7 @@ public class ProductUnitEditorViewModel : ViewModelBase
         if (IsEditMode && UnitId.HasValue)
         {
             // Update: only UnitId is updateable per new UpdateProductUnitRequest
-            var request = new UpdateProductUnitRequest(SelectedUnitLookupId!.Value);
+            var request = new UpdateProductUnitRequest((short)SelectedUnitLookupId!.Value);
             var result = await _unitService.UpdateUnitAsync(ProductId, UnitId.Value, request);
 
             if (result.IsSuccess)
@@ -234,7 +234,7 @@ public class ProductUnitEditorViewModel : ViewModelBase
         else
         {
             var request = new AddProductUnitRequest(
-                UnitId: SelectedUnitLookupId!.Value,
+                UnitId: (short)SelectedUnitLookupId!.Value,
                 Factor: ConversionFactor,
                 IsBaseUnit: IsBaseUnit);
             var result = await _unitService.AddUnitAsync(ProductId, request);

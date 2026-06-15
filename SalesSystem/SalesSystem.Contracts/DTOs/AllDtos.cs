@@ -56,6 +56,8 @@ public record ProductDto(
     bool TrackExpiry,
     string? ImagePath,
     string? Notes,
+    short? DefaultPurchaseUnitId,
+    short? DefaultSalesUnitId,
     bool IsActive,
     decimal CurrentStock = 0)
 {
@@ -166,6 +168,7 @@ public record PurchaseInvoiceDto(
     decimal SubTotal,
     decimal DiscountAmount,
     decimal TaxAmount,
+    decimal OtherCharges,
     decimal NetTotal,
     decimal PaidAmount,
     decimal RemainingAmount,
@@ -814,7 +817,7 @@ public record ProductImportRowDto(
     string ProductName,
     string? CategoryName,
     string? Barcode,
-    int? BaseUnitId,
+    short? BaseUnitId,
     decimal? MinStockLevel,
     string? Description
 );

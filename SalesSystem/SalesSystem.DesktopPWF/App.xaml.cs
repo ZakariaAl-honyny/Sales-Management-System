@@ -431,8 +431,6 @@ public partial class App : System.Windows.Application
 
         // Phase 31 — Cash Box Report ViewModels
         services.AddTransient<CashBoxSummaryViewModel>();
-        services.AddTransient<DailyClosureReportViewModel>();
-
         // Phase 31 — User & Login Report ViewModels
         services.AddTransient<UserActivityViewModel>();
         services.AddTransient<LoginHistoryViewModel>();

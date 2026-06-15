@@ -18,6 +18,7 @@ public class PurchaseInvoice : DocumentEntity
     public decimal SubTotal { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal TaxAmount { get; private set; }
+    public decimal OtherCharges { get; private set; }
     public decimal NetTotal { get; private set; }
     public decimal PaidAmount { get; private set; }
     public decimal RemainingAmount { get; private set; }
@@ -44,6 +45,7 @@ public class PurchaseInvoice : DocumentEntity
         DateOnly? dueDate = null,
         PaymentType paymentType = PaymentType.Cash,
         decimal discountAmount = 0,
+        decimal otherCharges = 0,
         string? notes = null,
         short? taxId = null,
         short? currencyId = null,
@@ -58,6 +60,8 @@ public class PurchaseInvoice : DocumentEntity
             throw new DomainException("رقم الفاتورة غير صحيح.");
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
+        if (otherCharges < 0)
+            throw new DomainException("مصاريف إضافية لا يمكن أن تكون سالبة.");
         if (dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow.Date))
             throw new DomainException("تاريخ الاستحقاق لا يمكن أن يكون في الماضي.");
         if (currencyId.HasValue && !exchangeRate.HasValue)
@@ -73,6 +77,7 @@ public class PurchaseInvoice : DocumentEntity
             DueDate = dueDate,
             PaymentType = paymentType,
             DiscountAmount = discountAmount,
+            OtherCharges = otherCharges,
             CurrencyId = currencyId,
             ExchangeRate = exchangeRate,
             Notes = notes,
@@ -107,7 +112,7 @@ public class PurchaseInvoice : DocumentEntity
     public void RecalculateTotals()
     {
         SubTotal = Items.Sum(i => i.LineTotal);
-        NetTotal = SubTotal - DiscountAmount + TaxAmount;
+        NetTotal = SubTotal - DiscountAmount + TaxAmount + OtherCharges;
         RemainingAmount = NetTotal - PaidAmount;
     }
 
@@ -128,6 +133,15 @@ public class PurchaseInvoice : DocumentEntity
         if (taxAmount < 0)
             throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
         TaxAmount = taxAmount;
+        RecalculateTotals();
+        UpdateTimestamp();
+    }
+
+    public void SetOtherCharges(decimal otherCharges)
+    {
+        if (otherCharges < 0)
+            throw new DomainException("مصاريف إضافية لا يمكن أن تكون سالبة.");
+        OtherCharges = otherCharges;
         RecalculateTotals();
         UpdateTimestamp();
     }
@@ -166,15 +180,18 @@ public class PurchaseInvoice : DocumentEntity
         Status = InvoiceStatus.Cancelled;
     }
 
-    public void UpdateTotals(decimal discountAmount, decimal taxAmount)
+    public void UpdateTotals(decimal discountAmount, decimal taxAmount, decimal otherCharges = 0)
     {
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
         if (taxAmount < 0)
             throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
+        if (otherCharges < 0)
+            throw new DomainException("مصاريف إضافية لا يمكن أن تكون سالبة.");
 
         DiscountAmount = discountAmount;
         TaxAmount = taxAmount;
+        OtherCharges = otherCharges;
         RecalculateTotals();
         UpdateTimestamp();
     }

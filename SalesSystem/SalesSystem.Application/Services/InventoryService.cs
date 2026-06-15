@@ -181,8 +181,22 @@ public class InventoryService : IInventoryService
 
         var transactionType = (InventoryTransactionType)request.TransactionType;
 
+        // Auto-generate TransactionNo if not provided
+        int transactionNo;
+        if (request.TransactionNo > 0)
+        {
+            transactionNo = request.TransactionNo;
+        }
+        else
+        {
+            var seqResult = await _sequenceService.GetNextIntAsync("InventoryTransaction", ct);
+            if (!seqResult.IsSuccess)
+                return Result<InventoryTransactionDto>.Failure("فشل في توليد رقم المعاملة");
+            transactionNo = seqResult.Value;
+        }
+
         var tx = InventoryTransaction.Create(
-            request.TransactionNo,
+            transactionNo,
             transactionType,
             request.WarehouseId,
             request.TransactionDate,
@@ -237,7 +251,7 @@ public class InventoryService : IInventoryService
 
         tx.Post();
 
-        // Update stock levels
+        // Update stock levels based on transaction type
         foreach (var line in tx.Lines)
         {
             if (IsOutgoingTransaction(tx.TransactionType))

@@ -26,6 +26,8 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
             .HasForeignKey(x => x.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Property(x => x.CategoryId).IsRequired(false);
+
         builder.Property(x => x.PhoneNumber).HasMaxLength(20).IsRequired(false);
         builder.Property(x => x.TaxNumber).HasMaxLength(50).IsRequired(false);
         builder.Property(x => x.Address).HasMaxLength(500).IsRequired(false);

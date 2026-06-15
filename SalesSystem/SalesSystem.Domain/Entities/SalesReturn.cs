@@ -143,6 +143,7 @@ public class SalesReturn : DocumentEntity
             throw new DomainException("لا يمكن ترحيل مرتجع بدون أصناف.");
 
         Status = InvoiceStatus.Posted;
+        PostedAt = DateTime.UtcNow;
     }
 
     public void Cancel()
@@ -150,5 +151,6 @@ public class SalesReturn : DocumentEntity
         if (Status == InvoiceStatus.Cancelled)
             throw new DomainException("المرتجع ملغى بالفعل.");
         Status = InvoiceStatus.Cancelled;
+        CancelledAt = DateTime.UtcNow;
     }
 }

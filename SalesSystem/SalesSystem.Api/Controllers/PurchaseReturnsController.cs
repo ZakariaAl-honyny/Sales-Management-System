@@ -125,6 +125,18 @@ public class PurchaseReturnsController : ControllerBase
         return BadRequest(new { error = result.Error });
     }
 
+    /// <summary>الحصول على الكميات المرتجعة لكل منتج في فاتورة شراء معينة.</summary>
+    [HttpGet("returned-quantities/{invoiceId:int}")]
+    [Authorize(Policy = "AllStaff")]
+    [ProducesResponseType(typeof(Dictionary<int, decimal>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetReturnedQuantities(int invoiceId, CancellationToken ct)
+    {
+        _logger.LogInformation("طلب كميات المرتجعات لفاتورة الشراء المعرف {InvoiceId}", invoiceId);
+        var result = await _purchaseReturnService.GetReturnedQuantitiesByInvoiceAsync(invoiceId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
     /// <summary>إلغاء مرتجع شراء (عكس تأثير المخزون ورصيد المورد إذا كان مرحلاً).</summary>
     [HttpPost("{id:int}/cancel")]
     [Authorize(Policy = "ManagerAndAbove")]

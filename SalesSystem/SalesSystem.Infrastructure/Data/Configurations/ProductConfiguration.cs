@@ -24,6 +24,21 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(p => p.Description).HasMaxLength(500);
         builder.Property(p => p.Notes).HasMaxLength(500);
         builder.Property(p => p.ImagePath).HasMaxLength(500);
+        builder.Property(p => p.DefaultPurchaseUnitId).HasColumnName("DefaultPurchaseUnitId").HasColumnType("smallint");
+        builder.Property(p => p.DefaultSalesUnitId).HasColumnName("DefaultSalesUnitId").HasColumnType("smallint");
+
+        // ─── Default unit FKs ──────────────────────────────────
+        builder.HasOne(p => p.DefaultPurchaseUnit)
+            .WithMany()
+            .HasForeignKey(p => p.DefaultPurchaseUnitId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        builder.HasOne(p => p.DefaultSalesUnit)
+            .WithMany()
+            .HasForeignKey(p => p.DefaultSalesUnitId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
 
         // ─── Numeric properties ─────────────────────────────
         builder.Property(p => p.ReorderLevel).HasPrecision(18, 3);

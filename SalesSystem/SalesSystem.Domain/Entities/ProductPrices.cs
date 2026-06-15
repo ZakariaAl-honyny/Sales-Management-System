@@ -18,7 +18,7 @@ public class ProductPrice : ActivatableEntity
     /// <summary>
     /// FK to Currency (smallint).
     /// </summary>
-    public int CurrencyId { get; private set; }
+    public short CurrencyId { get; private set; }
 
     /// <summary>
     /// The actual price amount. decimal(18,2).
@@ -49,7 +49,7 @@ public class ProductPrice : ActivatableEntity
     /// </summary>
     public static ProductPrice Create(
         int productUnitId,
-        int currencyId,
+        short currencyId,
         decimal price,
         DateTime effectiveFrom,
         DateTime? effectiveTo = null,

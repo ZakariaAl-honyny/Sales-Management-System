@@ -160,7 +160,7 @@ public class ProductImportService : IProductImportService
                     // Phase 25: UnitId replaces UnitName, cost managed via InventoryBatches
                     var baseUnit = ProductUnit.CreateBaseUnit(
                         product.Id,
-                        row.BaseUnitId!.Value
+                        (short)row.BaseUnitId!.Value
                     );
                     await _uow.ProductUnits.AddAsync(baseUnit, ct);
                     // Add the unit to the product's in-memory collection for consistency

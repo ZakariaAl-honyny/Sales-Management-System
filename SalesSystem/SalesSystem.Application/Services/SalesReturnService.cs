@@ -15,6 +15,7 @@ public class SalesReturnService : ISalesReturnService
     private readonly IInventoryService _inventoryService;
     private readonly IDocumentSequenceService _sequenceService;
     private readonly ICashBoxService _cashBoxService;
+    private readonly IAccountingIntegrationService _accountingService;
     private readonly ILogger<SalesReturnService> _logger;
 
     public SalesReturnService(
@@ -22,12 +23,14 @@ public class SalesReturnService : ISalesReturnService
         IInventoryService inventoryService,
         IDocumentSequenceService sequenceService,
         ICashBoxService cashBoxService,
+        IAccountingIntegrationService accountingService,
         ILogger<SalesReturnService> logger)
     {
         _uow = uow;
         _inventoryService = inventoryService;
         _sequenceService = sequenceService;
         _cashBoxService = cashBoxService;
+        _accountingService = accountingService;
         _logger = logger;
     }
 
@@ -136,11 +139,10 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Items.Product");
+            r => r.Id == id, ct, "Items.Product", "Customer", "Customer.Party");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status != InvoiceStatus.Draft) return Result<SalesReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
-
 
         return await _uow.ExecuteAsync(async () =>
         {
@@ -185,6 +187,17 @@ public class SalesReturnService : ISalesReturnService
                     }
                 }
 
+                // Create journal entry for the sales return
+                var totalCost = sr.Items.Sum(i => i.UnitPrice * i.Quantity);
+                var entryResult = await _accountingService.CreateSalesReturnEntryAsync(
+                    sr, totalCost, userId, ct);
+                if (!entryResult.IsSuccess)
+                {
+                    _logger.LogWarning("Journal entry creation failed for sales return {Id}: {Error}",
+                        sr.Id, entryResult.Error);
+                    return Result<SalesReturnDto>.Failure(entryResult.Error!);
+                }
+
                 await _uow.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
@@ -209,7 +222,7 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Items.Product");
+            r => r.Id == id, ct, "Items.Product", "Customer", "Customer.Party");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status == InvoiceStatus.Cancelled)
@@ -235,6 +248,16 @@ public class SalesReturnService : ISalesReturnService
                             ct: ct);
                     }
 
+                    // Reverse the journal entry for the posted sales return
+                    var totalCost = sr.Items.Sum(i => i.UnitPrice * i.Quantity);
+                    var reversalResult = await _accountingService.ReverseSalesReturnEntryAsync(
+                        sr, totalCost, userId, ct);
+                    if (!reversalResult.IsSuccess)
+                    {
+                        _logger.LogWarning("Journal entry reversal failed for sales return {Id}: {Error}",
+                            sr.Id, reversalResult.Error);
+                        return Result<SalesReturnDto>.Failure(reversalResult.Error!);
+                    }
                 }
 
                 sr.Cancel();

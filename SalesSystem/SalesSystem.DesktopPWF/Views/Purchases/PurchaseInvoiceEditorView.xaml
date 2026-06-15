@@ -160,7 +160,15 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotal, StringFormat=N2}" Width="100" IsReadOnly="True" FontWeight="Bold"/>
+                                <DataGridTemplateColumn Header="الإجمالي" Width="100">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding LineTotalInput, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
+                                                     Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"
+                                                     ToolTip="يمكنك تعديل الإجمالي مباشرة — سيتم إعادة حساب التكلفة أو الكمية تلقائياً"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTemplateColumn Width="40">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -254,6 +262,13 @@
                                          ToolTip="قيمة الخصم الإضافي على الفاتورة"/>
                             </Grid>
 
+                            <Grid Margin="0,0,0,8">
+                                <TextBlock Text="مصاريف إضافية" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding OtherCharges, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
+                                         Width="100" HorizontalAlignment="Right" TextAlignment="Left"
+                                         ToolTip="مصاريف الشحن والنقل والجمارك — توزع تلقائياً على بنود الفاتورة"/>
+                            </Grid>
+
                             <Separator Margin="0,8"/>
 
                             <Grid Margin="0,0,0,6">
@@ -263,6 +278,10 @@
                             <Grid Margin="0,0,0,6">
                                 <TextBlock Text="قيمة الضريبة" Foreground="{StaticResource TextSecondaryBrush}"/>
                                 <TextBlock Text="{Binding TaxAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                            </Grid>
+                            <Grid Margin="0,0,0,6">
+                                <TextBlock Text="مصاريف إضافية" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{Binding OtherCharges, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
                             </Grid>
                             <Grid Margin="0,0,0,6">
                                 <TextBlock Text="صافي الفاتورة" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>

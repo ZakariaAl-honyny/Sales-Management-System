@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SalesSystem.Application.Helpers;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
@@ -133,6 +134,7 @@ public class PurchaseService : IPurchaseService
                     request.DueDate,
                     (Domain.Enums.PaymentType)request.PaymentType,
                     request.DiscountAmount,
+                    otherCharges: request.OtherCharges,
                     request.Notes,
                     taxId: null,
                     currencyId: request.CurrencyId is not null ? (short?)request.CurrencyId.Value : null,
@@ -185,7 +187,7 @@ public class PurchaseService : IPurchaseService
             if (request.CurrencyId.HasValue)
                 invoice.SetCurrency(request.CurrencyId is not null ? (short?)request.CurrencyId.Value : null, request.ExchangeRate);
 
-            invoice.UpdateTotals(request.DiscountAmount, request.TaxAmount);
+            invoice.UpdateTotals(request.DiscountAmount, request.TaxAmount, request.OtherCharges);
             invoice.SetPaidAmount(request.PaidAmount);
 
             // Re-create items (simplest way for draft)
@@ -240,14 +242,32 @@ public class PurchaseService : IPurchaseService
                 invoice.Post();
                 await _uow.SaveChangesAsync();
 
-                // ─── Update Stock ────────────────────────────────────────────────
-                foreach (var item in invoice.Items)
+                // ─── Compute Landed Costs ─────────────────────────────────────
+                // توزيع المصاريف الإضافية (نقل، جمارك، إلخ) بشكل تناسبي على البنود
+                var itemsList = invoice.Items.ToList();
+                var allocationLines = itemsList.Select((item, index) => new AllocationLine
                 {
+                    Index = index,
+                    LineTotal = item.LineTotal,
+                    Quantity = item.Quantity,
+                    UnitCost = item.UnitCost
+                }).ToArray();
+
+                var landedCosts = AdditionalChargeAllocator.Allocate(
+                    allocationLines,
+                    invoice.OtherCharges,
+                    invoice.SubTotal);
+
+                // ─── Update Stock ────────────────────────────────────────────────
+                for (int i = 0; i < itemsList.Count; i++)
+                {
+                    var item = itemsList[i];
+                    var landedUnitCost = landedCosts.GetValueOrDefault(i, item.UnitCost);
                     var stockResult = await _inventoryService.IncreaseStockAsync(
                         item.ProductId,
                         invoice.WarehouseId,
                         item.Quantity,
-                        unitCost: item.UnitCost,
+                        unitCost: landedUnitCost,
                         userId: userId,
                         ct: ct);
 
@@ -259,17 +279,19 @@ public class PurchaseService : IPurchaseService
                 }
 
                 // ─── Auto-update product costs via pricing service ───────────────
-                foreach (var item in invoice.Items)
+                for (int i = 0; i < itemsList.Count; i++)
                 {
+                    var item = itemsList[i];
                     if (item.Product == null) continue;
 
                     try
                     {
+                        var landedUnitCost = landedCosts.GetValueOrDefault(i, item.UnitCost);
                         var baseUnit = item.Product.GetBaseUnit();
                         var result = await _pricingService.UpdateFromPurchaseAsync(
                             new UpdatePricingRequest(
                                 ProductUnitId: baseUnit.Id,
-                                NewPurchaseCost: item.UnitCost,
+                                NewPurchaseCost: landedUnitCost,
                                 NewQuantityPurchased: item.Quantity,
                                 NewSalesPrice: null,
                                 InvoiceId: invoice.Id,
@@ -489,6 +511,7 @@ public class PurchaseService : IPurchaseService
             i.SubTotal,
             i.DiscountAmount,
             i.TaxAmount,
+            i.OtherCharges,
             i.NetTotal,
             i.PaidAmount,
             i.RemainingAmount,

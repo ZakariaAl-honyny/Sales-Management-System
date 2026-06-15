@@ -35,14 +35,17 @@
                              helpers:FocusHelper.AdvanceOnEnter="True"
                              ToolTip="أدخل اسم البنك — هذا الحقل إلزامي"/>
 
-                    <!-- Account -->
-                    <TextBlock Text="الحساب المرتبط *" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
+                    <!-- Account (auto-created if empty) -->
+                    <TextBlock Text="الحساب المرتبط" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
                     <TextBox Text="{Binding AccountName, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource ModernTextBox}"
-                             Tag="اسم الحساب المحاسبي المرتبط"
+                             Tag="اسم الحساب المحاسبي — يتم إنشاؤه تلقائياً أسفل البنوك"
                              TabIndex="2"
                              IsReadOnly="True"
-                             ToolTip="الحساب المحاسبي المرتبط بالبنك"/>
+                             ToolTip="الحساب المحاسبي المرتبط — يتم إنشاؤه تلقائياً تحت الحساب 1120 (البنوك) إذا لم يتم تحديده"/>
+                    <TextBlock Text="يتم إنشاء حساب محاسبي تلقائياً تحت الحساب الرئيسي (البنوك)" 
+                               Style="{StaticResource HelperTextStyle}"
+                               Margin="4,2,0,0"/>
 
                     <!-- IsActive -->
                     <CheckBox Content="نشط" 

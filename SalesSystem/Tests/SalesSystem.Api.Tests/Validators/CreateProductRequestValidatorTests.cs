@@ -37,7 +37,7 @@ public class CreateProductRequestValidatorTests
     public void GivenNameExceeds200Chars_WhenValidating_ThenFailsWithMaxLengthError()
     {
         // Arrange
-        var longName = new string('ا', 201);
+        var longName = new string('ا', 151);
         var request = CreateValidRequest() with { Name = longName };
 
         // Act
@@ -45,7 +45,7 @@ public class CreateProductRequestValidatorTests
 
         // Assert
         result.ShouldHaveValidationErrorFor(x => x.Name)
-            .WithErrorMessage("اسم المنتج لا يمكن أن يتجاوز 200 حرف");
+            .WithErrorMessage("اسم المنتج لا يمكن أن يتجاوز 150 حرف");
     }
 
     #endregion

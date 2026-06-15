@@ -263,7 +263,7 @@ public class UnitServiceTests : IDisposable
         }
 
         public async Task<T?> GetByIdAsync(int id, CancellationToken ct = default)
-            => await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            => await FindByIdAsync(id, ct);
 
         public Task<IReadOnlyList<T>> GetAllAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<T>>(_context.Set<T>().ToList());
@@ -283,7 +283,7 @@ public class UnitServiceTests : IDisposable
 
         public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
         {
-            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            var entity = await FindByIdAsync(id, ct);
             if (entity != null && entity is ActivatableEntity activatable)
             {
                 activatable.MarkAsDeleted();
@@ -294,12 +294,32 @@ public class UnitServiceTests : IDisposable
 
         public async Task HardDeleteAsync(int id, CancellationToken ct = default)
         {
-            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            var entity = await FindByIdAsync(id, ct);
             if (entity != null)
             {
                 _context.Set<T>().Remove(entity);
                 await _context.SaveChangesAsync(ct);
             }
+        }
+
+        /// <summary>
+        /// Finds an entity by Id, handling key type mismatches (e.g., int vs short for Unit).
+        /// </summary>
+        private async Task<T?> FindByIdAsync(int id, CancellationToken ct)
+        {
+            var entityType = _context.Model.FindEntityType(typeof(T));
+            var pk = entityType?.FindPrimaryKey();
+            if (pk?.Properties.Count == 1)
+            {
+                var keyType = pk.Properties[0].ClrType;
+                if (keyType == typeof(short))
+                    return await _context.Set<T>().FindAsync(new object[] { (short)id }, ct);
+                if (keyType == typeof(long))
+                    return await _context.Set<T>().FindAsync(new object[] { (long)id }, ct);
+                if (keyType == typeof(byte))
+                    return await _context.Set<T>().FindAsync(new object[] { (byte)id }, ct);
+            }
+            return await _context.Set<T>().FindAsync(new object[] { id }, ct);
         }
 
         public void DeleteRange(IEnumerable<T> entities)
