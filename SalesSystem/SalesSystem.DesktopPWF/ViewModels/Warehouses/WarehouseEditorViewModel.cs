@@ -28,7 +28,6 @@ public class WarehouseEditorViewModel : ViewModelBase
     private string? _address;
     private string? _managerName;
     private string? _notes;
-    private bool _isDefault;
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
@@ -61,8 +60,6 @@ public class WarehouseEditorViewModel : ViewModelBase
         _phone = warehouse.Phone;
         _address = warehouse.Address;
         _managerName = warehouse.ManagerName;
-        _notes = warehouse.Notes;
-        _isDefault = warehouse.IsDefault;
         _isActive = warehouse.IsActive;
         _isEditMode = true;
     }
@@ -175,12 +172,6 @@ public class WarehouseEditorViewModel : ViewModelBase
         }
     }
 
-    public bool IsDefault
-    {
-        get => _isDefault;
-        set => SetProperty(ref _isDefault, value);
-    }
-
     public bool IsActive
     {
         get => _isActive;
@@ -243,29 +234,29 @@ public class WarehouseEditorViewModel : ViewModelBase
         if (IsEditMode)
         {
             var updateRequest = new UpdateWarehouseRequest(
+                BranchId: (short)1,
+                Code: _isEditMode ? _name : string.Empty,
                 Name,
                 Type: SelectedType,
                 Location: string.IsNullOrWhiteSpace(Location) ? null : Location,
                 Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                 Address: string.IsNullOrWhiteSpace(Address) ? null : Address,
                 ManagerName: string.IsNullOrWhiteSpace(ManagerName) ? null : ManagerName,
-                IsDefault: IsDefault,
-                IsActive: IsActive,
-                Notes: string.IsNullOrWhiteSpace(Notes) ? null : Notes);
+                IsActive: IsActive);
 
             result = await _warehouseService.UpdateAsync(_warehouseId, updateRequest);
         }
         else
         {
             var createRequest = new CreateWarehouseRequest(
+                BranchId: (short)1,
+                Code: string.Empty,
                 Name,
                 Type: SelectedType,
                 Location: string.IsNullOrWhiteSpace(Location) ? null : Location,
                 Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                 Address: string.IsNullOrWhiteSpace(Address) ? null : Address,
-                ManagerName: string.IsNullOrWhiteSpace(ManagerName) ? null : ManagerName,
-                IsDefault: IsDefault,
-                Notes: string.IsNullOrWhiteSpace(Notes) ? null : Notes);
+                ManagerName: string.IsNullOrWhiteSpace(ManagerName) ? null : ManagerName);
 
             result = await _warehouseService.CreateAsync(createRequest);
         }

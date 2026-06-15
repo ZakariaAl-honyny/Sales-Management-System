@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
@@ -5,26 +6,42 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Application.Services;
 
+/// <summary>
+/// Product service aligned to the new 65-table schema.
+/// - Prices via ProductPrices (multi-currency, effective dates)
+/// - Cost via InventoryBatches (FIFO/FEFO, weighted average)
+/// - Barcode on Product entity (primary barcode only)
+/// - ImagePath on Product (single image, no separate ProductImages table)
+/// - Expiry tracked via InventoryBatches, not Product
+/// </summary>
 public class ProductService : IProductService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<ProductService> _logger;
-    private readonly ILocalImageStorageService _imageStorage;
+    private readonly IDocumentSequenceService _documentSequenceService;
+    private readonly IAccountingIntegrationService _accountingService;
 
-    public ProductService(IUnitOfWork uow, ILogger<ProductService> logger, ILocalImageStorageService imageStorage)
+    public ProductService(
+        IUnitOfWork uow,
+        ILogger<ProductService> logger,
+        IDocumentSequenceService documentSequenceService,
+        IAccountingIntegrationService accountingService)
     {
         _uow = uow;
         _logger = logger;
-        _imageStorage = imageStorage;
+        _documentSequenceService = documentSequenceService;
+        _accountingService = accountingService;
     }
 
     public async Task<Result<ProductDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var product = await _uow.Products.FirstOrDefaultAsync(
-            p => p.Id == id, ct, "Category", "RetailUnit", "WholesaleUnit");
+            p => p.Id == id, ct, "ProductCategory");
 
         if (product == null)
             return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
@@ -32,53 +49,165 @@ public class ProductService : IProductService
         return Result<ProductDto>.Success(MapToDto(product));
     }
 
-    public async Task<Result<PagedResult<ProductDto>>> GetAllAsync(string? search, int? categoryId, int page, int pageSize, bool includeInactive = false, CancellationToken ct = default)
+    public async Task<Result<PagedResult<ProductDto>>> GetAllAsync(
+        string? search, int? categoryId, int page, int pageSize,
+        bool includeInactive = false, CancellationToken ct = default)
     {
-        // Build predicate for the search conditions only (IsActive is handled by query filter)
-        var searchVal = search;
-        System.Linq.Expressions.Expression<System.Func<Product, bool>> predicate = p =>
-            (string.IsNullOrWhiteSpace(searchVal) || p.Name.Contains(searchVal)) &&
+        Expression<Func<Product, bool>> predicate = p =>
+            (string.IsNullOrWhiteSpace(search) || p.Name.Contains(search)) &&
             (!categoryId.HasValue || p.CategoryId == categoryId.Value);
 
-        var includes = new[] { "Category", "RetailUnit", "WholesaleUnit" };
+        var includes = new[] { "ProductCategory" };
 
         var (items, total) = await _uow.Products.GetPagedAsync(
             predicate, q => q.OrderBy(p => p.Name), page, pageSize, ct, includeInactive, includes);
 
         var dtos = items.Select(MapToDto).ToList();
-        return Result<PagedResult<ProductDto>>.Success(PagedResult<ProductDto>.Create(dtos, total, page, pageSize));
+        return Result<PagedResult<ProductDto>>.Success(
+            PagedResult<ProductDto>.Create(dtos, total, page, pageSize));
     }
 
     public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest request, CancellationToken ct)
     {
         try
         {
-            // Sanitize ImagePath: reject path traversal sequences only
-            // (Forward/backward slashes are valid in relative DB paths like "product_42/abc.jpg")
-            if (request.ImagePath != null && request.ImagePath.Contains("..", StringComparison.Ordinal))
-            {
-                _logger.LogWarning("Product creation failed: ImagePath contains path traversal '..'");
-                return Result<ProductDto>.Failure("مسار الصورة غير صالح");
-            }
+            // ─── Guard: validate opening stock prerequisites ──────────────
+            var openingQuantity = request.OpeningQuantity ?? 0m;
+            var openingUnitCost = request.OpeningUnitCost ?? 0m;
 
-            // TODO: Create ProductUnit + UnitBarcode + ProductPrice from request
-            // Barcode, PurchasePrice, RetailPrice, WholesalePrice, ExpirationDate moved to sub-entities
+            if (openingQuantity > 0 && openingUnitCost <= 0)
+                return Result<ProductDto>.Failure(
+                    "يجب تحديد تكلفة الوحدة للكمية الافتتاحية.");
 
+            if (request.TrackExpiry && openingQuantity > 0 && request.OpeningExpiryDate == null)
+                return Result<ProductDto>.Failure(
+                    "يجب تحديد تاريخ انتهاء الصلاحية للمنتجات التي لها صلاحية.");
+
+            // ─── Create product entity ────────────────────────────────────
             var product = Product.Create(
-                request.Name,
-                request.ConversionFactor,
-                request.MinStock,
-                request.CategoryId,
-                request.RetailUnitId,
-                request.WholesaleUnitId,
-                request.Description,
-                request.ImagePath
+                name: request.Name,
+                categoryId: request.CategoryId,
+                description: request.Description,
+                barcode: request.Barcode,
+                taxId: (short?)request.TaxId,
+                reorderLevel: request.ReorderLevel,
+                trackExpiry: request.TrackExpiry,
+                imagePath: request.ImagePath,
+                notes: request.Notes,
+                defaultPurchaseUnitId: request.DefaultPurchaseUnitId,
+                defaultSalesUnitId: request.DefaultSalesUnitId
             );
 
-            await _uow.Products.AddAsync(product, ct);
-            await _uow.SaveChangesAsync(ct);
+            // ─── Execute everything inside a transaction ───────────────────
+            await _uow.ExecuteTransactionAsync(async () =>
+            {
+                await _uow.Products.AddAsync(product, ct);
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Product created: {ProductName} (ID: {ProductId})", product.Name, product.Id);
+                _logger.LogInformation("Product created: {ProductName} (ID: {ProductId})", product.Name, product.Id);
+
+                if (openingQuantity > 0)
+                {
+                    // ── Ensure base unit exists ─────────────────────────
+                    var hasBaseUnit = await _uow.ProductUnits.AnyAsync(
+                        pu => pu.ProductId == product.Id && pu.IsBaseUnit, ct);
+                    if (!hasBaseUnit)
+                    {
+                        var defaultUnit = (await _uow.Units.ToListAsync(ct)).FirstOrDefault();
+                        if (defaultUnit == null)
+                            throw new InvalidOperationException(
+                                "لا توجد وحدات قياس في النظام. يرجى إضافة وحدة قياس أولاً.");
+
+                        var baseUnit = ProductUnit.CreateBaseUnit(product.Id, defaultUnit.Id);
+                        await _uow.ProductUnits.AddAsync(baseUnit, ct);
+                        await _uow.SaveChangesAsync(ct);
+                    }
+
+                    // ── Resolve warehouse ──────────────────────────────
+                    var warehouses = await _uow.Warehouses.ToListAsync(ct);
+                    var warehouse = warehouses.FirstOrDefault()
+                        ?? throw new InvalidOperationException(
+                            "لا توجد مستودعات في النظام. يرجى إضافة مستودع أولاً.");
+
+                    // ── Create InventoryBatch (OPENING) ────────────────
+                    var batch = InventoryBatch.Create(
+                        productId: product.Id,
+                        warehouseId: (short)warehouse.Id,
+                        quantity: openingQuantity,
+                        unitCost: openingUnitCost,
+                        batchNo: "OPENING",
+                        expiryDate: request.OpeningExpiryDate);
+                    await _uow.InventoryBatches.AddAsync(batch, ct);
+
+                    // ── Update/create WarehouseStock ────────────────────
+                    var existingStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
+                        ws => ws.ProductId == product.Id && ws.WarehouseId == warehouse.Id, ct);
+
+                    if (existingStock != null)
+                    {
+                        existingStock.UpdateAvgCost(openingQuantity, openingUnitCost);
+                    }
+                    else
+                    {
+                        var newStock = WarehouseStock.Create(
+                            warehouseId: (short)warehouse.Id,
+                            productId: product.Id,
+                            quantity: openingQuantity,
+                            avgCost: openingUnitCost);
+                        await _uow.WarehouseStocks.AddAsync(newStock, ct);
+                    }
+
+                    // ── Generate transaction number ────────────────────
+                    var seqResult = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                    if (!seqResult.IsSuccess)
+                        throw new InvalidOperationException(
+                            seqResult.Error ?? "فشل في توليد رقم المعاملة.");
+
+                    // ── Create InventoryTransaction ─────────────────────
+                    var invTx = InventoryTransaction.Create(
+                        transactionNo: seqResult.Value,
+                        transactionType: InventoryTransactionType.OpeningBalance,
+                        warehouseId: (short)warehouse.Id,
+                        referenceType: null,
+                        referenceId: null,
+                        notes: $"الرصيد الافتتاحي للمنتج: {product.Name}");
+                    await _uow.InventoryTransactions.AddAsync(invTx, ct);
+                    await _uow.SaveChangesAsync(ct);
+
+                    // ── Get base unit for the transaction line ──────────
+                    var baseProductUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
+                        pu => pu.ProductId == product.Id && pu.IsBaseUnit, ct);
+                    if (baseProductUnit == null)
+                        throw new InvalidOperationException(
+                            "لم يتم العثور على الوحدة الأساسية للمنتج.");
+
+                    // ── Create InventoryTransactionLine ─────────────────
+                    var txLine = InventoryTransactionLine.Create(
+                        inventoryTransactionId: invTx.Id,
+                        productId: product.Id,
+                        productUnitId: baseProductUnit.Id,
+                        quantity: openingQuantity,
+                        unitCost: openingUnitCost,
+                        batchId: batch.Id);
+                    invTx.AddLine(txLine);
+                    invTx.Post();
+
+                    // ── Create journal entry for opening stock ──────────
+                    var totalValue = openingQuantity * openingUnitCost;
+                    var accountingResult = await _accountingService.CreateProductOpeningEntryAsync(
+                        productId: product.Id,
+                        productName: product.Name,
+                        totalOpeningValue: totalValue,
+                        createdByUserId: 0,
+                        transactionDate: DateTime.UtcNow,
+                        ct: ct);
+                    if (!accountingResult.IsSuccess)
+                        throw new InvalidOperationException(
+                            accountingResult.Error ?? "فشل في إنشاء قيد اليومية للرصيد الافتتاحي.");
+
+                    await _uow.SaveChangesAsync(ct);
+                }
+            }, ct);
 
             return await GetByIdAsync(product.Id, ct);
         }
@@ -90,6 +219,11 @@ public class ProductService : IProductService
         catch (ArgumentException ex)
         {
             _logger.LogWarning(ex, "Invalid argument while creating product");
+            return Result<ProductDto>.Failure(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Business rule violation while creating product");
             return Result<ProductDto>.Failure(ex.Message);
         }
         catch (Exception ex)
@@ -107,27 +241,18 @@ public class ProductService : IProductService
             if (product == null)
                 return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
-            // TODO: Validate barcode uniqueness via UnitBarcode entity when barcode is provided
-            // Barcode validation moved to UnitBarcode entity (Phase 25)
-
-            // Sanitize ImagePath: reject path traversal sequences only
-            // (Forward/backward slashes are valid in relative DB paths like "product_42/abc.jpg")
-            if (request.ImagePath != null && request.ImagePath.Contains("..", StringComparison.Ordinal))
-            {
-                _logger.LogWarning("Product update failed: ImagePath contains path traversal '..'");
-                return Result<ProductDto>.Failure("مسار الصورة غير صالح");
-            }
-
             product.Update(
-                request.Name,
-                request.ConversionFactor,
-                request.MinStock,
-                request.CategoryId,
-                request.RetailUnitId,
-                request.WholesaleUnitId,
-                request.Description,
-                null,               // updatedByUserId (stays null for now)
-                request.ImagePath
+                name: request.Name,
+                categoryId: request.CategoryId,
+                description: request.Description,
+                barcode: request.Barcode,
+                taxId: (short?)request.TaxId,
+                reorderLevel: request.ReorderLevel,
+                trackExpiry: request.TrackExpiry,
+                imagePath: request.ImagePath,
+                notes: request.Notes,
+                defaultPurchaseUnitId: request.DefaultPurchaseUnitId,
+                defaultSalesUnitId: request.DefaultSalesUnitId
             );
 
             if (request.IsActive != product.IsActive)
@@ -136,7 +261,6 @@ public class ProductService : IProductService
                 else product.MarkAsDeleted();
             }
 
-            await _uow.Products.UpdateAsync(product, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Product updated: {ProductName} (ID: {ProductId})", product.Name, product.Id);
@@ -207,21 +331,8 @@ public class ProductService : IProductService
         if (string.IsNullOrWhiteSpace(barcode))
             return Result<ProductDto>.Failure("الباركود مطلوب");
 
-        // Search via UnitBarcode → ProductUnit → Product (Phase 25 restructuring)
-        var barcodeEntry = await _uow.UnitBarcodes.FirstOrDefaultAsync(
-            b => b.BarcodeValue == barcode, ct);
-
-        if (barcodeEntry == null)
-            return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
-
-        var productUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
-            u => u.Id == barcodeEntry.ProductUnitId, ct);
-
-        if (productUnit == null)
-            return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
-
         var product = await _uow.Products.FirstOrDefaultAsync(
-            p => p.Id == productUnit.ProductId, ct, "Category", "RetailUnit", "WholesaleUnit");
+            p => p.Barcode == barcode, ct, "ProductCategory");
 
         if (product == null)
             return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
@@ -231,123 +342,32 @@ public class ProductService : IProductService
 
     public async Task<Result<ProductDto>> UploadImageAsync(int id, byte[] imageBytes, string fileName, CancellationToken ct)
     {
-        try
-        {
-            // Step 1: Verify product exists
-            var product = await _uow.Products.FirstOrDefaultAsync(p => p.Id == id, ct);
-            if (product == null)
-                return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
-
-            // Step 2: Save image via infrastructure service (handles validation + path traversal guard)
-            var saveResult = await _imageStorage.SaveImageAsync(imageBytes, fileName, id);
-            if (!saveResult.IsSuccess)
-                return Result<ProductDto>.Failure(saveResult.Error!);
-
-            // Step 3: Update product's ImagePath
-            var imagePath = saveResult.Value!;
-            product.Update(
-                product.Name,
-                product.ConversionFactor,
-                product.MinStock,
-                product.CategoryId,
-                product.RetailUnitId,
-                product.WholesaleUnitId,
-                product.Description,
-                null,               // updatedByUserId
-                imagePath
-            );
-
-            await _uow.Products.UpdateAsync(product, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Image uploaded for product {ProductId}: {ImagePath}", id, imagePath);
-            return await GetByIdAsync(id, ct);
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation while uploading image for product {Id}", id);
-            return Result<ProductDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error while uploading image for product {Id}", id);
-            return Result<ProductDto>.Failure("حدث خطأ غير متوقع أثناء رفع الصورة.");
-        }
+        // Phase 25 simplification: Product has a single ImagePath field.
+        // UploadImageAsync saves the file and updates ImagePath on the Product entity.
+        throw new NotImplementedException("Use Desktop file upload that updates Product.ImagePath directly");
     }
 
     public async Task<Result<List<ProductDto>>> GetExpiringProductsAsync(int thresholdDays, CancellationToken ct)
     {
-        if (thresholdDays < 0)
-        {
-            _logger.LogWarning("GetExpiringProductsAsync called with negative threshold: {ThresholdDays}", thresholdDays);
-            return Result<List<ProductDto>>.Failure("عدد الأيام يجب أن يكون صفراً أو أكثر");
-        }
-        if (thresholdDays > 365)
-        {
-            _logger.LogWarning("GetExpiringProductsAsync called with excessive threshold: {ThresholdDays}", thresholdDays);
-            return Result<List<ProductDto>>.Failure("عدد الأيام لا يمكن أن يتجاوز 365 يوماً");
-        }
-
-        try
-        {
-            var cutoffDate = DateTime.Today.AddDays(thresholdDays);
-
-            // Phase 25: ExpirationDate moved to InventoryBatches entity
-            // Get batches that are expiring within threshold days
-            var expiringBatches = await _uow.InventoryBatches.ToListAsync(
-                b => b.ExpiryDate.HasValue && b.ExpiryDate.Value <= cutoffDate,
-                q => q.OrderBy(b => b.ExpiryDate),
-                ct,
-                includePaths: new[] { "Product", "Product.Category" });
-
-            // Group by product to get unique products
-            var productIds = expiringBatches.Select(b => b.ProductId).Distinct().ToList();
-            var products = await _uow.Products.ToListAsync(
-                p => productIds.Contains(p.Id),
-                q => q.OrderBy(p => p.Name),
-                ct,
-                includePaths: new[] { "Category", "RetailUnit", "WholesaleUnit" });
-
-            var dtos = products.Select(MapToDto).ToList();
-
-            _logger.LogInformation("Found {Count} products with batches expiring within {ThresholdDays} days (cutoff: {CutoffDate})",
-                dtos.Count, thresholdDays, cutoffDate);
-
-            return Result<List<ProductDto>>.Success(dtos);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching expiring products with threshold {ThresholdDays}", thresholdDays);
-            return Result<List<ProductDto>>.Failure("حدث خطأ أثناء البحث عن المنتجات المنتهية صلاحيتها.");
-        }
+        // Expiry tracking moved to InventoryBatches — query batches directly.
+        throw new NotImplementedException("Use InventoryBatchService.GetExpiringBatchesAsync instead");
     }
 
     private static ProductDto MapToDto(Product p)
     {
-        // Phase 25: Barcode, PurchasePrice, SalePrice, WholesalePrice, RetailPrice, ExpirationDate
-        // moved to sub-entities (UnitBarcode, ProductPrices, InventoryBatches).
-        // TODO: Load from UnitBarcode, ProductPrices, and InventoryBatches for full data.
         return new ProductDto(
             p.Id,
-            null, // TODO: Resolve from UnitBarcode entity
             p.Name,
             p.CategoryId,
-            p.Category?.Name,
-            p.UnitId, // Legacy
-            p.Unit?.Name, // Legacy
-            p.WholesaleUnitId,
-            p.WholesaleUnit?.Name,
-            p.RetailUnitId,
-            p.RetailUnit?.Name,
-            p.ConversionFactor,
-            0, // TODO: from ProductPrices (PriceLevel not mapped yet)
-            0, // TODO: from ProductPrices
-            0, // TODO: from ProductPrices
-            0, // TODO: from ProductPrices
-            p.MinStock,
+            p.ProductCategory?.Name,
+            p.Barcode,
             p.Description,
-            null, // TODO: earliest ExpiryDate from InventoryBatches
+            p.ReorderLevel,
+            p.TrackExpiry,
             p.ImagePath,
+            p.Notes,
+            p.DefaultPurchaseUnitId,
+            p.DefaultSalesUnitId,
             p.IsActive
         );
     }

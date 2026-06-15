@@ -4,7 +4,7 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SalesInvoiceItem : BaseEntity
+public class SalesInvoiceItem : Entity
 {
     public int SalesInvoiceId { get; private set; }
     public int ProductId { get; private set; }
@@ -15,8 +15,31 @@ public class SalesInvoiceItem : BaseEntity
     public SaleMode Mode { get; private set; } = SaleMode.Retail;
     public string? Notes { get; private set; }
 
+    // ─── Phase 28: Profit Tracking & Price Override ─────────────────
+    /// <summary>
+    /// تكلفة الوحدة بعملة الأساس — تستخدم لحساب الربح
+    /// </summary>
+    public decimal? CostInBaseCurrency { get; private set; }
+
+    /// <summary>
+    /// هل تم تجاوز السعر يدوياً (صلاحية خاصة)
+    /// </summary>
+    public bool IsPriceOverridden { get; private set; }
+
+    /// <summary>
+    /// معرف الوحدة المستخدمة للصنف (ProductUnit)
+    /// </summary>
+    public int? ProductUnitId { get; private set; }
+
+    // ─── Computed Properties ─────────────────────────────────────────
+    /// <summary>
+    /// الربح المحقق: إجمالي السطر - (التكلفة × الكمية)
+    /// </summary>
+    public decimal Profit => LineTotal - ((CostInBaseCurrency ?? 0) * Quantity);
+
     public virtual SalesInvoice? SalesInvoice { get; private set; }
     public virtual Product? Product { get; private set; }
+    public virtual ProductUnit? ProductUnit { get; private set; }
 
     private SalesInvoiceItem() { }
 
@@ -26,7 +49,10 @@ public class SalesInvoiceItem : BaseEntity
         decimal unitPrice,
         decimal discountAmount = 0,
         SaleMode mode = SaleMode.Retail,
-        string? notes = null)
+        string? notes = null,
+        decimal? costInBaseCurrency = null,
+        bool isPriceOverridden = false,
+        int? productUnitId = null)
     {
         if (productId <= 0)
             throw new DomainException("المنتج مطلوب.");
@@ -44,7 +70,10 @@ public class SalesInvoiceItem : BaseEntity
             UnitPrice = unitPrice,
             DiscountAmount = discountAmount,
             Mode = mode,
-            Notes = notes
+            Notes = notes,
+            CostInBaseCurrency = costInBaseCurrency,
+            IsPriceOverridden = isPriceOverridden,
+            ProductUnitId = productUnitId
         };
 
         item.RecalculateLineTotal();

@@ -26,6 +26,7 @@ public class InvoicePrintDto
     // ─── Financials ───────────────────────────────
     public decimal SubTotal { get; init; }
     public decimal DiscountAmount { get; init; }
+    public decimal OtherCharges { get; init; }
     public decimal TaxRate { get; init; }
     public decimal TaxAmount { get; init; }
     public decimal GrandTotal { get; init; }
@@ -36,4 +37,10 @@ public class InvoicePrintDto
     public decimal AmountPaid { get; init; }
     public decimal ChangeAmount { get; init; }
     public string? Notes { get; init; }
+
+    // ─── Print Template Settings ─────────────────
+    /// <summary>
+    /// رسالة تذييل مخصصة من إعدادات الطباعة (بدلاً من الرسالة الثابتة)
+    /// </summary>
+    public string? FooterNote { get; set; }
 }

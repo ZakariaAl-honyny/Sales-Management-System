@@ -13,6 +13,8 @@ public class CashBoxApiService : ApiServiceBase, ICashBoxApiService
     {
     }
 
+    // ─── Cash Box CRUD ───────────────────────────────────
+
     public async Task<Result<List<CashBoxDto>>> GetAllAsync(CancellationToken ct = default)
     {
         return await ExecuteAsync<List<CashBoxDto>>(
@@ -48,47 +50,72 @@ public class CashBoxApiService : ApiServiceBase, ICashBoxApiService
             "CashBoxApiService.DeactivateAsync");
     }
 
-    public async Task<Result<List<CashTransactionDto>>> GetTransactionsAsync(int cashBoxId, DateOnly? from, DateOnly? to, CancellationToken ct = default)
-    {
-        var url = $"api/v1/cash-boxes/{cashBoxId}/transactions";
-        var queryParams = new List<string>();
-        if (from.HasValue)
-            queryParams.Add($"from={from.Value:yyyy-MM-dd}");
-        if (to.HasValue)
-            queryParams.Add($"to={to.Value:yyyy-MM-dd}");
-        if (queryParams.Count > 0)
-            url += "?" + string.Join("&", queryParams);
+    // ─── Receipt Vouchers ────────────────────────────────
 
-        return await ExecuteAsync<List<CashTransactionDto>>(
-            () => _httpClient.GetAsync(url, ct),
-            "CashBoxApiService.GetTransactionsAsync");
+    public async Task<Result<ReceiptVoucherDto>> CreateReceiptVoucherAsync(int cashBoxId, CreateReceiptVoucherRequest request, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<ReceiptVoucherDto>(
+            () => _httpClient.PostAsJsonAsync($"api/v1/cash-boxes/{cashBoxId}/receipt-vouchers", request, ct),
+            "CashBoxApiService.CreateReceiptVoucherAsync");
     }
 
-    public async Task<Result<CashTransactionDto>> RecordExpenseAsync(int cashBoxId, AddCashTransactionRequest request, CancellationToken ct = default)
+    public async Task<Result<ReceiptVoucherDto>> PostReceiptVoucherAsync(int cashBoxId, int voucherId, CancellationToken ct = default)
     {
-        return await ExecuteAsync<CashTransactionDto>(
-            () => _httpClient.PostAsJsonAsync($"api/v1/cash-boxes/{cashBoxId}/transactions", request, ct),
-            "CashBoxApiService.RecordExpenseAsync");
+        return await ExecuteAsync<ReceiptVoucherDto>(
+            () => _httpClient.PostAsync($"api/v1/cash-boxes/{cashBoxId}/receipt-vouchers/{voucherId}/post", null, ct),
+            "CashBoxApiService.PostReceiptVoucherAsync");
     }
+
+    public async Task<Result<ReceiptVoucherDto>> CancelReceiptVoucherAsync(int cashBoxId, int voucherId, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<ReceiptVoucherDto>(
+            () => _httpClient.PostAsync($"api/v1/cash-boxes/{cashBoxId}/receipt-vouchers/{voucherId}/cancel", null, ct),
+            "CashBoxApiService.CancelReceiptVoucherAsync");
+    }
+
+    public async Task<Result<List<ReceiptVoucherDto>>> GetReceiptVouchersAsync(int cashBoxId, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<List<ReceiptVoucherDto>>(
+            () => _httpClient.GetAsync($"api/v1/cash-boxes/{cashBoxId}/receipt-vouchers", ct),
+            "CashBoxApiService.GetReceiptVouchersAsync");
+    }
+
+    // ─── Payment Vouchers ────────────────────────────────
+
+    public async Task<Result<PaymentVoucherDto>> CreatePaymentVoucherAsync(int cashBoxId, CreatePaymentVoucherRequest request, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<PaymentVoucherDto>(
+            () => _httpClient.PostAsJsonAsync($"api/v1/cash-boxes/{cashBoxId}/payment-vouchers", request, ct),
+            "CashBoxApiService.CreatePaymentVoucherAsync");
+    }
+
+    public async Task<Result<PaymentVoucherDto>> PostPaymentVoucherAsync(int cashBoxId, int voucherId, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<PaymentVoucherDto>(
+            () => _httpClient.PostAsync($"api/v1/cash-boxes/{cashBoxId}/payment-vouchers/{voucherId}/post", null, ct),
+            "CashBoxApiService.PostPaymentVoucherAsync");
+    }
+
+    public async Task<Result<PaymentVoucherDto>> CancelPaymentVoucherAsync(int cashBoxId, int voucherId, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<PaymentVoucherDto>(
+            () => _httpClient.PostAsync($"api/v1/cash-boxes/{cashBoxId}/payment-vouchers/{voucherId}/cancel", null, ct),
+            "CashBoxApiService.CancelPaymentVoucherAsync");
+    }
+
+    public async Task<Result<List<PaymentVoucherDto>>> GetPaymentVouchersAsync(int cashBoxId, CancellationToken ct = default)
+    {
+        return await ExecuteAsync<List<PaymentVoucherDto>>(
+            () => _httpClient.GetAsync($"api/v1/cash-boxes/{cashBoxId}/payment-vouchers", ct),
+            "CashBoxApiService.GetPaymentVouchersAsync");
+    }
+
+    // ─── Transfer ────────────────────────────────────────
 
     public async Task<Result> TransferAsync(CashTransferRequest request, CancellationToken ct = default)
     {
         return await ExecuteCommandAsync(
             () => _httpClient.PostAsJsonAsync("api/v1/cash-boxes/transfer", request, ct),
             "CashBoxApiService.TransferAsync");
-    }
-
-    public async Task<Result<DailyClosureDto>> PerformDailyClosureAsync(int cashBoxId, CancellationToken ct = default)
-    {
-        return await ExecuteAsync<DailyClosureDto>(
-            () => _httpClient.PostAsync($"api/v1/cash-boxes/{cashBoxId}/daily-closures", null, ct),
-            "CashBoxApiService.PerformDailyClosureAsync");
-    }
-
-    public async Task<Result<List<DailyClosureDto>>> GetDailyClosuresAsync(int cashBoxId, CancellationToken ct = default)
-    {
-        return await ExecuteAsync<List<DailyClosureDto>>(
-            () => _httpClient.GetAsync($"api/v1/cash-boxes/{cashBoxId}/daily-closures", ct),
-            "CashBoxApiService.GetDailyClosuresAsync");
     }
 }

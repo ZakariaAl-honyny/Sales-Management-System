@@ -44,13 +44,16 @@ public class PrintDataService : IPrintDataService
         var invoice = await _uow.SalesInvoices.Query()
             .Include(i => i.Customer)
             .Include(i => i.Items).ThenInclude(it => it.Product)
+            .Include(i => i.Items).ThenInclude(it => it.ProductUnit).ThenInclude(pu => pu.Unit)
             .FirstOrDefaultAsync(i => i.Id == invoiceId, ct);
 
         if (invoice == null)
             return Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة");
 
-        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
         var dto = await _builder.BuildFromSalesAsync(invoice, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
         return Result<InvoicePrintDto>.Success(dto);
     }
 
@@ -59,14 +62,70 @@ public class PrintDataService : IPrintDataService
         var invoice = await _uow.PurchaseInvoices.Query()
             .Include(i => i.Supplier)
             .Include(i => i.Items).ThenInclude(it => it.Product)
+            .Include(i => i.Items).ThenInclude(it => it.ProductUnit).ThenInclude(pu => pu.Unit)
             .FirstOrDefaultAsync(i => i.Id == invoiceId, ct);
 
         if (invoice == null)
             return Result<InvoicePrintDto>.Failure("الفاتورة غير موجودة");
 
-        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
         var dto = await _builder.BuildFromPurchaseAsync(invoice, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
         return Result<InvoicePrintDto>.Success(dto);
+    }
+
+    public async Task<Result<InvoicePrintDto>> GetSalesReturnPrintDataAsync(int returnId, CancellationToken ct = default)
+    {
+        var returnEntity = await _uow.SalesReturns.Query()
+            .Include(r => r.Customer).ThenInclude(c => c!.Party)
+            .Include(r => r.Items).ThenInclude(it => it.Product)
+            .FirstOrDefaultAsync(r => r.Id == returnId, ct);
+
+        if (returnEntity == null)
+            return Result<InvoicePrintDto>.Failure("مرتجع المبيعات غير موجود");
+
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
+        var dto = await _builder.BuildFromSalesReturnAsync(returnEntity, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
+        return Result<InvoicePrintDto>.Success(dto);
+    }
+
+    public async Task<Result<InvoicePrintDto>> GetPurchaseReturnPrintDataAsync(int returnId, CancellationToken ct = default)
+    {
+        var returnEntity = await _uow.PurchaseReturns.Query()
+            .Include(r => r.Supplier).ThenInclude(s => s!.Party)
+            .Include(r => r.Items).ThenInclude(it => it.Product)
+            .Include(r => r.Items).ThenInclude(it => it.ProductUnit).ThenInclude(pu => pu.Unit)
+            .FirstOrDefaultAsync(r => r.Id == returnId, ct);
+
+        if (returnEntity == null)
+            return Result<InvoicePrintDto>.Failure("مرتجع المشتريات غير موجود");
+
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
+        var dto = await _builder.BuildFromPurchaseReturnAsync(returnEntity, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
+        return Result<InvoicePrintDto>.Success(dto);
+    }
+
+    /// <summary>
+    /// Loads store info PLUS FooterNote from print settings.
+    /// Returns 7-tuple: name, phone, address, taxNumber, logoBytes, taxRate, footerNote.
+    /// </summary>
+    private async Task<(string name, string phone, string address, string taxNumber,
+        byte[]? logoBytes, decimal taxRate, string? footerNote)> LoadAllStoreInfoAsync(CancellationToken ct)
+    {
+        var (name, phone, address, taxNumber, logoBytes, taxRate) = await LoadStoreInfoAsync(ct);
+        var footerNote = string.Empty;
+        var sysSettingsResult = await GetPrintSystemSettingsAsync(ct);
+        if (sysSettingsResult.IsSuccess && sysSettingsResult.Value != null)
+        {
+            footerNote = sysSettingsResult.Value
+                .FirstOrDefault(s => s.SettingKey == "FooterNote")?.SettingValue ?? string.Empty;
+        }
+        return (name, phone, address, taxNumber, logoBytes, taxRate, footerNote);
     }
 
     private async Task<(string name, string phone, string address, string taxNumber,
@@ -101,19 +160,48 @@ public class PrintDataService : IPrintDataService
         return (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate);
     }
 
-    public async Task<Result<StoreSettings>> GetStoreSettingsAsync(CancellationToken ct = default)
+    public async Task<Result<StoreSettingsDto>> GetStoreSettingsAsync(CancellationToken ct = default)
     {
         try
         {
-            var settings = await _uow.StoreSettings.Query().FirstOrDefaultAsync(ct);
-            if (settings == null)
-                return Result<StoreSettings>.Failure("إعدادات المتجر غير موجودة");
-            return Result<StoreSettings>.Success(settings);
+            var storeName = await _systemSettingsRepo.GetStringAsync("Store.Name", "متجري", ct);
+            var phone = await _systemSettingsRepo.GetStringAsync("Store.Phone", "", ct);
+            var address = await _systemSettingsRepo.GetStringAsync("Store.Address", "", ct);
+            var logoPath = await _systemSettingsRepo.GetStringAsync("Store.LogoPath", "", ct);
+            var email = await _systemSettingsRepo.GetStringAsync("Store.Email", "", ct);
+            var currencyCode = await _systemSettingsRepo.GetStringAsync("Store.CurrencyCode", "SAR", ct);
+            var taxNumber = await _systemSettingsRepo.GetStringAsync("Store.TaxNumber", "", ct);
+            _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync("Store.EnableStockAlerts", "false", ct), out var enableStockAlerts);
+            _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync("Store.AllowNegativeStock", "false", ct), out var allowNegativeStock);
+            _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync("Store.AutoUpdatePrices", "false", ct), out var autoUpdatePrices);
+            var signaturePath = await _systemSettingsRepo.GetStringAsync("Store.SignaturePath", "", ct);
+            var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
+
+            var dto = new StoreSettingsDto(
+                1,
+                storeName ?? "متجري",
+                phone,
+                address,
+                logoPath,
+                email,
+                currencyCode ?? "SAR",
+                0m,         // DEPRECATED: DefaultTaxRate
+                true,       // DEPRECATED: IsTaxEnabled
+                taxNumber,
+                enableStockAlerts,
+                allowNegativeStock,
+                autoUpdatePrices,
+                "",         // DEPRECATED: InvoicePrefix
+                (int)costingMethod,
+                null, null, 30, null,
+                signaturePath);
+
+            return Result<StoreSettingsDto>.Success(dto);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading store settings");
-            return Result<StoreSettings>.Failure("فشل في تحميل إعدادات المتجر");
+            return Result<StoreSettingsDto>.Failure("فشل في تحميل إعدادات المتجر");
         }
     }
 

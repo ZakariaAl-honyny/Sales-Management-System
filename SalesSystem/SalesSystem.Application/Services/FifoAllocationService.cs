@@ -31,13 +31,12 @@ public class FifoAllocationService : IFifoAllocationService
 
     public async Task<Result<List<InventoryBatch>>> AddPurchaseBatchesAsync(
         int productId,
-        int warehouseId,
+        short warehouseId,
         decimal quantity,
         decimal unitCost,
         string? batchNo,
-        DateTime? manufactureDate,
         DateTime? expiryDate,
-        int? purchaseInvoiceItemId,
+        int? purchaseInvoiceId,
         bool isOpeningBatch,
         CancellationToken ct)
     {
@@ -52,15 +51,13 @@ public class FifoAllocationService : IFifoAllocationService
             var lotNumber = batchNo ?? GenerateLotNumber(isOpeningBatch);
 
             var batch = InventoryBatch.Create(
-                productId,
-                warehouseId,
-                quantity,
-                unitCost,
-                lotNumber,
-                purchaseInvoiceItemId,
-                manufactureDate,
-                expiryDate,
-                createdByUserId: null);
+                productId: productId,
+                warehouseId: warehouseId,
+                quantity: quantity,
+                unitCost: unitCost,
+                batchNo: lotNumber,
+                purchaseInvoiceId: purchaseInvoiceId,
+                expiryDate: expiryDate);
 
             await _uow.InventoryBatches.AddAsync(batch, ct);
 
@@ -86,7 +83,7 @@ public class FifoAllocationService : IFifoAllocationService
 
     public async Task<Result<List<InventoryBatchAllocation>>> DeductFromBatchesAsync(
         int productId,
-        int warehouseId,
+        short warehouseId,
         decimal quantityNeeded,
         int? salesInvoiceItemId,
         int? createdByUserId,
@@ -127,7 +124,7 @@ public class FifoAllocationService : IFifoAllocationService
             List<InventoryBatch> sortedBatches;
             if (hasExpiryBatches)
             {
-                // FEFO: sort by ExpiryDate ascending, then by Id for tie-breaking
+                // FEFO: sort by ExpiryDate ascending
                 sortedBatches = batches
                     .OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue)
                     .ThenBy(b => b.Id)
@@ -139,13 +136,11 @@ public class FifoAllocationService : IFifoAllocationService
             }
             else
             {
-                // FIFO: sort by ReceivedDate (CreatedAt) ascending, then by Id
+                // FIFO: sort by Id (receive order)
                 sortedBatches = batches
                     .OrderBy(b => b.Id)
                     .ToList();
 
-                // Note: InventoryBatch has no CreatedAt on the entity itself — it's on BaseEntity
-                // We use Id as a proxy for receive order (Id increments over time)
                 _logger.LogInformation(
                     "FIFO allocation for Product {ProductId}, Warehouse {WarehouseId}: {BatchCount} batches sorted by Id",
                     productId, warehouseId, sortedBatches.Count);
@@ -161,7 +156,7 @@ public class FifoAllocationService : IFifoAllocationService
                 var takeQuantity = Math.Min(remaining, batch.Quantity);
 
                 // Domain method validates and deducts
-                batch.DeductStock(takeQuantity);
+                batch.DecreaseQuantity(takeQuantity);
 
                 // Record the allocation
                 allocations.Add(new InventoryBatchAllocation(
@@ -170,28 +165,12 @@ public class FifoAllocationService : IFifoAllocationService
                     UnitCost: batch.UnitCost,
                     SalesInvoiceItemId: salesInvoiceItemId));
 
-                // Record inventory movement for audit trail
-                var movement = InventoryMovement.Create(
-                    productId,
-                    warehouseId,
-                    MovementType.SaleOut,
-                    -takeQuantity,
-                    batch.Quantity + takeQuantity, // QuantityBefore
-                    batch.Quantity,                 // QuantityAfter
-                    "SalesInvoice",
-                    salesInvoiceItemId ?? 0,
-                    batch.UnitCost,
-                    notes: $"FIFO allocation from batch {batch.BatchNo}",
-                    createdByUserId);
-
-                await _uow.InventoryMovements.AddAsync(movement, ct);
-
-                remaining -= takeQuantity;
-
                 _logger.LogInformation(
                     "FIFO allocation: {Quantity} units from Batch {BatchId} ({BatchNo}) " +
                     "for Product {ProductId}, InvoiceItem {InvoiceItemId}",
                     takeQuantity, batch.Id, batch.BatchNo, productId, salesInvoiceItemId);
+
+                remaining -= takeQuantity;
             }
 
             if (remaining > 0)
@@ -244,40 +223,19 @@ public class FifoAllocationService : IFifoAllocationService
             if (batch == null)
                 return Result.Failure("الدفعة غير موجودة", ErrorCodes.NotFound);
 
-            if (!batch.IsActive)
-                return Result.Failure("لا يمكن الإرجاع إلى دفعة غير نشطة");
-
-            // Create a new return batch with the same cost, prefixed "RET-"
-            var returnBatchNo = $"RET-{batch.BatchNo}";
+            // Generate a new batch number for the return batch
+            var returnBatchNo = GenerateReturnBatchNo();
 
             var newBatch = InventoryBatch.Create(
-                batch.ProductId,
-                batch.WarehouseId,
-                quantityReturned,
-                batch.UnitCost,
-                returnBatchNo,
-                purchaseInvoiceItemId: null,
-                batch.ManufactureDate,
-                batch.ExpiryDate,
-                createdByUserId);
+                productId: batch.ProductId,
+                warehouseId: batch.WarehouseId,
+                quantity: quantityReturned,
+                unitCost: batch.UnitCost,
+                batchNo: returnBatchNo,
+                expiryDate: batch.ExpiryDate,
+                createdByUserId: createdByUserId);
 
             await _uow.InventoryBatches.AddAsync(newBatch, ct);
-
-            // Record inventory movement for audit trail
-            var movement = InventoryMovement.Create(
-                batch.ProductId,
-                batch.WarehouseId,
-                MovementType.SaleReturnIn,
-                quantityReturned,
-                0m, // QuantityBefore is approximate for the product+warehouse
-                quantityReturned,
-                "SalesReturn",
-                salesReturnItemId ?? 0,
-                batch.UnitCost,
-                notes: $"Return to batch {batch.BatchNo} via new batch {returnBatchNo}",
-                createdByUserId);
-
-            await _uow.InventoryMovements.AddAsync(movement, ct);
 
             _logger.LogInformation(
                 "Return stock: {Quantity} units returned to Batch {BatchId} ({BatchNo}) " +
@@ -301,15 +259,12 @@ public class FifoAllocationService : IFifoAllocationService
     // ─── Get Batch Breakdown ──────────────────────────────────────────
 
     public async Task<Result<List<BatchStockInfo>>> GetBatchBreakdownAsync(
-        int productId, int warehouseId, CancellationToken ct)
+        int productId, short warehouseId, CancellationToken ct)
     {
         try
         {
-            // Get all active batches (including those with zero quantity) sorted by receipt order
             var batches = await _uow.InventoryBatches.ToListAsync(
-                b => b.ProductId == productId
-                     && b.WarehouseId == warehouseId
-                     && b.IsActive,
+                b => b.ProductId == productId && b.WarehouseId == warehouseId,
                 q => q.OrderBy(b => b.Id),
                 ct: ct);
 
@@ -319,9 +274,6 @@ public class FifoAllocationService : IFifoAllocationService
                 BatchId: b.Id,
                 BatchNo: b.BatchNo,
                 RemainingQuantity: b.Quantity,
-                // Estimate original quantity as current + total sale-out movements for this batch.
-                // Without a dedicated OriginalQuantity field on the entity, use the current quantity.
-                // For a better estimate, we could sum all movements, but this is sufficient for display.
                 OriginalQuantity: b.Quantity,
                 UnitCost: b.UnitCost,
                 ExpiryDate: b.ExpiryDate,
@@ -342,7 +294,7 @@ public class FifoAllocationService : IFifoAllocationService
     // ─── Get Current Stock Cost (Weighted Average) ────────────────────
 
     public async Task<Result<decimal>> GetCurrentStockCostAsync(
-        int productId, int warehouseId, CancellationToken ct)
+        int productId, short warehouseId, CancellationToken ct)
     {
         try
         {
@@ -376,15 +328,16 @@ public class FifoAllocationService : IFifoAllocationService
 
     // ─── Private Helpers ──────────────────────────────────────────────
 
-    /// <summary>
-    /// Generates a batch number when none is provided by the supplier.
-    /// Uses "OPN-" prefix for opening stock batches, "B-" prefix for regular purchases.
-    /// </summary>
     private static string GenerateLotNumber(bool isOpeningBatch)
     {
-        var prefix = isOpeningBatch ? "OPN" : "B";
-        var datePart = DateTime.UtcNow.ToString("yyyyMMdd");
-        var uniquePart = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
-        return $"{prefix}-{datePart}-{uniquePart}";
+        var prefix = isOpeningBatch ? "OPN" : "PUR";
+        var ticks = DateTime.UtcNow.Ticks % 100000000;
+        return $"{prefix}-{ticks:D8}";
+    }
+
+    private static string GenerateReturnBatchNo()
+    {
+        var ticks = DateTime.UtcNow.Ticks % 100000000;
+        return $"RET-{ticks:D8}";
     }
 }

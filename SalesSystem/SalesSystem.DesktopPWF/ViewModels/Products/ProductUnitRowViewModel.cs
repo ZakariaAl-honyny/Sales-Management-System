@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -8,10 +9,13 @@ public class ProductUnitRowViewModel : ViewModelBase
     private int _id;
     private string _unitName = string.Empty;
     private string _placeholder_UnitName = "مثال: حبة، قطعة";
-    private decimal _baseConversionFactor = 1;
+    private decimal _factor = 1;
     private bool _isBaseUnit;
+    [Obsolete("Prices moved to ProductPrices table")]
     private decimal _salesPrice;
+    [Obsolete("Cost tracked via InventoryBatches")]
     private decimal _purchaseCost;
+    [Obsolete("SupplierPrice replaced by ProductPrices table")]
     private decimal _supplierPrice;
     private int _sortOrder;
     private bool _isActive = true;
@@ -36,12 +40,12 @@ public class ProductUnitRowViewModel : ViewModelBase
         set => SetProperty(ref _placeholder_UnitName, value);
     }
 
-    public decimal BaseConversionFactor
+    public decimal Factor
     {
-        get => _baseConversionFactor;
+        get => _factor;
         set
         {
-            if (SetProperty(ref _baseConversionFactor, value))
+            if (SetProperty(ref _factor, value))
                 OnPropertyChanged(nameof(IsFactorValid));
         }
     }
@@ -53,18 +57,20 @@ public class ProductUnitRowViewModel : ViewModelBase
         {
             if (SetProperty(ref _isBaseUnit, value))
             {
-                if (value) BaseConversionFactor = 1;
+                if (value) Factor = 1;
                 OnPropertyChanged(nameof(IsFactorValid));
             }
         }
     }
 
+    [Obsolete("Use ProductPrices instead — pricing moved to ProductPrices table.")]
     public decimal SalesPrice
     {
         get => _salesPrice;
         set => SetProperty(ref _salesPrice, value);
     }
 
+#pragma warning disable CS0618 // Obsolete — kept for backward compatibility during Phase 25 transition
     public decimal PurchaseCost
     {
         get => _purchaseCost;
@@ -76,6 +82,7 @@ public class ProductUnitRowViewModel : ViewModelBase
         get => _supplierPrice;
         set => SetProperty(ref _supplierPrice, value);
     }
+#pragma warning restore CS0618
 
     public int SortOrder
     {
@@ -101,7 +108,7 @@ public class ProductUnitRowViewModel : ViewModelBase
         set => SetProperty(ref _barcodeValue, value);
     }
 
-    public bool IsFactorValid => IsBaseUnit || BaseConversionFactor > 1;
+    public bool IsFactorValid => IsBaseUnit || Factor > 1;
 
     public string ConversionHint => IsBaseUnit
         ? "الوحدة الصغرى = 1"

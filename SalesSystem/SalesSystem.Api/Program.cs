@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SalesSystem.Api.Middleware;
+using SalesSystem.Api.Validators.Reports;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
@@ -34,6 +35,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Api.Validators;
+using SalesSystem.Api.Validators.Accounting;
+using SalesSystem.Api.Validators.Transfers;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -77,6 +80,10 @@ var jwtSecret = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_SECRET")
     ?? (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development"
         ? "ThisIsASecretKeyThatIsLongEnoughForHS256Algorithm!"
         : throw new InvalidOperationException("SALESSYSTEM_JWT_SECRET is required in production"));
+
+if (string.IsNullOrEmpty(jwtSecret) || jwtSecret.Length < 32)
+    throw new InvalidOperationException("JWT secret must be at least 32 characters");
+
 var jwtIssuer = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_ISSUER") ?? "SalesSystem";
 var jwtAudience = Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_AUDIENCE") ?? "SalesSystem";
 var jwtExpirationHours = int.TryParse(Environment.GetEnvironmentVariable("SALESSYSTEM_JWT_EXPIRATION_HOURS"), out var hours) ? hours : 8;
@@ -129,12 +136,14 @@ builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepositor
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IProductImportService, ProductImportService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
-builder.Services.AddScoped<ICustomerGroupService, CustomerGroupService>();
+
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IDocumentSequenceService, DocumentSequenceService>();
-builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IAccountCategoryService, AccountCategoryService>();
+builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
 builder.Services.AddScoped<ITaxService, TaxService>();
 builder.Services.AddScoped<ICurrencyService, CurrencyService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
@@ -145,18 +154,24 @@ builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<ISalesReturnService, SalesReturnService>();
 builder.Services.AddScoped<IPurchaseReturnService, PurchaseReturnService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
-builder.Services.AddScoped<IInventoryWriteOffService, InventoryWriteOffService>();
-builder.Services.AddScoped<IPaymentService, PaymentService>();
+// REMOVED: InventoryWriteOffService (Phase 26 — deferred to V2)
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IStoreSettingsService, StoreSettingsService>();
 builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IFinancialReportService, FinancialReportService>();
+builder.Services.AddScoped<ISalesReportService, SalesReportService>();
+builder.Services.AddScoped<IPurchaseReportService, PurchaseReportService>();
+builder.Services.AddScoped<ICashBoxReportService, CashBoxReportService>();
+builder.Services.AddScoped<IUserReportService, UserReportService>();
+// ReportExportService is in Infrastructure (uses QuestPDF + ClosedXML)
+builder.Services.AddScoped<IReportExportService, SalesSystem.Infrastructure.Services.ReportExportService>();
 builder.Services.AddScoped<ISystemSettingsRepository, SystemSettingsRepository>();
 builder.Services.AddScoped<IUpdateProductPricingService, UpdateProductPricingService>();
 builder.Services.AddScoped<IProductUnitService, ProductUnitService>();
-            builder.Services.AddScoped<ICashBoxService, CashBoxService>();
-            builder.Services.AddScoped<IPrintService, PrintService>();
+builder.Services.AddScoped<IProductCostService, ProductCostService>();
+builder.Services.AddScoped<ICashBoxService, CashBoxService>();
+builder.Services.AddScoped<IPrintService, PrintService>();
 builder.Services.AddScoped<IPrintDataService, PrintDataService>();
 builder.Services.AddScoped<InvoicePrintDtoBuilder>();
 builder.Services.AddScoped<ILogService, LogService>();
@@ -167,6 +182,8 @@ builder.Services.AddScoped<IFifoAllocationService, FifoAllocationService>();
 builder.Services.AddScoped<IProductImageService, ProductImageService>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IAdditionalFeeService, AdditionalFeeService>();
+// REMOVED: ProductImageService (implementation not yet created)
+// REMOVED: AssemblyService (BillOfMaterials deferred to V2)
 
 // ─── Accounting Services ────────────────────────────────────
 builder.Services.AddScoped<IJournalEntryService, JournalEntryService>();
@@ -174,7 +191,36 @@ builder.Services.AddScoped<ISystemAccountService, SystemAccountService>();
 builder.Services.AddScoped<IJournalEntryNumberGenerator, JournalEntryNumberGenerator>();
 builder.Services.AddScoped<IAnnualClosingService, AnnualClosingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
-builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationService>();
+        builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationService>();
+builder.Services.AddScoped<IFiscalYearService, FiscalYearService>();
+
+// ─── New Entity Services (v4.7+) ──────────────────────────────
+builder.Services.AddScoped<IPartyService, PartyService>();
+builder.Services.AddScoped<IAttachmentService, AttachmentService>();
+builder.Services.AddScoped<IBranchService, BranchService>();
+builder.Services.AddScoped<IDepartmentService, DepartmentService>();
+builder.Services.AddScoped<IBankService, BankService>();
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IInventoryCountService, InventoryCountService>();
+builder.Services.AddScoped<IInventoryAdjustmentService, InventoryAdjustmentService>();
+builder.Services.AddScoped<IExpenseService, ExpenseService>();
+builder.Services.AddScoped<ICustomerReceiptService, CustomerReceiptService>();
+builder.Services.AddScoped<ISupplierPaymentApplicationService, SupplierPaymentApplicationService>();
+builder.Services.AddScoped<ISupplierPaymentService, SupplierPaymentService>();
+
+// ─── Customer/Supplier Contact Services ──────────────
+builder.Services.AddScoped<ICustomerContactService, CustomerContactService>();
+builder.Services.AddScoped<ISupplierContactService, SupplierContactService>();
+
+// ─── Receipt, Payment Voucher & Transfer Services ────────────
+builder.Services.AddScoped<IReceiptVoucherService, ReceiptVoucherService>();
+builder.Services.AddScoped<IPaymentVoucherService, PaymentVoucherService>();
+builder.Services.AddScoped<IWarehouseTransferService, WarehouseTransferService>();
+
+// ─── Cheque Service (Phase 29) ───────────────────────────────
+builder.Services.AddScoped<IChequeService, ChequeService>();
 
 builder.Services.AddSingleton(jwtSettings);
 
@@ -279,11 +325,21 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 // Explicit validator registrations (redundant with auto-discovery, but ensure DI clarity)
 builder.Services.AddScoped<IValidator<CreateCustomerRequest>, CreateCustomerRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateCustomerRequest>, UpdateCustomerRequestValidator>();
-builder.Services.AddScoped<IValidator<CreateCustomerGroupRequest>, CreateCustomerGroupRequestValidator>();
-builder.Services.AddScoped<IValidator<UpdateCustomerGroupRequest>, UpdateCustomerGroupRequestValidator>();
-builder.Services.AddScoped<IValidator<CreateBillOfMaterialRequest>, CreateBillOfMaterialRequestValidator>();
-builder.Services.AddScoped<IValidator<UpdateBillOfMaterialRequest>, UpdateBillOfMaterialRequestValidator>();
-builder.Services.AddScoped<IValidator<ProduceAssemblyRequest>, ProduceAssemblyRequestValidator>();
+
+// REMOVED: BillOfMaterials/Assembly validators (deferred to V2)
+builder.Services.AddScoped<IValidator<UpdateAllocationsRequest>, UpdateAllocationsRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateReceiptVoucherRequest>, CreateReceiptVoucherRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateReceiptVoucherRequest>, UpdateReceiptVoucherRequestValidator>();
+builder.Services.AddScoped<IValidator<CreatePaymentVoucherRequest>, CreatePaymentVoucherRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdatePaymentVoucherRequest>, UpdatePaymentVoucherRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateSystemAccountMappingRequest>, CreateSystemAccountMappingRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateSystemAccountMappingRequest>, UpdateSystemAccountMappingRequestValidator>();
+builder.Services.AddScoped<IValidator<UpdateCompanySettingsRequest>, UpdateCompanySettingsRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateFiscalYearRequest>, CreateFiscalYearRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateWarehouseTransferRequest>, CreateWarehouseTransferValidator>();
+builder.Services.AddScoped<IValidator<ReportDateRangeRequest>, ReportDateRangeValidator>();
+builder.Services.AddScoped<IValidator<CreateInventoryTransactionRequest>, CreateInventoryTransactionRequestValidator>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>
 {

@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 
 namespace SalesSystem.Application.Interfaces.Services;
 
@@ -32,4 +33,12 @@ public interface ILogService
         int? userId,
         string? machineName,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Queries system logs with filtering and pagination.
+    /// </summary>
+    Task<Result<PagedResult<SystemLogDto>>> QueryLogsAsync(
+        int? level, string? source, string? search,
+        DateTime? from, DateTime? to,
+        int page, int pageSize, CancellationToken ct = default);
 }

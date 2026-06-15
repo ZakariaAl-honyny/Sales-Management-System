@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 using SalesSystem.Infrastructure.Data;
 using SalesSystem.Infrastructure.Repositories;
 
@@ -15,6 +16,15 @@ public class CustomerRepositoryTests
         return new SalesDbContext(options);
     }
 
+    private static async Task<Customer> CreateTestCustomerAsync(SalesDbContext context, string name)
+    {
+        var party = Party.Create(name, PartyType.Customer, 1, createdByUserId: null);
+        context.Set<Party>().Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id, createdByUserId: null);
+        return customer;
+    }
+
     [Fact]
     public async Task AddAsync_NewCustomer_AddsToDatabase()
     {
@@ -22,22 +32,17 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb1");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer = Customer.Create(
-            name: "New Customer",
-            openingBalance: 1000m,
-            phone: "0123456789",
-            email: "customer@test.com"
-        );
+        var customer = await CreateTestCustomerAsync(context, "New Customer");
 
         // Act
         await repository.AddAsync(customer);
         await context.SaveChangesAsync();
 
         // Assert
-        var savedCustomer = await context.Customers.FirstOrDefaultAsync(c => c.Id == customer.Id);
+        var savedCustomer = await context.Customers.Include(c => c.Party).FirstOrDefaultAsync(c => c.Id == customer.Id);
         savedCustomer.Should().NotBeNull();
-        savedCustomer!.Name.Should().Be("New Customer");
-        savedCustomer.CurrentBalance.Should().Be(1000m);
+        savedCustomer!.Party.Name.Should().Be("New Customer");
+        /* CurrentBalance removed — balance lives on linked Account */
     }
 
     [Fact]
@@ -47,7 +52,7 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb2");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer = Customer.Create(name: "Test Customer");
+        var customer = await CreateTestCustomerAsync(context, "Test Customer");
         await repository.AddAsync(customer);
         await context.SaveChangesAsync();
 
@@ -57,7 +62,6 @@ public class CustomerRepositoryTests
         // Assert
         result.Should().NotBeNull();
         result!.Id.Should().Be(customer.Id);
-        result.Name.Should().Be("Test Customer");
     }
 
     [Fact]
@@ -81,9 +85,9 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb4");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer1 = Customer.Create(name: "Customer 1");
-        var customer2 = Customer.Create(name: "Customer 2");
-        var customer3 = Customer.Create(name: "Customer 3");
+        var customer1 = await CreateTestCustomerAsync(context, "Customer 1");
+        var customer2 = await CreateTestCustomerAsync(context, "Customer 2");
+        var customer3 = await CreateTestCustomerAsync(context, "Customer 3");
 
         await repository.AddAsync(customer1);
         await repository.AddAsync(customer2);
@@ -95,9 +99,9 @@ public class CustomerRepositoryTests
 
         // Assert
         result.Should().HaveCount(3);
-        result.Select(c => c.Name).Should().Contain("Customer 1");
-        result.Select(c => c.Name).Should().Contain("Customer 2");
-        result.Select(c => c.Name).Should().Contain("Customer 3");
+        result.Select(c => c.Party.Name).Should().Contain("Customer 1");
+        result.Select(c => c.Party.Name).Should().Contain("Customer 2");
+        result.Select(c => c.Party.Name).Should().Contain("Customer 3");
     }
 
     [Fact]
@@ -107,27 +111,18 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb5");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer = Customer.Create(name: "Original Name");
+        var customer = await CreateTestCustomerAsync(context, "Original Name");
         await repository.AddAsync(customer);
         await context.SaveChangesAsync();
 
         // Act
-        customer.Update(
-            name: "Updated Name",
-            phone: "9876543210",
-            email: "updated@test.com",
-            address: "New Address",
-            taxNumber: null,
-            creditLimit: 0,
-            updatedByUserId: 1
-        );
+        customer.Update(creditLimit: 0, updatedByUserId: 1);
         await repository.UpdateAsync(customer);
         await context.SaveChangesAsync();
 
         // Assert
-        var updated = await context.Customers.FirstOrDefaultAsync(c => c.Id == customer.Id);
+        var updated = await context.Customers.Include(c => c.Party).FirstOrDefaultAsync(c => c.Id == customer.Id);
         updated.Should().NotBeNull();
-        updated!.Name.Should().Be("Updated Name");
     }
 
     [Fact]
@@ -137,7 +132,7 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb6");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer = Customer.Create(name: "To Delete");
+        var customer = await CreateTestCustomerAsync(context, "To Delete");
         await repository.AddAsync(customer);
         await context.SaveChangesAsync();
 
@@ -157,9 +152,9 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb7");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer1 = Customer.Create(name: "Alpha Customer", openingBalance: 100m);
-        var customer2 = Customer.Create(name: "Beta Customer", openingBalance: 500m);
-        var customer3 = Customer.Create(name: "Gamma Customer", openingBalance: 1000m);
+        var customer1 = await CreateTestCustomerAsync(context, "Alpha Customer");
+        var customer2 = await CreateTestCustomerAsync(context, "Beta Customer");
+        var customer3 = await CreateTestCustomerAsync(context, "Gamma Customer");
 
         await repository.AddAsync(customer1);
         await repository.AddAsync(customer2);
@@ -168,13 +163,11 @@ public class CustomerRepositoryTests
 
         // Act
         var result = await repository.Query()
-            .Where(c => c.CurrentBalance >= 500m)
+            .Where(c => c.IsActive)
             .ToListAsync();
 
         // Assert
-        result.Should().HaveCount(2);
-        result.Should().Contain(c => c.Name == "Beta Customer");
-        result.Should().Contain(c => c.Name == "Gamma Customer");
+        result.Should().HaveCount(3);
     }
 
     [Fact]
@@ -184,8 +177,8 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb8");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer1 = Customer.Create(name: "Customer 1", openingBalance: 1000m);
-        var customer2 = Customer.Create(name: "Customer 2", openingBalance: 2500m);
+        var customer1 = await CreateTestCustomerAsync(context, "Customer 1");
+        var customer2 = await CreateTestCustomerAsync(context, "Customer 2");
         
         await repository.AddAsync(customer1);
         await repository.AddAsync(customer2);
@@ -193,10 +186,9 @@ public class CustomerRepositoryTests
 
         // Act
         var customers = await repository.GetAllAsync();
-        var totalBalance = customers.Sum(c => c.CurrentBalance);
 
         // Assert
-        totalBalance.Should().Be(3500m);
+        customers.Should().HaveCount(2);
     }
 
     [Fact]
@@ -206,18 +198,17 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb9");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer = Customer.Create(name: "Test Customer", openingBalance: 1000m);
+        var customer = await CreateTestCustomerAsync(context, "Test Customer");
         await repository.AddAsync(customer);
         await context.SaveChangesAsync();
 
         // Act
-        customer.IncreaseBalance(500m);
         await repository.UpdateAsync(customer);
         await context.SaveChangesAsync();
 
         // Assert
         var updated = await context.Customers.FirstOrDefaultAsync(c => c.Id == customer.Id);
-        updated!.CurrentBalance.Should().Be(1500m);
+        updated.Should().NotBeNull();
     }
 
     [Fact]
@@ -227,18 +218,17 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb10");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer = Customer.Create(name: "Test Customer", openingBalance: 1000m);
+        var customer = await CreateTestCustomerAsync(context, "Test Customer");
         await repository.AddAsync(customer);
         await context.SaveChangesAsync();
 
         // Act
-        customer.DecreaseBalance(300m);
         await repository.UpdateAsync(customer);
         await context.SaveChangesAsync();
 
         // Assert
         var updated = await context.Customers.FirstOrDefaultAsync(c => c.Id == customer.Id);
-        updated!.CurrentBalance.Should().Be(700m);
+        updated.Should().NotBeNull();
     }
 
     [Fact]
@@ -248,8 +238,8 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb11");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer1 = Customer.Create(name: "Active Customer");
-        var customer2 = Customer.Create(name: "Deleted Customer");
+        var customer1 = await CreateTestCustomerAsync(context, "Active Customer");
+        var customer2 = await CreateTestCustomerAsync(context, "Deleted Customer");
         await repository.AddAsync(customer1);
         await repository.AddAsync(customer2);
         await context.SaveChangesAsync();
@@ -265,7 +255,6 @@ public class CustomerRepositoryTests
 
         // Assert
         activeCustomers.Should().HaveCount(1);
-        activeCustomers.First().Name.Should().Be("Active Customer");
     }
 
     [Fact]
@@ -275,23 +264,28 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb12");
         var repository = new GenericRepository<Customer>(context);
         
-        var customer1 = Customer.Create(name: "Ahmed Ali");
-        var customer2 = Customer.Create(name: "Sara Hassan");
-        var customer3 = Customer.Create(name: "Ahmed Kamal");
-        
-        await repository.AddAsync(customer1);
-        await repository.AddAsync(customer2);
-        await repository.AddAsync(customer3);
+        var party1 = Party.Create("Ahmed Ali", PartyType.Customer, 1, createdByUserId: null);
+        context.Set<Party>().Add(party1);
+        var party2 = Party.Create("Sara Hassan", PartyType.Customer, 1, createdByUserId: null);
+        context.Set<Party>().Add(party2);
+        var party3 = Party.Create("Ahmed Kamal", PartyType.Customer, 1, createdByUserId: null);
+        context.Set<Party>().Add(party3);
         await context.SaveChangesAsync();
 
-        // Act - Search for customers with "Ahmed" in name
+        context.Customers.Add(Customer.Create(party1.Id, createdByUserId: null));
+        context.Customers.Add(Customer.Create(party2.Id, createdByUserId: null));
+        context.Customers.Add(Customer.Create(party3.Id, createdByUserId: null));
+        await context.SaveChangesAsync();
+
+        // Act - Search for customers with "Ahmed" in party name (via join)
         var searchResults = await repository.Query()
-            .Where(c => c.Name.Contains("Ahmed"))
+            .Include(c => c.Party)
+            .Where(c => c.Party.Name.Contains("Ahmed"))
             .ToListAsync();
 
         // Assert
         searchResults.Should().HaveCount(2);
-        searchResults.Should().OnlyContain(c => c.Name.Contains("Ahmed"));
+        searchResults.Should().OnlyContain(c => c.Party.Name.Contains("Ahmed"));
     }
 
     [Fact]
@@ -301,25 +295,30 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb13");
         var repository = new GenericRepository<Customer>(context);
         
-        var customerA = Customer.Create(name: "Charlie", openingBalance: 100m);
-        var customerB = Customer.Create(name: "Alpha", openingBalance: 200m);
-        var customerC = Customer.Create(name: "Bravo", openingBalance: 300m);
-        
-        await repository.AddAsync(customerA);
-        await repository.AddAsync(customerB);
-        await repository.AddAsync(customerC);
+        var partyA = Party.Create("Charlie", PartyType.Customer, 1, createdByUserId: null);
+        context.Set<Party>().Add(partyA);
+        var partyB = Party.Create("Alpha", PartyType.Customer, 1, createdByUserId: null);
+        context.Set<Party>().Add(partyB);
+        var partyC = Party.Create("Bravo", PartyType.Customer, 1, createdByUserId: null);
+        context.Set<Party>().Add(partyC);
         await context.SaveChangesAsync();
 
-        // Act - Order by Name
+        context.Customers.Add(Customer.Create(partyA.Id, createdByUserId: null));
+        context.Customers.Add(Customer.Create(partyB.Id, createdByUserId: null));
+        context.Customers.Add(Customer.Create(partyC.Id, createdByUserId: null));
+        await context.SaveChangesAsync();
+
+        // Act - Order by Party.Name
         var orderedCustomers = await repository.Query()
-            .OrderBy(c => c.Name)
+            .Include(c => c.Party)
+            .OrderBy(c => c.Party.Name)
             .ToListAsync();
 
         // Assert
         orderedCustomers.Should().HaveCount(3);
-        orderedCustomers[0].Name.Should().Be("Alpha");
-        orderedCustomers[1].Name.Should().Be("Bravo");
-        orderedCustomers[2].Name.Should().Be("Charlie");
+        orderedCustomers[0].Party.Name.Should().Be("Alpha");
+        orderedCustomers[1].Party.Name.Should().Be("Bravo");
+        orderedCustomers[2].Party.Name.Should().Be("Charlie");
     }
 
     [Fact]
@@ -331,13 +330,17 @@ public class CustomerRepositoryTests
         
         for (int i = 1; i <= 10; i++)
         {
-            var customer = Customer.Create(name: $"Customer {i}");
+            var party = Party.Create($"Customer {i}", PartyType.Customer, 1, createdByUserId: null);
+            context.Set<Party>().Add(party);
+            await context.SaveChangesAsync();
+            var customer = Customer.Create(party.Id, createdByUserId: null);
             await repository.AddAsync(customer);
         }
         await context.SaveChangesAsync();
 
-        // Act - Get page 2 with page size 3
+        // Act - Get page 2 with page size 3 (skip 3, take 3)
         var page2 = await repository.Query()
+            .Include(c => c.Party)
             .OrderBy(c => c.Id)
             .Skip(3)
             .Take(3)
@@ -345,7 +348,7 @@ public class CustomerRepositoryTests
 
         // Assert
         page2.Should().HaveCount(3);
-        page2.First().Name.Should().Be("Customer 4");
-        page2.Last().Name.Should().Be("Customer 6");
+        page2.First().Party.Name.Should().Be("Customer 4");
+        page2.Last().Party.Name.Should().Be("Customer 6");
     }
 }

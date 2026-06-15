@@ -102,7 +102,7 @@ public class WarehouseRequestValidatorTests
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Location)
-                .WithErrorMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
+                .WithErrorMessage("الموقع لا يمكن أن يتجاوز 200 حرف");
         }
 
         #endregion
@@ -127,9 +127,10 @@ public class WarehouseRequestValidatorTests
         {
             // Arrange
             var request = new CreateWarehouseRequest(
+                BranchId: 1,
+                Code: "WH-001",
                 Name: "مستودع - Warehouse",
-                Location: "القاهرة - Cairo",
-                IsDefault: false
+                Location: "القاهرة - Cairo"
             );
 
             // Act
@@ -142,9 +143,10 @@ public class WarehouseRequestValidatorTests
         #endregion
 
         private static CreateWarehouseRequest CreateValidRequest() => new(
+            BranchId: 1,
+            Code: "WH-001",
             Name: "Main Warehouse",
-            Location: "Cairo, Egypt",
-            IsDefault: false
+            Location: "Cairo, Egypt"
         );
     }
 
@@ -228,7 +230,7 @@ public class WarehouseRequestValidatorTests
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Location)
-                .WithErrorMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
+                .WithErrorMessage("الموقع لا يمكن أن يتجاوز 200 حرف");
         }
 
         #endregion
@@ -251,9 +253,10 @@ public class WarehouseRequestValidatorTests
         #endregion
 
         private static UpdateWarehouseRequest CreateValidRequest() => new(
+            BranchId: 1,
+            Code: "WH-001",
             Name: "Updated Warehouse",
             Location: "Alexandria, Egypt",
-            IsDefault: true,
             IsActive: true
         );
     }

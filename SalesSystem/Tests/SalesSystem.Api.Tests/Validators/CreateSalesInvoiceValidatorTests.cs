@@ -615,8 +615,12 @@ public class CreateSalesInvoiceValidatorTests
         PaymentType: PaymentType.Cash,
         DiscountAmount: 0,
         TaxAmount: 0,
+        OtherCharges: 0m,
         PaidAmount: 100m,
         Notes: "Test invoice",
+        CurrencyId: null,
+        ExchangeRate: null,
+        TaxId: null,
         Items: new List<CreateSalesInvoiceItemRequest>
         {
             CreateValidItem()

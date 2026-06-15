@@ -11,6 +11,7 @@ public class JournalEntryTests
     {
         return JournalEntry.Create(
             "JE-2026-000001",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -33,6 +34,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000001",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -42,15 +44,15 @@ public class JournalEntryTests
         entry.EntryNumber.Should().Be("JE-2026-000001");
         entry.TransactionDate.Should().Be(new DateTime(2026, 6, 1));
         entry.EntryType.Should().Be(JournalEntryType.Manual);
-        entry.IsPosted.Should().BeFalse();
-        entry.IsReversed.Should().BeFalse();
+        entry.Status.Should().Be(JournalEntryStatus.Draft);
+        entry.ReversedByEntryId.Should().BeNull();
         entry.Lines.Should().BeEmpty();
         entry.Description.Should().Be("اختبار");
         entry.ReferenceType.Should().BeNull();
         entry.ReferenceId.Should().BeNull();
         entry.ReferenceNumber.Should().BeNull();
-        entry.PostedBy.Should().BeNull();
-        entry.PostedAt.Should().BeNull();
+        entry.CurrencyId.Should().BeNull();
+        entry.ExchangeRate.Should().BeNull();
     }
 
     [Fact]
@@ -59,6 +61,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -75,6 +78,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000002",
+            1,
             default,
             "اختبار",
             JournalEntryType.Manual,
@@ -91,6 +95,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000003",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             (JournalEntryType)99,
@@ -107,6 +112,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000004",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -123,6 +129,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000005",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -139,6 +146,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000006",
+            1,
             new DateTime(2026, 6, 1),
             "قيد يومية مبيعات",
             JournalEntryType.Sales,
@@ -154,6 +162,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000007",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Sales,
@@ -176,6 +185,7 @@ public class JournalEntryTests
         {
             var entry = JournalEntry.Create(
                 $"JE-{(int)entryType}",
+                (int)entryType,
                 new DateTime(2026, 6, 1),
                 "اختبار",
                 entryType,
@@ -191,6 +201,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "  JE-2026-000008  ",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -206,6 +217,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000009",
+            1,
             new DateTime(2026, 6, 1),
             "  وصف به مسافات  ",
             JournalEntryType.Manual,
@@ -221,6 +233,7 @@ public class JournalEntryTests
         // Act
         var entry = JournalEntry.Create(
             "JE-2026-000010",
+            1,
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
@@ -236,6 +249,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000011",
+            1,
             new DateTime(2026, 6, 1),
             "",
             JournalEntryType.Manual,
@@ -252,6 +266,7 @@ public class JournalEntryTests
         // Act
         var act = () => JournalEntry.Create(
             "JE-2026-000012",
+            1,
             new DateTime(2026, 6, 1),
             "   ",
             JournalEntryType.Manual,
@@ -380,14 +395,14 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateBalancedEntry();
-        entry.ValidateAndPost(postedBy: 1);
+        entry.Post(postedByUserId: 1);
 
         // Act
         var act = () => entry.AddDebitLine(accountId: 3, "301", "رأس المال", amount: 50m);
 
         // Assert
         act.Should().Throw<DomainException>()
-            .Which.Message.Should().Contain("تم ترحيله");
+            .Which.Message.Should().Contain("ترحيله");
     }
 
     [Fact]
@@ -395,14 +410,14 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateBalancedEntry();
-        entry.ValidateAndPost(postedBy: 1);
+        entry.Post(postedByUserId: 1);
 
         // Act
         var act = () => entry.AddCreditLine(accountId: 3, "301", "رأس المال", amount: 50m);
 
         // Assert
         act.Should().Throw<DomainException>()
-            .Which.Message.Should().Contain("تم ترحيله");
+            .Which.Message.Should().Contain("ترحيله");
     }
 
     // ─── TotalDebit / TotalCredit ──────────────────────
@@ -544,6 +559,7 @@ public class JournalEntryTests
         // Arrange: typical sales journal — Dr Cash 1150, Cr Revenue 1000, Cr VAT 150
         var entry = JournalEntry.Create(
             "JE-SALES-001",
+            1,
             new DateTime(2026, 6, 1),
             "قيد مبيعات",
             JournalEntryType.Sales,
@@ -567,6 +583,7 @@ public class JournalEntryTests
         // Arrange: typical purchase journal — Dr Inventory 500, Dr VAT Input 25, Cr Cash 525
         var entry = JournalEntry.Create(
             "JE-PUR-001",
+            1,
             new DateTime(2026, 6, 1),
             "قيد مشتريات",
             JournalEntryType.Purchase,
@@ -614,16 +631,16 @@ public class JournalEntryTests
         balanced.Should().BeFalse();
     }
 
-    // ─── ValidateAndPost ──────────────────────────────
+    // ─── Post (Lifecycle) ─────────────────────────────
 
     [Fact]
-    public void ValidateAndPost_ThrowsDomainException_WhenNoLines()
+    public void Post_ThrowsDomainException_WhenNoLines()
     {
         // Arrange
         var entry = CreateEmptyEntry();
 
         // Act
-        var act = () => entry.ValidateAndPost(postedBy: 1);
+        var act = () => entry.Post(postedByUserId: 1);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -631,7 +648,7 @@ public class JournalEntryTests
     }
 
     [Fact]
-    public void ValidateAndPost_ThrowsDomainException_WhenUnbalanced()
+    public void Post_ThrowsDomainException_WhenUnbalanced()
     {
         // Arrange
         var entry = CreateEmptyEntry();
@@ -639,7 +656,7 @@ public class JournalEntryTests
         entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 50m);
 
         // Act
-        var act = () => entry.ValidateAndPost(postedBy: 1);
+        var act = () => entry.Post(postedByUserId: 1);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -647,13 +664,13 @@ public class JournalEntryTests
     }
 
     [Fact]
-    public void ValidateAndPost_NegativePostedBy_ThrowsDomainException()
+    public void Post_NegativePostedBy_ThrowsDomainException()
     {
         // Arrange
         var entry = CreateBalancedEntry();
 
         // Act
-        var act = () => entry.ValidateAndPost(postedBy: -1);
+        var act = () => entry.Post(postedByUserId: -1);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -661,13 +678,13 @@ public class JournalEntryTests
     }
 
     [Fact]
-    public void ValidateAndPost_ZeroPostedBy_ThrowsDomainException()
+    public void Post_ZeroPostedBy_ThrowsDomainException()
     {
         // Arrange
         var entry = CreateBalancedEntry();
 
         // Act
-        var act = () => entry.ValidateAndPost(postedBy: 0);
+        var act = () => entry.Post(postedByUserId: 0);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -675,89 +692,92 @@ public class JournalEntryTests
     }
 
     [Fact]
-    public void ValidateAndPost_SetsPosted_WhenBalanced()
+    public void Post_SetsStatusPosted_WhenBalanced()
     {
         // Arrange
         var entry = CreateBalancedEntry();
 
         // Act
-        entry.ValidateAndPost(postedBy: 1);
+        entry.Post(postedByUserId: 1);
 
         // Assert
-        entry.IsPosted.Should().BeTrue();
-        entry.PostedBy.Should().Be(1);
-        entry.PostedAt.Should().NotBeNull();
+        entry.Status.Should().Be(JournalEntryStatus.Posted);
     }
 
     [Fact]
-    public void ValidateAndPost_SetsPostedBy_ToValidUser()
+    public void Post_AlreadyPosted_ThrowsDomainException()
     {
         // Arrange
         var entry = CreateBalancedEntry();
+        entry.Post(postedByUserId: 1);
 
         // Act
-        entry.ValidateAndPost(postedBy: 42);
+        var act = () => entry.Post(postedByUserId: 2);
 
         // Assert
-        entry.PostedBy.Should().Be(42);
+        act.Should().Throw<DomainException>()
+            .Which.Message.Should().Contain("مسودة");
     }
 
     [Fact]
-    public void ValidateAndPost_SetsPostedAt_ToRecentTimestamp()
-    {
-        // Arrange
-        var entry = CreateBalancedEntry();
-        var beforePost = DateTime.UtcNow.AddSeconds(-1);
-
-        // Act
-        entry.ValidateAndPost(postedBy: 1);
-
-        // Assert
-        entry.PostedAt.Should().NotBeNull();
-        entry.PostedAt!.Value.Should().BeOnOrAfter(beforePost);
-    }
-
-    [Fact]
-    public void ValidateAndPost_AfterPost_CanBeCalledAgain()
-    {
-        // Arrange
-        var entry = CreateBalancedEntry();
-        entry.ValidateAndPost(postedBy: 1);
-
-        // Act — no guard against double-posting, should succeed again
-        entry.ValidateAndPost(postedBy: 2);
-
-        // Assert — values are overwritten
-        entry.PostedBy.Should().Be(2);
-        entry.IsPosted.Should().BeTrue();
-    }
-
-    // ─── IsPosted / IsReversed Defaults ───────────────
-
-    [Fact]
-    public void IsPosted_Default_IsFalse()
+    public void Post_DraftStatus_CreatesAsDraft()
     {
         // Arrange
         var entry = CreateEmptyEntry();
 
         // Assert
-        entry.IsPosted.Should().BeFalse();
+        entry.Status.Should().Be(JournalEntryStatus.Draft);
     }
 
+    // ─── Cancel (Lifecycle) ───────────────────────────
+
     [Fact]
-    public void IsReversed_Default_IsFalse()
+    public void Cancel_ThrowsDomainException_WhenDraft()
     {
         // Arrange
         var entry = CreateEmptyEntry();
 
+        // Act
+        var act = () => entry.Cancel(cancelledByUserId: 1);
+
         // Assert
-        entry.IsReversed.Should().BeFalse();
+        act.Should().Throw<DomainException>()
+            .Which.Message.Should().Contain("مرحلة");
+    }
+
+    [Fact]
+    public void Cancel_SetsStatusCancelled_WhenPosted()
+    {
+        // Arrange
+        var entry = CreateBalancedEntry();
+        entry.Post(postedByUserId: 1);
+
+        // Act
+        entry.Cancel(cancelledByUserId: 1);
+
+        // Assert
+        entry.Status.Should().Be(JournalEntryStatus.Cancelled);
+    }
+
+    [Fact]
+    public void Cancel_WithReversalEntryId_SetsReversedByEntryId()
+    {
+        // Arrange
+        var entry = CreateBalancedEntry();
+        entry.Post(postedByUserId: 1);
+
+        // Act
+        entry.Cancel(cancelledByUserId: 1, reversedByEntryId: 999);
+
+        // Assert
+        entry.Status.Should().Be(JournalEntryStatus.Cancelled);
+        entry.ReversedByEntryId.Should().Be(999);
     }
 
     // ─── Unbalanced Error Message ────────────────────
 
     [Fact]
-    public void ValidateAndPost_Unbalanced_ErrorMessageContainsTotals()
+    public void Post_Unbalanced_ErrorMessageContainsTotals()
     {
         // Arrange
         var entry = CreateEmptyEntry();
@@ -765,7 +785,7 @@ public class JournalEntryTests
         entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 50m);
 
         // Act
-        var act = () => entry.ValidateAndPost(postedBy: 1);
+        var act = () => entry.Post(postedByUserId: 1);
 
         // Assert
         act.Should().Throw<DomainException>()

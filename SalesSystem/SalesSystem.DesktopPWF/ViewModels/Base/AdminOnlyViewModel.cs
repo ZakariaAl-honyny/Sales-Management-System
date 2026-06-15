@@ -1,5 +1,4 @@
 using SalesSystem.DesktopPWF.Services.Api;
-using SalesSystem.Contracts.Enums;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Base;
 
@@ -15,9 +14,7 @@ public abstract class AdminOnlyViewModel : ViewModelBase
 
     protected void EnsureAdminRole()
     {
-        var role = _sessionService.GetUserRole();
-
-        if (role != UserRole.Admin)
+        if (!_sessionService.IsAdmin)
             throw new UnauthorizedAccessException(
                 "عذراً، هذه الشاشة مخصصة للمسؤولين فقط. لا يمكنك الوصول إليها.");
     }

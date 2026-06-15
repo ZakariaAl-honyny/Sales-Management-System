@@ -7,6 +7,8 @@ using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Application.Services;
 
@@ -14,19 +16,17 @@ public class SupplierService : ISupplierService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<SupplierService> _logger;
-    private readonly IAccountingIntegrationService _accountingService;
 
-    public SupplierService(IUnitOfWork uow, ILogger<SupplierService> logger, IAccountingIntegrationService accountingService)
+    public SupplierService(IUnitOfWork uow, ILogger<SupplierService> logger)
     {
         _uow = uow;
         _logger = logger;
-        _accountingService = accountingService;
     }
 
     public async Task<Result<SupplierDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var supplier = await _uow.Suppliers.FirstOrDefaultAsync(
-            s => s.Id == id, ct, "Account");
+            s => s.Id == id, ct, "Party.Account");
         if (supplier == null)
             return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
@@ -40,11 +40,11 @@ public class SupplierService : ISupplierService
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search;
-            predicate = sup => sup.Name.Contains(s) || (sup.Phone != null && sup.Phone.Contains(s));
+            predicate = sup => sup.Party.Name.Contains(s) || (sup.Party.Phone != null && sup.Party.Phone.Contains(s));
         }
 
         var (items, total) = await _uow.Suppliers.GetPagedAsync(
-            predicate, q => q.OrderBy(s => s.Name), page, pageSize, ct, includeInactive, "Account");
+            predicate, q => q.OrderByDescending(s => s.Id), page, pageSize, ct, includeInactive, "Party.Account");
 
         var dtos = items.Select(MapToDto).ToList();
         return Result<PagedResult<SupplierDto>>.Success(PagedResult<SupplierDto>.Create(dtos, total, page, pageSize));
@@ -54,59 +54,38 @@ public class SupplierService : ISupplierService
     {
         try
         {
-            // Step 1: Auto-create account under AP parent if AccountId not provided
-            int? accountId = request.AccountId;
-            if (accountId == null)
-            {
-                var accountResult = await AutoCreateSupplierAccountAsync(request.Name, userId, ct);
-                if (!accountResult.IsSuccess)
-                    return Result<SupplierDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
-                accountId = accountResult.Value;
-            }
+            // Step 1: Auto-create account under AP parent (1320 — الموردون)
+            var accountResult = await AutoCreateSupplierAccountAsync(request.Name, userId, ct);
+            if (!accountResult.IsSuccess)
+                return Result<SupplierDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
+            var accountId = accountResult.Value;
 
-            // Step 2: Create supplier with the account ID
-            var supplier = Supplier.Create(
+            // Step 2: Create Party record (Name, Phone, Email, Address, TaxNumber)
+            var party = Party.Create(
                 name: request.Name,
-                openingBalance: request.OpeningBalance,
+                partyType: PartyType.Supplier,
+                accountId: accountId,
                 phone: request.Phone,
+                mobile: null,
                 email: request.Email,
                 address: request.Address,
                 taxNumber: request.TaxNumber,
-                creditLimit: request.CreditLimit,
-                createdByUserId: userId,
-                accountId: accountId
-            );
+                createdByUserId: userId);
+            await _uow.Parties.AddAsync(party, ct);
+            await _uow.SaveChangesAsync(ct);
 
-            if (request.OpeningBalance > 0)
-            {
-                // Use transaction for atomicity — supplier + journal entry
-                await _uow.ExecuteTransactionAsync(async () =>
-                {
-                    await _uow.Suppliers.AddAsync(supplier, ct);
-                    await _uow.SaveChangesAsync(ct);
+            // Step 3: Create Supplier record with shared PK (Id = Party.Id)
+            var supplier = Supplier.Create(
+                partyId: party.Id,
+                createdByUserId: userId);
+            await _uow.Suppliers.AddAsync(supplier, ct);
+            await _uow.SaveChangesAsync(ct);
 
-                    var entryResult = await _accountingService.CreateSupplierOpeningEntryAsync(
-                        supplier.Id,
-                        supplier.Name,
-                        request.OpeningBalance,
-                        createdByUserId: userId,
-                        DateTime.UtcNow,
-                        ct);
+            _logger.LogInformation("Supplier created: {SupplierName} (ID: {SupplierId})", party.Name, supplier.Id);
 
-                    if (!entryResult.IsSuccess)
-                        throw new DomainException(entryResult.Error!);
-                }, ct);
-            }
-            else
-            {
-                // No opening balance — simple save without transaction
-                await _uow.Suppliers.AddAsync(supplier, ct);
-                await _uow.SaveChangesAsync(ct);
-            }
-
-            _logger.LogInformation("Supplier created: {SupplierName} (ID: {SupplierId})", supplier.Name, supplier.Id);
-
-            return Result<SupplierDto>.Success(MapToDto(supplier));
+            var saved = await _uow.Suppliers.FirstOrDefaultAsync(
+                s => s.Id == supplier.Id, ct, "Party.Account");
+            return Result<SupplierDto>.Success(MapToDto(saved!));
         }
         catch (DomainException ex)
         {
@@ -124,20 +103,25 @@ public class SupplierService : ISupplierService
         try
         {
             var supplier = await _uow.Suppliers.FirstOrDefaultIgnoreFiltersAsync(
-                s => s.Id == id, ct, "Account");
+                s => s.Id == id, ct, "Party.Account");
             if (supplier == null)
                 return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
-            supplier.Update(
+            // Update Party record (contact data)
+            supplier.Party.Update(
                 name: request.Name,
+                accountId: supplier.Party.AccountId, // AccountId unchanged
                 phone: request.Phone,
+                mobile: null,
                 email: request.Email,
                 address: request.Address,
                 taxNumber: request.TaxNumber,
-                creditLimit: request.CreditLimit,
-                updatedByUserId: userId,
-                accountId: request.AccountId
-            );
+                updatedByUserId: userId);
+
+            // Update supplier-specific fields
+            supplier.Update(
+                notes: null,
+                updatedByUserId: userId);
 
             if (request.IsActive != supplier.IsActive)
             {
@@ -148,9 +132,11 @@ public class SupplierService : ISupplierService
             await _uow.Suppliers.UpdateAsync(supplier, ct);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Supplier updated: {SupplierName} (ID: {SupplierId})", supplier.Name, supplier.Id);
+            _logger.LogInformation("Supplier updated: {SupplierName} (ID: {SupplierId})", supplier.Party.Name, supplier.Id);
 
-            return Result<SupplierDto>.Success(MapToDto(supplier));
+            var updated = await _uow.Suppliers.FirstOrDefaultAsync(
+                s => s.Id == supplier.Id, ct, "Party.Account");
+            return Result<SupplierDto>.Success(MapToDto(updated!));
         }
         catch (DomainException ex)
         {
@@ -205,25 +191,33 @@ public class SupplierService : ISupplierService
 
     /// <summary>
     /// Auto-creates a Level 4 Liability account under the AP parent account for this supplier.
+    /// Uses the parent account at code "2100 — حسابات الموردين" (Accounts Payable).
+    /// Falls back to SystemAccountMappings.AccountsPayableAccountId if 2100 not found.
     /// </summary>
     private async Task<Result<int>> AutoCreateSupplierAccountAsync(string supplierName, int userId, CancellationToken ct)
     {
         try
         {
-            // Get SystemAccountMappings to find AP parent account
-            var mappings = await _uow.SystemAccountMappings.FirstOrDefaultAsync(_ => true, ct);
-            if (mappings == null)
-                return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
+            // Try to find parent account "2100 — حسابات الموردين" by code
+            var apParentAccount = await _uow.Accounts.FirstOrDefaultAsync(
+                a => a.AccountCode == "1320" && a.IsActive, ct);
 
-            // Get the AP account (Level 4 detail account, e.g. 1321)
-            var apAccount = await _uow.Accounts.GetByIdAsync(mappings.AccountsPayableAccountId, ct);
-            if (apAccount == null || apAccount.ParentAccountId == null)
-                return Result<int>.Failure("لم يتم العثور على حساب الموردين", ErrorCodes.NotFound);
-
-            // Get the parent account (Level 3, e.g. 1320 - الموردون)
-            var apParentAccount = await _uow.Accounts.GetByIdAsync(apAccount.ParentAccountId.Value, ct);
+            // Fallback: use SystemAccountMappings.AccountsPayableAccountId parent
             if (apParentAccount == null)
-                return Result<int>.Failure("لم يتم العثور على حساب الموردين الرئيسي", ErrorCodes.NotFound);
+            {
+                var apMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
+                    m => m.MappingKey == SystemAccountKey.AccountsPayable, ct);
+                if (apMapping == null)
+                    return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
+
+                var apAccount = await _uow.Accounts.GetByIdAsync(apMapping.AccountId, ct);
+                if (apAccount == null || apAccount.ParentAccountId == null)
+                    return Result<int>.Failure("لم يتم العثور على حساب الموردين", ErrorCodes.NotFound);
+
+                apParentAccount = await _uow.Accounts.GetByIdAsync(apAccount.ParentAccountId.Value, ct);
+                if (apParentAccount == null)
+                    return Result<int>.Failure("لم يتم العثور على حساب الموردين الرئيسي", ErrorCodes.NotFound);
+            }
 
             // Generate next account code under this parent
             var nextCode = await GenerateNextAccountCodeAsync(apParentAccount.Id, apParentAccount.AccountCode, ct);
@@ -248,7 +242,8 @@ public class SupplierService : ISupplierService
             await _uow.Accounts.AddAsync(newAccount, ct);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Auto-created supplier account: {Code} - {Name} under parent {ParentCode}", nextCode, supplierName, apParentAccount.AccountCode);
+            _logger.LogInformation("Auto-created supplier account: {Code} - {Name} under parent {ParentCode}",
+                nextCode, supplierName, apParentAccount.AccountCode);
             return Result<int>.Success(newAccount.Id);
         }
         catch (Exception ex)
@@ -260,16 +255,13 @@ public class SupplierService : ISupplierService
 
     /// <summary>
     /// Generates the next available account code under a parent account.
-    /// For example, under parent "1130", existing children "1131","1132" produce "1133".
     /// </summary>
     private async Task<string> GenerateNextAccountCodeAsync(int parentAccountId, string parentCode, CancellationToken ct)
     {
-        // Get all child accounts under this parent
         var childAccounts = await _uow.Accounts.ToListAsync(
             predicate: a => a.ParentAccountId == parentAccountId,
             ct: ct);
 
-        // Get the max existing child code as integer
         int maxSuffix = 0;
         foreach (var child in childAccounts)
         {
@@ -280,7 +272,6 @@ public class SupplierService : ISupplierService
             }
         }
 
-        // Generate next code: increment max code, or append "1" to parent code if no children yet
         return maxSuffix > 0
             ? (maxSuffix + 1).ToString()
             : parentCode + "1";
@@ -290,17 +281,14 @@ public class SupplierService : ISupplierService
     {
         return new SupplierDto(
             s.Id,
-            s.Name,
-            s.Phone,
-            s.Email,
-            s.Address,
-            s.TaxNumber,
-            s.OpeningBalance,
-            s.CurrentBalance,
-            s.CreditLimit,
+            s.Party.Name,
+            s.Party.Phone,
+            s.Party.Email,
+            s.Party.Address,
+            s.Party.TaxNumber,
             s.IsActive,
-            AccountId: s.AccountId,
-            AccountName: s.Account?.NameAr
+            AccountId: s.Party.AccountId,
+            AccountName: s.Party.Account?.NameAr
         );
     }
 }

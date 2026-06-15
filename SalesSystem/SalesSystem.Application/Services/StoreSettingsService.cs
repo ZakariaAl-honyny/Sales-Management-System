@@ -5,16 +5,33 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
+/// <summary>
+/// Manages store-level settings and system-wide configuration.
+/// All settings are now stored in the <see cref="SystemSetting"/> key-value table.
+/// </summary>
 public sealed class StoreSettingsService : IStoreSettingsService
 {
     private readonly IUnitOfWork _uow;
     private readonly ISystemSettingsRepository _systemSettingsRepo;
     private readonly ILogger<StoreSettingsService> _logger;
+
+    // SystemSetting key prefixes
+    private const string Prefix = "Store.";
+    private const string KeyStoreName = Prefix + "Name";
+    private const string KeyPhone = Prefix + "Phone";
+    private const string KeyAddress = Prefix + "Address";
+    private const string KeyLogoPath = Prefix + "LogoPath";
+    private const string KeyEmail = Prefix + "Email";
+    private const string KeyCurrencyCode = Prefix + "CurrencyCode";
+    private const string KeyTaxNumber = Prefix + "TaxNumber";
+    private const string KeyEnableStockAlerts = Prefix + "EnableStockAlerts";
+    private const string KeyAllowNegativeStock = Prefix + "AllowNegativeStock";
+    private const string KeyAutoUpdatePrices = Prefix + "AutoUpdatePrices";
+    private const string KeySignaturePath = Prefix + "SignaturePath";
 
     public StoreSettingsService(IUnitOfWork uow, ISystemSettingsRepository systemSettingsRepo, ILogger<StoreSettingsService> logger)
     {
@@ -25,86 +42,52 @@ public sealed class StoreSettingsService : IStoreSettingsService
 
     public async Task<Result<StoreSettingsDto>> GetSettingsAsync(CancellationToken ct = default)
     {
-        var settings = (await _uow.StoreSettings.GetAllAsync(ct)).FirstOrDefault();
-
-        if (settings == null)
+        try
         {
-            // Seed default settings if none exist
-            settings = StoreSettings.Create("متجر المبيعات", currencyCode: "SAR");
-            await _uow.StoreSettings.AddAsync(settings, ct);
-            await _uow.SaveChangesAsync(ct);
+            var dto = await LoadSettingsFromSystemAsync(ct);
+            return Result<StoreSettingsDto>.Success(dto);
         }
-
-        return Result<StoreSettingsDto>.Success(await MapToDto(settings, ct));
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading store settings");
+            return Result<StoreSettingsDto>.Failure("فشل في تحميل إعدادات المتجر");
+        }
     }
 
     public async Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, int userId, CancellationToken ct = default)
     {
         try
         {
-            StoreSettings? settings = null;
-
             await _uow.ExecuteTransactionAsync(async () =>
             {
-                settings = (await _uow.StoreSettings.GetAllAsync(ct)).FirstOrDefault();
+                // Persist individual SystemSetting key-value pairs
+                await _systemSettingsRepo.SetStringAsync(KeyStoreName, request.StoreName ?? "متجر المبيعات", category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyPhone, request.Phone ?? "", category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyAddress, request.Address ?? "", category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyLogoPath, request.LogoUrl ?? "", category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyEmail, request.Email ?? "", category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyCurrencyCode, request.Currency ?? "SAR", category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyTaxNumber, request.TaxNumber ?? "", category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyEnableStockAlerts, request.EnableStockAlerts.ToString().ToLower(), category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyAllowNegativeStock, request.AllowNegativeStock.ToString().ToLower(), category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeyAutoUpdatePrices, request.AutoUpdatePrices.ToString().ToLower(), category: "Store", userId: userId, ct: ct);
+                await _systemSettingsRepo.SetStringAsync(KeySignaturePath, request.SignatureUrl ?? "", category: "Store", userId: userId, ct: ct);
 
-                if (settings == null)
-                {
-                    settings = StoreSettings.Create(
-                        request.StoreName,
-                        request.Phone,
-                        request.Address,
-                        request.LogoUrl,
-                        request.Email,
-                        request.Currency,
-                        0m,             // DEPRECATED: DefaultTaxRate — Tax entity is source of truth
-                        true,           // DEPRECATED: IsTaxEnabled — Tax entity is source of truth
-                        request.TaxNumber,
-                        request.EnableStockAlerts,
-                        request.AllowNegativeStock,
-                        request.AutoUpdatePrices,
-                        string.Empty,   // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead
-                        signaturePath: request.SignatureUrl);
-
-                    await _uow.StoreSettings.AddAsync(settings, ct);
-                }
-                else
-                {
-                    settings.Update(
-                        request.StoreName,
-                        request.Phone,
-                        request.Address,
-                        request.LogoUrl,
-                        request.Email,
-                        request.Currency,
-                        0m,             // DEPRECATED: DefaultTaxRate — Tax entity is source of truth
-                        true,           // DEPRECATED: IsTaxEnabled — Tax entity is source of truth
-                        request.TaxNumber,
-                        request.EnableStockAlerts,
-                        request.AllowNegativeStock,
-                        request.AutoUpdatePrices,
-                        string.Empty,   // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead
-                        signaturePath: request.SignatureUrl);
-                }
-
-                // First save: persist StoreSettings
-                await _uow.SaveChangesAsync(ct);
-
-                // Write SystemSettings via repo (no internal SaveChanges — tracked by ChangeTracker)
-                var costingMethod = (Domain.Enums.CostingMethod)request.CostingMethod;
+                // Write other SystemSettings via repo
+                var costingMethod = (CostingMethod)request.CostingMethod;
                 await _systemSettingsRepo.SetCostingMethodAsync(costingMethod, ct);
                 await _systemSettingsRepo.SetStringAsync("Backup.BackupPath", request.BackupPath ?? "", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync("Backup.ScheduleTime", request.BackupScheduleTime ?? "02:00", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync("Backup.RetentionDays", request.BackupRetentionDays.ToString(), userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync("Update.ServerUrl", request.UpdateServerUrl ?? "", userId: userId, ct: ct);
 
-                // Second save: persist SystemSettings changes within the same transaction
                 await _uow.SaveChangesAsync(ct);
             }, ct);
 
             _logger.LogInformation("Store settings updated by user {UserId}", userId);
 
-            return Result<StoreSettingsDto>.Success(await MapToDto(settings!, ct));
+            var dto = await LoadSettingsFromSystemAsync(ct);
+            return Result<StoreSettingsDto>.Success(dto);
         }
         catch (DomainException ex)
         {
@@ -174,7 +157,7 @@ public sealed class StoreSettingsService : IStoreSettingsService
                 return Result.Failure(validationError);
 
             await _systemSettingsRepo.SetBatchSystemSettingsAsync(settings, ct);
-            await _uow.SaveChangesAsync(ct);  // Service owns the commit (RULE-024)
+            await _uow.SaveChangesAsync(ct);
             _logger.LogInformation("System settings updated in batch ({Count} keys)", settings.Count);
             return Result.Success();
         }
@@ -183,6 +166,51 @@ public sealed class StoreSettingsService : IStoreSettingsService
             _logger.LogError(ex, "Error saving system settings");
             return Result.Failure("فشل في حفظ إعدادات النظام");
         }
+    }
+
+    private async Task<StoreSettingsDto> LoadSettingsFromSystemAsync(CancellationToken ct)
+    {
+        var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
+        var backupPath = await _systemSettingsRepo.GetStringAsync("Backup.BackupPath", "", ct);
+        var scheduleTime = await _systemSettingsRepo.GetStringAsync("Backup.ScheduleTime", "02:00", ct);
+        var retentionStr = await _systemSettingsRepo.GetStringAsync("Backup.RetentionDays", "30", ct);
+        _ = int.TryParse(retentionStr, out var retentionDays);
+        var updateServerUrl = await _systemSettingsRepo.GetStringAsync("Update.ServerUrl", "", ct);
+
+        var storeName = await _systemSettingsRepo.GetStringAsync(KeyStoreName, "متجر المبيعات", ct);
+        var phone = await _systemSettingsRepo.GetStringAsync(KeyPhone, "", ct);
+        var address = await _systemSettingsRepo.GetStringAsync(KeyAddress, "", ct);
+        var logoPath = await _systemSettingsRepo.GetStringAsync(KeyLogoPath, "", ct);
+        var email = await _systemSettingsRepo.GetStringAsync(KeyEmail, "", ct);
+        var currencyCode = await _systemSettingsRepo.GetStringAsync(KeyCurrencyCode, "SAR", ct);
+        var taxNumber = await _systemSettingsRepo.GetStringAsync(KeyTaxNumber, "", ct);
+        var signaturePath = await _systemSettingsRepo.GetStringAsync(KeySignaturePath, "", ct);
+
+        _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync(KeyEnableStockAlerts, "false", ct), out var enableStockAlerts);
+        _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync(KeyAllowNegativeStock, "false", ct), out var allowNegativeStock);
+        _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync(KeyAutoUpdatePrices, "false", ct), out var autoUpdatePrices);
+
+        return new StoreSettingsDto(
+            1,                          // Virtual Id
+            storeName ?? "",
+            phone,
+            address,
+            logoPath,
+            email,
+            currencyCode ?? "",
+            0m,                         // DEPRECATED: DefaultTaxRate — Tax entity is source of truth
+            true,                       // DEPRECATED: IsTaxEnabled — Tax entity is source of truth
+            taxNumber,
+            enableStockAlerts,
+            allowNegativeStock,
+            autoUpdatePrices,
+            "",                         // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead
+            (int)costingMethod,
+            backupPath,
+            scheduleTime,
+            retentionDays,
+            updateServerUrl,
+            signaturePath);
     }
 
     private static string? ValidateSystemSettings(Dictionary<string, string> settings)
@@ -237,36 +265,5 @@ public sealed class StoreSettingsService : IStoreSettingsService
             }
         }
         return null;
-    }
-
-    private async Task<StoreSettingsDto> MapToDto(StoreSettings s, CancellationToken ct)
-    {
-        var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
-        var backupPath = await _systemSettingsRepo.GetStringAsync("Backup.BackupPath", "", ct);
-        var scheduleTime = await _systemSettingsRepo.GetStringAsync("Backup.ScheduleTime", "02:00", ct);
-        var retentionStr = await _systemSettingsRepo.GetStringAsync("Backup.RetentionDays", "30", ct);
-        _ = int.TryParse(retentionStr, out var retentionDays);
-        var updateServerUrl = await _systemSettingsRepo.GetStringAsync("Update.ServerUrl", "", ct);
-        return new StoreSettingsDto(
-            s.Id,
-            s.StoreName,
-            s.Phone,
-            s.Address,
-            s.LogoPath,
-            s.Email,
-            s.CurrencyCode,
-            s.DefaultTaxRate,    // DEPRECATED: still mapped from DB column — remove in Phase 20
-            s.IsTaxEnabled,      // DEPRECATED: still mapped from DB column — remove in Phase 20
-            s.TaxNumber,
-            s.EnableStockAlerts,
-            s.AllowNegativeStock,
-            s.AutoUpdatePrices,
-            s.InvoicePrefix,     // DEPRECATED: still mapped from DB column — remove in Phase 20
-            (int)costingMethod,
-            backupPath,
-            scheduleTime,
-            retentionDays,
-            updateServerUrl,
-            s.SignaturePath);
     }
 }

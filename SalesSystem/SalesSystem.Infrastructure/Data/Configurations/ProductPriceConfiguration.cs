@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
@@ -13,11 +12,9 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
         builder.HasKey(x => x.Id);
 
         // Properties
-        builder.Property(x => x.PriceLevel)
-            .HasConversion<int>()
-            .IsRequired()
-            .HasDefaultValue(PriceLevel.Retail)
-            .HasComment("مستوى السعر: 1=تجزئة, 2=جملة, 3=VIP, 4=موزع");
+        builder.Property(x => x.CurrencyId)
+            .HasColumnType("smallint")
+            .IsRequired();
 
         builder.Property(x => x.Price)
             .HasPrecision(18, 2)
@@ -32,9 +29,6 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
             .IsRequired(false)
             .HasComment("تاريخ انتهاء السريان (اختياري)");
 
-        builder.Property(x => x.IsActive)
-            .HasDefaultValue(true);
-
         // Relationships
         builder.HasOne(x => x.ProductUnit)
             .WithMany() // ProductUnit has no Prices navigation — prices managed via ProductPrice table directly
@@ -47,12 +41,8 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
             .OnDelete(DeleteBehavior.Restrict);
 
         // Indexes
-        builder.HasIndex(x => new { x.ProductUnitId, x.CurrencyId, x.PriceLevel, x.EffectiveFrom })
+        builder.HasIndex(x => new { x.ProductUnitId, x.CurrencyId, x.EffectiveFrom })
             .IsUnique()
-            .HasFilter("[IsActive] = 1")
-            .HasDatabaseName("IX_ProductPrices_ProductUnit_Currency_Level_Date");
-
-        // Global query filter
-        builder.HasQueryFilter(x => x.IsActive);
+            .HasDatabaseName("IX_ProductPrices_ProductUnit_Currency_Date");
     }
 }

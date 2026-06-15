@@ -131,10 +131,10 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         var invoiceId = 1;
         var postedInvoice = CreateInvoiceDto(invoiceId, 2);
         SetupUserId(_controller, 1);
-        SalesServiceMock.Setup(x => x.PostAsync(invoiceId, 1, It.IsAny<CancellationToken>()))
+        SalesServiceMock.Setup(x => x.PostAsync(invoiceId, It.IsAny<PostSalesInvoiceRequest>(), 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(postedInvoice));
 
-        var result = await _controller.Post(invoiceId, CancellationToken.None);
+        var result = await _controller.Post(invoiceId, new PostSalesInvoiceRequest(), CancellationToken.None);
 
         var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
         okResult.Value.Should().BeOfType<SalesInvoiceDto>();
@@ -145,10 +145,10 @@ public class SalesInvoicesControllerTests : ControllerTestBase
     {
         var invoiceId = 999;
         SetupUserId(_controller, 1);
-        SalesServiceMock.Setup(x => x.PostAsync(invoiceId, 1, It.IsAny<CancellationToken>()))
+        SalesServiceMock.Setup(x => x.PostAsync(invoiceId, It.IsAny<PostSalesInvoiceRequest>(), 1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<SalesInvoiceDto>("الفاتورة غير موجودة"));
 
-        var result = await _controller.Post(invoiceId, CancellationToken.None);
+        var result = await _controller.Post(invoiceId, new PostSalesInvoiceRequest(), CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -158,7 +158,7 @@ public class SalesInvoicesControllerTests : ControllerTestBase
     {
         SetupUserWithoutId(_controller);
 
-        var result = await _controller.Post(1, CancellationToken.None);
+        var result = await _controller.Post(1, new PostSalesInvoiceRequest(), CancellationToken.None);
 
         result.Should().BeOfType<UnauthorizedResult>();
     }
@@ -214,6 +214,7 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         SubTotal: 100.00m,
         DiscountAmount: 0.00m,
         TaxAmount: 15.00m,
+        OtherCharges: 0m,
         TotalAmount: 115.00m,
         PaidAmount: 50.00m,
         DueAmount: 65.00m,
@@ -224,6 +225,10 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         TaxRate: null,
         CurrencyId: null,
         ExchangeRate: null,
+        CashBoxId: null,
+        CashBoxName: null,
+        TotalCost: null,
+        TotalProfit: null,
         Items: new List<SalesInvoiceItemDto>
         {
             new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
@@ -239,8 +244,12 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         PaymentType: PaymentType.Cash,
         DiscountAmount: 0.00m,
         TaxAmount: 15.00m,
+        OtherCharges: 0m,
         PaidAmount: 50.00m,
         Notes: null,
+        CurrencyId: null,
+        ExchangeRate: null,
+        TaxId: null,
         Items: new List<CreateSalesInvoiceItemRequest>
         {
             new(ProductId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m, Mode: SaleMode.Retail, Notes: null)

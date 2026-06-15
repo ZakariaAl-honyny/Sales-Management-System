@@ -1,8 +1,9 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.Export;
 using Serilog;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Reports;
@@ -15,6 +16,9 @@ public class IncomeStatementViewModel : ViewModelBase
 {
     private IFinancialReportApiService? _reportApiService;
     private IFinancialReportApiService ReportApiService => _reportApiService ??= App.GetService<IFinancialReportApiService>();
+
+    private IFinancialReportExportService? _pdfExportService;
+    private IFinancialReportExportService PdfExportService => _pdfExportService ??= App.GetService<IFinancialReportExportService>();
 
     // Non-null helper for DialogService (set via SetDialogService in constructor)
     private IDialogService D => DialogService!;
@@ -37,6 +41,9 @@ public class IncomeStatementViewModel : ViewModelBase
 
         GenerateReportCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(LoadAsync)));
+
+        ExportPdfCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExportPdfAsync()));
     }
 
     #region Properties
@@ -119,6 +126,7 @@ public class IncomeStatementViewModel : ViewModelBase
     #region Commands
 
     public AsyncRelayCommand GenerateReportCommand { get; }
+    public AsyncRelayCommand ExportPdfCommand { get; }
 
     #endregion
 
@@ -165,6 +173,38 @@ public class IncomeStatementViewModel : ViewModelBase
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل قائمة الدخل", "IncomeStatementViewModel.LoadAsync");
             Log.Warning("Failed to load income statement: {Error}", result.Error);
+        }
+    }
+
+    #endregion
+
+    #region Export
+
+    private async Task ExportPdfAsync()
+    {
+        if (ReportData.Count == 0)
+        {
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
+            return;
+        }
+
+        try
+        {
+            var dataTable = new System.Data.DataTable();
+            dataTable.Columns.Add("التصنيف", typeof(string));
+            dataTable.Columns.Add("البيان", typeof(string));
+            dataTable.Columns.Add("المبلغ", typeof(decimal));
+
+            foreach (var item in ReportData)
+                dataTable.Rows.Add(item.Category, item.Description, item.Amount);
+
+            await PdfExportService.ExportToPdfAsync("قائمة الدخل", dataTable, NetProfit,
+                $"IncomeStatement_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تصدير قائمة الدخل إلى PDF", "IncomeStatementViewModel.ExportPdf", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
         }
     }
 

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.Requests;
-using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
@@ -16,9 +16,9 @@ namespace SalesSystem.Api.Controllers;
 [Authorize]
 public class SupplierPaymentsController : ControllerBase
 {
-    private readonly IPaymentService _paymentService;
+    private readonly ISupplierPaymentService _paymentService;
 
-    public SupplierPaymentsController(IPaymentService paymentService)
+    public SupplierPaymentsController(ISupplierPaymentService paymentService)
     {
         _paymentService = paymentService;
     }
@@ -38,7 +38,7 @@ public class SupplierPaymentsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
-        var result = await _paymentService.CreateSupplierPaymentAsync(request, userId, ct);
+        var result = await _paymentService.CreateAsync(request, userId, ct);
         return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -56,7 +56,7 @@ public class SupplierPaymentsController : ControllerBase
         [FromQuery] int pageSize = 10,
         CancellationToken ct = default)
     {
-        var result = await _paymentService.GetSupplierPaymentsAsync(search, from, to, page, pageSize, ct);
+        var result = await _paymentService.GetAllAsync(search, from, to, page, pageSize, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -69,7 +69,7 @@ public class SupplierPaymentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
-        var result = await _paymentService.GetSupplierPaymentByIdAsync(id, ct);
+        var result = await _paymentService.GetByIdAsync(id, ct);
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
     }
 
@@ -85,7 +85,7 @@ public class SupplierPaymentsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
-        var result = await _paymentService.UpdateSupplierPaymentAsync(id, request, userId, ct);
+        var result = await _paymentService.UpdateAsync(id, request, userId, ct);
         if (result.IsSuccess) return Ok(result.Value);
         if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
@@ -103,9 +103,10 @@ public class SupplierPaymentsController : ControllerBase
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
-        var result = await _paymentService.DeleteSupplierPaymentAsync(id, userId, ct);
+        var result = await _paymentService.DeleteAsync(id, userId, ct);
         if (result.IsSuccess) return NoContent();
         if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
+
 }

@@ -7,275 +7,112 @@ namespace SalesSystem.Domain.Tests.Entities;
 public class CustomerTests
 {
     [Fact]
-    public void Create_GivenValidName_ShouldCreateCustomer()
+    public void Create_GivenValidPartyId_ShouldCreateCustomer()
     {
         var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 0,
-            phone: "1234567890",
-            email: "test@example.com",
-            address: "Test Address",
+            partyId: 1,
+            creditLimit: 0,
             createdByUserId: 1
         );
 
-        customer.Name.Should().Be("Test Customer");
-        customer.OpeningBalance.Should().Be(0);
-        customer.CurrentBalance.Should().Be(0);
-        customer.Phone.Should().Be("1234567890");
-        customer.Email.Should().Be("test@example.com");
-        customer.Address.Should().Be("Test Address");
+        customer.Id.Should().Be(1);
+        customer.CreditLimit.Should().Be(0);
+        customer.CustomerSince.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Create_GivenEmptyName_ShouldThrowArgumentException(string? emptyName)
+    [Fact]
+    public void Create_GivenCreditLimit_ShouldSetCreditLimit()
     {
-        var action = () => Customer.Create(
-            name: emptyName!,
+        var customer = Customer.Create(
+            partyId: 1,
+            creditLimit: 500m,
             createdByUserId: 1
         );
+
+        customer.CreditLimit.Should().Be(500m);
+    }
+
+    [Fact]
+    public void Create_GivenPriceLevel_ShouldSetPriceLevel()
+    {
+        var customer = Customer.Create(
+            partyId: 1,
+            priceLevel: 2,
+            createdByUserId: 1
+        );
+
+        customer.PriceLevel.Should().Be(2);
+    }
+
+    [Fact]
+    public void Create_GivenInvalidPartyId_ShouldThrowDomainException()
+    {
+        var action = () => Customer.Create(partyId: 0, createdByUserId: 1);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("*اسم العميل مطلوب*");
+            .WithMessage("*معرّف الطرف غير صالح*");
     }
 
     [Fact]
-    public void Create_GivenOpeningBalance_ShouldSetCurrentBalance()
+    public void Create_GivenNegativeCreditLimit_ShouldThrowDomainException()
     {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 500m,
-            createdByUserId: 1
-        );
-
-        customer.OpeningBalance.Should().Be(500m);
-        customer.CurrentBalance.Should().Be(500m);
-    }
-
-    [Fact]
-    public void IncreaseBalance_GivenPositiveAmount_ShouldIncreaseCurrentBalance()
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 100m,
-            createdByUserId: 1
-        );
-
-        customer.IncreaseBalance(50m);
-
-        customer.CurrentBalance.Should().Be(150m);
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    [InlineData(-100)]
-    public void IncreaseBalance_GivenInvalidAmount_ShouldThrowArgumentException(decimal invalidAmount)
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 100m,
-            createdByUserId: 1
-        );
-
-        var action = () => customer.IncreaseBalance(invalidAmount);
+        var action = () => Customer.Create(partyId: 1, creditLimit: -100m, createdByUserId: 1);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("*المبلغ يجب أن يكون أكبر من الصفر*");
+            .WithMessage("*حد الائتمان لا يمكن أن يكون سالباً*");
     }
 
     [Fact]
-    public void IncreaseBalance_MultipleTimes_ShouldAccumulateCorrectly()
+    public void Create_GivenInvalidPriceLevel_ShouldThrowDomainException()
     {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 100m,
-            createdByUserId: 1
-        );
-
-        customer.IncreaseBalance(50m);
-        customer.IncreaseBalance(30m);
-        customer.IncreaseBalance(20m);
-
-        customer.CurrentBalance.Should().Be(200m);
-    }
-
-    [Fact]
-    public void DecreaseBalance_GivenPositiveAmount_ShouldDecreaseCurrentBalance()
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 100m,
-            createdByUserId: 1
-        );
-
-        customer.DecreaseBalance(30m);
-
-        customer.CurrentBalance.Should().Be(70m);
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    [InlineData(-100)]
-    public void DecreaseBalance_GivenInvalidAmount_ShouldThrowArgumentException(decimal invalidAmount)
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 100m,
-            createdByUserId: 1
-        );
-
-        var action = () => customer.DecreaseBalance(invalidAmount);
+        var action = () => Customer.Create(partyId: 1, priceLevel: 5, createdByUserId: 1);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("*المبلغ يجب أن يكون أكبر من الصفر*");
-    }
-
-    [Fact]
-    public void DecreaseBalance_MultipleTimes_ShouldAccumulateCorrectly()
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 200m,
-            createdByUserId: 1
-        );
-
-        customer.DecreaseBalance(50m);
-        customer.DecreaseBalance(30m);
-        customer.DecreaseBalance(20m);
-
-        customer.CurrentBalance.Should().Be(100m);
-    }
-
-    [Fact]
-    public void DecreaseBalance_CanMakeBalanceNegative()
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 100m,
-            createdByUserId: 1
-        );
-
-        customer.DecreaseBalance(150m);
-
-        customer.CurrentBalance.Should().Be(-50m);
-    }
-
-    [Fact]
-    public void IncreaseBalance_CanMakeBalancePositive()
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 0,
-            createdByUserId: 1
-        );
-
-        customer.IncreaseBalance(50m);
-
-        customer.CurrentBalance.Should().Be(50m);
+            .WithMessage("*مستوى السعر يجب أن يكون بين 1 و 4*");
     }
 
     [Fact]
     public void Update_GivenValidData_ShouldUpdateCustomer()
     {
-        var customer = Customer.Create(
-            name: "Original Name",
-            phone: "1111111111",
-            email: "old@example.com",
-            address: "Old Address",
-            createdByUserId: 1
-        );
+        var customer = Customer.Create(partyId: 1, creditLimit: 1000m, priceLevel: 2, createdByUserId: 1);
 
         customer.Update(
-            name: "Updated Name",
-            phone: "2222222222",
-            email: "new@example.com",
-            address: "New Address",
-            taxNumber: null,
-            creditLimit: 0,
+            creditLimit: 5000m,
+            priceLevel: 3,
             updatedByUserId: 1
         );
 
-        customer.Name.Should().Be("Updated Name");
-        customer.Phone.Should().Be("2222222222");
-        customer.Email.Should().Be("new@example.com");
-        customer.Address.Should().Be("New Address");
+        customer.CreditLimit.Should().Be(5000m);
+        customer.PriceLevel.Should().Be(3);
     }
 
     [Fact]
-    public void Create_GivenOptionalParametersAreNull_ShouldSucceed()
+    public void CheckCreditLimit_ZeroLimit_ShouldReturnTrue()
     {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            createdByUserId: 1
-        );
+        var customer = Customer.Create(partyId: 1, creditLimit: 0m, createdByUserId: 1);
 
-        customer.Phone.Should().BeNull();
-        customer.Email.Should().BeNull();
-        customer.Address.Should().BeNull();
+        var result = customer.CheckCreditLimit(10000m);
+
+        result.Should().BeTrue();
     }
 
     [Fact]
-    public void Create_GivenNegativeOpeningBalance_ShouldThrowDomainException()
+    public void CheckCreditLimit_UnderLimit_ShouldReturnTrue()
     {
-        var action = () => Customer.Create(
-            name: "Test Customer",
-            openingBalance: -100m,
-            createdByUserId: 1
-        );
+        var customer = Customer.Create(partyId: 1, creditLimit: 1000m, createdByUserId: 1);
 
-        action.Should().Throw<DomainException>()
-            .WithMessage("*الرصيد الافتتاحي لا يمكن أن يكون سالباً*");
+        var result = customer.CheckCreditLimit(500m);
+
+        result.Should().BeTrue();
     }
 
     [Fact]
-    public void DecreaseBalance_ExactAmount_ShouldSetBalanceToZero()
+    public void MarkAsDeleted_ShouldSetIsActiveFalse()
     {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 100m,
-            createdByUserId: 1
-        );
+        var customer = Customer.Create(partyId: 1, createdByUserId: 1);
 
-        customer.DecreaseBalance(100m);
+        customer.MarkAsDeleted();
 
-        customer.CurrentBalance.Should().Be(0);
-    }
-
-    [Theory]
-    [InlineData(0.01)]
-    [InlineData(0.5)]
-    [InlineData(999.99)]
-    public void IncreaseBalance_GivenDecimalAmount_ShouldAccept(decimal amount)
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 100m,
-            createdByUserId: 1
-        );
-
-        customer.IncreaseBalance(amount);
-
-        customer.CurrentBalance.Should().Be(100m + amount);
-    }
-
-    [Theory]
-    [InlineData(0.01)]
-    [InlineData(0.5)]
-    [InlineData(999.99)]
-    public void DecreaseBalance_GivenDecimalAmount_ShouldAccept(decimal amount)
-    {
-        var customer = Customer.Create(
-            name: "Test Customer",
-            openingBalance: 1000m,
-            createdByUserId: 1
-        );
-
-        customer.DecreaseBalance(amount);
-
-        customer.CurrentBalance.Should().Be(1000m - amount);
+        customer.IsActive.Should().BeFalse();
     }
 }

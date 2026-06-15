@@ -58,6 +58,14 @@
                         </StackPanel>
                     </Button>
 
+                    <Button Command="{Binding PricesCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            ToolTip="عرض أسعار الوحدة المحددة وإدارتها">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💰" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="أسعار" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
                     <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                             ToolTip="تحديث قائمة وحدات القياس">
                         <StackPanel Orientation="Horizontal">
@@ -108,22 +116,7 @@
                                             Width="100" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
 
-                        <DataGridTextColumn Header="سعر التجزئة" 
-                                            Binding="{Binding RetailPrice, StringFormat=N2}" 
-                                            Width="110" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-
-                        <DataGridTextColumn Header="سعر الجملة" 
-                                            Binding="{Binding WholesalePrice, StringFormat=N2}" 
-                                            Width="110" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-
-                        <DataGridTextColumn Header="متوسط التكلفة" 
-                                            Binding="{Binding AvgCost, StringFormat=N2}" 
-                                            Width="110" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-
-                        <DataGridTemplateColumn Header="الوحدة الأساسية" Width="110" CellStyle="{StaticResource DataGridCellCenterStyle}">
+                        <DataGridTemplateColumn Header="الوحدة الأساسية" Width="100" CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Border>
@@ -155,11 +148,6 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-
-                        <DataGridTextColumn Header="الباركود" 
-                                            Binding="{Binding Barcodes, Converter={StaticResource StringListJoinConverter}}" 
-                                            Width="150" 
-                                            CellStyle="{StaticResource DataGridCellStyle}"/>
                     </DataGrid.Columns>
                 </DataGrid>
 

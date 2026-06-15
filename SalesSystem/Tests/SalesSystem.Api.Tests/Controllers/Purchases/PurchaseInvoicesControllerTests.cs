@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using FluentAssertions;
 using Moq;
 using SalesSystem.Api.Controllers;
+using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
@@ -13,10 +15,12 @@ namespace SalesSystem.Api.Tests.Controllers.Purchases;
 public class PurchaseInvoicesControllerTests : ControllerTestBase
 {
     private readonly PurchaseInvoicesController _controller;
+    private readonly Mock<ILogger<PurchaseInvoicesController>> _loggerMock;
 
     public PurchaseInvoicesControllerTests()
     {
-        _controller = new PurchaseInvoicesController(PurchaseServiceMock.Object);
+        _loggerMock = new Mock<ILogger<PurchaseInvoicesController>>();
+        _controller = new PurchaseInvoicesController(PurchaseServiceMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -198,10 +202,10 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         SubTotal: 200.00m,
         DiscountAmount: 10.00m,
         TaxAmount: 28.50m,
-        TotalAmount: 218.50m,
+        OtherCharges: 0,
+        NetTotal: 218.50m,
         PaidAmount: 100.00m,
-        DueAmount: 118.50m,
-        SupplierInvoiceNo: null,
+        RemainingAmount: 118.50m,
         Notes: null,
         Status: status,
         TaxId: null,
@@ -209,17 +213,11 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         TaxRate: null,
         CurrencyId: null,
         ExchangeRate: null,
-        CostInBaseCurrency: null,
-        AdditionalFeesTotal: 0,
         AttachmentPath: null,
-        DiscountType: null,
-        DiscountRate: null,
-        CurrencyName: null,
         Items: new List<PurchaseInvoiceItemDto>
         {
-            new(Id: id * 10, ProductId: 1, ProductName: "منتج اختبار", ProductUnitId: 1, ProductUnitName: "وحدة", Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, DiscountType: null, DiscountRate: null, LineTotal: 200.00m, CostInBaseCurrency: null, AdditionalFeesAmount: 0, Mode: 1, Notes: null)
-        },
-        AdditionalFees: new List<AdditionalFeeDto>());
+            new(id * 10, 1, "منتج اختبار", 1, null, 5.000m, 40.00m, 200.00m)
+        });
 
     private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
@@ -228,20 +226,17 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         InvoiceDate: null,
         DueDate: null,
         PaymentType: PaymentType.Cash,
-        CashBoxId: null,
         DiscountAmount: 10.00m,
         DiscountType: null,
         DiscountRate: null,
         TaxAmount: 28.50m,
+        OtherCharges: 0,
         PaidAmount: 100.00m,
         CurrencyId: null,
         ExchangeRate: null,
         Notes: null,
-        SupplierInvoiceNo: null,
-        AttachmentBase64: null,
-        AttachmentFileName: null,
         Items: new List<CreatePurchaseInvoiceItemRequest>
         {
-            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, DiscountType: null, DiscountRate: null, Mode: SaleMode.Retail, Notes: null)
+            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitCost: 40.00m)
         });
 }

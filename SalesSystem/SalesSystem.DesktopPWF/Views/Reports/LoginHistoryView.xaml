@@ -1,0 +1,170 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Reports.LoginHistoryView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
+      mc:Ignorable="d"
+      d:DesignHeight="700" d:DesignWidth="1000"
+     
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Style="{StaticResource PageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="🔐  سجل تسجيل الدخول" Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="LoginHistoryPageTitle"/>
+
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="المستخدم" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox ItemsSource="{Binding Users}"
+                              SelectedValue="{Binding SelectedUserId}"
+                              SelectedValuePath="Id"
+                              DisplayMemberPath="FullName"
+                              Width="180" TabIndex="1"
+                              ToolTip="اختر مستخدماً محدداً أو اترك الكل لعرض جميع المستخدمين"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="من تاريخ" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <DatePicker SelectedDate="{Binding FromDate}" Style="{StaticResource ModernDatePicker}" Width="140" TabIndex="2"
+                                ToolTip="اختر تاريخ بداية الفترة"/>
+                    <TextBlock Text="إلى تاريخ" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="12,0,12,0"/>
+                    <DatePicker SelectedDate="{Binding ToDate}" Style="{StaticResource ModernDatePicker}" Width="140" TabIndex="3"
+                                ToolTip="اختر تاريخ نهاية الفترة"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding GenerateReportCommand}" Style="{StaticResource PrimaryButton}" TabIndex="4"
+                            ToolTip="توليد سجل تسجيل الدخول حسب الفترة والمستخدم المحدد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔐" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="عرض السجل" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ExportExcelCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" TabIndex="5"
+                            ToolTip="تصدير سجل تسجيل الدخول إلى ملف Excel">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Excel" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ExportPdfCommand}" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" TabIndex="6"
+                            ToolTip="تصدير سجل تسجيل الدخول إلى ملف PDF">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="PDF" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <Border Background="{StaticResource ErrorLightBrush}" Padding="10,6" Margin="0,0,0,0"
+                        VerticalAlignment="Top" Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <Button Grid.Column="2" Command="{Binding GenerateReportCommand}" Style="{StaticResource SecondaryButton}" Height="28" Padding="12,0" FontSize="11"
+                                ToolTip="إعادة المحاولة">
+                            <TextBlock Text="إعادة المحاولة"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <DataGrid ItemsSource="{Binding Entries}" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
+                    <DataGrid.Style>
+                        <Style TargetType="DataGrid" BasedOn="{StaticResource ModernDataGrid}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Style>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="وقت الدخول" Binding="{Binding LoginTime, StringFormat={}{0:yyyy/MM/dd HH:mm}}" Width="1.5*"
+                                            ToolTipService.ToolTip="تاريخ ووقت محاولة تسجيل الدخول"/>
+                        <DataGridTextColumn Header="اسم المستخدم" Binding="{Binding UserName}" Width="1.5*"
+                                            ToolTipService.ToolTip="اسم المستخدم"/>
+                        <DataGridTextColumn Header="عنوان IP" Binding="{Binding IpAddress}" Width="1.5*"
+                                            ToolTipService.ToolTip="عنوان IP المستخدم في تسجيل الدخول"/>
+                        <DataGridTextColumn Header="الحالة" Binding="{Binding IsSuccess}" Width="1*"
+                                            ToolTipService.ToolTip="هل نجحت عملية تسجيل الدخول">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSuccess}" Value="True">
+                                            <Setter Property="Text" Value="ناجح"/>
+                                            <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsSuccess}" Value="False">
+                                            <Setter Property="Text" Value="فاشل"/>
+                                            <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,0">
+                        <TextBlock Text="🔐" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
+                        <TextBlock Text="سجل تسجيل الدخول" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="اختر الفترة والمستخدم ثم اضغط على 'عرض السجل'"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border Background="#CCFFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="240" Height="6" Background="#E2E8F0" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="جاري تحميل سجل الدخول..." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Summary Footer -->
+        <Border Grid.Row="3" Style="{StaticResource FooterBarStyle}"
+                Visibility="{Binding HasData, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,0,30,0">
+                    <TextBlock Text="محاولات ناجحة:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                    <TextBlock Text="{Binding SuccessDisplay}" Style="{StaticResource FooterBarTextStyle}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="محاولات فاشلة:" Style="{StaticResource FooterBarTextStyle}" Opacity="0.8"/>
+                    <TextBlock Text="{Binding FailureDisplay}" Style="{StaticResource FooterBarTextStyle}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource ErrorBrush}" Margin="6,0,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

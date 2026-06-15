@@ -130,6 +130,9 @@ public class SalesReturnsControllerTests : ControllerTestBase
         ExchangeRate: null,
         Notes: "ملاحظات",
         Status: 1,
+        CashBoxId: null,
+        CashBoxName: null,
+        RefundAmount: 0m,
         Items: new List<SalesReturnItemDto>
         {
             new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
@@ -141,6 +144,8 @@ public class SalesReturnsControllerTests : ControllerTestBase
         WarehouseId: 1,
         ReturnDate: null,
         Notes: "ملاحظات إرجاع",
+        CashBoxId: null,
+        RefundAmount: null,
         Items: new List<ReturnItemRequest>
         {
             new(ProductId: 1, ProductUnitId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m)
@@ -170,7 +175,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         PurchaseReturnServiceMock.Setup(x => x.GetAllAsync(null, 1, 10, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(expectedResult));
 
-        var result = await _controller.GetAll(null, false, 1, 10, CancellationToken.None);
+        var result = await _controller.GetAll(null, 1, 10, false, CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
     }
@@ -181,7 +186,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         PurchaseReturnServiceMock.Setup(x => x.GetAllAsync(null, 1, 10, false, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<PagedResult<PurchaseReturnDto>>("حدث خطأ"));
 
-        var result = await _controller.GetAll(null, false, 1, 10, CancellationToken.None);
+        var result = await _controller.GetAll(null, 1, 10, false, CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -252,7 +257,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
 
     private static PurchaseReturnDto CreateReturnDto(int id) => new(
         Id: id,
-        ReturnNo: $"PR-2026-{id:D6}",
+        ReturnNo: id,
         WarehouseId: 1,
         WarehouseName: "المستودع الرئيسي",
         SupplierId: 1,
@@ -261,10 +266,6 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         LinkToInvoice: true,
         ReturnDate: DateTime.UtcNow,
         SubTotal: 200.00m,
-        TaxAmount: 0.00m,
-        DiscountAmount: 0.00m,
-        DiscountType: null,
-        DiscountRate: null,
         TotalAmount: 200.00m,
         CurrencyId: null,
         ExchangeRate: null,
@@ -272,7 +273,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         Status: 1,
         Items: new List<PurchaseReturnItemDto>
         {
-            new(Id: id * 10, ProductId: 1, ProductName: "منتج اختبار", ProductUnitId: 1, ProductUnitName: "وحدة", Quantity: 5.000m, UnitCost: 40.00m, DiscountAmount: 0.00m, LineTotal: 200.00m, CostInBaseCurrency: null, Mode: 1)
+            new(id * 10, 1, "منتج اختبار", 1, null, 5.000m, 40.00m, 200.00m)
         });
 
     private static CreatePurchaseReturnRequest CreateValidRequest() => new(
@@ -282,12 +283,9 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         ReturnDate: null,
         CurrencyId: null,
         ExchangeRate: null,
-        DiscountAmount: 0,
-        DiscountType: null,
-        DiscountRate: null,
         Notes: "ملاحظات إرجاع",
-        Items: new List<ReturnItemRequest>
+        Items: new List<CreatePurchaseReturnItemRequest>
         {
-            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitPrice: 40.00m, DiscountAmount: 0.00m)
+            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitCost: 40.00m)
         });
 }

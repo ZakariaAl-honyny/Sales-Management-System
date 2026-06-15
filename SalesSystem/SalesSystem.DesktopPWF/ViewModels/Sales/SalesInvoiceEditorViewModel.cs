@@ -34,8 +34,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly ICashBoxApiService _cashBoxService;
     private readonly IPrintApiService _printApiService;
     private readonly IToastNotificationService _toastService;
-    private readonly ICategoryApiService _categoryService;
-
+    private readonly ICurrencyApiService _currencyService;
+    private readonly IProductCategoryApiService _productCategoryService;
     private int? _invoiceId;
     private int _invoiceNo;
     private int _selectedWarehouseId;
@@ -47,6 +47,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private decimal _taxRate = 15;
     private bool _isTaxInclusive;
     private decimal _paidAmount;
+    private decimal _otherCharges;
     private string? _notes;
     private string _barcodeSearchText = string.Empty;
     private bool _isEditMode;
@@ -55,6 +56,12 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private byte _status = (byte)InvoiceStatus.Draft;
     public bool IsReadOnly { get; private set; }
 
+    // Currency fields
+    private int? _selectedCurrencyId;
+    private decimal? _exchangeRate;
+    private bool _isForeignCurrency;
+
+    private ObservableCollection<CurrencyDto> _currencies = new();
     private ObservableCollection<InvoiceLineViewModel> _items = new();
     private ObservableCollection<CustomerDto> _customers = new();
     private ObservableCollection<WarehouseDto> _warehouses = new();
@@ -92,7 +99,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         ICashBoxApiService cashBoxService,
         IPrintApiService printApiService,
         IToastNotificationService toastService,
-        ICategoryApiService categoryService,
+        ICurrencyApiService currencyService,
+        IProductCategoryApiService productCategoryService,
         int? invoiceId = null,
         bool isReadOnly = false)
     {
@@ -110,7 +118,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _cashBoxService = cashBoxService;
         _printApiService = printApiService;
         _toastService = toastService;
-        _categoryService = categoryService;
+        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
+        _productCategoryService = productCategoryService ?? throw new ArgumentNullException(nameof(productCategoryService));
         _invoiceId = invoiceId;
         _isEditMode = invoiceId.HasValue;
 
@@ -141,9 +150,10 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         });
         DeleteCommand = new AsyncRelayCommand(DeleteAsync, () => IsEditMode && !IsReadOnly);
         ToggleViewModeCommand = new RelayCommand(ToggleViewMode);
+        StartContinuousScanCommand = new AsyncRelayCommand(StartContinuousScanAsync);
 
         // --- Touch POS ViewModels ---
-        TouchPosVM = new TouchPosViewModel(_categoryService, _productService, _inventoryService);
+        TouchPosVM = new TouchPosViewModel(_productCategoryService, _productService, _inventoryService);
         TouchPosCartVM = new TouchPosCartViewModel(Items, RecalculateTotals);
 
         // Wire: when a product is selected in Touch POS, validate stock then add to cart
@@ -185,19 +195,21 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 if (existingLine != null)
                 {
                     existingLine.Quantity += 1m;
+                    if (!existingLine.CostInBaseCurrency.HasValue)
+                    {
+                        existingLine.CostInBaseCurrency = 0m;
+                    }
                     _soundService.PlaySuccess();
                 }
                 else
                 {
-                    var line = new InvoiceLineViewModel(Products, _soundService)
-                    {
-                        SelectedProduct = product,
-                        Quantity = 1m,
-                        Mode = (byte)SaleMode.Retail
-                    };
+                    var line = new InvoiceLineViewModel(Products, _soundService);
+                    line.SetPriceFromProduct(product, (byte)SaleMode.Retail);
+                    line.Quantity = 1m;
                     line.PropertyChanged += (s, e) =>
                     {
-                        if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
+                        if (e.PropertyName is nameof(InvoiceLineViewModel.LineTotal)
+                            or nameof(InvoiceLineViewModel.Profit))
                             RecalculateTotals();
                     };
                     Items.Add(line);
@@ -264,7 +276,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             // Select default warehouse before adding line
             if (Warehouses.Any())
             {
-                var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
+                var defaultWarehouse = Warehouses.FirstOrDefault() ?? Warehouses.First();
                 SelectedWarehouseId = defaultWarehouse.Id;
             }
             AddLine();
@@ -322,7 +334,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             App.GetService<ICashBoxApiService>(),
             App.GetService<IPrintApiService>(),
             App.GetService<IToastNotificationService>(),
-            App.GetService<ICategoryApiService>(),
+            App.GetService<ICurrencyApiService>(),
+            App.GetService<IProductCategoryApiService>(),
             invoiceId,
             isReadOnly)
     {
@@ -486,6 +499,18 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         }
     }
 
+    public decimal OtherCharges
+    {
+        get => _otherCharges;
+        set
+        {
+            if (SetProperty(ref _otherCharges, value))
+            {
+                RecalculateTotals();
+            }
+        }
+    }
+
     public string? Notes
     {
         get => _notes;
@@ -554,6 +579,42 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     };
 
     public List<EnumDisplayItem> SaleModeOptions { get; }
+
+    // Currency properties
+    public ObservableCollection<CurrencyDto> Currencies
+    {
+        get => _currencies;
+        set => SetProperty(ref _currencies, value);
+    }
+
+    public int? SelectedCurrencyId
+    {
+        get => _selectedCurrencyId;
+        set
+        {
+            if (SetProperty(ref _selectedCurrencyId, value))
+            {
+                IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
+                OnPropertyChanged(nameof(IsForeignCurrency));
+            }
+        }
+    }
+
+    public decimal? ExchangeRate
+    {
+        get => _exchangeRate;
+        set
+        {
+            if (SetProperty(ref _exchangeRate, value))
+                RecalculateTotals();
+        }
+    }
+
+    public bool IsForeignCurrency
+    {
+        get => _isForeignCurrency;
+        set => SetProperty(ref _isForeignCurrency, value);
+    }
     #endregion
 
     #region Commands
@@ -568,6 +629,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     public ICommand SearchProductSingleCommand { get; }    // Single: closes after one pick
     public ICommand SearchCustomerCommand { get; }
     public ICommand ProcessBarcodeCommand { get; }
+    public ICommand StartContinuousScanCommand { get; }
     public ICommand DeleteCommand { get; }
     public ICommand ToggleViewModeCommand { get; }
     #endregion
@@ -600,7 +662,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 Warehouses = new ObservableCollection<WarehouseDto>(warehousesResult.Value);
                 if (Warehouses.Any() && SelectedWarehouseId == 0)
                 {
-                    var defaultWarehouse = Warehouses.FirstOrDefault(w => w.IsDefault) ?? Warehouses.First();
+                    var defaultWarehouse = Warehouses.FirstOrDefault() ?? Warehouses.First();
                     SelectedWarehouseId = defaultWarehouse.Id;
                 }
             }
@@ -623,6 +685,18 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 if (settingsResult.Value.IsTaxEnabled)
                 {
                     TaxRate = settingsResult.Value.DefaultTaxRate;
+                }
+            }
+
+            var currenciesResult = await _currencyService.GetAllAsync();
+            if (currenciesResult.IsSuccess && currenciesResult.Value != null)
+            {
+                Currencies = new ObservableCollection<CurrencyDto>(currenciesResult.Value);
+                if (!_isEditMode)
+                {
+                    var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+                    if (baseCurrency != null)
+                        SelectedCurrencyId = baseCurrency.Id;
                 }
             }
         });
@@ -667,9 +741,17 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     lineVm.DiscountAmount = item.DiscountAmount;
                     lineVm.SelectedProduct = Products.FirstOrDefault(p => p.Id == item.ProductId);
                     
+                    // Set cost from the invoice item's loaded cost for profit display
+                    var product = Products.FirstOrDefault(p => p.Id == item.ProductId);
+                    if (product != null)
+                    {
+                        lineVm.CostInBaseCurrency = item.CostInBaseCurrency;
+                    }
+                    
                     lineVm.PropertyChanged += (s, e) =>
                     {
-                        if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
+                        if (e.PropertyName is nameof(InvoiceLineViewModel.LineTotal)
+                            or nameof(InvoiceLineViewModel.Profit))
                         {
                             RecalculateTotals();
                         }
@@ -677,7 +759,20 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     Items.Add(lineVm);
                 }
 
-                // TODO: Restore CashBoxId when DTO supports it
+                // Restore currency
+                SelectedCurrencyId = invoice.CurrencyId;
+                ExchangeRate = invoice.ExchangeRate;
+
+                OtherCharges = invoice.OtherCharges;
+
+                // Restore CashBoxId selection
+                if (invoice.CashBoxId.HasValue)
+                {
+                    var cashBox = CashBoxes.FirstOrDefault(cb => cb.Id == invoice.CashBoxId.Value);
+                    if (cashBox != null)
+                        SelectedCashBox = cashBox;
+                }
+
                 RecalculateTotals();
             }
             else
@@ -707,15 +802,15 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             ErrorMessage = null;
-            var request = BuildRequest();
-
             Result<SalesInvoiceDto> result;
             if (_isEditMode)
             {
+                var request = BuildUpdateRequest();
                 result = await _invoiceService.UpdateAsync(_invoiceId!.Value, request);
             }
             else
             {
+                var request = BuildRequest();
                 result = await _invoiceService.CreateAsync(request);
             }
 
@@ -897,11 +992,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         var line = new InvoiceLineViewModel(Products, _soundService);
         line.PropertyChanged += async (s, e) =>
         {
-            if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
+            if (e.PropertyName is nameof(InvoiceLineViewModel.LineTotal)
+                or nameof(InvoiceLineViewModel.Profit))
             {
                 RecalculateTotals();
             }
-            else if (e.PropertyName == nameof(InvoiceLineViewModel.SelectedProduct) || e.PropertyName == nameof(InvoiceLineViewModel.Quantity))
+            else if (e.PropertyName is nameof(InvoiceLineViewModel.SelectedProduct)
+                     or nameof(InvoiceLineViewModel.Quantity))
             {
                 if (!_allowNegativeStock && line.SelectedProduct != null && SelectedWarehouseId > 0)
                 {
@@ -972,7 +1069,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 i.UnitPrice,
                 i.DiscountAmount,
                 (SaleMode)i.Mode,
-                null))
+                null,
+                ProductUnitId: i.ProductUnitId,
+                IsPriceOverridden: i.IsPriceOverridden))
             .ToList();
 
         return new CreateSalesInvoiceRequest(
@@ -985,8 +1084,45 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
             TaxAmount,
+            OtherCharges,
             PaidAmount,
             Notes,
+            SelectedCurrencyId,
+            ExchangeRate,
+            null,        // TaxId
+            items);
+    }
+
+    private UpdateSalesInvoiceRequest BuildUpdateRequest()
+    {
+        var items = Items
+            .Where(i => i.SelectedProduct != null && i.Quantity > 0)
+            .Select(i => new CreateSalesInvoiceItemRequest(
+                i.SelectedProduct!.Id,
+                i.Quantity,
+                i.UnitPrice,
+                i.DiscountAmount,
+                (SaleMode)i.Mode,
+                null,
+                ProductUnitId: i.ProductUnitId,
+                IsPriceOverridden: i.IsPriceOverridden))
+            .ToList();
+
+        return new UpdateSalesInvoiceRequest(
+            SelectedWarehouseId,
+            SelectedCustomerId,
+            InvoiceDate,
+            null,
+            (PaymentType)SelectedPaymentType,
+            InvoiceDiscount,
+            TaxAmount,
+            OtherCharges,
+            PaidAmount,
+            SelectedCashBox?.Id,
+            Notes,
+            SelectedCurrencyId,
+            ExchangeRate,
+            null,        // TaxId
             items);
     }
 
@@ -1004,7 +1140,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         else
         {
             TaxAmount = netAmount * (TaxRate / 100);
-            TotalAmount = netAmount + TaxAmount;
+            TotalAmount = netAmount + TaxAmount + OtherCharges;
         }
 
         if (SelectedPaymentType == (byte)PaymentType.Cash)
@@ -1073,21 +1209,24 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         if (existingLine != null)
         {
             existingLine.Quantity += 1;
+            // Ensure CostInBaseCurrency is set (should have been set on first creation)
+            if (!existingLine.CostInBaseCurrency.HasValue)
+            {
+                existingLine.CostInBaseCurrency = 0m;
+            }
             _soundService.PlaySuccess();
         }
         else
         {
-            // Add new line
-            var line = new InvoiceLineViewModel(Products, _soundService)
-            {
-                SelectedProduct = product,
-                Quantity = 1,
-                UnitPrice = product.RetailPrice
-            };
+            // Add new line — use SetPriceFromProduct to ensure cost and price-override are set
+            var line = new InvoiceLineViewModel(Products, _soundService);
+            line.SetPriceFromProduct(product, (byte)SaleMode.Retail);
+            line.Quantity = 1;
             
             line.PropertyChanged += (s, e) =>
             {
-                if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
+                if (e.PropertyName is nameof(InvoiceLineViewModel.LineTotal)
+                    or nameof(InvoiceLineViewModel.Profit))
                 {
                     RecalculateTotals();
                 }
@@ -1105,6 +1244,54 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
         RecalculateTotals();
         return true;
+    }
+
+    /// <summary>
+    /// Opens a continuous barcode scan dialog. Each scanned barcode auto-adds
+    /// the product to the invoice items list.
+    /// </summary>
+    public async Task StartContinuousScanAsync()
+    {
+        try
+        {
+            // Validate warehouse selection first
+            if (SelectedWarehouseId <= 0)
+            {
+                await _dialogService.ShowWarningAsync("المسح المستمر", "يجب اختيار المستودع أولاً قبل بدء المسح");
+                return;
+            }
+
+            var dialog = new Views.Dialogs.BarcodeScanDialog();
+            if (System.Windows.Application.Current.MainWindow != null && System.Windows.Application.Current.MainWindow != dialog)
+            {
+                dialog.Owner = System.Windows.Application.Current.MainWindow;
+            }
+
+            // In continuous mode, each scanned barcode auto-adds product
+            dialog.OnBarcodeScanned += async (barcode) =>
+            {
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+                {
+                    var result = await ProcessBarcodeAsync(barcode);
+                    if (result)
+                    {
+                        _soundService?.PlaySuccess();
+                    }
+                    else
+                    {
+                        _soundService?.PlayError();
+                        await _dialogService.ShowWarningAsync("المسح المستمر",
+                            $"لم يتم العثور على منتج للباركود: {barcode}");
+                    }
+                });
+            };
+
+            dialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في فتح نافذة المسح المستمر", "StartContinuousScanAsync", ex);
+        }
     }
 
     private void SearchProduct(object? parameter)
@@ -1142,17 +1329,15 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             }
             else
             {
-                // Add new line
-                var line = new InvoiceLineViewModel(Products, _soundService)
-                {
-                    SelectedProduct = product,
-                    Quantity = 1,
-                    UnitPrice = product.RetailPrice
-                };
+                // Add new line with enhanced cost/price-override tracking
+                var line = new InvoiceLineViewModel(Products, _soundService);
+                line.SetPriceFromProduct(product, (byte)SaleMode.Retail);
+                line.Quantity = 1;
                 
                 line.PropertyChanged += (s, e) =>
                 {
-                    if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
+                    if (e.PropertyName is nameof(InvoiceLineViewModel.LineTotal)
+                        or nameof(InvoiceLineViewModel.Profit))
                     {
                         RecalculateTotals();
                     }
@@ -1218,7 +1403,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 {
                     targetLine.SelectedProduct = product;
                     targetLine.Quantity = 1;
-                    targetLine.UnitPrice = product.RetailPrice;
+                    targetLine.SetPriceFromProduct(product, (byte)SaleMode.Retail);
                     RecalculateTotals();
                     _soundService.PlaySuccess();
                 }
@@ -1242,15 +1427,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 }
                 else
                 {
-                    var newLine = new InvoiceLineViewModel(Products, _soundService)
-                    {
-                        SelectedProduct = product,
-                        Quantity = 1,
-                        UnitPrice = product.RetailPrice
-                    };
+                    var newLine = new InvoiceLineViewModel(Products, _soundService);
+                    newLine.SetPriceFromProduct(product, (byte)SaleMode.Retail);
+                    newLine.Quantity = 1;
                     newLine.PropertyChanged += (s, e) =>
                     {
-                        if (e.PropertyName == nameof(InvoiceLineViewModel.LineTotal))
+                        if (e.PropertyName is nameof(InvoiceLineViewModel.LineTotal)
+                            or nameof(InvoiceLineViewModel.Profit))
                             RecalculateTotals();
                     };
                     var lastLine = Items.LastOrDefault();
@@ -1334,6 +1517,12 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             : $"• {ProductName}: الكمية المطلوبة {RequiredQty:N0} لكن المتوفر {AvailableStock:N0}";
     }
 
+    private int GetBaseCurrencyId()
+    {
+        var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+        return baseCurrency?.Id ?? 0;
+    }
+
     #endregion
 }
 
@@ -1344,7 +1533,13 @@ public class InvoiceLineViewModel : ViewModelBase
     private decimal _quantity = 1;
     private decimal _unitPrice;
     private decimal _discountAmount;
+    private decimal _lineTotalInput;  // Editable gross total (Qty × Price), before discount
+    private FlexibleInputCalculator.CalculationField? _lastModifiedField;
+    private bool _isRecalculating;
     private byte _mode = (byte)SaleMode.Retail;
+    private decimal? _costInBaseCurrency;
+    private bool _isPriceOverridden;
+    private int? _productUnitId;
 
     private readonly ISoundService? _soundService;
     public ObservableCollection<ProductDto> AvailableProducts { get; }
@@ -1353,12 +1548,50 @@ public class InvoiceLineViewModel : ViewModelBase
     {
         AvailableProducts = products;
         _soundService = soundService;
+        _lineTotalInput = _quantity * _unitPrice;  // Initialize: Qty (1) × Price (0) = 0
     }
 
     public int ProductId
     {
         get => _productId;
         set => SetProperty(ref _productId, value);
+    }
+
+    /// <summary>
+    /// Read-only computed property for profit display.
+    /// Profit = LineTotal - (CostInBaseCurrency × Quantity)
+    /// Returns null when cost is unknown.
+    /// </summary>
+    public decimal? Profit => CostInBaseCurrency.HasValue
+        ? LineTotal - (CostInBaseCurrency.Value * Quantity)
+        : null;
+
+    /// <summary>
+    /// Cost per unit in base currency (from Product.Cost).
+    /// Used to compute profit display.
+    /// </summary>
+    public decimal? CostInBaseCurrency
+    {
+        get => _costInBaseCurrency;
+        set => SetProperty(ref _costInBaseCurrency, value);
+    }
+
+    /// <summary>
+    /// Indicates whether the unit price was manually overridden from the product's default price.
+    /// </summary>
+    public bool IsPriceOverridden
+    {
+        get => _isPriceOverridden;
+        set => SetProperty(ref _isPriceOverridden, value);
+    }
+
+    /// <summary>
+    /// The specific ProductUnitId used for this line (retail or wholesale unit).
+    /// </summary>
+    public int? ProductUnitId
+    {
+        get => _productUnitId;
+        set => SetProperty(ref _productUnitId, value);
     }
 
     public ProductDto? SelectedProduct
@@ -1370,12 +1603,23 @@ public class InvoiceLineViewModel : ViewModelBase
             {
                 ProductId = value.Id;
                 ClearErrors(nameof(ProductName));
+
+                // Set cost from product's Cost
+                CostInBaseCurrency = null;
+
+                // Set ProductUnitId from product's default sales unit (or 0 for service auto-determination)
+                ProductUnitId = value.DefaultSalesUnitId ?? 0;
+
+                // Reset price override flag
+                IsPriceOverridden = false;
+
                 if (UnitPrice == 0)
                 {
-                    UnitPrice = Mode == (byte)SaleMode.Wholesale 
-                        ? value.WholesalePrice 
-                        : value.RetailPrice;
+                    UnitPrice = GetDefaultPrice(value);
                 }
+
+                // Determine if current price differs from default
+                UpdatePriceOverrideState(value);
             }
         }
     }
@@ -1391,9 +1635,9 @@ public class InvoiceLineViewModel : ViewModelBase
             {
                 if (SelectedProduct != null)
                 {
-                    UnitPrice = value == (byte)SaleMode.Wholesale 
-                        ? SelectedProduct.WholesalePrice 
-                        : SelectedProduct.RetailPrice;
+                    UnitPrice = GetDefaultPrice(SelectedProduct);
+                    ProductUnitId = SelectedProduct.DefaultSalesUnitId ?? 0; // From product's default sales unit
+                    IsPriceOverridden = false;
                 }
                 OnPropertyChanged(nameof(LineTotal));
             }
@@ -1408,7 +1652,9 @@ public class InvoiceLineViewModel : ViewModelBase
             if (SetProperty(ref _quantity, value))
             {
                 ValidateQuantity();
-                OnPropertyChanged(nameof(LineTotal));
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Quantity;
+                RecalculateFromFlexibleInput();
+                OnPropertyChanged(nameof(Profit));
                 _soundService?.PlaySuccess();
             }
         }
@@ -1422,7 +1668,15 @@ public class InvoiceLineViewModel : ViewModelBase
             if (SetProperty(ref _unitPrice, value))
             {
                 ValidateUnitPrice();
-                OnPropertyChanged(nameof(LineTotal));
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Price;
+                RecalculateFromFlexibleInput();
+                OnPropertyChanged(nameof(Profit));
+
+                // Check if price was overridden from default
+                if (SelectedProduct != null)
+                {
+                    UpdatePriceOverrideState(SelectedProduct);
+                }
             }
         }
     }
@@ -1435,11 +1689,125 @@ public class InvoiceLineViewModel : ViewModelBase
             if (SetProperty(ref _discountAmount, value))
             {
                 OnPropertyChanged(nameof(LineTotal));
+                OnPropertyChanged(nameof(Profit));
             }
         }
     }
 
     public decimal LineTotal => (Quantity * UnitPrice) - DiscountAmount;
+
+    /// <summary>
+    /// Editable gross total (Quantity × UnitPrice), before discount.
+    /// When user edits this field, the system recalculates either Quantity or UnitPrice
+    /// depending on which was last modified.
+    /// </summary>
+    public decimal LineTotalInput
+    {
+        get => _lineTotalInput;
+        set
+        {
+            if (SetProperty(ref _lineTotalInput, value))
+            {
+                ValidateLineTotalInput();
+                _lastModifiedField = FlexibleInputCalculator.CalculationField.Total;
+                RecalculateFromFlexibleInput();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets the price from a product based on the given sale mode (retail/wholesale).
+    /// </summary>
+    public void SetPriceFromProduct(ProductDto product, byte mode)
+    {
+        Mode = mode;
+        if (product != null)
+        {
+            UnitPrice = GetDefaultPrice(product);
+            ProductUnitId = product.DefaultSalesUnitId ?? 0; // From product's default sales unit
+            CostInBaseCurrency = null;
+            IsPriceOverridden = false;
+        }
+    }
+
+    /// <summary>
+    /// Recalculates based on user input.
+    /// When the user explicitly edits the LineTotal (Total) column, the
+    /// <see cref="FlexibleInputCalculator"/> determines whether to compute
+    /// Quantity or UnitPrice using the two entered values.
+    /// When the user edits Quantity or UnitPrice, the LineTotal is simply
+    /// recalculated as Quantity × UnitPrice (the total column is NOT used as
+    /// an anchor — it was only auto-set from a prior field edit, not user-entered).
+    /// A guard flag (<c>_isRecalculating</c>) prevents infinite recursion.
+    /// </summary>
+    private void RecalculateFromFlexibleInput()
+    {
+        if (_isRecalculating) return;
+        _isRecalculating = true;
+        try
+        {
+            if (_lastModifiedField == FlexibleInputCalculator.CalculationField.Total)
+            {
+                // User explicitly edited LineTotalInput — use the calculator
+                // to determine Quantity or UnitPrice from the two known values.
+                var result = FlexibleInputCalculator.Calculate(
+                    _quantity, _unitPrice, _lineTotalInput,
+                    FlexibleInputCalculator.CalculationField.Total);
+
+                _quantity = result.quantity;
+                _unitPrice = result.price;
+                _lineTotalInput = result.total;
+
+                OnPropertyChanged(nameof(Quantity));
+                OnPropertyChanged(nameof(UnitPrice));
+                OnPropertyChanged(nameof(LineTotalInput));
+            }
+            else
+            {
+                // User edited Quantity or UnitPrice — just recompute the total.
+                // Do NOT treat the current LineTotalInput as a user-entered anchor.
+                _lineTotalInput = _quantity * _unitPrice;
+                OnPropertyChanged(nameof(LineTotalInput));
+            }
+
+            OnPropertyChanged(nameof(LineTotal));
+        }
+        finally
+        {
+            _isRecalculating = false;
+        }
+    }
+
+    private void ValidateLineTotalInput()
+    {
+        ClearErrors(nameof(LineTotalInput));
+        if (LineTotalInput < 0)
+        {
+            AddError(nameof(LineTotalInput), "الإجمالي لا يمكن أن يكون سالباً");
+        }
+    }
+
+    /// <summary>
+    /// Gets the default unit price for a product.
+    /// Returns 0m when no price data is available (user enters price manually).
+    /// Server-side enforcement in SalesService.PostAsync prevents selling below registered prices.
+    /// Phase 25 (ProductPrices table) will populate this via effective price lookup per unit + currency.
+    /// </summary>
+    private decimal GetDefaultPrice(ProductDto product)
+    {
+        // V1: ProductDto has no price fields — prices come from ProductPrices table (Phase 25).
+        // Server validates via SalesService.PostAsync → PreventBelowRetailPrice setting.
+        return 0m;
+    }
+
+    /// <summary>
+    /// Updates the IsPriceOverridden flag by comparing current UnitPrice with the product's default price.
+    /// </summary>
+    private void UpdatePriceOverrideState(ProductDto product)
+    {
+        var defaultPrice = GetDefaultPrice(product);
+        IsPriceOverridden = UnitPrice != defaultPrice;
+    }
 
     private void ValidateProductId()
     {

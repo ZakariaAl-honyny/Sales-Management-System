@@ -4,18 +4,14 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class PurchaseReturnItem : BaseEntity
+public class PurchaseReturnItem : Entity
 {
     public int PurchaseReturnId { get; private set; }
     public int ProductId { get; private set; }
     public int ProductUnitId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal UnitCost { get; private set; }
-    public decimal DiscountAmount { get; private set; }
     public decimal LineTotal { get; private set; }
-    public decimal? CostInBaseCurrency { get; private set; }
-    public SaleMode Mode { get; private set; }
-    public string? Notes { get; private set; }
 
     // Navigation properties
     public virtual PurchaseReturn? PurchaseReturn { get; private set; }
@@ -24,28 +20,16 @@ public class PurchaseReturnItem : BaseEntity
 
     private PurchaseReturnItem() { }
 
-    public static PurchaseReturnItem Create(
-        int productId,
-        decimal quantity,
-        decimal unitCost,
-        int productUnitId = 0,
-        decimal discountAmount = 0,
-        decimal? costInBaseCurrency = null,
-        SaleMode mode = SaleMode.Retail,
-        string? notes = null)
+    public static PurchaseReturnItem Create(int productId, int productUnitId, decimal quantity, decimal unitCost)
     {
         if (productId <= 0)
             throw new DomainException("المنتج مطلوب.");
         if (productUnitId <= 0)
-            throw new DomainException("وحدة المنتج مطلوبة.");
+            throw new DomainException("الوحدة مطلوبة.");
         if (quantity <= 0)
             throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
         if (unitCost < 0)
             throw new DomainException("تكلفة الوحدة لا يمكن أن تكون سالبة.");
-        if (discountAmount < 0)
-            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
-        if (costInBaseCurrency.HasValue && costInBaseCurrency < 0)
-            throw new DomainException("التكلفة بعملة الأساس لا يمكن أن تكون سالبة.");
 
         var item = new PurchaseReturnItem
         {
@@ -53,24 +37,20 @@ public class PurchaseReturnItem : BaseEntity
             ProductUnitId = productUnitId,
             Quantity = quantity,
             UnitCost = unitCost,
-            DiscountAmount = discountAmount,
-            CostInBaseCurrency = costInBaseCurrency,
-            Mode = mode,
-            Notes = notes
         };
         item.RecalculateLineTotal();
         return item;
     }
 
-    public void RecalculateLineTotal() => LineTotal = (Quantity * UnitCost) - DiscountAmount;
+    public void RecalculateLineTotal() => LineTotal = Quantity * UnitCost;
 }
 
-public class PurchaseReturn : BaseEntity
+public class PurchaseReturn : DocumentEntity
 {
-    public string ReturnNo { get; private set; } = string.Empty;
+    public int ReturnNo { get; private set; }
     public int? PurchaseInvoiceId { get; private set; }
     public int SupplierId { get; private set; }
-    public int WarehouseId { get; private set; }
+    public short WarehouseId { get; private set; }
     public DateTime ReturnDate { get; private set; }
     public string? Notes { get; private set; }
     public decimal SubTotal { get; private set; }
@@ -78,7 +58,7 @@ public class PurchaseReturn : BaseEntity
     public DiscountType? DiscountType { get; private set; }
     public decimal? DiscountRate { get; private set; }
     public decimal TotalAmount { get; private set; }
-    public int? CurrencyId { get; private set; }
+    public short? CurrencyId { get; private set; }
     public decimal? ExchangeRate { get; private set; }
     public bool LinkToInvoice { get; private set; }
     public InvoiceStatus Status { get; private set; }
@@ -93,57 +73,16 @@ public class PurchaseReturn : BaseEntity
     private PurchaseReturn() { }
 
     public static PurchaseReturn Create(
-        string returnNo,
-        int warehouseId,
-        int supplierId,
-        int? purchaseInvoiceId = null,
-        DateTime? returnDate = null,
-        string? notes = null,
-        int? currencyId = null,
-        decimal? exchangeRate = null,
-        int? userId = null)
-    {
-        if (string.IsNullOrWhiteSpace(returnNo))
-            throw new DomainException("رقم الإرجاع مطلوب.");
-        if (warehouseId <= 0)
-            throw new DomainException("المستودع مطلوب.");
-        if (supplierId <= 0)
-            throw new DomainException("المورد مطلوب.");
-        if (currencyId.HasValue && !exchangeRate.HasValue)
-            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
-
-        var pr = new PurchaseReturn
-        {
-            ReturnNo = returnNo,
-            WarehouseId = warehouseId,
-            SupplierId = supplierId,
-            PurchaseInvoiceId = purchaseInvoiceId,
-            ReturnDate = returnDate ?? DateTime.UtcNow,
-            CurrencyId = currencyId,
-            ExchangeRate = exchangeRate,
-            Notes = notes,
-            LinkToInvoice = purchaseInvoiceId.HasValue,
-            DiscountAmount = 0,
-            Status = InvoiceStatus.Draft
-        };
-        pr.SetCreatedBy(userId);
-        return pr;
-    }
-
-    /// <summary>
-    /// Creates a standalone purchase return not linked to any invoice.
-    /// </summary>
-    public static PurchaseReturn CreateStandalone(
-        string returnNo,
-        int warehouseId,
+        int returnNo,
+        short warehouseId,
         int supplierId,
         DateTime? returnDate = null,
         string? notes = null,
-        int? currencyId = null,
+        short? currencyId = null,
         decimal? exchangeRate = null,
         int? userId = null)
     {
-        if (string.IsNullOrWhiteSpace(returnNo))
+        if (returnNo <= 0)
             throw new DomainException("رقم الإرجاع مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
@@ -162,17 +101,15 @@ public class PurchaseReturn : BaseEntity
             CurrencyId = currencyId,
             ExchangeRate = exchangeRate,
             Notes = notes,
-            LinkToInvoice = false,
-            DiscountAmount = 0,
             Status = InvoiceStatus.Draft
         };
         pr.SetCreatedBy(userId);
         return pr;
     }
 
-    public void AddItem(int productId, decimal quantity, decimal unitCost, int productUnitId = 0, decimal discountAmount = 0, decimal? costInBaseCurrency = null, SaleMode mode = SaleMode.Retail, string? notes = null)
+    public void AddItem(int productId, int productUnitId, decimal quantity, decimal unitCost)
     {
-        var item = PurchaseReturnItem.Create(productId, quantity, unitCost, productUnitId, discountAmount, costInBaseCurrency, mode, notes);
+        var item = PurchaseReturnItem.Create(productId, productUnitId, quantity, unitCost);
         Items.Add(item);
         RecalculateTotals();
     }
@@ -210,6 +147,15 @@ public class PurchaseReturn : BaseEntity
         UpdateTimestamp();
     }
 
+    public void SetPurchaseInvoice(int? purchaseInvoiceId)
+    {
+        if (purchaseInvoiceId.HasValue && purchaseInvoiceId.Value <= 0)
+            throw new DomainException("رقم الفاتورة غير صحيح.");
+
+        PurchaseInvoiceId = purchaseInvoiceId;
+        UpdateTimestamp();
+    }
+
     public void Post()
     {
         if (Status != InvoiceStatus.Draft)
@@ -217,7 +163,7 @@ public class PurchaseReturn : BaseEntity
         if (!Items.Any())
             throw new DomainException("لا يمكن ترحيل مرتجع بدون أصناف.");
 
-        RecalculateTotals();
+        PostedAt = DateTime.UtcNow;
         Status = InvoiceStatus.Posted;
     }
 
@@ -225,6 +171,7 @@ public class PurchaseReturn : BaseEntity
     {
         if (Status == InvoiceStatus.Cancelled)
             throw new DomainException("المرتجع ملغى بالفعل.");
+        CancelledAt = DateTime.UtcNow;
         Status = InvoiceStatus.Cancelled;
     }
 }

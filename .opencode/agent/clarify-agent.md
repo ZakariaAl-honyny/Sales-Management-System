@@ -19,6 +19,32 @@ Surface hidden assumptions and underspecified areas BEFORE planning begins.
 - `AGENTS.md` — All rules
 - `docs/PRD-MVP.md` — Full requirements
 
+## v4.10 — Clarification Questions for New Schema
+
+### Products Module (Multi-Currency Pricing, Batch Tracking)
+1. `[SCOPE]` ProductPrices: Should the system support price lists with effective dates (e.g., seasonal pricing), or is a simple single-price-per-currency sufficient for V1?
+2. `[LOGIC]` InventoryBatches: For FEFO (TrackExpiry = true), is the nearest-expiry-first enforced automatically, or should the user be able to override the batch selection during sales?
+3. `[SCOPE]` BOM (Bill of Materials): Is product assembly/component tracking needed in V1, or is BOM deferred to V2?
+4. `[DATA]` DefaultPurchaseUnitId/DefaultSalesUnitId on Product: Should these be mandatory or optional? What happens if user tries to purchase/sell in a unit that has no price defined?
+
+### Warehouses Module (Type, Stock Adjustments)
+5. `[SCOPE]` WarehouseType (Main/Store/Showroom): Does this affect any behavior (e.g., Showroom cannot receive purchases), or is it purely informational?
+6. `[LOGIC]` InventoryAdjustments with Damage type: Should damage adjustments create a journal entry (Dr Expense / Cr Inventory), or is this a simple stock correction?
+7. `[SCOPE]` Physical Count (InventoryCounts): Confirmed deferred to V2? V1 relies solely on Perpetual Inventory without periodic count verification?
+
+### Perpetual Inventory Implementation
+8. `[LOGIC]` Perpetual Inventory: All purchase costs go directly to Inventory Asset — confirmed NO intermediate "Purchases" account is needed?
+9. `[DATA]` InventoryBatches: On purchase return, is the unit cost restored from the original batch, or recomputed as the current weighted average?
+10. `[SECURITY]` WarehouseTransfer: Should transfers require Manager+ approval, or can any warehouse staff execute a transfer?
+
+### Party Entity
+11. `[DATA]` Party: Do Customers/Suppliers share the same Parties table, or should there be separate `Parties` for each type? (Schema shows shared table with `IsCustomer`/`IsSupplier` columns — confirm)
+12. `[UX]` Party selector in Customer/Supplier forms: Should the user search/create a Party in a lookup window, or should the form auto-create a Party on Customer/Supplier save?
+
+### Units (Independent Table)
+13. `[SCOPE]` Units: Seed data includes 7 units (حبة, كرتون, كيلو, جرام, لتر, متر, بالة) — are these sufficient for V1, or should more be added?
+14. `[UX]` Unit management: Should Units be managed from a separate settings screen, or inline within the Products screen?
+
 ## Question Categories
 - `[SCOPE]` — in or out of scope? (reference PRD Out of Scope section)
 - `[LOGIC]` — business rule unclear (e.g., return flow edge cases)

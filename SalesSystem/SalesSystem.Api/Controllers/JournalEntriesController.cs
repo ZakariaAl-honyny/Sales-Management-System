@@ -54,7 +54,7 @@ public class JournalEntriesController : ControllerBase
             return CreatedAtAction(nameof(GetById), new { id = result.Value }, new
             {
                 id = result.Value,
-                message = "تم إنشاء القيد المحاسبي وترحيله بنجاح"
+                message = "تم إنشاء القيد المحاسبي بنجاح"
             });
         }
 
@@ -154,12 +154,110 @@ public class JournalEntriesController : ControllerBase
     }
 
     /// <summary>
+    /// Posts a Draft journal entry (transitions to Posted status).
+    /// </summary>
+    [HttpPut("{id:int:min(1)}/post")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Post(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _journalEntryService.PostJournalEntryAsync(id, userId, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Cancels a Posted journal entry (transitions to Cancelled status).
+    /// </summary>
+    [HttpPut("{id:int:min(1)}/cancel")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Cancel(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _journalEntryService.CancelJournalEntryAsync(id, userId, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Posts a Draft journal entry (transitions to Posted status).
+    /// </summary>
+    /// <param name="id">Journal entry ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posted journal entry details.</returns>
+    [HttpPost("{id:int:min(1)}/post")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PostEntry(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _journalEntryService.PostJournalEntryAsync(id, userId, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Cancels a Posted journal entry (transitions to Cancelled status).
+    /// </summary>
+    /// <param name="id">Journal entry ID.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cancelled journal entry details.</returns>
+    [HttpPost("{id:int:min(1)}/cancel")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CancelEntry(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized(new { error = "المستخدم غير مصرح له" });
+
+        var result = await _journalEntryService.CancelJournalEntryAsync(id, userId, ct);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
     /// Closes the specified fiscal year: zeros out Revenue/Expense accounts
     /// and transfers net income/loss to Retained Earnings.
     /// </summary>
     /// <param name="request">Fiscal year to close.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>Fiscal year closure details.</returns>
+    /// <returns>Journal entry ID of the closing entry.</returns>
     [HttpPost("close-fiscal-year")]
     [Authorize(Policy = "ManagerAndAbove")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -172,31 +270,8 @@ public class JournalEntriesController : ControllerBase
 
         var result = await _annualClosingService.CloseFiscalYearAsync(request.FiscalYear, userId, ct);
         return result.IsSuccess
-            ? Ok(result.Value)
+            ? Ok(new { journalEntryId = result.Value })
             : BadRequest(new { error = result.Error });
-    }
-
-    /// <summary>
-    /// Gets all fiscal year closures.
-    /// </summary>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>List of fiscal year closures.</returns>
-    [HttpGet("closed-years")]
-    [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAllClosures(CancellationToken ct)
-    {
-        var result = await _annualClosingService.GetAllClosuresAsync(ct);
-        if (result.IsSuccess)
-        {
-            return Ok(result.Value ?? new List<FiscalYearClosureDto>());
-        }
-
-        if (result.ErrorCode == ErrorCodes.NotFound)
-            return NotFound(new { error = result.Error });
-        return BadRequest(new { error = result.Error });
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.DesktopPWF.Services.Api;
 
@@ -28,4 +29,19 @@ public interface IJournalEntryApiService
     /// Gets the ledger (detailed transactions) for a specific account within a date range.
     /// </summary>
     Task<Result<AccountLedgerDto>> GetLedgerAsync(int accountId, DateTime startDate, DateTime endDate);
+
+    /// <summary>
+    /// Creates a new journal entry (Draft status).
+    /// </summary>
+    Task<Result<int>> CreateAsync(CreateJournalEntryRequest request);
+
+    /// <summary>
+    /// Posts a Draft journal entry (transitions to Posted status).
+    /// </summary>
+    Task<Result<JournalEntryDetailDto>> PostAsync(int id);
+
+    /// <summary>
+    /// Cancels a Posted journal entry (transitions to Cancelled status).
+    /// </summary>
+    Task<Result<JournalEntryDetailDto>> CancelAsync(int id);
 }

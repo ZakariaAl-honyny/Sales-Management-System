@@ -160,6 +160,77 @@ When fixing Settings Module issues, check for these common patterns:
 
 ---
 
+## v4.10 — 65-Table Schema Quick Fixes
+
+When touching code related to the restructured schema, apply these fixes automatically:
+
+### New Entity Quick-Fix Patterns
+
+1. **`ProductPrices` (multi-currency pricing)** — Replace any `product.RetailPrice` or `product.WholesalePrice` with `product.ProductPrices.FirstOrDefault(p => p.CurrencyId == sessionCurrencyId && p.EffectiveFrom <= today && (!p.EffectiveTo.HasValue || p.EffectiveTo >= today))?.Price`
+
+2. **`InventoryBatches` (FIFO/FEFO)** — Replace any `product.CurrentQuantity` or simple stock deduction with `InventoryBatch` FIFO logic: consume from oldest batch first (`OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue)` or `OrderBy(b => b.Id)` based on TrackExpiry).
+
+3. **`Party` entity** — Customers and Suppliers now link to `PartyId` (shared contact data). Replace direct `Customer.Name`/`Customer.Phone`/`Customer.Address` with `customer.Party.Name`/`customer.Party.Phone`/`customer.Party.Address`.
+
+4. **`Unit` independent table** — Replace any `ProductUnit.UnitName` with `productUnit.Unit.Name` and `productUnit.Unit.Symbol`. Units are no longer embedded strings.
+
+5. **`InventoryTransaction`/`InventoryTransactionLine`** — Replace any old `InventoryMovement` reference with `InventoryTransaction` (header) + `InventoryTransactionLine` (detail) pattern.
+
+6. **`WarehouseTransfer`/`WarehouseTransferLine`** — Replace any old `StockTransfer`/`StockTransferItem` with `WarehouseTransfer`/`WarehouseTransferLine`.
+
+### Removed Entity Detection (Fix When Found)
+
+| Old Entity | Replacement |
+|------------|-------------|
+| `InventoryMovement` | `InventoryTransaction` + `InventoryTransactionLine` |
+| `StockTransfer` | `WarehouseTransfer` + `WarehouseTransferLine` |
+| `InventoryOperation` | `InventoryTransactions` with appropriate TransactionType |
+| `StockWriteOff` | `InventoryAdjustments` with `AdjustmentType = Damage` |
+| `CustomerGroup` | REMOVED — not in V1, deferred to V2 |
+| `SupplierType` | REMOVED — not in V1, deferred to V2 |
+| `PurchaseOrder` | REMOVED — not in V1, deferred to V2 |
+| `SalesQuotation` | REMOVED — not in V1, deferred to V2 |
+| `Cheque` | REMOVED — not in V1, deferred to V2 |
+| `DailyClosure` | REMOVED — not in V1, deferred to V2 |
+| `ProductBarcode` | REPLACED by `UnitBarcode` (FK to ProductUnits) |
+| `ProductCode` | REMOVED — use auto-increment `Id` only |
+
+### int→smallint FK Type Changes
+
+When you see `int` FK to these tables, change to `smallint`:
+- `Roles(Id)` — used as FK in UserRoles, RolePermissions
+- `Departments(Id)` — used as FK in Employees
+- `Branches(Id)` — used as FK in UserBranches, Warehouses
+- `Warehouses(Id)` — used as FK in many entities
+- `Currencies(Id)` — used as FK in many entities
+- `Taxes(Id)` — used as FK in Products, invoices
+- `Units(Id)` — used as FK in ProductUnits
+
+### AuditLog.Id int→bigint
+
+When you see `AuditLog.Id` as `int`, change to `long` (bigint). Also verify:
+- `SystemLogs.Id` is `long`
+- `AuditLogs` has indexes on `(UserId, CreatedAt DESC)`, `(EntityName, EntityId)`, `(CreatedAt DESC)`
+- `SystemLogs.Level` is `tinyint` NOT `nvarchar`
+
+### BaseCurrency Immutability Guard
+
+When you see code that changes `IsBaseCurrency`:
+1. The base currency is set at system creation and NEVER changes
+2. `Currency.SetAsBaseCurrency()` and `UnsetBaseCurrency()` are domain methods that call `UpdateTimestamp()`
+3. The filtered unique index has `AND [IsActive] = 1` guard
+4. User-facing UI should NEVER show a "set as base" toggle
+
+### No Purchases Account (Perpetual Inventory)
+
+When you see code referencing a "Purchases" account:
+1. All inventory costs go DIRECTLY to Inventory Asset account (not Purchases clearing account)
+2. Purchase invoice posts: Dr Inventory / Cr Cash (or AP)
+3. NO intermediate Purchases account is used
+4. COGS is computed from InventoryBatches at time of sale
+
+---
+
 ## 📋 Phase Awareness (Phases 23-31)
 
 The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
@@ -168,8 +239,7 @@ The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-3
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
-| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
+| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), Unit independent table, Party entity, opening stock via InventoryBatches |
 | 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
 | 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
 | 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |

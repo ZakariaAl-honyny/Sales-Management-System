@@ -14,7 +14,7 @@ namespace SalesSystem.DesktopPWF.ViewModels.Inventory;
 public class InventoryViewModel : ViewModelBase
 {
     private readonly IInventoryApiService _inventoryService;
-    private ObservableCollection<InventoryMovementDto> _movements = new();
+    private ObservableCollection<InventoryTransactionDto> _movements = new();
     private ObservableCollection<WarehouseStockDto> _stocks = new();
     private string? _searchText;
     private int _currentPage = 1;
@@ -40,7 +40,7 @@ public class InventoryViewModel : ViewModelBase
    
 #region Properties
 
-    public ObservableCollection<InventoryMovementDto> Movements
+    public ObservableCollection<InventoryTransactionDto> Movements
     {
         get => _movements;
         set => SetProperty(ref _movements, value);

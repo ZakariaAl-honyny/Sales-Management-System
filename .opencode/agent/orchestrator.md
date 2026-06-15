@@ -260,6 +260,42 @@ Phase 24: Accounting Engine Automation + CashBox Refactoring (v4.6.9+) → Autom
 - [ ] Build: 0 errors, 0 warnings across all 7+5 projects
 - [ ] Tests: 1,906 pass, 0 failures
 
+## v4.10 — Schema Restructuring (65 Tables)
+
+### Removed Entities (17 tables consolidated/removed)
+- `InventoryMovement` → replaced by `InventoryTransaction` + `InventoryTransactionLine`
+- `StockTransfer` / `StockTransferItem` → renamed to `WarehouseTransfer` / `WarehouseTransferLine`
+- `InventoryOperation` → merged into `InventoryTransactions` with TransactionType enum
+- `StockWriteOff` → covered by `InventoryAdjustments` with AdjustmentType=Damage
+- `CustomerGroup` → NOT in V1 (deferred to V2)
+- `SupplierType` → NOT in V1 (deferred to V2)
+- `SalesQuotation` → NOT in V1
+- `PurchaseOrder` → NOT in V1
+- `Cheque` → NOT in V1
+- `DailyClosure` → NOT in V1
+- `ProductBarcode` → replaced by `UnitBarcode`
+- `CustomerPayment` / `SupplierPayment` → replaced by `CustomerReceipt` / `SupplierPayment`
+- `CashTransaction` → replaced by `ReceiptVoucher` / `PaymentVoucher`
+
+### Added Entities (8 tables added)
+- `Parties` — shared contact data for Customers, Suppliers, Employees
+- `Units` — independent table (not embedded in ProductUnit)
+- `ProductPrices` — multi-currency pricing per (ProductUnit + Currency)
+- `InventoryBatches` — FIFO/FEFO batch tracking
+- `InventoryTransactions` / `InventoryTransactionLines` — replaces InventoryMovement
+- `WarehouseTransfers` / `WarehouseTransferLines` — replaces StockTransfer
+- `InventoryCounts` / `InventoryCountLines` — physical count (V2)
+- `InventoryAdjustments` / `InventoryAdjustmentLines` — stock adjustments
+
+### Key Changes
+- **Party consolidation**: Customers/Suppliers now share `PartyId` FK → `Parties` for name, phone, email, address, tax number
+- **Units independent**: `Units` table (smallint PK, Name, Symbol, IsSystem, IsActive) — user-addable, not hardcoded strings
+- **Perpetual Inventory**: ALL inventory costs go DIRECTLY to Inventory Asset account. No Purchases clearing account. COGS computed from InventoryBatches at sale time.
+- **65 tables total**: Up from 48 previous schema
+- **smallint PKs**: Roles, Departments, Branches, Warehouses, Currencies, Taxes, Units, AccountCategories all use smallint PK
+- **AuditLogs/SystemLogs**: bigint PK for high-volume logging
+- **SystemLogs.Level**: tinyint (1=Info, 2=Warning, 3=Error, 4=Critical) — not nvarchar
+
 ## v4.6.9 — Phase 19 Settings Module Remediations
 
 When reviewing Settings Module code, enforce these 7 rules:
@@ -297,16 +333,16 @@ Run through AGENTS.md Section 9 checklist. If ANY item fails, reject the code.
 
 ## 📋 Phase Awareness (Phases 23-31)
 
-The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+The system is currently at **v4.10.2+ — Deep Review Complete: All 13 Analysis Documents Reviewed, All Sales/Purchases Gaps Implemented, AllowBelowCostSale Fixed to WARNING**:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
-| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
-| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 25 — Products Module | ✅ Completed | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), Unit independent table, Party entity, opening stock via InventoryBatches |
+| 26 — Warehouses Module | 📝 Planned | Warehouse types (Main/Store/Showroom), Transfer/WarehouseTransferLine replaces StockTransfer, InventoryCount V2 deferred, Perpetual Inventory |
+| 27 — Purchases Module | 🟡 Partial — OtherCharges ✅ | Multi-currency, landed cost (OtherCharges), Purchase Orders, standalone returns, attachments |
+| 28 — Sales Module | 🟡 Partial — PriceEnforcement+DeliveryChargesRevenue+FlexibleInput ✅ | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
 | 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
 | 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
 | 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
@@ -325,6 +361,18 @@ When implementing or reviewing code, ALWAYS enforce these rules:
 8. **Passwordless Users**: User.Create() NEVER accepts a password — MustChangePassword=true is the default
 9. **ReferenceId over ReferenceNumber**: Journal entry lookups use int FK (ReferenceId), not string matching
 10. **AvgCost for COGS**: COGS uses ProductUnit.AverageCost (weighted average), never PurchaseCost
+11. **Landed Cost**: Purchase invoices MUST include OtherCharges distribution — distribute proportionally by line total before batch creation. NEVER record purchase cost without transport/customs allocation.
+12. **Sales Price Enforcement**: Sales posting MUST check PreventBelowRetailPrice and AllowBelowCostSale settings — NEVER allow under-retail sales when blocked, or below-cost sales when prohibited.
+13. **DeliveryCharges Revenue**: Delivery/service fees on sales invoices MUST be credited to separate DeliveryChargesRevenue account — NOT lumped into SalesRevenue.
+14. **Purchase Return Standalone**: Purchase return MUST support BOTH linked-to-invoice and standalone mode — NEVER block returns without an invoice when supplier and items are provided.
+15. **Flexible Input**: Sales/Purchase line items MUST support entering ANY TWO of (Quantity, Price, LineTotal) — the third auto-calculates. NEVER force users to enter all three.
+
+16. **AllowBelowCostSale = WARNING not BLOCK**: Below-cost sales MUST warn via `LogWarning` but NEVER block with `Result.Failure`. The analysis document explicitly states "ولا نمنع البيع" (do not block the sale). The `PreventBelowRetailPrice` setting is the OPPOSITE — it DOES block (correct). These two settings have fundamentally different behaviors.
+17. **InventoryOps TransactionNo Auto-Generation**: `InventoryService.CreateTransactionAsync()` MUST auto-generate TransactionNo via `_sequenceService.GetNextIntAsync("InventoryTransaction", ct)` when `<= 0` — NEVER require Desktop to provide it. Same pattern as InvoiceNo (RULE-255).
+18. **Atomic Stock Updates via IInventoryService**: Stock operations in Adjustment/Count services MUST use `IInventoryService.IncreaseStockAsync()`/`DecreaseStockAsync()` — NEVER directly assign `WarehouseStock.Quantity` (bypasses audit trail).
+19. **Count Creates Single Adjustment**: `InventoryCountService.PostAsync()` MUST create ONE `InventoryAdjustment` per Post with `ReferenceType = "InventoryCount"` — NOT one per line (creates cleaner audit trail).
+20. **AdjustmentType Validator Range**: `InventoryAdjustmentRequestValidator` MUST use `InclusiveBetween(1, 3)` — NOT `(1, 2)` which excludes Correction=3.
+21. **CancellationToken Before Optional Parameters**: `ReportsController` and all controllers MUST place `CancellationToken` parameter BEFORE any optional parameters — ASP.NET Core model binding requires this order.
 
 ### 💡 Bug Prevention Checklist
 
@@ -343,6 +391,16 @@ When writing or reviewing code in ANY layer, check these:
 - [ ] Are Arabic messages properly UTF-8 encoded?
 - [ ] Does the list display newest-first (OrderByDescending)?
 - [ ] Are EventBus subscriptions disposed in `Cleanup()`?
+- [ ] Does `InventoryService.CreateTransactionAsync()` auto-generate TransactionNo via DocumentSequenceService when `<= 0`?
+- [ ] Does `InventoryAdjustmentService.PostAsync()` use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` (not direct assignment)?
+- [ ] Does `InventoryCountService.PostAsync()` create ONE Adjustment per Post (not per line)?
+- [ ] Does `AdjustmentType` validator use `InclusiveBetween(1, 3)` (not `(1, 2)`)?
+- [ ] Does `ReportsController` place `CancellationToken` BEFORE optional parameters?
+- [ ] Do all Inventory Operations ViewModels implement `IDisposable`?
+- [ ] Does `SalesReturn.Post()` set `PostedAt = DateTime.UtcNow` and `SalesReturn.Cancel()` set `CancelledAt = DateTime.UtcNow`?
+- [ ] Does `SalesReturnService` inject `IAccountingIntegrationService` and call `CreateSalesReturnEntryAsync()` on Post/Cancel?
+- [ ] Is `ProductUnitId` NEVER hardcoded to `1` in ANY ViewModel (use DefaultPurchaseUnitId/DefaultSalesUnitId)?
+- [ ] Is `AllocateAdditionalCharges()` extracted to standalone `AdditionalChargeAllocator` helper?
 
 ### Features to Fix By Default
 
@@ -350,7 +408,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 
 1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
+3. Missing `CustomerGroupId` on Customer → REMOVED in V1 (deferred to V2). Do NOT add this field.
 4. Missing `CurrencyId` on financial entities → Add multi-currency support
 5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
 6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
@@ -360,3 +418,13 @@ When you encounter any code related to these areas, apply fixes automatically:
 10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
 11. Payment without allocation → Add PaymentAllocation tracking
 12. Missing reversal entries on payment update/delete → Add reversal journal entries
+13. `InventoryService.CreateTransactionAsync()` without auto-generation → ADD `_sequenceService.GetNextIntAsync()` when `TransactionNo <= 0`
+14. Direct `WarehouseStock.Quantity` assignment in Adjustment/Count services → CHANGE to use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync`
+15. InventoryCount creating one Adjustment per line → CHANGE to ONE per Post with `ReferenceType = "InventoryCount"`
+16. `AdjustmentType` validator range `(1,2)` → CHANGE to `InclusiveBetween(1, 3)`
+17. `CancellationToken` after optional params → MOVE before optional params
+18. Inventory Operations ViewModels missing `IDisposable` → ADD `IDisposable` with `Cleanup()` in `Dispose()`
+19. `SalesReturn.Post()`/`Cancel()` missing timestamps → ADD `PostedAt = DateTime.UtcNow`/`CancelledAt = DateTime.UtcNow` — matches RULE-489 for PurchaseReturn.
+20. `SalesReturnService` missing journal entries → ADD `IAccountingIntegrationService` DI, call `CreateSalesReturnEntryAsync()` on Post and `ReverseSalesReturnEntryAsync()` on Cancel.
+21. `ProductUnitId` hardcoded to `1` → REPLACE with `product.DefaultPurchaseUnitId`/`DefaultSalesUnitId` in all ViewModels. Fallback to `0`.
+22. `AllocateAdditionalCharges` inline → EXTRACT to standalone `AdditionalChargeAllocator` static helper.

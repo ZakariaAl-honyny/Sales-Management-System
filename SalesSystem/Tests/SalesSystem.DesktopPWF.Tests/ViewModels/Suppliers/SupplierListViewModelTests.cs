@@ -43,7 +43,7 @@ public class SupplierListViewModelTests : IDisposable
 
     private static SupplierDto CreateSupplier(int id, string name, bool isActive = true)
     {
-        return new SupplierDto(id, name, null, null, null, null, 0m, 0m, 0m, isActive);
+        return new SupplierDto(id, name, null, null, null, null, isActive, 1);
     }
 
     #region LoadSuppliers Tests

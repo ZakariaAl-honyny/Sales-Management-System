@@ -5,6 +5,7 @@ using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.Contracts.Enums;
@@ -20,6 +21,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
     private readonly ISalesReturnApiService _returnService;
     private readonly ISalesInvoiceApiService _invoiceService;
     private readonly IWarehouseApiService _warehouseService;
+    private readonly ICashBoxApiService _cashBoxService;
     private readonly ISettingsApiService _settingsService;
     private readonly IInvoicePrinter _invoicePrinter;
     private readonly IReceiptPrinter _receiptPrinter;
@@ -34,6 +36,10 @@ public class SalesReturnEditorViewModel : ViewModelBase
     private SalesInvoiceDto? _selectedInvoice;
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ObservableCollection<SalesReturnItemViewModel> _items = new();
+    private ObservableCollection<CashBoxDto> _cashBoxes = new();
+    private CashBoxDto? _selectedCashBox;
+    private decimal _refundAmount;
+    private bool _enableRefund;
     private string _searchText = string.Empty;
     private bool _isEditMode;
     private string? _errorMessage;
@@ -47,6 +53,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
         _returnService = App.GetService<ISalesReturnApiService>();
         _invoiceService = App.GetService<ISalesInvoiceApiService>();
         _warehouseService = App.GetService<IWarehouseApiService>();
+        _cashBoxService = App.GetService<ICashBoxApiService>();
         _settingsService = App.GetService<ISettingsApiService>();
         _invoicePrinter = App.GetService<IInvoicePrinter>();
         _receiptPrinter = App.GetService<IReceiptPrinter>();
@@ -185,6 +192,53 @@ public class SalesReturnEditorViewModel : ViewModelBase
         get => _impact;
         set => SetProperty(ref _impact, value);
     }
+
+    public ObservableCollection<CashBoxDto> CashBoxes
+    {
+        get => _cashBoxes;
+        set => SetProperty(ref _cashBoxes, value);
+    }
+
+    public CashBoxDto? SelectedCashBox
+    {
+        get => _selectedCashBox;
+        set
+        {
+            if (SetProperty(ref _selectedCashBox, value))
+            {
+                ClearErrors(nameof(SelectedCashBox));
+                if (_refundAmount == 0 && value != null)
+                    RefundAmount = Items.Sum(i => i.LineTotal);
+            }
+        }
+    }
+
+    public decimal RefundAmount
+    {
+        get => _refundAmount;
+        set
+        {
+            if (SetProperty(ref _refundAmount, value))
+            {
+                ClearErrors(nameof(RefundAmount));
+            }
+        }
+    }
+
+    public bool EnableRefund
+    {
+        get => _enableRefund;
+        set
+        {
+            if (SetProperty(ref _enableRefund, value))
+            {
+                if (!value) { SelectedCashBox = null; RefundAmount = 0; }
+                OnPropertyChanged(nameof(ShowRefundFields));
+            }
+        }
+    }
+
+    public bool ShowRefundFields => EnableRefund;
     #endregion
 
     #region Commands
@@ -295,6 +349,16 @@ public class SalesReturnEditorViewModel : ViewModelBase
                     if (invResult.IsSuccess) SelectedInvoice = invResult.Value;
                 }
 
+                // Restore CashBox and Refund state
+                if (dto.CashBoxId.HasValue && dto.RefundAmount > 0)
+                {
+                    EnableRefund = true;
+                    RefundAmount = dto.RefundAmount;
+                    var cashBox = CashBoxes.FirstOrDefault(c => c.Id == dto.CashBoxId.Value);
+                    if (cashBox != null)
+                        SelectedCashBox = cashBox;
+                }
+
                 Items.Clear();
                 foreach (var item in dto.Items)
                 {
@@ -325,6 +389,12 @@ public class SalesReturnEditorViewModel : ViewModelBase
             {
                 Warehouses = new ObservableCollection<WarehouseDto>(warehouseResult.Value);
                 if (Warehouses.Any()) SelectedWarehouseId = Warehouses.First().Id;
+            }
+
+            var cashBoxesResult = await _cashBoxService.GetAllAsync();
+            if (cashBoxesResult.IsSuccess && cashBoxesResult.Value != null)
+            {
+                CashBoxes = new ObservableCollection<CashBoxDto>(cashBoxesResult.Value);
             }
         });
     }
@@ -375,21 +445,21 @@ public class SalesReturnEditorViewModel : ViewModelBase
 
     private async Task<bool> ValidateAsync()
     {
+        var errors = new List<string>();
         if (SelectedInvoice == null)
-        {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يجب اختيار فاتورة بيع لإنشاء مرتجع" });
-            RequestFocusFirstInvalidField();
-            return false;
-        }
+            errors.Add("يجب اختيار فاتورة بيع لإنشاء مرتجع");
         if (SelectedWarehouseId <= 0)
-        {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يجب اختيار المستودع" });
-            RequestFocusFirstInvalidField();
-            return false;
-        }
+            errors.Add("يجب اختيار المستودع");
         if (!Items.Any(i => i.ReturnQuantity > 0))
+            errors.Add("يجب إدخال كمية المرتجع لمنتج واحد على الأقل");
+        if (EnableRefund && SelectedCashBox == null)
+            errors.Add("يجب اختيار الصندوق عند تفعيل الاسترداد");
+        if (EnableRefund && RefundAmount <= 0)
+            errors.Add("يجب إدخال مبلغ الاسترداد الموجب");
+
+        if (errors.Any())
         {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يجب إدخال كمية المرتجع لمنتج واحد على الأقل" });
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
             RequestFocusFirstInvalidField();
             return false;
         }
@@ -409,6 +479,8 @@ public class SalesReturnEditorViewModel : ViewModelBase
                 WarehouseId: SelectedWarehouseId,
                 ReturnDate: ReturnDate,
                 Notes: Notes,
+                CashBoxId: EnableRefund && SelectedCashBox?.Id > 0 ? SelectedCashBox.Id : null,
+                RefundAmount: EnableRefund ? RefundAmount : null,
                 Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new ReturnItemRequest(
                     ProductId: i.ProductId,
                     ProductUnitId: 1,
@@ -451,6 +523,9 @@ public class SalesReturnEditorViewModel : ViewModelBase
                              $"📦 الأثر على المخزون: سيتم إضافة {Impact.StockQuantityImpact} قطعة إلى مستودع {Impact.WarehouseName}.\n" +
                              $"💰 الأثر المالي: سيتم خصم {Impact.BalanceImpact:N2} من مديونية العميل {Impact.CounterpartyName}.\n\n" +
                              $"لا يمكن التعديل بعد الترحيل.";
+
+        if (EnableRefund && SelectedCashBox != null)
+            confirmMessage += $"\n💰 سيتم استرداد {RefundAmount:N2} إلى صندوق {SelectedCashBox.BoxName}.";
 
         var confirm = await _dialogService.ShowConfirmationAsync("تأكيد الترحيل - تحليل الأثر", confirmMessage);
         if (!confirm) return;

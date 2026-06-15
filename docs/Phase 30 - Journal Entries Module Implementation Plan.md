@@ -239,33 +239,7 @@ These 3 issues must be resolved before Phase 30 implementation begins.
 3. Reference `Currencies` table via nullable FK with `DeleteBehavior.Restrict`
 4. Add a system setting `DefaultCurrencyId` as fallback when CurrencyId is null
 
-```csharp
-// JournalEntry.cs — add
-public int? CurrencyId { get; private set; }
-public decimal? ExchangeRate { get; private set; }  // Rate: 1 Currency = X BaseCurrency
-
-// In Create() factory — add optional params
-public static JournalEntry Create(
-    string entryNumber,
-    DateTime transactionDate,
-    JournalEntryType entryType,
-    int createdBy,
-    string? description = null,
-    string? referenceType = null,
-    int? referenceId = null,
-    string? referenceNumber = null,
-    int? currencyId = null,
-    decimal? exchangeRate = null)
-{
-    // ... existing guard clauses ...
-    return new JournalEntry
-    {
-        // ... existing fields ...
-        CurrencyId = currencyId,
-        ExchangeRate = exchangeRate
-    };
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
 
 **Files changed**: `JournalEntry.cs`, `JournalEntryConfiguration.cs`, `CreateJournalEntryRequest.cs`, `IJournalEntryService.cs`, `JournalEntryService.cs`
 
@@ -279,11 +253,7 @@ public static JournalEntry Create(
 1. Add `bool IsLeafAccount` to Account entity (or verify via `CanHaveChildren` pattern)
 2. In `JournalEntryService.CreateJournalEntryAsync()`, add validation: `if (account.IsLeafAccount == false) return Result.Failure("لا يمكن الترحيل إلى حساب رئيسي — استخدم حساب تفصيلي")`
 
-```csharp
-// In JournalEntryService.CreateJournalEntryAsync(), after IsActive check:
-if (!account.IsLeafAccount)
-    return Result<int>.Failure($"الحساب \"{account.NameAr}\" هو حساب رئيسي ولا يقبل الترحيل المباشر");
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Files changed**: `Account.cs` (add `IsLeafAccount`), `AccountConfiguration.cs`, `JournalEntryService.cs`
 
@@ -301,22 +271,7 @@ if (!account.IsLeafAccount)
 3. A central `AutoJournalEntryOrchestrator` calls the appropriate provider based on `ReferenceType` + `EntryType`
 4. Existing code is refactored to use the provider pattern
 
-```csharp
-public interface IAutoJournalEntryProvider
-{
-    /// <summary>
-    /// Returns true if this provider handles the given reference type.
-    /// </summary>
-    bool CanHandle(string referenceType);
-
-    /// <summary>
-    /// Generates journal entry lines for a referenced transaction.
-    /// Returns list of lines (debit/credit per account).
-    /// </summary>
-    Task<Result<List<JournalEntryLineRequest>>> GenerateLinesAsync(
-        string referenceType, int referenceId, CancellationToken ct);
-}
-```
+> See `docs/AGENTS.md` for service layer patterns and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **Files to create**:
 - `Application/Accounting/Services/AutoEntryProviders/IAutoJournalEntryProvider.cs`
@@ -378,55 +333,16 @@ public interface IAutoJournalEntryProvider
 
 Opening entries are **not** a separate table. They use `JournalEntry` with `EntryType = OpeningBalance (9)`:
 
-```csharp
-// OpeningEntry is a journal entry with:
-// - EntryType = JournalEntryType.OpeningBalance
-// - IsPosted = true (auto-posted on creation)
-// - Lines contain opening balances:
-//   Debit: Asset accounts (cash, receivables, inventory)
-//   Credit: Liability accounts, Equity, Opening Balance contra
-// - ReferenceType = "System"
-// - ReferenceId = 0 (or null)
-```
+> See `docs/database-schema.md` Module 4.3 for the canonical OpeningEntry concept and `docs/AGENTS.md` for domain entity patterns.
 
 **Domain logic**:
-```csharp
-public static JournalEntry CreateOpeningEntry(
-    List<OpeningBalanceLine> balances,
-    int createdBy,
-    int? currencyId = null,
-    decimal? exchangeRate = null)
-{
-    // 1. Validate all balances are non-zero
-    // 2. Create entry with EntryType = OpeningBalance
-    // 3. Add debit lines for debit-normal accounts
-    // 4. Add credit lines for credit-normal accounts
-    // 5. Auto-post (IsPosted = true)
-    // 6. Return the entry
-}
-
-public record OpeningBalanceLine(
-    int AccountId,
-    decimal Balance,
-    string? Description = null);
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `SalesSystem.Contracts/` for DTO definitions.
 
 ### 4.4 AnnualClosing (NEW Concept — No Dedicated Table)
 
 Annual closing uses `JournalEntry` with `EntryType = AnnualClosing (10)`:
 
-```csharp
-// Annual closing procedure:
-// 1. Verify all entries in the year are posted
-// 2. Calculate net profit/loss from revenue - expense accounts
-// 3. Create closing entry:
-//    Debit: Revenue accounts (zero them out)
-//    Credit: Expense accounts (zero them out)
-//    Difference → Retained Earnings (or Accumulated Loss)
-// 4. Mark year as closed
-// 5. Generate opening entry for new year:
-//    Debit/Credit: All balance sheet accounts with their closing balances
-```
+> See `docs/AGENTS.md` for domain entity patterns and `docs/database-schema.md` for the FiscalYear table definition.
 
 **Implementation phases**:
 - **V1**: Simple closing — zero out P&L accounts, move net to Retained Earnings. Manual process.
@@ -434,26 +350,7 @@ Annual closing uses `JournalEntry` with `EntryType = AnnualClosing (10)`:
 
 ### 4.5 Trial Balance Report (NEW)
 
-```csharp
-public record TrialBalanceDto(
-    DateTime AsOfDate,
-    List<TrialBalanceLineDto> Lines,
-    decimal TotalDebit,
-    decimal TotalCredit
-);
-
-public record TrialBalanceLineDto(
-    int AccountId,
-    string AccountCode,
-    string AccountNameAr,
-    decimal OpeningDebit,
-    decimal OpeningCredit,
-    decimal Debit,
-    decimal Credit,
-    decimal ClosingDebit,
-    decimal ClosingCredit
-);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 **Calculation**:
 - For each account:
@@ -478,13 +375,7 @@ Current `AccountLedgerDto` already supports:
 
 ### 4.7 Document Attachments
 
-```csharp
-// JournalEntry entity already has AttachmentPath + AttachmentFileName proposed above.
-// Desktop: File picker (OpenFileDialog) to select image/PDF
-// API: Accept base64 or multipart form upload
-// Storage: Save to `%AppData%\SalesSystem\Attachments\JournalEntries\{Id}\`
-// Display: Show thumbnail or link in journal entry editor
-```
+> See `docs/AGENTS.md` for domain entity patterns and `docs/database-schema.md` for the JournalEntry table definition.
 
 ---
 
@@ -613,38 +504,12 @@ Current `AccountLedgerDto` already supports:
 | All 6 auto-entry providers | Inject and use `ISystemAccountService` for account resolution |
 
 **Example provider pattern:**
-```csharp
-public class SalesAutoEntryProvider : IAutoEntryProvider
-{
-    private readonly ISystemAccountService _systemAccounts;
-
-    public SalesAutoEntryProvider(ISystemAccountService systemAccounts)
-    {
-        _systemAccounts = systemAccounts;
-    }
-
-    public async Task<Result<List<JournalEntryLineRequest>>> GenerateLinesAsync(int referenceId, CancellationToken ct)
-    {
-        var revenueAccountId = await _systemAccounts.GetAccountIdAsync(SystemAccountType.SalesRevenue, ct);
-        var cogsAccountId = await _systemAccounts.GetAccountIdAsync(SystemAccountType.COGS, ct);
-        var inventoryAccountId = await _systemAccounts.GetAccountIdAsync(SystemAccountType.Inventory, ct);
-        var cashAccountId = await _systemAccounts.GetAccountIdAsync(SystemAccountType.CashOnHand, ct);
-        var receivablesAccountId = await _systemAccounts.GetAccountIdAsync(SystemAccountType.AR, ct);
-
-        if (revenueAccountId == null || cogsAccountId == null || inventoryAccountId == null)
-            return Result<List<JournalEntryLineRequest>>.Failure("لم يتم تعيين حسابات النظام — يرجى مراجعة إعدادات الحسابات");
-
-        // ... build lines using resolved account IDs ...
-    }
-}
-```
+> See `docs/AGENTS.md` for service layer patterns and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **Integration test requirement**: Each provider's test MUST verify account resolution failure behavior.
 
 **Logging pattern**:
-```csharp
-Log.Verbose("SystemAccount {AccountType} resolved to AccountId {AccountId}", type, accountId);
-```
+> See `docs/AGENTS.md` §2.15 for Serilog logging patterns.
 
 ---
 
@@ -661,19 +526,7 @@ Log.Verbose("SystemAccount {AccountType} resolved to AccountId {AccountId}", typ
 **Why not just `IsPosted`?** The analysis documents show users need to save drafts (e.g., partially complete entries), post them when ready, and reverse errors. A single boolean cannot represent all 3 states.
 
 **Implementation**:
-```csharp
-public class JournalEntry
-{
-    public bool IsDraft { get; private set; }    // Default = true
-    public bool IsPosted { get; private set; }   // Only true after posting
-    public bool IsReversed { get; private set; } // True after reversal
-    
-    // State machine
-    // Draft → Post() → IsDraft=false, IsPosted=true
-    // Draft → Reverse() → IsDraft=false, IsReversed=true
-    // Posted → Reverse() → Creates reversal entry, marks original IsReversed=true
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
 
 ### 6.2 Auto-Posting Rules
 
@@ -705,60 +558,14 @@ public class JournalEntry
 - Can only be created once per fiscal period
 
 **Implementation**:
-```csharp
-public static JournalEntry CreateOpeningEntry(
-    List<OpeningBalanceLine> balances,
-    int createdBy,
-    int? currencyId = null,
-    decimal? exchangeRate = null)
-{
-    if (balances == null || balances.Count == 0)
-        throw new DomainException("يجب إضافة بند رصيد افتتاحي واحد على الأقل");
-    
-    var totalDebit = balances.Where(b => b.IsDebitNormal).Sum(b => b.Balance);
-    var totalCredit = balances.Where(b => !b.IsDebitNormal).Sum(b => b.Balance);
-    
-    if (Math.Abs(totalDebit - totalCredit) > 0.001m)
-        throw new DomainException("الأرصدة الافتتاحية غير متوازنة");
-    
-    // Create and auto-post
-    var entry = Create(/* ... */);
-    entry.ForcePost(createdBy); // ForcePost skips some validations
-    return entry;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
 
 ### 6.4 Annual Closing Procedure
 
 **Decision**: Annual closing is a multi-step procedure. Requires a proper `FiscalYear` entity (not a flat string).
 
 **FiscalYear Entity**:
-```csharp
-public class FiscalYear
-{
-    public int Id { get; private set; }
-    public string Name { get; private set; } = string.Empty;       // "2025", "2026"
-    public DateTime StartDate { get; private set; }
-    public DateTime EndDate { get; private set; }
-    public bool IsClosed { get; private set; }
-    public DateTime? ClosedAt { get; private set; }
-    public int? ClosedByUserId { get; private set; }
-
-    public static FiscalYear Create(string name, DateTime startDate, DateTime endDate)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم السنة المالية مطلوب");
-        if (startDate >= endDate)
-            throw new DomainException("تاريخ البداية يجب أن يكون قبل تاريخ النهاية");
-        return new FiscalYear { Name = name, StartDate = startDate, EndDate = endDate, IsClosed = false };
-    }
-
-    public bool IsDateInFiscalYear(DateTime date) => date >= StartDate && date <= EndDate;
-    public void Close(int closedByUserId) { IsClosed = true; ClosedAt = DateTime.UtcNow; ClosedByUserId = closedByUserId; }
-}
-
-// Fluent config: FiscalYears table, unique index on Name
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for the canonical table definition.
 
 **Migration**: CREATE FiscalYears table.
 **Seed data**: Create FiscalYear for current year (2026) on first run.
@@ -841,12 +648,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 | `Infrastructure/Data/Migrations/` | New migration: `ALTER TABLE JournalEntries ADD CurrencyId int NULL, ExchangeRate decimal(18,6) NULL` |
 
 **Domain guards**:
-```csharp
-if (currencyId.HasValue && exchangeRate == null)
-    throw new DomainException("يرجى إدخال سعر الصرف للعملة المحددة");
-if (exchangeRate.HasValue && exchangeRate <= 0)
-    throw new DomainException("سعر الصرف يجب أن يكون أكبر من صفر");
-```
+> See `docs/AGENTS.md` for Guard Clauses pattern in domain entities.
 
 **Logging**: `Log.Information("Journal entry {EntryNumber} created with Currency {CurrencyId} @ rate {Rate}", ...)`
 
@@ -889,33 +691,7 @@ if (exchangeRate.HasValue && exchangeRate <= 0)
 | `Infrastructure/Data/Configurations/JournalEntryLineConfiguration.cs` | **CREATE**: Explicit config with `HasPrecision(18,2)` for Debit/Credit, FK to Accounts with `DeleteBehavior.Restrict`, FK to JournalEntry with `DeleteBehavior.Cascade` |
 | `Infrastructure/Data/Configurations/JournalEntryConfiguration.cs` | Move line FK config to the new file |
 
-```csharp
-public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEntryLine>
-{
-    public void Configure(EntityTypeBuilder<JournalEntryLine> builder)
-    {
-        builder.ToTable("JournalEntryLines");
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.AccountCode).IsRequired().HasMaxLength(50);
-        builder.Property(x => x.AccountNameAr).IsRequired().HasMaxLength(200);
-        builder.Property(x => x.Debit).HasPrecision(18, 2).HasDefaultValue(0);
-        builder.Property(x => x.Credit).HasPrecision(18, 2).HasDefaultValue(0);
-        builder.Property(x => x.Description).HasMaxLength(500);
-        
-        // FK to Accounts — Restrict (account cannot be deleted if referenced)
-        builder.HasOne<Account>()
-            .WithMany()
-            .HasForeignKey(x => x.AccountId)
-            .OnDelete(DeleteBehavior.Restrict);
-        
-        // FK to JournalEntry — Cascade (lines are owned by entry)
-        builder.HasOne(x => x.JournalEntry)
-            .WithMany(x => x.Lines)
-            .HasForeignKey(x => x.JournalEntryId)
-            .OnDelete(DeleteBehavior.Cascade);
-    }
-}
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
 
 **Estimate**: ~20 minutes
 
@@ -935,22 +711,7 @@ public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEnt
 | `Domain/Accounting/Enums/JournalEntryType.cs` | Add `Reversal = 11` |
 
 **Domain method — Reverse**:
-```csharp
-public void Reverse(int reversedBy, string? reason = null)
-{
-    if (IsReversed)
-        throw new DomainException("لا يمكن عكس قيد تم عكسه بالفعل");
-    
-    IsPosted = false;
-    IsReversed = true;
-    ReversedById = reversedBy;
-    ReversedAt = DateTime.UtcNow;
-    ReversalReason = reason?.Trim();
-    UpdateTimestamp();
-}
-
-public bool Status => IsReversed ? "ملغي" : IsPosted ? "مرحل" : IsDraft ? "مسودة" : "غير معروف";
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
 
 **Logging**: `Log.Information("Journal entry {EntryNumber} (ID={Id}) reversed by User {UserId}. Reason: {Reason}", ...)`
 
@@ -979,15 +740,7 @@ public bool Status => IsReversed ? "ملغي" : IsPosted ? "مرحل" : IsDraft 
 5. `ReferenceType = "OpeningBalance"`, `ReferenceId = 0`
 
 **Validation**:
-```csharp
-// In JournalEntryService.CreateOpeningEntryAsync():
-var existingOpening = await _uow.JournalEntries.ExistsAsync(
-    je => je.EntryType == JournalEntryType.OpeningBalance 
-       && je.TransactionDate.Year == request.TransactionDate.Year
-       && je.IsActive, ct);
-if (existingOpening)
-    return Result<int>.Failure("يوجد قيد افتتاحي لهذه السنة بالفعل — لا يمكن إضافة قيد افتتاحي آخر");
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Logging**: `Log.Information("Opening entry created for fiscal year {Year} with {LineCount} lines", year, lines.Count)`
 
@@ -1065,33 +818,10 @@ Step 5: Mark fiscal year closed
 | `Application/ServiceRegistration.cs` | Register all providers as scoped services |
 
 **IAutoJournalEntryProvider interface**:
-```csharp
-public interface IAutoJournalEntryProvider
-{
-    string ReferenceType { get; }  // e.g., "Sales", "Purchase", "Payment"
-    Task<Result<List<JournalEntryLineRequest>>> GenerateLinesAsync(
-        int referenceId, 
-        CancellationToken ct = default);
-}
-```
+> See `docs/AGENTS.md` for service layer patterns and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **Orchestrator pattern**:
-```csharp
-public class AutoJournalEntryOrchestrator
-{
-    private readonly IEnumerable<IAutoJournalEntryProvider> _providers;
-    
-    public async Task<Result<List<JournalEntryLineRequest>>> GenerateLinesAsync(
-        string referenceType, int referenceId, CancellationToken ct)
-    {
-        var provider = _providers.FirstOrDefault(p => p.ReferenceType == referenceType);
-        if (provider == null)
-            return Result<List<JournalEntryLineRequest>>.Failure(
-                $"لا يوجد مزود قيود تلقائية لنوع المرجع '{referenceType}'");
-        return await provider.GenerateLinesAsync(referenceId, ct);
-    }
-}
-```
+> See `docs/AGENTS.md` for service layer patterns and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **Existing code refactoring**: 
 - Current code that auto-creates entries for sales/purchases must be refactored to call `AutoJournalEntryOrchestrator` instead of inline logic
@@ -1119,22 +849,7 @@ public class AutoJournalEntryOrchestrator
 | `Desktop/Views/Reports/TrialBalanceView.xaml.cs` | **CREATE** |
 
 **SQL-like logic**:
-```sql
-SELECT 
-    a.Id AS AccountId,
-    a.AccountCode,
-    a.NameAr AS AccountNameAr,
-    SUM(CASE WHEN je.TransactionDate < @StartDate THEN jel.Debit ELSE 0 END) AS OpeningDebit,
-    SUM(CASE WHEN je.TransactionDate < @StartDate THEN jel.Credit ELSE 0 END) AS OpeningCredit,
-    SUM(CASE WHEN je.TransactionDate >= @StartDate THEN jel.Debit ELSE 0 END) AS Debit,
-    SUM(CASE WHEN je.TransactionDate >= @StartDate THEN jel.Credit ELSE 0 END) AS Credit
-FROM JournalEntryLines jel
-JOIN JournalEntries je ON jel.JournalEntryId = je.Id
-JOIN Accounts a ON jel.AccountId = a.Id
-WHERE je.IsPosted = 1 AND je.IsReversed = 0 AND je.TransactionDate <= @AsOfDate
-GROUP BY a.Id, a.AccountCode, a.NameAr, a.AccountType
-ORDER BY a.AccountCode
-```
+> See `docs/database-schema.md` for the canonical table definitions and query patterns.
 
 **Estimate**: ~2 hours
 
@@ -1158,16 +873,7 @@ ORDER BY a.AccountCode
 | `Desktop/Views/Reports/AccountStatementView.xaml.cs` | **CREATE** |
 
 **Running balance calculation** (same as current implementation):
-```csharp
-var runningBalance = openingBalance;
-foreach (var line in periodLines)
-{
-    runningBalance += account.IsDebitNormal()
-        ? line.Debit - line.Credit
-        : line.Credit - line.Debit;
-    statementLines.Add(new AccountLedgerLineDto(..., runningBalance));
-}
-```
+> See `docs/AGENTS.md` for service layer patterns and `SalesSystem.Application/` for canonical service implementations.
 
 **Estimate**: ~1.5 hours
 
@@ -1186,37 +892,7 @@ foreach (var line in periodLines)
 | `Desktop/App.xaml.cs` | DI registrations |
 
 **ViewModel structure**:
-```csharp
-public class JournalEntryEditorViewModel : ViewModelBase
-{
-    // Header properties
-    public int? EntryId { get; }
-    public string EntryNumber { get; }
-    public DateTime TransactionDate { get; set; }
-    public string? Description { get; set; }
-    public JournalEntryType EntryType { get; }
-    public int? CurrencyId { get; set; }
-    public decimal? ExchangeRate { get; set; }
-    
-    // Lines as ObservableCollection
-    public ObservableCollection<JournalEntryLineViewModel> Lines { get; }
-    
-    // Commands (always enabled — RULE-059)
-    public ICommand AddLineCommand { get; }
-    public ICommand RemoveLineCommand { get; }
-    public ICommand SaveDraftCommand { get; }    // Save as draft
-    public ICommand PostCommand { get; }          // Save + post
-    public ICommand ReverseCommand { get; }       // Reverse (only on posted entries)
-    public ICommand AttachFileCommand { get; }    // File picker
-    public ICommand RemoveAttachmentCommand { get; }
-    
-    // Computed
-    public decimal TotalDebit => Lines.Sum(l => l.Debit);
-    public decimal TotalCredit => Lines.Sum(l => l.Credit);
-    public bool IsBalanced => Math.Abs(TotalDebit - TotalCredit) < 0.001m;
-    public string BalanceStatus => IsBalanced ? "✅ متوازن" : $"⚠️ غير متوازن (الفرق: {TotalDebit - TotalCredit:N2})";
-}
-```
+> See `DesktopPWF/ViewModels/` for canonical ViewModel patterns and `docs/AGENTS.md` §2.36 for the ExecuteAsync pattern.
 
 **Validation** (RULE-059, RULE-228):
 - All buttons enabled — validate on click
@@ -1351,63 +1027,7 @@ public class JournalEntryEditorViewModel : ViewModelBase
 | `Api/Validators/Accounting/CreateAnnualClosingRequestValidator.cs` | **CREATE** |
 
 **CreateJournalEntryRequestValidator**:
-```csharp
-public class CreateJournalEntryRequestValidator : AbstractValidator<CreateJournalEntryRequest>
-{
-    public CreateJournalEntryRequestValidator()
-    {
-        RuleFor(x => x.TransactionDate)
-            .NotEmpty().WithMessage("تاريخ القيد مطلوب");
-        
-        RuleFor(x => x.EntryType)
-            .IsInEnum().WithMessage("نوع القيد غير صالح");
-        
-        RuleFor(x => x.Lines)
-            .NotNull().WithMessage("يجب إضافة بنود القيد")
-            .Must(list => list.Count >= 2).WithMessage("يجب إضافة بندين على الأقل");
-        
-        RuleFor(x => x.Lines)
-            .Must(lines => 
-            {
-                var totalDebit = lines.Sum(l => l.Debit);
-                var totalCredit = lines.Sum(l => l.Credit);
-                return Math.Abs(totalDebit - totalCredit) < 0.001m;
-            }).WithMessage("القيد غير متوازن — مجموع الخصوم لا يساوي مجموع الإيداعات");
-        
-        RuleForEach(x => x.Lines).SetValidator(new JournalEntryLineRequestValidator());
-        
-        When(x => x.CurrencyId.HasValue, () =>
-        {
-            RuleFor(x => x.ExchangeRate)
-                .NotNull().WithMessage("سعر الصرف مطلوب عند اختيار عملة")
-                .GreaterThan(0).WithMessage("سعر الصرف يجب أن يكون أكبر من صفر");
-        });
-    }
-}
-
-public class JournalEntryLineRequestValidator : AbstractValidator<JournalEntryLineRequest>
-{
-    public JournalEntryLineRequestValidator()
-    {
-        RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("الحساب مطلوب");
-        
-        RuleFor(x => x)
-            .Must(x => x.Debit > 0 || x.Credit > 0)
-            .WithMessage("يجب أن يكون للبند قيمة خصم أو إيداع");
-        
-        RuleFor(x => x)
-            .Must(x => x.Debit == 0 || x.Credit == 0)
-            .WithMessage("لا يمكن أن يحتوي البند على خصم وإيداع معاً");
-        
-        RuleFor(x => x.Debit)
-            .GreaterThanOrEqualTo(0).WithMessage("قيمة الخصم لا يمكن أن تكون سالبة");
-        
-        RuleFor(x => x.Credit)
-            .GreaterThanOrEqualTo(0).WithMessage("قيمة الإيداع لا يمكن أن تكون سالبة");
-    }
-}
-```
+> See `docs/AGENTS.md` §2.13 for the Validation (4 Layers) strategy and `Api/Validators/` for canonical validator patterns.
 
 **Estimate**: ~45 minutes
 
@@ -1426,76 +1046,10 @@ public class JournalEntryLineRequestValidator : AbstractValidator<JournalEntryLi
 | `Contracts/DTOs/AllDtos.cs` | Add `ReversalEntryId` to `JournalEntryDto` |
 
 **Reversal logic**:
-```csharp
-public async Task<Result<int>> ReverseEntryAsync(int entryId, ReverseJournalEntryRequest request, CancellationToken ct)
-{
-    await using var tx = await _uow.BeginTransactionAsync(ct);
-    try
-    {
-        // 1. Load original entry
-        var original = await _uow.JournalEntries.GetByIdAsync(entryId, ct);
-        if (original == null)
-            return Result<int>.Failure("القيد غير موجود", ErrorCodes.NotFound);
-        if (!original.IsPosted)
-            return Result<int>.Failure("لا يمكن عكس قيد لم يتم ترحيله");
-        if (original.IsReversed)
-            return Result<int>.Failure("لا يمكن عكس قيد تم عكسه بالفعل");
-        
-        // 2. Generate reversal entry
-        var reversalNumber = await _numberGenerator.GenerateAsync(ct);
-        var reversal = JournalEntry.CreateReversalEntry(
-            original, reversalNumber.Value!, request.ReversedBy, request.Reason);
-        
-        // 3. Save reversal
-        await _uow.JournalEntries.AddAsync(reversal, ct);
-        
-        // 4. Mark original as reversed
-        original.Reverse(request.ReversedBy, request.Reason);
-        
-        await _uow.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        
-        _logger.LogInformation("Journal entry {EntryId} reversed. Reversal entry {ReversalId} created.",
-            entryId, reversal.Id);
-        
-        return Result<int>.Success(reversal.Id);
-    }
-    catch
-    {
-        await tx.RollbackAsync(ct);
-        throw;
-    }
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns and transaction strategy (§2.65).
 
 **CreateReversalEntry**:
-```csharp
-public static JournalEntry CreateReversalEntry(
-    JournalEntry original, string reversalNumber, int reversedBy, string? reason = null)
-{
-    var reversal = Create(
-        reversalNumber,
-        DateTime.UtcNow,
-        JournalEntryType.Reversal,
-        reversedBy,
-        $"عكس القيد {original.EntryNumber}: {reason ?? original.Description}",
-        original.ReferenceType,
-        original.ReferenceId,
-        original.EntryNumber);
-    
-    // Swap debits and credits
-    foreach (var line in original.Lines)
-    {
-        if (line.Debit > 0)
-            reversal.AddCreditLine(line.AccountId, line.AccountCode, line.AccountNameAr, line.Debit, line.Description);
-        if (line.Credit > 0)
-            reversal.AddDebitLine(line.AccountId, line.AccountCode, line.AccountNameAr, line.Credit, line.Description);
-    }
-    
-    reversal.ValidateAndPost(reversedBy);
-    return reversal;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
 
 **Logging**: `Log.Information("Journal entry {EntryId} reversed by User {UserId}. Reversal: {ReversalNumber}", ...)`
 

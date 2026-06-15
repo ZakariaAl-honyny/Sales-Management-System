@@ -4,8 +4,7 @@ public record BarcodeResolutionDto(
     int ProductId,
     string ProductName,
     int ProductUnitId,
-    string UnitName,
-    decimal ConversionFactor,
-    decimal RetailPrice,
-    decimal WholesalePrice
+    int UnitId,
+    string? UnitName,
+    decimal ConversionFactor
 );

@@ -135,6 +135,92 @@ public class PrintController : ControllerBase
     }
 
     // ═══════════════════════════════════════════════
+    // SALES RETURNS
+    // ═══════════════════════════════════════════════
+
+    [HttpPost("preview/sales-returns/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
+    public async Task<IActionResult> PreviewSalesReturn(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetSalesReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var previewResult = await _printService.PreviewA4Async(result.Value!);
+        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
+    }
+
+    [HttpPost("a4/sales-returns/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
+    public async Task<IActionResult> PrintSalesReturnA4(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetSalesReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var printResult = await _printService.PrintA4Async(result.Value!);
+        return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
+    }
+
+    [HttpGet("generate-a4/sales-returns/{id:int}")]
+    [Authorize(Policy = "AllStaff")]
+    public async Task<IActionResult> GenerateSalesReturnA4Pdf(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetSalesReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var pdfResult = await _printService.GenerateA4PdfBytesAsync(result.Value!);
+        if (!pdfResult.IsSuccess)
+            return BadRequest(new { error = pdfResult.Error });
+
+        return File(pdfResult.Value!, "application/pdf", $"SalesReturn_{id}.pdf");
+    }
+
+    // ═══════════════════════════════════════════════
+    // PURCHASE RETURNS
+    // ═══════════════════════════════════════════════
+
+    [HttpPost("preview/purchase-returns/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> PreviewPurchaseReturn(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetPurchaseReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var previewResult = await _printService.PreviewA4Async(result.Value!);
+        return previewResult.IsSuccess ? Ok(previewResult) : BadRequest(previewResult);
+    }
+
+    [HttpPost("a4/purchase-returns/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> PrintPurchaseReturnA4(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetPurchaseReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var printResult = await _printService.PrintA4Async(result.Value!);
+        return printResult.IsSuccess ? Ok(printResult) : BadRequest(printResult);
+    }
+
+    [HttpGet("generate-a4/purchase-returns/{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> GeneratePurchaseReturnA4Pdf(int id, CancellationToken ct)
+    {
+        var result = await _printDataService.GetPurchaseReturnPrintDataAsync(id, ct);
+        if (!result.IsSuccess)
+            return NotFound(new { error = result.Error });
+
+        var pdfResult = await _printService.GenerateA4PdfBytesAsync(result.Value!);
+        if (!pdfResult.IsSuccess)
+            return BadRequest(new { error = pdfResult.Error });
+
+        return File(pdfResult.Value!, "application/pdf", $"PurchaseReturn_{id}.pdf");
+    }
+
+    // ═══════════════════════════════════════════════
     // GENERATE A4 PDF (Returns raw PDF bytes)
     // ═══════════════════════════════════════════════
 
@@ -231,20 +317,17 @@ public class PrintController : ControllerBase
         // This is the ONLY place that still directly accesses store data.
         // The PrintDataService handles store info for all invoice-based endpoints.
         var settingsResult = await _printDataService.GetStoreSettingsAsync(ct);
-        var sysSettingsResult = await _printDataService.GetPrintSystemSettingsAsync(ct);
+        var printSettingsResult = await _printDataService.GetPrintSettingsAsync(ct);
 
         var settings = settingsResult.IsSuccess ? settingsResult.Value : null;
-        var sysSettings = sysSettingsResult.IsSuccess && sysSettingsResult.Value != null ? sysSettingsResult.Value : new List<SystemSetting>();
+        var printSettings = printSettingsResult.IsSuccess ? printSettingsResult.Value : null;
 
         var storeName = settings?.StoreName ?? "متجري";
         var storePhone = settings?.Phone ?? string.Empty;
         var storeAddress = settings?.Address ?? string.Empty;
-        var storeTaxNumber = sysSettings
-            .FirstOrDefault(s => s.SettingKey == "StoreTaxNumber")?.SettingValue ?? string.Empty;
-        var logoPath = sysSettings
-            .FirstOrDefault(s => s.SettingKey == "LogoPath")?.SettingValue;
-        var taxRateStr = sysSettings
-            .FirstOrDefault(s => s.SettingKey == "TaxRate")?.SettingValue ?? "15";
+        var storeTaxNumber = printSettings?.StoreTaxNumber ?? string.Empty;
+        var logoPath = printSettings?.LogoPath;
+        var taxRateStr = printSettings?.TaxRate.ToString() ?? "15";
 
         byte[]? logoBytes = null;
         if (!string.IsNullOrWhiteSpace(logoPath) && System.IO.File.Exists(logoPath))

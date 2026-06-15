@@ -180,15 +180,7 @@ These issues must be resolved **before** any Phase 29 implementation begins.
 - Accounts module (Phase 28) may not be completed yet
 - Once Accounts exist, CashBox must link to an Account
 
-```csharp
-// CashBox.cs — add
-public int? AccountId { get; private set; }
-
-// CashBoxConfiguration.cs — add FK config
-builder.Property(x => x.AccountId);
-builder.HasIndex(x => x.AccountId);
-// FK will reference Accounts table when created in Phase 28
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
 
 **Files changed**: `CashBox.cs`, `CashBoxConfiguration.cs`, `CashBoxDto.cs`, `CreateCashBoxRequest.cs`, `CashBoxService.cs`, migration
 
@@ -203,14 +195,7 @@ builder.HasIndex(x => x.AccountId);
 
 **Fix**: Add `int? CurrencyId` nullable FK to `CashBox`. Keep `CurrencyCode` as denormalized string for quick display.
 
-```csharp
-// CashBox.cs — add
-public int? CurrencyId { get; private set; }
-
-// CashBoxConfiguration.cs — add FK config
-builder.Property(x => x.CurrencyId);
-builder.HasIndex(x => x.CurrencyId);
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
 
 **Files changed**: `CashBox.cs`, `CashBoxConfiguration.cs`, `CashBoxDto.cs`, `CreateCashBoxRequest.cs`, `CashBoxService.cs`, migration
 
@@ -226,21 +211,7 @@ builder.HasIndex(x => x.CurrencyId);
 3. Implement the `IAutoJournalService` interface with a **stub** that logs the intended entry
 4. Full auto-journal generation implemented when Phase 28 (Accounts) + Phase 30 (Accounting Integration) are complete
 
-```csharp
-// CashTransaction.cs — add (Phase 29 forward-looking)
-public int? JournalEntryId { get; private set; }
-
-// Stub implementation:
-public Task<Result> CreateJournalEntryAsync(CashTransaction transaction, CancellationToken ct)
-{
-    _logger.LogInformation(
-        "Auto-journal entry STUB: Debit CashBox Account {AccountId}, " +
-        "Credit {ReferenceType} #{ReferenceId}, Amount {Amount}",
-        transaction.CashBox?.AccountId, transaction.ReferenceType,
-        transaction.ReferenceId, transaction.Amount);
-    return Task.FromResult(Result.Success());
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns and `docs/CONSTITUTION.md` for the Result<T> pattern and service stub patterns.
 
 **Files changed**: `CashTransaction.cs`, `CashTransactionConfiguration.cs`, `CashTransactionDto.cs`, create `IAutoJournalService.cs` + stub
 
@@ -270,21 +241,12 @@ public Task<Result> CreateJournalEntryAsync(CashTransaction transaction, Cancell
 **⚠️ NEW domain methods**: `SetDefault(bool isDefault)` — manages IsDefault flag. `ValidateSufficientBalance(decimal amount)` — throws `DomainException` if `amount > CurrentBalance` (RULE-080).
 
 **🔴 AccountId FK — New Property (CRITICAL)**:
-```csharp
-// CashBox.cs
-public int? AccountId { get; private set; }
-public Account? Account { get; private set; }
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
 
 > **Note**: Required for auto-journal posting. Links the cash box to its Chart of Accounts entry.
 
 **Fluent API** (add to `CashBoxConfiguration.cs`):
-```csharp
-builder.HasOne(cb => cb.Account)
-    .WithMany()
-    .HasForeignKey(cb => cb.AccountId)
-    .OnDelete(DeleteBehavior.Restrict);
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
 
 ### 4.2 CashTransaction (Extended)
 
@@ -359,65 +321,14 @@ Same fields as CustomerPayment, but with `SupplierId` FK and `PurchaseInvoiceId`
 
 ### 4.5 Cheque (NEW Entity)
 
-```csharp
-public class Cheque : BaseEntity
-{
-    public int Id { get; private set; }
-    public string ChequeNumber { get; private set; } = string.Empty;
-    public string BankName { get; private set; } = string.Empty;
-    public string? BranchName { get; private set; }
-    public decimal Amount { get; private set; }
-    public DateTime ChequeDate { get; private set; }
-    public DateTime? DepositDate { get; private set; }
-    public ChequeStatus Status { get; private set; } = ChequeStatus.UnderCollection;
-    
-    // Payee/Payer
-    public string? DrawerName { get; private set; }   // Issuer
-    public string? PayeeName { get; private set; }    // Recipient
-    public int? CustomerId { get; private set; }      // If from customer
-    public int? SupplierId { get; private set; }      // If to supplier
-    
-    // Reference
-    public int? PaymentId { get; private set; }       // Link to CustomerPayment/SupplierPayment
-    public string? Notes { get; private set; }
-    public int? ImageAttachmentId { get; private set; } // Scanned cheque image
-    
-    // Navigation
-    public Customer? Customer { get; private set; }
-    public Supplier? Supplier { get; private set; }
-    
-    // Domain methods
-    public static Cheque Create(...) { }
-    public void Deposit(DateTime depositDate) { Status = ChequeStatus.Deposited; }
-    public void MarkAsCleared() { Status = ChequeStatus.Cleared; }
-    public void MarkAsBounced(string reason) { Status = ChequeStatus.Bounced; }
-    public void Cancel() { Status = ChequeStatus.Cancelled; }
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for the canonical table definition.
 
 **ChequeStatus enum**:
-```csharp
-public enum ChequeStatus : byte
-{
-    UnderCollection = 1,  // تحت التحصيل
-    Deposited = 2,         // تم الإيداع
-    Cleared = 3,           // مقبوض / تم الصرف
-    Bounced = 4,           // مرتجع / بدون رصيد
-    Cancelled = 5          // ملغي
-}
-```
+> See `docs/AGENTS.md` §3 for canonical enum definitions.
 
 ### 4.6 PaymentMethod Enum (NEW — Enhanced)
 
-```csharp
-public enum PaymentMethod : byte
-{
-    Cash = 1,         // نقدي
-    Cheque = 2,       // شيك
-    BankTransfer = 3, // تحويل بنكي
-    CreditCard = 4    // بطاقة ائتمان
-}
-```
+> See `docs/AGENTS.md` §3 for canonical enum definitions.
 
 **⚠️ IMPORTANT**: The existing `PaymentType` enum (`Cash=1, Credit=2, Mixed=3`) is used for **invoice payment type** (cash vs credit sale). This is DIFFERENT from `PaymentMethod` (how the payment is tendered). Do NOT conflate them.
 
@@ -441,43 +352,19 @@ public enum PaymentMethod : byte
 | `ClosedByUserId` | `int` | ✅ | — |
 
 **DailyClosureStatus enum**:
-```csharp
-public enum DailyClosureStatus : byte
-{
-    Open = 1,           // مفتوح — no closure yet
-    Closed = 2,         // مغلق — closure recorded
-    Verified = 3,       // معتمد — verified by supervisor
-    Discrepancy = 4     //存在 فرق — has discrepancy requiring approval
-}
+> See `docs/AGENTS.md` §3 for canonical enum definitions.
 
 **🔴 New Fields — ActualCashCount & Difference**:
-```csharp
-// DailyClosure.cs — add properties
-public decimal ActualCashCount { get; private set; } // Manual cash count entered by user
-public decimal Difference => ActualCashCount - ClosingBalance; // Computed: surplus (positive) or shortage (negative)
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, domain methods).
 
 **Fluent API** (add to `DailyClosureConfiguration.cs`):
-```csharp
-builder.Property(x => x.ActualCashCount).HasPrecision(18, 2);
-// Difference is computed property — no DB column needed
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
 
 > **Both use `HasPrecision(18, 2)` per RULE-001.
 
 ### 4.8 PaymentInvoiceAllocation (NEW Entity)
 
-```csharp
-public class PaymentInvoiceAllocation : BaseEntity
-{
-    public int Id { get; private set; }
-    public string PaymentType { get; private set; } // "Customer" or "Supplier"
-    public int PaymentId { get; private set; }       // FK to CustomerPayment or SupplierPayment
-    public string InvoiceType { get; private set; }   // "SalesInvoice" or "PurchaseInvoice"
-    public int InvoiceId { get; private set; }        // FK to SalesInvoice or PurchaseInvoice
-    public decimal AllocatedAmount { get; private set; }
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
 
 **Constraint**: Sum of `AllocatedAmount` for a payment must equal the payment's total `Amount`.
 
@@ -625,37 +512,7 @@ When a payment is made without specifying a single invoice:
 4. Create `PaymentInvoiceAllocation` records for each invoice
 5. Update each invoice's `PaidAmount` 
 
-```csharp
-public async Task<Result<List<PaymentInvoiceAllocation>>> DistributePaymentAsync(
-    int customerId, decimal amount, CancellationToken ct)
-{
-    var unpaidInvoices = await _uow.SalesInvoices.ToListAsync(
-        i => i.CustomerId == customerId && i.DueAmount > 0,
-        q => q.OrderBy(i => i.DueDate ?? i.InvoiceDate),
-        ct);
-
-    var allocations = new List<PaymentInvoiceAllocation>();
-    var remaining = amount;
-
-    foreach (var invoice in unpaidInvoices)
-    {
-        if (remaining <= 0) break;
-        
-        var allocAmount = Math.Min(remaining, invoice.DueAmount);
-        // Create PaymentInvoiceAllocation
-        // Update invoice.PaidAmount += allocAmount
-        remaining -= allocAmount;
-    }
-    
-    if (remaining > 0)
-    {
-        // Remaining amount becomes credit balance / overpayment
-        // Customer.IncreaseBalance(-remaining) — they have credit
-    }
-    
-    return allocations;
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 ### 6.5 Auto Journal Entry — Deferred
 
@@ -748,28 +605,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | `Infrastructure/Data/Migrations/` | New migration: ALTER TABLE |
 
 **Domain method update**:
-```csharp
-internal static CashTransaction Create(
-    int cashBoxId,
-    CashTransactionType type,
-    decimal amount,
-    decimal balanceBefore,
-    decimal balanceAfter,
-    string? referenceType,
-    int? referenceId,
-    int createdBy,
-    string? notes,
-    PaymentMethod paymentMethod = PaymentMethod.Cash,
-    DateTime? transactionDate = null)
-{
-    return new CashTransaction
-    {
-        // ... existing fields ...
-        PaymentMethod = paymentMethod,
-        TransactionDate = transactionDate ?? DateTime.UtcNow,
-    };
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
 
 **Logging**: `Log.Information("CashTransaction {Id}: {Type} of {Amount} via {PaymentMethod} in box {CashBoxId}", ...)` (RULE-035)
 
@@ -783,31 +619,7 @@ internal static CashTransaction Create(
 
 **File**: `Domain/Entities/Cheque.cs`
 
-```csharp
-public class Cheque : BaseEntity
-{
-    public string ChequeNumber { get; private set; } = string.Empty;
-    public string BankName { get; private set; } = string.Empty;
-    public string? BranchName { get; private set; }
-    public decimal Amount { get; private set; }
-    public DateTime ChequeDate { get; private set; }
-    public DateTime? DepositDate { get; private set; }
-    public ChequeStatus Status { get; private set; } = ChequeStatus.UnderCollection;
-    public string? DrawerName { get; private set; }
-    public string? PayeeName { get; private set; }
-    public int? CustomerId { get; private set; }
-    public int? SupplierId { get; private set; }
-    public int? PaymentId { get; private set; }
-    public string? Notes { get; private set; }
-
-    // Domain methods
-    public static Cheque Create(...) { /* guard clauses */ }
-    public void Deposit(DateTime depositDate) { /* status → Deposited */ }
-    public void MarkAsCleared() { /* status → Cleared */ }
-    public void MarkAsBounced(string reason) { /* status → Bounced */ }
-    public void Cancel() { /* status → Cancelled */ }
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for the canonical table definition.
 
 **File**: `Domain/Enums/ChequeStatus.cs` — `UnderCollection=1, Deposited=2, Cleared=3, Bounced=4, Cancelled=5`
 
@@ -822,18 +634,7 @@ public class Cheque : BaseEntity
 #### 3.3 Application Layer
 
 **File**: `Application/Interfaces/Services/IChequeService.cs`
-```csharp
-public interface IChequeService
-{
-    Task<Result<List<ChequeDto>>> GetAllAsync(ChequeStatus? status, CancellationToken ct);
-    Task<Result<ChequeDto>> GetByIdAsync(int id, CancellationToken ct);
-    Task<Result<ChequeDto>> CreateAsync(CreateChequeRequest request, int userId, CancellationToken ct);
-    Task<Result> DepositAsync(int id, DateTime depositDate, int userId, CancellationToken ct);
-    Task<Result> MarkAsClearedAsync(int id, int userId, CancellationToken ct);
-    Task<Result> MarkAsBouncedAsync(int id, string reason, int userId, CancellationToken ct);
-    Task<Result> CancelAsync(int id, int userId, CancellationToken ct);
-}
-```
+> See `docs/AGENTS.md` for service layer patterns and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **File**: `Application/Services/ChequeService.cs`
 - Uses `IUnitOfWork` (RULE-024)
@@ -846,9 +647,7 @@ public interface IChequeService
 #### 3.4 Add to IUnitOfWork
 
 **File**: `Application/Interfaces/IUnitOfWork.cs`
-```csharp
-IRepository<Cheque> Cheques { get; }
-```
+> See `Application/Interfaces/IUnitOfWork.cs` for the canonical IUnitOfWork interface.
 
 **Estimate**: ~4 hours
 
@@ -871,34 +670,7 @@ IRepository<Cheque> Cheques { get; }
 | `Infrastructure/Data/Migrations/` | New migration: CREATE TABLE `PaymentInvoiceAllocations` |
 
 **Algorithm**:
-```csharp
-public async Task<Result<List<PaymentInvoiceAllocationDto>>> DistributePaymentAsync(
-    string paymentType, int paymentId, int customerOrSupplierId, 
-    decimal totalAmount, List<InvoiceAllocationRequest> allocations,
-    CancellationToken ct)
-{
-    if (allocations == null || allocations.Count == 0)
-    {
-        // Auto-distribute: find unpaid invoices, allocate oldest first
-        allocations = await AutoDistributeAsync(customerOrSupplierId, totalAmount, ct);
-    }
-    
-    var totalAllocated = allocations.Sum(a => a.AllocatedAmount);
-    if (Math.Abs(totalAllocated - totalAmount) > 0.001m)
-        return Result<List<...>>.Failure("مجموع المبالغ الموزعة لا يساوي المبلغ الإجمالي");
-    
-    // Create allocation records
-    foreach (var alloc in allocations)
-    {
-        // Validate invoice exists and has sufficient due amount
-        // Create PaymentInvoiceAllocation record
-        // Update invoice.PaidAmount
-    }
-    
-    await _uow.SaveChangesAsync(ct);
-    return Result<List<...>>.Success(dtos);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Logging**: `Log.Information("Payment {PaymentId} distributed across {Count} invoices for {Type}", paymentId, allocations.Count, paymentType)`
 
@@ -947,41 +719,7 @@ public async Task<Result<List<PaymentInvoiceAllocationDto>>> DistributePaymentAs
 | `Infrastructure/Data/Migrations/` | New migration: ALTER TABLE |
 
 **Closure workflow**:
-```csharp
-public async Task<Result<DailyClosureDto>> PerformDailyClosureAsync(
-    int cashBoxId, int userId, decimal? actualCashCount, CancellationToken ct)
-{
-    // Get current balance
-    var box = await _uow.CashBoxes.GetByIdAsync(cashBoxId, ct);
-    var closingBalance = box.CurrentBalance;
-    
-    var difference = actualCashCount.HasValue 
-        ? actualCashCount.Value - closingBalance 
-        : (decimal?)null;
-    
-    var status = difference.HasValue && Math.Abs(difference.Value) > 0.001m
-        ? DailyClosureStatus.Discrepancy
-        : DailyClosureStatus.Closed;
-    
-    // Create closure with actual count + difference
-    var closure = DailyClosure.Create(
-        cashBoxId, today, openingBalance, totalIncome, 
-        totalExpense, closingBalance, userId,
-        actualCashCount, difference, status);
-    
-    // If discrepancy exists, require verification
-    if (status == DailyClosureStatus.Discrepancy)
-    {
-        _logger.LogWarning("Daily closure discrepancy: CashBox {CashBoxId}, " +
-            "System={Closing:N2}, Actual={Actual:N2}, Diff={Diff:N2}",
-            cashBoxId, closingBalance, actualCashCount, difference);
-    }
-    
-    await _uow.DailyClosures.AddAsync(closure, ct);
-    await _uow.SaveChangesAsync(ct);
-    return Result<DailyClosureDto>.Success(MapToClosureDto(closure));
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Logging**: 
 - `Log.Information("Daily closure for CashBox {Id}: Opening={Op}, Income={Inc}, Expense={Exp}, Closing={Cls}", ...)`
@@ -1172,22 +910,7 @@ public async Task<Result<DailyClosureDto>> PerformDailyClosureAsync(
 | `Contracts/DTOs/AllDtos.cs` | Add `CashBoxSummaryReportDto`, `ChequeReportDto`, `PaymentSummaryDto` |
 
 **Report DTOs**:
-```csharp
-public record CashBoxSummaryReportDto(
-    int CashBoxId, string CashBoxName, decimal OpeningBalance,
-    decimal TotalIncome, decimal TotalExpense, decimal ClosingBalance,
-    int TransactionCount, DateTime AsOfDate);
-
-public record ChequeReportDto(
-    int ChequeId, string ChequeNumber, string BankName, decimal Amount,
-    DateTime ChequeDate, string Status, string? DrawerName,
-    string? PayeeName, int? CustomerId, int? SupplierId);
-
-public record PaymentSummaryDto(
-    string PaymentType, int PaymentId, string PaymentNumber,
-    string PartyName, decimal Amount, string PaymentMethod,
-    DateTime PaymentDate, string? CashBoxName);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 **Estimate**: ~3 hours
 
@@ -1228,12 +951,7 @@ public record PaymentSummaryDto(
 | `DesktopPWF/Views/CashBoxes/DailyClosureView.xaml` | Add `ⓘ` tooltips next to: الإغلاق اليومي, الرصيد النظري, الرصيد الفعلي |
 
 **XAML usage pattern**:
-```xml
-<StackPanel Orientation="Horizontal">
-    <TextBlock Text="سند قبض" Style="{StaticResource LabelStyle}"/>
-    <controls:InfoTooltip HelpText="سند القبض هو مستند يثبت استلام الشركة مبلغاً مالياً من عميل أو جهة أخرى."/>
-</StackPanel>
-```
+> See `DesktopPWF/Controls/InfoTooltip.xaml` for the canonical InfoTooltip pattern.
 
 **Estimate**: ~1 hour
 

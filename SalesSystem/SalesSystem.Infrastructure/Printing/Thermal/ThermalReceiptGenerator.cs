@@ -14,9 +14,13 @@ public class ThermalReceiptGenerator
     private const char Separator = '-';
     private const char DoubleSeparator = '=';
 
-    public byte[] GenerateEscPosCommands(InvoicePrintDto data)
+    public byte[] GenerateEscPosCommands(InvoicePrintDto data, int escPosCodePage = 1256)
     {
+        var encoding = Encoding.GetEncoding(escPosCodePage);
         var commands = new List<byte[]>();
+
+        // Pass encoding to all EscPos.PrintLine calls
+        byte[] PrintLine(string text) => EscPos.PrintLine(text, encoding);
 
         // ─── Initialize printer ─────────────────
         commands.Add(EscPos.Initialize());
@@ -27,90 +31,98 @@ public class ThermalReceiptGenerator
         commands.Add(EscPos.SetFontSize(2));
 
         var storeName = TruncateCenter(data.StoreName, LineWidth);
-        commands.Add(EscPos.PrintLine(storeName));
+        commands.Add(PrintLine(storeName));
 
         commands.Add(EscPos.SetFontSize(1));
         commands.Add(EscPos.SetBold(false));
 
         if (!string.IsNullOrWhiteSpace(data.StorePhone))
-            commands.Add(EscPos.PrintLine(data.StorePhone));
+            commands.Add(PrintLine(data.StorePhone));
 
         if (!string.IsNullOrWhiteSpace(data.StoreAddress))
         {
             foreach (var line in WrapText(data.StoreAddress, LineWidth))
-                commands.Add(EscPos.PrintLine(line));
+                commands.Add(PrintLine(line));
         }
 
         if (!string.IsNullOrWhiteSpace(data.StoreTaxNumber))
-            commands.Add(EscPos.PrintLine($"ض: {data.StoreTaxNumber}"));
+            commands.Add(PrintLine($"ض: {data.StoreTaxNumber}"));
 
-        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
+        commands.Add(PrintLine(new string(DoubleSeparator, LineWidth)));
 
         // ─── Invoice info ──────────────────────
         commands.Add(EscPos.SetAlignment(Alignment.Right));
-        commands.Add(EscPos.PrintLine(
+        commands.Add(PrintLine(
             FormatTwoColumns("رقم الفاتورة:", data.InvoiceNumber)));
-        commands.Add(EscPos.PrintLine(
+        commands.Add(PrintLine(
             FormatTwoColumns("التاريخ:", data.InvoiceDate.ToString("dd/MM/yyyy HH:mm"))));
-        commands.Add(EscPos.PrintLine(
+        commands.Add(PrintLine(
             FormatTwoColumns("العميل:", TruncateRight(data.CustomerOrSupplierName, 20))));
 
-        commands.Add(EscPos.PrintLine(new string(Separator, LineWidth)));
+        commands.Add(PrintLine(new string(Separator, LineWidth)));
 
         // ─── Column headers ────────────────────
         commands.Add(EscPos.SetBold(true));
-        commands.Add(EscPos.PrintLine(FormatItemHeader()));
+        commands.Add(PrintLine(FormatItemHeader()));
         commands.Add(EscPos.SetBold(false));
-        commands.Add(EscPos.PrintLine(new string(Separator, LineWidth)));
+        commands.Add(PrintLine(new string(Separator, LineWidth)));
 
         // ─── Items ─────────────────────────────
         foreach (var item in data.Items)
         {
             var name = TruncateRight(item.ProductName, LineWidth - 2);
-            commands.Add(EscPos.PrintLine($"  {name}"));
+            commands.Add(PrintLine($"  {name}"));
 
             var itemLine = FormatItemLine(
                 item.UnitName,
                 item.Quantity,
                 item.UnitPrice,
                 item.Total);
-            commands.Add(EscPos.PrintLine(itemLine));
+            commands.Add(PrintLine(itemLine));
 
             if (item.Discount > 0)
-                commands.Add(EscPos.PrintLine(
+                commands.Add(PrintLine(
                     FormatTwoColumns("  خصم:", $"-{item.Discount:N2}")));
         }
 
-        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
+        commands.Add(PrintLine(new string(DoubleSeparator, LineWidth)));
 
         // ─── Totals ────────────────────────────
         if (data.DiscountAmount > 0)
-            commands.Add(EscPos.PrintLine(
+            commands.Add(PrintLine(
                 FormatTwoColumns("الخصم:", $"-{data.DiscountAmount:N2}")));
 
-        commands.Add(EscPos.PrintLine(
+        // Other Charges (delivery, shipping — only if exists)
+        if (data.OtherCharges > 0)
+            commands.Add(PrintLine(
+                FormatTwoColumns("مصاريف إضافية:", $"+{data.OtherCharges:N2}")));
+
+        commands.Add(PrintLine(
             FormatTwoColumns($"ض.ق.م ({data.TaxRate:N0}%):", $"{data.TaxAmount:N2}")));
 
         commands.Add(EscPos.SetBold(true));
         commands.Add(EscPos.SetFontSize(2));
-        commands.Add(EscPos.PrintLine(
+        commands.Add(PrintLine(
             FormatTwoColumns("الإجمالي:", $"{data.GrandTotal:N2} ر.س")));
         commands.Add(EscPos.SetFontSize(1));
         commands.Add(EscPos.SetBold(false));
 
-        commands.Add(EscPos.PrintLine(
+        commands.Add(PrintLine(
             FormatTwoColumns("المدفوع:", $"{data.AmountPaid:N2}")));
         if (data.ChangeAmount > 0)
-            commands.Add(EscPos.PrintLine(
+            commands.Add(PrintLine(
                 FormatTwoColumns("الباقي:", $"{data.ChangeAmount:N2}")));
 
-        commands.Add(EscPos.PrintLine(new string(DoubleSeparator, LineWidth)));
+        commands.Add(PrintLine(new string(DoubleSeparator, LineWidth)));
 
         // ─── Footer ────────────────────────────
         commands.Add(EscPos.SetAlignment(Alignment.Center));
-        commands.Add(EscPos.PrintLine("شكراً لتعاملكم معنا"));
-        commands.Add(EscPos.PrintLine(string.Empty));
-        commands.Add(EscPos.PrintLine(string.Empty));
+        var footerText = string.IsNullOrWhiteSpace(data.FooterNote)
+            ? "شكراً لتعاملكم معنا"
+            : data.FooterNote;
+        commands.Add(PrintLine(footerText));
+        commands.Add(PrintLine(string.Empty));
+        commands.Add(PrintLine(string.Empty));
 
         // ─── Cut paper ─────────────────────────
         commands.Add(EscPos.CutPaper());
@@ -196,9 +208,9 @@ public static class EscPos
         return new byte[] { 0x1D, 0x21, size };
     }
 
-    public static byte[] PrintLine(string text)
+    public static byte[] PrintLine(string text, Encoding? encoding = null)
     {
-        var encoding = Encoding.GetEncoding(1256);
+        encoding ??= Encoding.GetEncoding(1256);
         var textBytes = encoding.GetBytes(text);
         var newLine = new byte[] { 0x0A };
         return textBytes.Concat(newLine).ToArray();

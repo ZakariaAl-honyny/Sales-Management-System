@@ -2,6 +2,9 @@ using SalesSystem.Contracts.Enums;
 
 namespace SalesSystem.Contracts.Requests;
 
+/// <summary>
+/// طلب إنشاء فاتورة شراء جديدة — مع دعم العملات المتعددة.
+/// </summary>
 public record CreatePurchaseInvoiceRequest(
     int WarehouseId,
     int SupplierId,
@@ -9,28 +12,24 @@ public record CreatePurchaseInvoiceRequest(
     DateTime? InvoiceDate,
     DateOnly? DueDate,
     PaymentType PaymentType,
-    int? CashBoxId,
     decimal DiscountAmount,
     byte? DiscountType,                          // NEW
     decimal? DiscountRate,                       // NEW
     decimal TaxAmount,
+    decimal OtherCharges,
     decimal PaidAmount,
-    int? CurrencyId,                             // NEW
-    decimal? ExchangeRate,                       // NEW
+    int? CurrencyId,
+    decimal? ExchangeRate,
     string? Notes,
-    string? SupplierInvoiceNo,
-    string? AttachmentBase64,                    // NEW
-    string? AttachmentFileName,                  // NEW
-    List<CreatePurchaseInvoiceItemRequest> Items,
-    List<CreateAdditionalFeeRequest>? AdditionalFees = null);   // NEW
+    List<CreatePurchaseInvoiceItemRequest> Items);
 
+/// <summary>
+/// طلب إنشاء بند في فاتورة الشراء.
+/// </summary>
 public record CreatePurchaseInvoiceItemRequest(
     int ProductId,
-    int ProductUnitId,                           // NEW (required now)
+    int ProductUnitId,
     decimal Quantity,
     decimal UnitCost,
-    decimal DiscountAmount,
-    byte? DiscountType,                          // NEW
-    decimal? DiscountRate,                       // NEW
-    SaleMode Mode,
-    string? Notes);
+    byte? DiscountType = null,
+    decimal? DiscountRate = null);

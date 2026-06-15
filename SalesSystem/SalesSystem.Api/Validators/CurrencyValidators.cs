@@ -26,6 +26,9 @@ public class CreateCurrencyRequestValidator : AbstractValidator<CreateCurrencyRe
         RuleFor(x => x.FractionName)
             .MaximumLength(20).WithMessage("اسم الجزء الكسري لا يمكن أن يتجاوز 20 حرفاً")
             .When(x => !string.IsNullOrEmpty(x.FractionName));
+
+        RuleFor(x => x.DecimalPlaces)
+            .InclusiveBetween(0, 4).WithMessage("عدد المنازل العشرية يجب أن يكون بين 0 و 4");
     }
 }
 
@@ -47,6 +50,9 @@ public class UpdateCurrencyRequestValidator : AbstractValidator<UpdateCurrencyRe
         RuleFor(x => x.FractionName)
             .MaximumLength(20).WithMessage("اسم الجزء الكسري لا يمكن أن يتجاوز 20 حرفاً")
             .When(x => !string.IsNullOrEmpty(x.FractionName));
+
+        RuleFor(x => x.DecimalPlaces)
+            .InclusiveBetween(0, 4).WithMessage("عدد المنازل العشرية يجب أن يكون بين 0 و 4");
     }
 }
 

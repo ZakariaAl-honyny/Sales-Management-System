@@ -1,21 +1,21 @@
-using System.Collections.Generic;
-using SalesSystem.DesktopPWF.Messaging.Messages;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
+using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.Services.App.Toast;
-using System.Linq;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Users;
 
 public class UserEditorViewModel : ViewModelBase
 {
     private readonly IUserApiService _userService;
+    private readonly IRoleApiService _roleService;
+    private readonly IBranchApiService _branchService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
@@ -24,7 +24,7 @@ public class UserEditorViewModel : ViewModelBase
     private int _id;
     private string _username = string.Empty;
     private string _fullName = string.Empty;
-    private UserRole _role = UserRole.Cashier;
+    private int _selectedRoleId = 3; // Cashier (default)
     private bool _isActive = true;
     private bool _isEditMode;
     private string _phone = string.Empty;
@@ -33,6 +33,19 @@ public class UserEditorViewModel : ViewModelBase
     private int? _defaultCashBoxId;
     private ObservableCollection<CashBoxOptionItem> _cashBoxOptions = new();
     private bool _isLocked;
+
+    // Role assignment fields
+    private ObservableCollection<RoleDto> _availableRoles = new();
+    private ObservableCollection<RoleDto> _assignedRoles = new();
+    private RoleDto? _selectedAvailableRole;
+    private RoleDto? _selectedAssignedRole;
+
+    // Branch assignment fields
+    private ObservableCollection<BranchDto> _availableBranches = new();
+    private ObservableCollection<BranchDto> _assignedBranches = new();
+    private BranchDto? _selectedAvailableBranch;
+    private BranchDto? _selectedAssignedBranch;
+
     public bool IsEditMode
     {
         get => _isEditMode;
@@ -43,6 +56,8 @@ public class UserEditorViewModel : ViewModelBase
     public UserEditorViewModel()
     {
         _userService = App.GetService<IUserApiService>();
+        _roleService = App.GetService<IRoleApiService>();
+        _branchService = App.GetService<IBranchApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
@@ -51,6 +66,7 @@ public class UserEditorViewModel : ViewModelBase
         _isEditMode = false;
         WindowTitle = "إضافة مستخدم جديد";
         InitializeCommands();
+        _ = LoadAuxiliaryDataAsync();
     }
 
     public UserEditorViewModel(UserDto user) : this()
@@ -58,7 +74,7 @@ public class UserEditorViewModel : ViewModelBase
         _id = user.Id;
         Username = user.UserName;
         FullName = user.FullName;
-        Role = (UserRole)user.Role;
+        SelectedRoleId = user.Role;
         IsActive = user.Status == 1;
         Phone = user.Phone ?? string.Empty;
         Email = user.Email ?? string.Empty;
@@ -67,6 +83,7 @@ public class UserEditorViewModel : ViewModelBase
         _isEditMode = true;
         _isLocked = user.Status == 2; // Locked status
         WindowTitle = $"تعديل مستخدم: {user.UserName}";
+        _ = LoadUserRolesAndBranchesAsync(user.Id);
     }
 
     private void InitializeCommands()
@@ -76,6 +93,14 @@ public class UserEditorViewModel : ViewModelBase
         UploadAvatarCommand = new RelayCommand(UploadAvatar);
         RemoveAvatarCommand = new RelayCommand(RemoveAvatar, () => HasAvatar);
         ChangePasswordCommand = new RelayCommand(OpenChangePassword);
+
+        // Role assignment commands
+        AddRoleCommand = new RelayCommand(AddRole, () => SelectedAvailableRole != null);
+        RemoveRoleCommand = new RelayCommand(RemoveRole, () => SelectedAssignedRole != null);
+
+        // Branch assignment commands
+        AddBranchCommand = new RelayCommand(AddBranch, () => SelectedAvailableBranch != null);
+        RemoveBranchCommand = new RelayCommand(RemoveBranch, () => SelectedAssignedBranch != null);
     }
 
     #region Properties
@@ -111,10 +136,10 @@ public class UserEditorViewModel : ViewModelBase
         }
     }
 
-    public UserRole Role
+    public int SelectedRoleId
     {
-        get => _role;
-        set => SetProperty(ref _role, value);
+        get => _selectedRoleId;
+        set => SetProperty(ref _selectedRoleId, value);
     }
 
     public bool IsActive
@@ -194,10 +219,89 @@ public class UserEditorViewModel : ViewModelBase
 
     public ObservableCollection<RoleOption> RoleOptions { get; } = new()
     {
-        new RoleOption { Value = UserRole.Admin, Display = "مدير نظام" },
-        new RoleOption { Value = UserRole.Manager, Display = "مدير فرع" },
-        new RoleOption { Value = UserRole.Cashier, Display = "كاشير" }
+        new RoleOption { Id = 1, Display = "مدير النظام" },
+        new RoleOption { Id = 2, Display = "مدير" },
+        new RoleOption { Id = 3, Display = "كاشير" },
+        new RoleOption { Id = 4, Display = "مراقب" },
+        new RoleOption { Id = 5, Display = "مدير فرع" },
     };
+
+    // ─── Role Assignment Properties ─────────────────────────────────
+
+    public ObservableCollection<RoleDto> AvailableRoles
+    {
+        get => _availableRoles;
+        set => SetProperty(ref _availableRoles, value);
+    }
+
+    public ObservableCollection<RoleDto> AssignedRoles
+    {
+        get => _assignedRoles;
+        set => SetProperty(ref _assignedRoles, value);
+    }
+
+    public RoleDto? SelectedAvailableRole
+    {
+        get => _selectedAvailableRole;
+        set
+        {
+            if (SetProperty(ref _selectedAvailableRole, value))
+            {
+                (AddRoleCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public RoleDto? SelectedAssignedRole
+    {
+        get => _selectedAssignedRole;
+        set
+        {
+            if (SetProperty(ref _selectedAssignedRole, value))
+            {
+                (RemoveRoleCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    // ─── Branch Assignment Properties ───────────────────────────────
+
+    public ObservableCollection<BranchDto> AvailableBranches
+    {
+        get => _availableBranches;
+        set => SetProperty(ref _availableBranches, value);
+    }
+
+    public ObservableCollection<BranchDto> AssignedBranches
+    {
+        get => _assignedBranches;
+        set => SetProperty(ref _assignedBranches, value);
+    }
+
+    public BranchDto? SelectedAvailableBranch
+    {
+        get => _selectedAvailableBranch;
+        set
+        {
+            if (SetProperty(ref _selectedAvailableBranch, value))
+            {
+                (AddBranchCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public BranchDto? SelectedAssignedBranch
+    {
+        get => _selectedAssignedBranch;
+        set
+        {
+            if (SetProperty(ref _selectedAssignedBranch, value))
+            {
+                (RemoveBranchCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     #endregion
 
     #region Commands
@@ -206,6 +310,14 @@ public class UserEditorViewModel : ViewModelBase
     public ICommand UploadAvatarCommand { get; private set; } = null!;
     public ICommand RemoveAvatarCommand { get; private set; } = null!;
     public ICommand ChangePasswordCommand { get; private set; } = null!;
+
+    // Role assignment commands
+    public ICommand AddRoleCommand { get; private set; } = null!;
+    public ICommand RemoveRoleCommand { get; private set; } = null!;
+
+    // Branch assignment commands
+    public ICommand AddBranchCommand { get; private set; } = null!;
+    public ICommand RemoveBranchCommand { get; private set; } = null!;
     #endregion
 
     #region Methods
@@ -225,6 +337,109 @@ public class UserEditorViewModel : ViewModelBase
         catch
         {
             return false;
+        }
+    }
+
+    private async Task LoadAuxiliaryDataAsync()
+    {
+        // Load available roles
+        var rolesResult = await _roleService.GetAllAsync();
+        if (rolesResult.IsSuccess && rolesResult.Value != null)
+        {
+            await InvokeOnUIThreadAsync(() =>
+            {
+                AvailableRoles.Clear();
+                foreach (var role in rolesResult.Value.Where(r => r.IsActive))
+                {
+                    AvailableRoles.Add(role);
+                }
+                return Task.CompletedTask;
+            });
+        }
+
+        // Load available branches
+        var branchesResult = await _branchService.GetAllAsync();
+        if (branchesResult.IsSuccess && branchesResult.Value != null)
+        {
+            await InvokeOnUIThreadAsync(() =>
+            {
+                AvailableBranches.Clear();
+                foreach (var branch in branchesResult.Value.Where(b => b.IsActive))
+                {
+                    AvailableBranches.Add(branch);
+                }
+                return Task.CompletedTask;
+            });
+        }
+    }
+
+    private async Task LoadUserRolesAndBranchesAsync(int userId)
+    {
+        // Load user roles from API
+        try
+        {
+            var httpClient = App.GetService<System.Net.Http.HttpClient>();
+            var session = App.GetService<ISessionService>();
+            var token = session.GetToken();
+            if (!string.IsNullOrEmpty(token))
+            {
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var rolesResponse = await httpClient.GetAsync($"api/v1/users/{userId}/roles");
+            if (rolesResponse.IsSuccessStatusCode)
+            {
+                var userRoles = System.Text.Json.JsonSerializer.Deserialize<List<UserRoleDto>>(
+                    await rolesResponse.Content.ReadAsStringAsync(),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (userRoles != null)
+                {
+                    await InvokeOnUIThreadAsync(() =>
+                    {
+                        foreach (var ur in userRoles)
+                        {
+                            var role = AvailableRoles.FirstOrDefault(r => r.Id == ur.RoleId);
+                            if (role != null)
+                            {
+                                AssignedRoles.Add(role);
+                                AvailableRoles.Remove(role);
+                            }
+                        }
+                        return Task.CompletedTask;
+                    });
+                }
+            }
+
+            var branchesResponse = await httpClient.GetAsync($"api/v1/users/{userId}/branches");
+            if (branchesResponse.IsSuccessStatusCode)
+            {
+                var userBranches = System.Text.Json.JsonSerializer.Deserialize<List<UserBranchDto>>(
+                    await branchesResponse.Content.ReadAsStringAsync(),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (userBranches != null)
+                {
+                    await InvokeOnUIThreadAsync(() =>
+                    {
+                        foreach (var ub in userBranches)
+                        {
+                            var branch = AvailableBranches.FirstOrDefault(b => b.Id == ub.BranchId);
+                            if (branch != null)
+                            {
+                                AssignedBranches.Add(branch);
+                                AvailableBranches.Remove(branch);
+                            }
+                        }
+                        return Task.CompletedTask;
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Failed to load user roles and branches for user {UserId}", userId);
         }
     }
 
@@ -264,6 +479,54 @@ public class UserEditorViewModel : ViewModelBase
         }
     }
 
+    #region Role Assignment
+
+    private void AddRole()
+    {
+        if (SelectedAvailableRole == null) return;
+
+        var role = SelectedAvailableRole;
+        AvailableRoles.Remove(role);
+        AssignedRoles.Add(role);
+        SelectedAvailableRole = AvailableRoles.FirstOrDefault();
+    }
+
+    private void RemoveRole()
+    {
+        if (SelectedAssignedRole == null) return;
+
+        var role = SelectedAssignedRole;
+        AssignedRoles.Remove(role);
+        AvailableRoles.Add(role);
+        SelectedAssignedRole = AssignedRoles.FirstOrDefault();
+    }
+
+    #endregion
+
+    #region Branch Assignment
+
+    private void AddBranch()
+    {
+        if (SelectedAvailableBranch == null) return;
+
+        var branch = SelectedAvailableBranch;
+        AvailableBranches.Remove(branch);
+        AssignedBranches.Add(branch);
+        SelectedAvailableBranch = AvailableBranches.FirstOrDefault();
+    }
+
+    private void RemoveBranch()
+    {
+        if (SelectedAssignedBranch == null) return;
+
+        var branch = SelectedAssignedBranch;
+        AssignedBranches.Remove(branch);
+        AvailableBranches.Add(branch);
+        SelectedAssignedBranch = AssignedBranches.FirstOrDefault();
+    }
+
+    #endregion
+
     private async Task<bool> ValidateAsync()
     {
         ClearAllErrors();
@@ -296,7 +559,7 @@ public class UserEditorViewModel : ViewModelBase
         {
             var request = new UpdateUserRequest(
                 FullName: FullName,
-                Role: (byte)Role,
+                Role: (byte)SelectedRoleId,
                 Status: (byte)(IsActive ? SalesSystem.Domain.Enums.UserStatus.Active : SalesSystem.Domain.Enums.UserStatus.Inactive),
                 Password: null,
                 Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
@@ -309,7 +572,7 @@ public class UserEditorViewModel : ViewModelBase
             var request = new CreateUserRequest(
                 UserName: Username,
                 FullName: FullName,
-                Role: (byte)Role,
+                Role: (byte)SelectedRoleId,
                 Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                 Email: string.IsNullOrWhiteSpace(Email) ? null : Email,
                 DefaultCashBoxId: DefaultCashBoxId);
@@ -318,6 +581,24 @@ public class UserEditorViewModel : ViewModelBase
 
         if (result.IsSuccess && result.Value != null)
         {
+            // Save role assignments
+            var roleIds = AssignedRoles.Select(r => r.Id).ToList();
+            if (roleIds.Any())
+            {
+                // Ensure primary role is included
+                if (!roleIds.Contains(SelectedRoleId))
+                    roleIds.Add(SelectedRoleId);
+
+                await SaveUserRolesAsync(result.Value.Id, roleIds);
+            }
+
+            // Save branch assignments
+            var branchIds = AssignedBranches.Select(b => (short)b.Id).ToList();
+            if (branchIds.Any())
+            {
+                await SaveUserBranchesAsync(result.Value.Id, branchIds);
+            }
+
             _eventBus.Publish(new UserChangedMessage(result.Value.Id));
             _toastService.ShowSuccess(IsEditMode ? "تم تحديث بيانات المستخدم بنجاح" : "تم إنشاء المستخدم بنجاح");
             RequestClose();
@@ -328,6 +609,65 @@ public class UserEditorViewModel : ViewModelBase
             await _dialogService.ShowErrorAsync("خطأ في حفظ المستخدم", ErrorMessage!);
         }
     }
+
+    private async Task SaveUserRolesAsync(int userId, List<int> roleIds)
+    {
+        try
+        {
+            var httpClient = App.GetService<System.Net.Http.HttpClient>();
+            var session = App.GetService<ISessionService>();
+            var token = session.GetToken();
+            if (!string.IsNullOrEmpty(token))
+            {
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var json = System.Text.Json.JsonSerializer.Serialize(roleIds);
+            var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await httpClient.PutAsync($"api/v1/users/{userId}/roles", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Serilog.Log.Warning("Failed to save roles for user {UserId}: {Error}", userId, errorBody);
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Failed to save roles for user {UserId}", userId);
+        }
+    }
+
+    private async Task SaveUserBranchesAsync(int userId, List<short> branchIds)
+    {
+        try
+        {
+            var httpClient = App.GetService<System.Net.Http.HttpClient>();
+            var session = App.GetService<ISessionService>();
+            var token = session.GetToken();
+            if (!string.IsNullOrEmpty(token))
+            {
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var json = System.Text.Json.JsonSerializer.Serialize(branchIds);
+            var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            var response = await httpClient.PutAsync($"api/v1/users/{userId}/branches", content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Serilog.Log.Warning("Failed to save branches for user {UserId}: {Error}", userId, errorBody);
+            }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Failed to save branches for user {UserId}", userId);
+        }
+    }
+
     #endregion
 }
 
@@ -335,6 +675,6 @@ public record CashBoxOptionItem(int Id, string Name);
 
 public class RoleOption
 {
-    public UserRole Value { get; set; }
+    public int Id { get; set; }
     public string Display { get; set; } = string.Empty;
 }

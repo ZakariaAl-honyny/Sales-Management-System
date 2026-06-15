@@ -7,7 +7,7 @@ namespace SalesSystem.Domain.Accounting.Entities;
 /// Represents a single line (debit or credit) within a journal entry.
 /// Lines are created through JournalEntry methods only (internal constructors).
 /// </summary>
-public class JournalEntryLine : BaseEntity
+public class JournalEntryLine : Entity
 {
     public int JournalEntryId { get; private set; }
     public JournalEntry? JournalEntry { get; private set; }

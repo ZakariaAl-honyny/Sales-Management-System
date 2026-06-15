@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models;
 using SalesSystem.DesktopPWF.ViewModels.Invoices;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Returns;
 
@@ -27,12 +28,15 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private readonly ISoundService _soundService;
     private readonly IDialogService _dialogService;
     private readonly ICurrencyApiService _currencyService;
-    private readonly ISupplierApiService _supplierService;
+    private readonly IToastNotificationService _toastService;
 
     private DateTime _returnDate = DateTime.Now;
     private string _notes = string.Empty;
     private int _selectedWarehouseId;
     private PurchaseInvoiceDto? _selectedInvoice;
+    private int _selectedSupplierId;
+    private string _selectedSupplierName = string.Empty;
+    private bool _isLinkedToInvoice = true;
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ObservableCollection<PurchaseReturnItemViewModel> _items = new();
     private string _searchText = string.Empty;
@@ -42,17 +46,12 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private int? _returnId;
     private ReturnImpactSummary _impact = new();
 
-    private ObservableCollection<CurrencyDto> _currencies = new();
+    // Currency fields
     private int? _selectedCurrencyId;
-    private decimal _exchangeRate = 1.0m;
-    private string? _currencyName;
-    private byte _selectedDiscountType;
-    private decimal? _discountRate;
-    private bool _isStandaloneMode;
-    private int? _standaloneSupplierId;
-    private ObservableCollection<SupplierDto> _suppliers = new();
-    private string? _standaloneProductName;
-    private decimal _standaloneUnitPrice;
+    private decimal? _exchangeRate;
+    private bool _isForeignCurrency;
+    private ObservableCollection<CurrencyDto> _currencies = new();
+
 
     public PurchaseReturnEditorViewModel()
     {
@@ -66,37 +65,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         _logger = App.GetService<ILogger<PurchaseReturnEditorViewModel>>();
         _dialogService = App.GetService<IDialogService>();
         _currencyService = App.GetService<ICurrencyApiService>();
-        _supplierService = App.GetService<ISupplierApiService>();
-        SetDialogService(_dialogService);
-
-        InitializeCommands();
-        _ = LoadInitialDataAsync();
-    }
-
-    public PurchaseReturnEditorViewModel(
-        IPurchaseReturnApiService returnService,
-        IPurchaseInvoiceApiService invoiceService,
-        IWarehouseApiService warehouseService,
-        ISettingsApiService settingsService,
-        IInvoicePrinter invoicePrinter,
-        IEventBus eventBus,
-        ILogger<PurchaseReturnEditorViewModel> logger,
-        ISoundService soundService,
-        IDialogService dialogService,
-        ICurrencyApiService currencyService,
-        ISupplierApiService supplierService)
-    {
-        _returnService = returnService;
-        _invoiceService = invoiceService;
-        _warehouseService = warehouseService;
-        _settingsService = settingsService;
-        _invoicePrinter = invoicePrinter;
-        _eventBus = eventBus;
-        _logger = logger;
-        _soundService = soundService;
-        _dialogService = dialogService;
-        _currencyService = currencyService;
-        _supplierService = supplierService;
+        _toastService = App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
 
         InitializeCommands();
@@ -110,6 +79,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         CancelReturnCommand = new AsyncRelayCommand(CancelReturnAsync);
         CancelCommand = new RelayCommand(() => RequestClose());
         SearchInvoiceCommand = new AsyncRelayCommand(SearchInvoiceAsync);
+        SearchSupplierCommand = new AsyncRelayCommand(SearchSupplierAsync);
         PrintA4Command = new AsyncRelayCommand(PrintA4Async);
         ProcessBarcodeCommand = new AsyncRelayCommand(async () =>
         {
@@ -161,10 +131,34 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedInvoice, value))
             {
-                if (value != null) SearchText = value.Id.ToString();
+                if (value != null)
+                {
+                    SearchText = value.Id.ToString();
+                    IsLinkedToInvoice = true;
+                    SelectedSupplierId = value.SupplierId;
+                    SelectedSupplierName = value.SupplierName;
+                }
                 UpdateItemsFromInvoice();
             }
         }
+    }
+
+    public int SelectedSupplierId
+    {
+        get => _selectedSupplierId;
+        set => SetProperty(ref _selectedSupplierId, value);
+    }
+
+    public string SelectedSupplierName
+    {
+        get => _selectedSupplierName;
+        set => SetProperty(ref _selectedSupplierName, value);
+    }
+
+    public bool IsLinkedToInvoice
+    {
+        get => _isLinkedToInvoice;
+        set => SetProperty(ref _isLinkedToInvoice, value);
     }
 
     public ObservableCollection<WarehouseDto> Warehouses
@@ -229,6 +223,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         set => SetProperty(ref _impact, value);
     }
 
+    // Currency properties
     public ObservableCollection<CurrencyDto> Currencies
     {
         get => _currencies;
@@ -242,80 +237,24 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedCurrencyId, value))
             {
-                UpdateCurrencyDisplay();
+                IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
+                OnPropertyChanged(nameof(IsForeignCurrency));
             }
         }
     }
 
-    public decimal ExchangeRate
+    public decimal? ExchangeRate
     {
         get => _exchangeRate;
         set => SetProperty(ref _exchangeRate, value);
     }
 
-    public string CurrencyName
+    public bool IsForeignCurrency
     {
-        get => _currencyName ?? "ريال سعودي";
-        private set => SetProperty(ref _currencyName, value);
+        get => _isForeignCurrency;
+        set => SetProperty(ref _isForeignCurrency, value);
     }
 
-    public bool IsBaseCurrency => SelectedCurrencyId == GetBaseCurrencyId();
-
-    public byte SelectedDiscountType
-    {
-        get => _selectedDiscountType;
-        set => SetProperty(ref _selectedDiscountType, value);
-    }
-
-    public decimal? DiscountRate
-    {
-        get => _discountRate;
-        set => SetProperty(ref _discountRate, value);
-    }
-
-    public List<DiscountOption> DiscountTypeOptions { get; } = new()
-    {
-        new DiscountOption { Value = 0, Display = "مبلغ" },
-        new DiscountOption { Value = 1, Display = "نسبة مئوية" }
-    };
-
-    public bool IsStandaloneMode
-    {
-        get => _isStandaloneMode;
-        set
-        {
-            if (SetProperty(ref _isStandaloneMode, value))
-            {
-                OnPropertyChanged(nameof(IsInvoiceLinked));
-            }
-        }
-    }
-
-    public bool IsInvoiceLinked => !IsStandaloneMode;
-
-    public ObservableCollection<SupplierDto> Suppliers
-    {
-        get => _suppliers;
-        set => SetProperty(ref _suppliers, value);
-    }
-
-    public int? StandaloneSupplierId
-    {
-        get => _standaloneSupplierId;
-        set => SetProperty(ref _standaloneSupplierId, value);
-    }
-
-    public string? StandaloneProductName
-    {
-        get => _standaloneProductName;
-        set => SetProperty(ref _standaloneProductName, value);
-    }
-
-    public decimal StandaloneUnitPrice
-    {
-        get => _standaloneUnitPrice;
-        set => SetProperty(ref _standaloneUnitPrice, value);
-    }
     #endregion
 
     #region Commands
@@ -324,6 +263,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     public ICommand CancelReturnCommand { get; private set; } = null!;
     public ICommand CancelCommand { get; private set; } = null!;
     public ICommand SearchInvoiceCommand { get; private set; } = null!;
+    public ICommand SearchSupplierCommand { get; private set; } = null!;
     public ICommand PrintA4Command { get; private set; } = null!;
     public ICommand ProcessBarcodeCommand { get; private set; } = null!;
     public ICommand ToggleStandaloneModeCommand { get; private set; } = null!;
@@ -359,6 +299,70 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         });
 
         ShowInvoiceSelectionDialog();
+    }
+
+    private async Task SearchSupplierAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            await _dialogService.ShowWarningAsync("بحث عن مورد", "يرجى إدخال اسم المورد أو رقمه في حقل البحث");
+            return;
+        }
+
+        await ExecuteAsync(async () =>
+        {
+            ErrorMessage = null;
+            var supplierService = App.GetService<ISupplierApiService>();
+            var result = await supplierService.GetAllAsync();
+
+            if (result.IsSuccess && result.Value != null)
+            {
+                var search = SearchText.Trim().ToLowerInvariant();
+                var matches = result.Value
+                    .Where(s => s.Name.ToLowerInvariant().Contains(search) || s.Id.ToString() == search)
+                    .ToList();
+
+                if (matches.Count == 1)
+                {
+                    var supplier = matches[0];
+                    InvokeOnUIThread(() =>
+                    {
+                        SelectedSupplierId = supplier.Id;
+                        SelectedSupplierName = supplier.Name;
+                        SearchText = string.Empty;
+                        if (SelectedInvoice != null && SelectedInvoice.SupplierId != supplier.Id)
+                        {
+                            SelectedInvoice = null; // Clear invoice if supplier changed
+                        }
+                    });
+                }
+                else if (matches.Count > 1)
+                {
+                    // Multiple matches — show first match
+                    var supplier = matches.First();
+                    InvokeOnUIThread(() =>
+                    {
+                        SelectedSupplierId = supplier.Id;
+                        SelectedSupplierName = supplier.Name;
+                        SearchText = string.Empty;
+                    });
+                }
+                else
+                {
+                    InvokeOnUIThread(() =>
+                    {
+                        ErrorMessage = $"لم يتم العثور على مورد: {SearchText}";
+                    });
+                }
+            }
+            else
+            {
+                InvokeOnUIThread(() =>
+                {
+                    ErrorMessage = result.Error ?? "فشل في البحث عن المورد";
+                });
+            }
+        });
     }
 
     private void ShowInvoiceSelectionDialog()
@@ -430,10 +434,12 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                     var invResult = await _invoiceService.GetByIdAsync(dto.PurchaseInvoiceId.Value);
                     if (invResult.IsSuccess) SelectedInvoice = invResult.Value;
                 }
-
-                if (!dto.LinkToInvoice)
+                else
                 {
-                    StandaloneSupplierId = dto.SupplierId;
+                    // Standalone return — set supplier from DTO
+                    SelectedSupplierId = dto.SupplierId;
+                    SelectedSupplierName = dto.SupplierName;
+                    IsLinkedToInvoice = false;
                 }
 
                 Items.Clear();
@@ -471,23 +477,13 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 if (Warehouses.Any()) SelectedWarehouseId = Warehouses.First().Id;
             }
 
-            var currenciesResult = await _currencyService.GetAllAsync(true);
+            var currenciesResult = await _currencyService.GetAllAsync();
             if (currenciesResult.IsSuccess && currenciesResult.Value != null)
             {
                 Currencies = new ObservableCollection<CurrencyDto>(currenciesResult.Value);
-                var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency) ?? Currencies.FirstOrDefault();
+                var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
                 if (baseCurrency != null)
-                {
                     SelectedCurrencyId = baseCurrency.Id;
-                    CurrencyName = baseCurrency.Name;
-                    ExchangeRate = baseCurrency.ExchangeRateToBase;
-                }
-            }
-
-            var suppliersResult = await _supplierService.GetAllAsync();
-            if (suppliersResult.IsSuccess && suppliersResult.Value != null)
-            {
-                Suppliers = new ObservableCollection<SupplierDto>(suppliersResult.Value);
             }
         });
     }
@@ -523,9 +519,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             TotalReturnAmount = TotalAmount,
             StockQuantityImpact = Items.Sum(i => i.ReturnQuantity),
             WarehouseName = warehouse?.Name ?? "غير محدد",
-            CounterpartyName = IsStandaloneMode
-                ? (Suppliers.FirstOrDefault(s => s.Id == StandaloneSupplierId)?.Name ?? "غير محدد")
-                : (SelectedInvoice?.SupplierName ?? "غير محدد"),
+            CounterpartyName = SelectedInvoice?.SupplierName ?? SelectedSupplierName,
             CounterpartyType = "المورد",
             BalanceImpact = TotalAmount,
             TaxImpact = Items.Sum(i => {
@@ -545,27 +539,22 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             RequestFocusFirstInvalidField();
             return false;
         }
-        if (!IsStandaloneMode && SelectedInvoice == null)
+        var errors = new List<string>();
+        if (SelectedInvoice == null && SelectedSupplierId <= 0)
         {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى اختيار فاتورة المشتريات أولاً" });
-            RequestFocusFirstInvalidField();
-            return false;
-        }
-        if (IsStandaloneMode && (!StandaloneSupplierId.HasValue || StandaloneSupplierId.Value <= 0))
-        {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى اختيار المورد" });
-            RequestFocusFirstInvalidField();
-            return false;
+            errors.Add("يرجى اختيار فاتورة المشتريات أو اختيار المورد للمرتجع المستقل");
         }
         if (SelectedWarehouseId <= 0)
         {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى اختيار المستودع" });
-            RequestFocusFirstInvalidField();
-            return false;
+            errors.Add("يرجى اختيار المستودع");
         }
         if (!Items.Any(i => i.ReturnQuantity > 0))
         {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", new List<string> { "يرجى إدخال كميات المرتجع" });
+            errors.Add("يرجى إدخال كميات المرتجع");
+        }
+        if (errors.Any())
+        {
+            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
             RequestFocusFirstInvalidField();
             return false;
         }
@@ -579,14 +568,38 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             ErrorMessage = null;
-            var request = BuildRequest();
+            var returnItems = Items.Where(i => i.ReturnQuantity > 0).Select(i => new CreatePurchaseReturnItemRequest(
+                ProductId: i.ProductId,
+                ProductUnitId: i.ProductUnitId,
+                Quantity: i.ReturnQuantity,
+                UnitCost: i.UnitPrice
+            )).ToList();
+
+            var supplierId = SelectedInvoice?.SupplierId ?? SelectedSupplierId;
+            if (supplierId <= 0)
+            {
+                ErrorMessage = "يرجى اختيار المورد";
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage);
+                return;
+            }
+
+            var request = new CreatePurchaseReturnRequest(
+                PurchaseInvoiceId: SelectedInvoice?.Id,
+                SupplierId: supplierId,
+                WarehouseId: SelectedWarehouseId,
+                ReturnDate: ReturnDate,
+                CurrencyId: SelectedCurrencyId,
+                ExchangeRate: ExchangeRate,
+                Notes: Notes,
+                Items: returnItems
+            );
 
             var result = await _returnService.CreateAsync(request);
 
             if (result.IsSuccess)
             {
                 _eventBus.Publish(new PurchaseReturnChangedMessage(result.Value!.Id));
-                await _dialogService.ShowSuccessAsync("نجاح", "تم إنشاء مرتجع المشتريات بنجاح");
+                _toastService.ShowSuccess("تم إنشاء مرتجع المشتريات بنجاح");
                 RequestClose();
             }
             else
@@ -754,34 +767,10 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         return false;
     }
 
-    private void ToggleStandaloneMode()
+    private int GetBaseCurrencyId()
     {
-        IsStandaloneMode = !IsStandaloneMode;
-        if (IsStandaloneMode)
-        {
-            SelectedInvoice = null;
-            Items.Clear();
-        }
-    }
-
-    private void UpdateCurrencyDisplay()
-    {
-        if (_selectedCurrencyId.HasValue && _currencies != null)
-        {
-            var currency = _currencies.FirstOrDefault(c => c.Id == _selectedCurrencyId.Value);
-            if (currency != null)
-            {
-                CurrencyName = currency.Name;
-                ExchangeRate = currency.ExchangeRateToBase;
-            }
-        }
-        OnPropertyChanged(nameof(IsBaseCurrency));
-        OnPropertyChanged(nameof(CurrencyName));
-    }
-
-    private int? GetBaseCurrencyId()
-    {
-        return _currencies?.FirstOrDefault(c => c.IsBaseCurrency)?.Id;
+        var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
+        return baseCurrency?.Id ?? 0;
     }
     #endregion
 }
@@ -789,7 +778,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
 public class PurchaseReturnItemViewModel : ViewModelBase
 {
     private decimal _returnQuantity;
-    private byte _mode = 1;
     private readonly ISoundService? _soundService;
 
     public int ProductId { get; }
@@ -797,11 +785,8 @@ public class PurchaseReturnItemViewModel : ViewModelBase
     public string ProductName { get; }
     public decimal OriginalQuantity { get; }
     public decimal UnitPrice { get; }
-    public decimal DiscountAmount { get; }
-    public byte Mode => _mode;
-    public string? Notes { get; set; }
 
-    public decimal LineTotal => ReturnQuantity * (UnitPrice - (OriginalQuantity > 0 ? DiscountAmount / OriginalQuantity : 0));
+    public decimal LineTotal => ReturnQuantity * UnitPrice;
 
     public decimal ReturnQuantity
     {
@@ -825,8 +810,6 @@ public class PurchaseReturnItemViewModel : ViewModelBase
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitCost;
-        DiscountAmount = item.DiscountAmount;
-        _mode = item.Mode;
         _returnQuantity = 0;
         _soundService = soundService;
     }
@@ -838,8 +821,6 @@ public class PurchaseReturnItemViewModel : ViewModelBase
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitCost;
-        DiscountAmount = item.DiscountAmount;
-        _mode = item.Mode;
         _returnQuantity = item.Quantity;
         _soundService = soundService;
     }

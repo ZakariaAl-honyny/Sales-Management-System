@@ -213,11 +213,9 @@ public class SalesInvoiceListViewModel : ViewModelBase
     #region Methods
     public async Task LoadInvoicesAsync()
     {
-        IsBusy = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var result = await _invoiceService.GetAllAsync(
                 search: string.IsNullOrWhiteSpace(SearchText) ? null : SearchText,
                 from: DateFrom,
@@ -243,15 +241,7 @@ public class SalesInvoiceListViewModel : ViewModelBase
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل فواتير البيع", "SalesInvoiceListViewModel.LoadInvoicesAsync", "[SalesInvoiceListViewModel.LoadInvoicesAsync] Failed to load sales invoices list.");
                 IsEmpty = Invoices.Count == 0;
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "SalesInvoiceListViewModel.LoadInvoicesAsync", "[SalesInvoiceListViewModel.LoadInvoicesAsync] Failed to load sales invoices list.");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     private void SetupCollectionView()
@@ -334,35 +324,23 @@ public class SalesInvoiceListViewModel : ViewModelBase
 
         if (!result) return;
 
-        IsBusy = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var postResult = await _invoiceService.PostAsync(SelectedInvoice.Id);
 
             if (postResult.IsSuccess)
             {
-                IsBusy = false;
                 await _dialogService.ShowSuccessAsync("نجاح", "تم ترحيل الفاتورة بنجاح");
                 _eventBus.Publish(new SaleInvoiceChangedMessage(SelectedInvoice.Id));
                 await LoadInvoicesAsync();
             }
             else
             {
-                IsBusy = false;
                 ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "SalesInvoiceListViewModel.PostInvoiceAsync", $"[SalesInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm sales invoice ID {SelectedInvoice.Id}.");
                 await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "SalesInvoiceListViewModel.PostInvoiceAsync", $"[SalesInvoiceListViewModel.PostInvoiceAsync] Failed to post/confirm sales invoice ID {SelectedInvoice.Id}.");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     private async Task CancelInvoiceAsync()
@@ -373,35 +351,23 @@ public class SalesInvoiceListViewModel : ViewModelBase
 
         if (!result) return;
 
-        IsBusy = true;
-        ErrorMessage = null;
-
-        try
+        await ExecuteAsync(async () =>
         {
+            ErrorMessage = null;
             var cancelResult = await _invoiceService.CancelAsync(SelectedInvoice.Id);
 
             if (cancelResult.IsSuccess)
             {
-                IsBusy = false;
                 await _dialogService.ShowSuccessAsync("نجاح", "تم إلغاء الفاتورة بنجاح");
                 _eventBus.Publish(new SaleInvoiceChangedMessage(SelectedInvoice.Id));
                 await LoadInvoicesAsync();
             }
             else
             {
-                IsBusy = false;
                 ErrorMessage = HandleFailure(cancelResult.Error ?? "فشل في إلغاء الفاتورة", "SalesInvoiceListViewModel.CancelInvoiceAsync", $"[SalesInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel sales invoice ID {SelectedInvoice.Id}.");
                 await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = HandleException(ex, "SalesInvoiceListViewModel.CancelInvoiceAsync", $"[SalesInvoiceListViewModel.CancelInvoiceAsync] Failed to cancel sales invoice ID {SelectedInvoice.Id}.");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        });
     }
 
     // ─── Print Methods ──────────────────────────────────────────────────────

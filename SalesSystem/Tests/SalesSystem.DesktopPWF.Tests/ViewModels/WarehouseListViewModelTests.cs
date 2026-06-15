@@ -52,8 +52,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "المستودع الرئيسي", Type: 1, Location: "الرياض", Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null),
-            new(Id: 2, Name: "المستودع الثاني", Type: 1, Location: "جدة", Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
+            new(Id: 1, Code: "", Name: "المستودع الرئيسي", Type: 1, Location: "الرياض", Phone: null, Address: null, ManagerName: null, IsActive: true),
+            new(Id: 2, Code: "", Name: "المستودع الثاني", Type: 1, Location: "جدة", Phone: null, Address: null, ManagerName: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -105,7 +105,7 @@ public class WarehouseListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto>
             {
-                new(Id: 1, Name: "مستودع تجريبي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
+                new(Id: 1, Code: "", Name: "مستودع تجريبي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
             }));
 
         await _viewModel.LoadWarehousesAsync();
@@ -120,7 +120,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
-        var warehouseToDelete = new WarehouseDto(5, "مستودع للحذف", 1, null, null, null, null, true, true, null, null);
+        var warehouseToDelete = new WarehouseDto(5, "", "مستودع للحذف", 1, null, null, null, null, true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -152,7 +152,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenDeleteFails_SetsErrorMessage()
     {
-        var warehouseToDelete = new WarehouseDto(5, "مستودع", 1, null, null, null, null, true, true, null, null);
+        var warehouseToDelete = new WarehouseDto(5, "", "مستودع", 1, null, null, null, null, true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -178,7 +178,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenWarehouseSelected_PublishesEvent()
     {
-        var warehouseToDelete = new WarehouseDto(5, "مستودع", 1, null, null, null, null, true, true, null, null);
+        var warehouseToDelete = new WarehouseDto(5, "", "مستودع", 1, null, null, null, null, true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -212,9 +212,9 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "مستودع الرياض", Type: 1, Location: "الرياض", Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null),
-            new(Id: 2, Name: "مستودع جدة", Type: 1, Location: "جدة", Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null),
-            new(Id: 3, Name: "مستودع الرياض الفرعي", Type: 1, Location: "الرياض", Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
+            new(Id: 1, Code: "", Name: "مستودع الرياض", Type: 1, Location: "الرياض", Phone: null, Address: null, ManagerName: null, IsActive: true),
+            new(Id: 2, Code: "", Name: "مستودع جدة", Type: 1, Location: "جدة", Phone: null, Address: null, ManagerName: null, IsActive: true),
+            new(Id: 3, Code: "", Name: "مستودع الرياض الفرعي", Type: 1, Location: "الرياض", Phone: null, Address: null, ManagerName: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -245,8 +245,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "مستودع الرياض", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null),
-            new(Id: 2, Name: "مستودع جدة", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
+            new(Id: 1, Code: "", Name: "مستودع الرياض", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true),
+            new(Id: 2, Code: "", Name: "مستودع جدة", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -274,8 +274,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "مستودع أ", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null),
-            new(Id: 2, Name: "مستودع ب", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
+            new(Id: 1, Code: "", Name: "مستودع أ", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true),
+            new(Id: 2, Code: "", Name: "مستودع ب", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -326,7 +326,7 @@ public class WarehouseListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var warehouse = new WarehouseDto(1, "مستودع", 1, null, null, null, null, true, true, null, null);
+        var warehouse = new WarehouseDto(1, "", "مستودع", 1, null, null, null, null, true);
         _viewModel.SelectedWarehouse = warehouse;
 
         propertyChangedEvents.Should().Contain("SelectedWarehouse");
@@ -358,7 +358,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_AlwaysEnabled_WhenActiveWarehouseSelected()
     {
-        var warehouse = new WarehouseDto(1, "مستودع", 1, null, null, null, null, true, true, null, null);
+        var warehouse = new WarehouseDto(1, "", "مستودع", 1, null, null, null, null, true);
         _viewModel.SelectedWarehouse = warehouse;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -374,7 +374,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_AlwaysEnabled_WhenWarehouseSelected()
     {
-        var warehouse = new WarehouseDto(1, "مستودع", 1, null, null, null, null, true, true, null, null);
+        var warehouse = new WarehouseDto(1, "", "مستودع", 1, null, null, null, null, true);
         _viewModel.SelectedWarehouse = warehouse;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -426,7 +426,7 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "مستودع", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
+            new(Id: 1, Code: "", Name: "مستودع", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -448,8 +448,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "مستودع رئيسي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null),
-            new(Id: 2, Name: "مستودع فرعي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null)
+            new(Id: 1, Code: "", Name: "مستودع رئيسي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true),
+            new(Id: 2, Code: "", Name: "مستودع فرعي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
         };
 
         _mockWarehouseService

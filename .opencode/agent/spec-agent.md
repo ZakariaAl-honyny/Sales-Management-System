@@ -18,17 +18,76 @@ Requirements ownership, user stories, and the source-of-truth for WHAT the syste
 ## MUST READ FIRST
 - `docs/PRD-MVP.md` — All requirements
 
-## Domain Knowledge (from AGENTS.md)
+## Domain Knowledge (from AGENTS.md + v4.10 Schema)
+
+### Schema Overview (65 Tables)
+- **Core, Parties & Security (14)**: Parties, Customers, CustomerContacts, Suppliers, SupplierContacts, Departments, Employees, Roles, Users, UserRoles, Permissions, RolePermissions, UserBranches, UserSessions
+- **Organization, Currencies & Settings (11)**: Branches, Warehouses, Currencies, CurrencyRates, Taxes, CompanySettings, SystemSettings, DocumentSequences, FiscalYears, Notifications, Attachments
+- **Products (5)**: ProductCategories, Products, Units, ProductUnits, ProductPrices
+- **Accounting (10)**: AccountCategories, Accounts, CashBoxes, Banks, JournalEntries, JournalEntryLines, ReceiptVouchers, PaymentVouchers, Expenses, SystemAccountMappings
+- **Inventory (10)**: WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, InventoryCounts, InventoryCountLines, InventoryAdjustments, InventoryAdjustmentLines, WarehouseTransfers, WarehouseTransferLines
+- **Sales (6)**: SalesInvoices, SalesInvoiceLines, SalesReturns, SalesReturnLines, CustomerReceipts, CustomerReceiptApplications
+- **Purchases (6)**: PurchaseInvoices, PurchaseInvoiceLines, PurchaseReturns, PurchaseReturnLines, SupplierPayments, SupplierPaymentApplications
+- **Infrastructure (2)**: AuditLogs, SystemLogs
+
+### Key Spec Patterns
+
+#### ProductPrices Pattern (Multi-Currency Pricing)
+```text
+REQ-PROD-001: Pricing is per (ProductUnit + Currency)
+  - Table: ProductPrices (ProductUnitId FK, CurrencyId FK, Price decimal(18,2), EffectiveFrom date, EffectiveTo date nullable)
+  - Never store prices on Product entity
+  - Price lookup: filter by ProductUnitId + CurrencyId + current date in [EffectiveFrom, EffectiveTo]
+```
+
+#### InventoryBatches Pattern (FIFO/FEFO)
+```text
+REQ-INV-001: Inventory uses batch-level tracking
+  - Batch created on purchase (or opening stock)
+  - Sale consumes from oldest batch (FIFO): OrderBy(b => b.Id)
+  - If TrackExpiry = true: FEFO — consume nearest expiry first: OrderBy(b => b.ExpiryDate)
+  - Purchase return restores original batch
+  - No weighted-average cost on Product entity — cost lives on each batch
+```
+
+#### Party Pattern (Shared Contact)
+```text
+REQ-PARTY-001: Customers, Suppliers, Employees share contact data via Parties table
+  - Party: Name, Phone, Email, Address, TaxNumber, Notes
+  - Customer: PartyId FK, AccountId FK, CategoryId FK, CreditLimit
+  - Supplier: PartyId FK, AccountId FK, CategoryId FK
+  - No OpeningBalance or CurrentBalance on Customer/Supplier (balance via Account)
+```
+
+#### Units Pattern (Independent Table)
+```text
+REQ-UNIT-001: Units are an independent table (smallint PK)
+  - Name (e.g., "حبة", "كرتون"), Symbol (e.g., "pc", "box")
+  - IsSystem flag protects seed units
+  - User can add units, soft-deactivate used units
+  - ProductUnits links Product → Unit via UnitId FK with Factor + IsBaseUnit
+```
+
+#### Perpetual Inventory Pattern
+```text
+REQ-INV-002: Perpetual Inventory system
+  - No "Purchases" clearing account — all costs go DIRECTLY to Inventory Asset
+  - Purchase: Dr Inventory / Cr Cash (or AP)
+  - Sale: Dr COGS / Cr Inventory (based on batch UnitCost)
+  - Every stock change recorded in InventoryTransaction + InventoryTransactionLine
+  - WarehouseStock.Quantity updated in real-time (CHECK Quantity >= 0)
+```
+
 - 4 roles: `Admin=1, Manager=2, Cashier=3, Accountant=4`
 - Invoice statuses: `Draft=1, Posted=2, Cancelled=3`
 - Payment types: `Cash=1, Credit=2, Mixed=3`
-- 7 movement types: PurchaseIn, SaleOut, SaleReturnIn, PurchaseReturnOut, TransferOut, TransferIn, Adjustment
+- 12 inventory transaction types: Purchase=1, PurchaseReturn=2, Sale=3, SaleReturn=4, TransferOut=5, TransferIn=6, Count=7, Adjustment=8, Damage=9, OpeningBalance=10, InternalIssue=11, InternalReceipt=12
 - InvoiceNo = int, UNIQUE per document type, generated via DocumentSequenceService.GetNextIntAsync() (SemaphoreSlim lock)
 - Accounting: 60-account Chart of Accounts, JournalEntries, FiscalYears, 7 auto-journal entry providers
-- FIFO/FEFO: PurchaseLot batch tracking with expiry-based deduction
-- Multi-currency: Currency entity with exchange rates
+- FIFO/FEFO: InventoryBatches batch tracking with expiry-based deduction
+- Multi-currency: Currency entity with exchange rates, FractionName, immutable IsBaseCurrency
 - 33 permission codes across 9 modules
-- 14 current implementation phases (18-31)
+- Removed: CustomerGroup, SupplierType, SalesQuotation, PurchaseOrder, Cheque, DailyClosure, InventoryMovement, StockTransfer
 
 ## Behaviors
 - Tag every requirement: `REQ-001` through `REQ-NNN`
@@ -104,7 +163,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 
 1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
+3. Missing `CustomerGroupId` on Customer → REMOVED in V1 (deferred to V2). Do NOT add.
 4. Missing `CurrencyId` on financial entities → Add multi-currency support
 5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
 6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking

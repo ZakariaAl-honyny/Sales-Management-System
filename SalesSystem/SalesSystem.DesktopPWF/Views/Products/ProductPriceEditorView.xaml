@@ -59,15 +59,12 @@
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,0,0,6">
 
-                        <!-- Price Level -->
-                        <StackPanel Margin="0,0,0,6">
-                            <TextBlock Text="مستوى السعر *" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox ItemsSource="{Binding PriceLevelOptions}"
-                                      SelectedItem="{Binding SelectedPriceLevelItem}"
-                                      DisplayMemberPath="DisplayName"
-                                      Style="{StaticResource ModernComboBox}"
-                                      AutomationProperties.AutomationId="CmbPriceLevel"
-                                      ToolTip="اختر مستوى السعر — تجزئة للأفراد، جملة للتجار، VIP لكبار العملاء، موزع للشركاء"/>
+                        <!-- Unit Name Display -->
+                        <StackPanel Margin="0,0,0,8">
+                            <TextBlock Text="الوحدة" Style="{StaticResource LabelStyle}"/>
+                            <Border Background="{StaticResource InfoLightBrush}" Padding="10,6" CornerRadius="4">
+                                <TextBlock Text="{Binding ProductUnitName}" FontWeight="SemiBold" FontSize="13"/>
+                            </Border>
                         </StackPanel>
 
                         <!-- Currency -->

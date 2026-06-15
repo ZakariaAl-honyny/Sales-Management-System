@@ -4,7 +4,6 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
@@ -31,11 +30,11 @@ public class PermissionService : IPermissionService
 
             var dtos = permissions
                 .OrderBy(p => p.Category)
-                .ThenBy(p => p.Name)
+                .ThenBy(p => p.Code)
                 .Select(p => new PermissionDto(
                     p.Id,
-                    p.Name,
-                    p.DisplayNameAr,
+                    p.Code,
+                    p.DisplayName,
                     p.Category,
                     p.IsActive))
                 .ToList();
@@ -50,42 +49,44 @@ public class PermissionService : IPermissionService
     }
 
     /// <inheritdoc />
-    public async Task<Result<Dictionary<UserRole, List<int>>>> GetRolePermissionsAsync(CancellationToken ct = default)
+    public async Task<Result<Dictionary<Domain.Enums.UserRole, List<int>>>> GetRolePermissionsAsync(CancellationToken ct = default)
     {
         try
         {
             var rolePermissions = await _uow.RolePermissions.ToListAsync(
                 includePaths: new[] { "Permission" });
 
-            var result = new Dictionary<UserRole, List<int>>();
+            var result = new Dictionary<Domain.Enums.UserRole, List<int>>();
 
-            foreach (UserRole role in Enum.GetValues<UserRole>())
+            foreach (Domain.Enums.UserRole role in Enum.GetValues<Domain.Enums.UserRole>())
             {
                 if (role == 0) continue; // Skip undefined
+                var roleId = (int)role;
                 result[role] = rolePermissions
-                    .Where(rp => rp.Role == role && rp.Permission.IsActive)
+                    .Where(rp => rp.RoleId == roleId && rp.Permission.IsActive)
                     .Select(rp => rp.PermissionId)
                     .Distinct()
                     .ToList();
             }
 
-            return Result<Dictionary<UserRole, List<int>>>.Success(result);
+            return Result<Dictionary<Domain.Enums.UserRole, List<int>>>.Success(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get role permissions");
-            return Result<Dictionary<UserRole, List<int>>>.Failure("حدث خطأ أثناء جلب صلاحيات الأدوار.");
+            return Result<Dictionary<Domain.Enums.UserRole, List<int>>>.Failure("حدث خطأ أثناء جلب صلاحيات الأدوار.");
         }
     }
 
     /// <inheritdoc />
-    public async Task<Result> UpdateRolePermissionsAsync(UserRole role, List<int> permissionIds, CancellationToken ct = default)
+    public async Task<Result> UpdateRolePermissionsAsync(Domain.Enums.UserRole role, List<int> permissionIds, CancellationToken ct = default)
     {
         try
         {
             // 1. Get existing role permissions (read — outside transaction)
+            var roleId = (int)role;
             var existing = await _uow.RolePermissions.ToListAsync(
-                rp => rp.Role == role,
+                rp => rp.RoleId == roleId,
                 ct: ct);
 
             // 2. Execute atomic write operations inside a transaction (RULE-317)
@@ -102,7 +103,7 @@ public class PermissionService : IPermissionService
 
                 foreach (var permissionId in toAdd)
                 {
-                    var rp = RolePermission.Create(role, permissionId);
+                    var rp = RolePermission.Create((int)role, permissionId);
                     await _uow.RolePermissions.AddAsync(rp, ct);
                 }
 
@@ -126,18 +127,25 @@ public class PermissionService : IPermissionService
     {
         try
         {
-            var user = await _uow.Users.GetByIdAsync(userId, ct);
-            if (user == null)
-                return Result<List<string>>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
+            // Get user's roles via UserRole join entity (many-to-many through Role entity)
+            var userRoles = await _uow.UserRoles.ToListAsync(ur => ur.UserId == userId, ct: ct);
+            if (!userRoles.Any())
+                return Result<List<string>>.Success(new List<string>());
 
-            // Get all permission names for the user's role
-            var rolePermissions = await _uow.RolePermissions.ToListAsync(
-                rp => rp.Role == user.Role,
-                includePaths: new[] { "Permission" });
+            var roleIds = userRoles.Select(ur => ur.RoleId).ToHashSet();
+
+            // Get all permission names for the user's roles
+            // RolePermission.Role is the UserRole enum but matches Role.Id values (Admin=1, Manager=2, etc.)
+            var allRolePermissions = await _uow.RolePermissions.ToListAsync(
+                ct: ct,
+                includePaths: "Permission");
+            var rolePermissions = allRolePermissions
+                .Where(rp => roleIds.Contains(rp.RoleId))
+                .ToList();
 
             var permissionNames = rolePermissions
                 .Where(rp => rp.Permission.IsActive)
-                .Select(rp => rp.Permission.Name)
+                .Select(rp => rp.Permission.Code)
                 .Distinct()
                 .ToList();
 

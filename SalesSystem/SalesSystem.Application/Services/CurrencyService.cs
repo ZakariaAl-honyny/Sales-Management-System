@@ -111,25 +111,10 @@ public class CurrencyService : ICurrencyService
                 request.Symbol,
                 request.ExchangeRateToBase,
                 request.IsBaseCurrency,
-                request.FractionName);
+                request.FractionName,
+                decimalPlaces: request.DecimalPlaces);
 
             currency.SetCreatedBy(userId);
-
-            // If setting as base currency, unset any existing base currency
-            if (request.IsBaseCurrency)
-            {
-                var existingBase = await _uow.Currencies.FirstOrDefaultAsync(c => c.IsBaseCurrency && c.IsActive, ct);
-                if (existingBase != null)
-                {
-                    // Use Update to reflect that it's no longer base
-                    existingBase.Update(
-                        existingBase.Name,
-                        existingBase.Symbol,
-                        existingBase.ExchangeRateToBase,
-                        false,
-                        existingBase.FractionName);
-                }
-            }
 
             await _uow.Currencies.AddAsync(currency, ct);
             await _uow.SaveChangesAsync(ct);
@@ -156,47 +141,13 @@ public class CurrencyService : ICurrencyService
             if (currency == null)
                 return Result<CurrencyDto>.Failure("العملة غير موجودة", ErrorCodes.NotFound);
 
-            // Track if exchange rate changed for history
-            var rateChanged = currency.ExchangeRateToBase != request.ExchangeRateToBase;
-
-            // If setting as base currency, unset existing base currency
-            if (request.IsBaseCurrency && !currency.IsBaseCurrency)
-            {
-                var existingBase = await _uow.Currencies.FirstOrDefaultAsync(
-                    c => c.IsBaseCurrency && c.IsActive && c.Id != id, ct);
-                if (existingBase != null)
-                {
-                    existingBase.Update(
-                        existingBase.Name,
-                        existingBase.Symbol,
-                        existingBase.ExchangeRateToBase,
-                        false,
-                        existingBase.FractionName);
-                }
-            }
-
-            var oldRate = currency.ExchangeRateToBase;
             currency.Update(
                 request.Name,
                 request.Symbol,
                 request.ExchangeRateToBase,
-                request.IsBaseCurrency,
-                request.FractionName);
+                request.FractionName,
+                decimalPlaces: request.DecimalPlaces);
             currency.SetUpdatedBy(userId);
-
-            // Record exchange rate change history
-            if (rateChanged)
-            {
-                var history = ExchangeRateHistory.Create(
-                    currency.Id,
-                    oldRate,
-                    currency.ExchangeRateToBase,
-                    DateOnly.FromDateTime(DateTime.UtcNow),
-                    "Manual",
-                    $"تحديث بواسطة المستخدم {userId}",
-                    userId);
-                await _uow.ExchangeRateHistories.AddAsync(history, ct);
-            }
 
             await _uow.SaveChangesAsync(ct);
 
@@ -276,24 +227,12 @@ public class CurrencyService : ICurrencyService
             if (currency == null)
                 return Result.Failure("العملة غير موجودة", ErrorCodes.NotFound);
 
-            var oldRate = currency.ExchangeRateToBase;
-
             currency.UpdateExchangeRate(newRate);
             currency.SetUpdatedBy(userId);
 
-            var history = ExchangeRateHistory.Create(
-                currency.Id,
-                oldRate,
-                newRate,
-                DateOnly.FromDateTime(DateTime.UtcNow),
-                "Daily",
-                $"تحديث سعر الصرف بواسطة المستخدم {userId}",
-                userId);
-            await _uow.ExchangeRateHistories.AddAsync(history, ct);
-
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Exchange rate updated for currency {Id}: {OldRate} -> {NewRate}", id, oldRate, newRate);
+            _logger.LogInformation("Exchange rate updated for currency {Id}: {NewRate}", id, newRate);
             return Result.Success();
         }
         catch (DomainException ex)
@@ -307,29 +246,6 @@ public class CurrencyService : ICurrencyService
         }
     }
 
-    public async Task<Result<List<ExchangeRateHistoryDto>>> GetRateHistoryAsync(int currencyId, CancellationToken ct = default)
-    {
-        try
-        {
-            var currency = await _uow.Currencies.GetByIdAsync(currencyId, ct);
-            if (currency == null)
-                return Result<List<ExchangeRateHistoryDto>>.Failure("العملة غير موجودة", ErrorCodes.NotFound);
-
-            var history = await _uow.ExchangeRateHistories.ToListAsync(
-                h => h.CurrencyId == currencyId,
-                q => q.OrderByDescending(h => h.EffectiveDate).ThenByDescending(h => h.Id),
-                ct);
-
-            var dtos = history.Select(MapToHistoryDto).ToList();
-            return Result<List<ExchangeRateHistoryDto>>.Success(dtos);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to load rate history for currency {Id}", currencyId);
-            return Result<List<ExchangeRateHistoryDto>>.Failure("فشل في تحميل سجل أسعار الصرف");
-        }
-    }
-
     private static CurrencyDto MapToDto(Currency c) => new(
         c.Id,
         c.Name,
@@ -338,18 +254,8 @@ public class CurrencyService : ICurrencyService
         c.ExchangeRateToBase,
         c.IsBaseCurrency,
         c.FractionName,
+        c.DecimalPlaces,
         c.IsSystem,
         c.IsActive
-    );
-
-    private static ExchangeRateHistoryDto MapToHistoryDto(ExchangeRateHistory h) => new(
-        h.Id,
-        h.CurrencyId,
-        h.OldRate,
-        h.NewRate,
-        h.EffectiveDate,
-        h.RateType,
-        h.Notes,
-        h.ChangedByUserId
     );
 }

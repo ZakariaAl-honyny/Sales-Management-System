@@ -3,7 +3,7 @@ using SalesSystem.Domain.Common;
 
 namespace SalesSystem.Application.Interfaces.Repositories;
 
-public interface IGenericRepository<T> where T : BaseEntity
+public interface IGenericRepository<T> where T : Entity
 {
     Task<T?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<IReadOnlyList<T>> GetAllAsync(CancellationToken ct = default);

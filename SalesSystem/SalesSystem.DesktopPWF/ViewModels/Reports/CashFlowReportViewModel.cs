@@ -1,9 +1,10 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.Export;
 using Serilog;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Reports;
@@ -22,6 +23,9 @@ public class CashFlowReportViewModel : ViewModelBase
 
     // Non-null helper for DialogService (set via SetDialogService in constructor)
     private IDialogService D => DialogService!;
+
+    private IFinancialReportExportService? _pdfExportService;
+    private IFinancialReportExportService PdfExportService => _pdfExportService ??= App.GetService<IFinancialReportExportService>();
 
     private DateTime _dateFrom;
     private DateTime _dateTo;
@@ -45,11 +49,14 @@ public class CashFlowReportViewModel : ViewModelBase
 
         SetDialogService(App.GetService<IDialogService>());
 
-        GenerateReportCommand = new AsyncRelayCommand(
+        GenerateCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(LoadAsync)));
 
         LoadCashBoxesCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(LoadCashBoxesAsync)));
+
+        ExportPdfCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExportPdfAsync()));
 
         _ = LoadCashBoxesAsync();
     }
@@ -168,8 +175,9 @@ public class CashFlowReportViewModel : ViewModelBase
 
     #region Commands
 
-    public AsyncRelayCommand GenerateReportCommand { get; }
+    public AsyncRelayCommand GenerateCommand { get; }
     public AsyncRelayCommand LoadCashBoxesCommand { get; }
+    public AsyncRelayCommand ExportPdfCommand { get; }
 
     #endregion
 
@@ -251,6 +259,40 @@ public class CashFlowReportViewModel : ViewModelBase
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل تقرير التدفق النقدي", "CashFlowReportViewModel.LoadAsync");
             Log.Warning("Failed to load cash flow report: {Error}", result.Error);
+        }
+    }
+
+    #endregion
+
+    #region Export
+
+    private async Task ExportPdfAsync()
+    {
+        if (!HasData)
+        {
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
+            return;
+        }
+
+        try
+        {
+            var dataTable = new System.Data.DataTable();
+            dataTable.Columns.Add("النوع", typeof(string));
+            dataTable.Columns.Add("التصنيف", typeof(string));
+            dataTable.Columns.Add("المبلغ", typeof(decimal));
+
+            foreach (var item in IncomeItems)
+                dataTable.Rows.Add("إيرادات", item.Category, item.Amount);
+            foreach (var item in ExpenseItems)
+                dataTable.Rows.Add("مصروفات", item.Category, item.Amount);
+
+            await PdfExportService.ExportToPdfAsync("التدفق النقدي", dataTable, NetCashFlow,
+                $"CashFlow_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تصدير تقرير التدفق النقدي إلى PDF", "CashFlowReportViewModel.ExportPdf", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
         }
     }
 

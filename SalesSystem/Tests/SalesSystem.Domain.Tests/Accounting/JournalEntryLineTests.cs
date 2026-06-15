@@ -374,17 +374,4 @@ public class JournalEntryLineTests
         line.Id.Should().Be(0); // Not yet persisted
     }
 
-    [Fact]
-    public void CreatedLine_IsActive_ByDefault()
-    {
-        // Act
-        var line = JournalEntryLine.CreateDebit(
-            accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
-            amount: 100m);
-
-        // Assert
-        line.IsActive.Should().BeTrue();
-    }
 }

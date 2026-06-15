@@ -85,7 +85,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Create_WhenValidRequest_ReturnsCreatedAtAction()
     {
-        var request = new CreateCustomerRequest("عميل جديد", null, null, null, null, 0.00m);
+        var request = new CreateCustomerRequest("عميل جديد", null, null, null, null);
         var createdCustomer = CreateCustomerDto(1);
         CustomerServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(createdCustomer));
@@ -98,7 +98,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Create_WhenServiceFails_ReturnsBadRequest()
     {
-        var request = new CreateCustomerRequest("عميل جديد", null, null, null, null, 0.00m);
+        var request = new CreateCustomerRequest("عميل جديد", null, null, null, null);
         CustomerServiceMock.Setup(x => x.CreateAsync(request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<CustomerDto>("اسم العميل موجود مسبقاً"));
 
@@ -183,8 +183,8 @@ public class CustomersControllerTests : ControllerTestBase
         Email: null,
         Address: null,
         TaxNumber: null,
-        OpeningBalance: 0.00m,
-        CurrentBalance: 0.00m,
         CreditLimit: 1000.00m,
-        IsActive: true);
+        IsActive: true,
+        AccountId: 1,
+        AccountName: null);
 }

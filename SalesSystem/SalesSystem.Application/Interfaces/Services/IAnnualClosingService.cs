@@ -1,5 +1,4 @@
 using SalesSystem.Contracts.Common;
-using SalesSystem.Contracts.DTOs;
 
 namespace SalesSystem.Application.Interfaces.Services;
 
@@ -11,16 +10,12 @@ public interface IAnnualClosingService
     /// <summary>
     /// Closes the specified fiscal year: zeros out Revenue/Expense accounts,
     /// transfers net income/loss to Retained Earnings (AccountCode 3102).
+    /// Returns the journal entry ID of the closing entry.
     /// </summary>
-    Task<Result<FiscalYearClosureDto>> CloseFiscalYearAsync(int fiscalYear, int closedByUserId, CancellationToken ct = default);
+    Task<Result<int>> CloseFiscalYearAsync(int fiscalYear, int closedByUserId, CancellationToken ct = default);
 
     /// <summary>
     /// Checks if the given fiscal year is already closed.
     /// </summary>
     Task<Result<bool>> IsFiscalYearClosedAsync(int fiscalYear, CancellationToken ct = default);
-
-    /// <summary>
-    /// Gets all fiscal year closures.
-    /// </summary>
-    Task<Result<List<FiscalYearClosureDto>>> GetAllClosuresAsync(CancellationToken ct = default);
 }

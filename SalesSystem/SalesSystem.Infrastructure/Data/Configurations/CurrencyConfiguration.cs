@@ -11,8 +11,8 @@ public class CurrencyConfiguration : IEntityTypeConfiguration<Currency>
         builder.ToTable("Currencies");
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Name).IsRequired().HasMaxLength(100);
-        builder.Property(c => c.Code).IsRequired().HasMaxLength(10);
-        builder.Property(c => c.Symbol).IsRequired().HasMaxLength(10);
+        builder.Property(c => c.Code).IsRequired().HasMaxLength(3);
+        builder.Property(c => c.Symbol).IsRequired().HasMaxLength(20);
         builder.Property(c => c.ExchangeRateToBase).HasPrecision(18, 6).HasDefaultValue(1.0m);
         builder.Property(c => c.IsBaseCurrency).HasDefaultValue(false);
         builder.Property(c => c.FractionName).HasMaxLength(20).IsRequired(false);

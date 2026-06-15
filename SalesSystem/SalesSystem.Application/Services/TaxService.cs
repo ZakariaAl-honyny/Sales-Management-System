@@ -56,7 +56,7 @@ public class TaxService : ITaxService
     {
         try
         {
-            var tax = Tax.Create(request.Name, request.Rate, request.IsDefault);
+            var tax = Tax.Create(request.Name, request.Code, request.Rate, request.TaxType, request.IsDefault);
 
             // If this is the default, unset all other defaults
             if (request.IsDefault)
@@ -65,7 +65,7 @@ public class TaxService : ITaxService
                     t => t.IsDefault && t.IsActive, ct: ct);
                 foreach (var d in existingDefaults)
                 {
-                    d.Update(d.Name, d.Rate, false);
+                    d.Update(d.Name, d.Code, d.Rate, taxType: d.TaxType, isDefault: false);
                 }
             }
 
@@ -101,11 +101,11 @@ public class TaxService : ITaxService
                     t => t.IsDefault && t.IsActive && t.Id != id, ct: ct);
                 foreach (var d in existingDefaults)
                 {
-                    d.Update(d.Name, d.Rate, false);
+                    d.Update(d.Name, d.Code, d.Rate, taxType: d.TaxType, isDefault: false);
                 }
             }
 
-            tax.Update(request.Name, request.Rate, request.IsDefault);
+            tax.Update(request.Name, request.Code, request.Rate, request.TaxType, request.IsDefault);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Tax {Id} updated: {Name} @ {Rate}%", id, tax.Name, tax.Rate);
@@ -172,7 +172,9 @@ public class TaxService : ITaxService
     private static TaxDto MapToDto(Tax tax) => new(
         tax.Id,
         tax.Name,
+        tax.Code,
         tax.Rate,
+        tax.TaxType,
         tax.IsDefault,
         tax.IsActive
     );

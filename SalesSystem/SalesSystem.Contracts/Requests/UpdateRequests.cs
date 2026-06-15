@@ -2,30 +2,17 @@ using SalesSystem.Contracts.Enums;
 
 namespace SalesSystem.Contracts.Requests;
 
-public record UpdateCustomerPaymentRequest(
-    int CustomerId,
-    decimal Amount,
-    PaymentType PaymentMethod,
-    DateTime? PaymentDate,
-    string? Notes = null
-);
-
 public record UpdateSupplierPaymentRequest(
     int SupplierId,
     decimal Amount,
-    PaymentType PaymentMethod,
+    PaymentMethod PaymentMethod,
     DateTime? PaymentDate,
     string? Notes = null
 );
 
-public record UpdateStockTransferRequest(
-    int FromWarehouseId,
-    int ToWarehouseId,
-    DateTime TransferDate,
-    string? Notes,
-    List<CreateStockTransferItemRequest> Items
-);
-
+/// <summary>
+/// طلب تحديث فاتورة شراء.
+/// </summary>
 public record UpdatePurchaseInvoiceRequest(
     int WarehouseId,
     int SupplierId,
@@ -36,12 +23,11 @@ public record UpdatePurchaseInvoiceRequest(
     byte? DiscountType,                          // NEW
     decimal? DiscountRate,                       // NEW
     decimal TaxAmount,
+    decimal OtherCharges,
     decimal PaidAmount,
-    int? CashBoxId,
-    int? CurrencyId,                             // NEW
-    decimal? ExchangeRate,                       // NEW
+    int? CurrencyId,
+    decimal? ExchangeRate,
     string? Notes,
-    string? SupplierInvoiceNo,
     List<CreatePurchaseInvoiceItemRequest> Items);
 
 public record UpdateSalesInvoiceRequest(
@@ -52,7 +38,11 @@ public record UpdateSalesInvoiceRequest(
     PaymentType PaymentType,
     decimal DiscountAmount,
     decimal TaxAmount,
+    decimal OtherCharges,
     decimal PaidAmount,
     int? CashBoxId,
     string? Notes,
+    int? CurrencyId,
+    decimal? ExchangeRate,
+    int? TaxId,
     List<CreateSalesInvoiceItemRequest> Items);

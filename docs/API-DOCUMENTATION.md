@@ -32,7 +32,19 @@ Content-Type: application/json
 5. [Suppliers](#suppliers)
 6. [Warehouses](#warehouses)
 7. [Units](#units)
-8. [Health Check](#health-check)
+8. [Settings](#settings)
+9. [Backup](#backup)
+10. [Reports](#reports)
+11. [Health Check](#health-check)
+12. [Parties](#parties-v410)
+13. [ProductPrices](#productprices-v410)
+14. [InventoryBatches](#inventorybatches-v410)
+15. [InventoryTransactions](#inventorytransactions-v410)
+16. [WarehouseTransfers](#warehousetransfers-v410)
+17. [CustomerReceipts](#customerreceipts-v410)
+18. [ReceiptVouchers](#receiptvouchers-سندات-قبض)
+19. [PaymentVouchers](#paymentvouchers-سندات-صرف)
+20. [Expenses](#expenses)
 
 ---
 
@@ -84,6 +96,15 @@ Content-Type: application/json
 | Payments (customer) | GET, POST | AllStaff |
 | Payments (supplier) | GET, POST | ManagerAndAbove |
 | Inventory | GET /stock, /movements, /warehouse-stocks | ManagerAndAbove |
+| Parties | GET, POST, PUT, DELETE | AllStaff (GET), Manager+ (write) |
+| ProductPrices | GET, POST, PUT, DELETE | ManagerAndAbove |
+| InventoryBatches | GET | ManagerAndAbove |
+| InventoryTransactions | GET | ManagerAndAbove |
+| WarehouseTransfers | GET, POST, POST/{id}/post, POST/{id}/cancel | ManagerAndAbove |
+| CustomerReceipts | GET, POST, POST/{id}/post, POST/{id}/cancel | AllStaff |
+| ReceiptVouchers | GET, POST, POST/{id}/post, POST/{id}/cancel | AllStaff |
+| PaymentVouchers | GET, POST, POST/{id}/post, POST/{id}/cancel | ManagerAndAbove |
+| Expenses | GET, POST, POST/{id}/post, POST/{id}/cancel | ManagerAndAbove |
 
 ---
 
@@ -1196,6 +1217,1127 @@ Check API health status.
   "Status": "OK",
   "Version": "1.0",
   "Timestamp": "2026-05-07T12:00:00.0000000Z"
+}
+```
+
+---
+
+## Parties (v4.10)
+
+**Base URL:** `/api/v1/parties`  
+**Authorization:** All Staff (GET), Manager+ (POST/PUT/DELETE)
+
+### GET /api/v1/parties
+
+List all parties with pagination.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| search | string | No | Search by name or phone |
+| page | int | No | Page number (default: 1) |
+| pageSize | int | No | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "عميل نقدي",
+      "phone": "0123456789",
+      "email": "cash@example.com",
+      "address": "Cairo",
+      "taxNumber": "123-456-789",
+      "notes": "",
+      "isActive": true
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/parties/{id}
+
+Get party by ID.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "name": "عميل نقدي",
+  "phone": "0123456789",
+  "email": "cash@example.com",
+  "address": "Cairo",
+  "taxNumber": "123-456-789",
+  "notes": "",
+  "isActive": true
+}
+```
+
+**Response (404):**
+```json
+{
+  "error": "الطرف غير موجود"
+}
+```
+
+### POST /api/v1/parties
+
+Create new party.
+
+**Request Body:**
+```json
+{
+  "name": "New Party",
+  "phone": "0123456789",
+  "email": "party@example.com",
+  "address": "Cairo",
+  "taxNumber": "123-456-789",
+  "notes": ""
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 2,
+  "name": "New Party",
+  "phone": "0123456789",
+  "email": "party@example.com",
+  "address": "Cairo",
+  "taxNumber": "123-456-789",
+  "notes": "",
+  "isActive": true
+}
+```
+
+**Validation Errors (400):**
+```json
+{
+  "errors": {
+    "Name": ["اسم الطرف مطلوب"]
+  }
+}
+```
+
+### PUT /api/v1/parties/{id}
+
+Update party.
+
+**Request Body:**
+```json
+{
+  "id": 1,
+  "name": "Updated Party",
+  "phone": "0987654321",
+  "email": "updated@example.com",
+  "address": "Giza",
+  "taxNumber": "987-654-321",
+  "notes": "Updated notes",
+  "isActive": true
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "name": "Updated Party",
+  "phone": "0987654321",
+  "email": "updated@example.com",
+  "address": "Giza",
+  "taxNumber": "987-654-321",
+  "notes": "Updated notes",
+  "isActive": true
+}
+```
+
+### DELETE /api/v1/parties/{id}
+
+Soft delete party (sets `IsActive = false`).
+
+**Response (200):**
+```json
+{
+  "message": "تم الحذف بنجاح",
+  "id": 1
+}
+```
+
+**Response (400):**
+```json
+{
+  "error": "الطرف غير موجود"
+}
+```
+
+---
+
+## ProductPrices (v4.10)
+
+**Base URL:** `/api/v1/products/{productId}/prices`  
+**Authorization:** Manager+ (Role 1 or 2)
+
+### GET /api/v1/products/{productId}/prices
+
+List all prices for a product unit.
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "productUnitId": 1,
+      "currencyId": 1,
+      "currencyCode": "YER",
+      "price": 15000.00,
+      "effectiveFrom": "2026-01-01T00:00:00",
+      "effectiveTo": null
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/products/{productId}/prices/{id}
+
+Get specific price.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "productUnitId": 1,
+  "currencyId": 1,
+  "currencyCode": "YER",
+  "price": 15000.00,
+  "effectiveFrom": "2026-01-01T00:00:00",
+  "effectiveTo": null
+}
+```
+
+**Response (404):**
+```json
+{
+  "error": "السعر غير موجود"
+}
+```
+
+### POST /api/v1/products/{productId}/prices
+
+Create new price.
+
+**Request Body:**
+```json
+{
+  "productUnitId": 1,
+  "currencyId": 1,
+  "price": 16000.00,
+  "effectiveFrom": "2026-06-01T00:00:00",
+  "effectiveTo": null
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 2,
+  "productUnitId": 1,
+  "currencyId": 1,
+  "currencyCode": "YER",
+  "price": 16000.00,
+  "effectiveFrom": "2026-06-01T00:00:00",
+  "effectiveTo": null
+}
+```
+
+### PUT /api/v1/products/{productId}/prices/{id}
+
+Update price.
+
+**Request Body:**
+```json
+{
+  "price": 17000.00,
+  "effectiveFrom": "2026-06-01T00:00:00",
+  "effectiveTo": "2026-12-31T00:00:00"
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "productUnitId": 1,
+  "currencyId": 1,
+  "currencyCode": "YER",
+  "price": 17000.00,
+  "effectiveFrom": "2026-06-01T00:00:00",
+  "effectiveTo": "2026-12-31T00:00:00"
+}
+```
+
+### DELETE /api/v1/products/{productId}/prices/{id}
+
+Delete price.
+
+**Response (200):**
+```json
+{
+  "message": "تم الحذف بنجاح",
+  "id": 1
+}
+```
+
+---
+
+## InventoryBatches (v4.10)
+
+**Base URL:** `/api/v1/inventory/batches`  
+**Authorization:** Manager+
+
+### GET /api/v1/inventory/batches
+
+List all batches with optional filters.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| productId | int | No | Filter by product |
+| warehouseId | int | No | Filter by warehouse |
+| expiryBefore | date | No | Filter batches expiring before date |
+| expiryAfter | date | No | Filter batches expiring after date |
+| page | int | No | Page number (default: 1) |
+| pageSize | int | No | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "productId": 1,
+      "productName": "Product Name",
+      "warehouseId": 1,
+      "warehouseName": "المخزن الرئيسي",
+      "batchNo": "BATCH-2026-001",
+      "expiryDate": "2027-06-01",
+      "quantityReceived": 100.000,
+      "quantityRemaining": 85.000,
+      "unitCost": 12000.00,
+      "purchaseInvoiceId": 1
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/inventory/batches/{id}
+
+Get batch by ID.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "productId": 1,
+  "productName": "Product Name",
+  "warehouseId": 1,
+  "warehouseName": "المخزن الرئيسي",
+  "batchNo": "BATCH-2026-001",
+  "expiryDate": "2027-06-01",
+  "quantityReceived": 100.000,
+  "quantityRemaining": 85.000,
+  "unitCost": 12000.00,
+  "purchaseInvoiceId": 1
+}
+```
+
+### GET /api/v1/inventory/batches/{id}/movements
+
+Get all inventory movements for a specific batch.
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "transactionId": 10,
+      "movementType": "SaleOut",
+      "quantity": -15.000,
+      "unitCost": 12000.00,
+      "referenceType": "SalesInvoice",
+      "referenceId": 5,
+      "createdAt": "2026-06-10T14:30:00"
+    }
+  ]
+}
+```
+
+---
+
+## InventoryTransactions (v4.10)
+
+**Base URL:** `/api/v1/inventory/transactions`  
+**Authorization:** Manager+
+
+### GET /api/v1/inventory/transactions
+
+List inventory transactions with filters.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| warehouseId | int | No | Filter by warehouse |
+| type | int | No | Filter by movement type (1-7) |
+| fromDate | date | No | Start date |
+| toDate | date | No | End date |
+| page | int | No | Page number (default: 1) |
+| pageSize | int | No | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "referenceType": "PurchaseInvoice",
+      "referenceId": 1,
+      "warehouseId": 1,
+      "warehouseName": "المخزن الرئيسي",
+      "notes": "استلام مشتريات",
+      "createdAt": "2026-06-01T10:00:00",
+      "lines": [
+        {
+          "productId": 1,
+          "productName": "Product Name",
+          "quantity": 100.000,
+          "unitCost": 12000.00
+        }
+      ]
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/inventory/transactions/{id}
+
+Get transaction with its lines.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "referenceType": "PurchaseInvoice",
+  "referenceId": 1,
+  "warehouseId": 1,
+  "warehouseName": "المخزن الرئيسي",
+  "notes": "استلام مشتريات",
+  "createdAt": "2026-06-01T10:00:00",
+  "lines": [
+    {
+      "id": 1,
+      "productId": 1,
+      "productName": "Product Name",
+      "productUnitId": 1,
+      "quantity": 100.000,
+      "unitCost": 12000.00,
+      "batchNo": "BATCH-2026-001",
+      "expiryDate": "2027-06-01"
+    }
+  ]
+}
+```
+
+---
+
+## WarehouseTransfers (v4.10)
+
+**Base URL:** `/api/v1/warehouse-transfers`  
+**Authorization:** Manager+
+
+### GET /api/v1/warehouse-transfers
+
+List warehouse transfers.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| status | int | No | Filter by status (1=Draft, 2=Posted, 3=Cancelled) |
+| fromDate | date | No | Start date |
+| toDate | date | No | End date |
+| page | int | No | Page number (default: 1) |
+| pageSize | int | No | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "transferNo": "TRF-2026-000001",
+      "fromWarehouseId": 1,
+      "fromWarehouseName": "المخزن الرئيسي",
+      "toWarehouseId": 2,
+      "toWarehouseName": "مخزن العرض",
+      "status": 1,
+      "notes": "تحويل مخزون",
+      "createdAt": "2026-06-10T09:00:00",
+      "totalItems": 2
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/warehouse-transfers/{id}
+
+Get transfer with lines.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "transferNo": "TRF-2026-000001",
+  "fromWarehouseId": 1,
+  "fromWarehouseName": "المخزن الرئيسي",
+  "toWarehouseId": 2,
+  "toWarehouseName": "مخزن العرض",
+  "status": 1,
+  "notes": "تحويل مخزون",
+  "createdAt": "2026-06-10T09:00:00",
+  "lines": [
+    {
+      "id": 1,
+      "productUnitId": 1,
+      "productName": "Product Name",
+      "quantity": 50.000,
+      "batchNo": "BATCH-2026-001"
+    }
+  ]
+}
+```
+
+### POST /api/v1/warehouse-transfers
+
+Create new transfer (draft).
+
+**Request Body:**
+```json
+{
+  "fromWarehouseId": 1,
+  "toWarehouseId": 2,
+  "notes": "تحويل مخزون",
+  "items": [
+    {
+      "productUnitId": 1,
+      "quantity": 50.000,
+      "batchNo": "BATCH-2026-001"
+    }
+  ]
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 1,
+  "transferNo": "TRF-2026-000001",
+  "fromWarehouseId": 1,
+  "toWarehouseId": 2,
+  "status": 1,
+  "notes": "تحويل مخزون",
+  "lines": [
+    {
+      "productUnitId": 1,
+      "quantity": 50.000
+    }
+  ]
+}
+```
+
+### PUT /api/v1/warehouse-transfers/{id}
+
+Update draft transfer.
+
+**Request Body:**
+```json
+{
+  "fromWarehouseId": 1,
+  "toWarehouseId": 2,
+  "notes": "Updated notes",
+  "items": [
+    {
+      "productUnitId": 1,
+      "quantity": 75.000,
+      "batchNo": "BATCH-2026-001"
+    }
+  ]
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "notes": "Updated notes",
+  "status": 1
+}
+```
+
+### POST /api/v1/warehouse-transfers/{id}/post
+
+Post draft transfer — deducts stock from source warehouse, adds to destination.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "status": 2,
+  "message": "تم ترحيل التحويل بنجاح"
+}
+```
+
+**Response (400):**
+```json
+{
+  "error": "المخزون غير كافٍ في المخزن المصدر"
+}
+```
+
+### POST /api/v1/warehouse-transfers/{id}/cancel
+
+Cancel posted transfer — reverses stock movement.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "status": 3,
+  "message": "تم إلغاء التحويل بنجاح"
+}
+```
+
+---
+
+## CustomerReceipts (v4.10)
+
+**Base URL:** `/api/v1/customer-receipts`  
+**Authorization:** All Staff
+
+### GET /api/v1/customer-receipts
+
+List customer receipts.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| customerId | int | No | Filter by customer |
+| status | int | No | Filter by status (1=Draft, 2=Posted, 3=Cancelled) |
+| fromDate | date | No | Start date |
+| toDate | date | No | End date |
+| page | int | No | Page number (default: 1) |
+| pageSize | int | No | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "receiptNo": "CP-2026-000001",
+      "customerId": 1,
+      "customerName": "عميل نقدي",
+      "amount": 5000.00,
+      "paymentMethod": "Cash",
+      "cashBoxId": 1,
+      "cashBoxName": "الصندوق الرئيسي",
+      "status": 2,
+      "receiptDate": "2026-06-10T00:00:00",
+      "notes": "دفعة على فاتورة",
+      "createdAt": "2026-06-10T10:00:00"
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/customer-receipts/{id}
+
+Get receipt with payment allocations.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "receiptNo": "CP-2026-000001",
+  "customerId": 1,
+  "customerName": "عميل نقدي",
+  "amount": 5000.00,
+  "paymentMethod": "Cash",
+  "cashBoxId": 1,
+  "cashBoxName": "الصندوق الرئيسي",
+  "currencyId": 1,
+  "currencyCode": "YER",
+  "exchangeRate": 1.00,
+  "status": 2,
+  "receiptDate": "2026-06-10T00:00:00",
+  "notes": "دفعة على فاتورة",
+  "allocations": [
+    {
+      "invoiceId": 1,
+      "invoiceType": "SalesInvoice",
+      "allocatedAmount": 5000.00
+    }
+  ]
+}
+```
+
+### POST /api/v1/customer-receipts
+
+Create new receipt (draft).
+
+**Request Body:**
+```json
+{
+  "customerId": 1,
+  "amount": 5000.00,
+  "paymentMethod": "Cash",
+  "cashBoxId": 1,
+  "currencyId": 1,
+  "exchangeRate": 1.00,
+  "receiptDate": "2026-06-10",
+  "notes": "دفعة على فاتورة",
+  "allocations": [
+    {
+      "invoiceId": 1,
+      "invoiceType": "SalesInvoice",
+      "allocatedAmount": 5000.00
+    }
+  ]
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 2,
+  "receiptNo": "CP-2026-000002",
+  "status": 1,
+  "amount": 5000.00
+}
+```
+
+### POST /api/v1/customer-receipts/{id}/post
+
+Post receipt — adds cash transaction and updates customer balance.
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "status": 2,
+  "message": "تم ترحيل السند بنجاح"
+}
+```
+
+### POST /api/v1/customer-receipts/{id}/cancel
+
+Cancel receipt — reverses cash transaction and customer balance.
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "status": 3,
+  "message": "تم إلغاء السند بنجاح"
+}
+```
+
+---
+
+## ReceiptVouchers (سندات قبض)
+
+**Base URL:** `/api/v1/vouchers/receipt`  
+**Authorization:** All Staff
+
+### GET /api/v1/vouchers/receipt
+
+List receipt vouchers.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| fromDate | date | No | Start date |
+| toDate | date | No | End date |
+| status | int | No | Filter by status |
+| page | int | No | Page number (default: 1) |
+| pageSize | int | No | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "voucherNo": "RV-2026-000001",
+      "amount": 10000.00,
+      "fromPartyName": "مورد نقدي",
+      "cashBoxId": 1,
+      "cashBoxName": "الصندوق الرئيسي",
+      "status": 2,
+      "voucherDate": "2026-06-10T00:00:00",
+      "notes": "سند قبض",
+      "createdAt": "2026-06-10T10:00:00"
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/vouchers/receipt/{id}
+
+Get receipt voucher by ID.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "voucherNo": "RV-2026-000001",
+  "partyId": 1,
+  "fromPartyName": "مورد نقدي",
+  "amount": 10000.00,
+  "cashBoxId": 1,
+  "cashBoxName": "الصندوق الرئيسي",
+  "currencyId": 1,
+  "exchangeRate": 1.00,
+  "status": 2,
+  "voucherDate": "2026-06-10T00:00:00",
+  "notes": "سند قبض",
+  "referenceType": null,
+  "referenceId": null
+}
+```
+
+### POST /api/v1/vouchers/receipt
+
+Create receipt voucher.
+
+**Request Body:**
+```json
+{
+  "partyId": 1,
+  "amount": 10000.00,
+  "cashBoxId": 1,
+  "currencyId": 1,
+  "exchangeRate": 1.00,
+  "voucherDate": "2026-06-10",
+  "notes": "سند قبض"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 2,
+  "voucherNo": "RV-2026-000002",
+  "status": 1,
+  "amount": 10000.00
+}
+```
+
+### POST /api/v1/vouchers/receipt/{id}/post
+
+Post receipt voucher.
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "status": 2,
+  "message": "تم ترحيل سند القبض بنجاح"
+}
+```
+
+### POST /api/v1/vouchers/receipt/{id}/cancel
+
+Cancel receipt voucher.
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "status": 3,
+  "message": "تم إلغاء سند القبض بنجاح"
+}
+```
+
+---
+
+## PaymentVouchers (سندات صرف)
+
+**Base URL:** `/api/v1/vouchers/payment`  
+**Authorization:** Manager+
+
+### GET /api/v1/vouchers/payment
+
+List payment vouchers.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| fromDate | date | No | Start date |
+| toDate | date | No | End date |
+| status | int | No | Filter by status |
+| page | int | No | Page number (default: 1) |
+| pageSize | int | No | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "voucherNo": "PV-2026-000001",
+      "amount": 5000.00,
+      "toPartyName": "مورد نقدي",
+      "cashBoxId": 1,
+      "cashBoxName": "الصندوق الرئيسي",
+      "status": 2,
+      "voucherDate": "2026-06-10T00:00:00",
+      "notes": "سند صرف",
+      "createdAt": "2026-06-10T10:00:00"
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/vouchers/payment/{id}
+
+Get payment voucher by ID.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "voucherNo": "PV-2026-000001",
+  "partyId": 1,
+  "toPartyName": "مورد نقدي",
+  "amount": 5000.00,
+  "cashBoxId": 1,
+  "cashBoxName": "الصندوق الرئيسي",
+  "currencyId": 1,
+  "exchangeRate": 1.00,
+  "status": 2,
+  "voucherDate": "2026-06-10T00:00:00",
+  "notes": "سند صرف",
+  "referenceType": null,
+  "referenceId": null
+}
+```
+
+### POST /api/v1/vouchers/payment
+
+Create payment voucher.
+
+**Request Body:**
+```json
+{
+  "partyId": 1,
+  "amount": 5000.00,
+  "cashBoxId": 1,
+  "currencyId": 1,
+  "exchangeRate": 1.00,
+  "voucherDate": "2026-06-10",
+  "notes": "سند صرف مورد"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 2,
+  "voucherNo": "PV-2026-000002",
+  "status": 1,
+  "amount": 5000.00
+}
+```
+
+### POST /api/v1/vouchers/payment/{id}/post
+
+Post payment voucher.
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "status": 2,
+  "message": "تم ترحيل سند الصرف بنجاح"
+}
+```
+
+### POST /api/v1/vouchers/payment/{id}/cancel
+
+Cancel payment voucher.
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "status": 3,
+  "message": "تم إلغاء سند الصرف بنجاح"
+}
+```
+
+---
+
+## Expenses
+
+**Base URL:** `/api/v1/expenses`  
+**Authorization:** Manager+
+
+### GET /api/v1/expenses
+
+List expenses.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| fromDate | date | No | Start date |
+| toDate | date | No | End date |
+| categoryId | int | No | Filter by expense category |
+| status | int | No | Filter by status |
+| page | int | No | Page number (default: 1) |
+| pageSize | int | No | Items per page (default: 10) |
+
+**Response (200):**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "expenseNo": "EXP-2026-000001",
+      "categoryId": 1,
+      "categoryName": "إيجار",
+      "amount": 50000.00,
+      "cashBoxId": 1,
+      "cashBoxName": "الصندوق الرئيسي",
+      "status": 2,
+      "expenseDate": "2026-06-01T00:00:00",
+      "notes": "إيجار المحل",
+      "createdAt": "2026-06-01T09:00:00"
+    }
+  ],
+  "totalCount": 1,
+  "page": 1,
+  "pageSize": 10,
+  "totalPages": 1
+}
+```
+
+### GET /api/v1/expenses/{id}
+
+Get expense by ID.
+
+**Response (200):**
+```json
+{
+  "id": 1,
+  "expenseNo": "EXP-2026-000001",
+  "categoryId": 1,
+  "categoryName": "إيجار",
+  "accountId": 1,
+  "accountName": "مصروفات إيجار",
+  "amount": 50000.00,
+  "cashBoxId": 1,
+  "cashBoxName": "الصندوق الرئيسي",
+  "currencyId": 1,
+  "exchangeRate": 1.00,
+  "status": 2,
+  "expenseDate": "2026-06-01T00:00:00",
+  "notes": "إيجار المحل"
+}
+```
+
+### POST /api/v1/expenses
+
+Create new expense (draft).
+
+**Request Body:**
+```json
+{
+  "categoryId": 1,
+  "amount": 50000.00,
+  "cashBoxId": 1,
+  "currencyId": 1,
+  "exchangeRate": 1.00,
+  "expenseDate": "2026-06-01",
+  "notes": "إيجار المحل"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 2,
+  "expenseNo": "EXP-2026-000002",
+  "status": 1,
+  "amount": 50000.00
+}
+```
+
+### POST /api/v1/expenses/{id}/post
+
+Post expense — deducts from cash box and creates journal entry.
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "status": 2,
+  "message": "تم ترحيل المصروف بنجاح"
+}
+```
+
+### POST /api/v1/expenses/{id}/cancel
+
+Cancel expense — reverses cash transaction and journal entry.
+
+**Response (200):**
+```json
+{
+  "id": 2,
+  "status": 3,
+  "message": "تم إلغاء المصروف بنجاح"
 }
 ```
 

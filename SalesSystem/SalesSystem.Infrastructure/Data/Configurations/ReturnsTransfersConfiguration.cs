@@ -39,7 +39,7 @@ public class SalesReturnConfiguration : IEntityTypeConfiguration<SalesReturn>
             .HasForeignKey(i => i.SalesReturnId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(sr => sr.IsActive);
+        builder.HasQueryFilter(sr => sr.Status != SalesSystem.Domain.Enums.InvoiceStatus.Cancelled);
     }
 }
 
@@ -60,129 +60,10 @@ public class SalesReturnItemConfiguration : IEntityTypeConfiguration<SalesReturn
             .HasForeignKey(sri => sri.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(sri => sri.IsActive);
-    }
-}
-
-public class PurchaseReturnConfiguration : IEntityTypeConfiguration<PurchaseReturn>
-{
-    public void Configure(EntityTypeBuilder<PurchaseReturn> builder)
-    {
-        builder.ToTable("PurchaseReturns");
-        builder.HasKey(pr => pr.Id);
-        builder.Property(pr => pr.ReturnNo).IsRequired().HasMaxLength(30);
-        builder.HasIndex(pr => pr.ReturnNo).IsUnique();
-        builder.Property(pr => pr.SubTotal).HasPrecision(18, 2);
-        builder.Property(pr => pr.TotalAmount).HasPrecision(18, 2);
-        builder.Property(pr => pr.Notes).HasColumnName("Reason").HasMaxLength(250);
-        builder.Property(pr => pr.Status).HasConversion<byte>();
-
-        // Phase 27 — Additional purchase return properties
-        builder.Property(pr => pr.LinkToInvoice).HasDefaultValue(true);
-        builder.Property(pr => pr.DiscountAmount).HasPrecision(18, 2).HasDefaultValue(0);
-        builder.Property(pr => pr.DiscountType).HasConversion<byte?>().IsRequired(false);
-        builder.Property(pr => pr.DiscountRate).HasPrecision(18, 2).IsRequired(false);
-
-        builder.HasOne(pr => pr.Supplier)
+        builder.HasOne<SalesInvoiceItem>()
             .WithMany()
-            .HasForeignKey(pr => pr.SupplierId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(pr => pr.Warehouse)
-            .WithMany()
-            .HasForeignKey(pr => pr.WarehouseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(pr => pr.Currency)
-            .WithMany()
-            .HasForeignKey(pr => pr.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.Property(pr => pr.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
-
-        builder.HasMany(pr => pr.Items)
-            .WithOne(i => i.PurchaseReturn)
-            .HasForeignKey(i => i.PurchaseReturnId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(pr => pr.IsActive);
-    }
-}
-
-public class PurchaseReturnItemConfiguration : IEntityTypeConfiguration<PurchaseReturnItem>
-{
-    public void Configure(EntityTypeBuilder<PurchaseReturnItem> builder)
-    {
-        builder.ToTable("PurchaseReturnItems");
-        builder.HasKey(pri => pri.Id);
-        builder.Property(pri => pri.Quantity).HasPrecision(18, 3);
-        builder.Property(pri => pri.UnitCost).HasPrecision(18, 2);
-        builder.Property(pri => pri.DiscountAmount).HasPrecision(18, 2);
-        builder.Property(pri => pri.LineTotal).HasPrecision(18, 2);
-        builder.Ignore(pri => pri.Notes); // DB Schema doesn't have Notes for return items
-
-        // Phase 27 — Additional purchase return item properties
-        builder.Property(pri => pri.ProductUnitId).IsRequired();
-        builder.Property(pri => pri.CostInBaseCurrency).HasPrecision(18, 2).IsRequired(false);
-
-        builder.HasOne(pri => pri.Product)
-            .WithMany()
-            .HasForeignKey(pri => pri.ProductId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(pri => pri.ProductUnit)
-            .WithMany()
-            .HasForeignKey(pri => pri.ProductUnitId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(pri => pri.IsActive);
-    }
-}
-
-public class StockTransferConfiguration : IEntityTypeConfiguration<StockTransfer>
-{
-    public void Configure(EntityTypeBuilder<StockTransfer> builder)
-    {
-        builder.ToTable("StockTransfers");
-        builder.HasKey(st => st.Id);
-        builder.Property(st => st.TransferNo).IsRequired().HasMaxLength(30);
-        builder.HasIndex(st => st.TransferNo).IsUnique();
-        builder.Property(st => st.Notes).HasMaxLength(500);
-        builder.Property(st => st.Status).HasConversion<byte>();
-
-        builder.HasOne(st => st.FromWarehouse)
-            .WithMany()
-            .HasForeignKey(st => st.FromWarehouseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(st => st.ToWarehouse)
-            .WithMany()
-            .HasForeignKey(st => st.ToWarehouseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasMany(st => st.Items)
-            .WithOne(i => i.StockTransfer)
-            .HasForeignKey(i => i.StockTransferId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(st => st.IsActive);
-    }
-}
-
-public class StockTransferItemConfiguration : IEntityTypeConfiguration<StockTransferItem>
-{
-    public void Configure(EntityTypeBuilder<StockTransferItem> builder)
-    {
-        builder.ToTable("StockTransferItems");
-        builder.HasKey(sti => sti.Id);
-        builder.Property(sti => sti.Quantity).HasPrecision(18, 3);
-        builder.Property(sti => sti.Notes).HasMaxLength(250);
-
-        builder.HasOne(sti => sti.Product)
-            .WithMany()
-            .HasForeignKey(sti => sti.ProductId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(sti => sti.IsActive);
+            .HasForeignKey(sri => sri.SalesInvoiceLineId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

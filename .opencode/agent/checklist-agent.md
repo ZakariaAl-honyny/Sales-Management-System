@@ -58,6 +58,96 @@ Enforces AGENTS.md rules and Clean Architecture constraints.
 - [ ] Fluent API config — no DataAnnotations on entities
 - [ ] All FKs use `DeleteBehavior.Restrict`
 
+## 65-Table Schema Validation Checklist
+- [ ] All 65 tables exist across 8 modules (Core=14, Org/Curr/Settings=11, Products=5, Accounting=10, Inventory=10, Sales=6, Purchases=6, Infrastructure=2)
+- [ ] NO `InventoryMovement` table — replaced by `InventoryTransactions` + `InventoryTransactionLines`
+- [ ] NO `StockTransfer`/`StockTransferItem` — replaced by `WarehouseTransfer`/`WarehouseTransferLine`
+- [ ] NO `CustomerGroup` or `SupplierType` entities anywhere
+- [ ] NO `SalesQuotation` or `PurchaseOrder` tables
+- [ ] NO `Cheque` or `DailyClosure` tables
+- [ ] `Parties` table exists: Name, Phone, Email, Address, TaxNumber, Notes
+- [ ] `Units` table exists with smallint PK, Name, Symbol, IsSystem, IsActive
+- [ ] `ProductPrices` table: ProductUnitId FK, CurrencyId FK, Price decimal(18,2), EffectiveFrom, EffectiveTo
+- [ ] `InventoryBatches` table: ProductId FK, WarehouseId FK, BatchNo, ExpiryDate, QuantityReceived, QuantityRemaining, UnitCost
+- [ ] `InventoryTransactions` + `InventoryTransactionLines` replace `InventoryMovement`
+- [ ] `WarehouseTransfers` + `WarehouseTransferLines` replace `StockTransfer`
+- [ ] `InventoryAdjustments` + `InventoryAdjustmentLines`: AdjustmentType (Opening/Increase/Shortage/Damage)
+- [ ] `InventoryCounts` + `InventoryCountLines`: SystemQuantity, ActualQuantity, DifferenceQuantity
+- [ ] `SalesInvoiceLines` has NO DiscountAmount per line (header only)
+- [ ] `PurchaseInvoiceLines` has NO DiscountAmount per line (header only)
+- [ ] `SystemLogs.Level` = tinyint (not nvarchar)
+
+## smallint FK Type Checklist
+- [ ] `Roles.Id` = smallint → UserRoles.RoleId = smallint, RolePermissions.RoleId = smallint
+- [ ] `Departments.Id` = smallint → Employees.DepartmentId = smallint
+- [ ] `Branches.Id` = smallint → UserBranches.BranchId = smallint, Warehouses.BranchId = smallint
+- [ ] `Warehouses.Id` = smallint → all FK references use smallint
+- [ ] `Currencies.Id` = smallint → all FK references (ProductPrices, invoices, etc.) use smallint
+- [ ] `Taxes.Id` = smallint → all FK references use smallint
+- [ ] `Units.Id` = smallint → ProductUnits.UnitId = smallint
+- [ ] `AccountCategories.Id` = smallint → Accounts.CategoryId = smallint
+- [ ] C# types match: `short` for smallint columns in entity classes
+
+## bigint AuditLog Checklist
+- [ ] `AuditLog.Id` is `long` (C#) / `bigint` (SQL)
+- [ ] `SystemLogs.Id` is `long` / `bigint`
+- [ ] AuditLog has index on `(UserId, CreatedAt DESC)`
+- [ ] AuditLog has index on `(EntityName, EntityId)`
+- [ ] AuditLog has index on `(CreatedAt DESC)`
+- [ ] SystemLogs has index on `(Level, CreatedAt DESC)`
+
+## ProductPrices (Multi-Currency) Checklist
+- [ ] Prices stored on `ProductPrices` table (not on Product entity)
+- [ ] Price = per (ProductUnit × Currency) with effective date range
+- [ ] No `RetailPrice`/`WholesalePrice` on Product entity
+- [ ] Price lookup: filter by ProductUnitId + CurrencyId + EffectiveFrom/EffectiveTo
+- [ ] Price has DB CHECK constraint `>= 0`
+- [ ] ProductPrices seed data includes prices in base currency
+
+## InventoryBatches (FIFO/FEFO) Checklist
+- [ ] Batch created on every purchase (QuantityReceived = QuantityRemaining = purchase qty)
+- [ ] Opening stock creates an opening batch (BatchNo = 1)
+- [ ] Sale consumes from oldest batch first: `OrderBy(b => b.Id)` for FIFO
+- [ ] If `TrackExpiry = true`: FEFO — `OrderBy(b => b.ExpiryDate)` nearest expiry first
+- [ ] QuantityRemaining updated on sale, never goes below 0
+- [ ] Purchase return restores original batch's QuantityRemaining
+- [ ] Batch has UnitCost (decimal(18,2)) for COGS calculation
+- [ ] Sales COGS = SUM of batch UnitCost × quantity consumed per batch
+
+## Party Entity Checklist
+- [ ] Customers have `PartyId` FK → Parties (mandatory, non-nullable)
+- [ ] Suppliers have `PartyId` FK → Parties (mandatory, non-nullable)
+- [ ] Employees have `PartyId` FK → Parties (mandatory, non-nullable)
+- [ ] Party stores: Name, Phone, Email, Address, TaxNumber, Notes
+- [ ] Customer/Supplier do NOT have Name/Phone/Email directly (use Party.Name etc.)
+- [ ] Party soft-delete cascades: deactivating Party deactivates linked Customer/Supplier
+- [ ] NO OpeningBalance or CurrentBalance on Customer/Supplier entity
+- [ ] NO CurrencyId on Customer/Supplier entity (per-transaction)
+
+## Unit Entity (Independent Table) Checklist
+- [ ] `Units` table exists: smallint PK, Name, Symbol, IsSystem, IsActive
+- [ ] Seed data: حبة (PCS), كرتون (CTN), كيلو (KG), جرام (G), لتر (L), متر (M), بالة (BAL)
+- [ ] `IsSystem = true` for seed units (protected from deletion)
+- [ ] User can add new units, can soft-deactivate unused units
+- [ ] `ProductUnits` links Product → Unit via `UnitId` FK (not string name)
+- [ ] `ProductUnit.Unit.Name` / `ProductUnit.Unit.Symbol` for display
+
+## BaseCurrency Immutability Checklist
+- [ ] `IsBaseCurrency` set during system creation only — NEVER user-changeable
+- [ ] `Currency.SetAsBaseCurrency()` calls `UpdateTimestamp()`
+- [ ] Filtered unique index: `WHERE IsBaseCurrency = 1 AND IsActive = 1`
+- [ ] Desktop UI has NO "Set as base" button or toggle
+- [ ] System seed always creates one base currency + USD as secondary
+
+## Perpetual Inventory Checklist
+- [ ] NO "Purchases" clearing account in chart of accounts
+- [ ] Purchase invoice posts: Dr Inventory Asset / Cr Cash or AP
+- [ ] COGS computed from InventoryBatches.UnitCost at sale time
+- [ ] Every stock change recorded in InventoryTransaction + InventoryTransactionLine
+- [ ] WarehouseStock.Quantity updated in real-time on every transaction
+- [ ] No direct WarehouseStock.Quantity manipulation outside transaction system
+- [ ] InventoryAdjustments used for corrections (not direct stock edits)
+
 ## InvoiceNo Checklist
 - [ ] InvoiceNo = int (NOT string)
 - [ ] InvoiceNo generated via DocumentSequenceService.GetNextIntAsync() (never lastId + 1)
@@ -101,8 +191,8 @@ The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-3
 |-------|--------|-------------|
 | 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
-| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
+| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), Unit independent table, Party entity, opening stock via InventoryBatches |
+| 26 — Warehouses Module | 📝 Planned | Warehouse types, WarehouseTransfer/WarehouseTransferLine replaces StockTransfer, InventoryAdjustments with Damage type, Perpetual Inventory |
 | 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
 | 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
 | 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
@@ -148,7 +238,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 
 1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
+3. Missing `CustomerGroupId` on Customer → REMOVED in V1 (deferred to V2). Do NOT add.
 4. Missing `CurrencyId` on financial entities → Add multi-currency support
 5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
 6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking

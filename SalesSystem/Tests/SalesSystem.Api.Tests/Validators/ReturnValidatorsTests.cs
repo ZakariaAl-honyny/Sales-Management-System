@@ -118,6 +118,8 @@ public class ReturnValidatorsTests
             WarehouseId: 1,
             ReturnDate: DateTime.UtcNow.AddDays(-1),
             Notes: "Return note",
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<ReturnItemRequest>
             {
                 new(1, 1, 5, 100, 0)
@@ -188,7 +190,7 @@ public class ReturnValidatorsTests
         public void GivenEmptyItems_WhenValidating_ThenFails()
         {
             // Arrange
-            var request = CreateValidRequest() with { Items = new List<ReturnItemRequest>() };
+            var request = CreateValidRequest() with { Items = new List<CreatePurchaseReturnItemRequest>() };
 
             // Act
             var result = _validator.TestValidate(request);
@@ -247,13 +249,10 @@ public class ReturnValidatorsTests
             ReturnDate: DateTime.UtcNow.AddDays(-1),
             CurrencyId: null,
             ExchangeRate: null,
-            DiscountAmount: 0,
-            DiscountType: null,
-            DiscountRate: null,
             Notes: "Purchase return note",
-            Items: new List<ReturnItemRequest>
+            Items: new List<CreatePurchaseReturnItemRequest>
             {
-                new(1, 1, 5, 100, 0)
+                new(ProductId: 1, ProductUnitId: 1, Quantity: 5, UnitCost: 100)
             }
         );
     }
@@ -414,6 +413,8 @@ public class ReturnValidatorsTests
             WarehouseId: 1,
             ReturnDate: DateTime.UtcNow.AddDays(-1),
             Notes: "Return note",
+            CashBoxId: null,
+            RefundAmount: null,
             Items: new List<ReturnItemRequest>
             {
                 new(1, 1, 5, 100, 0)

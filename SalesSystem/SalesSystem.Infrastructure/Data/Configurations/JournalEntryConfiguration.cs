@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
+using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
@@ -12,17 +14,34 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.EntryNumber).IsRequired().HasMaxLength(50);
         builder.HasIndex(x => x.EntryNumber).IsUnique();
+        builder.Property(x => x.EntryNo).IsRequired();
+        builder.HasIndex(x => x.EntryNo).IsUnique();
         builder.Property(x => x.TransactionDate).IsRequired();
         builder.Property(x => x.Description).HasMaxLength(500);
         builder.Property(x => x.EntryType).HasConversion<int>().IsRequired();
+
+        // ─── 3-State Lifecycle (replaces IsPosted/IsReversed) ───────────
+        builder.Property(x => x.Status)
+            .HasConversion<int>()
+            .IsRequired();
+
         builder.Property(x => x.ReferenceType).HasMaxLength(50);
         builder.Property(x => x.ReferenceNumber).HasMaxLength(50);
         builder.Property(x => x.ReferenceId);
         builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId })
             .HasFilter("[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL");
-        builder.Property(x => x.IsPosted).HasDefaultValue(false);
-        builder.Property(x => x.IsReversed).HasDefaultValue(false);
-        builder.Property(x => x.IsActive).HasDefaultValue(true);
+
+        // ─── Multi-Currency ─────────────────────────────────────────────
+        builder.Property(x => x.CurrencyId);
+        builder.HasIndex(x => x.CurrencyId);
+
+        builder.Property(x => x.ExchangeRate)
+            .HasPrecision(18, 2);
+
+        // ─── Attachments ────────────────────────────────────────────────
+        builder.Property(x => x.AttachmentPath)
+            .HasMaxLength(500);
+
         builder.HasIndex(x => x.TransactionDate);
 
         // Lines collection — Restrict (soft-delete only, no hard deletes)
@@ -38,6 +57,6 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(x => x.IsActive);
+        builder.HasQueryFilter(x => x.Status != JournalEntryStatus.Cancelled);
     }
 }

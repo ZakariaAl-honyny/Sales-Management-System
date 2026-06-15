@@ -283,7 +283,9 @@ public class TaxesListViewModel : ViewModelBase
         {
             var request = new UpdateTaxRequest(
                 Name: SelectedTax.Name,
+                Code: SelectedTax.Code,
                 Rate: SelectedTax.Rate,
+                TaxType: SelectedTax.TaxType,
                 IsDefault: SelectedTax.IsDefault,
                 IsActive: true
             );

@@ -440,57 +440,7 @@ public class CreatePurchaseInvoiceValidatorTests
             .WithErrorMessage("التكلفة لا يمكن أن تكون سالبة");
     }
 
-    [Fact]
-    public void GivenItemWithZeroItemDiscount_WhenValidating_ThenPasses()
-    {
-        // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
-        {
-            CreateValidItem() with { DiscountAmount = 0 }
-        };
-        var request = CreateValidRequest() with { Items = items };
 
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldNotHaveValidationErrorFor("Items[0].DiscountAmount");
-    }
-
-    [Fact]
-    public void GivenItemWithPositiveDiscount_WhenValidating_ThenPasses()
-    {
-        // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
-        {
-            CreateValidItem() with { DiscountAmount = 10m }
-        };
-        var request = CreateValidRequest() with { Items = items };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldNotHaveValidationErrorFor("Items[0].DiscountAmount");
-    }
-
-    [Fact]
-    public void GivenItemWithNegativeDiscount_WhenValidating_ThenFails()
-    {
-        // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
-        {
-            CreateValidItem() with { DiscountAmount = -5 }
-        };
-        var request = CreateValidRequest() with { Items = items };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor("Items[0].DiscountAmount")
-            .WithErrorMessage("الخصم لا يمكن أن يكون سالباً");
-    }
 
     #endregion
 
@@ -623,18 +573,15 @@ public class CreatePurchaseInvoiceValidatorTests
         InvoiceDate: DateTime.UtcNow.AddDays(-1),
         DueDate: null,
         PaymentType: PaymentType.Cash,
-        CashBoxId: 1,
         DiscountAmount: 0,
         DiscountType: null,
         DiscountRate: null,
         TaxAmount: 0,
+        OtherCharges: 0,
         PaidAmount: 100m,
         CurrencyId: null,
         ExchangeRate: null,
         Notes: "Test purchase invoice",
-        SupplierInvoiceNo: null,
-        AttachmentBase64: null,
-        AttachmentFileName: null,
         Items: new List<CreatePurchaseInvoiceItemRequest>
         {
             CreateValidItem()
@@ -645,17 +592,11 @@ public class CreatePurchaseInvoiceValidatorTests
         int productId = 1,
         int productUnitId = 1,
         decimal quantity = 1,
-        decimal unitCost = 100m,
-        decimal discountAmount = 0
+        decimal unitCost = 100m
     ) => new(
         ProductId: productId,
         ProductUnitId: productUnitId,
         Quantity: quantity,
-        UnitCost: unitCost,
-        DiscountAmount: discountAmount,
-        DiscountType: null,
-        DiscountRate: null,
-        Mode: SaleMode.Retail,
-        Notes: null
+        UnitCost: unitCost
     );
 }

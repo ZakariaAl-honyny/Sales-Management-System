@@ -96,19 +96,143 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - CashBox auto-creates Level-4 sub-account under parent "1110 — النقدية" when AccountId is null
   - AccountCode auto-increments: 1111, 1112, 1113...
 
+### 65-Table Schema Changes (Refactored from ~82 tables)
+
+#### Removed Tables (17)
+| Old Table | Replacement |
+|-----------|-------------|
+| `StockTransfer` | `WarehouseTransfer` + `WarehouseTransferLine` |
+| `InventoryMovement` | `InventoryTransaction` + `InventoryTransactionLine` |
+| `CustomerGroup` | ❌ Deferred to V2 |
+| `SupplierType` | ❌ Deferred to V2 |
+| `InventoryOperation` | ❌ Deferred to V2 |
+| `StockWriteOff` | ❌ Deferred to V2 |
+| `ProductBarcode` | Merged into `UnitBarcode` |
+| `ProductPurchasePrice` | `ProductPrices` (restructured) |
+| `PurchaseLots` | `InventoryBatches` (restructured) |
+| Old `Currencies` | Restructured (IsBaseCurrency immutable, IsSystem, FractionName) |
+| Old `Units` | Restructured (independent smallint PK table) |
+| Old `ProductUnits` | Restructured (Factor, IsBaseUnit, DefaultPurchase/Sales) |
+| `OpeningBalance`/`CurrentBalance` | Removed from Customer/Supplier/CashBox — balance on linked Account |
+
+#### Added/Modified Entity Configurations
+
+**ProductPrice Configuration:**
+```csharp
+builder.Property(x => x.Price).HasPrecision(18, 2);
+builder.Property(x => x.EffectiveFrom).IsRequired();
+builder.Property(x => x.EffectiveTo).IsRequired(false);
+builder.HasOne(x => x.ProductUnit).WithMany().HasForeignKey(x => x.ProductUnitId).OnDelete(DeleteBehavior.Restrict);
+builder.HasOne(x => x.Currency).WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+```
+
+**InventoryBatch Configuration:**
+```csharp
+builder.Property(x => x.QuantityReceived).HasPrecision(18, 3);
+builder.Property(x => x.QuantityRemaining).HasPrecision(18, 3);
+builder.Property(x => x.UnitCost).HasPrecision(18, 2);
+builder.Property(x => x.BatchNo).HasMaxLength(100);
+builder.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+builder.HasOne(x => x.Warehouse).WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+builder.HasIndex(x => new { x.ProductId, x.WarehouseId });
+```
+
+**Unit Configuration (smallint PK):**
+```csharp
+builder.Property(x => x.Id).HasColumnType("smallint").ValueGeneratedOnAdd();
+builder.Property(x => x.Name).HasMaxLength(100).IsRequired();
+builder.Property(x => x.Symbol).HasMaxLength(20).IsRequired();
+builder.Property(x => x.IsSystem).IsRequired();
+builder.HasIndex(x => x.Name).IsUnique().HasFilter("[IsActive] = 1");
+builder.HasQueryFilter(x => x.IsActive);
+```
+
+**ProductUnit Configuration:**
+```csharp
+builder.Property(x => x.Factor).HasPrecision(18, 3).IsRequired();
+builder.Property(x => x.IsBaseUnit).IsRequired();
+builder.HasOne(x => x.Unit).WithMany().HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+builder.HasOne(x => x.Product).WithMany(x => x.Units).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+builder.HasIndex(x => new { x.ProductId, x.UnitId }).IsUnique().HasFilter("[IsActive] = 1");
+builder.HasQueryFilter(x => x.IsActive);
+```
+
+**WarehouseTransfer Configuration:**
+```csharp
+builder.Property(x => x.TransferNo).HasMaxLength(50).IsRequired();
+builder.HasIndex(x => x.TransferNo).IsUnique();
+builder.HasOne(x => x.FromWarehouse).WithMany().HasForeignKey(x => x.FromWarehouseId).OnDelete(DeleteBehavior.Restrict);
+builder.HasOne(x => x.ToWarehouse).WithMany().HasForeignKey(x => x.ToWarehouseId).OnDelete(DeleteBehavior.Restrict);
+// Status property stored as int (InvoiceStatus enum)
+builder.Property(x => x.Status).HasConversion<int>().IsRequired();
+```
+
+**InventoryTransaction Configuration:**
+```csharp
+builder.Property(x => x.ReferenceType).HasMaxLength(50).IsRequired();
+builder.HasOne(x => x.Warehouse).WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId }).HasFilter("[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL");
+```
+
+**InventoryTransactionLine Configuration:**
+```csharp
+builder.Property(x => x.Quantity).HasPrecision(18, 3);
+builder.Property(x => x.UnitCost).HasPrecision(18, 2);
+builder.Property(x => x.BatchNo).HasMaxLength(100);
+builder.Property(x => x.ExpiryDate).IsRequired(false);
+builder.HasOne(x => x.ProductUnit).WithMany().HasForeignKey(x => x.ProductUnitId).OnDelete(DeleteBehavior.Restrict);
+```
+
+**AuditLog Configuration (bigint PK):**
+```csharp
+builder.Property(x => x.Id).HasColumnType("bigint").ValueGeneratedOnAdd();
+builder.Property(x => x.Action).HasMaxLength(50).IsRequired();
+builder.Property(x => x.EntityType).HasMaxLength(100).IsRequired(false);
+builder.Property(x => x.OldValues).HasColumnType("nvarchar(max)").IsRequired(false);
+builder.Property(x => x.NewValues).HasColumnType("nvarchar(max)").IsRequired(false);
+builder.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+builder.HasIndex(x => new { x.UserId, x.Timestamp }).IsDescending(false, true);
+builder.HasIndex(x => new { x.EntityType, x.EntityId });
+builder.HasIndex(x => x.Timestamp);
+```
+
+### Smallint FK Pattern (Lookup Tables)
+Lookup tables (Units, Roles, Departments, Currencies, Branches, Taxes, AccountCategories):
+```csharp
+// Entity — Id stays as int in C#, DB stores as smallint
+// In Fluent API:
+builder.Property(x => x.Id).HasColumnType("smallint").ValueGeneratedOnAdd();
+```
+
+### Bigint PK Pattern (High-Volume Tables)
+```csharp
+// Entity — use long Id in C#
+public long Id { get; private set; }
+// In Fluent API:
+builder.Property(x => x.Id).HasColumnType("bigint").ValueGeneratedOnAdd();
+```
+
+### Currency Immutability — IsBaseCurrency
+`Currency.IsBaseCurrency` is IMMUTABLE after creation. The setter is `private set` with NO public method to change it. Service code MUST NOT call `SetAsBaseCurrency()` after initialization — this method is SYSTEM-ONLY for seeding. Filtered unique index:
+```csharp
+builder.HasIndex(x => x.IsBaseCurrency).IsUnique()
+    .HasFilter("[IsBaseCurrency] = 1 AND [IsActive] = 1");  // Two conditions
+```
+
+### Perpetual Inventory — No Purchases Account
+All inventory costs go DIRECTLY to Inventory Asset account:
+```csharp
+// Purchase Invoice: Dr InventoryAssetAccountId, Dr VATInput, Cr AccountsPayable/Cash
+// Sales Invoice COGS: Dr COGS, Cr InventoryAssetAccountId
+// Purchase Return: Dr AP/Cash, Cr PurchaseReturnAccountId (contra expense)
+```
+
 ### Future Fixes Needed (Audit Findings v4.6.1)
-- ALL entity types that extend BaseEntity MUST have `.HasQueryFilter(x => x.IsActive)` in their configuration
-- `ProductUnit.BaseConversionFactor`: MUST use `.HasPrecision(18, 3)` — NOT `(18, 6)`
-- `StoreSettings.DefaultTaxRate`: SHOULD use `.HasPrecision(18, 2)` — currently uses `(5, 2)`
+- ALL entity types that extend ActivatableEntity MUST have `.HasQueryFilter(x => x.IsActive)` in their configuration
+- `ProductUnit.Factor`: MUST use `.HasPrecision(18, 3)` — conversion factor for quantities
 - `SalesInvoices` and `PurchaseInvoices`: SHOULD have DB-level `CHECK (PaidAmount >= 0 AND PaidAmount <= TotalAmount)` constraint
 - NO unique indexes on `ReturnNo`, `TransferNo`, `PaymentNo` columns — these are int but NOT unique
 - `DocumentSequences` table kept (NOT removed) — used for both string prefix sequences and int sequences (GetNextNumber vs GetNextInt)
-- New entities added for accounting: `Accounts`, `JournalEntries`, `JournalEntryLines`
-- New entities added for batch tracking: `PurchaseLots`
-- New entities added for multi-currency: `Currencies`, `Taxes`
-- New entity for fiscal year management: `FiscalYears`
-- New FK columns: `Customers.AccountId` (FK to Accounts), `Suppliers.AccountId`, `CashBoxes.AccountId` (required — balance lives on linked Account), `Products.AvgCost` (decimal(18,2))
-- `Users.Status` column for user status tracking
 - `InvoiceNo` = int, UNIQUE per document type in SalesInvoices and PurchaseInvoices tables
 - `DocumentSequence` entity supports both `GetNextNumber()` (string) and `GetNextInt()` (int) methods
 - `ExchangeRate` on `CustomerPayment` and `SupplierPayment`: MUST use `.HasPrecision(18, 2)` — NEVER leave unspecified (defaults to truncation risk)
@@ -504,43 +628,86 @@ NEVER use `:byte` route constraint — ASP.NET Core has no built-in `:byte` cons
 public async Task<IActionResult> GetByType(AccountType type, CancellationToken ct)
 ```
 
-### Phase 23 — Customers Module
+### Phase 23 — Customers Module (65-table schema: Parties-based, No CustomerGroup)
 
 #### New Entities
-- CustomerGroup: Id (PK), Name (nvarchar(100)), Description (nvarchar(250) nullable), CreatedAt, UpdatedAt, IsActive
 
-#### Enhanced Entities
-- Customer: +AccountId (int?, FK → Account), +CustomerType (byte?, Cash=1/Credit=2), +CustomerGroupId (int?, FK → CustomerGroup)
+**Parties table** (shared contact data):
+```csharp
+public class Party : ActivatableEntity
+{
+    public string Name { get; private set; }         // nvarchar(200)
+    public string? Phone { get; private set; }        // nvarchar(20)
+    public string? Email { get; private set; }        // nvarchar(100)
+    public string? Address { get; private set; }      // nvarchar(500)
+    public string? TaxNumber { get; private set; }    // nvarchar(50)
+    public string? Notes { get; private set; }        // nvarchar(500)
+}
+```
+
+#### Modified Entities (Customers + Suppliers)
+
+**Customer:** Removed CustomerGroupId, CustomerType, OpeningBalance, CurrentBalance, CurrencyId
+- Added `PartyId int NOT NULL FK → Parties`
+- Added `AccountId int NOT NULL FK → Account` (MANDATORY — auto-created by service)
+- `CreditLimit decimal(18,2) NOT NULL DEFAULT 0`
+- `CategoryId int? FK → Categories`
+
+**Supplier:** Same as Customer but:
+- Added `PartyId int NOT NULL FK → Parties`
+- Added `AccountId int NOT NULL FK → Account` (MANDATORY — auto-created under 2100)
+- `CategoryId int? FK → Categories`
 
 #### Constraints
-- FK Customer.AccountId → Account.Id (Restrict)
-- FK Customer.CustomerGroupId → CustomerGroup.Id (Restrict)
-- CustomerGroup is soft-deletable — deletion blocked if any customer references the group
-- CustomerType stored as byte (tinyint) — not int or string
-- All FKs use DeleteBehavior.Restrict — no cascade
+- FK Customer.PartyId → Parties.Id (Restrict) — Customer MUST have Party
+- FK Customer.AccountId → Account.Id (Restrict) — Customer MUST have Account
+- FK Supplier.PartyId → Parties.Id (Restrict)
+- FK Supplier.AccountId → Account.Id (Restrict)
+- NO CustomerGroup table — removed from V1
+- NO CustomerType/SupplierType — payment type is per-invoice
+
+#### Configuration Snippets
+```csharp
+// CustomerConfiguration
+builder.HasOne(x => x.Party).WithMany().HasForeignKey(x => x.PartyId).OnDelete(DeleteBehavior.Restrict);
+builder.HasOne(x => x.Account).WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+builder.Property(x => x.CreditLimit).HasPrecision(18, 2);
+// NO CustomerGroupId, CustomerType, OpeningBalance, CurrentBalance, CurrencyId configs
+
+// PartyConfiguration
+builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
+builder.Property(x => x.Phone).HasMaxLength(20);
+builder.Property(x => x.Email).HasMaxLength(100);
+builder.Property(x => x.Address).HasMaxLength(500);
+builder.Property(x => x.TaxNumber).HasMaxLength(50);
+builder.Property(x => x.Notes).HasMaxLength(500);
+builder.HasQueryFilter(x => x.IsActive);
+```
 
 #### Migration
-- Name: Phase23_CustomersModule
-- Creates CustomerGroups table
-- Adds AccountId, CustomerType, CustomerGroupId columns to Customers
-- Creates indexes on new FK columns
+- Name: Phase23_PartiesAndAccounts
+- Creates Parties table
+- Adds PartyId, AccountId, CategoryId to Customers and Suppliers
+- Drops CustomerGroupId, CustomerType, OpeningBalance, CurrentBalance, CurrencyId from Customers
+- Drops SupplierType, OpeningBalance, CurrentBalance, CurrencyId from Suppliers
+- Creates unique index on PartyId in both tables
 
 ---
 
 ## 📋 Phase Awareness (Phases 23-31)
 
-The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+The system is currently at **v4.10.1+ with Phases 18-25 + Purchases/Sales Analysis Gaps Implemented**: OtherCharges Landed Cost, Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone, Flexible Input
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
+| 23 — Customers Module | ✅ Completed | Parties-based (Party entity → shared contact data), no CustomerGroup/SupplierType, Account auto-created under 1210/2100, no balance fields on Customer/Supplier |
 | 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
-| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
-| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
-| 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
-| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
+| 25 — Products Module | ✅ Completed | ProductPrices (per unit×currency×effective dates), Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, InventoryBatches (FIFO), Perpetual Inventory (no Purchases account), product images, opening stock |
+| 26 — Warehouses Module | 📝 Planned | WarehouseTransfer/WarehouseTransferLine (replaces StockTransfer), InventoryTransaction/InventoryTransactionLine (replaces InventoryMovement), warehouse types, AccountId FK |
+| 27 — Purchases Module | 🟡 Partial | Multi-currency, landed cost (AdditionalCharge via AdditionalCharges table), Purchase Orders, standalone returns |
+| 28 — Sales Module | 🟡 Partial | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
+| 29 — Receipts & Payments | 🟡 Partial — CashBox ✅ | CashBox refactored (no balance fields, AccountId FK, RunningBalance); Cheques, PaymentAllocation, DailyClosure planned |
+| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency (CurrencyId + ExchangeRate), attachments, FiscalYear, Annual Closing |
 | 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
 
 ### Key Architecture Rules for Subagents
@@ -580,15 +747,23 @@ When writing or reviewing code in ANY layer, check these:
 
 When you encounter any code related to these areas, apply fixes automatically:
 
-1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
+1. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1110 — النقدية"
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
-4. Missing `CurrencyId` on financial entities → Add multi-currency support
-5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
-6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
-7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
+3. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record
+4. Missing `AccountId` FK on Customer/Supplier → Add it (mandatory, auto-created by service)
+5. Missing `ProductPrices` table → Add per-unit pricing replacing SalePrice/RetailPrice on Product
+6. Missing `InventoryBatches` → Add FIFO batch tracking on purchase
+7. Missing `AdditionalCharges` table → Add landed cost allocation on purchase
 8. Missing journal entry on cash operations → Call AccountingIntegrationService
 9. Missing Excel export on report → Add ClosedXML worksheet generation
 10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
 11. Payment without allocation → Add PaymentAllocation tracking
 12. Missing reversal entries on payment update/delete → Add reversal journal entries
+13. Old `StockTransfer`/`StockTransferItem` → Replace with `WarehouseTransfer`/`WarehouseTransferLine`
+14. Old `InventoryMovement` → Replace with `InventoryTransaction`/`InventoryTransactionLine`
+15. CustomerGroup/SupplierType references → Remove (deferred to V2)
+16. OpeningBalance/CurrentBalance on Customer/Supplier/CashBox → Remove (balance on linked Account)
+17. PriceLevel enum references → Remove (V1 uses per-unit pricing, no price levels)
+18. NON-smallint PK on lookup tables (Units, Roles, etc.) → Change to smallint
+19. NON-bigint PK on AuditLog → Change to bigint
+20. Missing filtered unique indexes on soft-deletable entities → Add `.HasFilter("[IsActive] = 1")`

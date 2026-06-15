@@ -1,7 +1,7 @@
 # Phase 25 — Products Module: Comprehensive Enhancement & Implementation Plan
 
 > **Version**: 1.0 — Full rewrite based on Analysis Parts 1–5, Global Analysis, and codebase audit
-> **Scope**: Complete Products module overhaul — Pricing per currency, Multiple price levels, FIFO batch tracking, Assembly/BOM, Product images, Min stock alerts, Enhanced barcode management, Default seeds
+> **Scope**: Complete Products module overhaul — Pricing per unit and currency (no retail/wholesale levels), FIFO batch tracking, Assembly/BOM, Product images, Min stock alerts, Enhanced barcode management, Default seeds
 
 ---
 
@@ -29,8 +29,8 @@ Based on full codebase audit + user requirements from Analysis Parts 1–5, the 
 |---|------------|--------------|--------------|
 | 🏗️ | **Products CRUD** | Create, edit, list, search, soft-delete products | Categories, Units |
 | 📐 | **Units (UOM)** | Multi-unit with conversion factors, base unit enforcement | Products |
-| 💰 | **Pricing** | Per-unit + per-currency pricing with history | Units, Currencies (Phase 20) |
-| 🏷️ | **Barcodes** | Per-unit barcodes, auto-generation, scanning | Units |
+| 💰 | **Pricing** | Per-unit + per-currency pricing with history (no retail/wholesale) | Units, Currencies (Phase 20) |
+| 🏷️ | **Barcodes** | One barcode per product (stored on Product entity) | (none) |
 | 📦 | **Batches/FIFO** | Purchase lots, FIFO/FEFO allocation, costing | Products, Purchases |
 | 🗂️ | **Categories** | Product grouping, default "عام" seed | (standalone) |
 | 📜 | **Price History** | Audit trail for all cost/price changes | ProductUnits |
@@ -40,15 +40,15 @@ Based on full codebase audit + user requirements from Analysis Parts 1–5, the 
 ```text
 Desktop → (HttpClient) → Api → Application Services → Infrastructure → SQL Server
                                     ↓
-                             Domain (Products, ProductUnits, PurchaseLots, 
+                             Domain (Products, ProductUnits, InventoryBatches, 
                                     BillOfMaterials, ProductImages, Categories)
 ```
 
 **Stock/Costing flow:**
 ```text
-PurchaseInvoice → Create PurchaseLot (FIFO) → Update WarehouseStock 
+PurchaseInvoice → Create InventoryBatch (FIFO) → Update WarehouseStock 
                → UpdateProductPricingService → ProductPriceHistory
-SaleInvoice    → Deduct from PurchaseLots (FIFO/FEFO) → Update WarehouseStock
+SaleInvoice    → Deduct from InventoryBatches (FIFO/FEFO) → Update WarehouseStock
 ```
 
 ---
@@ -63,16 +63,16 @@ SaleInvoice    → Deduct from PurchaseLots (FIFO/FEFO) → Update WarehouseStoc
 |-------|------|--------|-----------------|
 | `Id` | `int PK` | ✅ | Keep |
 | `Name` | `string(150)` | ✅ | Keep |
-| `Barcode` | `string(50)?` | ✅ | **DEPRECATE** — move to UnitBarcode |
+| `Barcode` | `string(50)?` | ❌ Missing | **ADD** — one barcode per product |
 | `CategoryId` | `int?` FK | ✅ | Keep |
 | `UnitId` (Legacy) | `int?` FK | ⚠️ Legacy | **DEPRECATE** — remove |
 | `WholesaleUnitId` (Legacy) | `int?` FK | ⚠️ Legacy | **DEPRECATE** — remove |
 | `RetailUnitId` (Legacy) | `int?` FK | ⚠️ Legacy | **DEPRECATE** — remove |
 | `ConversionFactor` (Legacy) | `decimal(18,3)` | ⚠️ Legacy | **DEPRECATE** — use ProductUnit |
-| `PurchasePrice` (Legacy) | `decimal(18,2)` | ⚠️ Legacy | **DEPRECATE** — cost from PurchaseLots |
-| `SalePrice` (Legacy) | `decimal(18,2)` | ⚠️ Legacy | **DEPRECATE** — use ProductUnit prices |
-| `WholesalePrice` (Legacy) | `decimal(18,2)` | ⚠️ Legacy | **DEPRECATE** — use ProductUnit prices |
-| `RetailPrice` (Legacy) | `decimal(18,2)` | ⚠️ Legacy | **DEPRECATE** — use ProductUnit prices |
+| `PurchasePrice` (Legacy) | `decimal(18,2)` | ⚠️ Legacy | **DEPRECATE** — cost from InventoryBatches |
+| `SalePrice` (Legacy) | `decimal(18,2)` | ⚠️ Legacy | **DEPRECATE** — use ProductPrices per (ProductUnit × CurrencyId) |
+| `WholesalePrice` (Legacy) | `decimal(18,2)` | ⚠️ Legacy | **DEPRECATE** — use ProductPrices per (ProductUnit × CurrencyId) |
+| `RetailPrice` (Legacy) | `decimal(18,2)` | ⚠️ Legacy | **DEPRECATE** — use ProductPrices per (ProductUnit × CurrencyId) |
 | `MinStock` | `decimal(18,3)` | ✅ | **RENAME** → `MinStockLevel` |
 | `ReorderLevel` | `decimal(18,3)` | ✅ | Keep |
 | `Description` | `string(500)?` | ✅ | Keep |
@@ -101,8 +101,8 @@ SaleInvoice    → Deduct from PurchaseLots (FIFO/FEFO) → Update WarehouseStoc
 | `UnitName` | `string(100)` | ✅ | Keep |
 | `BaseConversionFactor` | `decimal(18,3)` | ✅ | Keep |
 | `IsBaseUnit` | `bool` | ✅ | Keep |
-| `SalesPrice` | `decimal(18,2)` | ✅ | **DEPRECATE** → moved to ProductUnitPrice |
-| `WholesalePrice` | `decimal(18,2)` | ✅ | **DEPRECATE** → moved to ProductUnitPrice |
+| `SalesPrice` | `decimal(18,2)` | ✅ | **DEPRECATE** → moved to ProductPrice |
+| `WholesalePrice` | `decimal(18,2)` | ✅ | **DEPRECATE** → moved to ProductPrice |
 | `PurchaseCost` | `decimal(18,2)` | ✅ | Keep (computed from batches) |
 | `SupplierPrice` | `decimal(18,2)` | ✅ | Keep (catalog reference) |
 | `LastPurchasePrice` | `decimal(18,2)` | ✅ | Keep (informational) |
@@ -110,38 +110,32 @@ SaleInvoice    → Deduct from PurchaseLots (FIFO/FEFO) → Update WarehouseStoc
 | Barcodes collection | `List<UnitBarcode>` | ✅ | Keep |
 
 **New fields**:
-- `CurrencyId` → ❌ Missing → **ADD** (moved to ProductUnitPrice per analysis)
-- Actually pricing goes to **ProductUnitPrice** entity, not here
+- `CurrencyId` → ❌ Missing → **ADD** (moved to ProductPrice per analysis)
+- Actually pricing goes to **ProductPrice** entity, not here
 
 **Methods**:
 - `UpdatePurchaseCost()` — keep
-- `UpdateSalesPrice()` — **REMOVE** (pricing is now in ProductUnitPrice)
-- `GetPriceByUnit()` — **REMOVE** (use ProductUnitPrice)
+- `UpdateSalesPrice()` — **REMOVE** (pricing is now in ProductPrice)
+- `GetPriceByUnit()` — **REMOVE** (use ProductPrice)
 - `AddBarcode()` — keep
 - `CalculateCostFromBaseUnitCost()` — keep
 - `ToBaseUnitQuantity()` — keep
 
-### 2.3 UnitBarcode Entity ✅ (Exists)
+### 2.3 UnitBarcode Entity ⚠️ (Deferred)
 
 **File**: `Domain/Entities/UnitBarcode.cs`
 
-| Field | Type | Status |
-|-------|------|--------|
-| `Id` | `int PK` | ✅ |
-| `ProductUnitId` | `int FK` | ✅ |
-| `BarcodeValue` | `string(50)` | ✅ |
-| `IsDefault` | `bool` | ✅ |
-| `SupplierCode` | `string(50)?` | ✅ |
+Per Analysis Part 3 final revisions: separate unit barcodes are NOT supported in V1. The barcode belongs to the **product** and there is only ONE main barcode per product.
 
-**Note**: This is the correct structure per analysis. The `ProductBarcode` entity (per-product barcode) is legacy and should be deprecated.
+**Decision**: **DEFER** — hide from UI, do not use in V1.
 
 ### 2.4 ProductBarcode Entity ⚠️ (Legacy — Deprecate)
 
 **File**: `Domain/Entities/ProductBarcode.cs` (36 lines)
 
-Per Analysis Part 3: barcode must follow the **unit**, not the product. This entity is redundant with `UnitBarcode`.
+Per Analysis: one barcode per product, so a separate table `ProductBarcode` is redundant.
 
-**Decision**: **DEPRECATE** — hide from UI, keep in DB for backwards compat. All new barcode creation goes through `UnitBarcode`.
+**Decision**: **DEPRECATE** — hide from UI, keep in DB for backwards compat. Add `Barcode` string directly to `Product` entity.
 
 ### 2.5 Category Entity ✅ (Exists — needs seed)
 
@@ -172,7 +166,7 @@ Per Analysis Part 3: barcode must follow the **unit**, not the product. This ent
 | `ChangedByUserId` | `int` | ✅ |
 | `CostingMethod` | `string(50)?` | ✅ |
 
-**Enhancement needed**: Add `CurrencyId` + `PriceLevel` fields to support multi-currency price history tracking.
+**Enhancement needed**: Add `CurrencyId` field to support multi-currency price history tracking. (`PriceLevel` is NOT in V1 — pricing is per ProductUnit × CurrencyId only.)
 
 ### 2.7 Existing Services
 
@@ -212,13 +206,12 @@ Per Analysis Part 3: barcode must follow the **unit**, not the product. This ent
 
 | Component | Status |
 |-----------|--------|
-| `PurchaseLot` entity + config | ❌ NOT EXIST — must create |
-| `PurchaseLotAllocation` entity | ❌ NOT EXIST — must create |
+| `InventoryBatch` entity + config | ❌ NOT EXIST — must create |
+| `InventoryBatchAllocation` entity | ❌ NOT EXIST — must create |
 | `BillOfMaterials` entity + config | ❌ NOT EXIST — must create |
 | `BillOfMaterialsItem` entity | ❌ NOT EXIST — must create |
 | `ProductImage` entity + config | ❌ NOT EXIST — must create |
-| `ProductUnitPrice` entity + config | ❌ NOT EXIST — must create (pricing per currency) |
-| `PriceLevel` enum (VIP, Distributor) | ❌ NOT EXIST — must create |
+| `ProductPrice` entity + config | ❌ NOT EXIST — must create (pricing per currency) |
 | `IFifoAllocationService` + implementation | ❌ NOT EXIST — must create |
 | `IMinStockAlertService` | ❌ NOT EXIST — must create |
 | `IProductImageService` | ❌ NOT EXIST — must create |
@@ -245,10 +238,10 @@ Purchase → UpdateProductPricingService → WeightedAverage formula
 
 **Required flow** (FIFO):
 ```text
-Purchase → Create PurchaseLot (LotNumber, Qty, UnitCost, ExpiryDate)
+Purchase → Create InventoryBatch (LotNumber, Qty, UnitCost, ExpiryDate)
          → UpdateProductPricingService (optional — keep WeightedAverage as alternative)
          → InventoryMovement record
-Sale → Deduct from PurchaseLots (earliest lot first)
+Sale → Deduct from InventoryBatches (earliest lot first)
      → If HasExpiry: FEFO (earliest expiry first)
      → InventoryMovement record
 ```
@@ -257,7 +250,7 @@ Sale → Deduct from PurchaseLots (earliest lot first)
 
 | Option | Description | Complexity | Migration |
 |--------|-------------|------------|-----------|
-| **A: FIFO + WeightedAverage** | Add FIFO as CostingMethod = 4, keep WA as default | **HIGH** — ~600 new lines + new tables | Requires new PurchaseLot table, no backfill of existing stock |
+| **A: FIFO + WeightedAverage** | Add FIFO as CostingMethod = 4, keep WA as default | **HIGH** — ~600 new lines + new tables | Requires new InventoryBatch table, no backfill of existing stock |
 | **B: FIFO Only** | Replace WA entirely with FIFO | **HIGH** — requires rewriting UpdateProductPricingService | Breaks existing stock cost data |
 | **C: Defer FIFO to V2** | Keep WA only, skip batch tracking | **LOW** — no changes | Analysis explicitly requires FIFO — cannot defer |
 
@@ -268,32 +261,18 @@ Sale → Deduct from PurchaseLots (earliest lot first)
 - Add `EnableFefo` SystemSetting (already planned in Phase 19)
 - Update `UpdateProductPricingService` to handle FIFO method
 
-### 3.2 Blocker 2: Pricing Model — Per-Unit + Per-Currency + Price Levels
+### 3.2 Blocker 2: Pricing Model — Per-Unit + Per-Currency Only
 
-**Problem**: Current pricing stores `SalesPrice` and `WholesalePrice` directly on `ProductUnit`. Analysis requires:
-1. Price = f(ProductUnit, Currency) — per-currency pricing
-2. Multiple price levels: Retail, Wholesale, VIP, Distributor
-3. Price history per change
+**Problem**: Current pricing stores `SalesPrice` and `WholesalePrice` directly on `ProductUnit`. Analysis requires a simplified but more powerful model:
+1. Price = f(ProductUnit, Currency) — per-currency pricing per unit.
+2. NO MORE Retail/Wholesale/VIP price levels. The unit itself determines the price (e.g., Piece price, Carton price).
+3. Price history per change.
 
 **Current**:
-```csharp
-// ProductUnit.cs
-public decimal SalesPrice { get; private set; }      // Single retail price
-public decimal WholesalePrice { get; private set; }   // Single wholesale price
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods). Legacy SalesPrice/WholesalePrice on ProductUnit are deprecated — use `ProductPrices` table instead.
 
 **Required**:
-```csharp
-// NEW: ProductUnitPrice entity
-public class ProductUnitPrice : BaseEntity
-{
-    public int ProductUnitId { get; private set; }
-    public int CurrencyId { get; private set; }
-    public PriceLevel PriceLevel { get; private set; } // Retail=1, Wholesale=2, VIP=3, Distributor=4
-    public decimal Price { get; private set; }
-    public bool IsActive { get; private set; }
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns and `docs/database-schema.md` for table definitions. Note: `PriceLevel` is NOT in V1 — pricing is per (ProductUnit × CurrencyId) only.
 
 **This BLOCKER depends on Phase 20 (Currencies)** — `CurrencyId` FK cannot exist without the Currencies module. Options:
 
@@ -302,11 +281,11 @@ public class ProductUnitPrice : BaseEntity
 | **A: Wait for Phase 20** | Build pricing without CurrencyId, add it in Phase 20 |
 | **B: Build now with CurrencyId placeholder** | Add CurrencyId FK now (requires Currency table to exist or be seeded) |
 
-**⚠️ RECOMMENDATION**: **Option A** — Build the `ProductUnitPrice` entity NOW with CurrencyId as `int NOT NULL`, and ensure the Currencies module (Phase 20) seeds at least a "Base Currency" (e.g., YER or SAR) so the FK constraint is satisfied. This avoids a later migration.
+**⚠️ RECOMMENDATION**: **Option A** — Build the `ProductPrice` entity NOW with CurrencyId as `int NOT NULL`, and ensure the Currencies module (Phase 20) seeds at least a "Base Currency" (e.g., YER or SAR) so the FK constraint is satisfied. This avoids a later migration.
 
-### 3.3 Blocker 3: PurchaseLot Entity Doesn't Exist
+### 3.3 Blocker 3: InventoryBatch Entity Doesn't Exist
 
-**Problem**: FIFO tracking requires a `PurchaseLot` entity that tracks:
+**Problem**: FIFO tracking requires a `InventoryBatch` entity that tracks:
 - ProductId + WarehouseId
 - Quantity (remaining)
 - UnitCost (in base currency)
@@ -315,7 +294,7 @@ public class ProductUnitPrice : BaseEntity
 - ReceivedDate
 - SourceInvoiceId
 
-**No PurchaseLot entity, no PurchaseLotConfiguration, no migration, no service layer exists.**
+**No InventoryBatch entity, no InventoryBatchConfiguration, no migration, no service layer exists.**
 
 **Resolution**: This is a full new entity build within Phase 25 — see [Section 4 — Products Design Catalog](#4-products-design-catalog).
 
@@ -339,7 +318,7 @@ These must be system-wide seeds, not per-user data. No seed data exists for eith
 |---|-------|------|---------|----------|-------------|--------|
 | 1 | `Id` | `int PK` | Auto-Increment | ✅ | — | ✅ Exists |
 | 2 | `Name` | `nvarchar(150)` | — | ✅ | — | ✅ Exists |
-| 3 | `Barcode` (Legacy) | `nvarchar(50)` | `null` | ❌ | **UNIQUE** | ⚠️ Deprecate |
+| 3 | `Barcode` | `nvarchar(50)` | `null` | ❌ | **UNIQUE** | **NEW** (Moved from external tables) |
 | 4 | `CategoryId` | `int FK` | `1` (عام) | ❌ | FK→Categories, Restrict | ✅ Exists |
 | 5 | `MinStockLevel` | `decimal(18,3)` | `0` | ❌ | `CHECK >= 0` | ✏️ Rename from MinStock |
 | 6 | `ReorderLevel` | `decimal(18,3)` | `0` | ❌ | `CHECK >= 0` | ✅ Exists |
@@ -355,9 +334,9 @@ These must be system-wide seeds, not per-user data. No seed data exists for eith
 - `RetailUnitId` (Legacy FK)
 - `ConversionFactor` (Legacy decimal)
 - `PurchasePrice` (Legacy — cost from batches now)
-- `SalePrice` (Legacy — use ProductUnitPrice)
-- `WholesalePrice` (Legacy — use ProductUnitPrice)
-- `RetailPrice` (Legacy — use ProductUnitPrice)
+- `SalePrice` (Legacy — use ProductPrice)
+- `WholesalePrice` (Legacy — use ProductPrice)
+- `RetailPrice` (Legacy — use ProductPrice)
 - `ExpirationDate` (Legacy — per-batch expiry)
 - `ImagePath` (Legacy — use ProductImage entity)
 
@@ -384,11 +363,11 @@ These must be system-wide seeds, not per-user data. No seed data exists for eith
 - لتر (Liter) — base unit for liquids
 - متر (Meter) — base unit for length
 
-**Deprecated fields** (move to ProductUnitPrice):
-- `SalesPrice` → use ProductUnitPrice where PriceLevel = Retail
-- `WholesalePrice` → use ProductUnitPrice where PriceLevel = Wholesale
+**Deprecated fields** (move to ProductPrice):
+- `SalesPrice` → use ProductPrice (per ProductUnit × CurrencyId — no PriceLevel in V1)
+- `WholesalePrice` → use ProductPrice (per ProductUnit × CurrencyId — no PriceLevel in V1)
 
-### 4.3 ProductUnitPrice Entity — NEW
+### 4.3 ProductPrice Entity — NEW
 
 Stores price per unit + currency + price level combination.
 
@@ -397,17 +376,16 @@ Stores price per unit + currency + price level combination.
 | 1 | `Id` | `int PK` | Auto-Increment | ✅ | — |
 | 2 | `ProductUnitId` | `int FK` | — | ✅ | FK→ProductUnits, Restrict |
 | 3 | `CurrencyId` | `int FK` | — | ✅ | FK→Currencies, Restrict |
-| 4 | `PriceLevel` | `tinyint` | `1` (Retail) | ✅ | 1=Retail, 2=Wholesale, 3=VIP, 4=Distributor |
-| 5 | `Price` | `decimal(18,2)` | `0` | ✅ | `CHECK >= 0` |
-| 6 | `EffectiveFrom` | `datetime2` | `GETUTCDATE()` | ✅ | — |
-| 7 | `EffectiveTo` | `datetime2?` | `null` | ❌ | Null = currently active |
-| 8 | `IsActive` | `bit` | `true` | ❌ | Global QF |
+| 4 | `Price` | `decimal(18,2)` | `0` | ✅ | `CHECK >= 0` |
+| 5 | `EffectiveFrom` | `datetime2` | `GETUTCDATE()` | ✅ | — |
+| 6 | `EffectiveTo` | `datetime2?` | `null` | ❌ | Null = currently active |
+| 7 | `IsActive` | `bit` | `true` | ❌ | Global QF |
 
-**Unique Index**: `(ProductUnitId, CurrencyId, PriceLevel)` — one active price per combination.
+**Unique Index**: `(ProductUnitId, CurrencyId)` — one active price per combination.
 
-**Seed data**: Each product's base unit gets a default Retail + Wholesale price entry for the base currency (Phase 20 dependency).
+**Seed data**: Each product's base unit gets a default price entry for the base currency (Phase 20 dependency).
 
-### 4.4 PurchaseLot Entity — NEW (FIFO Foundation)
+### 4.4 InventoryBatch Entity — NEW (FIFO Foundation)
 
 | # | Field | Type | Default | Required | Constraints |
 |---|-------|------|---------|----------|-------------|
@@ -426,19 +404,19 @@ Stores price per unit + currency + price level combination.
 | 13 | `IsActive` | `bit` | `true` | ❌ | Global QF |
 
 **Key behaviors**:
-- On purchase: create PurchaseLot with `Qty = OriginalQuantity`, `Quantity = OriginalQuantity`
+- On purchase: create InventoryBatch with `Qty = OriginalQuantity`, `Quantity = OriginalQuantity`
 - On sale: deduct from batches (FIFO or FEFO), reduce `Quantity`, create `InventoryMovement` records
 - When `Quantity = 0`: lot is fully consumed (keep for history, mark inactive)
 - `LotNumber` auto-format: `B-{YYYYMMDD}-{Sequence:000}` (e.g., `B-20260605-001`)
 
-### 4.5 PurchaseLotAllocation Entity — NEW
+### 4.5 InventoryBatchAllocation Entity — NEW
 
 Tracks which sales invoice items consumed from which purchase lot.
 
 | # | Field | Type | Default | Required | Constraints |
 |---|-------|------|---------|----------|-------------|
 | 1 | `Id` | `int PK` | Auto-Increment | ✅ | — |
-| 2 | `PurchaseLotId` | `int FK` | — | ✅ | FK→PurchaseLots, Restrict |
+| 2 | `InventoryBatchId` | `int FK` | — | ✅ | FK→InventoryBatches, Restrict |
 | 3 | `SalesInvoiceItemId` | `int FK?` | `null` | ❌ | FK→SalesInvoiceItems |
 | 4 | `SalesReturnItemId` | `int FK?` | `null` | ❌ | FK→SalesReturnItems |
 | 5 | `Quantity` | `decimal(18,3)` | — | ✅ | `CHECK > 0` |
@@ -476,51 +454,22 @@ For products made from other products (بضائع تامة — assemblies).
 
 **Storage**: Images stored on disk (App_Data/ProductImages/), path saved in DB.
 
-### 4.8 PriceLevel Enum — NEW
+> See `Domain/Enums/` for enum definitions and `docs/AGENTS.md` §3 for canonical enum values.
 
-```csharp
-public enum PriceLevel : byte
-{
-    Retail = 1,        // سعر التجزئة
-    Wholesale = 2,     // سعر الجملة
-    VIP = 3,           // سعر VIP
-    Distributor = 4    // سعر الموزع
-}
-```
-
-**Note**: Analysis Part 5 initially recommended against multiple price levels in V1, but the reference images from محاسب سوفت clearly show this feature. Decision: **Include in V1** with 4 levels. Users can ignore unused levels.
-
-### 4.9 CostingMethod Enum — EXTENDED
-
-```csharp
-public enum CostingMethod : byte
-{
-    WeightedAverage = 1,   // Current — default
-    LastPurchasePrice = 2, // Current
-    SupplierPrice = 3,     // Current
-    FIFO = 4               // NEW — batch-based costing
-}
-```
-
-### 4.10 ProductPriceHistory Entity — Enhanced
+### 4.9 ProductPriceHistory Entity — Enhanced
 
 Add these fields to support multi-currency pricing history + price validity periods:
 
 | # | Field | Type | Required | Status |
 |---|-------|------|----------|--------|
 | `CurrencyId` | `int` FK? | ❌ | **NEW** |
-| `PriceLevel` | `tinyint`? | ❌ | **NEW** |
 | `OldPrice` | `decimal(18,2)` | ❌ | **NEW** (to complement OldAvgCost) |
 | `NewPrice` | `decimal(18,2)` | ❌ | **NEW** |
 | `FromDate` | `datetime2` | ✅ | **NEW** — When this price becomes effective |
 | `ToDate` | `datetime2?` | ❌ | **NEW** — Optional: when price expires |
 | Existing fields | — | — | ✅ Keep |
 
-**Validity logic**:
-```csharp
-// If ToDate is null, this is the current active price
-public bool IsCurrentPrice => ToDate == null || ToDate >= DateTime.UtcNow;
-```
+> See `docs/AGENTS.md` for domain entity patterns.
 
 **UI display rules**:
 - Current price clearly marked (green highlight)
@@ -545,24 +494,23 @@ public bool IsCurrentPrice => ToDate == null || ToDate >= DateTime.UtcNow;
 
 | Field | Status | Action |
 |-------|--------|--------|
-| `SalesPrice` | ⚠️ Deprecate | Move to ProductUnitPrice.Price with PriceLevel=Retail |
-| `WholesalePrice` | ⚠️ Deprecate | Move to ProductUnitPrice.Price with PriceLevel=Wholesale |
+| `SalesPrice` | ⚠️ Deprecate | Move to ProductPrice.Price |
+| `WholesalePrice` | ⚠️ Deprecate | Move to ProductPrice.Price (if appropriate unit exists, else drop) |
 
 ### 5.3 Pricing
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| Per-currency pricing | ❌ Missing | Create ProductUnitPrice entity |
-| Multiple price levels | ❌ Missing | Create PriceLevel enum + ProductUnitPrice.PriceLevel |
-| ProductUnitPrice entity + config | ❌ Missing | Full build |
-| Price history for per-currency changes | ❌ Missing | Extend ProductPriceHistory with CurrencyId + PriceLevel |
+| Per-currency pricing | ❌ Missing | Create ProductPrice entity |
+| ProductPrice entity + config | ❌ Missing | Full build |
+| Price history for per-currency changes | ❌ Missing | Extend ProductPriceHistory with CurrencyId |
 
 ### 5.4 Batches / FIFO
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| PurchaseLot entity | ❌ Missing | Full build — core of FIFO |
-| PurchaseLotAllocation entity | ❌ Missing | Track sale→lot consumption |
+| InventoryBatch entity | ❌ Missing | Full build — core of FIFO |
+| InventoryBatchAllocation entity | ❌ Missing | Track sale→lot consumption |
 | FIFO allocation service | ❌ Missing | Create IFifoAllocationService |
 | FEFO logic | ❌ Missing | Extend allocation for expiry-based sorting |
 | CostingMethod.FIFO = 4 | ❌ Missing | Add to enum + service |
@@ -618,136 +566,37 @@ public bool IsCurrentPrice => ToDate == null || ToDate >= DateTime.UtcNow;
 
 **Implementation approach**:
 
-```csharp
-// IFifoAllocationService.cs — Application layer
-public interface IFifoAllocationService
-{
-    // Called ON PURCHASE: Create PurchaseLot records
-    Task<Result<List<PurchaseLot>>> AddPurchaseBatchesAsync(
-        int productUnitId, int warehouseId, decimal quantity,
-        decimal unitCostBase, string? lotNumber, DateTime? expiryDate,
-        int? purchaseInvoiceId, bool isOpeningBatch, CancellationToken ct);
-
-    // Called ON SALE: Deduct from earliest batches (FIFO) or earliest expiry (FEFO)
-    Task<Result<List<PurchaseLotAllocation>>> DeductFromBatchesAsync(
-        int productId, int warehouseId, decimal quantity,
-        int? salesInvoiceItemId, bool useFefo, CancellationToken ct);
-
-    // Called ON RETURN: Add back to the original batch
-    Task<Result> ReturnToBatchAsync(
-        int allocationId, decimal quantityReturned,
-        int? salesReturnItemId, CancellationToken ct);
-
-    // Get current stock breakdown by batch
-    Task<Result<List<BatchStockInfo>>> GetBatchBreakdownAsync(
-        int productId, int warehouseId, CancellationToken ct);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **FIFO Allocation Algorithm**:
 ```
 Input: ProductId, WarehouseId, QuantityNeeded
-1. Query PurchaseLots WHERE ProductId AND WarehouseId AND Quantity > 0
+1. Query InventoryBatches WHERE ProductId AND WarehouseId AND Quantity > 0
 2. ORDER BY (useFefo ? ExpiryDate ASC : ReceivedDate ASC, Id ASC)
 3. For each lot:
    - TakeQuantity = Min(QuantityNeeded, lot.Quantity)
-   - Create PurchaseLotAllocation record
+   - Create InventoryBatchAllocation record
    - lot.Quantity -= TakeQuantity
    - QuantityNeeded -= TakeQuantity
    - If QuantityNeeded == 0: break
 4. If QuantityNeeded > 0: return error "Insufficient stock"
 ```
 
-**Costing integration**: When `CostingMethod = FIFO`, `UpdateProductPricingService` computes cost as the weighted average of all active PurchaseLots (for display). The actual COGS for each sale is the specific lot's UnitCost.
+**Costing integration**: When `CostingMethod = FIFO`, `UpdateProductPricingService` computes cost as the weighted average of all active InventoryBatches (for display). The actual COGS for each sale is the specific lot's UnitCost.
 
-### 6.2 Pricing Model — Per-Unit + Per-Currency + Price Level
+### 6.2 Pricing Model — Per-Unit + Per-Currency ONLY
 
-**Decision**: Create `ProductUnitPrice` entity as the single source of truth for all pricing.
+**Decision**: Create `ProductPrice` entity as the single source of truth for all pricing.
 
-```csharp
-// Price lookup algorithm:
-// 1. Find ProductUnitPrice WHERE ProductUnitId = X AND CurrencyId = Y AND PriceLevel = Z
-// 2. If not found and Z > 1 (Wholesale/VIP/Distributor): fallback to Retail price for that currency
-// 3. If not found for currency: fallback to base currency price with exchange rate conversion
-// 4. If still not found: price = 0 (user must enter manually in invoice)
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
-public async Task<Result<decimal>> GetEffectivePriceAsync(
-    int productUnitId, int currencyId, PriceLevel priceLevel, CancellationToken ct)
-{
-    // Exact match first
-    var exact = await _repo.FindAsync(pup => 
-        pup.ProductUnitId == productUnitId && 
-        pup.CurrencyId == currencyId && 
-        pup.PriceLevel == priceLevel &&
-        pup.IsActive);
-    if (exact != null) return Result<decimal>.Success(exact.Price);
-
-    // Fallback to Retail price for this currency
-    if (priceLevel != PriceLevel.Retail)
-    {
-        var retail = await _repo.FindAsync(pup =>
-            pup.ProductUnitId == productUnitId &&
-            pup.CurrencyId == currencyId &&
-            pup.PriceLevel == PriceLevel.Retail &&
-            pup.IsActive);
-        if (retail != null) return Result<decimal>.Success(retail.Price);
-    }
-
-    // Fallback: convert from base currency
-    // ... exchange rate conversion logic ...
-    return Result<decimal>.Failure("لا يوجد سعر محدد لهذه التركيبة", "PRICE_NOT_FOUND");
-}
-```
-
-**Price history**: Every create/update/delete of `ProductUnitPrice` records a `ProductPriceHistory` entry with CurrencyId + PriceLevel.
+**Price history**: Every create/update/delete of `ProductPrice` records a `ProductPriceHistory` entry with CurrencyId.
 
 ### 6.3 Batch Allocation Algorithm — FIFO vs FEFO
 
 **Decision**: Always use FIFO. Use FEFO only when the product has `HasExpiry = true`.
 
-```csharp
-public async Task<Result<List<PurchaseLotAllocation>>> DeductFromBatchesAsync(
-    int productId, int warehouseId, decimal quantityNeeded,
-    int? salesInvoiceItemId, CancellationToken ct)
-{
-    var product = await _uow.Products.GetByIdAsync(productId, ct);
-    if (product == null) return Result<List<PurchaseLotAllocation>>.Failure("المنتج غير موجود");
-
-    var useFefo = product.HasExpiry;
-
-    var availableLots = await _uow.PurchaseLots.FindAllAsync(l =>
-        l.ProductId == productId &&
-        l.WarehouseId == warehouseId &&
-        l.Quantity > 0 &&
-        l.IsActive);
-
-    // Sort: FEFO if has expiry, otherwise FIFO
-    var sortedLots = useFefo
-        ? availableLots.OrderBy(l => l.ExpiryDate ?? DateTime.MaxValue).ThenBy(l => l.Id)
-        : availableLots.OrderBy(l => l.ReceivedDate).ThenBy(l => l.Id);
-
-    var allocations = new List<PurchaseLotAllocation>();
-    var remaining = quantityNeeded;
-
-    foreach (var lot in sortedLots)
-    {
-        if (remaining <= 0) break;
-
-        var takeQuantity = Math.Min(remaining, lot.Quantity);
-        var allocation = PurchaseLotAllocation.Create(
-            lot.Id, salesInvoiceItemId, takeQuantity, lot.UnitCost);
-        lot.DeductQuantity(takeQuantity);
-
-        allocations.Add(allocation);
-        remaining -= takeQuantity;
-    }
-
-    if (remaining > 0)
-        return Result<List<PurchaseLotAllocation>>.Failure("الكمية المتاحة في المخزون غير كافية");
-
-    return Result<List<PurchaseLotAllocation>>.Success(allocations);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns. Note: `InventoryBatches` is named `InventoryBatches` in the final schema — see `docs/database-schema.md`.
 
 ### 6.4 Assembly/BOM Structure
 
@@ -770,14 +619,14 @@ public async Task<Result<List<PurchaseLotAllocation>>> DeductFromBatchesAsync(
 
 This is enforced in `Product.ValidateUnits()` and checked at save time.
 
-### 6.6 Barcode Strategy — Unit-Level Only
+### 6.6 Barcode Strategy — One Barcode Per Product
 
-**Decision**: Per Analysis Part 3, barcode belongs to the **unit**, not the product. The existing `ProductBarcode` entity is deprecated. All new barcode creation uses `UnitBarcode`.
+**Decision**: Per final revisions in Analysis Part 3, the barcode belongs to the **product**, not the unit. There is exactly ONE main barcode per product in V1. When scanning the barcode, the POS selects the product, and the user selects the specific unit from a dropdown.
 
-**Auto-generation**: When creating a unit without a barcode, generate one:
-- Format: `29` + `ProductUnitId.ToString("D10")` (e.g., `290000000125`)
-- Starting at `290000000001`
-- Adding a check digit is deferred to V2 unless specifically requested
+**Implementation**: 
+- Add `public string? Barcode { get; private set; }` to the `Product` entity.
+- Deprecate `ProductBarcode` and `UnitBarcode` entities.
+- Ensure the `Barcode` column has a unique index in the database.
 
 ### 6.7 Min Stock Alert — Background Service
 
@@ -785,40 +634,7 @@ This is enforced in `Product.ValidateUnits()` and checked at save time.
 
 **Alert delivery**: Via `EventBus` → `LowStockAlertMessage` → Desktop notification through `IToastNotificationService`.
 
-```csharp
-public class MinStockAlertWorker : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            await Task.Delay(TimeSpan.FromHours(6), stoppingToken);
-            await CheckLowStockAsync(stoppingToken);
-        }
-    }
-
-    private async Task CheckLowStockAsync(CancellationToken ct)
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-        var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
-
-        var lowStockItems = await uow.WarehouseStocks.FindAllAsync(
-            ws => ws.Quantity <= ws.Product.MinStockLevel &&
-                  ws.Product.IsActive &&
-                  ws.Warehouse.IsActive &&
-                  ws.Quantity > 0, // Only items that HAVE stock but below threshold
-            ct, "Product", "Warehouse");
-
-        foreach (var item in lowStockItems)
-        {
-            eventBus.Publish(new LowStockAlertMessage(
-                item.ProductId, item.Product.Name, item.Warehouse.Name,
-                item.Quantity, item.Product.MinStockLevel));
-        }
-    }
-}
-```
+> See `docs/AGENTS.md` for BackgroundService patterns and `docs/AGENTS.md` §2.15 for Serilog logging conventions.
 
 ### 6.8 Product Code — Design Decision (RULE-191 vs Analysis)
 
@@ -852,7 +668,7 @@ These features appeared in Analysis Parts 1–5 but are deferred to future versi
 | **Barcode Printing** (label generation + print) | Requires label designer — V2 |
 | **Serial Number Tracking** (per-unit serial tracking) | Requires SerialNumber entity + tracking engine — V2 |
 | **Composite Products** (multi-level BOM) | Nested assemblies add complexity — V2 |
-| **Stock Transfer Orders** (between warehouses) | Already planned as separate module |
+| **Warehouse Transfer Orders** (between warehouses) | Already planned as separate module |
 | **Physical Inventory (Stocktake)** | Separate module — V2 |
 | **Purchase Request** (internal request before purchase) | Analysis says defer to V2 |
 | **Sales Quotation** (offer before invoice) | Analysis says defer to V2 |
@@ -893,17 +709,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 | `Infrastructure/Data/DbSeeder.cs` | Add unit templates (not stored as rows, used for UI suggestions) |
 
 **Seed block**:
-```csharp
-// ═══════════════════════════════════════════
-// Seed Default Categories
-// ═══════════════════════════════════════════
-if (!await db.Set<Category>().AnyAsync())
-{
-    var general = Category.Create("عام", "التصنيف الافتراضي لجميع المنتجات");
-    db.Set<Category>().Add(general);
-    logger?.LogInformation("Seeded default category 'عام'.");
-}
-```
+> See `Infrastructure/Data/Seeders/DbSeeder.cs` for existing seed patterns.
 
 **Default unit templates** (stored as `SystemSetting` or constant list):
 | Unit Name (Arabic) | Type | Conversion Factor |
@@ -922,96 +728,23 @@ These are NOT stored as database rows — they are displayed as suggestions in t
 
 ---
 
-### Task 2 — Create PurchaseLot Entity + Configuration + Migration
+### Task 2 — Create InventoryBatch Entity + Configuration + Migration
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Domain/Entities/PurchaseLot.cs` | NEW — full entity with guard clauses |
-| `Domain/Entities/PurchaseLotAllocation.cs` | NEW — allocation tracking |
-| `Infrastructure/Data/Configurations/PurchaseLotConfiguration.cs` | NEW — Fluent API config |
-| `Infrastructure/Data/Configurations/PurchaseLotAllocationConfiguration.cs` | NEW — Fluent API config |
+| `Domain/Entities/InventoryBatch.cs` | NEW — full entity with guard clauses |
+| `Domain/Entities/InventoryBatchAllocation.cs` | NEW — allocation tracking |
+| `Infrastructure/Data/Configurations/InventoryBatchConfiguration.cs` | NEW — Fluent API config |
+| `Infrastructure/Data/Configurations/InventoryBatchAllocationConfiguration.cs` | NEW — Fluent API config |
 | `Infrastructure/Data/Migrations/` | NEW migration: 2 new tables |
 
-**PurchaseLot entity pattern**:
-```csharp
-public class PurchaseLot : BaseEntity
-{
-    public int ProductId { get; private set; }
-    public int ProductUnitId { get; private set; }
-    public int WarehouseId { get; private set; }
-    public string LotNumber { get; private set; } = string.Empty;
-    public decimal Quantity { get; private set; }       // Remaining quantity
-    public decimal OriginalQuantity { get; private set; } // Original quantity
-    public decimal UnitCost { get; private set; }       // In base currency
-    public DateTime? ExpiryDate { get; private set; }
-    public DateTime ReceivedDate { get; private set; }
-    public int? PurchaseInvoiceId { get; private set; }
-    public bool IsOpeningBatch { get; private set; }
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for the canonical `InventoryBatches` table definition. Note: Named `InventoryBatches` in the final schema (not `InventoryBatches`).
 
-    private PurchaseLot() { }
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions (all FKs use `DeleteBehavior.Restrict`, explicit precision on decimals, CHECK constraints).
 
-    public static PurchaseLot Create(...)
-    {
-        // Guard clauses
-        if (quantity <= 0) throw new DomainException("الكمية يجب أن تكون أكبر من الصفر");
-        if (unitCost <= 0) throw new DomainException("التكلفة يجب أن تكون أكبر من الصفر");
-        // ...
-    }
-
-    public void DeductQuantity(decimal qty)
-    {
-        if (qty <= 0) throw new DomainException("الكمية المراد خصمها يجب أن تكون أكبر من الصفر");
-        if (qty > Quantity) throw new DomainException("الكمية المطلوبة أكبر من المتاحة في الدفعة");
-        Quantity -= qty;
-        UpdateTimestamp();
-    }
-
-    public void AddReturnQuantity(decimal qty)
-    {
-        if (qty <= 0) throw new DomainException("الكمية المراد إرجاعها يجب أن تكون أكبر من الصفر");
-        if (Quantity + qty > OriginalQuantity)
-            throw new DomainException("لا يمكن إرجاع كمية أكبر من الكمية الأصلية للدفعة");
-        Quantity += qty;
-        UpdateTimestamp();
-    }
-}
-```
-
-**PurchaseLotConfiguration**:
-```csharp
-builder.ToTable("PurchaseLots");
-builder.Property(l => l.LotNumber).IsRequired().HasMaxLength(50);
-builder.Property(l => l.Quantity).HasPrecision(18, 3);
-builder.Property(l => l.OriginalQuantity).HasPrecision(18, 3);
-builder.Property(l => l.UnitCost).HasPrecision(18, 2);
-builder.Property(l => l.ReceivedDate).IsRequired();
-builder.ToTable(t => t.HasCheckConstraint("CHK_PurchaseLots_Quantity_NonNegative", "[Quantity] >= 0"));
-builder.HasOne(l => l.Product).WithMany().HasForeignKey(l => l.ProductId).OnDelete(DeleteBehavior.Restrict);
-builder.HasOne(l => l.Warehouse).WithMany().HasForeignKey(l => l.WarehouseId).OnDelete(DeleteBehavior.Restrict);
-```
-
-**Migration SQL** (generated by EF Core):
-```sql
-CREATE TABLE PurchaseLots (
-    Id int IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    ProductId int NOT NULL,
-    ProductUnitId int NOT NULL,
-    WarehouseId int NOT NULL,
-    LotNumber nvarchar(50) NOT NULL,
-    Quantity decimal(18,3) NOT NULL,
-    OriginalQuantity decimal(18,3) NOT NULL,
-    UnitCost decimal(18,2) NOT NULL,
-    ExpiryDate datetime2 NULL,
-    ReceivedDate datetime2 NOT NULL DEFAULT GETUTCDATE(),
-    PurchaseInvoiceId int NULL,
-    IsOpeningBatch bit NOT NULL DEFAULT 0,
-    IsActive bit NOT NULL DEFAULT 1,
-    -- Audit fields...
-);
-ALTER TABLE PurchaseLots ADD CONSTRAINT CHK_PurchaseLots_Quantity_NonNegative CHECK (Quantity >= 0);
-```
+> See `docs/database-schema.md` for the canonical DDL definitions. Note: Named `InventoryBatches` in the final schema.
 
 **Estimate**: ~3 hours
 
@@ -1025,41 +758,18 @@ ALTER TABLE PurchaseLots ADD CONSTRAINT CHK_PurchaseLots_Quantity_NonNegative CH
 |------|--------|
 | `Application/Interfaces/Services/IFifoAllocationService.cs` | NEW — interface with 5 methods |
 | `Application/Services/FifoAllocationService.cs` | NEW — implementation |
-| `Contracts/Common/AllDtos.cs` | Add `BatchStockInfoDto`, `PurchaseLotDto` |
+| `Contracts/Common/AllDtos.cs` | Add `BatchStockInfoDto`, `InventoryBatchDto` |
 
-**IFifoAllocationService Interface**:
-```csharp
-public interface IFifoAllocationService
-{
-    Task<Result<List<PurchaseLot>>> AddPurchaseBatchesAsync(
-        int productUnitId, int warehouseId, decimal quantity,
-        decimal unitCostBase, string? lotNumber, DateTime? expiryDate,
-        int? purchaseInvoiceId, bool isOpeningBatch, CancellationToken ct);
-
-    Task<Result<List<PurchaseLotAllocation>>> DeductFromBatchesAsync(
-        int productId, int warehouseId, decimal quantityNeeded,
-        int? salesInvoiceItemId, CancellationToken ct);
-
-    Task<Result> ReturnToBatchAsync(
-        int allocationId, decimal quantityReturned,
-        int? salesReturnItemId, CancellationToken ct);
-
-    Task<Result<List<BatchStockInfo>>> GetBatchBreakdownAsync(
-        int productId, int warehouseId, CancellationToken ct);
-
-    Task<Result<decimal>> GetCurrentStockCostAsync(
-        int productId, int warehouseId, CancellationToken ct);
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Key implementation details**:
-- `AddPurchaseBatchesAsync`: Converts quantity to base unit first → creates PurchaseLot
+- `AddPurchaseBatchesAsync`: Converts quantity to base unit first → creates InventoryBatch
 - `DeductFromBatchesAsync`: FEFO if product.HasExpiry, otherwise FIFO
 - Batch operations inside transactions (RULE-003)
 - Every allocation = `InventoryMovement` record (RULE-029)
 
 **Logging** (RULE-035):
-- `Log.Information("PurchaseLot {LotNumber} created: Product {ProductId}, Qty {Qty}, Cost {Cost}", ...)`
+- `Log.Information("InventoryBatch {LotNumber} created: Product {ProductId}, Qty {Qty}, Cost {Cost}", ...)`
 - `Log.Information("FIFO allocation: {Qty} units from Lot {LotId} to InvoiceItem {ItemId}", ...)`
 
 **Estimate**: ~4 hours
@@ -1075,82 +785,49 @@ public interface IFifoAllocationService
 | `Application/Services/UpdateProductPricingService.cs` | Add FIFO costing method handler |
 | `Domain/Enums/CostingMethod.cs` | Add `FIFO = 4` |
 
-**New logic in UpdateFromPurchaseAsync**:
-```csharp
-// After existing WA/LPP/SP logic:
-if (costingMethod == CostingMethod.FIFO)
-{
-    // Create PurchaseLot via IFifoAllocationService
-    var batchResult = await _fifoService.AddPurchaseBatchesAsync(
-        request.ProductUnitId,
-        request.WarehouseId,
-        request.NewQuantityPurchased,
-        newBaseUnitCost, // Already converted to base currency
-        request.LotNumber,
-        request.ExpiryDate,
-        request.PurchaseInvoiceId,
-        isOpeningBatch: false,
-        ct);
-
-    if (!batchResult.IsSuccess)
-        return Result.Failure(batchResult.Error!);
-
-    // Update the unit's LastPurchasePrice for display
-    purchasedUnit.UpdatePurchaseCost(newBaseUnitCost);
-    
-    // Record history
-    _priceHistoryService.RecordCostChange(/*...*/);
-    
-    return Result.Success();
-}
-```
+> See `UpdateProductPricingService` in `Application/Services/` for the existing WA/LPP/SP logic patterns. FIFO handler calls `IFifoAllocationService.AddPurchaseBatchesAsync()` then records cost change via `ProductPriceHistory`.
 
 **Note**: When FIFO is selected:
-- `AvgCost` on Product = calculated from active PurchaseLots (weighted average of remaining quantities)
+- `AvgCost` on Product = calculated from active InventoryBatches (weighted average of remaining quantities)
 - Actual sale COGS = specific lot's UnitCost (not computed average)
 
 **Estimate**: ~2 hours
 
 ---
 
-### Task 5 — Create ProductUnitPrice Entity + Pricing Service
+### Task 5 — Create ProductPrice Entity + Pricing Service
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Domain/Entities/ProductUnitPrice.cs` | NEW — per-unit, per-currency, per-level pricing |
-| `Domain/Enums/PriceLevel.cs` | NEW — enum (Retail=1, Wholesale=2, VIP=3, Distributor=4) |
-| `Infrastructure/Data/Configurations/ProductUnitPriceConfiguration.cs` | NEW — Fluent API config |
-| `Application/Interfaces/Services/IProductUnitPriceService.cs` | NEW — interface |
-| `Application/Services/ProductUnitPriceService.cs` | NEW — implementation with price lookup + history |
+| `Domain/Entities/ProductPrice.cs` | NEW — per-unit, per-currency, per-level pricing |
+| `Domain/Enums/PriceLevel.cs` | 🔴 NOT in V1 — pricing is per (ProductUnit × CurrencyId) only; no Retail/Wholesale levels |
+| `Infrastructure/Data/Configurations/ProductPriceConfiguration.cs` | NEW — Fluent API config |
+| `Application/Interfaces/Services/IProductPriceService.cs` | NEW — interface |
+| `Application/Services/ProductPriceService.cs` | NEW — implementation with price lookup + history |
 | `Infrastructure/Data/Migrations/` | NEW migration |
-| `Contracts/DTOs/AllDtos.cs` | Add `ProductUnitPriceDto` |
-| `Contracts/Requests/ProductRequests.cs` | Add `CreateProductUnitPriceRequest`, `UpdateProductUnitPriceRequest` |
+| `Contracts/DTOs/AllDtos.cs` | Add `ProductPriceDto` |
+| `Contracts/Requests/ProductRequests.cs` | Add `CreateProductPriceRequest`, `UpdateProductPriceRequest` |
 
-**ProductUnitPriceService methods**:
-```csharp
-Task<Result<ProductUnitPriceDto>> SetPriceAsync(
-    int productUnitId, int currencyId, PriceLevel priceLevel,
-    decimal price, int changedByUserId, CancellationToken ct);
+> See `IProductPriceService` in `Application/Interfaces/Services/` for the full interface definition.
 
-Task<Result<ProductUnitPriceDto>> UpdatePriceAsync(
+Task<Result<ProductPriceDto>> UpdatePriceAsync(
     int id, decimal newPrice, int changedByUserId, CancellationToken ct);
 
-Task<Result<List<ProductUnitPriceDto>>> GetPricesForUnitAsync(
+Task<Result<List<ProductPriceDto>>> GetPricesForUnitAsync(
     int productUnitId, CancellationToken ct);
 
 Task<Result<decimal>> GetEffectivePriceAsync(
-    int productUnitId, int currencyId, PriceLevel priceLevel, CancellationToken ct);
+    int productUnitId, int currencyId, CancellationToken ct);
 
 Task<Result> DeletePriceAsync(int id, CancellationToken ct);
 ```
 
 **GetEffectivePriceAsync algorithm** (fallback chain):
-1. Exact match: ProductUnitId + CurrencyId + PriceLevel
-2. Fallback to Retail price for same unit + currency
-3. Fallback to base currency price (converted via exchange rate)
-4. Return 0 if nothing found (user enters manually)
+1. Exact match: ProductUnitId + CurrencyId
+2. Fallback to base currency price (converted via exchange rate)
+3. Return 0 if nothing found (user enters manually)
 
 **Estimate**: ~3 hours
 
@@ -1169,26 +846,7 @@ Task<Result> DeletePriceAsync(int id, CancellationToken ct);
 | `Infrastructure/Data/Migrations/` | NEW migration |
 | `Contracts/DTOs/AllDtos.cs` | Add `ProductImageDto` |
 
-**ProductImage entity**:
-```csharp
-public class ProductImage : BaseEntity
-{
-    public int ProductId { get; private set; }
-    public string ImagePath { get; private set; } = string.Empty;
-    public bool IsPrimary { get; private set; }
-    public int SortOrder { get; private set; }
-
-    public static ProductImage Create(int productId, string imagePath, bool isPrimary = false, int sortOrder = 0)
-    {
-        if (string.IsNullOrWhiteSpace(imagePath))
-            throw new DomainException("مسار الصورة مطلوب");
-        return new ProductImage { ProductId = productId, ImagePath = imagePath, IsPrimary = isPrimary, SortOrder = sortOrder };
-    }
-
-    public void SetPrimary() => IsPrimary = true;
-    public void UnsetPrimary() => IsPrimary = false;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
 
 **Image storage**: Files saved to `%AppData%/SalesSystem/ProductImages/{ProductId}/` with GUID-based filenames.
 
@@ -1207,19 +865,7 @@ public class ProductImage : BaseEntity
 | `Application/Interfaces/Services/IAssemblyService.cs` | NEW — interface |
 | `Application/Services/AssemblyService.cs` | NEW — BOM CRUD + production logic |
 
-**BillOfMaterials entity**:
-```csharp
-public class BillOfMaterials : BaseEntity
-{
-    public int AssemblyProductId { get; private set; }  // The finished good
-    public int ComponentProductId { get; private set; } // The raw material
-    public int ComponentUnitId { get; private set; }    // Unit of component
-    public decimal QuantityRequired { get; private set; } // How many units per assembly
-    public decimal WastePercentage { get; private set; }  // e.g., 5% waste
-
-    // Unique: one component can only appear once per assembly
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
 
 **AssemblyService.ProduceAsync**: Transactional — deduct components, add assembly product, record history.
 
@@ -1235,15 +881,7 @@ public class BillOfMaterials : BaseEntity
 |------|--------|
 | `Domain/Enums/CostingMethod.cs` | Add `FIFO = 4` |
 
-```csharp
-public enum CostingMethod : byte
-{
-    WeightedAverage = 1,
-    LastPurchasePrice = 2,
-    SupplierPrice = 3,
-    FIFO = 4  // NEW
-}
-```
+> See `Domain/Enums/` for enum definitions and `docs/AGENTS.md` §3 for canonical enum values.
 
 **Also ensure**: `SystemSettingsRepository.GetCostingMethodAsync()` handles value 4 safely. `SettingsViewModel` RadioButton for FIFO option.
 
@@ -1265,18 +903,7 @@ public enum CostingMethod : byte
 | `Infrastructure/Data/Migrations/` | NEW migration: ADD columns |
 | All services/DTOs that reference legacy fields | Update mappings |
 
-**New Product.Create signature**:
-```csharp
-public static Product Create(
-    string name,
-    int? categoryId = null,
-    decimal minStockLevel = 0,
-    decimal reorderLevel = 0,
-    string? description = null,
-    bool hasExpiry = false,
-    bool trackBatches = true,
-    int? createdByUserId = null)
-```
+> See `Domain/Entities/Product.cs` for the canonical Product.Create() signature and `docs/AGENTS.md` for domain factory method patterns.
 
 **Estimate**: ~2 hours
 
@@ -1292,8 +919,8 @@ public static Product Create(
 | `ProductUnit.CreateBaseUnit()` | Remove `salesPrice` param |
 | `ProductUnit.CreateDerivedUnit()` | Remove `salesPrice`, `wholesalePrice` params |
 | `ProductUnit.UpdatePurchaseCost()` | Keep — cost still relevant |
-| `ProductUnit.UpdateSalesPrice()` | **REMOVE** — pricing via ProductUnitPriceService |
-| `ProductUnit.GetPriceByUnit()` | **REMOVE** — use ProductUnitPriceService |
+| `ProductUnit.UpdateSalesPrice()` | **REMOVE** — pricing via ProductPriceService |
+| `ProductUnit.GetPriceByUnit()` | **REMOVE** — use ProductPriceService |
 
 **Estimate**: ~1 hour
 
@@ -1315,23 +942,10 @@ public static Product Create(
 | 📐 **Units** | ProductUnitBuilder (base unit + derived units with conversion factors) |
 | 💰 **Pricing** | Per-unit, per-currency, per-price-level grid |
 | 🖼️ **Images** | Product image gallery (upload, set primary, reorder) |
-| 📦 **Batches** | PurchaseLot breakdown (read-only list) |
+| 📦 **Batches** | InventoryBatch breakdown (read-only list) |
 | 📈 **History** | ProductPriceHistory (read-only list) |
 
-**Properties to add**:
-```csharp
-public string? Name { get; set; }
-public int? CategoryId { get; set; }
-public string? Description { get; set; }
-public bool HasExpiry { get; set; }
-public bool TrackBatches { get; set; } // Always true, disabled
-public decimal MinStockLevel { get; set; }
-public decimal ReorderLevel { get; set; }
-public ObservableCollection<ProductUnitRowViewModel> Units { get; }
-public ObservableCollection<ProductUnitPriceDto> Prices { get; }
-public ObservableCollection<ProductImageDto> Images { get; }
-public string? NewBarcode { get; set; }
-```
+> See `docs/AGENTS.md` for ViewModelBase patterns (INotifyDataErrorInfo, ExecuteAsync, properties with SetProperty).
 
 **INotifyDataErrorInfo validation** (RULE-228):
 - Name required (max 150)
@@ -1339,27 +953,7 @@ public string? NewBarcode { get; set; }
 - BaseConversionFactor > 1 for derived units
 - MinStockLevel >= 0
 
-**Interactive Validation** (RULE-059): Save always enabled, validate on click:
-```csharp
-private bool Validate()
-{
-    var errors = new List<string>();
-    if (string.IsNullOrWhiteSpace(Name))
-        errors.Add("• اسم المنتج مطلوب");
-    if (!Units.Any(u => u.IsBaseUnit))
-        errors.Add("• يجب إضافة وحدة أساسية واحدة على الأقل");
-    if (!Units.Any(u => !u.IsBaseUnit && u.ConversionFactor > 1))
-        errors.Add("• يجب إضافة وحدة إضافية واحدة على الأقل (مثل كرتون)");
-    
-    if (errors.Any())
-    {
-        _ = _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-        RequestFocusFirstInvalidField();
-        return false;
-    }
-    return true;
-}
-```
+> See `docs/AGENTS.md` §2.23 for Interactive Validation pattern (RULE-059) — buttons always enabled, Validate() on click with styled warning dialog.
 
 **Estimate**: ~6 hours (largest single task)
 
@@ -1367,13 +961,13 @@ private bool Validate()
 
 ### Task 11.1 — Add Opening Stock Section to Product Creation Flow
 
-**Problem**: Analysis Part 3 (lines 1663-1695) requires that when creating a new product, users can enter an opening quantity to create the initial stock balance immediately. This must create a `PurchaseLot` with `IsOpeningBatch = true` and an `InventoryMovement` record.
+**Problem**: Analysis Part 3 (lines 1663-1695) requires that when creating a new product, users can enter an opening quantity to create the initial stock balance immediately. This must create a `InventoryBatch` with `IsOpeningBatch = true` and an `InventoryMovement` record.
 
 **Design**:
 - Add an "Opening Stock" expandable section to the Product Editor (Tab 1: Basic Info or a dedicated area)
 - Fields: Warehouse (dropdown), Quantity (decimal(18,3)), Unit Cost (decimal(18,2)), Expiry Date (if HasExpiry)
 - Optional: user can skip and add stock later
-- On save: create `PurchaseLot` with `IsOpeningBatch = true` + `InventoryMovement`
+- On save: create `InventoryBatch` with `IsOpeningBatch = true` + `InventoryMovement`
 
 **Files**:
 
@@ -1385,192 +979,19 @@ private bool Validate()
 | `Contracts/DTOs/AllDtos.cs` | Add `OpeningStockDto` for the UI binding |
 | `Contracts/Requests/ProductRequests.cs` | Add optional `OpeningStock` to `CreateProductRequest` |
 
-**ViewModel properties**:
-```csharp
-private bool _hasOpeningStock;
-private int? _openingWarehouseId;
-private decimal _openingQuantity;
-private decimal _openingUnitCost;
-private DateTime? _openingExpiryDate;
-private ObservableCollection<WarehouseDto> _warehouses = new();
+> See `docs/AGENTS.md` for ViewModelBase patterns and `docs/AGENTS.md` §2.23 for Interactive Validation.
 
-// Properties with INotifyDataErrorInfo validation:
-public bool HasOpeningStock { get; set; ... }
-public int? OpeningWarehouseId { get; set; ... }  // Required if HasOpeningStock
-public decimal OpeningQuantity { get; set; ... }    // > 0 if HasOpeningStock
-public decimal OpeningUnitCost { get; set; ... }    // >= 0 if HasOpeningStock
-public DateTime? OpeningExpiryDate { get; set; ... } // Only if HasExpiry
-public ObservableCollection<WarehouseDto> Warehouses { get; set; }
+> See `Contracts/DTOs/` for DTO/record patterns.
 
-// Load warehouses in constructor:
-_ = LoadWarehousesAsync();
-```
+> See `Contracts/Requests/` for Request/record patterns.
 
-**OpeningStockDto**:
-```csharp
-public record OpeningStockDto(
-    int? WarehouseId,
-    decimal Quantity,
-    decimal UnitCost,
-    DateTime? ExpiryDate
-);
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern, `docs/AGENTS.md` for service layer patterns, and `docs/AGENTS.md` §2.15 for Serilog logging conventions.
 
-**Update CreateProductRequest**:
-```csharp
-public record CreateProductRequest(
-    string Name,
-    int? CategoryId,
-    string? Description,
-    bool HasExpiry,
-    decimal MinStockLevel,
-    decimal ReorderLevel,
-    OpeningStockDto? OpeningStock = null,  // NEW — optional
-    List<CreateProductUnitDto> Units,
-    List<CreateProductUnitPriceDto>? Prices = null
-);
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
-**Service method — CreateOpeningStockBatchAsync()**:
-```csharp
-public async Task<Result<PurchaseLot>> CreateOpeningStockBatchAsync(
-    Product product, int productUnitId, OpeningStockDto dto, int? createdByUserId, CancellationToken ct)
-{
-    // Validate warehouse exists
-    var warehouse = await _uow.Warehouses.GetByIdAsync(dto.WarehouseId!.Value, ct);
-    if (warehouse == null)
-        return Result<PurchaseLot>.Failure("المستودع غير موجود", ErrorCodes.NotFound);
+> See XAML patterns in existing views at `DesktopPWF/Views/` for control styling and layout conventions.
 
-    // Generate lot number for opening batch
-    var lotNumber = $"OPN-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
-
-    var purchaseLot = PurchaseLot.Create(
-        productId: product.Id,
-        productUnitId: productUnitId,
-        warehouseId: dto.WarehouseId.Value,
-        lotNumber: lotNumber,
-        quantity: dto.Quantity,
-        unitCost: dto.UnitCost,
-        expiryDate: dto.ExpiryDate,
-        receivedDate: DateTime.UtcNow,
-        purchaseInvoiceId: null,
-        isOpeningBatch: true,
-        createdByUserId: createdByUserId
-    );
-
-    await _uow.PurchaseLots.AddAsync(purchaseLot, ct);
-
-    // Record inventory movement
-    var movement = InventoryMovement.Create(
-        productId: product.Id,
-        warehouseId: dto.WarehouseId.Value,
-        movementType: MovementType.PurchaseIn,  // Opening = initial stock-in
-        quantityChange: dto.Quantity,
-        quantityBefore: 0m,
-        quantityAfter: dto.Quantity,
-        referenceType: "Product",
-        referenceId: product.Id,
-        description: $"رصيد افتتاحي للمنتج: {product.Name}",
-        createdByUserId: createdByUserId
-    );
-
-    await _uow.InventoryMovements.AddAsync(movement, ct);
-
-    // Update warehouse stock
-    var stock = await _uow.WarehouseStocks.GetAsync(product.Id, dto.WarehouseId.Value, ct)
-                ?? WarehouseStock.Create(product.Id, dto.WarehouseId.Value, 0m);
-    stock.AddStock(dto.Quantity);
-    if (stock.Id == 0)
-        await _uow.WarehouseStocks.AddAsync(stock, ct);
-
-    _logger.LogInformation(
-        "Opening stock batch created for Product {ProductId}: Lot={LotNumber}, Qty={Qty}, Cost={Cost}, Warehouse={WarehouseId}",
-        product.Id, lotNumber, dto.Quantity, dto.UnitCost, dto.WarehouseId);
-
-    return Result<PurchaseLot>.Success(purchaseLot);
-}
-```
-
-**Integration into ProductService.CreateAsync()**:
-```csharp
-// After product + units are saved and have IDs:
-if (request.OpeningStock?.WarehouseId.HasValue == true && request.OpeningStock.Quantity > 0)
-{
-    var baseUnit = product.GetBaseUnit();
-    var batchResult = await CreateOpeningStockBatchAsync(
-        product,
-        baseUnit.Id,
-        request.OpeningStock,
-        request.CreatedByUserId,
-        ct);
-    if (!batchResult.IsSuccess)
-        return Result<ProductDto>.Failure(batchResult.Error!);
-}
-```
-
-**XAML section — Opening Stock (expandable, placed after basic info)**:
-```xml
-<!-- Opening Stock Section -->
-<Expander Header="📦 رصيد افتتاحي (اختياري)" 
-          IsExpanded="{Binding HasOpeningStock}"
-          Margin="0,8,0,0"
-          ToolTip="إدخال الكمية الافتتاحية للمنتج — يمكن تخطي هذه الخطوة وإضافة المخزون لاحقاً">
-    <StackPanel Margin="0,6,0,0">
-        <TextBlock Text="أدخل الرصيد الافتتاحي للمنتج — سيتم إنشاء دفعة مخزون أولية"
-                   Style="{StaticResource HelperTextStyle}" Margin="0,0,0,6"/>
-
-        <TextBlock Text="المستودع *" Style="{StaticResource LabelStyle}"/>
-        <ComboBox ItemsSource="{Binding Warehouses}" 
-                  SelectedValue="{Binding OpeningWarehouseId}"
-                  DisplayMemberPath="Name" SelectedValuePath="Id"
-                  Style="{StaticResource ModernComboBox}" Margin="0,0,0,6"
-                  ToolTip="اختر المستودع الذي سيتم إضافة الرصيد الافتتاحي إليه"/>
-
-        <Grid Margin="0,0,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                <TextBlock Text="الكمية *" Style="{StaticResource LabelStyle}"/>
-                <TextBox Text="{Binding OpeningQuantity, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource ModernTextBox}"
-                         ToolTip="الكمية الافتتاحية للمنتج في المخزون"/>
-            </StackPanel>
-            <StackPanel Grid.Column="1" Margin="4,0,0,0">
-                <TextBlock Text="تكلفة الوحدة *" Style="{StaticResource LabelStyle}"/>
-                <TextBox Text="{Binding OpeningUnitCost, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource ModernTextBox}"
-                         ToolTip="تكلفة شراء الوحدة — ستُستخدم لحساب متوسط التكلفة"/>
-            </StackPanel>
-        </Grid>
-
-        <!-- Expiry Date (only if HasExpiry is true) -->
-        <StackPanel Visibility="{Binding HasExpiry, Converter={StaticResource BoolToVisibility}}"
-                    Margin="0,6,0,0">
-            <TextBlock Text="تاريخ انتهاء الصلاحية" Style="{StaticResource LabelStyle}"/>
-            <DatePicker SelectedDate="{Binding OpeningExpiryDate}"
-                        Style="{StaticResource ModernDatePicker}"
-                        ToolTip="اختر تاريخ انتهاء الصلاحية للدفعة الافتتاحية"/>
-        </StackPanel>
-    </StackPanel>
-</Expander>
-```
-
-**Validation in ViewModel.Validate()**:
-```csharp
-if (HasOpeningStock)
-{
-    if (!OpeningWarehouseId.HasValue)
-        errors.Add("• المستودع مطلوب للرصيد الافتتاحي");
-    if (OpeningQuantity <= 0)
-        errors.Add("• الكمية الافتتاحية يجب أن تكون أكبر من صفر");
-    if (OpeningUnitCost < 0)
-        errors.Add("• تكلفة الوحدة لا يمكن أن تكون سالبة");
-    if (HasExpiry && !OpeningExpiryDate.HasValue && OpeningQuantity > 0)
-        errors.Add("• تاريخ انتهاء الصلاحية مطلوب للمنتجات ذات تاريخ انتهاء");
-}
-```
+> See `docs/AGENTS.md` §2.23 for Interactive Validation pattern (RULE-059).
 
 **Logging**:
 - `Log.Information("Opening stock batch created for Product {ProductId}: Qty={Qty}, Cost={Cost}, Warehouse={WarehouseId}", ...)`
@@ -1595,113 +1016,7 @@ if (HasOpeningStock)
 | `Views/Products/ProductEditorView.xaml` | Rewrite with tab control, compact styles |
 | `Views/Products/ProductEditorView.xaml.cs` | Minimal changes |
 
-**XAML structure**:
-```xml
-<!-- ProductEditorView.xaml — Tab-based layout -->
-<Grid Margin="10">
-    <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="*"/>
-        <RowDefinition Height="Auto"/>
-    </Grid.RowDefinitions>
-
-    <!-- Header -->
-    <Border Background="{StaticResource PrimaryBrush}" Padding="12,6">
-        <TextBlock Text="{Binding HeaderText}" FontSize="14" FontWeight="Bold" Foreground="White"/>
-    </Border>
-
-    <!-- Error message bar -->
-    <Border Grid.Row="1" Background="#FFE0E0" Padding="8,4" 
-            Visibility="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyToVisibility}}">
-        <TextBlock Text="{Binding ErrorMessage}" Foreground="#C62828" FontSize="12"/>
-    </Border>
-
-    <!-- Tab Control -->
-    <TabControl Grid.Row="2" Margin="0,8,0,0">
-        <!-- Tab 1: Basic Info -->
-        <TabItem Header="📋 معلومات أساسية">
-            <ScrollViewer>
-                <StackPanel Margin="0,6,0,0">
-                    <TextBlock Text="اسم المنتج *" Style="{StaticResource LabelStyle}"/>
-                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="أدخل اسم المنتج — هذا الحقل إلزامي"
-                             Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
-                    
-                    <TextBlock Text="التصنيف" Style="{StaticResource LabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding Categories}" 
-                              SelectedValue="{Binding CategoryId}"
-                              DisplayMemberPath="Name" SelectedValuePath="Id"
-                              ToolTip="اختر تصنيف المنتج — التصنيف الافتراضي 'عام'"
-                              Style="{StaticResource ModernComboBox}" Margin="0,0,0,6"/>
-
-                    <TextBlock Text="الوصف" Style="{StaticResource LabelStyle}"/>
-                    <TextBox Text="{Binding Description}" AcceptsReturn="True"
-                             ToolTip="وصف اختياري للمنتج"
-                             Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"
-                             MinHeight="60"/>
-
-                    <CheckBox Content="له تاريخ انتهاء" IsChecked="{Binding HasExpiry}"
-                              ToolTip="تفعيل تتبع تواريخ انتهاء الصلاحية — سيعمل النظام بـ FEFO لهذا المنتج"
-                              Margin="0,0,0,4"/>
-
-                    <Grid Margin="0,6,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                            <TextBlock Text="أقل كمية" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding MinStockLevel}"
-                                     ToolTip="الحد الأدنى للمخزون — عند الوصول لهذه الكمية سيظهر تنبيه"
-                                     Style="{StaticResource ModernTextBox}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="4,0,0,0">
-                            <TextBlock Text="حد إعادة الطلب" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding ReorderLevel}"
-                                     ToolTip="كمية إعادة الطلب الموصى بها"
-                                     Style="{StaticResource ModernTextBox}"/>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </ScrollViewer>
-        </TabItem>
-
-        <!-- Tab 2: Units -->
-        <TabItem Header="📐 الوحدات">
-            <!-- ProductUnitBuilder content -->
-        </TabItem>
-
-        <!-- Tab 3: Pricing -->
-        <TabItem Header="💰 الأسعار">
-            <!-- Per-unit, per-currency, per-level grid -->
-        </TabItem>
-
-        <!-- Tab 4: Images -->
-        <TabItem Header="🖼️ الصور">
-            <!-- Image upload + gallery -->
-        </TabItem>
-
-        <!-- Tab 5: Batches (read-only) -->
-        <TabItem Header="📦 الدفعات" IsEnabled="{Binding IsExistingProduct}">
-            <!-- PurchaseLot breakdown -->
-        </TabItem>
-    </TabControl>
-
-    <!-- Footer buttons -->
-    <Border Grid.Row="3" Background="White" Padding="12,8" 
-            BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button Content="💾 حفظ" Command="{Binding SaveCommand}"
-                    Style="{StaticResource PrimaryButton}"
-                    ToolTip="حفظ المنتج مع جميع البيانات المدخلة"/>
-            <Button Content="❌ إلغاء" Command="{Binding CancelCommand}"
-                    Style="{StaticResource SecondaryButton}"
-                    ToolTip="إلغاء التعديل والعودة"/>
-        </StackPanel>
-    </Border>
-</Grid>
-```
+> See XAML patterns in existing views at `DesktopPWF/Views/` for tab control, form styling, and compact layout conventions (RULE-262-274).
 
 **Arabic ToolTips** (RULE-185-190):
 - Save button: `" حفظ المنتج — سيتم إنشاء الوحدات والأسعار والباركود"`
@@ -1730,26 +1045,9 @@ if (HasOpeningStock)
 | `ViewModels/Products/ProductsListViewModel.cs` | Add cost/profit columns, enhanced search |
 | `Views/Products/ProductsListView.xaml` | Add columns for AvgCost, Stock Qty, Profit Margin |
 
-**New DataGrid columns**:
-```xml
-<DataGridTextColumn Header="التكلفة" Binding="{Binding AvgCost, StringFormat={}{0:N2}}"/>
-<DataGridTextColumn Header="الكمية" Binding="{Binding StockQuantity, StringFormat={}{0:N3}}"/>
-<DataGridTextColumn Header="آخر بيع" Binding="{Binding LastSalePrice, StringFormat={}{0:N2}}"/>
-<DataGridTextColumn Header="الهامش" Binding="{Binding ProfitMargin, StringFormat={}{0:P1}}"/>
-```
+> See XAML patterns in `DesktopPWF/Views/` for DataGrid column styling conventions.
 
-**Search enhancement**: Search by name, barcode, category name, unit name:
-```csharp
-var searchVal = SearchText?.Trim();
-if (!string.IsNullOrWhiteSpace(searchVal))
-{
-    Products = new ObservableCollection<ProductDto>(
-        allProducts.Where(p =>
-            p.Name.Contains(searchVal, StringComparison.OrdinalIgnoreCase) ||
-            (p.Barcode != null && p.Barcode.Contains(searchVal)) ||
-            (p.CategoryName != null && p.CategoryName.Contains(searchVal, StringComparison.OrdinalIgnoreCase))));
-}
-```
+> See existing list ViewModel patterns in `DesktopPWF/ViewModels/` for search/filter implementation.
 
 **Estimate**: ~2 hours
 
@@ -1777,34 +1075,11 @@ if (!string.IsNullOrWhiteSpace(searchVal))
 
 | File | Change |
 |------|--------|
-| `Api/Validators/ProductRequests/` | NEW validators for CreateProductRequest (updated), CreateProductUnitPriceRequest |
-| `Api/Validators/PurchaseLotValidators/` | NEW validators for batch operations |
+| `Api/Validators/ProductRequests/` | NEW validators for CreateProductRequest (updated), CreateProductPriceRequest |
+| `Api/Validators/InventoryBatchValidators/` | NEW validators for batch operations |
 | `Api/Validators/AssemblyValidators/` | NEW validators for BillOfMaterials requests |
 
-**Validator examples**:
-```csharp
-public class CreateProductRequestValidator : AbstractValidator<CreateProductRequest>
-{
-    public CreateProductRequestValidator()
-    {
-        RuleFor(x => x.Name).NotEmpty().WithMessage("اسم المنتج مطلوب")
-            .MaximumLength(150).WithMessage("الاسم لا يتجاوز 150 حرفاً");
-        RuleFor(x => x.MinStockLevel).GreaterThanOrEqualTo(0)
-            .WithMessage("الحد الأدنى للمخزون لا يمكن أن يكون سالباً");
-    }
-}
-
-public class CreateProductUnitPriceRequestValidator : AbstractValidator<CreateProductUnitPriceRequest>
-{
-    public CreateProductUnitPriceRequestValidator()
-    {
-        RuleFor(x => x.Price).GreaterThanOrEqualTo(0)
-            .WithMessage("السعر لا يمكن أن يكون سالباً");
-        RuleFor(x => x.PriceLevel).IsInEnum()
-            .WithMessage("مستوى السعر غير صالح");
-    }
-}
-```
+> See existing validators in `SalesSystem.Api/Validators/` for FluentValidation patterns (RULE-044).
 
 **Estimate**: ~1.5 hours
 
@@ -1818,7 +1093,7 @@ public class CreateProductUnitPriceRequestValidator : AbstractValidator<CreatePr
 |------|--------|
 | `Api/Controllers/ProductsController.cs` | Add batch breakdown, price history, image upload endpoints |
 | `Api/Controllers/ProductUnitsController.cs` | Add pricing endpoints |
-| NEW: `Api/Controllers/BatchesController.cs` | PurchaseLot CRUD + FIFO allocation |
+| NEW: `Api/Controllers/BatchesController.cs` | InventoryBatch CRUD + FIFO allocation |
 | NEW: `Api/Controllers/AssembliesController.cs` | BOM CRUD + production |
 
 **New endpoints**:
@@ -1833,7 +1108,7 @@ public class CreateProductUnitPriceRequestValidator : AbstractValidator<CreatePr
 | POST | `/api/v1/product-unit-prices` | Set a price |
 | PUT | `/api/v1/product-unit-prices/{id}` | Update a price |
 | DELETE | `/api/v1/product-unit-prices/{id}` | Delete a price |
-| GET | `/api/v1/batches` | List PurchaseLots with filters |
+| GET | `/api/v1/batches` | List InventoryBatches with filters |
 | GET | `/api/v1/batches/{id}` | Get batch detail |
 | GET | `/api/v1/assemblies` | List BOMs |
 | POST | `/api/v1/assemblies` | Create BOM entry |
@@ -1867,28 +1142,19 @@ Already covered in Task 1. This task ensures all seed blocks are properly guarde
 |-------------|-------------|------------|
 | 1 | `AddCategorySeed` | None — additive data seed only |
 | 2 | `AddAvgCost_HasExpiry_TrackBatches_ToProducts` | None — additive columns |
-| 3 | `CreateProductUnitPrices` | Requires ProductUnits table + Currencies table (Phase 20) |
+| 3 | `CreateProductPrices` | Requires ProductUnits table + Currencies table (Phase 20) |
 | 4 | `CreateProductImages` | Requires Products table |
-| 5 | `CreatePurchaseLots` | Requires Products + Warehouses + ProductUnits tables |
-| 6 | `CreatePurchaseLotAllocations` | Requires PurchaseLots table |
+| 5 | `CreateInventoryBatches` | Requires Products + Warehouses + ProductUnits tables |
+| 6 | `CreateInventoryBatchAllocations` | Requires InventoryBatches table |
 | 7 | `CreateBillOfMaterials` | Requires Products table |
 
 **Data preservation**: All migrations are additive — no data loss. Legacy columns are kept in tables, not dropped.
 
-**⚠️ Migration 3 (ProductUnitPrices) depends on Phase 20 (Currencies)**:
+**⚠️ Migration 3 (ProductPrices) depends on Phase 20 (Currencies)**:
 - If Phase 20 is not yet complete: create a placeholder Currency with Id=1 (Base Currency) in a data seed
 - Mark `CurrencyId` FK as optional initially (`int?`), change to required in Phase 20
 
-**Rollback**: Each migration can be reversed individually:
-```sql
--- Reverse migration 2:
-ALTER TABLE Products DROP COLUMN AvgCost, HasExpiry, TrackBatches;
--- Reverse migration 3:
-DROP TABLE ProductUnitPrices;
--- Reverse migration 5:
-DROP TABLE PurchaseLotAllocations;
-DROP TABLE PurchaseLots;
-```
+> See EF Core migration rollback: `dotnet ef migrations remove` or manual SQL `ALTER TABLE DROP COLUMN` for the listed columns.
 
 **Estimate**: Migration creation + testing: ~2 hours
 
@@ -1898,10 +1164,10 @@ DROP TABLE PurchaseLots;
 
 | Rule | Directive | Where Applied | Verdict |
 |------|-----------|---------------|---------|
-| **RULE-001** | `decimal(18,2)` for ALL money | ProductUnitPrice.Price, PurchaseLot.UnitCost, Product.AvgCost | ✅ |
-| **RULE-002** | `decimal(18,3)` for ALL quantities | PurchaseLot.Quantity, BillOfMaterials.QuantityRequired, Product.MinStockLevel | ✅ |
+| **RULE-001** | `decimal(18,2)` for ALL money | ProductPrice.Price, InventoryBatch.UnitCost, Product.AvgCost | ✅ |
+| **RULE-002** | `decimal(18,3)` for ALL quantities | InventoryBatch.Quantity, BillOfMaterials.QuantityRequired, Product.MinStockLevel | ✅ |
 | **RULE-003** | Multi-table ops in transaction | FIFO allocation + stock deduction + InventoryMovement in single transaction | ✅ |
-| **RULE-006** | ALL services return `Result<T>` | IFifoAllocationService, IProductUnitPriceService, IAssemblyService | ✅ |
+| **RULE-006** | ALL services return `Result<T>` | IFifoAllocationService, IProductPriceService, IAssemblyService | ✅ |
 | **RULE-008** | ALL text columns `nvarchar` | All new entities | ✅ |
 | **RULE-016** | BaseEntity audit fields | All new entities inherit BaseEntity | ✅ |
 | **RULE-024** | Services inject `IUnitOfWork` | All new services | ✅ |
@@ -1910,10 +1176,10 @@ DROP TABLE PurchaseLots;
 | **RULE-036** | Log critical operations | Batch creation, price changes, assembly production | ✅ |
 | **RULE-037** | NEVER log passwords/conn strings | Verified | ✅ |
 | **RULE-038** | ALL endpoints `[Authorize]` | All new controllers | ✅ |
-| **RULE-042** | Rich Domain — `private set` + domain methods | PurchaseLot.DeductQuantity(), PurchaseLot.AddReturnQuantity(), ProductUnitPrice.SetPrice() | ✅ |
+| **RULE-042** | Rich Domain — `private set` + domain methods | InventoryBatch.DeductQuantity(), InventoryBatch.AddReturnQuantity(), ProductPrice.SetPrice() | ✅ |
 | **RULE-044** | FluentValidation for EVERY Command | All new request validators | ✅ |
 | **RULE-050** | DeleteStrategy for ALL deletes | Product, Category, ProductUnit | ✅ |
-| **RULE-052** | Guard Clauses on all entities | PurchaseLot.Create, BillOfMaterials.Create, ProductImage.Create | ✅ |
+| **RULE-052** | Guard Clauses on all entities | InventoryBatch.Create, BillOfMaterials.Create, ProductImage.Create | ✅ |
 | **RULE-053** | DomainException in Arabic | All messages in Arabic | ✅ |
 | **RULE-054** | IDialogService — no MessageBox | All ViewModels | ✅ |
 | **RULE-058** | INotifyDataErrorInfo | ProductEditorViewModel — AddError/ClearErrors | ✅ |
@@ -1923,7 +1189,7 @@ DROP TABLE PurchaseLots;
 | **RULE-062** | Derived units factor > 1 | ProductUnit.CreateDerivedUnit guard | ✅ |
 | **RULE-063** | UnitBarcode stores ALL barcodes | UnitBarcode entity — barcode per unit | ✅ |
 | **RULE-064** | SmartUnitFormatter selects display unit | UI only — deferred | ⏳ |
-| **RULE-065** | Pricing per ProductUnit (not Product) | ProductUnitPrice entity with ProductUnitId | ✅ |
+| **RULE-065** | Pricing per ProductUnit (not Product) | ProductPrice entity with ProductUnitId | ✅ |
 | **RULE-066** | Cost cascade: purchase cost → unit cost | UpdateProductPricingService with FIFO option | ✅ |
 | **RULE-067** | ProductMustHaveAtLeastOneUnit | Product.RemoveUnit() guard | ✅ |
 | **RULE-068** | CostingMethod default = WeightedAverage (1) | Seed unchanged | ✅ |
@@ -1935,7 +1201,7 @@ DROP TABLE PurchaseLots;
 | **RULE-074** | Cost cascade: ALL units updated | UpdateProductPricingService cascades | ✅ |
 | **RULE-075** | UpdateProductPricingService handles all methods | Extended to handle FIFO | ✅ |
 | **RULE-076** | ProductPriceHistory on EVERY cost change | All price/cost changes recorded | ✅ |
-| **RULE-084** | ProductPriceHistory records EVERY price change | Extended with CurrencyId + PriceLevel | ✅ |
+| **RULE-084** | ProductPriceHistory records EVERY price change | Extended with CurrencyId (PriceLevel NOT in V1) | ✅ |
 | **RULE-141** | ExecuteAsync() wrapper for all VMs | ProductEditorViewModel, ProductsListViewModel | ✅ |
 | **RULE-147** | NO MediatR / CQRS | Service Layer pattern | ✅ |
 | **RULE-160** | ScreenWindowService for non-modal windows | Product editor opens via OpenScreen() | ✅ |
@@ -1957,7 +1223,7 @@ DROP TABLE PurchaseLots;
 | **RULE-200** | ALL hard-delete catch DbUpdateException | ProductService.PermanentDeleteAsync | ✅ |
 | **RULE-202** | ALL Service methods return Result\<T\> | All new services | ✅ |
 | **RULE-203** | Controllers NO DbContext/IUnitOfWork | All new controllers — service only | ✅ |
-| **RULE-210** | CHECK constraints at DB level | `CHK_PurchaseLots_Quantity_NonNegative`, `CHK_ProductUnitPrices_Price_NonNegative` | ✅ |
+| **RULE-210** | CHECK constraints at DB level | `CHK_InventoryBatches_Quantity_NonNegative`, `CHK_ProductPrices_Price_NonNegative` | ✅ |
 | **RULE-214** | ALL FKs DeleteBehavior.Restrict | All new FK configurations | ✅ |
 | **RULE-220** | Newest-first sorting on lists | ProductsListViewModel: newest by Id desc | ✅ |
 | **RULE-227** | SetDialogService() in EVERY Editor VM | ProductEditorViewModel constructor | ✅ |
@@ -1978,18 +1244,18 @@ DROP TABLE PurchaseLots;
 
 | Risk | Impact | Probability | Mitigation |
 |------|--------|-------------|------------|
-| **Batch data loss during FIFO migration** | **HIGH** — existing products have no PurchaseLots | Medium | Create opening batches for existing stock at time of migration with `IsOpeningBatch = true` and cost = current AvgCost |
+| **Batch data loss during FIFO migration** | **HIGH** — existing products have no InventoryBatches | Medium | Create opening batches for existing stock at time of migration with `IsOpeningBatch = true` and cost = current AvgCost |
 | **Pricing inconsistency after deprecation** | **HIGH** — SalesPrice/WholesalePrice still read by old code | High | Keep legacy columns populated via sync method during transition period; remove only after all consumers updated |
 | **FIFO migration complexity** | **HIGH** — requires new tables + algorithm + validation | Medium | Build FIFO as Option A (alongside WA); extensive unit tests before integration |
-| **CurrencyId FK dependency on Phase 20** | **HIGH** — ProductUnitPrice cannot be built without Currencies | High | Seed a base currency (Id=1) as part of Phase 25 if Phase 20 isn't ready; mark FK as int? until Phase 20 |
-| **ProductUnitPrice falling back to wrong currency** | **MEDIUM** — pricing errors in multi-currency invoices | Low | Implement strict fallback chain: exact match → retail price for currency → base currency conversion → manual entry |
+| **CurrencyId FK dependency on Phase 20** | **HIGH** — ProductPrice cannot be built without Currencies | High | Seed a base currency (Id=1) as part of Phase 25 if Phase 20 isn't ready; mark FK as int? until Phase 20 |
+| **ProductPrice falling back to wrong currency** | **MEDIUM** — pricing errors in multi-currency invoices | Low | Implement strict fallback chain: exact match → retail price for currency → base currency conversion → manual entry |
 | **Assembly production consuming wrong batches** | **MEDIUM** — incorrect COGS | Low | Assembly always calls `IFifoAllocationService.DeductFromBatchesAsync()` — same FIFO algorithm as sales |
 | **Image upload failing silently** | **MEDIUM** — user thinks image saved | Medium | Validate file size (max 5MB) + format (JPG/PNG) + return clear error message |
 | **MinStockAlert flooding EventBus** | **LOW** — UI performance degradation | Low | Batch alerts into single message per warehouse; throttle to max 1 alert per product per day |
 | **Legacy field deprecation breaking existing code** | **MEDIUM** — compilation errors | Medium | Use `[Obsolete]` attribute with `error: false` first; change to `error: true` in next phase |
 | **Barcode uniqueness violation after migration** | **MEDIUM** — duplicate barcodes across units | Low | Query all UnitBarcodes before auto-generating to ensure uniqueness; add DB unique index on BarcodeValue |
 | **Product editor becoming too complex (6 tabs)** | **LOW** — user confusion | Low | Tab labels use clear Arabic names with ⓘ help icons; default to Basic Info tab on open |
-| **PriceLevel not understood by users** | **LOW** — users ignore VIP/Distributor levels | Low | Default to Retail + Wholesale only in UI; VIP/Distributor are expandable sections |
+| **PriceLevel excluded from V1** | **LOW** — pricing per (ProductUnit × CurrencyId) only, no level concept | Low | Removed entirely from V1 — UI falls back to flat per-currency price per unit |
 
 ---
 
@@ -1997,8 +1263,8 @@ DROP TABLE PurchaseLots;
 
 | Scenario | Action |
 |----------|--------|
-| **PurchaseLot migration causes issues** | `DROP TABLE PurchaseLotAllocations; DROP TABLE PurchaseLots;` |
-| **ProductUnitPrice migration causes issues** | `DROP TABLE ProductUnitPrices;` |
+| **InventoryBatch migration causes issues** | `DROP TABLE InventoryBatchAllocations; DROP TABLE InventoryBatches;` |
+| **ProductPrice migration causes issues** | `DROP TABLE ProductPrices;` |
 | **ProductImage migration causes issues** | `DROP TABLE ProductImages;` |
 | **BillOfMaterials migration causes issues** | `DROP TABLE BillOfMaterials;` |
 | **Product column changes cause issues** | `ALTER TABLE Products DROP COLUMN AvgCost, HasExpiry, TrackBatches;` |
@@ -2018,16 +1284,16 @@ DROP TABLE PurchaseLots;
 |------|--------|
 | `Tests/SalesSystem.Domain.Tests/Entities/ProductTests.cs` | **NEW** — Product factory tests |
 | `Tests/SalesSystem.Domain.Tests/Entities/ProductUnitTests.cs` | **NEW** — conversion + base/derived unit tests |
-| `Tests/SalesSystem.Domain.Tests/Entities/ProductUnitPriceTests.cs` | **NEW** — pricing entity guards |
-| `Tests/SalesSystem.Domain.Tests/Entities/PurchaseLotTests.cs` | **NEW** — batch creation + deduction tests |
+| `Tests/SalesSystem.Domain.Tests/Entities/ProductPriceTests.cs` | **NEW** — pricing entity guards |
+| `Tests/SalesSystem.Domain.Tests/Entities/InventoryBatchTests.cs` | **NEW** — batch creation + deduction tests |
 | `Tests/SalesSystem.Domain.Tests/Entities/BillOfMaterialsTests.cs` | **NEW** — BOM guards |
 | `Tests/SalesSystem.Application.Tests/Services/ProductServiceTests.cs` | **NEW** — service layer + FIFO + opening stock |
 | `Tests/SalesSystem.Application.Tests/Services/FifoAllocationServiceTests.cs` | **NEW** — FIFO/FEFO allocation tests |
-| `Tests/SalesSystem.Application.Tests/Services/ProductUnitPriceServiceTests.cs` | **NEW** — pricing fallback chain |
+| `Tests/SalesSystem.Application.Tests/Services/ProductPriceServiceTests.cs` | **NEW** — pricing fallback chain |
 | `Tests/SalesSystem.Application.Tests/Services/AssemblyServiceTests.cs` | **NEW** — production flow |
 | `Tests/SalesSystem.Api.Tests/Validators/ProductRequestValidatorTests.cs` | **NEW** — validation rules |
 | `Tests/SalesSystem.Infrastructure.Tests/Configurations/ProductConfigurationTests.cs` | **NEW** — EF config tests |
-| `Tests/SalesSystem.Infrastructure.Tests/Configurations/PurchaseLotConfigurationTests.cs` | **NEW** — batch config tests |
+| `Tests/SalesSystem.Infrastructure.Tests/Configurations/InventoryBatchConfigurationTests.cs` | **NEW** — batch config tests |
 
 ---
 
@@ -2035,209 +1301,15 @@ DROP TABLE PurchaseLots;
 
 Test `Create()` factory and all 7 sub-module validations:
 
-```csharp
-public class ProductTests
-{
-    [Fact]
-    public void Create_WithValidInputs_CreatesProductCorrectly()
-    {
-        var product = Product.Create(
-            name: "منتج تجربة",
-            categoryId: 1,
-            minStockLevel: 5m,
-            reorderLevel: 10m,
-            description: "منتج للاختبار",
-            hasExpiry: true,
-            trackBatches: true,
-            createdByUserId: 1);
-
-        Assert.Equal("منتج تجربة", product.Name);
-        Assert.Equal(1, product.CategoryId);
-        Assert.Equal(5m, product.MinStockLevel);
-        Assert.Equal(10m, product.ReorderLevel);
-        Assert.Equal("منتج للاختبار", product.Description);
-        Assert.True(product.HasExpiry);
-        Assert.True(product.TrackBatches);
-        Assert.Equal(1, product.CreatedByUserId);
-        Assert.True(product.IsActive);
-        Assert.Equal(0m, product.AvgCost);
-    }
-
-    [Fact]
-    public void Create_WithEmptyName_ThrowsDomainException()
-    {
-        var ex = Assert.Throws<DomainException>(() =>
-            Product.Create(""));
-        Assert.Contains("اسم المنتج مطلوب", ex.Message);
-    }
-
-    [Fact]
-    public void Create_WithNullName_ThrowsDomainException()
-    {
-        var ex = Assert.Throws<DomainException>(() =>
-            Product.Create(null!));
-        Assert.Contains("اسم المنتج مطلوب", ex.Message);
-    }
-
-    [Fact]
-    public void Create_WithNameExceedingMaxLength_ThrowsDomainException()
-    {
-        var longName = new string('ا', 151);
-        var ex = Assert.Throws<DomainException>(() =>
-            Product.Create(longName));
-        Assert.Contains("الاسم لا يمكن أن يتجاوز 150 حرف", ex.Message);
-    }
-
-    [Fact]
-    public void Create_WithNegativeMinStockLevel_ThrowsDomainException()
-    {
-        var ex = Assert.Throws<DomainException>(() =>
-            Product.Create("منتج", minStockLevel: -1m));
-        Assert.Contains("الحد الأدنى للمخزون لا يمكن أن يكون سالباً", ex.Message);
-    }
-
-    [Fact]
-    public void Create_WithZeroMinStockLevel_IsAllowed()
-    {
-        var product = Product.Create("منتج", minStockLevel: 0m);
-        Assert.Equal(0m, product.MinStockLevel);
-    }
-
-    [Fact]
-    public void Create_WithoutCategoryId_SetsNull()
-    {
-        var product = Product.Create("منتج");
-        Assert.Null(product.CategoryId);
-    }
-
-    [Fact]
-    public void Create_WithHasExpiryFalse_SetsCorrectly()
-    {
-        var product = Product.Create("منتج", hasExpiry: false);
-        Assert.False(product.HasExpiry);
-    }
-
-    [Fact]
-    public void Create_DefaultsToTrackBatchesTrue()
-    {
-        var product = Product.Create("منتج");
-        Assert.True(product.TrackBatches);
-    }
-
-    [Fact]
-    public void Update_ChangesAllowedFields()
-    {
-        var product = Product.Create("منتج قديم", categoryId: 1);
-        product.Update("منتج محدث", categoryId: 2, "وصف جديد",
-            10m, 20m, true, true, updatedByUserId: 2);
-
-        Assert.Equal("منتج محدث", product.Name);
-        Assert.Equal(2, product.CategoryId);
-        Assert.Equal("وصف جديد", product.Description);
-        Assert.Equal(10m, product.MinStockLevel);
-        Assert.Equal(20m, product.ReorderLevel);
-        Assert.True(product.HasExpiry);
-    }
-
-    [Fact]
-    public void Update_WithEmptyName_ThrowsDomainException()
-    {
-        var product = Product.Create("منتج");
-        var ex = Assert.Throws<DomainException>(() =>
-            product.Update("", null, null, 0m, 0m, false, true, null));
-        Assert.Contains("اسم المنتج مطلوب", ex.Message);
-    }
-
-    // ─── Units Management ─────────────────────────────────────────
-
-    [Fact]
-    public void AddUnit_WithValidUnit_AddsToCollection()
-    {
-        var product = Product.Create("منتج");
-        var unit = ProductUnit.CreateBaseUnit(product.Id, "حبة", 1m, createdByUserId: 1);
-        product.AddUnit(unit);
-
-        Assert.Single(product.Units);
-        Assert.Contains(unit, product.Units);
-    }
-
-    [Fact]
-    public void RemoveUnit_WithLastUnit_ThrowsDomainException()
-    {
-        var product = Product.Create("منتج");
-        var unit = ProductUnit.CreateBaseUnit(product.Id, "حبة", 1m, createdByUserId: 1);
-        product.AddUnit(unit);
-
-        var ex = Assert.Throws<DomainException>(() =>
-            product.RemoveUnit(unit));
-        Assert.Contains("يجب أن يحتوي المنتج على وحدة واحدة على الأقل", ex.Message);
-    }
-
-    [Fact]
-    public void RemoveUnit_WhenMultipleUnits_RemovesSuccessfully()
-    {
-        var product = Product.Create("منتج");
-        var baseUnit = ProductUnit.CreateBaseUnit(product.Id, "حبة", 1m, createdByUserId: 1);
-        var derivedUnit = ProductUnit.CreateDerivedUnit(product.Id, "كرتون", 24m, createdByUserId: 1);
-        product.AddUnit(baseUnit);
-        product.AddUnit(derivedUnit);
-
-        product.RemoveUnit(derivedUnit);
-
-        Assert.Single(product.Units);
-        Assert.DoesNotContain(derivedUnit, product.Units);
-    }
-
-    [Fact]
-    public void GetBaseUnit_ReturnsCorrectUnit()
-    {
-        var product = Product.Create("منتج");
-        var baseUnit = ProductUnit.CreateBaseUnit(product.Id, "حبة", 1m, createdByUserId: 1);
-        var derivedUnit = ProductUnit.CreateDerivedUnit(product.Id, "كرتون", 24m, createdByUserId: 1);
-        product.AddUnit(baseUnit);
-        product.AddUnit(derivedUnit);
-
-        var result = product.GetBaseUnit();
-        Assert.Equal(baseUnit, result);
-        Assert.True(result.IsBaseUnit);
-    }
-
-    [Fact]
-    public void GetBaseUnit_WhenNoBaseUnit_ThrowsDomainException()
-    {
-        var product = Product.Create("منتج");
-        var unit = ProductUnit.CreateDerivedUnit(product.Id, "كرتون", 24m, createdByUserId: 1);
-        product.AddUnit(unit);
-
-        Assert.Throws<DomainException>(() => product.GetBaseUnit());
-    }
-}
-```
+> See existing xUnit test patterns in `Tests/SalesSystem.Domain.Tests/` for Product entity factory tests. Test cases: valid creation, empty/null/long name, negative MinStockLevel, zero MinStockLevel, null CategoryId, HasExpiry false, TrackBatches default, Update changes, Update empty name, AddUnit, RemoveUnit last unit, RemoveUnit multiple, GetBaseUnit, GetBaseUnit missing.
 
 **Estimate**: ~2 hours
 
 ---
 
-#### 19.2 — Domain Entity Tests: ProductUnit + ProductUnitPrice + PurchaseLot
+#### 19.2 — Domain Entity Tests: ProductUnit + ProductPrice + InventoryBatch
 
-```csharp
-public class ProductUnitTests
-{
-    [Fact]
-    public void CreateBaseUnit_SetsIsBaseUnitTrue()
-    {
-        var unit = ProductUnit.CreateBaseUnit(1, "حبة", 1m, createdByUserId: 1);
-        Assert.Equal(1, unit.ProductId);
-        Assert.Equal("حبة", unit.UnitName);
-        Assert.Equal(1m, unit.BaseConversionFactor);
-        Assert.True(unit.IsBaseUnit);
-        Assert.Equal(1, unit.SortOrder);
-    }
-
-    [Fact]
-    public void CreateDerivedUnit_WithFactorGreaterThanOne_SetsCorrectly()
-    {
-        var unit = ProductUnit.CreateDerivedUnit(1, "كرتون", 24m, sortOrder: 2, createdByUserId: 1);
+> See existing xUnit test patterns in `Tests/SalesSystem.Domain.Tests/` for ProductUnit entity factory tests. Test cases: CreateBaseUnit, CreateDerivedUnit with valid factor, CreateDerivedUnit with factor ≤1, conversion methods, SalesPrice/WholesalePrice deprecation, etc.
         Assert.Equal(1, unit.ProductId);
         Assert.Equal("كرتون", unit.UnitName);
         Assert.Equal(24m, unit.BaseConversionFactor);
@@ -2297,12 +1369,12 @@ public class ProductUnitTests
     }
 }
 
-public class ProductUnitPriceTests
+public class ProductPriceTests
 {
     [Fact]
     public void Create_SetsAllFieldsCorrectly()
     {
-        var price = ProductUnitPrice.Create(
+        var price = ProductPrice.Create(
             productUnitId: 1, currencyId: 1,
             priceLevel: PriceLevel.Retail, price: 50m,
             createdByUserId: 1);
@@ -2320,21 +1392,21 @@ public class ProductUnitPriceTests
     public void Create_WithNegativePrice_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            ProductUnitPrice.Create(1, 1, PriceLevel.Retail, -10m, createdByUserId: 1));
+            ProductPrice.Create(1, 1, PriceLevel.Retail, -10m, createdByUserId: 1));
         Assert.Contains("السعر لا يمكن أن يكون سالباً", ex.Message);
     }
 
     [Fact]
     public void Create_WithZeroPrice_IsAllowed()
     {
-        var price = ProductUnitPrice.Create(1, 1, PriceLevel.Retail, 0m, createdByUserId: 1);
+        var price = ProductPrice.Create(1, 1, PriceLevel.Retail, 0m, createdByUserId: 1);
         Assert.Equal(0m, price.Price);
     }
 
     [Fact]
     public void SetPrice_UpdatesPriceAndEffectiveFrom()
     {
-        var price = ProductUnitPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
+        var price = ProductPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
         price.SetPrice(75m, 2);
 
         Assert.Equal(75m, price.Price);
@@ -2344,7 +1416,7 @@ public class ProductUnitPriceTests
     [Fact]
     public void SetPrice_WithNegativePrice_ThrowsDomainException()
     {
-        var price = ProductUnitPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
+        var price = ProductPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
         var ex = Assert.Throws<DomainException>(() =>
             price.SetPrice(-5m, 2));
         Assert.Contains("السعر لا يمكن أن يكون سالباً", ex.Message);
@@ -2353,7 +1425,7 @@ public class ProductUnitPriceTests
     [Fact]
     public void Deactivate_SetsIsActiveFalseAndEffectiveTo()
     {
-        var price = ProductUnitPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
+        var price = ProductPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
         price.Deactivate(2);
 
         Assert.False(price.IsActive);
@@ -2361,12 +1433,12 @@ public class ProductUnitPriceTests
     }
 }
 
-public class PurchaseLotTests
+public class InventoryBatchTests
 {
     [Fact]
     public void Create_WithValidInputs_CreatesLotCorrectly()
     {
-        var lot = PurchaseLot.Create(
+        var lot = InventoryBatch.Create(
             productId: 1, productUnitId: 1, warehouseId: 2,
             lotNumber: "B-20260605-001",
             quantity: 100m, unitCost: 25m,
@@ -2390,7 +1462,7 @@ public class PurchaseLotTests
     public void Create_WithZeroQuantity_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            PurchaseLot.Create(1, 1, 1, "LOT001", 0m, 25m, null, DateTime.UtcNow, null, false, null));
+            InventoryBatch.Create(1, 1, 1, "LOT001", 0m, 25m, null, DateTime.UtcNow, null, false, null));
         Assert.Contains("الكمية يجب أن تكون أكبر من الصفر", ex.Message);
     }
 
@@ -2398,7 +1470,7 @@ public class PurchaseLotTests
     public void Create_WithNegativeQuantity_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            PurchaseLot.Create(1, 1, 1, "LOT001", -10m, 25m, null, DateTime.UtcNow, null, false, null));
+            InventoryBatch.Create(1, 1, 1, "LOT001", -10m, 25m, null, DateTime.UtcNow, null, false, null));
         Assert.Contains("الكمية يجب أن تكون أكبر من الصفر", ex.Message);
     }
 
@@ -2406,14 +1478,14 @@ public class PurchaseLotTests
     public void Create_WithZeroUnitCost_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            PurchaseLot.Create(1, 1, 1, "LOT001", 100m, 0m, null, DateTime.UtcNow, null, false, null));
+            InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 0m, null, DateTime.UtcNow, null, false, null));
         Assert.Contains("التكلفة يجب أن تكون أكبر من الصفر", ex.Message);
     }
 
     [Fact]
     public void Create_WithOpeningBatch_SetsFlag()
     {
-        var lot = PurchaseLot.Create(1, 1, 1, "OPN-20260605-001",
+        var lot = InventoryBatch.Create(1, 1, 1, "OPN-20260605-001",
             100m, 25m, null, DateTime.UtcNow, null, isOpeningBatch: true, null);
         Assert.True(lot.IsOpeningBatch);
     }
@@ -2421,7 +1493,7 @@ public class PurchaseLotTests
     [Fact]
     public void DeductQuantity_ReducesRemainingQuantity()
     {
-        var lot = PurchaseLot.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
+        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
         lot.DeductQuantity(30m);
         Assert.Equal(70m, lot.Quantity);
     }
@@ -2429,7 +1501,7 @@ public class PurchaseLotTests
     [Fact]
     public void DeductQuantity_WithExcessiveAmount_ThrowsDomainException()
     {
-        var lot = PurchaseLot.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
+        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
         var ex = Assert.Throws<DomainException>(() =>
             lot.DeductQuantity(150m));
         Assert.Contains("الكمية المطلوبة أكبر من المتاحة في الدفعة", ex.Message);
@@ -2438,7 +1510,7 @@ public class PurchaseLotTests
     [Fact]
     public void AddReturnQuantity_IncreasesRemainingQuantity()
     {
-        var lot = PurchaseLot.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
+        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
         lot.DeductQuantity(50m);
         lot.AddReturnQuantity(20m);
         Assert.Equal(70m, lot.Quantity);
@@ -2447,7 +1519,7 @@ public class PurchaseLotTests
     [Fact]
     public void AddReturnQuantity_ExceedingOriginal_ThrowsDomainException()
     {
-        var lot = PurchaseLot.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
+        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
         lot.DeductQuantity(50m);
         var ex = Assert.Throws<DomainException>(() =>
             lot.AddReturnQuantity(60m));
@@ -2457,7 +1529,7 @@ public class PurchaseLotTests
     [Fact]
     public void IsFullyConsumed_WhenQuantityZero_ReturnsTrue()
     {
-        var lot = PurchaseLot.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
+        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
         lot.DeductQuantity(100m);
         Assert.Equal(0m, lot.Quantity);
     }
@@ -2512,129 +1584,7 @@ public class BillOfMaterialsTests
 
 #### 19.3 — Service Tests: ProductService (Opening Stock + CRUD)
 
-```csharp
-public class ProductServiceTests
-{
-    private readonly Mock<IUnitOfWork> _uowMock;
-    private readonly Mock<IProductRepository> _productRepoMock;
-    private readonly Mock<IWarehouseStockRepository> _stockRepoMock;
-    private readonly Mock<IPurchaseLotRepository> _lotRepoMock;
-    private readonly Mock<IInventoryMovementRepository> _movementRepoMock;
-    private readonly Mock<ILogger<ProductService>> _loggerMock;
-    private readonly ProductService _service;
-
-    public ProductServiceTests()
-    {
-        _uowMock = new Mock<IUnitOfWork>();
-        _productRepoMock = new Mock<IProductRepository>();
-        _stockRepoMock = new Mock<IWarehouseStockRepository>();
-        _lotRepoMock = new Mock<IPurchaseLotRepository>();
-        _movementRepoMock = new Mock<IInventoryMovementRepository>();
-        _loggerMock = new Mock<ILogger<ProductService>>();
-
-        _uowMock.Setup(x => x.Products).Returns(_productRepoMock.Object);
-        _uowMock.Setup(x => x.WarehouseStocks).Returns(_stockRepoMock.Object);
-        _uowMock.Setup(x => x.PurchaseLots).Returns(_lotRepoMock.Object);
-        _uowMock.Setup(x => x.InventoryMovements).Returns(_movementRepoMock.Object);
-
-        _service = new ProductService(_uowMock.Object, _loggerMock.Object);
-    }
-
-    // ─── CreateAsync Success ───────────────────────────────────────
-
-    [Fact]
-    public async Task CreateAsync_WithValidRequest_ReturnsSuccess()
-    {
-        var request = new CreateProductRequest(
-            "منتج جديد", categoryId: 1, description: null,
-            hasExpiry: false, minStockLevel: 5m, reorderLevel: 10m,
-            openingStock: null,
-            units: new List<CreateProductUnitDto>
-            {
-                new("حبة", 1m, true, 1),
-                new("كرتون", 24m, false, 2)
-            },
-            prices: null);
-
-        _productRepoMock.Setup(x => x.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Mock.Of<IDbContextTransaction>());
-
-        var result = await _service.CreateAsync(request, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Value);
-        Assert.Equal("منتج جديد", result.Value.Name);
-    }
-
-    // ─── CreateAsync Failure ───────────────────────────────────────
-
-    [Fact]
-    public async Task CreateAsync_WithEmptyName_ReturnsFailure()
-    {
-        var request = new CreateProductRequest("", null, null,
-            false, 0m, 0m, null, new List<CreateProductUnitDto>(), null);
-
-        var result = await _service.CreateAsync(request, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains("اسم المنتج مطلوب", result.Error);
-    }
-
-    // ─── GetByIdAsync ──────────────────────────────────────────────
-
-    [Fact]
-    public async Task GetByIdAsync_WhenProductExists_ReturnsDto()
-    {
-        var product = Product.Create("منتج موجود");
-        typeof(Product).GetProperty("Id")!.SetValue(product, 5);
-
-        _productRepoMock.Setup(x => x.GetByIdAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
-
-        var result = await _service.GetByIdAsync(5, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(5, result.Value.Id);
-        Assert.Equal("منتج موجود", result.Value.Name);
-    }
-
-    [Fact]
-    public async Task GetByIdAsync_WhenProductNotFound_ReturnsFailure()
-    {
-        _productRepoMock.Setup(x => x.GetByIdAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Product?)null);
-
-        var result = await _service.GetByIdAsync(999, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal(ErrorCodes.NotFound, result.ErrorCode);
-    }
-
-    // ─── Transaction Rollback ──────────────────────────────────────
-
-    [Fact]
-    public async Task CreateAsync_OnException_RollsBackTransaction()
-    {
-        var mockTransaction = new Mock<IDbContextTransaction>();
-        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockTransaction.Object);
-        _productRepoMock.Setup(x => x.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("DB error"));
-
-        var request = new CreateProductRequest("منتج", null, null,
-            false, 0m, 0m, null, new List<CreateProductUnitDto>(), null);
-
-        var result = await _service.CreateAsync(request, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        mockTransaction.Verify(x => x.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
-}
-```
+> See existing xUnit service test patterns in `Tests/SalesSystem.Application.Tests/Services/` for setup with Mock<IUnitOfWork>, repository mocks, and Result<T> assertions.
 
 **Estimate**: ~2 hours
 
@@ -2642,144 +1592,7 @@ public class ProductServiceTests
 
 #### 19.4 — Opening Stock Batch Service Tests
 
-```csharp
-public class ProductServiceOpeningStockTests
-{
-    private readonly Mock<IUnitOfWork> _uowMock;
-    private readonly Mock<IProductRepository> _productRepoMock;
-    private readonly Mock<IWarehouseRepository> _warehouseRepoMock;
-    private readonly Mock<IPurchaseLotRepository> _lotRepoMock;
-    private readonly Mock<IWarehouseStockRepository> _stockRepoMock;
-    private readonly Mock<IInventoryMovementRepository> _movementRepoMock;
-    private readonly Mock<ILogger<ProductService>> _loggerMock;
-    private readonly ProductService _service;
-
-    public ProductServiceOpeningStockTests()
-    {
-        _uowMock = new Mock<IUnitOfWork>();
-        _productRepoMock = new Mock<IProductRepository>();
-        _warehouseRepoMock = new Mock<IWarehouseRepository>();
-        _lotRepoMock = new Mock<IPurchaseLotRepository>();
-        _stockRepoMock = new Mock<IWarehouseStockRepository>();
-        _movementRepoMock = new Mock<IInventoryMovementRepository>();
-        _loggerMock = new Mock<ILogger<ProductService>>();
-
-        _uowMock.Setup(x => x.Products).Returns(_productRepoMock.Object);
-        _uowMock.Setup(x => x.Warehouses).Returns(_warehouseRepoMock.Object);
-        _uowMock.Setup(x => x.PurchaseLots).Returns(_lotRepoMock.Object);
-        _uowMock.Setup(x => x.WarehouseStocks).Returns(_stockRepoMock.Object);
-        _uowMock.Setup(x => x.InventoryMovements).Returns(_movementRepoMock.Object);
-
-        _service = new ProductService(_uowMock.Object, _loggerMock.Object);
-    }
-
-    [Fact]
-    public async Task CreateOpeningStockBatchAsync_CreatesLotWithIsOpeningBatchTrue()
-    {
-        var product = Product.Create("منتج", categoryId: 1);
-        typeof(Product).GetProperty("Id")!.SetValue(product, 10);
-        var baseUnit = ProductUnit.CreateBaseUnit(10, "حبة", 1m, createdByUserId: 1);
-        product.AddUnit(baseUnit);
-
-        var warehouse = new Warehouse("المستودع الرئيسي", 1);
-        typeof(Warehouse).GetProperty("Id")!.SetValue(warehouse, 5);
-
-        var dto = new OpeningStockDto(WarehouseId: 5, Quantity: 200m, UnitCost: 15m, ExpiryDate: null);
-
-        _warehouseRepoMock.Setup(x => x.GetByIdAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(warehouse);
-
-        var result = await _service.CreateOpeningStockBatchAsync(
-            product, baseUnit.Id, dto, createdByUserId: 1, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.True(result.Value.IsOpeningBatch);
-        Assert.Equal(200m, result.Value.Quantity);
-        Assert.Equal(200m, result.Value.OriginalQuantity);
-        Assert.Equal(15m, result.Value.UnitCost);
-        Assert.Equal(5, result.Value.WarehouseId);
-        Assert.Equal(10, result.Value.ProductId);
-        Assert.Null(result.Value.PurchaseInvoiceId);
-    }
-
-    [Fact]
-    public async Task CreateOpeningStockBatchAsync_CreatesInventoryMovement()
-    {
-        var product = Product.Create("منتج");
-        typeof(Product).GetProperty("Id")!.SetValue(product, 10);
-        var baseUnit = ProductUnit.CreateBaseUnit(10, "حبة", 1m, createdByUserId: 1);
-        product.AddUnit(baseUnit);
-
-        var warehouse = new Warehouse("مستودع", 1);
-        typeof(Warehouse).GetProperty("Id")!.SetValue(warehouse, 5);
-
-        var dto = new OpeningStockDto(WarehouseId: 5, Quantity: 100m, UnitCost: 10m, ExpiryDate: null);
-        _warehouseRepoMock.Setup(x => x.GetByIdAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(warehouse);
-
-        var result = await _service.CreateOpeningStockBatchAsync(
-            product, baseUnit.Id, dto, createdByUserId: 1, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        _movementRepoMock.Verify(x => x.AddAsync(
-            It.Is<InventoryMovement>(m =>
-                m.ProductId == 10 &&
-                m.WarehouseId == 5 &&
-                m.MovementType == MovementType.PurchaseIn &&
-                m.QuantityChange == 100m &&
-                m.QuantityBefore == 0m &&
-                m.QuantityAfter == 100m &&
-                m.ReferenceType == "Product"),
-            It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task CreateOpeningStockBatchAsync_UpdatesOrCreatesWarehouseStock()
-    {
-        var product = Product.Create("منتج");
-        typeof(Product).GetProperty("Id")!.SetValue(product, 10);
-        var baseUnit = ProductUnit.CreateBaseUnit(10, "حبة", 1m, createdByUserId: 1);
-        product.AddUnit(baseUnit);
-
-        var warehouse = new Warehouse("مستودع", 1);
-        typeof(Warehouse).GetProperty("Id")!.SetValue(warehouse, 5);
-
-        var existingStock = WarehouseStock.Create(10, 5, 50m);
-        typeof(WarehouseStock).GetProperty("Id")!.SetValue(existingStock, 1);
-
-        var dto = new OpeningStockDto(WarehouseId: 5, Quantity: 100m, UnitCost: 10m, ExpiryDate: null);
-        _warehouseRepoMock.Setup(x => x.GetByIdAsync(5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(warehouse);
-        _stockRepoMock.Setup(x => x.GetAsync(10, 5, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existingStock);
-
-        var result = await _service.CreateOpeningStockBatchAsync(
-            product, baseUnit.Id, dto, createdByUserId: 1, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(150m, existingStock.Quantity); // 50 + 100
-    }
-
-    [Fact]
-    public async Task CreateOpeningStockBatchAsync_WhenWarehouseNotFound_ReturnsFailure()
-    {
-        var product = Product.Create("منتج");
-        typeof(Product).GetProperty("Id")!.SetValue(product, 10);
-        var baseUnit = ProductUnit.CreateBaseUnit(10, "حبة", 1m, createdByUserId: 1);
-
-        _warehouseRepoMock.Setup(x => x.GetByIdAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Warehouse?)null);
-
-        var dto = new OpeningStockDto(WarehouseId: 999, Quantity: 100m, UnitCost: 10m, null);
-
-        var result = await _service.CreateOpeningStockBatchAsync(
-            product, baseUnit.Id, dto, createdByUserId: 1, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal(ErrorCodes.NotFound, result.ErrorCode);
-    }
-}
-```
+See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions.
 
 **Estimate**: ~2 hours
 
@@ -2787,226 +1600,7 @@ public class ProductServiceOpeningStockTests
 
 #### 19.5 — FIFO Allocation Service Tests
 
-```csharp
-public class FifoAllocationServiceTests
-{
-    private readonly Mock<IUnitOfWork> _uowMock;
-    private readonly Mock<IPurchaseLotRepository> _lotRepoMock;
-    private readonly Mock<IProductRepository> _productRepoMock;
-    private readonly Mock<IWarehouseStockRepository> _stockRepoMock;
-    private readonly Mock<IInventoryMovementRepository> _movementRepoMock;
-    private readonly Mock<ILogger<FifoAllocationService>> _loggerMock;
-    private readonly FifoAllocationService _service;
-
-    public FifoAllocationServiceTests()
-    {
-        _uowMock = new Mock<IUnitOfWork>();
-        _lotRepoMock = new Mock<IPurchaseLotRepository>();
-        _productRepoMock = new Mock<IProductRepository>();
-        _stockRepoMock = new Mock<IWarehouseStockRepository>();
-        _movementRepoMock = new Mock<IInventoryMovementRepository>();
-        _loggerMock = new Mock<ILogger<FifoAllocationService>>();
-
-        _uowMock.Setup(x => x.PurchaseLots).Returns(_lotRepoMock.Object);
-        _uowMock.Setup(x => x.Products).Returns(_productRepoMock.Object);
-        _uowMock.Setup(x => x.WarehouseStocks).Returns(_stockRepoMock.Object);
-        _uowMock.Setup(x => x.InventoryMovements).Returns(_movementRepoMock.Object);
-
-        _service = new FifoAllocationService(_uowMock.Object, _loggerMock.Object);
-    }
-
-    // ─── AddPurchaseBatchesAsync ──────────────────────────────────
-
-    [Fact]
-    public async Task AddPurchaseBatchesAsync_CreatesLotCorrectly()
-    {
-        var result = await _service.AddPurchaseBatchesAsync(
-            productUnitId: 1, warehouseId: 2, quantity: 100m,
-            unitCostBase: 25m, lotNumber: "B-20260605-001",
-            expiryDate: null, purchaseInvoiceId: 5,
-            isOpeningBatch: false, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Single(result.Value);
-        var lot = result.Value[0];
-        Assert.Equal(100m, lot.Quantity);
-        Assert.Equal(100m, lot.OriginalQuantity);
-        Assert.Equal(25m, lot.UnitCost);
-        Assert.Equal("B-20260605-001", lot.LotNumber);
-        Assert.Equal(5, lot.PurchaseInvoiceId);
-        Assert.False(lot.IsOpeningBatch);
-    }
-
-    // ─── DeductFromBatchesAsync — FIFO ────────────────────────────
-
-    [Fact]
-    public async Task DeductFromBatchesAsync_Fifo_DeductsFromOldestLotFirst()
-    {
-        var product = Product.Create("منتج", hasExpiry: false);
-        typeof(Product).GetProperty("Id")!.SetValue(product, 1);
-        _productRepoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
-
-        var lot1 = CreateLot(1, 1, 1, "LOT001", 100m, 20m, DateTime.UtcNow.AddDays(-10));
-        var lot2 = CreateLot(1, 1, 1, "LOT002", 50m, 25m, DateTime.UtcNow.AddDays(-5));
-
-        _lotRepoMock.Setup(x => x.FindAllAsync(
-                It.IsAny<Expression<Func<PurchaseLot, bool>>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<string[]>()))
-            .ReturnsAsync(new List<PurchaseLot> { lot1, lot2 });
-
-        var result = await _service.DeductFromBatchesAsync(
-            productId: 1, warehouseId: 1, quantityNeeded: 80m,
-            salesInvoiceItemId: 10, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value.Count);
-        // 80 units taken: 80 from LOT001 (oldest), 0 from LOT002
-        Assert.Equal(20m, lot1.Quantity);  // 100 - 80
-        Assert.Equal(50m, lot2.Quantity);  // untouched
-    }
-
-    [Fact]
-    public async Task DeductFromBatchesAsync_Fifo_SpansMultipleLots()
-    {
-        var product = Product.Create("منتج", hasExpiry: false);
-        typeof(Product).GetProperty("Id")!.SetValue(product, 1);
-        _productRepoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
-
-        var lot1 = CreateLot(1, 1, 1, "LOT001", 50m, 20m, DateTime.UtcNow.AddDays(-10));
-        var lot2 = CreateLot(1, 1, 1, "LOT002", 100m, 25m, DateTime.UtcNow.AddDays(-5));
-
-        _lotRepoMock.Setup(x => x.FindAllAsync(
-                It.IsAny<Expression<Func<PurchaseLot, bool>>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<string[]>()))
-            .ReturnsAsync(new List<PurchaseLot> { lot1, lot2 });
-
-        var result = await _service.DeductFromBatchesAsync(
-            productId: 1, warehouseId: 1, quantityNeeded: 120m,
-            salesInvoiceItemId: 10, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value.Count);
-        Assert.Equal(0m, lot1.Quantity);   // LOT001 fully consumed (50)
-        Assert.Equal(30m, lot2.Quantity);  // LOT002 has 100 - 70 = 30 remaining
-    }
-
-    // ─── DeductFromBatchesAsync — FEFO ────────────────────────────
-
-    [Fact]
-    public async Task DeductFromBatchesAsync_Fefo_DeductsEarliestExpiryFirst()
-    {
-        var product = Product.Create("منتج", hasExpiry: true);
-        typeof(Product).GetProperty("Id")!.SetValue(product, 1);
-        _productRepoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
-
-        var lot1 = CreateLot(1, 1, 1, "LOT001", 100m, 20m,
-            receivedDate: DateTime.UtcNow.AddDays(-10), expiryDate: DateTime.UtcNow.AddMonths(6));
-        var lot2 = CreateLot(1, 1, 1, "LOT002", 100m, 25m,
-            receivedDate: DateTime.UtcNow.AddDays(-5), expiryDate: DateTime.UtcNow.AddMonths(3));
-
-        _lotRepoMock.Setup(x => x.FindAllAsync(
-                It.IsAny<Expression<Func<PurchaseLot, bool>>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<string[]>()))
-            .ReturnsAsync(new List<PurchaseLot> { lot1, lot2 });
-
-        var result = await _service.DeductFromBatchesAsync(
-            productId: 1, warehouseId: 1, quantityNeeded: 100m,
-            salesInvoiceItemId: 10, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        // LOT002 expires first (3 months) → fully consumed
-        Assert.Equal(100m, lot1.Quantity); // LOT001 untouched
-        Assert.Equal(0m, lot2.Quantity);   // LOT002 fully consumed (100 - 100)
-    }
-
-    // ─── Insufficient Stock ────────────────────────────────────────
-
-    [Fact]
-    public async Task DeductFromBatchesAsync_WhenInsufficientStock_ReturnsFailure()
-    {
-        var product = Product.Create("منتج");
-        typeof(Product).GetProperty("Id")!.SetValue(product, 1);
-        _productRepoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
-
-        var lot1 = CreateLot(1, 1, 1, "LOT001", 30m, 20m, DateTime.UtcNow);
-
-        _lotRepoMock.Setup(x => x.FindAllAsync(
-                It.IsAny<Expression<Func<PurchaseLot, bool>>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<string[]>()))
-            .ReturnsAsync(new List<PurchaseLot> { lot1 });
-
-        var result = await _service.DeductFromBatchesAsync(
-            productId: 1, warehouseId: 1, quantityNeeded: 100m,
-            salesInvoiceItemId: 10, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains("الكمية المتاحة في المخزون غير كافية", result.Error);
-    }
-
-    // ─── ReturnToBatchAsync ────────────────────────────────────────
-
-    [Fact]
-    public async Task ReturnToBatchAsync_WithValidAllocation_ReturnsToLot()
-    {
-        var lot = CreateLot(1, 1, 1, "LOT001", 70m, 20m, DateTime.UtcNow);
-        lot.DeductQuantity(30m); // consumed 30, remaining 70
-
-        var allocation = PurchaseLotAllocation.Create(1, 10, 30m, 20m);
-        typeof(PurchaseLotAllocation).GetProperty("Id")!.SetValue(allocation, 1);
-
-        _lotRepoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(lot);
-
-        var result = await _service.ReturnToBatchAsync(
-            allocationId: 1, quantityReturned: 10m,
-            salesReturnItemId: 20, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(80m, lot.Quantity); // 70 + 10
-    }
-
-    // ─── GetBatchBreakdownAsync ────────────────────────────────────
-
-    [Fact]
-    public async Task GetBatchBreakdownAsync_ReturnsAllActiveLots()
-    {
-        var lot1 = CreateLot(1, 1, 1, "LOT001", 50m, 20m, DateTime.UtcNow);
-        var lot2 = CreateLot(1, 1, 1, "LOT002", 30m, 25m, DateTime.UtcNow);
-
-        _lotRepoMock.Setup(x => x.FindAllAsync(
-                It.IsAny<Expression<Func<PurchaseLot, bool>>>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<string[]>()))
-            .ReturnsAsync(new List<PurchaseLot> { lot1, lot2 });
-
-        var result = await _service.GetBatchBreakdownAsync(
-            productId: 1, warehouseId: 1, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value.Count);
-        Assert.Equal(80m, result.Value.Sum(b => b.RemainingQuantity));
-    }
-
-    private static PurchaseLot CreateLot(int productId, int unitId, int warehouseId,
-        string lotNo, decimal qty, decimal cost, DateTime receivedDate,
-        DateTime? expiryDate = null)
-    {
-        // Helper to create lots via reflection for test setup
-        // (Production code uses PurchaseLot.Create)
-        var lot = PurchaseLot.Create(productId, unitId, warehouseId, lotNo,
-            qty, cost, expiryDate, receivedDate, null, false, null);
-        return lot;
-    }
-}
-```
+See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions.
 
 **Estimate**: ~4 hours
 
@@ -3014,151 +1608,7 @@ public class FifoAllocationServiceTests
 
 #### 19.6 — Pricing Service Tests (Fallback Chain)
 
-```csharp
-public class ProductUnitPriceServiceTests
-{
-    private readonly Mock<IUnitOfWork> _uowMock;
-    private readonly Mock<IProductUnitPriceRepository> _priceRepoMock;
-    private readonly Mock<ICurrencyRepository> _currencyRepoMock;
-    private readonly Mock<IProductPriceHistoryRepository> _historyRepoMock;
-    private readonly Mock<ILogger<ProductUnitPriceService>> _loggerMock;
-    private readonly ProductUnitPriceService _service;
-
-    public ProductUnitPriceServiceTests()
-    {
-        _uowMock = new Mock<IUnitOfWork>();
-        _priceRepoMock = new Mock<IProductUnitPriceRepository>();
-        _currencyRepoMock = new Mock<ICurrencyRepository>();
-        _historyRepoMock = new Mock<IProductPriceHistoryRepository>();
-        _loggerMock = new Mock<ILogger<ProductUnitPriceService>>();
-
-        _uowMock.Setup(x => x.ProductUnitPrices).Returns(_priceRepoMock.Object);
-        _uowMock.Setup(x => x.Currencies).Returns(_currencyRepoMock.Object);
-        _uowMock.Setup(x => x.ProductPriceHistories).Returns(_historyRepoMock.Object);
-
-        _service = new ProductUnitPriceService(_uowMock.Object, _loggerMock.Object);
-    }
-
-    [Fact]
-    public async Task GetEffectivePriceAsync_ExactMatch_ReturnsPrice()
-    {
-        var price = ProductUnitPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
-        _priceRepoMock.Setup(x => x.FindAsync(
-                It.IsAny<Expression<Func<ProductUnitPrice, bool>>>()))
-            .ReturnsAsync(price);
-
-        var result = await _service.GetEffectivePriceAsync(
-            productUnitId: 1, currencyId: 1, priceLevel: PriceLevel.Retail,
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(50m, result.Value);
-    }
-
-    [Fact]
-    public async Task GetEffectivePriceAsync_WholesaleFallbackToRetail_UsesRetailPrice()
-    {
-        var retailPrice = ProductUnitPrice.Create(1, 1, PriceLevel.Retail, 60m, createdByUserId: 1);
-        _priceRepoMock.SetupSequence(x => x.FindAsync(
-                It.IsAny<Expression<Func<ProductUnitPrice, bool>>>()))
-            .ReturnsAsync((ProductUnitPrice?)null)  // No exact wholesale price
-            .ReturnsAsync(retailPrice);              // Found retail price
-
-        var result = await _service.GetEffectivePriceAsync(
-            productUnitId: 1, currencyId: 1, priceLevel: PriceLevel.Wholesale,
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(60m, result.Value);
-    }
-
-    [Fact]
-    public async Task GetEffectivePriceAsync_NoPriceFound_ReturnsFailure()
-    {
-        _priceRepoMock.Setup(x => x.FindAsync(
-                It.IsAny<Expression<Func<ProductUnitPrice, bool>>>()))
-            .ReturnsAsync((ProductUnitPrice?)null);
-
-        var result = await _service.GetEffectivePriceAsync(
-            productUnitId: 1, currencyId: 1, priceLevel: PriceLevel.Retail,
-            CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains("لا يوجد سعر محدد لهذه التركيبة", result.Error);
-    }
-
-    [Fact]
-    public async Task GetEffectivePriceAsync_WithDifferentCurrency_FallsBack()
-    {
-        var retailInBaseCurrency = ProductUnitPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
-
-        _priceRepoMock.SetupSequence(x => x.FindAsync(
-                It.IsAny<Expression<Func<ProductUnitPrice, bool>>>()))
-            .ReturnsAsync((ProductUnitPrice?)null)  // No price in target currency (Id=2)
-            .ReturnsAsync(retailInBaseCurrency);     // Found in base currency (Id=1)
-
-        var result = await _service.GetEffectivePriceAsync(
-            productUnitId: 1, currencyId: 2, priceLevel: PriceLevel.Retail,
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(50m, result.Value);
-    }
-
-    [Fact]
-    public async Task SetPriceAsync_CreatesPriceAndRecordsHistory()
-    {
-        var result = await _service.SetPriceAsync(
-            productUnitId: 1, currencyId: 1, priceLevel: PriceLevel.Retail,
-            price: 75m, changedByUserId: 1, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        _priceRepoMock.Verify(x => x.AddAsync(
-            It.Is<ProductUnitPrice>(p =>
-                p.ProductUnitId == 1 &&
-                p.CurrencyId == 1 &&
-                p.PriceLevel == PriceLevel.Retail &&
-                p.Price == 75m),
-            It.IsAny<CancellationToken>()), Times.Once);
-        _historyRepoMock.Verify(x => x.AddAsync(
-            It.Is<ProductPriceHistory>(h =>
-                h.ChangeType == "PriceUpdate" &&
-                h.NewValue == 75m),
-            It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task UpdatePriceAsync_UpdatesPriceAndRecordsHistory()
-    {
-        var price = ProductUnitPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
-        typeof(ProductUnitPrice).GetProperty("Id")!.SetValue(price, 10);
-
-        _priceRepoMock.Setup(x => x.GetByIdAsync(10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(price);
-
-        var result = await _service.UpdatePriceAsync(10, 80m, changedByUserId: 2, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(80m, price.Price);
-        _historyRepoMock.Verify(x => x.AddAsync(
-            It.Is<ProductPriceHistory>(h =>
-                h.OldValue == 50m && h.NewValue == 80m),
-            It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task UpdatePriceAsync_WhenPriceNotFound_ReturnsFailure()
-    {
-        _priceRepoMock.Setup(x => x.GetByIdAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ProductUnitPrice?)null);
-
-        var result = await _service.UpdatePriceAsync(999, 80m, changedByUserId: 2, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal(ErrorCodes.NotFound, result.ErrorCode);
-    }
-}
-```
+See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions.
 
 **Estimate**: ~3 hours
 
@@ -3166,117 +1616,7 @@ public class ProductUnitPriceServiceTests
 
 #### 19.7 — FluentValidation Tests
 
-```csharp
-public class CreateProductRequestValidatorTests
-{
-    private readonly CreateProductRequestValidator _validator;
-
-    public CreateProductRequestValidatorTests()
-    {
-        _validator = new CreateProductRequestValidator();
-    }
-
-    [Fact]
-    public void ValidRequest_PassesValidation()
-    {
-        var request = new CreateProductRequest(
-            "منتج صالح", categoryId: 1, description: "اختبار",
-            hasExpiry: false, minStockLevel: 5m, reorderLevel: 10m,
-            openingStock: null,
-            units: new List<CreateProductUnitDto>
-            {
-                new("حبة", 1m, true, 1),
-                new("كرتون", 24m, false, 2)
-            });
-
-        var result = _validator.Validate(request);
-
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
-    public void EmptyName_FailsValidation()
-    {
-        var request = new CreateProductRequest("", null, null,
-            false, 0m, 0m, null, new List<CreateProductUnitDto>());
-
-        var result = _validator.Validate(request);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "Name");
-    }
-
-    [Fact]
-    public void NegativeMinStockLevel_FailsValidation()
-    {
-        var request = new CreateProductRequest(
-            "منتج", null, null, false, -1m, 0m, null,
-            new List<CreateProductUnitDto> { new("حبة", 1m, true, 1) });
-
-        var result = _validator.Validate(request);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "MinStockLevel");
-    }
-
-    [Fact]
-    public void NoUnits_FailsValidation()
-    {
-        var request = new CreateProductRequest(
-            "منتج", null, null, false, 0m, 0m, null,
-            new List<CreateProductUnitDto>());
-
-        var result = _validator.Validate(request);
-
-        Assert.False(result.IsValid);
-    }
-}
-
-public class CreateProductUnitPriceRequestValidatorTests
-{
-    private readonly CreateProductUnitPriceRequestValidator _validator;
-
-    public CreateProductUnitPriceRequestValidatorTests()
-    {
-        _validator = new CreateProductUnitPriceRequestValidator();
-    }
-
-    [Fact]
-    public void ValidRequest_PassesValidation()
-    {
-        var request = new CreateProductUnitPriceRequest(
-            productUnitId: 1, currencyId: 1,
-            priceLevel: PriceLevel.Retail, price: 50m);
-
-        var result = _validator.Validate(request);
-
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
-    public void NegativePrice_FailsValidation()
-    {
-        var request = new CreateProductUnitPriceRequest(
-            1, 1, PriceLevel.Retail, -10m);
-
-        var result = _validator.Validate(request);
-
-        Assert.False(result.IsValid);
-    }
-
-    [Fact]
-    public void InvalidPriceLevel_FailsValidation()
-    {
-        var request = new CreateProductUnitPriceRequest(
-            1, 1, (PriceLevel)99, 50m);
-
-        var result = _validator.Validate(request);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "PriceLevel");
-    }
-}
-```
+See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions.
 
 **Estimate**: ~2 hours
 
@@ -3284,193 +1624,11 @@ public class CreateProductUnitPriceRequestValidatorTests
 
 #### 19.8 — Database Configuration Tests
 
-```csharp
-public class ProductConfigurationTests
-{
-    [Fact]
-    public void ProductConfiguration_HasCorrectTableName()
-    {
-        var modelBuilder = new ModelBuilder();
-        new ProductConfiguration().Configure(modelBuilder.Entity<Product>());
+See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions.
 
-        var entity = modelBuilder.Model.FindEntityType(typeof(Product));
-        Assert.Equal("Products", entity!.GetTableName());
-    }
+See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for canonical table definitions.
 
-    [Fact]
-    public void Name_HasRequiredMaxLength150()
-    {
-        var modelBuilder = new ModelBuilder();
-        new ProductConfiguration().Configure(modelBuilder.Entity<Product>());
-
-        var prop = modelBuilder.Model.FindEntityType(typeof(Product))!
-            .FindProperty(nameof(Product.Name));
-        Assert.False(prop!.IsNullable);
-        Assert.Equal(150, prop.GetMaxLength());
-    }
-
-    [Fact]
-    public void MinStockLevel_HasPrecision18_3()
-    {
-        var modelBuilder = new ModelBuilder();
-        new ProductConfiguration().Configure(modelBuilder.Entity<Product>());
-
-        var prop = modelBuilder.Model.FindEntityType(typeof(Product))!
-            .FindProperty(nameof(Product.MinStockLevel));
-        Assert.Equal(18, prop!.GetPrecision());
-        Assert.Equal(3, prop.GetScale());
-    }
-
-    [Fact]
-    public void AvgCost_HasPrecision18_2()
-    {
-        var modelBuilder = new ModelBuilder();
-        new ProductConfiguration().Configure(modelBuilder.Entity<Product>());
-
-        var prop = modelBuilder.Model.FindEntityType(typeof(Product))!
-            .FindProperty(nameof(Product.AvgCost));
-        Assert.Equal(18, prop!.GetPrecision());
-        Assert.Equal(2, prop.GetScale());
-    }
-
-    [Fact]
-    public void CategoryIdFK_UsesDeleteBehaviorRestrict()
-    {
-        var modelBuilder = new ModelBuilder();
-        new ProductConfiguration().Configure(modelBuilder.Entity<Product>());
-
-        var entity = modelBuilder.Model.FindEntityType(typeof(Product))!;
-        var fk = entity.GetForeignKeys()
-            .FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Category));
-        Assert.NotNull(fk);
-        Assert.Equal(DeleteBehavior.Restrict, fk!.DeleteBehavior);
-    }
-
-    [Fact]
-    public void Product_HasQueryFilterForIsActive()
-    {
-        var modelBuilder = new ModelBuilder();
-        new ProductConfiguration().Configure(modelBuilder.Entity<Product>());
-
-        var entity = modelBuilder.Model.FindEntityType(typeof(Product))!;
-        var queryFilter = entity.GetQueryFilter();
-        Assert.NotNull(queryFilter);
-    }
-}
-
-public class PurchaseLotConfigurationTests
-{
-    [Fact]
-    public void PurchaseLot_TableNameIsCorrect()
-    {
-        var modelBuilder = new ModelBuilder();
-        new PurchaseLotConfiguration().Configure(modelBuilder.Entity<PurchaseLot>());
-
-        var entity = modelBuilder.Model.FindEntityType(typeof(PurchaseLot));
-        Assert.Equal("PurchaseLots", entity!.GetTableName());
-    }
-
-    [Fact]
-    public void QuantityField_HasPrecision18_3()
-    {
-        var modelBuilder = new ModelBuilder();
-        new PurchaseLotConfiguration().Configure(modelBuilder.Entity<PurchaseLot>());
-
-        var prop = modelBuilder.Model.FindEntityType(typeof(PurchaseLot))!
-            .FindProperty(nameof(PurchaseLot.Quantity));
-        Assert.Equal(18, prop!.GetPrecision());
-        Assert.Equal(3, prop.GetScale());
-    }
-
-    [Fact]
-    public void UnitCost_HasPrecision18_2()
-    {
-        var modelBuilder = new ModelBuilder();
-        new PurchaseLotConfiguration().Configure(modelBuilder.Entity<PurchaseLot>());
-
-        var prop = modelBuilder.Model.FindEntityType(typeof(PurchaseLot))!
-            .FindProperty(nameof(PurchaseLot.UnitCost));
-        Assert.Equal(18, prop!.GetPrecision());
-        Assert.Equal(2, prop.GetScale());
-    }
-
-    [Fact]
-    public void LotNumber_HasMaxLength50()
-    {
-        var modelBuilder = new ModelBuilder();
-        new PurchaseLotConfiguration().Configure(modelBuilder.Entity<PurchaseLot>());
-
-        var prop = modelBuilder.Model.FindEntityType(typeof(PurchaseLot))!
-            .FindProperty(nameof(PurchaseLot.LotNumber));
-        Assert.Equal(50, prop!.GetMaxLength());
-    }
-
-    [Fact]
-    public void FK_Warehouse_UsesDeleteBehaviorRestrict()
-    {
-        var modelBuilder = new ModelBuilder();
-        new PurchaseLotConfiguration().Configure(modelBuilder.Entity<PurchaseLot>());
-
-        var entity = modelBuilder.Model.FindEntityType(typeof(PurchaseLot))!;
-        var fk = entity.GetForeignKeys()
-            .FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Warehouse));
-        Assert.NotNull(fk);
-        Assert.Equal(DeleteBehavior.Restrict, fk!.DeleteBehavior);
-    }
-
-    [Fact]
-    public void FK_Product_UsesDeleteBehaviorRestrict()
-    {
-        var modelBuilder = new ModelBuilder();
-        new PurchaseLotConfiguration().Configure(modelBuilder.Entity<PurchaseLot>());
-
-        var entity = modelBuilder.Model.FindEntityType(typeof(PurchaseLot))!;
-        var fk = entity.GetForeignKeys()
-            .FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Product));
-        Assert.NotNull(fk);
-        Assert.Equal(DeleteBehavior.Restrict, fk!.DeleteBehavior);
-    }
-
-    [Fact]
-    public void HasCheckConstraint_QuantityNonNegative()
-    {
-        var modelBuilder = new ModelBuilder();
-        new PurchaseLotConfiguration().Configure(modelBuilder.Entity<PurchaseLot>());
-
-        var entity = modelBuilder.Model.FindEntityType(typeof(PurchaseLot))!;
-        var checkConstraints = entity.GetCheckConstraints();
-        Assert.Contains(checkConstraints, c => c.Name == "CHK_PurchaseLots_Quantity_NonNegative");
-    }
-}
-
-public class ProductUnitPriceConfigurationTests
-{
-    [Fact]
-    public void Price_HasPrecision18_2()
-    {
-        var modelBuilder = new ModelBuilder();
-        new ProductUnitPriceConfiguration().Configure(modelBuilder.Entity<ProductUnitPrice>());
-
-        var prop = modelBuilder.Model.FindEntityType(typeof(ProductUnitPrice))!
-            .FindProperty(nameof(ProductUnitPrice.Price));
-        Assert.Equal(18, prop!.GetPrecision());
-        Assert.Equal(2, prop.GetScale());
-    }
-
-    [Fact]
-    public void FK_ProductUnit_UsesDeleteBehaviorRestrict()
-    {
-        var modelBuilder = new ModelBuilder();
-        new ProductUnitPriceConfiguration().Configure(modelBuilder.Entity<ProductUnitPrice>());
-
-        var entity = modelBuilder.Model.FindEntityType(typeof(ProductUnitPrice))!;
-        var fk = entity.GetForeignKeys()
-            .FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(ProductUnit));
-        Assert.NotNull(fk);
-        Assert.Equal(DeleteBehavior.Restrict, fk!.DeleteBehavior);
-    }
-}
-```
+> **Note**: `InventoryBatches` / `InventoryBatchAllocation` entities are named `InventoryBatches` / `InventoryBatchAllocation` in the final schema. `PriceLevel` is NOT in V1 — pricing is per (ProductUnit × CurrencyId) only.
 
 **Estimate**: ~2.5 hours
 
@@ -3478,128 +1636,7 @@ public class ProductUnitPriceConfigurationTests
 
 #### 19.9 — Assembly Service Tests
 
-```csharp
-public class AssemblyServiceTests
-{
-    private readonly Mock<IUnitOfWork> _uowMock;
-    private readonly Mock<IBillOfMaterialsRepository> _bomRepoMock;
-    private readonly Mock<IFifoAllocationService> _fifoMock;
-    private readonly Mock<IProductRepository> _productRepoMock;
-    private readonly Mock<IProductPriceHistoryRepository> _historyRepoMock;
-    private readonly Mock<ILogger<AssemblyService>> _loggerMock;
-    private readonly AssemblyService _service;
-
-    public AssemblyServiceTests()
-    {
-        _uowMock = new Mock<IUnitOfWork>();
-        _bomRepoMock = new Mock<IBillOfMaterialsRepository>();
-        _fifoMock = new Mock<IFifoAllocationService>();
-        _productRepoMock = new Mock<IProductRepository>();
-        _historyRepoMock = new Mock<IProductPriceHistoryRepository>();
-        _loggerMock = new Mock<ILogger<AssemblyService>>();
-
-        _uowMock.Setup(x => x.BillOfMaterials).Returns(_bomRepoMock.Object);
-        _uowMock.Setup(x => x.Products).Returns(_productRepoMock.Object);
-        _uowMock.Setup(x => x.ProductPriceHistories).Returns(_historyRepoMock.Object);
-
-        _service = new AssemblyService(_uowMock.Object, _fifoMock.Object, _loggerMock.Object);
-    }
-
-    [Fact]
-    public async Task ProduceAsync_WithValidComponents_DeductsAndCreatesProduct()
-    {
-        var assemblyProduct = Product.Create("منتج مُجمَّع");
-        typeof(Product).GetProperty("Id")!.SetValue(assemblyProduct, 1);
-
-        var component1 = Product.Create("مكون أ");
-        typeof(Product).GetProperty("Id")!.SetValue(component1, 2);
-        var component2 = Product.Create("مكون ب");
-        typeof(Product).GetProperty("Id")!.SetValue(component2, 3);
-
-        var bom = BillOfMaterials.Create(1, 2, 1, 2m, 0m, null);
-        var bom2 = BillOfMaterials.Create(1, 3, 1, 3m, 5m, null);
-        var boms = new List<BillOfMaterials> { bom, bom2 };
-
-        _productRepoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(assemblyProduct);
-        _bomRepoMock.Setup(x => x.FindAllAsync(
-                It.IsAny<Expression<Func<BillOfMaterials, bool>>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(boms);
-
-        _fifoMock.Setup(x => x.DeductFromBatchesAsync(
-                2, It.IsAny<int>(), 2m, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<PurchaseLotAllocation>>.Success(new List<PurchaseLotAllocation>()));
-        _fifoMock.Setup(x => x.DeductFromBatchesAsync(
-                3, It.IsAny<int>(), 3.15m, null, It.IsAny<CancellationToken>())) // 3 + 5% waste
-            .ReturnsAsync(Result<List<PurchaseLotAllocation>>.Success(new List<PurchaseLotAllocation>()));
-
-        var mockTransaction = new Mock<IDbContextTransaction>();
-        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockTransaction.Object);
-        _uowMock.Setup(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(1);
-
-        var result = await _service.ProduceAsync(
-            assemblyProductId: 1, warehouseId: 1, quantity: 10m,
-            produceUserId: 1, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        _fifoMock.Verify(x => x.DeductFromBatchesAsync(
-            2, 1, 20m, null, It.IsAny<CancellationToken>()), Times.Once); // 2 × 10 = 20
-        _fifoMock.Verify(x => x.DeductFromBatchesAsync(
-            3, 1, 31.5m, null, It.IsAny<CancellationToken>()), Times.Once); // 3.15 × 10 = 31.5
-        mockTransaction.Verify(x => x.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task ProduceAsync_WhenComponentInsufficient_ReturnsFailure()
-    {
-        var assemblyProduct = Product.Create("منتج مُجمَّع");
-        typeof(Product).GetProperty("Id")!.SetValue(assemblyProduct, 1);
-        var component = Product.Create("مكون");
-        typeof(Product).GetProperty("Id")!.SetValue(component, 2);
-
-        var bom = BillOfMaterials.Create(1, 2, 1, 5m, 0m, null);
-        var boms = new List<BillOfMaterials> { bom };
-
-        _productRepoMock.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(assemblyProduct);
-        _bomRepoMock.Setup(x => x.FindAllAsync(
-                It.IsAny<Expression<Func<BillOfMaterials, bool>>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(boms);
-
-        _fifoMock.Setup(x => x.DeductFromBatchesAsync(
-                2, 1, 5m, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<List<PurchaseLotAllocation>>.Failure("الكمية المتاحة غير كافية"));
-
-        var mockTransaction = new Mock<IDbContextTransaction>();
-        _uowMock.Setup(x => x.BeginTransactionAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockTransaction.Object);
-
-        var result = await _service.ProduceAsync(
-            assemblyProductId: 1, warehouseId: 1, quantity: 1m,
-            produceUserId: 1, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        mockTransaction.Verify(x => x.RollbackAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task ProduceAsync_WhenAssemblyProductNotFound_ReturnsFailure()
-    {
-        _productRepoMock.Setup(x => x.GetByIdAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Product?)null);
-
-        var result = await _service.ProduceAsync(
-            999, 1, 1m, 1, CancellationToken.None);
-
-        Assert.False(result.IsSuccess);
-        Assert.Equal(ErrorCodes.NotFound, result.ErrorCode);
-    }
-}
-```
+See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions.
 
 **Estimate**: ~3 hours
 
@@ -3610,12 +1647,12 @@ public class AssemblyServiceTests
 | Sub-Task | Focus | Key Test Files | Estimate |
 |----------|-------|----------------|----------|
 | 19.1 | Product.Create() factory + guards + units | `ProductTests.cs` | 2h |
-| 19.2 | ProductUnit, ProductUnitPrice, PurchaseLot, BOM entities | `ProductUnitTests.cs`, `PurchaseLotTests.cs`, `BillOfMaterialsTests.cs` | 3h |
+| 19.2 | ProductUnit, ProductPrice, InventoryBatch, BOM entities | `ProductUnitTests.cs`, `InventoryBatchTests.cs`, `BillOfMaterialsTests.cs` | 3h |
 | 19.3 | ProductService CRUD + opening stock batch | `ProductServiceTests.cs` | 2h |
-| 19.4 | OpeningStock: PurchaseLot + InventoryMovement + WarehouseStock | `ProductServiceOpeningStockTests.cs` | 2h |
+| 19.4 | OpeningStock: InventoryBatch + InventoryMovement + WarehouseStock | `ProductServiceOpeningStockTests.cs` | 2h |
 | 19.5 | FIFO/FEFO allocation algorithm + multi-lot spanning | `FifoAllocationServiceTests.cs` | 4h |
-| 19.6 | Pricing fallback chain + price history recording | `ProductUnitPriceServiceTests.cs` | 3h |
-| 19.7 | FluentValidation: Product, ProductUnitPrice requests | `ProductRequestValidatorTests.cs` | 2h |
-| 19.8 | EF Config: precision, maxlength, Restrict, check constraints | `ProductConfigurationTests.cs`, `PurchaseLotConfigurationTests.cs` | 2.5h |
+| 19.6 | Pricing fallback chain + price history recording | `ProductPriceServiceTests.cs` | 3h |
+| 19.7 | FluentValidation: Product, ProductPrice requests | `ProductRequestValidatorTests.cs` | 2h |
+| 19.8 | EF Config: precision, maxlength, Restrict, check constraints | `ProductConfigurationTests.cs`, `InventoryBatchConfigurationTests.cs` | 2.5h |
 | 19.9 | Assembly production + component deduction | `AssemblyServiceTests.cs` | 3h |
 | **Total** | **9 sub-tasks** | **~12 test files** | **~23.5h** |

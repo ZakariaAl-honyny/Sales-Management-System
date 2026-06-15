@@ -262,6 +262,67 @@ public class ReceiptPrinter
     }
 }
 
+## v4.10 — Print DTO Updates for 65-Table Schema
+
+### Updated InvoicePrintDto Structure
+```csharp
+// InvoicePrintDto now reflects new entity structure
+public class InvoicePrintDto
+{
+    public int InvoiceNo { get; set; }
+    public string InvoiceNumber => InvoiceNo.ToString();
+    public DateTime InvoiceDate { get; set; }
+    public string CustomerName { get; set; }          // From Customer.Party.Name
+    public string CustomerPhone { get; set; }         // From Customer.Party.Phone
+    public string CustomerTaxNumber { get; set; }     // From Customer.Party.TaxNumber
+    public string SupplierName { get; set; }          // From Supplier.Party.Name
+    public string SupplierPhone { get; set; }         // From Supplier.Party.Phone
+    public int CurrencyId { get; set; }
+    public string CurrencyCode { get; set; }
+    public string CurrencySymbol { get; set; }
+    public decimal ExchangeRate { get; set; }
+    public List<InvoiceItemPrintDto> Items { get; set; }
+    public decimal SubTotal { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal OtherCharges { get; set; }
+    public decimal NetTotal { get; set; }
+    public decimal PaidAmount { get; set; }
+    public decimal RemainingAmount { get; set; }
+    public decimal TotalCost { get; set; }            // SUM of batch costs
+    public decimal GrossProfit { get; set; }          // NetTotal - TotalCost
+    public string PaymentTypeDisplay { get; set; }
+}
+
+public class InvoiceItemPrintDto
+{
+    public string ProductName { get; set; }
+    public string UnitName { get; set; }              // From ProductUnit.Unit.Name
+    public string UnitSymbol { get; set; }            // From ProductUnit.Unit.Symbol
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal LineTotal { get; set; }
+    public string? BatchNo { get; set; }
+    public decimal UnitCost { get; set; }
+    public decimal LineCost { get; set; }
+    public decimal Profit { get; set; }
+    public string? ExpiryDate { get; set; }
+}
+```
+
+### Multi-Currency Display on Prints
+```
+// Show currency per line + exchange rate note at bottom
+Item Name    10 حبة   500 YER   5,000 YER
+Total: 5,000 YER (≈ $7.14 USD @ 700)
+```
+
+### Perpetual Inventory Cost on Prints
+```
+// When ShowProfitInInvoice enabled
+Item (Batch #1)    Cost: 3,500    Price: 5,000    Profit: 1,500 (30%)
+```
+
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
 Phase 21 (PRD alignment) — Users & Permissions is now complete. No direct changes to printing. Permission-based UI controls may affect print button visibility for different roles. Verify that PrintController endpoints respect [Authorize] attributes.

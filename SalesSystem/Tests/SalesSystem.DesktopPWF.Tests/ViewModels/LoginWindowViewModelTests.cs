@@ -7,6 +7,7 @@ using Moq;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.Contracts.Enums;
+using System.Collections.Generic;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Models;
 using SalesSystem.DesktopPWF.Services;
@@ -169,7 +170,7 @@ public class LoginWindowViewModelTests
                 UserId: 1,
                 UserName: "admin",
                 FullName: "Admin",
-                Role: (byte)UserRole.Admin,
+                Role: (byte)1,
                 Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))
         });
@@ -217,7 +218,7 @@ public class LoginWindowViewModelTests
             UserId: 1,
             UserName: "admin",
             FullName: "Admin User",
-            Role: (byte)UserRole.Admin,
+            Role: (byte)1,
             Token: "test-token-123",
             ExpiresAt: DateTime.UtcNow.AddHours(8));
 
@@ -240,7 +241,8 @@ public class LoginWindowViewModelTests
                 "test-token-123",
                 "admin",
                 1,
-                UserRole.Admin),
+                new List<int> { 1 },
+                "مدير النظام"),
             Times.Once);
     }
 
@@ -286,7 +288,7 @@ public class LoginWindowViewModelTests
                 UserId: 1,
                 UserName: "admin",
                 FullName: "Admin",
-                Role: (byte)UserRole.Admin,
+                Role: (byte)1,
                 Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))
         });
@@ -328,7 +330,7 @@ public class LoginWindowViewModelTests
                 UserId: 1,
                 UserName: "admin",
                 FullName: "Admin",
-                Role: (byte)UserRole.Admin,
+                Role: (byte)1,
                 Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))
         });
@@ -378,7 +380,7 @@ public class LoginWindowViewModelTests
             UserId: 1,
             UserName: "user1",
             FullName: "User One",
-            Role: (byte)UserRole.Cashier,
+            Role: (byte)3,
             Token: "change-password-token",
             ExpiresAt: DateTime.UtcNow.AddHours(8),
             MustChangePassword: true);
@@ -403,7 +405,8 @@ public class LoginWindowViewModelTests
                 "change-password-token",
                 "user1",
                 1,
-                UserRole.Cashier),
+                new List<int> { 3 },
+                "كاشير"),
             Times.Once);
     }
 
@@ -494,7 +497,7 @@ public class LoginWindowViewModelTests
                 UserId: 1,
                 UserName: "admin",
                 FullName: "Admin",
-                Role: (byte)UserRole.Admin,
+                Role: (byte)1,
                 Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))
         });

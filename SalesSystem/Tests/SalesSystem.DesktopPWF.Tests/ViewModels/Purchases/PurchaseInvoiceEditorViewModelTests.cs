@@ -30,8 +30,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<ICashBoxApiService> _cashBoxApiServiceMock;
     private readonly Mock<IPrintApiService> _printApiServiceMock;
     private readonly Mock<IToastNotificationService> _mockToastService;
-    private readonly Mock<ICurrencyApiService> _currencyServiceMock;
-    private readonly Mock<IAdditionalFeeApiService> _additionalFeeServiceMock;
+    private readonly Mock<ICurrencyApiService> _mockCurrencyService;
     private readonly PurchaseInvoiceEditorViewModel _viewModel;
 
     public PurchaseInvoiceEditorViewModelTests()
@@ -48,24 +47,18 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
         _cashBoxApiServiceMock = new Mock<ICashBoxApiService>();
         _printApiServiceMock = new Mock<IPrintApiService>();
         _mockToastService = new Mock<IToastNotificationService>();
-        _currencyServiceMock = new Mock<ICurrencyApiService>();
-        _additionalFeeServiceMock = new Mock<IAdditionalFeeApiService>();
-
-        _currencyServiceMock.Setup(s => s.GetAllAsync(true)).ReturnsAsync(Result<List<CurrencyDto>>.Success(new List<CurrencyDto>
-        {
-            new CurrencyDto(1, "ريال سعودي", "SAR", "﷼", 1.0m, true, null, true, true)
-        }));
+        _mockCurrencyService = new Mock<ICurrencyApiService>();
 
         var suppliers = new List<SupplierDto>
         {
-            new SupplierDto(Id: 1, Name: "مورد 1", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true),
-            new SupplierDto(Id: 2, Name: "مورد 2", Phone: null, Email: null, Address: null, TaxNumber: null, OpeningBalance: 0, CurrentBalance: 0, CreditLimit: 0, IsActive: true)
+            new SupplierDto(Id: 1, Name: "مورد 1", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, AccountId: 1),
+            new SupplierDto(Id: 2, Name: "مورد 2", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, AccountId: 1)
         };
 
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Name: "المستودع الرئيسي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: true, IsActive: true, AccountId: null, Notes: null),
-            new WarehouseDto(Id: 2, Name: "المستودع الفرعي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsDefault: false, IsActive: true, AccountId: null, Notes: null)
+            new WarehouseDto(Id: 1, Code: "", Name: "المستودع الرئيسي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true),
+            new WarehouseDto(Id: 2, Code: "", Name: "المستودع الفرعي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
         };
 
         var products = new List<ProductDto>
@@ -88,11 +81,9 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             _mockDialogService.Object,
             _mockSoundService.Object,
             _mockBarcodeInputService.Object,
-            _cashBoxApiServiceMock.Object,
             _printApiServiceMock.Object,
             _mockToastService.Object,
-            _currencyServiceMock.Object,
-            _additionalFeeServiceMock.Object);
+            _mockCurrencyService.Object);
     }
 
     public void Dispose() { }
@@ -106,7 +97,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
         var vmWithId = new PurchaseInvoiceEditorViewModel(
             _mockInvoiceService.Object, _mockEventBus.Object, _mockSupplierService.Object,
             _mockWarehouseService.Object, _mockProductService.Object, _mockSettingsService.Object,
-            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _cashBoxApiServiceMock.Object, _printApiServiceMock.Object, _mockToastService.Object, _currencyServiceMock.Object, _additionalFeeServiceMock.Object, invoiceId: 1);
+            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _printApiServiceMock.Object, _mockToastService.Object, _mockCurrencyService.Object, invoiceId: 1);
         vmWithId.IsEditMode.Should().BeTrue();
     }
 
@@ -136,10 +127,10 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             SubTotal: 1000m,
             DiscountAmount: 0,
             TaxAmount: 0,
-            TotalAmount: 1000m,
+            OtherCharges: 0,
+            NetTotal: 1000m,
             PaidAmount: 1000m,
-            DueAmount: 0,
-            SupplierInvoiceNo: null,
+            RemainingAmount: 0,
             Notes: null,
             Status: 1,
             TaxId: null,
@@ -147,24 +138,18 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
-            CostInBaseCurrency: null,
-            AdditionalFeesTotal: 0,
             AttachmentPath: null,
-            DiscountType: null,
-            DiscountRate: null,
-            CurrencyName: null,
             Items: new List<PurchaseInvoiceItemDto>
         {
-            new PurchaseInvoiceItemDto(Id: 1, ProductId: 1, ProductName: "منتج 1", ProductUnitId: 1, ProductUnitName: "وحدة", Quantity: 10, UnitCost: 100m, DiscountAmount: 0, DiscountType: null, DiscountRate: null, LineTotal: 1000m, CostInBaseCurrency: null, AdditionalFeesAmount: 0, Mode: 1, Notes: null)
-        },
-            AdditionalFees: new List<AdditionalFeeDto>());
+            new PurchaseInvoiceItemDto(1, 1, "منتج 1", 1, null, 10, 100m, 1000m)
+        });
 
         _mockInvoiceService.Setup(s => s.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(Result<PurchaseInvoiceDto>.Success(invoice));
 
         var vm = new PurchaseInvoiceEditorViewModel(
             _mockInvoiceService.Object, _mockEventBus.Object, _mockSupplierService.Object,
             _mockWarehouseService.Object, _mockProductService.Object, _mockSettingsService.Object,
-            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _cashBoxApiServiceMock.Object, _printApiServiceMock.Object, _mockToastService.Object, _currencyServiceMock.Object, _additionalFeeServiceMock.Object, invoiceId: 1);
+            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _printApiServiceMock.Object, _mockToastService.Object, _mockCurrencyService.Object, invoiceId: 1);
 
         await Task.Delay(100);
         vm.SelectedWarehouseId.Should().Be(1);
@@ -206,6 +191,6 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
     private static ProductDto CreateProductDto(int id, string name, decimal salePrice, decimal purchasePrice)
     {
-        return new ProductDto(id, null, name, null, null, 1, "وحدة", 1, "وحدة", 1, "وحدة", 1, purchasePrice, salePrice, salePrice, salePrice * 10, 0, null, null, null, true);
+        return new ProductDto(Id: id, Name: name, CategoryId: 1, CategoryName: null, Barcode: null, Description: null, ReorderLevel: 0m, TrackExpiry: false, ImagePath: null, Notes: null, DefaultPurchaseUnitId: null, DefaultSalesUnitId: null, IsActive: true);
     }
 }

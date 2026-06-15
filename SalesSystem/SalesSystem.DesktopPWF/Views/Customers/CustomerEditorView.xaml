@@ -131,22 +131,6 @@
                             <Border Height="12"/>
                         </StackPanel>
 
-                        <!-- Customer Group -->
-                        <Border Height="12"/>
-                        <TextBlock Text="مجموعة العملاء" Style="{StaticResource LabelStyle}"/>
-                        <ComboBox ItemsSource="{Binding AvailableGroups}"
-                                  SelectedItem="{Binding SelectedGroup}"
-                                  Style="{StaticResource ModernComboBox}"
-                                  TabIndex="9"
-                                  ToolTip="اختر مجموعة العميل — تُستخدم لتصنيف العملاء لأغراض التقارير والتسعير">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Name}"/>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <TextBlock Text="تصنيف اختياري يساعد في تجميع العملاء المتشابهين لأغراض التقارير فقط" Style="{StaticResource HelperTextStyle}"/>
-
                         <!-- Account - Auto-created by system -->
                         <Border Height="12"/>
                         <Border Background="#E3F2FD" CornerRadius="6" Padding="12,8">
@@ -161,7 +145,7 @@
                         <Border Height="12"/>
                         <CheckBox Content="عميل نشط" IsChecked="{Binding IsActive}" FontSize="14" 
                                   Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}" 
-                                  TabIndex="11"
+                                  TabIndex="9"
                                   AutomationProperties.AutomationId="ChkCustomerActive"
                                   ToolTip="تفعيل أو إلغاء تنشيط العميل — العميل غير النشط لن يظهر في قوائم الاختيار"/>
                     </StackPanel>
@@ -183,7 +167,7 @@
                             Width="140"
                             Margin="0,0,12,0"
                             IsDefault="True"
-                            TabIndex="12"
+                            TabIndex="10"
                             AutomationProperties.AutomationId="BtnSaveCustomer"
                             ToolTip="حفظ بيانات العميل — سيتم التحقق من صحة الحقول الإلزامية قبل الحفظ">
                         <StackPanel Orientation="Horizontal">
@@ -191,11 +175,21 @@
                             <TextBlock Text="حفظ البيانات"/>
                         </StackPanel>
                     </Button>
+                    <Button Command="{Binding ManageContactsCommand}"
+                            Style="{StaticResource SecondaryButton}"
+                            Width="140"
+                            Margin="0,0,12,0"
+                            TabIndex="11"
+                            ToolTip="إدارة جهات اتصال العميل">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="جهات الاتصال"/>
+                        </StackPanel>
+                    </Button>
                     <Button Content="إلغاء"
                             Command="{Binding CancelCommand}"
                             Style="{StaticResource SecondaryButton}"
                             Width="100"
-                            TabIndex="13"
+                            TabIndex="12"
                             AutomationProperties.AutomationId="BtnCancelCustomer"
                             ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>

@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using ClosedXML.Excel;
@@ -7,6 +7,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.Export;
 using Serilog;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Reports;
@@ -24,6 +25,9 @@ public class WarehouseMovementReportViewModel : ViewModelBase
     private IWarehouseApiService WarehouseApiService => _warehouseApiService ??= App.GetService<IWarehouseApiService>();
 
     private IDialogService D => DialogService!;
+
+    private IFinancialReportExportService? _pdfExportService;
+    private IFinancialReportExportService PdfExportService => _pdfExportService ??= App.GetService<IFinancialReportExportService>();
 
     private int? _selectedWarehouseId;
     private DateTime _dateFrom;
@@ -45,6 +49,8 @@ public class WarehouseMovementReportViewModel : ViewModelBase
             (Func<Task>)(async () => await ExecuteAsync(LoadDataAsync)));
 
         ExportCommand = new RelayCommand(ExportToExcel);
+        ExportPdfCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExportPdfAsync()));
 
         // Load data on initialization
         _ = LoadWarehousesAsync();
@@ -168,6 +174,7 @@ public class WarehouseMovementReportViewModel : ViewModelBase
     /// Exports the report data to Excel.
     /// </summary>
     public RelayCommand ExportCommand { get; }
+    public AsyncRelayCommand ExportPdfCommand { get; }
 
     #endregion
 
@@ -212,7 +219,7 @@ public class WarehouseMovementReportViewModel : ViewModelBase
                     Warehouses.Clear();
 
                     // Add "All Warehouses" option with Id=0
-                    Warehouses.Add(new WarehouseDto(0, "جميع المخازن", 1, string.Empty, null, null, null, true, true, null, null));
+                    Warehouses.Add(new WarehouseDto(0, string.Empty, "جميع المخازن", (byte)1, null, null, null, null, true));
 
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
@@ -290,6 +297,43 @@ public class WarehouseMovementReportViewModel : ViewModelBase
         catch (Exception ex)
         {
             LogSystemError("فشل في تصدير حركة المخازن إلى Excel", "WarehouseMovementReportViewModel.ExportToExcel", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        }
+    }
+
+    private async Task ExportPdfAsync()
+    {
+        if (ReportData.Count == 0)
+        {
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
+            return;
+        }
+
+        try
+        {
+            var dataTable = new System.Data.DataTable();
+            dataTable.Columns.Add("التاريخ", typeof(string));
+            dataTable.Columns.Add("المنتج", typeof(string));
+            dataTable.Columns.Add("المستودع", typeof(string));
+            dataTable.Columns.Add("نوع الحركة", typeof(string));
+            dataTable.Columns.Add("الكمية", typeof(decimal));
+            dataTable.Columns.Add("قبل", typeof(decimal));
+            dataTable.Columns.Add("بعد", typeof(decimal));
+            dataTable.Columns.Add("المرجع", typeof(string));
+
+            foreach (var item in ReportData)
+                dataTable.Rows.Add(item.Date.ToString("yyyy/MM/dd HH:mm"),
+                    item.ProductName, item.WarehouseName,
+                    item.MovementType, item.QuantityChange,
+                    item.QuantityBefore, item.QuantityAfter,
+                    item.ReferenceType);
+
+            await PdfExportService.ExportToPdfAsync("حركة المخازن", dataTable, 0,
+                $"WarehouseMovement_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في تصدير حركة المخازن إلى PDF", "WarehouseMovementReportViewModel.ExportPdf", ex);
             await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
         }
     }

@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.9+ — Phases 18-24 Complete, CashBox COA Integration Done, Phases 25-31 Planned)
+# AGENTS.md — Sales Management System (v4.10.3+ — Inventory Operations Complete: BLOCKER #1-3 Fixed, Desktop ViewModels Rewritten, 0 Build Errors)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -6,7 +6,7 @@
 ---
 
 <!-- SPECKIT START -->
-**Active Feature Plan**: [specs/021-users-permissions/plan.md](specs/021-users-permissions/plan.md)
+**Active Feature Plan**: [specs/028-products-module-complete/plan.md](specs/028-products-module-complete/plan.md)
 <!-- SPECKIT END -->
 
 ## 1. Project Overview
@@ -212,10 +212,10 @@ public async Task<ProductDto> GetByIdAsync(int id)
 ### 2.8 Balance Direction
 
 ```text
-Customer.CurrentBalance > 0 = Customer owes US money
-Customer.CurrentBalance < 0 = We owe the customer
-Supplier.CurrentBalance > 0 = We owe the supplier
-Supplier.CurrentBalance < 0 = Supplier owes US
+Customer's Account balance > 0 = Customer owes US money
+Customer's Account balance < 0 = We owe the customer
+Supplier's Account balance > 0 = We owe the supplier
+Supplier's Account balance < 0 = Supplier owes US
 ```
 
 ### 2.9 Audit Trail
@@ -317,15 +317,15 @@ public class ProductsListViewModel : ViewModelBase, IDisposable
 | RULE-043 | **CQRS & MediatR**: Strictly separate Read operations (Queries) from Write operations (Commands) to prevent UI reads from blocking transactional logic. |
 | RULE-044 | **FluentValidation**: EVERY Command (Write operation) MUST have an associated `AbstractValidator` executed before reaching the Database. |
 
-### 2.18 Wholesale/Retail Pricing (v4.1)
+### 2.18 Per-Unit Pricing (v4.1 — Updated)
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-045 | Product has TWO prices: `RetailPrice` and `WholesalePrice` - NEVER compute prices dynamically |
-| RULE-046 | Use `Product.GetPriceByUnit(UnitType)` to get correct price - NEVER use conditional logic outside Domain |
-| RULE-047 | Use `Product.ConvertToSmallestUnit(quantity, unitType)` for unit conversion - NEVER compute conversion in UI or Service |
-| RULE-048 | Use `Stock.DeductStock(quantity, unitType, conversionFactor)` - conversion happens inside Domain |
-| RULE-049 | Invoice items store `SaleMode` (Retail/Wholesale) to determine which price was used |
+| RULE-045 | Pricing is per (Product + Unit + Currency) — NEVER store RetailPrice/WholesalePrice on Product entity |
+| RULE-046 | Use `ProductPrices` table: ProductUnitId FK, CurrencyId FK, Price decimal(18,2), EffectiveFrom datetime2, EffectiveTo datetime2 (nullable) — supports multi-currency pricing with effective date ranges |
+| RULE-047 | Unit conversion uses Factor from ProductUnit — NEVER compute conversion in UI or Service |
+| RULE-048 | Stock is always stored in base unit — conversion happens inside Domain via ProductUnit.Factor |
+| RULE-049 | Invoice items store `ProductUnitId` to determine which unit price was used — NEVER store SaleMode |
 
 ### 2.19 Delete Strategy (v4.2)
 
@@ -501,18 +501,21 @@ Button IsEnabled="{Binding CanSave}"                                // ❌ WRONG
 - `"الكمية يجب أن تكون أكبر من صفر"` (Quantity must be > 0)
 - `"السعر لا يمكن أن يكون سالباً"` (Price cannot be negative)
 
-### 2.24 Dynamic Unit of Measure (v4.3)
+### 2.24 Units & Product Units (v4.3 — Updated)
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-060 | `ProductUnit` stores conversion factor from base unit — use `ConvertToUnit(decimal quantity, int fromUnitId, int toUnitId)` for all unit conversions |
-| RULE-061 | Base unit always has `ConversionFactor = 1` (represents the smallest/foundational unit) |
-| RULE-062 | Derived units `ConversionFactor > 1` (e.g., Box=24 means 1 Box = 24 Base units) |
+| RULE-060 | `Units` is an INDEPENDENT table (seed data + user-addable) — NEVER embed unit names in ProductUnit. `Units` has: Id, Name, Symbol, IsSystem (protects seed units), IsActive. |
+| RULE-061 | `ProductUnit` links Product to Unit via `UnitId` FK — stores `Factor` (conversion to base unit) and `IsBaseUnit` flag. Base unit always has `Factor = 1`. |
+| RULE-062 | Derived units have `Factor > 1` (e.g., Carton=24 means 1 Carton = 24 Base units). Use `ConvertToUnit(decimal quantity, int fromUnitId, int toUnitId)` for all unit conversions. |
 | RULE-063 | `UnitBarcode` stores ALL barcodes per product-unit combination — never embed barcode in Unit entity |
 | RULE-064 | `SmartUnitFormatter` selects best display unit based on quantity threshold — use in UI only |
-| RULE-065 | Pricing: `RetailPrice` and `WholesalePrice` stored per `ProductUnit` (not per Product) — use `ProductUnit.GetPriceByUnit(UnitType)` |
-| RULE-066 | Cost cascade: When purchase cost updates via WeightedAverage, ALL product units recalculate from base unit cost × conversion factor |
-| RULE-067 | `ProductMustHaveAtLeastOneUnit` rule enforced in Domain — throw `DomainException` if deleting last unit |
+| RULE-065 | Pricing is stored in `ProductPrices` table (ProductUnitId + CurrencyId + Price) — NEVER store prices on ProductUnit entity |
+| RULE-066 | Cost cascade: When purchase cost updates via WeightedAverage, ALL product units recalculate from base unit cost × Factor |
+| RULE-067 | `ProductMustHaveAtLeastOneUnit` rule enforced in Domain — throw `DomainException` if deleting last unit. Product MUST have at least one base unit + one additional unit. |
+| RULE-464 | `Product` entity MUST have optional `DefaultPurchaseUnitId` (int?) and `DefaultSalesUnitId` (int?) — pre-selects units in purchase/sales screens for faster data entry |
+| RULE-465 | Units seed data: حبة (PCS), كرتون (CTN), كيلو (KG), جرام (G), لتر (L), متر (M), بالة (BAL) — all with `IsSystem = true` |
+| RULE-466 | User can add new units, but cannot delete units used by any ProductUnit — soft-deactivate instead |
 
 **ProductUnit Entity pattern:**
 ```csharp
@@ -520,16 +523,16 @@ public class ProductUnit
 {
     public int Id { get; private set; }
     public int ProductId { get; private set; }
-    public string UnitName { get; private set; }      // e.g., "Piece", "Box", "Carton"
-    public decimal ConversionFactor { get; private set; } // Base=1, Box=24, Carton=144
-    public decimal RetailPrice { get; private set; }   // Price for retail sales
-    public decimal WholesalePrice { get; private set; } // Price for wholesale sales
-    public bool IsBaseUnit { get; private set; }      // Exactly one per product
+    public int UnitId { get; private set; }          // FK to Units table
+    public Unit Unit { get; private set; }           // Navigation property
+    public decimal Factor { get; private set; }      // Conversion to base unit (Base=1, Carton=24)
+    public bool IsBaseUnit { get; private set; }     // Exactly one per product
+    public bool IsActive { get; private set; }
     public ICollection<UnitBarcode> Barcodes { get; private set; }
 
     public decimal ConvertToUnit(decimal quantity, decimal targetFactor)
     {
-        var baseQty = quantity * ConversionFactor;
+        var baseQty = quantity * Factor;
         return baseQty / targetFactor;
     }
 }
@@ -545,7 +548,7 @@ public class ProductUnit
 | RULE-071 | WeightedAverage = `(OldStock * OldAvgCost + NewQty * NewUnitCost) / (OldStock + NewQty)` |
 | RULE-072 | LastPurchasePrice = overwrite `AvgCost` with incoming `UnitCost` directly |
 | RULE-073 | SupplierPrice = use `Product.SupplierPrice` (catalog price) — no cost calculation |
-| RULE-074 | Cost cascade: ALL product units updated from base unit cost × conversion factor |
+| RULE-074 | Cost cascade: ALL product units updated from base unit cost × Factor |
 | RULE-075 | `UpdateProductPricingService` handles all three methods — NEVER write costing logic outside this service |
 | RULE-076 | Add audit entry in `ProductPriceHistory` on EVERY cost change |
 
@@ -1356,13 +1359,17 @@ All bugs from the Phase 19 settings review (`docs/phase19_settings_review.md`) h
 | RULE-296 | `DbSeeder` MUST seed ALL 25+ system settings from the plan specification — missing settings must be flagged and added during code review. Current seed count: 29 settings across Inventory (4), Sales (8), Purchases (3), Barcode (3), Accounting (1), Print (5), Notifications (4), General (3). |
 | RULE-297 | `StoreSettings` seed data MUST pass `defaultTaxRate: 0m` (deprecated — Tax entity is source of truth) — NEVER seed with `15m` which contradicts the deprecation strategy. |
 
-### 2.68 Phase 20 — Currencies Module: BUG-008 Fix (v4.6.9)
+### 2.68 Phase 20 — Currencies Module: BUG-008 Fix & Base Currency Immutability (v4.6.9)
 
-This rule codifies the last remaining remediation from the Phase 20 currencies review (`docs/phase20_currencies_review.md`). Earlier Phase 20 remediations (RULE-281 through RULE-290) were applied in v4.6.8 and are documented in §2.66. This section documents the BUG-008 fix applied in v4.6.9.
+This rule codifies the last remaining remediation from the Phase 20 currencies review (`docs/phase20_currencies_review.md`). Earlier Phase 20 remediations (RULE-281 through RULE-290) were applied in v4.6.8 and are documented in §2.66. This section documents the BUG-008 fix and base currency immutability rules applied in v4.6.9.
 
 | RULE | DIRECTIVE |
 |------|-----------|
 | RULE-298 | `Currency.Create()` MUST validate that `code.Trim().Length == 3` — ISO 4217 currency codes are always exactly 3 characters. NEVER use a generic max-length validation like `Length > 10`. |
+| RULE-471 | `Currency.IsBaseCurrency` MUST be IMMUTABLE after creation — NEVER allow user to change the base currency once the system is initialized. Base currency is determined at setup and locked for the system lifetime. |
+| RULE-472 | `FractionName` MUST be stored on Currency entity (e.g., "فلس" for YER, "Cent" for USD) — enables proper display of sub-currency units in invoices and reports. |
+| RULE-473 | `IsSystem` flag MUST protect system-seeded currencies (YER, USD) from deletion or deactivation — user-created currencies can be soft-deleted. `Currency.Create()` accepts `bool isSystem = false` parameter. |
+| RULE-474 | Filtered unique index on `Currency.IsBaseCurrency` MUST include `AND [IsActive] = 1` in the filter — a soft-deleted base currency must not prevent setting a new base currency. |
 
 ### 2.69 Phase 19 — Settings Module: Enhancement Remediations (v4.6.9)
 
@@ -1380,8 +1387,8 @@ Following the Phase 20 currencies review, 3 additional enhancements were applied
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-302 | `CashBox.Create()` MUST set `OpeningBalance = initialBalance` — not just `CurrentBalance`. NEVER leave `OpeningBalance` at default 0 when an initial balance is provided. |
-| RULE-303 | `Currency` entity MUST have `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods that set `IsBaseCurrency` and call `UpdateTimestamp()` — NEVER toggle `IsBaseCurrency` directly from service code. |
+| RULE-302 | Opening balance is a Journal Entry (Dr Cash Account / Cr OpeningBalanceEquity) — NEVER store OpeningBalance or CurrentBalance on CashBox entity. Balance is tracked on the linked GL Account. |
+| RULE-303 | `Currency` entity MUST have `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods that set `IsBaseCurrency` and call `UpdateTimestamp()` — NEVER toggle `IsBaseCurrency` directly from service code. These methods are SYSTEM-ONLY (used during seeding/setup) — NEVER user-callable after initialization. |
 | RULE-304 | `InvokeOnUIThreadAsync` callbacks MUST NOT use `async` keyword when the lambda contains no `await` — unnecessary `async` creates a fire-and-forget `Task` inside the dispatcher. |
 
 ### 2.71 Phase 21 — Users & Permissions Module Rules (v4.6.9)
@@ -1453,28 +1460,169 @@ The following rules codify the bugs found and fixed during Phase 22 code review.
 | RULE-351 | `nameof` operator MUST be used for validator property names instead of string literals — e.g., `RuleFor(x => x.NameAr)` NOT `RuleFor("NameAr")`. String literals for property names cause silent validator failures when properties are renamed. |
 | RULE-352 | Desktop health check MUST use `SecureDbContextFactory.GetDecryptedConnectionString()` as the single source of truth for connection strings — NEVER inject raw `IConfiguration` into health check services. The health check bypass must still go through DPAPI decryption to avoid false "connection refused" errors. |
 
-### 2.75 Phase 23 — Customers Module Rules (v4.6.9+)
+### 2.86 Phase 28 — Sales Price Enforcement Rules (v4.10.1)
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-353 | ~~REMOVED (CustomerType removed from Customer entity — Cash/Credit decision is per-invoice via `SalesInvoice.PaymentType`)~~ |
-| RULE-354 | `Customer` entity MUST have optional `AccountId` (int? FK to `Account`) for financial reporting integration — link is optional for legacy customer migration. |
-| RULE-355 | `Customer` entity MUST have optional `CustomerGroupId` (int? FK to `CustomerGroup`) for customer categorization — group is optional. |
-| RULE-356 | `CustomerGroup` is a soft-deletable entity (IsActive) — deletion is blocked if any customer references the group. |
-| RULE-357 | ~~REMOVED (CustomerType removed — credit limit enforcement uses `CreditLimit > 0` only, per `Customer.CheckCreditLimit()`)~~ |
-| RULE-358 | `Customer.CheckCreditLimit(decimal additionalAmount)` is a NON-THROWING domain method returning `bool` — computes `(CurrentBalance + additionalAmount) <= CreditLimit`. The caller decides whether to block or warn. |
-| RULE-359 | `Customer.Create()` MUST accept `accountId`, `customerGroupId` as optional parameters. |
-| RULE-360 | `Customer.Update()` must accept `accountId`, `customerGroupId` as optional parameters. |
-| RULE-361 | `CustomerDto` MUST include `AccountId`, `AccountName`, `CustomerGroupId`, `CustomerGroupName` for Desktop UI binding. |
-| RULE-362 | `CustomerGroup` API controller route MUST be `api/v1/customer-groups` — NOT `api/v1/customergroups` (kebab-case convention). |
-| RULE-363 | Customer groups READ endpoints use `AllStaff` policy — WRITE endpoints use `ManagerAndAbove` policy. |
-| RULE-364 | Desktop Customer Editor MUST load `AvailableGroups` and `AvailableAccounts` as lookup data on init — show dropdowns for group and linked account. |
-| RULE-365 | `CustomerGroupDto` MUST include `Id`, `Name`, `Description`, `IsActive` — groups are viewable by all staff (AllStaff). |
-| RULE-366 | Seeder MUST seed at least one default CustomerGroup ("عام") before seeding customers — the default customer "عميل نقدي" must reference the seeded group. |
-| RULE-367 | ~~REMOVED (CustomerType removed from system entirely)~~ |
-| RULE-368 | `ModernTextBox` style MUST NOT be used on `ComboBox` elements — `ModernTextBox` has `TargetType="TextBox"` and causes `XamlParseException`. Use `ModernComboBox` style instead. |
-| RULE-369 | `ComboBox` elements MUST NOT have both `DisplayMemberPath` and `ItemTemplate` set simultaneously — WPF throws `InvalidOperationException`. Use one or the other exclusively. |
-| RULE-370 | Phone number validation in customer FluentValidators MUST use regex `^05\d{8}$` with Arabic error message — NEVER only `MaxLength` check. Email MUST use `.EmailAddress()` validation. |
+| RULE-475 | `SalesService.PostAsync()` MUST enforce `PreventBelowRetailPrice` setting — before posting, look up `ProductPrices` for each item and reject if `item.UnitPrice < effectivePrice`. Return `Result.Failure("سعر البيع أقل من السعر الرسمي للمنتج: {name}")`. |
+| RULE-476 | `SalesService.PostAsync()` MUST enforce `AllowBelowCostSale` setting — if disabled, compare each item's `UnitPrice` against `CostInBaseCurrency` and reject if below cost. Return `Result.Failure("سعر البيع أقل من تكلفة المنتج: {name}")`. |
+| RULE-477 | `IProductPriceService` MUST be injected into `SalesService` for price lookups — use `GetEffectivePriceForInvoiceAsync()` to find the registered price for a ProductUnitId + CurrencyId combination. |
+| RULE-478 | Price override within invoice (`IsPriceOverridden`) MUST NOT change the base price in `ProductPrices` table — override is recorded only on the invoice line, not propagated to catalog. Discount is the CORRECT way to give price reductions, not price modification below default. |
+| RULE-479 | `Desktop InvoiceLineViewModel.GetDefaultPrice()` MUST NOT return `0m` stub — use actual price lookup from API (ProductPrices or ProductDto price field) to enable correct `IsPriceOverridden` detection. |
+
+### 2.87 Phase 27 — Purchase Invoice OtherCharges (Landed Cost) Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-480 | `PurchaseInvoice` entity MUST have `OtherCharges` property (decimal) with guard clause `otherCharges < 0` — included in `RecalculateTotals()` as `NetTotal = SubTotal - DiscountAmount + TaxAmount + OtherCharges`. |
+| RULE-481 | `AllocateAdditionalCharges()` MUST be called in `PurchaseService.PostAsync()` — distribute `OtherCharges` proportionally by line total: `lineShare = (LineTotal / SubTotal) × OtherCharges`, then `landedUnitCost = UnitCost + (lineShare / Quantity)`. |
+| RULE-482 | Inventory stock increase and batch creation MUST use `landedUnitCost` (unit cost plus distributed other charges share) — NEVER use raw `UnitCost` alone when `OtherCharges > 0`. |
+| RULE-483 | `CreatePurchaseInvoiceRequest`, `UpdatePurchaseInvoiceRequest`, and `PurchaseInvoiceDto` MUST include `OtherCharges` field (decimal) — mirroring `SalesInvoice` which already has it. |
+| RULE-484 | `PurchaseInvoiceConfiguration` MUST map `.Property(pi => pi.OtherCharges).HasPrecision(18, 2)` — the DB column already exists from `InitialCreate` migration. |
+| RULE-485 | Desktop `PurchaseInvoiceEditorViewModel` MUST have `OtherCharges` property included in `RecalculateTotals()`, `BuildRequest()`, `BuildUpdateRequest()`, and `LoadInvoiceAsync()` — XAML must show "مصاريف إضافية" input field. |
+| RULE-486 | `AccountingIntegrationService.CreatePurchasePostEntryAsync()` MUST use `SubTotal - DiscountAmount + OtherCharges` as `netInventoryCost` for the Dr Inventory line — NOT just `SubTotal - DiscountAmount`. |
+
+### 2.88 Phase 27 — Purchase Return Standalone Mode Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-487 | Purchase Return MUST support BOTH linked-to-invoice (`PurchaseInvoiceId` set) AND standalone mode (`PurchaseInvoiceId = null`) — Desktop editor MUST NOT block standalone returns with "يرجى اختيار فاتورة" validation when supplier is selected and items are entered. |
+| RULE-488 | `PurchaseReturnService.PostAsync()` MUST create journal entries via `CreatePurchaseReturnEntryAsync()` — Dr Supplier Account / Cr PurchaseReturnAccount — with per-entity account routing (`Supplier.Party.AccountId` fallback to `AccountsPayable`). |
+| RULE-489 | `PurchaseReturn.Post()` and `Cancel()` MUST set `PostedAt = DateTime.UtcNow` and `CancelledAt = DateTime.UtcNow` respectively — these were missing from `DocumentEntity` lifecycle. |
+| RULE-490 | `GET /api/v1/purchase-returns/returned-quantities/{invoiceId:int}` endpoint MUST exist for querying previously returned quantities — returns `Dictionary<ProductId, TotalReturnedQuantity>` from posted returns linked to the invoice. |
+| RULE-491 | `PurchaseReturnEditorViewModel` MUST NOT hardcode `ProductUnitId: 1` — use the actual `ProductUnitId` from the return line item's invoice item or input. |
+| RULE-492 | `AccountingIntegrationService` MUST have `ReversePurchaseReturnEntryAsync()` for cancelling posted purchase returns — Dr PurchaseReturnAccount / Cr Supplier Account (reversal of Dr↔Cr). |
+
+### 2.89 Phase 28 — Sales DeliveryChargesRevenue Account Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-493 | Sales OtherCharges (delivery, service fees) MUST be credited to a separate revenue account `DeliveryChargesRevenue` — NOT lumped into SalesRevenue. Journal entry must be: Dr Cash/AR = TotalAmount, Cr SalesRevenue = SubTotal - Discount, Cr DeliveryChargesRevenue = OtherCharges, Cr VatOutput = TaxAmount. |
+| RULE-494 | `SystemAccountKey` MUST have `DeliveryChargesRevenue = 21` enum value — mapped to account `1533 — إيرادات التوصيل` in `AccountingSeeder` under parent `1530 — إيرادات أخرى`. |
+| RULE-495 | `ReverseSalesPostEntryAsync()` MUST mirror the split — Dr SalesRevenue + Dr DeliveryChargesRevenue + Dr VatOutput / Cr Cash/AR — with `DeliveryChargesRevenue` included when `invoice.OtherCharges > 0`. |
+
+### 2.90 Phase 28 — Flexible Input Rules (v4.10.1)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-496 | Sales and Purchase line items MUST support Flexible Input — user enters ANY TWO of (Quantity, UnitPrice/UnitCost, LineTotal) and the system calculates the third automatically. Use `FlexibleInputCalculator` helper with `CalculationField` enum (Quantity/Price/Total). |
+| RULE-497 | LineTotal column in Sales and Purchase DataGrids MUST be editable (NOT `IsReadOnly`) — bind to `LineTotalInput` property. When user edits LineTotal, the system recalculates Quantity or UnitPrice based on which field was `_lastModifiedField`. Use `_isRecalculating` guard flag to prevent infinite recursion. |
+| RULE-498 | `InvoiceLineViewModel` and `PurchaseInvoiceLineViewModel` MUST have `LineTotalInput`, `_lastModifiedField`, and `_isRecalculating` fields. `RecalculateFromFlexibleInput()` MUST only call `FlexibleInputCalculator.Calculate()` when `_lastModifiedField == CalculationField.Total` (user explicitly edited LineTotal). When user edits Quantity or UnitPrice/UnitCost, `_lineTotalInput` MUST be recomputed directly as `_quantity * _unitPrice` WITHOUT using the calculator — otherwise the calculator incorrectly treats the auto-computed total as a user-entered anchor and recalculates Price/Quantity instead. |
+
+### 2.91 Phase 23 — Customers Module Rules (v4.6.9+ — Updated: كل عميل = حساب, No Balance on Entity)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-426 | `Customer` entity MUST have MANDATORY `AccountId` (int, non-nullable FK to `Account`) — auto-created by service, NEVER user-supplied in requests. |
+| RULE-427 | `CustomerGroup` NOT in V1 — deferred to V2. No CustomerGroup entity, DTO, service, API, or Desktop UI exists in V1 codebase. |
+| RULE-428 | `CustomerType` REMOVED from system entirely — Cash/Credit decision is per-invoice via `SalesInvoice.PaymentType`. |
+| RULE-429 | `Customer.Create()` MUST accept `accountId` as required parameter (`int`, non-nullable) — `customerGroupId` is NOT accepted. |
+| RULE-430 | `Customer.Update()` MUST accept `accountId` as required parameter (`int`, non-nullable) — `customerGroupId` is NOT accepted. |
+| RULE-431 | `Customer` entity MUST NOT have `OpeningBalance` or `CurrentBalance` fields — source of truth is the linked GL Account balance. Opening balance is a Journal Entry (Dr AR / Cr OpeningBalanceEquity). |
+| RULE-432 | `Customer` entity MUST NOT have `CurrencyId` — currency is per-transaction (invoice/payment), not per-customer. |
+| RULE-433 | `Customer.CheckCreditLimit(decimal additionalAmount)` is a NON-THROWING domain method returning `bool` — SOFT WARNING only, caller decides whether to block. |
+| RULE-434 | `CustomerDto` MUST include `AccountId` (int, non-nullable) and `AccountName` (string?) — NO `CustomerGroupId`, `CustomerGroupName`, or `CustomerType`. |
+| RULE-435 | `CreateCustomerRequest`/`UpdateCustomerRequest` MUST NOT have `AccountId`, `CustomerGroupId`, or `CustomerType` — these are auto-created or removed. |
+| RULE-436 | Desktop Customer Editor MUST NOT have CustomerGroup dropdown, AccountId selection combo, or CustomerType radio buttons — AccountName is display-only after save. |
+| RULE-437 | Account auto-creation: Service auto-creates Level-4 detail account under parent `"1210 — العملاء"` (Accounts Receivable) when creating a customer. |
+| RULE-438 | Seeder MUST NOT seed CustomerGroup — the default customer "عميل نقدي" is created with auto-created account linked to COA. |
+| RULE-439 | Phone number validation in customer FluentValidators MUST use regex `^05\d{8}$` with Arabic error message — NEVER only `MaxLength` check. Email MUST use `.EmailAddress()` validation. |
+| RULE-440 | `ModernTextBox` style MUST NOT be used on `ComboBox` elements — `ModernTextBox` has `TargetType="TextBox"` and causes `XamlParseException`. Use `ModernComboBox` style instead. |
+| RULE-441 | `ComboBox` elements MUST NOT have both `DisplayMemberPath` and `ItemTemplate` set simultaneously — WPF throws `InvalidOperationException`. Use one or the other exclusively. |
+
+### 2.92 Accounts.md Analysis — Bank Auto-Account, Employee Endpoint, & Parent Code Fixes (v4.10.2)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-502 | `Bank` entity MUST follow the same pattern as `CashBox`: `AccountId` is `int?` (nullable), with a `SetAccountId(int)` domain method. When `AccountId` is null at creation, `BankService` MUST auto-create a Level-4 detail account under parent `"1120 — البنوك"` (Bank Accounts) — mirroring `CashBoxService` auto-creation under `"1110 — النقدية"`. Account code auto-increments from existing child codes. |
+| RULE-503 | `EmployeesController` MUST expose `POST /api/v1/employees/{id}/auto-create-account` endpoint that calls `EmployeeService.AutoCreateEmployeeAccountAsync()` — creates a Level-4 detail account under parent `"1170 — عهد الموظفين"` (Employee Custody). This endpoint is needed because custody/advance/lone workflows need accounts created before transaction processing. |
+| RULE-504 | `CustomerService.AutoCreateCustomerAccountAsync()` MUST look up parent account by code `"1130"` (Accounts Receivable/العملاء) — NOT `"1210"` (Fixed Assets). `SupplierService.AutoCreateSupplierAccountAsync()` MUST look up parent account by code `"1320"` (Accounts Payable/الموردون) — NOT `"2100"` (doesn't exist). These parent codes were discovered during Accounts.md analysis and are CRITICAL for correct COA linking. |
+| RULE-505 | `RecalculateFromFlexibleInput()` in `InvoiceLineViewModel` and `PurchaseInvoiceLineViewModel` MUST ONLY call `FlexibleInputCalculator.Calculate()` when `_lastModifiedField == CalculationField.Total` — when user edited Quantity or UnitPrice/UnitCost, `_lineTotalInput` MUST be recomputed directly as `_quantity * _unitPrice` (or `_quantity * _unitCost`). NEVER pass Quantity or Price as `lastModifiedField` to the calculator because the auto-computed total is treated as a user-entered anchor, causing incorrect recalculation. |
+| RULE-506 | `Account.Create()` MUST receive `allowTransactions: true` when `level >= 4` — the domain guard `if (level >= 4 && !allowTransactions)` throws `DomainException("الحساب التفصيلي يجب أن يسمح بالحركات")`. This applies to ALL auto-creation callers: BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService. NEVER omit `allowTransactions: true` for detail accounts. |
+| RULE-507 | EVERY service interface registered in DI MUST have a concrete implementation class. Missing implementations cause `InvalidOperationException` at DI resolution. Search for ALL `services.AddScoped<I, T>` / `services.AddTransient<I, T>` and verify `T` exists as a concrete class. |
+| RULE-508 | Report API endpoints MUST match the URLs called by Desktop ViewModels. When adding a report ViewModel, verify the API controller has a matching route. Common mismatches: `detailed-stock-ledger`, `reports/returns`, `reports/aging`. For each `Get*Async()` call in `ReportApiService.cs`, verify the corresponding route exists in the controller. |
+| RULE-509 | `SupplierPaymentService.UpdateAsync()` and `CustomerReceiptService.UpdateAsync()` MUST create reversal journal entries when a posted payment's amount changes — (1) reverse the original via `ReverseSupplierPaymentEntryAsync()`/`ReverseCustomerPaymentEntryAsync()`, (2) create new entry for updated amount. Wrap in `ExecuteTransactionAsync()`. Use per-entity account routing with fallback to SystemAccountMappings. |
+| RULE-510 | `AccountingIntegrationService` MUST have `CreateSalesReturnEntryAsync()` for standalone sales returns — Dr `SalesReturnsAccount` / Cr `CustomerAccount` (per-entity routing) for return amount, Dr `InventoryAccount` / Cr `COGSAccount` for returned cost. This is separate from `ReverseSalesPostEntryAsync()` which handles full invoice cancellations. |
+| RULE-511 | Report services MUST NOT return hardcoded failure stubs. If a report query is complex, implement actual logic using available data entities (ReceiptVoucher, PaymentVoucher, InventoryTransaction, etc.) rather than returning `Result.Failure("تحت التطوير")` or similar stubs. |
+| RULE-512 | ALL financial report ViewModels MUST support Excel export via ClosedXML — if a report has PDF export but no Excel export, it is incomplete. Check `AccountStatementViewModel` and all 27 report ViewModels for `ExportExcelCommand`. |
+| RULE-506 | `AllowBelowCostSale` MUST default to `true` (allowed) with WARNING-only behavior — per analysis: "أنا أنصح: ✅ السماح. لكن مع تنبيه." When the setting is disabled (`false`), `SalesService.PostAsync()` MUST log a warning via `_logger.LogWarning` but MUST NOT block the sale (return `Result.Failure`). This differs from `PreventBelowRetailPrice` which DOES block. The analysis clearly states: "ولا نمنع البيع" (do not block the sale). |
+
+### 2.93 Inventory Operations Rules (v4.10.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-507 | `InventoryService.CreateTransactionAsync()` MUST auto-generate `TransactionNo` via `_sequenceService.GetNextIntAsync("InventoryTransaction", ct)` when the provided `TransactionNo <= 0`. NEVER require the Desktop to provide a TransactionNo — the service layer handles auto-generation (similar to InvoiceNo pattern in RULE-255). |
+| RULE-508 | `InventoryAdjustmentService.PostAsync()` MUST update `WarehouseStocks` per line — Addition=Increase, Deduction=Decrease, Correction=delta(target-current). MUST use `_inventoryService.IncreaseStockAsync()`/`DecreaseStockAsync()` for atomic stock changes with audit trail. MUST inject `IInventoryService` + `IDocumentSequenceService`. |
+| RULE-509 | `InventoryCountService.PostAsync()` MUST create a single `InventoryAdjustment` (Correction type per RULE-397) + update stock per line. MUST inject `IInventoryService` + `IDocumentSequenceService` + `IInventoryAdjustmentService`. Count creates one Adjustment per Post (not per line) for cleaner audit trail with `ReferenceType = "InventoryCount"`. |
+| RULE-510 | `InventoryAdjustmentEditorViewModel` MUST follow the `InventoryTransactionEditorViewModel` pattern — same DI, command, validation, and messaging patterns. 5 commands: `LoadWarehouses`, `LoadProducts`, `AddLine`, `RemoveLine`, `SaveDraft`/`Post`. Uses INotifyDataErrorInfo. AdjustmentType must support 1-3 (Addition, Deduction, Correction). |
+| RULE-511 | `InventoryCountEditorViewModel` MUST use `InventoryCountLineItem` mutable class for two-way binding. Supports `AddLine`/`RemoveLine` commands, Post flow with ValidateAllAsync, and edit mode for existing counts. Count lines store `ExpectedQuantity`, `ActualQuantity`, and compute `Difference`. |
+| RULE-512 | `WarehouseTransferEditorViewModel` MUST NOT hardcode IDs as `short` — use `short` for warehouse IDs matching `Warehouse.Id` type. Validate `SourceWarehouseId != DestinationWarehouseId` before posting. 5 commands: `LoadWarehouses`, `LoadSourceProducts`, `LoadDestinationProducts`, `AddLine`, `RemoveLine`, `SaveDraft`/`Post`. |
+| RULE-513 | `InventoryAdjustmentRequestValidator` MUST validate `AdjustmentType` range as `InclusiveBetween(1, 3)` — NOT `(1, 2)` which incorrectly excludes Correction=3. |
+| RULE-514 | `ReportsController` MUST place `CancellationToken` parameter BEFORE any optional parameters — ASP.NET Core model binding requires cancellation tokens to precede optional params to avoid binding errors. |
+| RULE-515 | `InventoryCountService.PostAsync()` MUST compute `Difference` for each line as `(ActualQuantity - ExpectedQuantity)` — positive difference = surplus (stock increase), negative difference = shortage (stock decrease). Apply increase or decrease via `IInventoryService` based on sign. |
+| RULE-516 | All Inventory Operations ViewModels (InventoryAdjustmentEditorViewModel, InventoryCountEditorViewModel, WarehouseTransferEditorViewModel) MUST implement `IDisposable` and call `Cleanup()` in `Dispose()` to unsubscribe EventBus subscriptions — same pattern as RULE-289. MUST use `IToastNotificationService` for minor success messages, not modal dialogs. |
+| RULE-517 | `SalesReturn.Post()` MUST set `PostedAt = DateTime.UtcNow` and `SalesReturn.Cancel()` MUST set `CancelledAt = DateTime.UtcNow` — these timestamps are required for audit trail compliance per DocumentEntity lifecycle (RULE-489). |
+| RULE-518 | `SalesReturnService` MUST inject `IAccountingIntegrationService` and call `CreateSalesReturnEntryAsync()` on Post AND `ReverseSalesReturnEntryAsync()` (or equivalent reversal) on Cancel — sales returns WITHOUT journal entries leave the general ledger out of sync. `AccountingIntegrationService` MUST have BOTH `CreateSalesReturnEntryAsync()` and `ReverseSalesReturnEntryAsync()` methods. |
+| RULE-519 | `ProductUnitId` MUST NEVER be hardcoded to `1` in any ViewModel — use the product's `DefaultPurchaseUnitId` (for purchase/inventory screens) or `DefaultSalesUnitId` (for sales screens) when creating line items. Fallback to `0` (let service determine) rather than hardcoding `1`. |
+| RULE-520 | `AllocateAdditionalCharges()` MUST be extracted to a standalone static helper class (`AdditionalChargeAllocator`) rather than being inline in `PurchaseService.PostAsync()` — enables DRY compliance (RULE-041) and unit testability. |
+
+### 2.94 Accounts.md Deep Review Rules (v4.10.3)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-521 | `ReportExportController.Export()` MUST delegate to `IReportExportService.ExportAsync()` for ALL 20+ report types — NEVER return a `BadRequest` stub. Each report type builds an Arabic-column `DataTable` and exports via ClosedXML (Excel) or QuestPDF (PDF). |
+| RULE-522 | `Permission.cs` MUST have ALL permission flags matching the AGENTS.md Section 6 matrix: SalesInvoice, SalesReturn, CustomerView, CustomerManagement, PurchaseInvoice, PurchaseReturn, ProductManagement, SupplierManagement, WarehouseTransfer, Reports, WarehouseManagement, Settings, UserManagement, Backup, ChartOfAccounts, JournalEntries, CashBoxes, Currencies, FiscalYear. Missing flags cause permission bypass or blocked access. |
+| RULE-523 | `CanNavigate()` in `MainViewModel` MUST use `_ => false` as the default (deny-by-default) — EVERY screen tag must be explicitly listed. The old `_ => true` pattern allowed unauthorized users to access Manager/Admin screens through navigation. |
+| RULE-524 | Organization Management screens (Branches, Departments, Employees, Banks, Parties, Expenses) and accounting screens (ReceiptVouchers, PaymentVouchers, سندات القبض المحاسبية, سندات الصرف) MUST have `Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"` to hide them from Basic users per the Accounts.md UI separation pattern. |
+| RULE-525 | ALL XAML windows SHOULD have keyboard shortcuts defined via `<Window.InputBindings>` — at minimum F3 (Products), F4 (Customers), F5 (Purchases), F8 (Reports). Keyboard shortcuts improve operational efficiency per Accounts.md Phase 5 UI analysis. |
+| RULE-526 | `InvoicePrintDto` MUST have `OtherCharges` and `FooterNote` properties — OtherCharges from the invoice (delivery/shipping fees) must appear in both A4 and thermal print. FooterNote from PrintSettings replaces the hardcoded "شكراً لتعاملكم معنا". |
+| RULE-527 | `PrintController` MUST have return print endpoints (`GET/POST /api/v1/print/sales-returns/{id}/...` and `GET/POST /api/v1/print/purchase-returns/{id}/...`) — the builder already has `BuildFromSalesReturnAsync()`/`BuildFromPurchaseReturnAsync()` methods. |
+| RULE-528 | `ThermalReceiptGenerator` MUST accept `EscPosCodePage` as a parameter instead of hardcoding `Encoding.GetEncoding(1256)` — the code page should come from `PrintSettingsDto`. |
+| RULE-529 | JWT tokens MUST include a `jti` (JWT ID) claim with a new `Guid` — this enables individual token identification and future revocation support. |
+| RULE-530 | JWT secret from environment variable MUST be validated for minimum length (`< 32` characters throws `InvalidOperationException`) — a short secret creates an HS256 security vulnerability. |
+| RULE-531 | `SecurityAudit` class MUST expose a non-conditional `RunSecurityAudit()` method callable from production — the `[Conditional("DEBUG")]` automatic check is kept for dev builds but a production endpoint can call the new method. |
+| RULE-532 | `JournalEntryLine` entity MUST have a composite index on `(JournalEntryId, AccountId)` in addition to the individual indexes — the accounting integration service frequently queries by both foreign keys simultaneously. |
+| RULE-533 | `DailyClosureReportViewModel` MUST be removed from DI and MainViewModel when its DataTemplate is removed — orphaned registrations waste resources and orphaned commands cause navigation to blank screens. |
+| RULE-534 | Permission system SHOULD support operation-level granularity (`PermissionOperation` enum: View, Create, Edit, Post, Cancel, Delete, PriceOverride) for future separation of duties — feature-level flags alone are insufficient for enterprise deployments. |
+
+### 2.95 Section 4 FORBIDDEN Updates (add these to the forbidden list)
+
+Add these NEW forbidden patterns:
+
+```text
+❌ ReportExportController returning BadRequest stub instead of routing to export service
+❌ CanNavigate() with _ => true fallback (must use _ => false deny-by-default)
+❌ Missing permission flags in Permission.cs (must match AGENTS.md Section 6)
+❌ Advanced-only screens visible to Basic users without IsAdvancedMode guard
+❌ Print endpoints missing for returns (sales-returns, purchase-returns)
+❌ OtherCharges missing from InvoicePrintDto and print templates
+❌ FooterNote missing from InvoicePrintDto (must display configurable footer from settings)
+❌ ThermalReceiptGenerator hardcoding code page 1256 (accept from settings)
+❌ JWT tokens without jti claim (breaks token identification)
+❌ JWT secret without minimum length validation (< 32 chars)
+❌ [Conditional("DEBUG")] as sole SecurityAudit access (add production endpoint)
+❌ Missing composite index on JournalEntryLine(JournalEntryId, AccountId)
+❌ Orphaned ViewModel registrations after DataTemplate removal (DailyClosureReportViewModel)
+❌ Feature-level-only permissions without operation-level granularity
+```
+
+### 2.96 Section 9 Pre-Submission Checklist Updates
+
+Add these NEW checklist items at the end of the existing checklist:
+
+- [ ] ReportExportController properly delegates to export service (no stub)?
+- [ ] All Permission.cs flags match AGENTS.md Section 6 matrix?
+- [ ] CanNavigate() uses _ => false deny-by-default with all screens explicit?
+- [ ] Organization Management and accounting screens have IsAdvancedMode guards?
+- [ ] Keyboard shortcuts (F3/F4/F5/F8) defined in MainWindow.InputBindings?
+- [ ] InvoicePrintDto has OtherCharges + FooterNote properties?
+- [ ] PrintController has returns endpoints (sales-returns, purchase-returns)?
+- [ ] ThermalReceiptGenerator accepts code page parameter?
+- [ ] JWT tokens include jti claim?
+- [ ] JWT secret validated for minimum 32 characters?
+- [ ] SecurityAudit has production-callable method?
+- [ ] Composite index on JournalEntryLine(JournalEntryId, AccountId) exists?
+- [ ] No orphaned ViewModel DI registrations after UI removal?
 
 Phase 24: Accounting Engine Automation → Automatic journal entries for all money operations
 Phase 25: Payment Update/Delete Reversal Entries → Fix C-2/C-3: Reversal entries for payment update/delete
@@ -1503,25 +1651,29 @@ Phase 26: Code Review Remediations (C-1 through C-8) → Fix COGS, netRevenue, C
 | RULE-387 | CashTransactionType on purchase cancel MUST use RefundOut (reversal), NOT SupplierPayment (forward payment type). |
 | RULE-388 | All AccountingIntegrationService methods MUST return Result<int> (never throw) and MUST NOT own transactions — the caller is responsible for wrapping in ExecuteTransactionAsync. |
 
-### 2.77 Phase 25 — Products Module Rules (v4.6.9+)
+### 2.77 Phase 25 — Products Module Rules (v4.6.9+ — Updated for Per-Unit Pricing)
+
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-389 | Product entity MUST be restructured: remove PurchasePrice, SalePrice, WholesalePrice, RetailPrice, ExpirationDate, Barcode — store pricing in ProductPrices table, batches in InventoryBatches, barcodes in UnitBarcodes. |
-| RULE-390 | `ProductPrices` entity: ProductUnitId FK, CurrencyId FK, Price decimal(18,2), EffectiveFrom datetime2, EffectiveTo datetime2 (nullable) — supports multi-currency pricing with effective date ranges. |
-| RULE-391 | `InventoryBatches` entity: ProductId FK, PurchaseInvoiceItemId FK, Quantity decimal(18,3), UnitCost decimal(18,2), ManufactureDate, ExpiryDate, BatchNo — enables FIFO/FEFO cost allocation. |
-| RULE-392 | `PriceLevel` enum: Retail=1, Wholesale=2, VIP=3, Distributor=4 — replaces binary Retail/Wholesale with multi-level pricing. |
-| RULE-393 | `PriceLevelService` returns `Result<decimal>` for price calculations — NEVER compute prices outside this service. |
-| RULE-394 | Product images stored in `ProductImages` table (multiple images per product) — ImagePath on Product entity is the primary/main image. |
-| RULE-395 | Opening stock on product creation: optional `OpeningQuantity`, `OpeningUnitCost`, `ExpiryDate` per warehouse — creates initial InventoryBatch + WarehouseStock + InventoryMovement entry. |
+| RULE-389 | Product entity MUST be SIMPLIFIED: only Name, CategoryId, Description, TrackExpiry (bool), IsActive, CreatedAt, UpdatedAt. NO PurchasePrice, SalePrice, WholesalePrice, RetailPrice, ExpirationDate, Barcode, OpeningQuantity, OpeningUnitCost, or CurrentQuantity on Product. |
+| RULE-390 | `ProductPrices` entity: ProductUnitId FK, CurrencyId FK, Price decimal(18,2), EffectiveFrom datetime2, EffectiveTo datetime2 (nullable) — supports multi-currency pricing with effective date ranges. Price is per (Product + Unit + Currency), NOT per Product. |
+| RULE-391 | `InventoryBatches` entity: ProductId FK, WarehouseId FK, BatchNo, ExpiryDate (nullable), QuantityReceived decimal(18,3), QuantityRemaining decimal(18,3), UnitCost decimal(18,2), PurchaseInvoiceId FK (nullable) — enables FIFO/FEFO cost allocation. |
+| RULE-392 | NO `PriceLevel` enum in V1 — pricing is simply per (ProductUnit + Currency). No Retail/Wholesale/VIP/Distributor concept. User defines price per unit directly. |
+| RULE-393 | Prices are retrieved from `ProductPrices` table filtered by ProductUnitId + CurrencyId + EffectiveFrom/EffectiveTo — NEVER compute prices dynamically outside this lookup. |
+| RULE-394 | Product images stored in `ProductImages` table (multiple images per product, ProductId FK, ImagePath, IsPrimary) — ImagePath on Product entity is NOT needed; all images in ProductImages table. |
+| RULE-395 | Opening stock on product creation: optional `OpeningQuantity`, `OpeningUnitCost`, `ExpiryDate` per warehouse — creates initial InventoryBatch + WarehouseStock entry. Opening stock generates a Journal Entry: Dr Inventory / Cr OpeningBalanceEquity. |
 
 ### 2.78 Phase 26 — Warehouses Module Rules (v4.6.9+)
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-396 | Warehouse entity MUST have: `Type` (Main=1, Store=2, Showroom=3), `ManagerName` (nullable string), `AccountId` (int? FK to Account), `Address` (nullable string), `Phone` (nullable string). |
+| RULE-396 | Warehouse entity MUST have: `Type` (Main=1, Store=2, Showroom=3), `ManagerName` (nullable string), `AccountId` (int? FK to Account linking to Chart of Accounts), `Address` (nullable string), `Phone` (nullable string). |
 | RULE-397 | `StockAdjustmentType` enum: Addition=1, Deduction=2, Correction=3 — for inventory adjustment operations. |
 | RULE-398 | `StockIssueReason` enum: SalesReturn=1, Damage=2, Expiry=3, InternalUse=4, Other=5. |
 | RULE-399 | Physical Count deferred to V2 — initial stock on product creation covers opening stock needs. |
-| RULE-400 | Each inventory operation (Receipt, Issue, Transfer, Adjustment) MUST create an `InventoryMovement` record with full audit trail. |
+| RULE-467 | `WarehouseTransfer` / `WarehouseTransferLine` entities replace `StockTransfer` / `StockTransferItem` — supports multi-item transfers with full audit trail. TransferLine stores ProductUnitId, Quantity (in base unit), BatchNo. |
+| RULE-468 | `InventoryTransaction` / `InventoryTransactionLine` entities replace `InventoryMovement` — Transaction stores ReferenceType, ReferenceId, WarehouseId, Notes. TransactionLine stores ProductUnitId, Quantity (in base unit), UnitCost, BatchNo, ExpiryDate. |
+| RULE-469 | Perpetual Inventory system: NO `Purchases` account used — all inventory costs go DIRECTLY to Inventory Asset account. Purchase invoice posts Dr Inventory / Cr Cash/AP. |
+| RULE-470 | `InventoryOperation` and `StockWriteOff` are NOT in V1 — deferred to V2. All stock changes happen through inventory transactions (Receipt, Issue, Transfer, Adjustment). |
 
 ### 2.79 Phase 27 — Purchases Module Rules (v4.6.9+)
 | RULE | DIRECTIVE |
@@ -1542,6 +1694,7 @@ Phase 26: Code Review Remediations (C-1 through C-8) → Fix COGS, netRevenue, C
 | RULE-410 | Sales return MUST generate automatic refund: CashTransaction with RefundOut type, reverse journal entry for the return amount. |
 
 ### 2.81 Phase 29 — Receipts & Payments Module Rules (v4.6.9+)
+
 | RULE | DIRECTIVE |
 |------|-----------|
 | RULE-411 | CustomerPayment/SupplierPayment MUST support: multi-invoice distribution, cheque management (Cheque entity), cash/ bank/ cheque payment methods. |
@@ -1567,6 +1720,38 @@ Phase 26: Code Review Remediations (C-1 through C-8) → Fix COGS, netRevenue, C
 | RULE-423 | Hierarchical Balance Sheet DTO: Assets = Liabilities + Equity with section subtotals, computed from Account balances. |
 | RULE-424 | Excel export via ClosedXML — ALL report DTOs must support `ToDataTable()` or equivalent for worksheet generation. |
 | RULE-425 | 35+ report DTOs across 7 categories: Financial (6), Inventory (5), Sales (6), Purchases (4), Cash/Box (4), Transactions (5), Users (5). |
+
+### 2.84 Phase 32 — Suppliers Module Rules (v4.6.9+ — Updated: كل مورد = حساب, No Balance on Entity)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-442 | `Supplier` entity MUST have MANDATORY `AccountId` (int, non-nullable FK to `Account`) — auto-created by service, NEVER user-supplied in requests. |
+| RULE-443 | `SupplierType` NOT in V1 — deferred to V2. No SupplierType entity or enum in V1 codebase. Payment terms stored on PurchaseInvoice (per-invoice), not on Supplier entity. |
+| RULE-444 | `Supplier.Create()` MUST accept `accountId` as required parameter (`int`, non-nullable). |
+| RULE-445 | `Supplier.Update()` MUST accept `accountId` as required parameter (`int`, non-nullable). |
+| RULE-446 | `Supplier` entity MUST NOT have `OpeningBalance` or `CurrentBalance` fields — source of truth is the linked GL Account balance. Opening balance is a Journal Entry (Dr OpeningBalanceEquity / Cr AP). |
+| RULE-447 | `Supplier` entity MUST NOT have `CurrencyId` — currency is per-transaction (invoice/payment), not per-supplier. |
+| RULE-448 | `Supplier.CheckCreditLimit(decimal additionalAmount)` is a NON-THROWING domain method returning `bool` — SOFT WARNING only. |
+| RULE-449 | `SupplierDto` MUST include `AccountId` (int, non-nullable) and `AccountName` (string?) — NO `SupplierType`, `SupplierTypeName`. |
+| RULE-450 | `CreateSupplierRequest`/`UpdateSupplierRequest` MUST NOT have `AccountId` — auto-created by service. |
+| RULE-451 | Desktop Supplier Editor MUST NOT have OpeningBalance input field, AccountId selection combo, or SupplierType radio — AccountName is display-only after save. |
+| RULE-452 | Account auto-creation: Service auto-creates Level-4 detail account under parent `"2100 — حسابات الموردين"` (Accounts Payable) when creating a supplier. |
+| RULE-453 | Seeder MUST seed a default supplier "مورد نقدي" with auto-created account linked to COA under 2100 parent. |
+| RULE-454 | Phone number validation in supplier FluentValidators MUST use regex `^05\d{8}$` with Arabic error message — NEVER only `MaxLength` check. Email MUST use `.EmailAddress()` validation. |
+
+### 2.85 Phase 18 Post-Analysis Remediations (v4.10)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-455 | `SystemAccountMappings` MUST have `PurchaseReturnAccountId` (int, non-nullable FK to Account) — NEVER omit the Purchase Returns account mapping. |
+| RULE-456 | `AccountingIntegrationService` MUST use per-entity accounts for ALL customer/supplier journal entries — use `Customer.AccountId` and `Supplier.AccountId` instead of fixed `SystemAccountMappings.AccountsReceivableAccountId`/`AccountsPayableAccountId`. |
+| RULE-457 | Sales revenue MUST use a SINGLE account (`1520 — إيرادات المبيعات`) — NEVER split into separate Cash Sales (`1521`) and Credit Sales (`1522`) accounts. The `PaymentType` distinction is captured in the debit side (Cash vs AR), not in the revenue account. |
+| RULE-458 | Purchase return reversal journal entries MUST credit `PurchaseReturnAccountId` (contra expense account) — NEVER credit `InventoryAssetAccountId` directly. This enables proper financial reporting of purchase returns separate from inventory adjustments. |
+| RULE-459 | `GetCustomerAccountId(SalesInvoice, SystemAccountMappingsDto)` helper MUST be used in ALL sales-related journal entry methods — falls back to `AccountsReceivableAccountId` when `invoice.Customer` nav property is null. |
+| RULE-460 | `GetSupplierAccountId(PurchaseInvoice, SystemAccountMappingsDto)` helper MUST be used in ALL purchase-related journal entry methods — falls back to `AccountsPayableAccountId` when `invoice.Supplier` nav property is null. |
+| RULE-461 | `AccountingIntegrationService.CreateCustomerOpeningEntryAsync()` and `CreateSupplierOpeningEntryAsync()` MUST accept `int customerAccountId`/`int supplierAccountId` parameters — NEVER hardcode `AccountsReceivableAccountId`/`AccountsPayableAccountId` from system mappings. |
+| RULE-462 | `AccountingIntegrationService.ReverseCustomerPaymentEntryAsync()` and `ReverseSupplierPaymentEntryAsync()` MUST accept `int customerAccountId`/`int supplierAccountId` parameters — NEVER use system mapping defaults. |
+| RULE-463 | COA account `1630` (Returns) MUST cover BOTH Sales Returns and Purchase Returns — rename to `المردودات` and add child account `1632 — مردودات مشتريات` under it. |
 
 ## 3. Enums (Use These EXACT Values)
 
@@ -1734,9 +1919,10 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ `nameof` operator NOT used in validator `RuleFor` calls (string literals break on rename)
 ❌ Health check injecting raw `IConfiguration` instead of `SecureDbContextFactory`
 ❌ `CheckCreditLimit()` throwing exceptions (return bool instead)
-❌ Hard-deleting CustomerGroup when customers reference it
-❌ CustomerGroup route without kebab-case (`customergroups` instead of `customer-groups`)
-❌ CustomerGroup Editor/List without proper group management UI
+❌ CustomerGroup in V1 (deferred to V2 — no CustomerGroup entity, service, controller, or Desktop UI in V1)
+❌ CustomerType/SupplierType in V1 (deferred to V2 — payment type is per-invoice)
+❌ User-supplied AccountId in Customer/Supplier requests (auto-created by service)
+❌ OpeningBalance input field in Customer/Supplier Desktop forms (journal entry is source of truth)
 ❌ `ModernTextBox` style on `ComboBox` elements — `ModernTextBox` has `TargetType="TextBox"`, causes `XamlParseException`
 ❌ `DisplayMemberPath` and `ItemTemplate` on same `ComboBox` — WPF throws `InvalidOperationException`
 ❌ client-supplied CreatedBy in journal entry requests (always extract from JWT)
@@ -1760,13 +1946,84 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ Deposit()/Withdraw() methods on CashBox (removed — service creates CashTransaction records directly)
 ❌ Client-side balance validation for CashBox transfers (server validates via Account)
 ❌ CashTransaction.Create() being internal (must be public — callable from service layer)
+❌ Fixed AccountsReceivableAccountId/AccountsPayableAccountId in AccountingIntegrationService (use per-entity Customer.AccountId/Supplier.AccountId instead)
+❌ Split Cash Sales (1521) and Credit Sales (1522) revenue accounts (use single 1520 instead)
+❌ Crediting InventoryAssetAccountId for purchase return reversals (use PurchaseReturnAccountId instead)
+❌ Missing PurchaseReturnAccountId in SystemAccountMappings (Purchase Returns account required for financial reporting)
+❌ Hardcoding system mapping account IDs in customer/supplier opening entries or payment reversals (accept per-entity accountId parameters)
 ❌ Journal entry without multi-currency support (must store CurrencyId + ExchangeRate)
 ❌ Report without Excel export (ALL report DTOs must support ClosedXML export)
 ❌ Hard-coded price levels (use PriceLevel enum + ProductPrices table)
-❌ Missing AccountId on Customer/Supplier (required for journal entry integration)
+❌ Optional/nullable AccountId on Customer/Supplier (must be mandatory non-nullable int, auto-created by service)
 ❌ Deleting fiscal year (must use open/close lifecycle, not delete)
 ❌ Physical count in V1 (deferred to V2 — use opening stock instead)
+❌ OpeningBalance/CurrentBalance on Customer/Supplier entity (balance lives on linked Account only)
+❌ CurrencyId on Customer/Supplier entity (currency is per-transaction, not per-entity)
+❌ Changing IsBaseCurrency after system creation (immutable — locked at setup)
+❌ Products without a second unit (must have at least base unit + one additional unit)
+❌ ProductPrices without EffectiveFrom/EffectiveTo date ranges (pricing must have date tracking)
+❌ InventoryMovement without ProductUnitId (use ProductUnitId instead of raw ProductId)
+❌ PurchaseInvoice without `OtherCharges` property (must match SalesInvoice for landed cost consistency)
+❌ `AllocateAdditionalCharges()` missing from `PurchaseService.PostAsync()` — landed cost MUST be distributed proportionally
+❌ `OtherCharges` missing from `CreatePurchaseInvoiceRequest`/`UpdatePurchaseInvoiceRequest`/`PurchaseInvoiceDto`
+❌ `OtherCharges` missing from Desktop VM `RecalculateTotals()`/`BuildRequest()`/`LoadInvoiceAsync()`
+❌ Sales Price Enforcement NOT wired — `SalesService.PostAsync()` MUST check `PreventBelowRetailPrice` and `AllowBelowCostSale`
+❌ `IProductPriceService` NOT injected into `SalesService` (price enforcement requires it)
+❌ `GetDefaultPrice()` returning `0m` stub in Editor VM (breaks `IsPriceOverridden` detection)
+❌ `CostInBaseCurrency` hardcoded to `0m` on load (must use actual cost from invoice DTO)
+❌ DeliveryCharges NOT in separate revenue account (OtherCharges credited to SalesRevenue instead of `DeliveryChargesRevenue`)
+❌ `DeliveryChargesRevenueAccountId` missing from `SystemAccountKey` enum and `AccountingSeeder`
+❌ Purchase Return VALIDATION requiring invoice (standalone mode must be allowed)
+❌ Purchase Return without journal entries (`AccountingIntegrationService` MUST have `CreatePurchaseReturnEntryAsync`/`ReversePurchaseReturnEntryAsync`)
+❌ `ProductUnitId` hardcoded to `1` in Purchase Return editor
+❌ `PostedAt`/`CancelledAt` NOT set in `PurchaseReturn.Post()`/`Cancel()` methods
+❌ Flexible Input missing — LineTotal column MUST be editable (not `IsReadOnly`)
+❌ `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` NOT implemented in line ViewModels
+❌ `FlexibleInputCalculator` helper class missing
+❌ `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator must ONLY be called when `_lastModifiedField == Total` — Quantity/Price changes should directly compute `_lineTotalInput = _quantity * _unitPrice`)
+❌ `Bank.AccountId` as non-nullable `int` (use `int?` with `SetAccountId()` for auto-creation support)
+❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1130"` (العملاء)
+❌ `SupplierService` looking up AP parent by code `"2100"` (doesn't exist) instead of `"1320"` (الموردون)
+❌ Missing `POST /api/v1/employees/{id}/auto-create-account` endpoint (Employee custody workflow needs it)
+❌ `Account.Create()` for Level 4+ without `allowTransactions: true` (DomainException thrown)
+❌ Service interface without concrete implementation class (DI resolution crash)
+❌ Report API URL mismatch between Desktop ViewModel and Controller (404 errors)
+❌ Payment UpdateAsync without journal entry reversal for posted amounts
+❌ Standalone sales return without `CreateSalesReturnEntryAsync()` (missing journal entries)
+❌ Report service returning hardcoded stub `"تحت التطوير"` instead of real data
+❌ Report ViewModel with PDF export but NO Excel export (incomplete)
+❌ `CashBoxReportService` missing implementation (3 API endpoints crash at runtime)
+❌ `FinancialReportService.GetCashFlowReportAsync()` returning stub instead of computing from ReceiptVoucher/PaymentVoucher data
+❌ `AllowBelowCostSale` BLOCKING instead of WARNING-only (per analysis: "ولا نمنع البيع" — must warn but never block below-cost sales)
+❌ `AllowBelowCostSale` defaulting to `"false"` (must default to `true` per analysis spec: "السماح مع تنبيه")
+❌ `InventoryService.CreateTransactionAsync()` requiring Desktop to provide TransactionNo (service MUST auto-generate via DocumentSequenceService when `<= 0`)
+❌ `InventoryAdjustmentService.PostAsync()` directly setting `WarehouseStock.Quantity` (MUST use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` for atomic + audit trail)
+❌ `InventoryCountService.PostAsync()` creating one Adjustment per line (MUST create ONE adjustment per Post with `ReferenceType = "InventoryCount"`)
+❌ `AdjustmentType` validator with range `(1,2)` excluding Correction=3 (MUST use `InclusiveBetween(1, 3)`)
+❌ `ReportsController` with `CancellationToken` AFTER optional parameters (MUST precede optional params)
+❌ Inventory Operations ViewModels NOT implementing `IDisposable` (EventBus subscriptions MUST be disposed)
+❌ `InvoiceLineViewModel`/`PurchaseInvoiceLineViewModel` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator MUST only be called when `_lastModifiedField == Total`)
+❌ `SalesReturn.Post()` without `PostedAt = DateTime.UtcNow` (missing audit trail timestamp — same issue as RULE-489 for PurchaseReturn)
+❌ `SalesReturn.Cancel()` without `CancelledAt = DateTime.UtcNow` (missing audit trail timestamp)
+❌ `SalesReturnService` NOT creating journal entries on Post/Cancel (general ledger out of sync — MUST inject IAccountingIntegrationService)
+❌ `ProductUnitId` hardcoded to `1` in ANY ViewModel (breaks inventory tracking — use DefaultPurchaseUnitId/DefaultSalesUnitId instead)
+❌ `AllocateAdditionalCharges()` logic inline in `PurchaseService.PostAsync()` (MUST extract to standalone `AdditionalChargeAllocator` helper)
+❌ ReportExportController returning BadRequest stub instead of routing to export service
+❌ CanNavigate() with _ => true fallback (must use _ => false deny-by-default)
+❌ Missing permission flags in Permission.cs (must match AGENTS.md Section 6)
+❌ Advanced-only screens visible to Basic users without IsAdvancedMode guard
+❌ Print endpoints missing for returns (sales-returns, purchase-returns)
+❌ OtherCharges missing from InvoicePrintDto and print templates
+❌ FooterNote missing from InvoicePrintDto (must display configurable footer from settings)
+❌ ThermalReceiptGenerator hardcoding code page 1256 (accept from settings)
+❌ JWT tokens without jti claim (breaks token identification)
+❌ JWT secret without minimum length validation (< 32 chars)
+❌ [Conditional("DEBUG")] as sole SecurityAudit access (add production endpoint)
+❌ Missing composite index on JournalEntryLine(JournalEntryId, AccountId)
+❌ Orphaned ViewModel registrations after DataTemplate removal (DailyClosureReportViewModel)
+❌ Feature-level-only permissions without operation-level granularity
 ```
+
 
 ---
 
@@ -2032,14 +2289,15 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] Search/filter works in BOTH TreeView and DataGrid modes?
 - [ ] `nameof` operator used in validator `RuleFor` calls (no string literals)?
 - [ ] Health check uses `SecureDbContextFactory.GetDecryptedConnectionString()` (not raw `IConfiguration`)?
-- [ ] CustomerGroup soft-deletable with child reference guard?
 - [ ] Customer.CheckCreditLimit() returns bool (never throws)?
-- [ ] AccountId/CustomerGroupId optional on Customer entity?
-- [ ] CustomerGroupsController uses `:int:min(1)` (not `:byte`) route constraint?
-- [ ] CustomerGroups read = AllStaff, write = ManagerAndAbove?
-- [ ] Desktop Editor loads AvailableGroups/AvailableAccounts lookup data?
-- [ ] Seeder seeds "عام" group + "عميل نقدي"?
-- [ ] CustomerGroup DTO includes Id, Name, Description, IsActive?
+- [ ] Supplier.CheckCreditLimit() returns bool (never throws)?
+- [ ] AccountId MANDATORY (non-nullable int) on Customer/Supplier entities?
+- [ ] CustomerGroup NOT in V1 — no entity, service, controller, or Desktop UI?
+- [ ] CustomerType/SupplierType NOT in V1 — payment type per-invoice?
+- [ ] Desktop Customer/Supplier Editor has NO CustomerGroup dropdown, AccountId selection, or CustomerType/SupplierType radio?
+- [ ] Desktop Supplier Editor has NO OpeningBalance input field?
+- [ ] AccountName is display-only in Customer/Supplier editors?
+- [ ] Account auto-created under 1210 parent for customers, 2100 parent for suppliers?
 - [ ] `ModernTextBox` style NOT used on `ComboBox` elements (use `ModernComboBox`)?
 - [ ] `DisplayMemberPath` and `ItemTemplate` NOT both set on same `ComboBox`?
 - [ ] Customer/Supplier opening balance creates journal entry (Dr/Cr)?
@@ -2063,5 +2321,83 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] ReportsViewModel uses Account balance (not CashBox OpeningBalance/CurrentBalance)?
 - [ ] FinancialReportService uses RunningBalance (not BalanceAfter)?
 - [ ] DbSeeder does NOT create default cash box (accounts not yet seeded)?
-- [ ] Build: 0 errors, 0 warnings?
+- [ ] `SystemAccountMappings` has `PurchaseReturnAccountId` (FK to Account)?
+- [ ] `AccountingIntegrationService` uses per-entity `Customer.AccountId` / `Supplier.AccountId` — not fixed AR/AP?
+- [ ] Sales revenue uses single account `1520 — إيرادات المبيعات` (not split 1521/1522)?
+- [ ] Purchase return reversal credits `PurchaseReturnAccountId` (not `InventoryAssetAccountId`)?
+- [ ] `CreateCustomerOpeningEntryAsync` / `CreateSupplierOpeningEntryAsync` accept `customerAccountId` / `supplierAccountId` parameters?
+- [ ] `ReverseCustomerPaymentEntryAsync` / `ReverseSupplierPaymentEntryAsync` accept `customerAccountId` / `supplierAccountId` parameters?
+- [ ] COA account 1630 renamed to `المردودات` with child 1632 `مردودات مشتريات`?
+- [ ] All callers updated (CustomerService, SupplierService, PaymentService, ChequeService) to pass per-entity account IDs?
+- [ ] Products use ProductPrices table (ProductUnitId + CurrencyId + Price) — NOT RetailPrice/WholesalePrice on Product?
+- [ ] Inventory batches tracked via InventoryBatches table (FIFO/FEFO)?
+- [ ] Units is independent table (seed data + user-addable) — NOT embedded in ProductUnit?
+- [ ] Product entity has DefaultPurchaseUnitId/DefaultSalesUnitId optional fields?
+- [ ] Product has at least 2 units (base unit + one additional unit)?
+- [ ] Currency.IsBaseCurrency IMMUTABLE after creation (locked at setup)?
+- [ ] FractionName stored on Currency entity?
+- [ ] IsSystem flag on Currency protects system-seeded currencies from deletion?
+- [ ] Customer/Supplier entity has NO OpeningBalance/CurrentBalance/CurrencyId fields?
+- [ ] Per-entity account routing: Customer.AccountId / Supplier.AccountId used in journal entries?
+- [ ] Perpetual inventory system — no Purchases account, Dr Inventory directly?
+- [ ] WarehouseTransfer/WarehouseTransferLine replaced StockTransfer/StockTransferItem?
+- [ ] InventoryTransaction/InventoryTransactionLine replaced InventoryMovement?
+- [ ] Build: 0 errors, 0 warnings across ALL 6 production projects?
+- [ ] CashBoxService registered in API DI and all 13 methods return Result<T>?
+- [ ] CashBoxService auto-creates sub-account under "1110 — النقدية" when AccountId is null?
+- [ ] CashBoxService uses IReceiptVoucherService/IPaymentVoucherService (no duplication)?
+- [ ] PDF export (QuestPDF) is first-choice export for ALL 27+ report ViewModels?
+- [ ] Multi-currency (SelectedCurrencyId, ExchangeRate) wired in SalesInvoiceEditorViewModel?
+- [ ] CompanySettings.DefaultCurrencyId typed as `short` (not int) across all layers?
+- [ ] PurchaseInvoice has `OtherCharges` (decimal) property with guard clause `otherCharges < 0`?
+- [ ] `AllocateAdditionalCharges()` called in `PurchaseService.PostAsync()` — landed cost distributed proportionally?
+- [ ] `OtherCharges` included in Create/Update/Desktop/Accounting for purchase invoices?
+- [ ] `SalesService.PostAsync()` checks `PreventBelowRetailPrice` and `AllowBelowCostSale` settings?
+- [ ] `IProductPriceService` injected into `SalesService` for price enforcement lookups?
+- [ ] `DeliveryChargesRevenueAccountId` in `SystemAccountKey` (21) and seeded in COA?
+- [ ] DeliveryCharges credited to separate `DeliveryChargesRevenue` account (not SalesRevenue)?
+- [ ] Purchase Return supports standalone mode (`PurchaseInvoiceId = null` allowed)?
+- [ ] `CreatePurchaseReturnEntryAsync()` / `ReversePurchaseReturnEntryAsync()` exist in `AccountingIntegrationService`?
+- [ ] `PostedAt`/`CancelledAt` set in `PurchaseReturn.Post()`/`Cancel()`?
+- [ ] `FlexibleInputCalculator` helper class exists with `CalculationField` enum?
+- [ ] LineTotal column editable in Sales/Purchase DataGrids (not `IsReadOnly`)?
+- [ ] `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` in line ViewModels?
+- [ ] `RecalculateFromFlexibleInput()` ONLY calls `FlexibleInputCalculator` when Total is modified (NOT for Quantity/Price)?
+- [ ] `Bank.AccountId` is `int?` (nullable) with `SetAccountId()` domain method?
+- [ ] `BankService` auto-creates sub-account under parent "1120 — البنوك" when AccountId is null?
+- [ ] `BankConfiguration` makes AccountId FK optional (`.IsRequired(false)`)?
+- [ ] `EmployeesController` has `POST /api/v1/employees/{id}/auto-create-account` endpoint?
+- [ ] `CustomerService.AutoCreateCustomerAccountAsync()` uses parent code `"1130"` (NOT `"1210"`)?
+- [ ] `SupplierService.AutoCreateSupplierAccountAsync()` uses parent code `"1320"` (NOT `"2100"`)?
+- [ ] All service interfaces have concrete implementations (no DI resolution crash)?
+- [ ] Report API endpoints match Desktop ViewModel calls (detailed-stock-ledger, returns, aging)?
+- [ ] Payment update/delete creates reversal journal entries?
+- [ ] `CreateSalesReturnEntryAsync()` exists in `AccountingIntegrationService`?
+- [ ] Report services don't return hardcoded stubs (CashFlowReport)?
+- [ ] ALL report ViewModels have Excel export (ClosedXML)?
+- [ ] AccountStatementViewModel has Excel export?
+- [ ] All stale navigation menu items guarded with "تحت التطوير" dialog (no NullReferenceException)?
 - [ ] All 2,083+ tests pass?
+- [ ] `SalesReturn.Post()` sets `PostedAt = DateTime.UtcNow` and `SalesReturn.Cancel()` sets `CancelledAt = DateTime.UtcNow`?
+- [ ] `SalesReturnService` injects `IAccountingIntegrationService` and creates journal entries on Post (CreateSalesReturnEntryAsync) + Cancel (ReverseSalesReturnEntryAsync)?
+- [ ] `ProductUnitId` NOT hardcoded to `1` anywhere in Desktop ViewModels (use product.DefaultPurchaseUnitId / DefaultSalesUnitId)?
+- [ ] `AllocateAdditionalCharges()` extracted to standalone `AdditionalChargeAllocator` helper class (not inline in PurchaseService.PostAsync)?
+- [ ] `InventoryService.CreateTransactionAsync()` uses `_sequenceService.GetNextIntAsync()` when `TransactionNo <= 0` — NEVER require Desktop to provide TransactionNo?
+- [ ] `InventoryAdjustmentService.PostAsync()` updates stock via `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` — NEVER direct `WarehouseStock.Quantity` assignment?
+- [ ] `InventoryCountService.PostAsync()` creates ONE `InventoryAdjustment` per Post with `ReferenceType = "InventoryCount"` — NOT one per line?
+- [ ] InventoryAdjustmentRequestValidator validates `AdjustmentType` with `InclusiveBetween(1, 3)` — NOT `(1, 2)`?
+- [ ] `ReportsController` places `CancellationToken` BEFORE optional parameters?
+- [ ] All Inventory Operations ViewModels implement `IDisposable` and dispose EventBus subscriptions in `Cleanup()`?
+- [ ] ReportExportController properly delegates to export service (no stub)?
+- [ ] All Permission.cs flags match AGENTS.md Section 6 matrix?
+- [ ] CanNavigate() uses _ => false deny-by-default with all screens explicit?
+- [ ] Organization Management and accounting screens have IsAdvancedMode guards?
+- [ ] Keyboard shortcuts (F3/F4/F5/F8) defined in MainWindow.InputBindings?
+- [ ] InvoicePrintDto has OtherCharges + FooterNote properties?
+- [ ] PrintController has returns endpoints (sales-returns, purchase-returns)?
+- [ ] ThermalReceiptGenerator accepts code page parameter?
+- [ ] JWT tokens include jti claim?
+- [ ] JWT secret validated for minimum 32 characters?
+- [ ] SecurityAudit has production-callable method?
+- [ ] Composite index on JournalEntryLine(JournalEntryId, AccountId) exists?
+- [ ] No orphaned ViewModel DI registrations after UI removal?

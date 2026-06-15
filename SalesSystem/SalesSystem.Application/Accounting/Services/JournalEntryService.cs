@@ -53,17 +53,12 @@ public class JournalEntryService : IJournalEntryService
                     return Result<int>.Failure("يجب أن يكون للبند قيمة خصم أو إيداع");
             }
 
-            // 3.5. Check if fiscal year is closed
-            var isFiscalYearClosed = await _uow.FiscalYearClosures.AnyAsync(
-                fyc => fyc.FiscalYear == request.TransactionDate.Year, ct);
-            if (isFiscalYearClosed)
-                return Result<int>.Failure(
-                    $"السنة المالية {request.TransactionDate.Year} مغلقة — لا يمكن إضافة قيود محاسبية في سنة مالية مغلقة");
-
             // 4. Generate entry number
             var numberResult = await _numberGenerator.GenerateAsync(ct);
             if (!numberResult.IsSuccess)
                 return Result<int>.Failure(numberResult.Error!);
+
+            var entryNo = numberResult.Value!.EntryNo;
 
             // 5. Verify all accounts exist and are active
             var accountIds = request.Lines.Select(l => l.AccountId).Distinct().ToList();
@@ -80,16 +75,20 @@ public class JournalEntryService : IJournalEntryService
                     return Result<int>.Failure($"الحساب \"{account.NameAr}\" غير نشط");
             }
 
-            // 6. Create the journal entry via domain factory
+            // 6. Create the journal entry via domain factory (Draft status)
             var entry = Domain.Accounting.Entities.JournalEntry.Create(
-                numberResult.Value!,
+                numberResult.Value.EntryNumber,
+                entryNo,
                 request.TransactionDate,
                 request.Description ?? string.Empty,
                 request.EntryType,
                 userId,
                 request.ReferenceType,
                 request.ReferenceId,
-                request.ReferenceNumber);
+                request.ReferenceNumber,
+                (short?)request.CurrencyId,
+                request.ExchangeRate,
+                request.AttachmentPath);
 
             // 7. Add debit/credit lines via domain methods
             foreach (var line in request.Lines)
@@ -101,15 +100,12 @@ public class JournalEntryService : IJournalEntryService
                     entry.AddCreditLine(line.AccountId, account.AccountCode, account.NameAr, line.Credit, line.Description);
             }
 
-            // 8. Validate and post the entry
-            entry.ValidateAndPost(userId);
-
-            // 9. Save to database
+            // 8. Save to database (Draft)
             await _uow.JournalEntries.AddAsync(entry, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Journal entry {EntryNumber} (ID={Id}) created and posted for {EntryType} by User {UserId}",
+                "Journal entry {EntryNumber} (ID={Id}) created as Draft for {EntryType} by User {UserId}",
                 entry.EntryNumber, entry.Id, entry.EntryType, userId);
 
             return Result<int>.Success(entry.Id);
@@ -176,6 +172,70 @@ public class JournalEntryService : IJournalEntryService
         }
     }
 
+    // ─── Lifecycle Methods ────────────────────────────
+
+    public async Task<Result<JournalEntryDetailDto>> PostJournalEntryAsync(int id, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            var entry = await _uow.JournalEntries.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "Lines");
+
+            if (entry == null)
+                return Result<JournalEntryDetailDto>.Failure("القيد المحاسبي غير موجود", ErrorCodes.NotFound);
+
+            entry.Post(userId);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Journal entry {EntryNumber} (ID={Id}) posted by User {UserId}",
+                entry.EntryNumber, entry.Id, userId);
+
+            return Result<JournalEntryDetailDto>.Success(MapToDetailDto(entry));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain validation failed for posting journal entry {Id}", id);
+            return Result<JournalEntryDetailDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error posting journal entry {Id}", id);
+            return Result<JournalEntryDetailDto>.Failure("حدث خطأ أثناء ترحيل القيد المحاسبي");
+        }
+    }
+
+    public async Task<Result<JournalEntryDetailDto>> CancelJournalEntryAsync(int id, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            var entry = await _uow.JournalEntries.FirstOrDefaultAsync(
+                e => e.Id == id, ct, "Lines");
+
+            if (entry == null)
+                return Result<JournalEntryDetailDto>.Failure("القيد المحاسبي غير موجود", ErrorCodes.NotFound);
+
+            entry.Cancel(userId);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation(
+                "Journal entry {EntryNumber} (ID={Id}) cancelled by User {UserId}",
+                entry.EntryNumber, entry.Id, userId);
+
+            return Result<JournalEntryDetailDto>.Success(MapToDetailDto(entry));
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain validation failed for cancelling journal entry {Id}", id);
+            return Result<JournalEntryDetailDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cancelling journal entry {Id}", id);
+            return Result<JournalEntryDetailDto>.Failure("حدث خطأ أثناء إلغاء القيد المحاسبي");
+        }
+    }
+
     // ─── Private Mapping Helpers ──────────────────────
 
     private static string GetEntryTypeDisplay(JournalEntryType entryType) => entryType switch
@@ -194,6 +254,14 @@ public class JournalEntryService : IJournalEntryService
         _ => "غير معروف"
     };
 
+    private static string GetStatusDisplay(JournalEntryStatus status) => status switch
+    {
+        JournalEntryStatus.Draft => "مسودة",
+        JournalEntryStatus.Posted => "مرحل",
+        JournalEntryStatus.Cancelled => "ملغي",
+        _ => "غير معروف"
+    };
+
     private static JournalEntryListDto MapToListDto(Domain.Accounting.Entities.JournalEntry entry)
     {
         return new JournalEntryListDto(
@@ -207,8 +275,11 @@ public class JournalEntryService : IJournalEntryService
             entry.ReferenceNumber,
             entry.TotalDebit,
             entry.TotalCredit,
-            entry.IsPosted,
-            entry.IsReversed,
+            (int)entry.Status,
+            GetStatusDisplay(entry.Status),
+            entry.CurrencyId,
+            entry.ExchangeRate,
+            entry.AttachmentPath,
             entry.CreatedAt,
             entry.CreatedByUserId
         );
@@ -235,8 +306,11 @@ public class JournalEntryService : IJournalEntryService
             entry.ReferenceType,
             entry.ReferenceId,
             entry.ReferenceNumber,
-            entry.IsPosted,
-            entry.IsReversed,
+            (int)entry.Status,
+            GetStatusDisplay(entry.Status),
+            entry.CurrencyId,
+            entry.ExchangeRate,
+            entry.AttachmentPath,
             entry.ReversedByEntryId,
             entry.CreatedAt,
             entry.CreatedByUserId,
@@ -258,11 +332,11 @@ public class JournalEntryService : IJournalEntryService
             var lines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.AccountId == accountId
                     && jel.JournalEntry != null
-                    && jel.JournalEntry.IsPosted
+                    && jel.JournalEntry.Status == JournalEntryStatus.Posted
                     && jel.JournalEntry.TransactionDate <= queryDate,
-                null, // queryConfig
-                ct,   // ct
-                false, // ignoreQueryFilters
+                null,
+                ct,
+                false,
                 "JournalEntry");
 
             var totalDebit = lines.Sum(l => l.Debit);
@@ -301,11 +375,11 @@ public class JournalEntryService : IJournalEntryService
             var openingLines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.AccountId == accountId
                     && jel.JournalEntry != null
-                    && jel.JournalEntry.IsPosted
+                    && jel.JournalEntry.Status == JournalEntryStatus.Posted
                     && jel.JournalEntry.TransactionDate < startDate,
-                null, // queryConfig
-                ct,   // ct
-                false, // ignoreQueryFilters
+                null,
+                ct,
+                false,
                 "JournalEntry");
 
             var openingDebit = openingLines.Sum(l => l.Debit);
@@ -316,12 +390,12 @@ public class JournalEntryService : IJournalEntryService
             var periodLines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.AccountId == accountId
                     && jel.JournalEntry != null
-                    && jel.JournalEntry.IsPosted
+                    && jel.JournalEntry.Status == JournalEntryStatus.Posted
                     && jel.JournalEntry.TransactionDate >= startDate
                     && jel.JournalEntry.TransactionDate <= endDate,
-                null, // queryConfig
-                ct,   // ct
-                false, // ignoreQueryFilters
+                null,
+                ct,
+                false,
                 "JournalEntry");
 
             var runningBalance = openingBalance;

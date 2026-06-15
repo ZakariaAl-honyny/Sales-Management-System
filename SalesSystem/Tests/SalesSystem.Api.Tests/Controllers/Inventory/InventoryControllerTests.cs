@@ -41,9 +41,9 @@ public class InventoryControllerTests : ControllerTestBase
     [Fact]
     public async Task GetMovements_WhenCalled_ReturnsOkWithPagedResult()
     {
-        var movements = new PagedResult<InventoryMovementDto>
+        var movements = new PagedResult<InventoryTransactionDto>
         {
-            Items = new List<InventoryMovementDto> { CreateMovementDto(1), CreateMovementDto(2) },
+            Items = new List<InventoryTransactionDto> { CreateMovementDto(1), CreateMovementDto(2) },
             Page = 1, PageSize = 10, TotalCount = 2
         };
 
@@ -59,7 +59,7 @@ public class InventoryControllerTests : ControllerTestBase
     public async Task GetMovements_WhenServiceFails_ReturnsBadRequest()
     {
         InventoryServiceMock.Setup(x => x.GetMovementsAsync(null, null, null, 1, 10, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CreateFailureResult<PagedResult<InventoryMovementDto>>("فشل في استرجاع حركات المخزون"));
+            .ReturnsAsync(CreateFailureResult<PagedResult<InventoryTransactionDto>>("فشل في استرجاع حركات المخزون"));
 
         var result = await _controller.GetMovements(null, null, null, 1, 10, CancellationToken.None);
 
@@ -69,9 +69,9 @@ public class InventoryControllerTests : ControllerTestBase
     [Fact]
     public async Task GetMovements_WithProductFilter_ReturnsFilteredResults()
     {
-        var movements = new PagedResult<InventoryMovementDto>
+        var movements = new PagedResult<InventoryTransactionDto>
         {
-            Items = new List<InventoryMovementDto> { CreateMovementDto(1) },
+            Items = new List<InventoryTransactionDto> { CreateMovementDto(1) },
             Page = 1, PageSize = 10, TotalCount = 1
         };
 
@@ -128,20 +128,21 @@ public class InventoryControllerTests : ControllerTestBase
         result.Should().BeOfType<OkObjectResult>();
     }
 
-    private static InventoryMovementDto CreateMovementDto(int id) => new(
+    private static InventoryTransactionDto CreateMovementDto(int id) => new(
         Id: id,
-        ProductId: 1,
-        ProductName: $"منتج {id}",
-        WarehouseId: 1,
+        TransactionNo: id,
+        TransactionDate: DateTime.UtcNow,
+        TransactionType: 1,
+        WarehouseId: (short)1,
         WarehouseName: "المستودع الرئيسي",
-        MovementType: 1,
-        QuantityChange: 50.00m,
-        QuantityBefore: 100.00m,
-        QuantityAfter: 150.00m,
-        ReferenceType: "PurchaseInvoice",
         ReferenceId: id,
-        MovementDate: DateTime.UtcNow,
-        Notes: null);
+        ReferenceType: 1,
+        Notes: null,
+        Status: 2,
+        Lines: new List<InventoryTransactionLineDto>
+        {
+            new(id, 1, $"منتج {id}", 1, "قطعة", 50.00m, 100.00m, 5000.00m, null)
+        });
 
     private static WarehouseStockDto CreateStockDto(int id) => new(
         WarehouseId: 1,
@@ -150,5 +151,5 @@ public class InventoryControllerTests : ControllerTestBase
         ProductName: $"منتج {id}",
         UnitName: "قطعة",
         Quantity: 100.00m,
-        ReorderLevel: 10.00m);
+        AvgCost: 0);
 }

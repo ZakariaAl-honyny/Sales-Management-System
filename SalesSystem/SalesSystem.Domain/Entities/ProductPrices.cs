@@ -1,14 +1,14 @@
 using SalesSystem.Domain.Common;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
 /// <summary>
-/// Represents a price entry for a specific product unit, currency, and price level.
+/// Represents a price entry for a specific product unit and currency.
 /// Supports multi-currency pricing with effective date ranges.
+/// Maps to "ProductPrices" table — ProductUnitId FK, CurrencyId (smallint FK), Price, EffectiveFrom/To.
 /// </summary>
-public class ProductPrice : BaseEntity
+public class ProductPrice : ActivatableEntity
 {
     /// <summary>
     /// FK to ProductUnit — identifies which unit this price applies to.
@@ -16,17 +16,12 @@ public class ProductPrice : BaseEntity
     public int ProductUnitId { get; private set; }
 
     /// <summary>
-    /// FK to Currency — the currency of this price entry.
+    /// FK to Currency (smallint).
     /// </summary>
-    public int CurrencyId { get; private set; }
+    public short CurrencyId { get; private set; }
 
     /// <summary>
-    /// The pricing tier (Retail, Wholesale, VIP, Distributor).
-    /// </summary>
-    public PriceLevel PriceLevel { get; private set; }
-
-    /// <summary>
-    /// The actual price amount. Stored as decimal(18,2).
+    /// The actual price amount. decimal(18,2).
     /// </summary>
     public decimal Price { get; private set; }
 
@@ -43,7 +38,6 @@ public class ProductPrice : BaseEntity
     // ─── Navigation Properties ──────────────────────────
 
     public ProductUnit ProductUnit { get; private set; } = null!;
-
     public Currency Currency { get; private set; } = null!;
 
     private ProductPrice() { } // EF Core
@@ -55,8 +49,7 @@ public class ProductPrice : BaseEntity
     /// </summary>
     public static ProductPrice Create(
         int productUnitId,
-        int currencyId,
-        PriceLevel priceLevel,
+        short currencyId,
         decimal price,
         DateTime effectiveFrom,
         DateTime? effectiveTo = null,
@@ -66,8 +59,8 @@ public class ProductPrice : BaseEntity
             throw new DomainException("معرف وحدة المنتج مطلوب.");
         if (currencyId <= 0)
             throw new DomainException("معرف العملة مطلوب.");
-        if (price <= 0)
-            throw new DomainException("السعر يجب أن يكون أكبر من الصفر.");
+        if (price < 0)
+            throw new DomainException("السعر لا يمكن أن يكون سالباً.");
         if (effectiveFrom == default)
             throw new DomainException("تاريخ بدء السعر مطلوب.");
         if (effectiveTo.HasValue && effectiveTo.Value <= effectiveFrom)
@@ -77,7 +70,6 @@ public class ProductPrice : BaseEntity
         {
             ProductUnitId = productUnitId,
             CurrencyId = currencyId,
-            PriceLevel = priceLevel,
             Price = Math.Round(price, 2),
             EffectiveFrom = effectiveFrom,
             EffectiveTo = effectiveTo,
@@ -89,18 +81,14 @@ public class ProductPrice : BaseEntity
 
     // ─── Domain Methods ───────────────────────────
 
-    /// <summary>
-    /// Updates the price amount, price level, effective from date, and optionally extends the effective date range.
-    /// </summary>
     public void UpdatePrice(
         decimal newPrice,
-        PriceLevel priceLevel,
         DateTime? effectiveFrom = null,
         DateTime? effectiveTo = null,
         int? updatedByUserId = null)
     {
-        if (newPrice <= 0)
-            throw new DomainException("السعر يجب أن يكون أكبر من الصفر.");
+        if (newPrice < 0)
+            throw new DomainException("السعر لا يمكن أن يكون سالباً.");
         if (effectiveFrom.HasValue && effectiveFrom.Value == default)
             throw new DomainException("تاريخ بدء السعر مطلوب.");
         if (effectiveTo.HasValue && effectiveFrom.HasValue && effectiveTo.Value <= effectiveFrom.Value)
@@ -109,11 +97,10 @@ public class ProductPrice : BaseEntity
             throw new DomainException("تاريخ انتهاء السعر يجب أن يكون بعد تاريخ البداية.");
 
         Price = Math.Round(newPrice, 2);
-        PriceLevel = priceLevel;
         if (effectiveFrom.HasValue)
             EffectiveFrom = effectiveFrom.Value;
         if (effectiveTo.HasValue)
-            EffectiveTo = effectiveTo;
+            EffectiveTo = effectiveTo.Value;
 
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

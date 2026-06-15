@@ -18,16 +18,6 @@ public class CreateSupplierRequestValidator : AbstractValidator<CreateSupplierRe
             .EmailAddress().WithMessage("البريد الإلكتروني غير صحيح")
             .MaximumLength(100).WithMessage("البريد الإلكتروني لا يمكن أن يتجاوز 100 حرف")
             .When(x => !string.IsNullOrEmpty(x.Email));
-
-        RuleFor(x => x.OpeningBalance)
-            .GreaterThanOrEqualTo(0).WithMessage("الرصيد الافتتاحي لا يمكن أن يكون سالباً");
-
-        RuleFor(x => x.CreditLimit)
-            .GreaterThanOrEqualTo(0).WithMessage("حد الائتمان لا يمكن أن يكون سالباً");
-
-        RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("رقم الحساب غير صحيح")
-            .When(x => x.AccountId.HasValue);
     }
 }
 
@@ -46,13 +36,5 @@ public class UpdateSupplierRequestValidator : AbstractValidator<UpdateSupplierRe
             .EmailAddress().WithMessage("البريد الإلكتروني غير صحيح")
             .MaximumLength(100).WithMessage("البريد الإلكتروني لا يمكن أن يتجاوز 100 حرف")
             .When(x => !string.IsNullOrEmpty(x.Email));
-
-        RuleFor(x => x.CreditLimit)
-            .GreaterThanOrEqualTo(0).WithMessage("حد الائتمان لا يمكن أن يكون سالباً");
-
-        RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("رقم الحساب غير صحيح")
-            .When(x => x.AccountId.HasValue);
     }
 }
-

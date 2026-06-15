@@ -1,7 +1,11 @@
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
 
 namespace SalesSystem.Contracts.Responses;
 
+/// <summary>
+/// استجابة فاتورة الشراء.
+/// </summary>
 public record PurchaseInvoiceResponse(
     int Id, string InvoiceNumber,
     int SupplierId, string SupplierName,
@@ -10,12 +14,19 @@ public record PurchaseInvoiceResponse(
     decimal SubTotal, decimal InvoiceDiscount,
     decimal TaxRate, decimal TaxAmount,
     bool IsTaxInclusive,
-    decimal TotalAmount, decimal PaidAmount, decimal DueAmount,
-    DateTime InvoiceDate, string? Notes,
+    decimal NetTotal, decimal PaidAmount, decimal RemainingAmount,
+    DateTime InvoiceDate,
+    int? CurrencyId, string? CurrencyCode, decimal? ExchangeRate,
+    string? AttachmentPath,
+    string? Notes,
     List<PurchaseInvoiceItemResponse> Items
 );
 
+/// <summary>
+/// استجابة بند فاتورة الشراء.
+/// </summary>
 public record PurchaseInvoiceItemResponse(
     int Id, int ProductId, string ProductName,
-    decimal Quantity, decimal UnitCost, decimal DiscountAmount, decimal LineTotal
+    int ProductUnitId, string ProductUnitName,
+    decimal Quantity, decimal UnitCost, decimal LineTotal
 );

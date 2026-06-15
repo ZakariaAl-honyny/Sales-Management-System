@@ -18,3 +18,23 @@ public enum MovementType : byte
 }
 
 public enum SaleMode : byte { Retail = 1, Wholesale = 2 }
+
+/// <summary>
+/// نوع الخصم: مبلغ أو نسبة مئوية
+/// </summary>
+public enum DiscountType : byte { Amount = 0, Percentage = 1 }
+
+/// <summary>
+/// أنواع معاملات الخزينة النقدية (للتوافق مع التقارير المالية القديمة — سيتم استبدالها بـ ReceiptVoucher/PaymentVoucher)
+/// </summary>
+public enum CashTransactionType : byte
+{
+    OpeningBalance = 1,
+    SalesIncome = 2,
+    Expense = 3,
+    TransferOut = 4,
+    TransferIn = 5,
+    RefundOut = 6,
+    SupplierPayment = 7,
+    CustomerPayment = 8
+}

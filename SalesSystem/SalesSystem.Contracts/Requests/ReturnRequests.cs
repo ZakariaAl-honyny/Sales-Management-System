@@ -6,22 +6,32 @@ public record CreateSalesReturnRequest(
     int WarehouseId,
     DateTime? ReturnDate,
     string? Notes,
+    int? CashBoxId,
+    decimal? RefundAmount,
     List<ReturnItemRequest> Items
 );
 
+/// <summary>
+/// طلب إنشاء مرتجع شراء — مع دعم الربط بالفاتورة والعملات.
+/// </summary>
 public record CreatePurchaseReturnRequest(
     int? PurchaseInvoiceId,
     int SupplierId,
     int WarehouseId,
     DateTime? ReturnDate,
-    int? CurrencyId,                             // NEW
-    decimal? ExchangeRate,                       // NEW
-    decimal DiscountAmount,                      // NEW
-    byte? DiscountType,                          // NEW
-    decimal? DiscountRate,                       // NEW
+    int? CurrencyId,
+    decimal? ExchangeRate,
     string? Notes,
-    List<ReturnItemRequest> Items
-);
+    List<CreatePurchaseReturnItemRequest> Items);
+
+/// <summary>
+/// طلب إنشاء بند في مرتجع الشراء.
+/// </summary>
+public record CreatePurchaseReturnItemRequest(
+    int ProductId,
+    int ProductUnitId,
+    decimal Quantity,
+    decimal UnitCost);
 
 public record ReturnItemRequest(
     int ProductId,
@@ -29,6 +39,6 @@ public record ReturnItemRequest(
     decimal Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
-    byte Mode = 1, // Retail by default
+    byte Mode = 1,
     string? Notes = null
 );

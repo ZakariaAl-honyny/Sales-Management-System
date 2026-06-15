@@ -30,15 +30,57 @@ For every REQ-###:
 ```text
 CHECK-001: Is DocumentSequenceService thread-safe (SemaphoreSlim)?
 CHECK-002: Does SalesService validate stock BEFORE transaction?
-CHECK-003: Does every stock change create InventoryMovement?
+CHECK-003: Does every stock change create InventoryTransaction + InventoryTransactionLine? (NOT InventoryMovement)
 CHECK-004: Does CancelInvoice reverse ALL stock and balances?
 CHECK-005: Does SalesReturnService check previously returned qty?
-CHECK-006: Does StockTransfer use ONE transaction for both warehouses?
+CHECK-006: Does WarehouseTransfer use ONE transaction for both warehouses?
 CHECK-007: Are all money fields decimal(18,2)?
 CHECK-008: Are all quantity fields decimal(18,3)?
 CHECK-009: Does EventBus unsubscribe in Dispose?
 CHECK-010: Is WarehouseStocks CHECK Qty >= 0 in EF config?
+CHECK-011: Is pricing per ProductUnit × CurrencyId (ProductPrices table), never on Product entity?
+CHECK-012: Are Customer/Supplier linked to AccountId and PartyId (mandatory FKs)?
+CHECK-013: Is BaseCurrency immutable after system creation?
+CHECK-014: Are all FK columns to lookup tables (Roles, Warehouses, Currencies, Taxes, Units) using smallint?
+CHECK-015: Is AuditLog.Id bigint (long), not int?
+CHECK-016: Is SystemLogs.Level tinyint, not nvarchar?
+CHECK-017: NO Purchases clearing account — inventory costs go directly to Inventory Asset?
 ```
+
+## 65-Table Schema Validation
+
+### Cross-Module Consistency Checks
+- [ ] Party → Account: Every Customer and Supplier has a valid AccountId AND PartyId
+- [ ] ProductPrices → Currencies: Every ProductPrice references a valid CurrencyId
+- [ ] ProductPrices → ProductUnits: Every ProductPrice references a valid ProductUnitId
+- [ ] InventoryBatches → Products: Every batch references a valid ProductId
+- [ ] InventoryBatches → Warehouses: Every batch references a valid WarehouseId (smallint)
+- [ ] InventoryTransaction → InventoryTransactionLine: Every line has a valid parent transaction
+- [ ] WarehouseTransfer → WarehouseTransferLine: Every line has a valid parent transfer
+- [ ] WarehouseTransfer: FromWarehouseId ≠ ToWarehouseId enforced
+- [ ] SalesInvoice → CustomerReceipt: Receipt references valid invoice + customer
+- [ ] PurchaseInvoice → SupplierPayment: Payment references valid invoice + supplier
+
+### Removed Entity Detection
+- [ ] NO `InventoryMovement` entity, service, controller, or DTO exists
+- [ ] NO `StockTransfer` / `StockTransferItem` exists (use WarehouseTransfer)
+- [ ] NO `CustomerGroup` entity, service, controller, DTO, or Desktop UI exists
+- [ ] NO `SupplierType` entity, enum, service, or controller exists
+- [ ] NO `SalesQuotation` entity or DTO exists
+- [ ] NO `PurchaseOrder` entity or DTO exists
+- [ ] NO `Cheque` entity or DTO exists
+- [ ] NO `DailyClosure` entity or DTO exists
+- [ ] NO `ProductBarcode` entity exists (use UnitBarcode)
+- [ ] NO `ProductCode` or `CustomerCode` or `SupplierCode` fields exist
+
+### smallint FK Check
+- [ ] `Roles.Id` = smallint → FK in UserRoles.RoleId, RolePermissions.RoleId = smallint
+- [ ] `Departments.Id` = smallint → FK in Employees.DepartmentId = smallint
+- [ ] `Warehouses.Id` = smallint → FK in WarehouseStocks, InventoryBatches, etc. = smallint
+- [ ] `Currencies.Id` = smallint → FK in ProductPrices, SalesInvoices, etc. = smallint
+- [ ] `Taxes.Id` = smallint → FK in Products, invoices = smallint
+- [ ] `Units.Id` = smallint → FK in ProductUnits = smallint
+- [ ] `AccountCategories.Id` = smallint → FK in Accounts = smallint
 
 ## Output Format
 ```text
@@ -138,11 +180,11 @@ When you encounter any code related to these areas, apply fixes automatically:
 |-------|-------|-----------|
 | 23 | Customers Module (CRUD, groups, credit limits) | Domain/Customer.cs, Application/CustomerService.cs, Desktop/CustomersListView.xaml |
 | 24 | Accounting Integration (auto journal entries) | Application/AccountingIntegrationService.cs, Domain/JournalEntry.cs |
-| 25 | Products Module v2 (ProductPrices, InventoryBatches, multi-currency) | Domain/Product.cs, Domain/ProductPrices.cs, Domain/InventoryBatches.cs |
-| 26 | Warehouses Module (type, manager, stock adjustments, inventory) | Domain/Warehouse.cs, Application/WarehouseService.cs, Application/StockService.cs |
-| 27 | Purchases Module v2 (PO, landed cost, multi-currency) | Domain/PurchaseOrder.cs, Domain/AdditionalCharge.cs, Application/PurchaseService.cs |
-| 28 | Sales Module v2 (quotes, POS, credit check) | Domain/SalesQuotation.cs, Application/SalesService.cs |
-| 29 | Receipts & Payments (cheques, allocation, cash boxes) | Domain/Cheque.cs, Domain/PaymentAllocation.cs, Application/PaymentService.cs |
+| 25 | Products Module v2 (ProductPrices, InventoryBatches, Unit, Party) | Domain/Product.cs, Domain/ProductPrices.cs, Domain/InventoryBatches.cs, Domain/Party.cs |
+| 26 | Warehouses Module (type, transfers, adjustments) | Domain/Warehouse.cs, Domain/WarehouseTransfer.cs, Domain/InventoryAdjustment.cs |
+| 27 | Purchases Module v2 (InventoryBatches, Perpetual Inventory, multi-currency) | Domain/PurchaseInvoice.cs, Application/PurchaseService.cs |
+| 28 | Sales Module v2 (FIFO/FEFO, batch allocation, credit check) | Domain/SalesInvoice.cs, Application/SalesService.cs |
+| 29 | Receipts & Payments (CustomerReceipt, SupplierPayment, CashBox) | Domain/CustomerReceipt.cs, Domain/SupplierPayment.cs, Application/PaymentService.cs |
 | 30 | Journal Entries (manual entries, fiscal year, annual closing) | Domain/FiscalYear.cs, Application/JournalEntryService.cs |
 | 31 | Reports (financial, inventory, sales, purchase, cash, Excel export) | Application/ReportService.cs, Desktop/ReportsView.xaml |
 

@@ -144,4 +144,66 @@ public class ReportsController : ControllerBase
         var result = await _reportService.GetExpiredProductsReportAsync(thresholdDays, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
+
+    // =====================================================================
+    // Missing Report Endpoints (Phase 31)
+    // =====================================================================
+
+    /// <summary>
+    /// Detailed stock ledger — full audit trail of inventory movements with running balances.
+    /// Filters: productId, warehouseId, from, to (all optional).
+    /// </summary>
+    [HttpGet("detailed-stock-ledger")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(typeof(List<DetailedStockLedgerDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetDetailedStockLedger(
+        [FromQuery] int? productId,
+        [FromQuery] int? warehouseId,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        CancellationToken ct)
+    {
+        var result = await _reportService.GetDetailedStockLedgerAsync(productId, warehouseId, from, to, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Combined sales/purchase returns report.
+    /// Filters: returnType (Sales/Purchases/null=both), from, to, productId (all optional).
+    /// </summary>
+    [HttpGet("returns")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(typeof(List<ReturnsReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetReturnsReport(
+        [FromQuery] string? returnType,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int? productId,
+        CancellationToken ct)
+    {
+        var result = await _reportService.GetReturnsReportAsync(returnType, from, to, productId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Customer/supplier aging report — balance aging buckets (Current, 1-30, 31-60, 61-90, 90+).
+    /// partyType: "Customers" or "Suppliers" (required). partyId optional.
+    /// </summary>
+    [HttpGet("aging")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(typeof(List<AgingReportDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetAgingReport(
+        CancellationToken ct,
+        [FromQuery] string partyType = "Customers",
+        [FromQuery] int? partyId = null)
+    {
+        if (partyType != "Customers" && partyType != "Suppliers")
+            return BadRequest(new { error = "نوع الطرف يجب أن يكون Customers أو Suppliers" });
+
+        var result = await _reportService.GetAgingReportAsync(partyType, partyId, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
 }

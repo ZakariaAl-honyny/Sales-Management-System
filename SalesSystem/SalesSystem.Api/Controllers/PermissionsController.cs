@@ -63,8 +63,11 @@ public class PermissionsController : ControllerBase
     [HttpPut("roles/{role}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UpdateRolePermissions(byte role, [FromBody] List<int> permissionIds, CancellationToken ct)
+    public async Task<IActionResult> UpdateRolePermissions(int role, [FromBody] List<int> permissionIds, CancellationToken ct)
     {
+        if (role < 1 || role > 5)
+            return BadRequest(new { error = "رقم الصلاحية غير صحيح" });
+
         if (!Enum.IsDefined(typeof(UserRole), role))
             return BadRequest(new { error = "دور غير صالح. يجب أن يكون 1 (مدير النظام), 2 (مدير), أو 3 (كاشير)" });
 

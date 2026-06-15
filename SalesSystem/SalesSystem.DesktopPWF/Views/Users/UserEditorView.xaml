@@ -149,8 +149,8 @@
                         <!-- Role -->
                         <TextBlock Text="الصلاحية" Style="{StaticResource LabelStyle}"/>
                         <ComboBox ItemsSource="{Binding RoleOptions}"
-                                  SelectedValue="{Binding Role, ValidatesOnDataErrors=True}"
-                                  SelectedValuePath="Value"
+                                  SelectedValue="{Binding SelectedRoleId, ValidatesOnDataErrors=True}"
+                                  SelectedValuePath="Id"
                                   DisplayMemberPath="Display"
                                   Style="{StaticResource ModernComboBox}"
                                   TabIndex="4"

@@ -34,8 +34,19 @@
         <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
             <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <!-- Unit Selector -->
+                    <TextBlock Text="الوحدة:" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold" Margin="0,0,4,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <ComboBox ItemsSource="{Binding AvailableUnits}"
+                              SelectedItem="{Binding SelectedAvailableUnit}"
+                              DisplayMemberPath="UnitName"
+                              Style="{StaticResource ModernComboBox}"
+                              MinWidth="120"
+                              Margin="0,0,12,0"
+                              ToolTip="اختر وحدة القياس لعرض أسعارها"/>
+                    <!-- /Unit Selector -->
+
                     <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
-                            ToolTip="إضافة سعر جديد لمستوى سعري وعملة مختلفين">
+                            ToolTip="إضافة سعر جديد بعملة مختلفة">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="إضافة سعر" VerticalAlignment="Center"/>
@@ -98,11 +109,6 @@
                           BorderThickness="0"
                           AutomationProperties.AutomationId="DgProductPrices">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="مستوى السعر" 
-                                            Binding="{Binding PriceLevelDisplay}" 
-                                            Width="90" 
-                                            CellStyle="{StaticResource DataGridCellStyle}"/>
-
                         <DataGridTextColumn Header="العملة" 
                                             Binding="{Binding CurrencyCode}" 
                                             Width="70" 
@@ -196,7 +202,7 @@
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="💰" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
                         <TextBlock Text="لا توجد أسعار" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
-                        <TextBlock Text="أضف أسعاراً للوحدة بمستويات سعرية وعملات مختلفة" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Text="أضف أسعاراً للوحدة بعملات مختلفة" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                          <Button Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
                                  ToolTip="إضافة سعر جديد للوحدة">
                              <StackPanel Orientation="Horizontal">

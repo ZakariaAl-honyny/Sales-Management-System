@@ -187,17 +187,29 @@ public interface ISessionService
     string? GetToken();
     string? GetUserName();
     int? GetUserId();
-    UserRole? GetUserRole();
-    void SetSession(string token, string userName, int userId, UserRole role);
+    List<int>? GetUserRoleIds();
+    string? GetUserRoleName();
+    bool HasRole(int roleId);
+    bool IsAdmin { get; }
+    bool IsManagerOrAbove { get; }
+    void SetSession(string token, string userName, int userId, List<int> roleIds, string roleName);
     void ClearSession();
     bool IsAuthenticated { get; }
     bool CanAccess(Permission permission);
     Permission GetPermissions();
+
+    /// <summary>
+    /// Gets the current UI view mode (Basic vs Advanced).
+    /// Basic = operational screens only; Advanced = operational + accounting.
+    /// Determined by user role at login time.
+    /// </summary>
+    ViewMode GetViewMode();
 }
 
 public interface ILogsApiService
 {
     Task<Result> SendLogAsync(CreateLogRequest request);
+    Task<Result<PagedResult<SystemLogDto>>> QueryLogsAsync(int? level = null, string? source = null, string? search = null, DateTime? from = null, DateTime? to = null, int page = 1, int pageSize = 50, CancellationToken ct = default);
 }
 
 public interface IProductApiService
@@ -214,15 +226,6 @@ public interface IProductApiService
     Task<Result<List<ProductDto>>> GetExpiringProductsAsync(int thresholdDays = 30);
 }
 
-public interface ICategoryApiService
-{
-    Task<Result<List<CategoryDto>>> GetAllAsync(bool includeInactive = false);
-    Task<Result<CategoryDto>> CreateAsync(CreateCategoryRequest request);
-    Task<Result<CategoryDto>> UpdateAsync(int id, UpdateCategoryRequest request);
-    Task<Result> DeleteAsync(int id);
-    Task<Result> DeletePermanentlyAsync(int id);
-}
-
 public interface IUnitApiService
 {
     Task<Result<List<UnitDto>>> GetAllAsync(bool includeInactive = false);
@@ -230,15 +233,6 @@ public interface IUnitApiService
     Task<Result<UnitDto>> UpdateAsync(int id, UpdateUnitRequest request);
     Task<Result> DeleteAsync(int id);
     Task<Result> DeletePermanentlyAsync(int id);
-}
-
-public interface ICustomerGroupApiService
-{
-    Task<Result<List<CustomerGroupDto>>> GetAllAsync(CancellationToken ct = default);
-    Task<Result<CustomerGroupDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<CustomerGroupDto>> CreateAsync(CreateCustomerGroupRequest request, CancellationToken ct = default);
-    Task<Result<CustomerGroupDto>> UpdateAsync(int id, UpdateCustomerGroupRequest request, CancellationToken ct = default);
-    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
 }
 
 public interface ICustomerApiService
@@ -249,7 +243,6 @@ public interface ICustomerApiService
     Task<Result<CustomerDto>> UpdateAsync(int id, UpdateCustomerRequest request);
     Task<Result> DeleteAsync(int id);
     Task<Result> DeletePermanentlyAsync(int id);
-    Task<Result<List<CustomerGroupDto>>> GetAllGroupsAsync(CancellationToken ct = default);
 }
 
 public interface ISupplierApiService
@@ -309,6 +302,9 @@ public interface IReportApiService
     Task<Result<List<ExpiredProductDto>>> GetExpiredProductsReportAsync(int thresholdDays = 0, CancellationToken ct = default);
     Task<Result<List<StockBalanceReportDto>>> GetStockBalanceReportAsync(int? warehouseId = null, CancellationToken ct = default);
     Task<Result<List<WarehouseMovementReportDto>>> GetWarehouseMovementsAsync(int? warehouseId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
+    Task<Result<List<DetailedStockLedgerDto>>> GetDetailedStockLedgerAsync(int? productId = null, int? warehouseId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
+    Task<Result<List<ReturnsReportDto>>> GetReturnsReportAsync(string? returnType = null, DateTime? from = null, DateTime? to = null, int? productId = null, CancellationToken ct = default);
+    Task<Result<List<AgingReportDto>>> GetAgingReportAsync(string partyType = "Customers", int? partyId = null, CancellationToken ct = default);
 }
 
 public interface ISettingsApiService
@@ -327,30 +323,34 @@ public interface ISettingsApiService
 public interface IInventoryApiService
 {
     Task<Result<decimal>> GetStockAsync(int productId, int warehouseId, CancellationToken ct = default);
-    Task<Result<List<InventoryMovementDto>>> GetMovementsAsync(int? productId = null, int? warehouseId = null, int? movementType = null, int page = 1, int pageSize = 50, CancellationToken ct = default);
+    Task<Result<List<InventoryTransactionDto>>> GetMovementsAsync(int? productId = null, int? warehouseId = null, int? movementType = null, int page = 1, int pageSize = 50, CancellationToken ct = default);
     Task<Result<List<WarehouseStockDto>>> GetWarehouseStocksAsync(int? warehouseId = null, int? productId = null, int page = 1, int pageSize = 50, CancellationToken ct = default);
+    Task<Result<InventoryTransactionDto>> CreateInventoryTransactionAsync(CreateInventoryTransactionRequest request, CancellationToken ct = default);
+    Task<Result<InventoryTransactionDto>> PostInventoryTransactionAsync(int id, CancellationToken ct = default);
+    Task<Result<InventoryTransactionDto>> CancelInventoryTransactionAsync(int id, CancellationToken ct = default);
+    Task<Result<InventoryTransactionDto>> GetInventoryTransactionByIdAsync(int id, CancellationToken ct = default);
 }
 
 public interface ISalesInvoiceApiService
 {
-    Task<Result<List<SalesInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<List<SalesInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, int? customerId = null, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, CancellationToken ct = default);
-    Task<Result<SalesInvoiceDto>> UpdateAsync(int id, CreateSalesInvoiceRequest request, CancellationToken ct = default);
-    Task<Result<SalesInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> UpdateAsync(int id, UpdateSalesInvoiceRequest request, CancellationToken ct = default);
+    Task<Result<SalesInvoiceDto>> PostAsync(int id, PostSalesInvoiceRequest? request = null, CancellationToken ct = default);
     Task<Result<SalesInvoiceDto>> CancelAsync(int id, CancellationToken ct = default);
 }
 
 public interface IPurchaseInvoiceApiService
 {
-    Task<Result<List<PurchaseInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<List<PurchaseInvoiceDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, int? supplierId = null, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
-    Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, CreatePurchaseInvoiceRequest request, CancellationToken ct = default);
+    Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> PostAsync(int id, CancellationToken ct = default);
     Task<Result<PurchaseInvoiceDto>> CancelAsync(int id, CancellationToken ct = default);
-    Task<Result> UploadAttachmentAsync(int id, byte[] fileData, string fileName, CancellationToken ct = default);
-    Task<Result<byte[]>> DownloadAttachmentAsync(int id, CancellationToken ct = default);
+    Task<Result<string>> UploadAttachmentAsync(int id, string base64Content, string fileName, CancellationToken ct = default);
+    Task<Result> DeleteAttachmentAsync(int id, CancellationToken ct = default);
 }
 
 public interface ISalesReturnApiService
@@ -358,7 +358,7 @@ public interface ISalesReturnApiService
     Task<Result<List<SalesReturnDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
     Task<Result<SalesReturnDto>> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Result<SalesReturnDto>> CreateAsync(CreateSalesReturnRequest request, CancellationToken ct = default);
-    Task<Result<SalesReturnDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesReturnDto>> PostAsync(int id, PostSalesReturnRequest? request = null, CancellationToken ct = default);
     Task<Result<SalesReturnDto>> CancelAsync(int id, CancellationToken ct = default);
 }
 
@@ -369,16 +369,17 @@ public interface IPurchaseReturnApiService
     Task<Result<PurchaseReturnDto>> CreateAsync(CreatePurchaseReturnRequest request, CancellationToken ct = default);
     Task<Result<PurchaseReturnDto>> PostAsync(int id, CancellationToken ct = default);
     Task<Result<PurchaseReturnDto>> CancelAsync(int id, CancellationToken ct = default);
+    Task<Result<Dictionary<int, decimal>>> GetReturnedQuantitiesByInvoiceAsync(int invoiceId, CancellationToken ct = default);
 }
 
-public interface IStockTransferApiService
+public interface IWarehouseTransferApiService
 {
-    Task<Result<List<StockTransferDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
-    Task<Result<StockTransferDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<StockTransferDto>> CreateAsync(CreateStockTransferRequest request, CancellationToken ct = default);
-    Task<Result<StockTransferDto>> UpdateAsync(int id, UpdateStockTransferRequest request, CancellationToken ct = default);
-    Task<Result<StockTransferDto>> PostAsync(int id, CancellationToken ct = default);
-    Task<Result<StockTransferDto>> CancelAsync(int id, CancellationToken ct = default);
+    Task<Result<List<WarehouseTransferDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<WarehouseTransferDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<WarehouseTransferDto>> CreateAsync(CreateWarehouseTransferRequest request, CancellationToken ct = default);
+    Task<Result<WarehouseTransferDto>> UpdateAsync(int id, CreateWarehouseTransferRequest request, CancellationToken ct = default);
+    Task<Result<WarehouseTransferDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<WarehouseTransferDto>> CancelAsync(int id, CancellationToken ct = default);
 }
 
 public interface ISupplierPaymentApiService
@@ -390,14 +391,6 @@ public interface ISupplierPaymentApiService
     Task<Result> DeleteAsync(int id, CancellationToken ct = default);
 }
 
-public interface ICustomerPaymentApiService
-{
-    Task<Result<List<CustomerPaymentDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
-    Task<Result<CustomerPaymentDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<CustomerPaymentDto>> CreateAsync(CreateCustomerPaymentRequest request, CancellationToken ct = default);
-    Task<Result<CustomerPaymentDto>> UpdateAsync(int id, UpdateCustomerPaymentRequest request, CancellationToken ct = default);
-    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
-}
 public interface IBackupApiService
 {
     Task<Result<string>> CreateBackupAsync(CancellationToken ct = default);
@@ -424,11 +417,6 @@ public interface IPrintApiService
     /// Returns the temp file path on success.
     /// </summary>
     Task<Result<string>> GetPurchaseA4PdfAsync(int invoiceId, CancellationToken ct = default);
-}
-
-public interface IInventoryWriteOffApiService
-{
-    Task<Result<StockWriteOffDto>> WriteOffAsync(CreateStockWriteOffRequest request, CancellationToken ct = default);
 }
 
 public interface IDatabaseHealthCheckService
@@ -462,7 +450,6 @@ public interface ICurrencyApiService
     Task<Result> DeleteAsync(int id);
     Task<Result> DeletePermanentlyAsync(int id);
     Task<Result> UpdateExchangeRateAsync(int id, decimal newRate);
-    Task<Result<List<ExchangeRateHistoryDto>>> GetRateHistoryAsync(int currencyId);
 }
 
 public interface IFinancialReportApiService
@@ -472,6 +459,23 @@ public interface IFinancialReportApiService
     Task<Result<List<VatReportDto>>> GetVatReportAsync(DateTime from, DateTime to, CancellationToken ct = default);
     Task<Result<List<AccountStatementDto>>> GetCustomerAccountStatementAsync(int customerId, DateTime from, DateTime to, CancellationToken ct = default);
     Task<Result<List<AccountStatementDto>>> GetSupplierAccountStatementAsync(int supplierId, DateTime from, DateTime to, CancellationToken ct = default);
+
+    // Phase 31 — Financial Reports
+    Task<Result<BalanceSheetDto>> GetBalanceSheetAsync(DateTime asOfDate, CancellationToken ct = default);
+    Task<Result<List<TrialBalanceDto>>> GetTrialBalanceAsync(DateTime asOfDate, CancellationToken ct = default);
+    Task<Result<AccountLedgerDto>> GetGeneralLedgerAsync(int accountId, DateTime from, DateTime to, CancellationToken ct = default);
+    Task<Result<WorkingCapitalSummaryDto>> GetWorkingCapitalAsync(DateTime asOfDate, CancellationToken ct = default);
+    Task<Result<List<AccountBalanceReportDto>>> GetAccountBalancesAsync(byte? accountType = null, string? search = null, CancellationToken ct = default);
+}
+
+public interface IFiscalYearApiService
+{
+    Task<Result<List<FiscalYearDto>>> GetAllAsync(CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> GetByYearAsync(int year, CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> CreateAsync(CreateFiscalYearRequest request, CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> OpenAsync(int id, CancellationToken ct = default);
+    Task<Result<FiscalYearDto>> CloseAsync(int id, CancellationToken ct = default);
 }
 
 public interface IAuditLogApiService
@@ -488,32 +492,198 @@ public interface IPermissionApiService
     Task<Result> UpdateRolePermissionsAsync(byte role, List<int> permissionIds);
 }
 
-public interface IInventoryOperationApiService
+public interface IBranchApiService
 {
-    Task<Result<List<InventoryOperationDto>>> GetAllAsync(int? warehouseId = null, byte? operationType = null, int page = 1, int pageSize = 1000);
-    Task<Result<InventoryOperationDto>> GetByIdAsync(int id);
-    Task<Result<InventoryOperationDto>> CreateAsync(CreateInventoryOperationRequest request);
-    Task<Result<InventoryOperationDto>> PostAsync(int id);
-    Task<Result<InventoryOperationDto>> CancelAsync(int id);
+    Task<Result<List<BranchDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<BranchDto>> GetByIdAsync(int id);
+    Task<Result<BranchDto>> CreateAsync(CreateBranchRequest request);
+    Task<Result<BranchDto>> UpdateAsync(int id, UpdateBranchRequest request);
+    Task<Result> DeactivateAsync(int id);
 }
 
-public interface IPurchaseOrderApiService
+public interface IDepartmentApiService
 {
-    Task<Result<List<PurchaseOrderDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, int page = 1, int pageSize = 100, CancellationToken ct = default);
-    Task<Result<PurchaseOrderDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<PurchaseOrderDto>> CreateAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default);
-    Task<Result<PurchaseOrderDto>> UpdateAsync(int id, CreatePurchaseOrderRequest request, CancellationToken ct = default);
-    Task<Result<PurchaseOrderDto>> PostAsync(int id, CancellationToken ct = default);
-    Task<Result<PurchaseOrderDto>> CancelAsync(int id, CancellationToken ct = default);
+    Task<Result<List<DepartmentDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<DepartmentDto>> GetByIdAsync(int id);
+    Task<Result<DepartmentDto>> CreateAsync(CreateDepartmentRequest request);
+    Task<Result<DepartmentDto>> UpdateAsync(int id, UpdateDepartmentRequest request);
+    Task<Result> DeactivateAsync(int id);
 }
 
-public interface IAdditionalFeeApiService
+public interface IBankApiService
 {
-    Task<Result<List<AdditionalFeeDto>>> GetByInvoiceAsync(int purchaseInvoiceId, CancellationToken ct = default);
-    Task<Result<AdditionalFeeDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<AdditionalFeeDto>> CreateAsync(CreateAdditionalFeeRequest request, CancellationToken ct = default);
-    Task<Result<AdditionalFeeDto>> UpdateAsync(int id, CreateAdditionalFeeRequest request, CancellationToken ct = default);
+    Task<Result<List<BankDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<BankDto>> GetByIdAsync(int id);
+    Task<Result<BankDto>> CreateAsync(CreateBankRequest request);
+    Task<Result<BankDto>> UpdateAsync(int id, UpdateBankRequest request);
+    Task<Result> DeactivateAsync(int id);
+}
+
+public interface IPartyApiService
+{
+    Task<Result<List<PartyDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<PartyDto>> GetByIdAsync(int id);
+    Task<Result<PartyDto>> CreateAsync(CreatePartyRequest request);
+    Task<Result<PartyDto>> UpdateAsync(int id, UpdatePartyRequest request);
+    Task<Result> DeactivateAsync(int id);
+}
+
+public interface IEmployeeApiService
+{
+    Task<Result<List<EmployeeDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<EmployeeDto>> GetByIdAsync(int id);
+    Task<Result<EmployeeDto>> CreateAsync(CreateEmployeeRequest request);
+    Task<Result<EmployeeDto>> UpdateAsync(int id, UpdateEmployeeRequest request);
+    Task<Result> DeactivateAsync(int id);
+}
+
+public interface IExpenseApiService
+{
+    Task<Result<List<ExpenseDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<ExpenseDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<ExpenseDto>> CreateAsync(CreateExpenseRequest request, CancellationToken ct = default);
+    Task<Result<ExpenseDto>> UpdateAsync(int id, UpdateExpenseRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+    Task<Result<ExpenseDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<ExpenseDto>> CancelAsync(int id, CancellationToken ct = default);
+}
+
+public interface IProductCategoryApiService
+{
+    Task<Result<List<ProductCategoryDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<ProductCategoryDto>> GetByIdAsync(int id);
+    Task<Result<ProductCategoryDto>> CreateAsync(CreateProductCategoryRequest request);
+    Task<Result<ProductCategoryDto>> UpdateAsync(int id, UpdateProductCategoryRequest request);
+    Task<Result> DeactivateAsync(int id);
+}
+
+public interface INotificationApiService
+{
+    Task<Result<List<NotificationDto>>> GetAllAsync(int? userId = null, bool unreadOnly = false, int page = 1, int pageSize = 50);
+    Task<Result> MarkAsReadAsync(int id);
+    Task<Result> MarkAllAsReadAsync(int userId);
+}
+
+public interface IInventoryCountApiService
+{
+    Task<Result<List<InventoryCountDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<InventoryCountDto>> GetByIdAsync(int id);
+    Task<Result<InventoryCountDto>> CreateAsync(CreateInventoryCountRequest request);
+    Task<Result<InventoryCountDto>> PostAsync(int id);
+    Task<Result> CancelAsync(int id);
+    Task<Result<InventoryCountDto>> AddLineAsync(int id, AddInventoryCountLineRequest request);
+}
+
+public interface IInventoryAdjustmentApiService
+{
+    Task<Result<List<InventoryAdjustmentDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<InventoryAdjustmentDto>> GetByIdAsync(int id);
+    Task<Result<InventoryAdjustmentDto>> CreateAsync(CreateInventoryAdjustmentRequest request);
+    Task<Result<InventoryAdjustmentDto>> PostAsync(int id);
+    Task<Result> CancelAsync(int id);
+    Task<Result<InventoryAdjustmentDto>> AddLineAsync(int id, AddInventoryAdjustmentLineRequest request);
+}
+
+public interface ICustomerReceiptApiService
+{
+    Task<Result<List<CustomerReceiptDto>>> GetAllAsync(bool includeInactive = false);
+    Task<Result<CustomerReceiptDto>> GetByIdAsync(int id);
+    Task<Result<CustomerReceiptDto>> CreateAsync(CreateCustomerReceiptRequest request);
+    Task<Result<CustomerReceiptDto>> PostAsync(int id);
+    Task<Result> CancelAsync(int id);
+    Task<Result<CustomerReceiptDto>> AddApplicationAsync(int id, AddReceiptApplicationRequest request);
+}
+
+public interface IAttachmentApiService
+{
+    Task<Result<List<AttachmentDto>>> GetAllAsync(string? referenceType = null, int? referenceId = null);
+    Task<Result<AttachmentDto>> GetByIdAsync(int id);
+    Task<Result<AttachmentDto>> CreateAsync(CreateAttachmentRequest request);
+    Task<Result<AttachmentDto>> UpdateAsync(int id, UpdateAttachmentRequest request);
+    Task<Result> DeleteAsync(int id);
+}
+
+public interface ISupplierPaymentApplicationApiService
+{
+    Task<Result<List<SupplierPaymentApplicationDto>>> GetAllAsync(int? supplierPaymentId = null, int? purchaseInvoiceId = null);
+    Task<Result<SupplierPaymentApplicationDto>> GetByIdAsync(int id);
+    Task<Result<SupplierPaymentApplicationDto>> CreateAsync(CreateSupplierPaymentApplicationRequest request);
+    Task<Result> DeleteAsync(int id);
+}
+
+public interface IRoleApiService
+{
+    Task<Result<List<RoleDto>>> GetAllAsync(bool includeInactive = false, CancellationToken ct = default);
+    Task<Result<RoleDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<RoleDto>> CreateAsync(CreateRoleRequest request, CancellationToken ct = default);
+    Task<Result<RoleDto>> UpdateAsync(int id, UpdateRoleRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+}
+
+public interface IUserSessionApiService
+{
+    Task<Result<List<UserSessionDto>>> GetAllAsync(int? userId = null, bool includeRevoked = false, CancellationToken ct = default);
+    Task<Result> RevokeAsync(long sessionId, CancellationToken ct = default);
+}
+
+
+public interface ICustomerContactApiService
+{
+    Task<Result<List<CustomerContactDto>>> GetAllAsync(int customerId);
+    Task<Result<CustomerContactDto>> GetByIdAsync(int id);
+    Task<Result<CustomerContactDto>> CreateAsync(CreateCustomerContactRequest request);
+    Task<Result<CustomerContactDto>> UpdateAsync(int id, UpdateCustomerContactRequest request);
+    Task<Result> DeactivateAsync(int id);
+}
+
+public interface ISupplierContactApiService
+{
+    Task<Result<List<SupplierContactDto>>> GetAllAsync(int supplierId);
+    Task<Result<SupplierContactDto>> GetByIdAsync(int id);
+    Task<Result<SupplierContactDto>> CreateAsync(CreateSupplierContactRequest request);
+    Task<Result<SupplierContactDto>> UpdateAsync(int id, UpdateSupplierContactRequest request);
+    Task<Result> DeactivateAsync(int id);
+}
+
+public interface ICompanySettingsApiService
+{
+    Task<Result<CompanySettingsDto>> GetAsync(CancellationToken ct = default);
+    Task<Result<CompanySettingsDto>> UpdateAsync(UpdateCompanySettingsRequest request, CancellationToken ct = default);
+}
+
+public interface IDocumentSequenceApiService
+{
+    Task<Result<List<DocumentSequenceDto>>> GetAllAsync(CancellationToken ct = default);
+    Task<Result<DocumentSequenceDto>> UpdateAsync(int id, UpdateDocumentSequenceRequest request, CancellationToken ct = default);
+}
+
+public interface IAccountCategoryApiService
+{
+    Task<Result<List<AccountCategoryDto>>> GetAllAsync(CancellationToken ct = default);
+    Task<Result<AccountCategoryDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<AccountCategoryDto>> CreateAsync(CreateAccountCategoryRequest request, CancellationToken ct = default);
+    Task<Result<AccountCategoryDto>> UpdateAsync(int id, UpdateAccountCategoryRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+}
+
+public interface ISystemAccountMappingApiService
+{
+    Task<Result<List<SystemAccountMappingDto>>> GetAllAsync(int? branchId = null, CancellationToken ct = default);
+    Task<Result<SystemAccountMappingDto>> GetByKeyAsync(string key, int? branchId = null, CancellationToken ct = default);
+    Task<Result<SystemAccountMappingDto>> CreateAsync(CreateSystemAccountMappingRequest request, CancellationToken ct = default);
+    Task<Result<SystemAccountMappingDto>> UpdateAsync(int id, UpdateSystemAccountMappingRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+}
+
+public interface IPaymentVoucherApiService
+{
+    Task<Result<List<PaymentVoucherDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, int page = 1, int pageSize = 100, CancellationToken ct = default);
+    Task<Result<PaymentVoucherDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<PaymentVoucherDto>> CreateAsync(CreatePaymentVoucherRequest request, CancellationToken ct = default);
+    Task<Result<PaymentVoucherDto>> UpdateAsync(int id, UpdatePaymentVoucherRequest request, CancellationToken ct = default);
+    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
+    Task<Result<PaymentVoucherDto>> PostAsync(int id, CancellationToken ct = default);
+    Task<Result<PaymentVoucherDto>> CancelAsync(int id, CancellationToken ct = default);
 }
 
 

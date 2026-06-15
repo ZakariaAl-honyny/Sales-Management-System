@@ -52,7 +52,8 @@ public class UnitService : IUnitService
             if (await _uow.Units.AnyAsync(u => u.Name == request.Name, ct))
                 return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", "DUPLICATE_UNIT_NAME");
 
-            var unit = Unit.Create(request.Name, request.Symbol, null);
+            // Unit.Create expects (name, nameEn?, symbol?, isSystem, createdByUserId)
+            var unit = Unit.Create(name: request.Name, symbol: request.Symbol);
 
             await _uow.Units.AddAsync(unit, ct);
             await _uow.SaveChangesAsync(ct);
@@ -83,7 +84,8 @@ public class UnitService : IUnitService
             if (await _uow.Units.AnyAsync(u => u.Name == request.Name && u.Id != id, ct))
                 return Result<UnitDto>.Failure("اسم الوحدة مستخدم بالفعل", "DUPLICATE_UNIT_NAME");
 
-            unit.Update(request.Name, request.Symbol, null);
+            // Unit.Update expects (name, nameEn?, symbol?, updatedByUserId?)
+            unit.Update(name: request.Name, symbol: request.Symbol);
 
             if (request.IsActive && !unit.IsActive) unit.Restore();
             else if (!request.IsActive && unit.IsActive) unit.MarkAsDeleted();
@@ -112,7 +114,7 @@ public class UnitService : IUnitService
         if (unit == null)
             return Result.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-        if (await _uow.Products.AnyAsync(p => p.UnitId == id, ct))
+        if (await _uow.ProductUnits.AnyAsync(pu => pu.UnitId == id, ct))
             return Result.Failure("لا يمكن حذف الوحدة لأنها مرتبطة بمنتجات");
 
         await _uow.Units.SoftDeleteAsync(id, ct);
@@ -128,7 +130,7 @@ public class UnitService : IUnitService
         if (unit == null)
             return Result.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-        if (await _uow.Products.AnyAsync(p => p.UnitId == id || p.RetailUnitId == id || p.WholesaleUnitId == id, ct))
+        if (await _uow.ProductUnits.AnyAsync(pu => pu.UnitId == id, ct))
             return Result.Failure("لا يمكن حذف الوحدة نهائياً لأنها مرتبطة بمنتجات");
 
         try

@@ -1,9 +1,12 @@
+using System;
+
 namespace SalesSystem.Domain.Enums;
 
 /// <summary>
 /// Defines the pricing tiers available for products.
 /// Each level can have a different price per currency per product unit.
 /// </summary>
+[Obsolete("Price levels are removed. Pricing is per (Unit + Currency) combination only.")]
 public enum PriceLevel : byte
 {
     /// <summary>

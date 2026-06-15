@@ -32,6 +32,17 @@
             <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <!-- Actions Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <!-- New Entry -->
+                    <Button Command="{Binding NewEntryCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnNewJournalEntry"
+                            ToolTip="فتح نافذة إدخال قيد يومي يدوي — يتم التحقق من توازن القيد تلقائياً">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="➕" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="قيد جديد" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- View Details -->
                     <Button Command="{Binding ViewDetailsCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
                             AutomationProperties.AutomationId="BtnViewEntryDetails"
                             ToolTip="عرض تفاصيل القيد المحدد — يشمل الحسابات المدينة والدائنة">
@@ -40,6 +51,28 @@
                             <TextBlock Text="عرض التفاصيل" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+
+                    <!-- Post Entry -->
+                    <Button Command="{Binding PostEntryCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnPostJournalEntry"
+                            ToolTip="ترحيل القيد المحدد — تحويله من مسودة إلى مرحل (لا يمكن التراجع)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="✅" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="ترحيل" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Cancel Entry -->
+                    <Button Command="{Binding CancelEntryCommand}" Style="{StaticResource DangerButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnCancelJournalEntry"
+                            ToolTip="إلغاء القيد المحدد — إنشاء قيد عكس للقيد المرحل">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🚫" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="إلغاء" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Refresh -->
                     <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
                             AutomationProperties.AutomationId="BtnRefreshJournalEntries"
                             ToolTip="تحديث القائمة — إعادة تحميل أحدث القيود اليومية من الخادم">

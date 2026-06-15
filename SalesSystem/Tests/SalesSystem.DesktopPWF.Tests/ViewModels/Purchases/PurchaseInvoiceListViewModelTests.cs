@@ -65,6 +65,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
@@ -88,6 +89,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .Returns(tcs.Task);
 
@@ -112,6 +114,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(new List<PurchaseInvoiceDto>
             {
@@ -146,6 +149,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
@@ -182,11 +186,12 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
         await _viewModel.LoadInvoicesAsync();
-        _viewModel.SearchText = "ط؛ظٹط± ظ…ظˆط¬ظˆط¯";
+        _viewModel.SearchText = "غير موجود";
 
         var count = 0;
         if (_viewModel.InvoicesView != null)
@@ -239,7 +244,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.SearchText = "ط¨ط­ط«";
+        _viewModel.SearchText = "بحث";
 
         propertyChangedEvents.Should().Contain("SearchText");
     }
@@ -459,10 +464,10 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             SubTotal: totalAmount,
             DiscountAmount: 0,
             TaxAmount: 0,
-            TotalAmount: totalAmount,
+            OtherCharges: 0,
+            NetTotal: totalAmount,
             PaidAmount: totalAmount,
-            DueAmount: 0,
-            SupplierInvoiceNo: null,
+            RemainingAmount: 0,
             Notes: null,
             Status: status,
             TaxId: null,
@@ -470,14 +475,8 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
-            CostInBaseCurrency: null,
-            AdditionalFeesTotal: 0,
             AttachmentPath: null,
-            DiscountType: null,
-            DiscountRate: null,
-            CurrencyName: null,
-            Items: new List<PurchaseInvoiceItemDto>(),
-            AdditionalFees: new List<AdditionalFeeDto>());
+            Items: new List<PurchaseInvoiceItemDto>());
     }
 
     #endregion

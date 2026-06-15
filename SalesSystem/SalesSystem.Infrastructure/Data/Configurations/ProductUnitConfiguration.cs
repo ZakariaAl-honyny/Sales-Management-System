@@ -10,25 +10,30 @@ public class ProductUnitConfiguration : IEntityTypeConfiguration<ProductUnit>
     {
         builder.ToTable("ProductUnits");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.UnitName).IsRequired().HasMaxLength(100);
-        builder.Property(x => x.BaseConversionFactor).HasPrecision(18, 3);
-        builder.Property(x => x.SalesPrice).HasPrecision(18, 2);
-        builder.Property(x => x.WholesalePrice).HasPrecision(18, 2);
-        builder.Property(x => x.PurchaseCost).HasPrecision(18, 2);
-        builder.Property(x => x.SupplierPrice).HasPrecision(18, 2);
-        builder.Property(x => x.LastPurchasePrice).HasPrecision(18, 2);
-        builder.Property(x => x.SortOrder).HasDefaultValue(1);
-        builder.Property(x => x.IsActive).HasDefaultValue(true);
 
+        // ─── Properties ────────────────────────────────────────
+        builder.Property(x => x.UnitId)
+            .HasColumnType("smallint")
+            .IsRequired();
+        builder.Property(x => x.Factor)
+            .HasColumnName("Factor")
+            .HasPrecision(18, 3)
+            .IsRequired();
+
+        // ─── CHECK constraint: base units must have Factor = 1 ──
         builder.ToTable(t => t.HasCheckConstraint(
             "CHK_ProductUnits_BaseUnitFactor",
-            "IsBaseUnit = 0 OR BaseConversionFactor = 1"));
+            "IsBaseUnit = 0 OR Factor = 1"));
 
+        // ─── Relationships ──────────────────────────────────────
         builder.HasOne(x => x.Product)
             .WithMany(x => x.Units)
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(x => x.IsActive);
+        builder.HasOne(x => x.Unit)
+            .WithMany()
+            .HasForeignKey(x => x.UnitId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

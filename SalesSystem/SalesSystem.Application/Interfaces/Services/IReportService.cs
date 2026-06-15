@@ -39,4 +39,22 @@ public interface IReportService
     /// Get warehouse movement report — shows inventory movements with quantities before/after
     /// </summary>
     Task<Result<List<WarehouseMovementReportDto>>> GetWarehouseMovementsAsync(int? warehouseId, DateTime? from, DateTime? to, CancellationToken ct);
+
+    // ─── Detailed Stock Ledger ──────────────────────────────────────────
+    /// <summary>
+    /// Get detailed stock ledger — full audit trail of inventory movements with running balances.
+    /// </summary>
+    Task<Result<List<DetailedStockLedgerDto>>> GetDetailedStockLedgerAsync(int? productId, int? warehouseId, DateTime? from, DateTime? to, CancellationToken ct);
+
+    // ─── Returns Report ─────────────────────────────────────────────────
+    /// <summary>
+    /// Get combined sales/purchase returns report.
+    /// </summary>
+    Task<Result<List<ReturnsReportDto>>> GetReturnsReportAsync(string? returnType, DateTime? from, DateTime? to, int? productId, CancellationToken ct);
+
+    // ─── Aging Report ───────────────────────────────────────────────────
+    /// <summary>
+    /// Get customer/supplier aging report — balance aging buckets.
+    /// </summary>
+    Task<Result<List<AgingReportDto>>> GetAgingReportAsync(string partyType, int? partyId, CancellationToken ct);
 }

@@ -107,21 +107,6 @@ public class CurrenciesController : ControllerBase
         return BadRequest(new { error = result.Error });
     }
 
-    [HttpGet("{id:int}/history")]
-    [Authorize(Policy = "AllStaff")]
-    [ProducesResponseType(typeof(List<ExchangeRateHistoryDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetRateHistory(int id, CancellationToken ct)
-    {
-        var result = await _currencyService.GetRateHistoryAsync(id, ct);
-        if (result.IsSuccess)
-            return Ok(result.Value);
-        if (result.ErrorCode == ErrorCodes.NotFound)
-            return NotFound(new { error = result.Error });
-        return BadRequest(new { error = result.Error });
-    }
-
     [HttpGet("by-code/{code}")]
     [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(typeof(CurrencyDto), StatusCodes.Status200OK)]

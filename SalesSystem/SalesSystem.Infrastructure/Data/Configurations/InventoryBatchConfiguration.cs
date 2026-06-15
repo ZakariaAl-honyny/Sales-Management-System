@@ -4,6 +4,10 @@ using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
+/// <summary>
+/// EF Core configuration for the <see cref="InventoryBatch"/> entity.
+/// WarehouseId is smallint FK; includes navigation to PurchaseInvoiceItem.
+/// </summary>
 public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBatch>
 {
     public void Configure(EntityTypeBuilder<InventoryBatch> builder)
@@ -12,10 +16,15 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
         builder.HasKey(x => x.Id);
 
         // Properties
+        builder.Property(x => x.WarehouseId)
+            .HasColumnType("smallint")
+            .IsRequired()
+            .HasComment("معرف المستودع (smallint FK)");
+
         builder.Property(x => x.Quantity)
             .HasPrecision(18, 3)
             .IsRequired()
-            .HasComment("الكمية المتبقية في الدفعة");
+            .HasComment("الكمية الحالية في الدفعة");
 
         builder.Property(x => x.UnitCost)
             .HasPrecision(18, 2)
@@ -23,8 +32,8 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
             .HasComment("تكلفة الوحدة عند الشراء");
 
         builder.Property(x => x.BatchNo)
-            .HasMaxLength(100)
-            .IsRequired()
+            .HasMaxLength(50)
+            .IsRequired(false)
             .HasComment("رقم الدفعة / رقم التشغيلة");
 
         builder.Property(x => x.ManufactureDate)
@@ -53,9 +62,9 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.PurchaseInvoiceItem)
+        builder.HasOne(x => x.PurchaseInvoice)
             .WithMany()
-            .HasForeignKey(x => x.PurchaseInvoiceItemId)
+            .HasForeignKey(x => x.PurchaseInvoiceId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired(false);
 
@@ -75,7 +84,7 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
             .HasDatabaseName("IX_InventoryBatches_ExpiryDate")
             .HasFilter("[ExpiryDate] IS NOT NULL");
 
-        // Global query filter
+        // Global query filter — soft delete
         builder.HasQueryFilter(x => x.IsActive);
     }
 }

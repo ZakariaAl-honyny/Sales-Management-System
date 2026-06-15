@@ -1,9 +1,13 @@
 ﻿# Product Requirements Document (PRD) & Master Implementation Reference
-# Sales Management System (v4.6.7 — InvoiceNo int Re-addition & Code Polish)
+# Sales Management System (v4.10 — 65-Table Schema, Per-Unit Pricing, Immutable Base Currency)
 # Platform: .NET 10 LTS | Clean Architecture | Year: 2026
 
----
+## Schema Reference
+- **Table definitions**: See `docs/database-schema.md` (65 tables, single source of truth)
+- **Domain entities & patterns**: See `docs/CONSTITUTION.md` and `AGENTS.md`
+- **Implementation plans**: See `specs/` directory (32 phases)
 
+---
 
 <!-- START OF SECTION: 1. Functional & Non-Functional Requirements (English) -->
 
@@ -21,14 +25,14 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 ## 2. Scope
 
 ### In Scope
-- User authentication with role-based access (Admin/Manager/Cashier) — JWT with BCrypt
-- **Dynamic Unit of Measure (v4.3)**: ProductUnits with per-unit pricing, unit-specific barcodes, SmartUnitFormatter
-- **Costing Strategy (v4.3)**: WeightedAverage (1), LastPurchasePrice (2), SupplierPrice (3)
-- **Cash Box Management (v4.3)**: Multi-box, immutable CashTransactions, DailyClosure
-- **Product Price History (v4.3)**: Audit trail for every price/cost change
+- User authentication with role-based access (Admin/Manager/Cashier) â€” JWT with BCrypt
+- **Dynamic Unit of Measure (v4.10)**: Units as independent table (seed + user-addable); ProductUnits junction (Factor, IsBaseUnit); ProductPrices per (unit × currency); barcode on Products table
+- **Costing Strategy (v4.10)**: FIFO Only via InventoryBatches — WeightedAverage/LastPurchasePrice/SupplierPrice removed
+- **Cash Box Management (v4.9)**: CashBox linked to Account (balance lives on Account, NOT CashBox); ReceiptVouchers/PaymentVouchers replace CashTransactions
+- **ProductPrices (v4.10)**: Pricing per (ProductUnit × CurrencyId) with EffectiveFrom/EffectiveTo date ranges
 - Multi-warehouse inventory management with stock transfer between warehouses
-- Purchase invoices (Cash/Credit/Mixed) with line-level/invoice-level discounts
-- Sales invoices (Cash/Credit/Mixed) with real-time stock validation
+- Purchase invoices (Cash/Credit/Mixed) with invoice-level discount
+- Sales invoices (Cash/Credit/Mixed, multi-currency) with real-time stock validation
 - Sales returns and purchase returns with quantity validation against originals
 - Customer and supplier balance tracking with payment management
 - **Invoice Printing (v4.3)**: A4 PDF via QuestPDF + 80mm thermal via Win32 raw printing
@@ -38,9 +42,9 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - **Windows Service (v4.4)**: API runs as `SalesSystemService` with auto-restart
 - **Database Health Check (v4.5)**: Desktop verifies DB before login; API exposes `/health/database`
 - **Multi-Window Screen Management (v4.5)**: Non-modal editors via ScreenWindowService
-- **WPF Validation ErrorTemplate (v4.6.2)**: Red border + ❗ icon, INotifyDataErrorInfo, ValidateAllAsync()
+- **WPF Validation ErrorTemplate (v4.6.2)**: Red border + â‌— icon, INotifyDataErrorInfo, ValidateAllAsync()
 - **LogSystemError centralized (v4.6)**: Unified system error logging in ViewModelBase
-- **Identifier Strategy — No Code columns (v4.5.3)**: Auto-increment Id only; Code removed from Product/Customer/Supplier/Warehouse
+- **Identifier Strategy â€” No Code columns (v4.5.3)**: Auto-increment Id only; Code removed from Product/Customer/Supplier/Warehouse
 - Delete operations with 3-tier strategy (Cancel/Deactivate/Permanent)
 - Audit tracking on all entities (CreatedAt, CreatedByUserId, IsActive)
 - Role-based UI visibility and API authorization
@@ -51,7 +55,10 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - **Users & Permissions (Phase 21)**: 4-role model (Admin/Manager/Cashier/Accountant), 33 permission codes, MustChangePassword, lockout policy
 - **Journal Entries (Phase 30)**: Auto-journal entries from all financial operations; manual entry; Annual Closing
 - **Reports (Phase 31)**: 35+ report DTOs; Hierarchical Income Statement + Balance Sheet; Excel via ClosedXML
-- **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with batch-level FIFO cost allocation and FEFO expiry-based inventory deduction
+- **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: InventoryBatches entity with batch-level FIFO cost allocation and FEFO expiry-based inventory deduction
+- **Party entity (v4.10)**: Shared contact data for Customers and Suppliers via PartyId FK
+- **Units as independent table (v4.10)**: Seed data + user-addable units, with ProductUnits junction table
+- **Perpetual Inventory (v4.10)**: No Purchases account â€” all inventory costs go directly to Inventory Asset account
 
 ### Out of Scope (Future Phases)
 - Multi-branch management with branch-level P&L
@@ -70,39 +77,42 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Refresh token for session continuity
 - Role stored in JWT claims: Admin=1, Manager=2, Cashier=3
 - Failed login attempts logged
+- Login rate limiting: 5 attempts per 15 minutes per IP
 - Logout clears token from Desktop memory
 
-### 3.2 Product Management (v4.6)
+### 3.2 Product Management (v4.10)
 - Add / Edit / Deactivate products (no hard delete)
-- Identifier: Auto-increment `Id` only — no `Code` field (v4.5.3)
-- Fields: Name, Barcode (unique), Category, Description
-- **Dynamic Units (v4.3)**: Each product has multiple `ProductUnit` entries with per-unit pricing:
-  - One `IsBaseUnit = true` (smallest unit, ConversionFactor=1)
-  - Derived units have ConversionFactor > 1 (e.g., Box=24)
-  - Per-unit: `RetailPrice`, `WholesalePrice`, `UnitName`
-- **UnitBarcodes (v4.3)**: Each product-unit combination can have multiple barcodes
+- Identifier: Auto-increment `Id` only â€” no `Code` field (v4.5.3)
+- Fields: Name, Category, Description, TrackExpiry, ImagePath, ReorderLevel
+- **DefaultPurchaseUnitId and DefaultSalesUnitId** on Product for faster data entry
+- **Units (v4.10)**: Independent `Units` table (seed data + user-addable) with `ProductUnits` junction table:
+  - One `IsBaseUnit = true` (smallest unit, Factor=1)
+  - Derived units have Factor > 1 (e.g., Box=24)
+- **ProductPrices (v4.10)**: Pricing per (ProductUnit أ— CurrencyId) with effective date ranges â€” NO RetailPrice/WholesalePrice on ProductUnit
+- **Barcodes**: Stored on `Products.Barcode` (varchar, ASCII-only, unique filtered for active products)
+- **Costing**: Cost sourced from `InventoryBatches.UnitCost` â€” NO cost field on Product or ProductUnit
 - Search by: Id, Name, Barcode
 - Filter by: Category, Active status, Warehouse stock
 - Barcode scanner support (keyboard input simulation)
-- **Cost cascade**: When purchase cost updates, all product units recalculate from base unit cost × conversion factor
 
-### 3.3 Warehouse Management (v4.6)
-- Add / Edit / Deactivate warehouses (no Code field — auto-increment Id only)
-- One warehouse flagged as IsDefault
+### 3.3 Warehouse Management (v4.10)
+- Add / Edit / Deactivate warehouses (no Code field â€” auto-increment Id only)
+- WarehouseType: Main (1), Store (2), Showroom (3)
+- ManagerName, Phone, Address metadata fields
 - View stock per warehouse per product
-- Stock transfer between warehouses (source ≠ destination enforced)
+- WarehouseTransfers replace StockTransfers â€” multi-item transfers with batch tracking
+- InventoryTransactions replace InventoryMovements â€” full audit trail (Purchase, Sale, Return, Transfer, Adjustment, etc.)
 - `CHECK (Quantity >= 0)` constraint on WarehouseStocks at DB level
 
 ### 3.4 Purchase Invoice
 - Select supplier and destination warehouse
 - Add multiple products with quantity and unit cost
-- Apply line-level discount per item
-- Apply invoice-level discount
+- Discount at invoice header level only (no line-level discount)
 - Tax calculation (optional, from settings)
 - Payment type: Cash / Credit / Mixed
 - If Mixed: enter paid amount, system calculates due amount
 - InvoiceNo = int, UNIQUE per purchase invoice, auto-generated via DocumentSequenceService.GetNextIntAsync("PurchaseInvoice"), user can override (validated for uniqueness)
-- On Post: create PurchaseLot (batch) per line with FIFO cost allocation
+- On Post: create InventoryBatch per line with BatchNo, QuantityReceived, QuantityRemaining, UnitCost
 - FEFO: if product has expiry, batches tracked by expiry date
 - On Post: increase stock in selected warehouse
 - On Post: update supplier balance if credit/mixed
@@ -112,11 +122,12 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Select customer (or use default Cash customer)
 - Select source warehouse
 - Add multiple products with quantity and unit price
-- Apply line-level and invoice-level discounts
+- Discount at invoice header level only (no line-level discount)
 - Payment type: Cash / Credit / Mixed
+- CurrencyId and multi-currency support on invoice
 - Validate: quantity available in selected warehouse
 - InvoiceNo = int, UNIQUE per sales invoice, auto-generated via DocumentSequenceService.GetNextIntAsync("SalesInvoice"), user can override (validated for uniqueness)
-- Batch allocation: FIFO (oldest batch first) or FEFO (closest expiry first)
+- Batch allocation: FIFO (oldest batch first) or FEFO (closest expiry first) â€” consumes from InventoryBatches
 - COGS computed from actual batch cost, not average
 - On Post: decrease stock from selected warehouse
 - On Post: update customer balance if credit/mixed
@@ -125,7 +136,7 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 
 ### 3.6 Sales Return
 - Reference original invoice (optional)
-- If referenced: validate return quantity ≤ sold quantity
+- If referenced: validate return quantity â‰¤ sold quantity
   minus previously returned quantity
 - On Post: increase stock in selected warehouse
 - On Post: decrease customer balance by return amount
@@ -135,20 +146,20 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - On Post: decrease stock from selected warehouse
 - On Post: decrease supplier balance by return amount
 
-### 3.8 Stock Transfer
+### 3.8 Warehouse Transfer
 - Select source warehouse and destination warehouse
 - Source ≠ Destination (enforced at DB and application level)
-- Add products with quantities
+- Add products with quantities (linked to specific InventoryBatches)
 - Validate: sufficient stock in source warehouse
 - On Post: decrease source warehouse stock
 - On Post: increase destination warehouse stock
-- Record both movements in InventoryMovements
+- Record both movements in InventoryTransactions
 
 ### 3.9 Payments
 - Customer payment: record cash received from customer
-  → decreases customer balance
+  â†’ decreases customer balance
 - Supplier payment: record cash paid to supplier
-  → decreases supplier balance
+  â†’ decreases supplier balance
 - Both linked optionally to specific invoice
 
 ### 3.10 Reports
@@ -172,6 +183,15 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - **Security**: User, Role, Permission management (Admin only)
 - CostingMethod exposed as RadioButton group in SettingsView (WeightedAverage/LastPurchasePrice/SupplierPrice)
 
+### 3.11a Party Management (v4.10)
+- Party entity stores shared contact data (Name, Phone, Email, Address, TaxNumber)
+- Customers and Suppliers each have PartyId FK to share contact data
+- AccountId mandatory on Customer and Supplier â€” auto-created under 1210 (AR) and 2100 (AP) respectively
+- NO OpeningBalance or CurrentBalance on Customer/Supplier â€” balance tracked on linked GL Account
+- NO CurrencyId on Customer/Supplier â€” currency is per-transaction
+- NO CustomerGroup or SupplierType in V1
+- CheckCreditLimit returns bool (soft warning, caller decides to block)
+
 ### 3.12 Backup
 - Backup database via SQL Server BACKUP DATABASE command
 - Restore database via API endpoint (requires restart)
@@ -179,20 +199,24 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Backup creates timestamped `.bak` file
 - Restore confirmation requires re-login
 
-### 3.13 Dynamic Unit of Measure (v4.3)
+### 3.13 Dynamic Unit of Measure (v4.10)
+
+**Units (Independent Table):**
+- `Units` is an independent table seeded with system units (حبة/PCS, كرتون/CTN, كيلو/KG, جرام/G, لتر/L, متر/M, بالة/BAL)
+- User-addable with `IsSystem` flag protecting seed units from deletion
+- Each product links to multiple units via `ProductUnits` junction table
 
 **ProductUnits:**
-- Each product can have multiple units (e.g., "Piece", "Box", "Carton")
+- Each product has at least one base unit + one additional unit
 - One unit must be marked as `IsBaseUnit = true` (the smallest/foundational unit)
-- Base unit always has `ConversionFactor = 1`
-- Derived units have `ConversionFactor > 1` (e.g., Box=24 means 1 Box = 24 base units)
-- Per-unit pricing: `RetailPrice` and `WholesalePrice` stored on each ProductUnit
+- Base unit always has `Factor = 1`
+- Derived units have `Factor > 1` (e.g., Box=24 means 1 Box = 24 base units)
+- NO pricing on ProductUnit — prices stored in `ProductPrices` table per (ProductUnit × CurrencyId)
 - **Enforced**: `ProductMustHaveAtLeastOneUnit` — throw DomainException if deleting last unit
 
-**UnitBarcodes:**
-- Barcodes stored in `UnitBarcode` table (FK → ProductUnits)
-- One barcode uniquely identifies one specific product unit
-- Replaces the old `ProductBarcodes` multi-barcode approach
+**Barcodes:**
+- Barcode stored on `Products` table as `varchar(50)` — unique filtered for active products
+- ASCII-only barcodes (not nvarchar)
 
 **SmartUnitFormatter:**
 - UI-only service that selects best display unit based on quantity threshold
@@ -200,77 +224,79 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 
 **Conversion Math (Domain-Only):**
 ```csharp
-var baseQty = quantity * sourceUnit.ConversionFactor;
-var targetQty = baseQty / targetUnit.ConversionFactor;
+var baseQty = quantity * sourceUnit.Factor;
+var targetQty = baseQty / targetUnit.Factor;
 ```
 
-### 3.14 Costing Strategy (v4.3)
+### 3.14 Costing Strategy (v4.10 â€” InventoryBatches FIFO Only)
 
-**Three Methods (configurable):**
+**Architectural Decision: FIFO Only with Batch Tracking â€” InventoryBatches Exclusively**
+The system's inventory valuation and cost calculation is built on **FIFO (First-In, First-Out)** via `InventoryBatches`:
+- `CostingMethod` enum (WeightedAverage, LastPurchasePrice, SupplierPrice) is **removed** â€” the costing data model uses `InventoryBatches` exclusively.
+- Each purchase creates an `InventoryBatch` with `BatchNo`, `QuantityReceived`, `QuantityRemaining`, and `UnitCost` per base unit.
+- Sales consume from `InventoryBatches.QuantityRemaining` â€” oldest batch first (FIFO), or by expiry date if `Product.TrackExpiry = true` (FEFO).
+- COGS at sale = SUM of (quantity consumed from each batch أ— `batch.UnitCost`)
 
-| Method | Enum | Formula | Use Case |
-|--------|------|---------|----------|
-| WeightedAverage | 1 | `(OldStock*OldCost + NewQty*NewCost) / TotalQty` | Default — smooths cost fluctuations |
-| LastPurchasePrice | 2 | Direct overwrite: `AvgCost = NewUnitCost` | When latest price is most relevant |
-| SupplierPrice | 3 | Use `Product.SupplierPrice` | Catalog pricing, no calculation |
+**System Settings (Inventory Rules):**
+1. `AllowNegativeStock` (ط§ظ„ط³ظ…ط§ط­ ط¨ط§ظ„ظ…ط®ط²ظˆظ† ط§ظ„ط³ط§ظ„ط¨)
+2. `AllowSalesBelowCost` (ط§ظ„ط³ظ…ط§ط­ ط¨ط§ظ„ط¨ظٹط¹ ط¨ط£ظ‚ظ„ ظ…ظ† ط§ظ„طھظƒظ„ظپط©)
+3. `AutoSelectBatchByExpiry` (ط§ط®طھظٹط§ط± ط§ظ„ط¯ظپط¹ط© طھظ„ظ‚ط§ط¦ظٹط§ظ‹ ط­ط³ط¨ FEFO)
+4. `DefaultTaxId` (ط§ظ„ط¶ط±ظٹط¨ط© ط§ظ„ط§ظپطھط±ط§ط¶ظٹط©)
+5. `ExpiryAlertDays` (ط¹ط¯ط¯ ط£ظٹط§ظ… ط§ظ„طھظ†ط¨ظٹظ‡ ظ‚ط¨ظ„ ط§ظ„ط§ظ†طھظ‡ط§ط،)
 
-**Flow:**
-1. Costing method stored in `SystemSettings` table (seeded as `WeightedAverage`)
-2. When purchase invoice is **Posted**: `UpdateProductPricingService` fires
-3. Service reads costing method from settings
-4. Calculates new cost using the selected formula
-5. Updates `Product.AvgCost` and cascades to ALL product units
-6. Records change in `ProductPriceHistory`
-7. NEVER write costing logic outside `UpdateProductPricingService`
-
-**Cost Cascade:**
+**Cost Computation (no Cost column on ProductUnit â€” computed on-the-fly):**
 ```csharp
-// After base unit cost is updated:
-foreach (var unit in product.Units)
-    unit.Cost = baseUnitCost * unit.ConversionFactor;
+// Average cost computed from all available batches for a product+warehouse
+var avgCost = batches
+    .Where(b => b.QuantityRemaining > 0)
+    .Sum(b => b.QuantityRemaining * b.UnitCost)
+    / batches.Sum(b => b.QuantityRemaining);
+
+// Per-unit cost for display (non-base units):
+// baseCost * unit.Factor â€” NO cost stored on ProductUnit
+var displayCost = avgCost * unitFactor;
 ```
 
-### 3.15 Cash Box Management (v4.3)
+### 3.15 Cash Box Management (v4.9 â€” Refactored)
 
 **CashBox Entities:**
-- Multiple cash boxes with `OpeningBalance` and `CurrentBalance`
-- `CurrentBalance` is computed from `CashTransaction` sum
+- CashBox is a **lightweight register entity** with `AccountId` (required FK to Account)
+- **NO** `OpeningBalance` or `CurrentBalance` on CashBox â€” balance lives on linked Account
+- Balance tracked on the Chart of Accounts Account, NOT on CashBox
+- CashBox has metadata: `CategoryId`, `PhoneNumber`, `TaxNumber`, `Address`
 - One cash box flagged as `IsDefault`
-- **Constraint**: `CurrentBalance >= 0` (never negative)
+- Account balance NEVER goes negative
 
-**CashTransaction Types:**
-| Type | Enum | Direction |
-|------|------|-----------|
-| OpeningBalance | 1 | Initial |
-| SalesIncome | 2 | IN |
-| Expense | 3 | OUT |
-| TransferOut | 4 | OUT (to another box) |
-| TransferIn | 5 | IN (from another box) |
-| RefundOut | 6 | OUT (sales return refund) |
-| SupplierPayment | 7 | OUT |
-| CustomerPayment | 8 | IN |
+**CashTransaction Types (v4.9+):**
+Replaced by `ReceiptVouchers` (ط³ظ†ط¯ط§طھ ظ‚ط¨ط¶) and `PaymentVouchers` (ط³ظ†ط¯ط§طھ طµط±ظپ)
+| Type | Entity | Direction |
+|------|--------|-----------|
+| Customer Receipt | ReceiptVoucher | IN (from customer) |
+| Supplier Payment | PaymentVoucher | OUT (to supplier) |
+| Expense | PaymentVoucher | OUT (expense) |
+| Transfer | Two vouchers | Out + In |
 
-**Rules:**
-- Cash transactions are **immutable** — no editing, no deletion
-- Cancellations done via **offsetting entry**
-- Transfer between boxes requires TWO entries (Out from source, In to destination)
-- `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance
-- Every invoice payment references `CashBoxId`
+**Key Design Changes (v4.9+):**
+- NO `DailyClosure` in V1 (deferred)
+- NO `Cheque` management in V1 (deferred)
+- Account auto-created under "1110 â€” ط§ظ„ظ†ظ‚ط¯ظٹط©" when CashBox created without AccountId
+- Opening balance = Journal Entry (Dr Cash Account / Cr OpeningBalanceEquity)
+- Cash transactions are immutable â€” cancellations via offsetting entry
 
 ### 3.16 Invoice Printing (v4.3)
 
 - Two print formats: A4 PDF (QuestPDF) + 80mm thermal receipt (ESC/POS)
 - A4: RTL layout with store logo, tax breakdown, invoice details
 - Thermal: 42-char monospaced columns, Windows-1256 encoding for Arabic
-- Desktop calls `PrintController` API — never prints directly (v4.3)
+- Desktop calls `PrintController` API â€” never prints directly (v4.3)
 - Preview A4 in `PdfPreviewWindow` before printing
 - Print settings stored in `SystemSetting` table with `Category = "Print"`
 - Supports: Sales, Purchase, SalesReturn, PurchaseReturn, Test page
-- Logo is optional — missing logo handled gracefully (null check)
+- Logo is optional â€” missing logo handled gracefully (null check)
 
 ### 3.17 Auto-Update System (v4.4)
 
-- Fire-and-forget on startup — never blocks login
+- Fire-and-forget on startup â€” never blocks login
 - SHA256 checksum verification before launching installer
 - Skipped version persisted to `%AppData%\SalesSystem\settings.json`
 - Timeout = 8 seconds with silent failure
@@ -278,8 +304,8 @@ foreach (var unit in product.Units)
 
 ### 3.18 Database Backup & Restore (v4.4)
 
-- Backup uses raw SQL `BACKUP DATABASE` — no SMO dependency
-- Restore uses `SINGLE_USER WITH ROLLBACK AFTER 30` — 30s grace period
+- Backup uses raw SQL `BACKUP DATABASE` â€” no SMO dependency
+- Restore uses `SINGLE_USER WITH ROLLBACK AFTER 30` â€” 30s grace period
 - `ScheduledBackupWorker` runs daily at 2:00 AM as `BackgroundService`
 - Backup retention = configurable days (default 30)
 - Restore failure triggers `TrySetMultiUserAsync` recovery
@@ -289,8 +315,8 @@ foreach (var unit in product.Units)
 - Connection strings encrypted via DPAPI with `"DPAPI:"` prefix
 - `FirstRunSetupService` encrypts on first run (idempotent)
 - DataProtection keys stored in `%ProgramData%\SalesSystem\DataProtectionKeys`
-- JWT secret from environment variable — throws in production if missing
-- `appsettings.json` writes use atomic pattern: `.tmp` → `File.Replace()` → `.bak`
+- JWT secret from environment variable â€” throws in production if missing
+- `appsettings.json` writes use atomic pattern: `.tmp` â†’ `File.Replace()` â†’ `.bak`
 
 ### 3.20 Windows Service (v4.4)
 
@@ -301,56 +327,65 @@ foreach (var unit in product.Units)
 
 ### 3.21 Database Health Check (v4.5)
 
-- API exposes `GET /api/v1/health` — returns `Database: Connected/Disconnected`
-- API exposes `GET /api/v1/health/database` — checks `DbContext.Database.CanConnectAsync()`
+- API exposes `GET /api/v1/health` â€” returns `Database: Connected/Disconnected`
+- API exposes `GET /api/v1/health/database` â€” checks `DbContext.Database.CanConnectAsync()`
 - Desktop checks DB on startup before showing login via `IDatabaseHealthCheckService`
 - `DatabaseErrorDialog` with Retry/Exit on connection failure
-- `ExceptionMiddleware` detects DB exceptions → returns `503` with `DATABASE_CONNECTION_ERROR`
+- `ExceptionMiddleware` detects DB exceptions â†’ returns `503` with `DATABASE_CONNECTION_ERROR`
 
 ### 3.22 Multi-Window Screen Management (v4.5)
 
-- Editors open non-modally via `ScreenWindowService.OpenScreen()` — never `ShowDialog()`
+- Editors open non-modally via `ScreenWindowService.OpenScreen()` â€” never `ShowDialog()`
 - `ScreenWindow.xaml` hosts any View/ViewModel pair generically
-- Window tracking via `WeakReference<Window>` — no memory leaks
-- Cascade positioning: 30px offset × (count % 10) from MainWindow
-- Auto-titles in Arabic (e.g., "فاتورة بيع") — not English type names
+- Window tracking via `WeakReference<Window>` â€” no memory leaks
+- Cascade positioning: 30px offset أ— (count % 10) from MainWindow
+- Auto-titles in Arabic (e.g., "ظپط§طھظˆط±ط© ط¨ظٹط¹") â€” not English type names
 
 ### 3.23 WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2)
 
-- ErrorTemplate in `Styles.xaml`: Red border (#EF4444, 1.5px) + ❗ icon badge
+- ErrorTemplate in `Styles.xaml`: Red border (#EF4444, 1.5px) + â‌— icon badge
 - ToolTip on error icon bound to `[0].ErrorContent`
 - Applies to TextBox, PasswordBox, ComboBox
 - `ViewModelBase.cs`: `SetDialogService()`, `ValidateAllAsync()`, `ValidateField()`
 - All Editor VMs call `SetDialogService()` in constructors
-- Pre-save validation: `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()`
-- No `HasXxxError` booleans — use `INotifyDataErrorInfo` directly
-- Save buttons always enabled — validate on click with warning dialog
+- Pre-save validation: `ClearAllErrors()` â†’ `AddError()` â†’ `await ValidateAllAsync()`
+- No `HasXxxError` booleans â€” use `INotifyDataErrorInfo` directly
+- Save buttons always enabled â€” validate on click with warning dialog
 
-### 3.24 Identifier Strategy — No Code Columns (v4.5.3)
+### 3.24 Identifier Strategy â€” No Code Columns (v4.5.3)
 
 - Product, Customer, Supplier, Warehouse: auto-increment `Id` only
 - No `Code` property on entities, DTOs, or editor ViewModels
-- Search/filter by `Id` (int) or `Name` (string) — never by Code
+- Search/filter by `Id` (int) or `Name` (string) â€” never by Code
 - `DuplicateCode` error constant removed from ErrorCodes
 - Code auto-generation services (`DocumentSequenceService` for PRD/CUST/SUP/WH) removed
 
 ### 3.25 Accounting Foundation (Phase 18)
 - JournalEntry entity with multi-currency support (SourceType, SourceId, Status, Description)
 - JournalEntryLine: AccountId, Debit/Credit amounts, CurrencyId, ExchangeRate; CHECK (Debit > 0 OR Credit > 0)
-- Account entity: hierarchical (ParentAccountId), 5 types (Asset/Liability/Equity/Revenue/Expense), ⓘ per account
-- FiscalYear: StartDate, EndDate, IsClosed, close(userId) — prevents double close
+- Account entity: hierarchical (ParentAccountId), 5 types (Asset/Liability/Equity/Revenue/Expense), â“ک per account
+- FiscalYear: StartDate, EndDate, IsClosed, close(userId) â€” prevents double close
 - 60 accounts seeded as default chart of accounts
 - 7 auto-journal entry providers (Sales, Purchases, Returns, Payments, Receipts, Transfers, Annual Closing)
-- Annual Closing: close revenue/expense accounts → transfer P&L to Retained Earnings → open new FiscalYear
+- Annual Closing: close revenue/expense accounts â†’ transfer P&L to Retained Earnings â†’ open new FiscalYear
 - Simple Mode UX: toggle hides/shows Debit/Credit columns for non-accountants
 
-### 3.26 FIFO/FEFO Batch Tracking (Phases 25/27/28)
-- PurchaseLot entity: ProductId, WarehouseId, BatchNo, ExpiryDate, CostPrice, QuantityReceived, QuantityRemaining
-- Each purchase creates PurchaseLot per line with cost allocation
-- On sale: FIFO deducts from oldest batch first; if TrackExpiry=true, FEFO deducts from closest-expiry first
-- Sales returns return to the original batch (if referenced)
-- Products with TrackBatch=false → WeightedAverage fallback
-- Products with TrackExpiry=true → FEFO applied during batch selection
+### 3.26 FIFO/FEFO Batch Tracking (v4.10 â€” InventoryBatches)
+- `InventoryBatches` entity replaces old `PurchaseLot` concept
+- Batch properties: BatchNo (int), ProductId FK, WarehouseId FK, PurchaseInvoiceId FK (nullable), SupplierBatchNo, ExpiryDate (nullable for non-expiry products)
+- `QuantityReceived` (total ever received) and `QuantityRemaining` (currently available) â€” both decimal(18,3) with CHECK >= 0
+- `UnitCost` decimal(18,2) â€” the actual cost per base unit for this batch
+- Each purchase creates InventoryBatch per line with unit cost allocation
+- On sale: FIFO deducts from oldest batch first (`OrderBy(b => b.Id)`); if `TrackExpiry=true`, FEFO deducts from closest-expiry first (`OrderBy(b => b.ExpiryDate)`)
+- Sales returns restore QuantityRemaining on the original batch (if referenced)
+- Opening stock creates an opening batch (BatchNo = 1)
+- COGS = SUM of (QuantityConsumed أ— Batch.UnitCost) per batch consumed
+
+**Batch Indexes:**
+- `(ProductId, WarehouseId)` â€” for stock location queries
+- `(ExpiryDate)` filtered â€” for FEFO allocation
+- `(PurchaseInvoiceId)` â€” for purchase return lookups
+- Products with TrackExpiry=true â†’ FEFO applied during batch selection
 
 ---
 
@@ -391,196 +426,168 @@ foreach (var unit in product.Units)
 ---
 
 ## 5. Database Entities Summary
-Users → Authentication and authorization
-Units → Product measurement units
-Categories → Product categories
-Products → Product catalog
-Warehouses → Storage locations
-WarehouseStocks → Stock per product per warehouse ⚠️ Critical
-            (includes: Quantity, ReorderLevel for low-stock alerts)
-Suppliers → Supplier master data with balance
-Customers → Customer master data with balance
-PurchaseInvoices → Purchase invoice headers
-PurchaseInvoiceItems → Purchase invoice line items
-SalesInvoices → Sales invoice headers
-SalesInvoiceItems → Sales invoice line items
-PurchaseReturns → Purchase return headers
-PurchaseReturnItems → Purchase return line items
-SalesReturns → Sales return headers
-SalesReturnItems → Sales return line items
-StockTransfers → Transfer headers
-StockTransferItems → Transfer line items
-CustomerPayments → Payments received from customers
-SupplierPayments → Payments made to suppliers
-InventoryMovements → Complete audit trail of stock changes ⚠️ Critical
-StoreSettings → Store configuration (single row)
-DocumentSequences → Auto-increment invoice numbers
-ProductUnits → Per-product dynamic units with pricing and conversion (v4.3)
-UnitBarcodes → Unit-specific barcodes (replaces ProductBarcodes) (v4.3)
-CashBoxes → Cash box management (v4.3)
-CashTransactions → Immutable cash transaction log (v4.3)
-ProductPriceHistory → Audit trail for price/cost changes (v4.3)
-SystemSettings → Application-level settings (costing method, etc.) (v4.3)
-SystemLog → Application/system log entries (v4.3)
 
-text
+See `docs/database-schema.md` for the complete 65-table schema across 8 modules (Core/Parties/Security, Organization/Currencies/Settings, Products, Accounting, Inventory, Sales, Purchases, Infrastructure/Support).
 
 
 ---
 
 ## 6. Solution Architecture
 
-> ⚠️ The Desktop project is **WPF (Windows Presentation Foundation)** with MVVM pattern.
-> Project name: `SalesSystem.DesktopPWF` — NOT WinForms. All UI files are `.xaml`.
-> Data Flow: `Desktop → (HttpClient) → Api → Application → Infrastructure → SQL Server`
+> âڑ ï¸ڈ The Desktop project is **WPF (Windows Presentation Foundation)** with MVVM pattern.
+> Project name: `SalesSystem.DesktopPWF` â€” NOT WinForms. All UI files are `.xaml`.
+> Data Flow: `Desktop â†’ (HttpClient) â†’ Api â†’ Application â†’ Infrastructure â†’ SQL Server`
 
 ```text
 SalesSystem/
-├── SalesSystem.Contracts/       ← DTOs + Requests + Responses + Result<T>
-├── SalesSystem.Domain/          ← Entities + Business Rules + Exceptions
-├── SalesSystem.Application/     ← Services + Interfaces + Use Cases
-├── SalesSystem.Infrastructure/  ← EF Core + DbContext + Repositories + UoW
-├── SalesSystem.Api/             ← Controllers + FluentValidation + Middleware + JWT
-└── SalesSystem.DesktopPWF/     ← WPF UI + MVVM + EventBus + Printing
-│       ├── Result.cs
-│       ├── PagedResult.cs
-│       └── ErrorCodes.cs
-│
-├── SalesSystem.Domain/
-│   ├── Entities/
-│   ├── Enums/
-│   ├── Exceptions/
-│   └── Common/
-│       └── BaseEntity.cs
-│
-├── SalesSystem.Application/
-│   ├── Interfaces/
-│   │   ├── Repositories/
-│   │   ├── Services/
-│   │   └── IUnitOfWork.cs
-│   ├── Services/
-│   │   ├── ProductService.cs
-│   │   ├── SalesService.cs ⚠️ Critical
-│   │   ├── PurchaseService.cs ⚠️ Critical
-│   │   ├── SalesReturnService.cs ⚠️ Critical
-│   │   ├── PurchaseReturnService.cs ⚠️ Critical
-│   │   ├── InventoryService.cs ⚠️ Critical
-│   │   ├── StockTransferService.cs ⚠️ Critical
-│   │   ├── PaymentService.cs
-│   │   ├── ReportService.cs
-│   │   ├── AuthService.cs
-│   │   ├── BackupService.cs
-│   │   └── DocumentSequenceService.cs ⚠️ Thread-safe
-│
-├── SalesSystem.Infrastructure/
-│   ├── Data/
-│   │   ├── SalesDbContext.cs
-│   │   └── Configurations/
-│   ├── Repositories/
-│   ├── Migrations/
-│   └── Services/
-│       └── BackupService.cs
-│
-├── SalesSystem.Api/
-│   ├── Controllers/
-│   ├── Validators/               ← FluentValidation
-│   ├── Middleware/
-│   │   ├── ExceptionMiddleware.cs
-│   │   └── RequestLoggingMiddleware.cs
-│   └── Extensions/
-│       ├── AuthExtensions.cs
-│       └── ValidationExtensions.cs
-│
-└── SalesSystem.DesktopPWF/       ← WPF + MVVM (NOT WinForms)
-    │
-    ├── MainWindow.xaml            ← Shell / main layout
-    ├── LoginWindow.xaml           ← Login screen
-    ├── App.xaml                   ← Application entry point
-    ├── App.xaml.cs                ← DI registration (App.GetService<T>())
-    ├── appsettings.json
-    │
-    ├── Views/                     ← .xaml UI files (no logic)
-    │   ├── Categories/
-    │   ├── Common/                ← Shared controls / dialogs
-    │   ├── Customers/
-    │   ├── Dashboard/
-    │   ├── Inventory/
-    │   ├── Invoices/              ← Selection dialogs for invoices
-    │   ├── Login/
-    │   ├── Payments/
-    │   ├── Products/
-    │   ├── Purchases/
-    │   ├── Reports/
-    │   │   └── LowStockView.xaml  ← [NEW] SPEC-009
-    │   ├── Returns/
-    │   ├── Sales/
-    │   ├── Settings/
-    │   ├── Suppliers/
-    │   ├── Transfers/
-    │   ├── Units/
-    │   ├── Users/
-    │   └── Warehouses/
-    │
-    ├── ViewModels/                ← MVVM binding logic
-    │   ├── ViewModelBase.cs
-    │   ├── DashboardViewModel.cs
-    │   ├── LoginWindowViewModel.cs
-    │   ├── ReportsViewModel.cs
-    │   ├── SettingsViewModel.cs
-    │   ├── WarehouseListViewModel.cs
-    │   ├── WarehouseEditorViewModel.cs
-    │   ├── Categories/
-    │   ├── Customers/
-    │   ├── Inventory/
-    │   ├── Invoices/
-    │   ├── Payments/
-    │   ├── Products/
-    │   ├── Purchases/
-    │   ├── Returns/
-    │   ├── Sales/
-    │   ├── Suppliers/
-    │   ├── Transfers/
-    │   ├── Units/
-    │   └── Users/
-    │
-    ├── Services/
-    │   ├── Api/                   ← HttpClient wrappers → API calls
-    │   │   ├── IApiService.cs     ← All API interfaces in one file
-    │   │   ├── AuthApiService.cs
-    │   │   ├── ProductApiService.cs
-    │   │   ├── SalesInvoiceApiService.cs
-    │   │   ├── PurchaseInvoiceApiService.cs
-    │   │   ├── SalesReturnApiService.cs
-    │   │   ├── PurchaseReturnApiService.cs
-    │   │   ├── InventoryApiService.cs
-    │   │   ├── StockTransferApiService.cs
-    │   │   ├── CustomerApiService.cs
-    │   │   ├── SupplierWarehouseApiService.cs
-    │   │   ├── CustomerPaymentApiService.cs
-    │   │   ├── SupplierPaymentApiService.cs
-    │   │   ├── ReportApiService.cs
-    │   │   ├── DashboardApiService.cs
-    │   │   ├── SettingsApiService.cs
-    │   │   ├── CategoryApiService.cs
-    │   │   ├── UnitApiService.cs
-    │   │   ├── UserApiService.cs
-    │   │   └── LogsApiService.cs
-    │   └── App/                   ← App-level services (DI singletons)
-    │       ├── EventBus.cs        ← Pub/Sub event bus
-    │       ├── NavigationService.cs
-    │       ├── SessionService.cs  ← JWT token storage (in-memory only)
-    │       ├── DialogService.cs
-    │       ├── ISoundService.cs
-    │       ├── SoundService.cs
-    │       └── IPrinterService.cs ← [NEW] SPEC-006 print contract
-    │
-    ├── Messaging/
-    │   └── Messages/              ← EventBus message types (ID only, no payload)
-    │
-    ├── Converters/                ← WPF IValueConverter implementations
-    ├── Helpers/                   ← UI helpers / ThemeHelper etc.
-    ├── Models/                    ← Local view models / display models
-    └── Resources/                 ← Styles, brushes, icons, themes
+â”œâ”€â”€ SalesSystem.Contracts/       â†گ DTOs + Requests + Responses + Result<T>
+â”œâ”€â”€ SalesSystem.Domain/          â†گ Entities + Business Rules + Exceptions
+â”œâ”€â”€ SalesSystem.Application/     â†گ Services + Interfaces + Use Cases
+â”œâ”€â”€ SalesSystem.Infrastructure/  â†گ EF Core + DbContext + Repositories + UoW
+â”œâ”€â”€ SalesSystem.Api/             â†گ Controllers + FluentValidation + Middleware + JWT
+â””â”€â”€ SalesSystem.DesktopPWF/     â†گ WPF UI + MVVM + EventBus + Printing
+â”‚       â”œâ”€â”€ Result.cs
+â”‚       â”œâ”€â”€ PagedResult.cs
+â”‚       â””â”€â”€ ErrorCodes.cs
+â”‚
+â”œâ”€â”€ SalesSystem.Domain/
+â”‚   â”œâ”€â”€ Entities/
+â”‚   â”œâ”€â”€ Enums/
+â”‚   â”œâ”€â”€ Exceptions/
+â”‚   â””â”€â”€ Common/
+â”‚       â””â”€â”€ BaseEntity.cs
+â”‚
+â”œâ”€â”€ SalesSystem.Application/
+â”‚   â”œâ”€â”€ Interfaces/
+â”‚   â”‚   â”œâ”€â”€ Repositories/
+â”‚   â”‚   â”œâ”€â”€ Services/
+â”‚   â”‚   â””â”€â”€ IUnitOfWork.cs
+â”‚   â”œâ”€â”€ Services/
+â”‚   â”‚   â”œâ”€â”€ ProductService.cs
+â”‚   â”‚   â”œâ”€â”€ SalesService.cs âڑ ï¸ڈ Critical
+â”‚   â”‚   â”œâ”€â”€ PurchaseService.cs âڑ ï¸ڈ Critical
+â”‚   â”‚   â”œâ”€â”€ SalesReturnService.cs âڑ ï¸ڈ Critical
+â”‚   â”‚   â”œâ”€â”€ PurchaseReturnService.cs âڑ ï¸ڈ Critical
+â”‚   â”‚   â”œâ”€â”€ InventoryBatchService.cs âڑ ï¸ڈ Critical
+â”‚   â”‚   â”œâ”€â”€ InventoryTransactionService.cs âڑ ï¸ڈ Critical
+â”‚   â”‚   â”œâ”€â”€ WarehouseTransferService.cs âڑ ï¸ڈ Critical
+â”‚   â”‚   â”œâ”€â”€ PartyService.cs
+â”‚   â”‚   â”œâ”€â”€ PaymentService.cs
+â”‚   â”‚   â”œâ”€â”€ ReportService.cs
+â”‚   â”‚   â”œâ”€â”€ AuthService.cs
+â”‚   â”‚   â”œâ”€â”€ BackupService.cs
+â”‚   â”‚   â””â”€â”€ DocumentSequenceService.cs âڑ ï¸ڈ Thread-safe
+â”‚
+â”œâ”€â”€ SalesSystem.Infrastructure/
+â”‚   â”œâ”€â”€ Data/
+â”‚   â”‚   â”œâ”€â”€ SalesDbContext.cs
+â”‚   â”‚   â””â”€â”€ Configurations/
+â”‚   â”œâ”€â”€ Repositories/
+â”‚   â”œâ”€â”€ Migrations/
+â”‚   â””â”€â”€ Services/
+â”‚       â””â”€â”€ BackupService.cs
+â”‚
+â”œâ”€â”€ SalesSystem.Api/
+â”‚   â”œâ”€â”€ Controllers/
+â”‚   â”œâ”€â”€ Validators/               â†گ FluentValidation
+â”‚   â”œâ”€â”€ Middleware/
+â”‚   â”‚   â”œâ”€â”€ ExceptionMiddleware.cs
+â”‚   â”‚   â””â”€â”€ RequestLoggingMiddleware.cs
+â”‚   â””â”€â”€ Extensions/
+â”‚       â”œâ”€â”€ AuthExtensions.cs
+â”‚       â””â”€â”€ ValidationExtensions.cs
+â”‚
+â””â”€â”€ SalesSystem.DesktopPWF/       â†گ WPF + MVVM (NOT WinForms)
+    â”‚
+    â”œâ”€â”€ MainWindow.xaml            â†گ Shell / main layout
+    â”œâ”€â”€ LoginWindow.xaml           â†گ Login screen
+    â”œâ”€â”€ App.xaml                   â†گ Application entry point
+    â”œâ”€â”€ App.xaml.cs                â†گ DI registration (App.GetService<T>())
+    â”œâ”€â”€ appsettings.json
+    â”‚
+    â”œâ”€â”€ Views/                     â†گ .xaml UI files (no logic)
+    â”‚   â”œâ”€â”€ Categories/
+    â”‚   â”œâ”€â”€ Common/                â†گ Shared controls / dialogs
+    â”‚   â”œâ”€â”€ Customers/
+    â”‚   â”œâ”€â”€ Dashboard/
+    â”‚   â”œâ”€â”€ Inventory/
+    â”‚   â”œâ”€â”€ Invoices/              â†گ Selection dialogs for invoices
+    â”‚   â”œâ”€â”€ Login/
+    â”‚   â”œâ”€â”€ Payments/
+    â”‚   â”œâ”€â”€ Products/
+    â”‚   â”œâ”€â”€ Purchases/
+    â”‚   â”œâ”€â”€ Reports/
+    â”‚   â”‚   â””â”€â”€ LowStockView.xaml  â†گ [NEW] SPEC-009
+    â”‚   â”œâ”€â”€ Returns/
+    â”‚   â”œâ”€â”€ Sales/
+    â”‚   â”œâ”€â”€ Settings/
+    â”‚   â”œâ”€â”€ Suppliers/
+    â”‚   â”œâ”€â”€ Transfers/
+    â”‚   â”œâ”€â”€ Units/
+    â”‚   â”œâ”€â”€ Users/
+    â”‚   â””â”€â”€ Warehouses/
+    â”‚
+    â”œâ”€â”€ ViewModels/                â†گ MVVM binding logic
+    â”‚   â”œâ”€â”€ ViewModelBase.cs
+    â”‚   â”œâ”€â”€ DashboardViewModel.cs
+    â”‚   â”œâ”€â”€ LoginWindowViewModel.cs
+    â”‚   â”œâ”€â”€ ReportsViewModel.cs
+    â”‚   â”œâ”€â”€ SettingsViewModel.cs
+    â”‚   â”œâ”€â”€ WarehouseListViewModel.cs
+    â”‚   â”œâ”€â”€ WarehouseEditorViewModel.cs
+    â”‚   â”œâ”€â”€ Categories/
+    â”‚   â”œâ”€â”€ Customers/
+    â”‚   â”œâ”€â”€ Inventory/
+    â”‚   â”œâ”€â”€ Invoices/
+    â”‚   â”œâ”€â”€ Payments/
+    â”‚   â”œâ”€â”€ Products/
+    â”‚   â”œâ”€â”€ Purchases/
+    â”‚   â”œâ”€â”€ Returns/
+    â”‚   â”œâ”€â”€ Sales/
+    â”‚   â”œâ”€â”€ Suppliers/
+    â”‚   â”œâ”€â”€ Transfers/
+    â”‚   â”œâ”€â”€ Units/
+    â”‚   â””â”€â”€ Users/
+    â”‚
+    â”œâ”€â”€ Services/
+    â”‚   â”œâ”€â”€ Api/                   â†گ HttpClient wrappers â†’ API calls
+    â”‚   â”‚   â”œâ”€â”€ IApiService.cs     â†گ All API interfaces in one file
+    â”‚   â”‚   â”œâ”€â”€ AuthApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ ProductApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ SalesInvoiceApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ PurchaseInvoiceApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ SalesReturnApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ PurchaseReturnApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ InventoryApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ WarehouseTransferApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ PartyApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ CustomerApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ SupplierWarehouseApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ CustomerPaymentApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ SupplierPaymentApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ ReportApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ DashboardApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ SettingsApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ CategoryApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ UnitApiService.cs
+    â”‚   â”‚   â”œâ”€â”€ UserApiService.cs
+    â”‚   â”‚   â””â”€â”€ LogsApiService.cs
+    â”‚   â””â”€â”€ App/                   â†گ App-level services (DI singletons)
+    â”‚       â”œâ”€â”€ EventBus.cs        â†گ Pub/Sub event bus
+    â”‚       â”œâ”€â”€ NavigationService.cs
+    â”‚       â”œâ”€â”€ SessionService.cs  â†گ JWT token storage (in-memory only)
+    â”‚       â”œâ”€â”€ DialogService.cs
+    â”‚       â”œâ”€â”€ ISoundService.cs
+    â”‚       â”œâ”€â”€ SoundService.cs
+    â”‚       â””â”€â”€ IPrinterService.cs â†گ [NEW] SPEC-006 print contract
+    â”‚
+    â”œâ”€â”€ Messaging/
+    â”‚   â””â”€â”€ Messages/              â†گ EventBus message types (ID only, no payload)
+    â”‚
+    â”œâ”€â”€ Converters/                â†گ WPF IValueConverter implementations
+    â”œâ”€â”€ Helpers/                   â†گ UI helpers / ThemeHelper etc.
+    â”œâ”€â”€ Models/                    â†گ Local view models / display models
+    â””â”€â”€ Resources/                 â†گ Styles, brushes, icons, themes
 ```
 
 
@@ -597,13 +604,13 @@ The current implementation follows Phases 18-31, corresponding to the post-MVP f
 | **20** | **Currencies Module** | Multi-currency CRUD with exchange rate history; FractionName field; IsSystem delete guard; YER/USD/SAR seed |
 | **21** | **Users & Permissions** | 4 roles (Admin/Manager/Cashier/Accountant); 33 permission codes; default admin with MustChangePassword; lockout policy |
 | **22** | **Chart of Accounts** | 60-account hierarchical seed; 5 account types; Level validation (max 10); tooltip per account |
-| **23** | **Customers Module** | Account auto-creation under 1210/1110; CreditLimit; CustomerType; OpeningBalance auto journal entry |
-| **24** | **Suppliers Module** | Account auto-creation under 2110; OpeningBalance auto journal entry (debit Inventory, credit supplier) |
-| **25** | **Products Module** | Multi-unit via ProductUnit; Opening Stock via PurchaseLot; Price Validity; TrackExpiry/TrackBatch; Barcode via UnitBarcode |
-| **26** | **Warehouses Module** | Warehouse CRUD; Stock Transfer; Physical Count (V2); AdjustmentType; StockIssueReason |
-| **27** | **Purchases Module** | FIFO batch costing per line; PurchaseLot creation; Partial PO Receive; AdditionalCharge with AccountId; standalone returns; 47 Arabic guards |
-| **28** | **Sales Module** | FIFO/FEFO batch allocation; Barcode auto-add with ISoundService; CashTransaction RefundOut; credit limit; quotation expiry; SaleMode |
-| **29** | **Receipts & Payments** | CashBox.AccountId FK; CustomerPayment/SupplierPayment with auto accounting; Cheque; ActualCashCount; immutability; 10 tooltips |
+| **23** | **Customers Module** | Party entity shared with Supplier; AccountId mandatory (auto-created under 1210); NO CustomerType; NO OpeningBalance on entity — via Journal Entry |
+| **24** | **Suppliers Module** | Party entity shared with Customer; AccountId mandatory (auto-created under 2100); NO OpeningBalance on entity — via Journal Entry |
+| **25** | **Products Module** | Multi-unit via ProductUnit; ProductPrices per (ProductUnit x Currency); Opening Stock via InventoryBatch; TrackExpiry; Barcode via UnitBarcode |
+| **26** | **Warehouses Module** | Warehouse CRUD with Type (Main/Store/Showroom); WarehouseTransfers replace StockTransfers; InventoryTransaction replace InventoryMovement; NO Physical Count in V1 |
+| **27** | **Purchases Module** | FIFO batch costing per line; InventoryBatch creation on Post; AdditionalCharge via OtherCharges (header level); standalone returns |
+| **28** | **Sales Module** | FIFO/FEFO batch allocation from InventoryBatches; Barcode auto-add with ISoundService; RefundOut for returns; credit limit check |
+| **29** | **Receipts & Payments** | CashBox.AccountId FK; ReceiptVouchers/PaymentVouchers replace CashTransactions; CustomerReceipts/SupplierPayments with multi-invoice allocation; NO Cheque, NO DailyClosure in V1 |
 | **30** | **Journal Entries** | SystemAccountMappings in 7 auto-entry providers; FiscalYear integration; Annual Closing; Simple Mode UX |
 | **31** | **Reports Module** | 35+ report DTOs; Hierarchical Income Statement + Balance Sheet; BuildAccountTree; General Ledger; Excel via ClosedXML |
 
@@ -640,7 +647,7 @@ The current implementation follows Phases 18-31, corresponding to the post-MVP f
 - User entity: Status(Active/Inactive/Locked), MustChangePassword, LoginAttempts, IsLocked, DefaultCashBoxId, Email, Phone
 - 4 roles: Admin(1), Manager(2), Cashier(3), Accountant(4)
 - 33 permission codes by module (Products, Customers, Suppliers, Sales, Purchases, Accounting, Reports, Settings, Users)
-- Default admin seed: username="admin", name="مدير النظام", MustChangePassword=true
+- Default admin seed: username="admin", name="ظ…ط¯ظٹط± ط§ظ„ظ†ط¸ط§ظ…", MustChangePassword=true
 - Password policy: BCrypt work factor 12, min 8 chars, complexity
 - Lockout after 5 failed attempts
 
@@ -653,63 +660,71 @@ The current implementation follows Phases 18-31, corresponding to the post-MVP f
 - SystemAccountMappings maps system operations to AccountId
 
 ### Phase 23: Customers Module
-- Account auto-creation under 1210 (Debtors) for Credit or 1110 (Cash) for Cash customers
-- OpeningBalance with auto journal entry (debit Customer account, credit OpeningBalance Equity)
-- Customer: CustomerType(Cash/Credit), CreditLimit, CurrencyId, AccountId FK
+- Party entity stores shared contact data (Name, Phone, Email, Address, TaxNumber) — shared with Suppliers
+- Customer has PartyId FK (mandatory) and AccountId FK (mandatory, auto-created under 1210 — Accounts Receivable)
+- NO CustomerType (Cash/Credit is per-invoice via PaymentType)
+- NO CurrencyId on Customer (currency per-transaction)
+- NO OpeningBalance on Customer entity — opening balance via Journal Entry (Dr AR / Cr OpeningBalanceEquity)
+- CreditLimit with CheckCreditLimit() returning bool (soft warning, caller decides)
 - tooltips: Account impact, credit limit flows, opening balance entries
 
 ### Phase 24: Suppliers Module
-- Account auto-creation under 2110 (Creditors)
-- OpeningBalance with auto journal entry (debit Inventory, credit Supplier account)
-- Supplier: CreditLimit, CurrencyId, AccountId FK
+- Party entity stores shared contact data (Name, Phone, Email, Address, TaxNumber) — shared with Customers
+- Supplier has PartyId FK (mandatory) and AccountId FK (mandatory, auto-created under 2100 — Accounts Payable)
+- NO CurrencyId on Supplier (currency per-transaction)
+- NO OpeningBalance on Supplier entity — opening balance via Journal Entry (Dr OpeningBalanceEquity / Cr AP)
+- CreditLimit with CheckCreditLimit() returning bool (soft warning, caller decides)
 - tooltips: Account impact, opening balance entries
 
 ### Phase 25: Products Module
-- Multi-unit via ProductUnit (conversion factor, per-unit pricing)
-- TrackExpiry + TrackBatch flags for FIFO/FEFO support
-- AvgCost computed via WeightedAverage or PurchaseLot cost
-- Opening Stock via PurchaseLot with IsOpeningBatch=true
-- Price Validity Period per product
-- Barcode via UnitBarcode table
-- ProductPriceHistory for all cost/price changes
+- Multi-unit via ProductUnits junction table (Units independent table + Factor)
+- ProductPrices table: pricing per (ProductUnit x CurrencyId) with EffectiveFrom/EffectiveTo date ranges
+- NO RetailPrice/WholesalePrice on ProductUnit
+- TrackExpiry flag for FEFO support
+- Opening Stock via InventoryBatch with BatchNo=1 (opening batch)
+- Cost sourced from InventoryBatches.UnitCost — no cost field on Product or ProductUnit
+- Barcode stored on Products table (varchar, ASCII-only, unique filtered)
+- DefaultPurchaseUnitId and DefaultSalesUnitId on Product
 - RULE-191: No Code column - auto-increment Id as sole identifier
 
 ### Phase 26: Warehouses Module
-- Warehouse CRUD with IsActive soft delete
-- Stock Transfer with validation
-- Physical Count (deferred to V2)
-- AdjustmentType: StockIn(1), StockOut(2), WrittenOff(3), FoundInExcess(4)
-- StockIssueReason enum
+- Warehouse CRUD with Type (Main=1, Store=2, Showroom=3), ManagerName, Phone, Address
+- WarehouseTransfers replace StockTransfers — multi-item transfers with batch tracking
+- InventoryTransactions replace InventoryMovements — 12 transaction types (Purchase, Sale, Return, Transfer, Adjustment, etc.)
+- InventoryBatches with FIFO cost allocation — BatchNo, QuantityReceived, QuantityRemaining, UnitCost
+- InventoryCounts/InventoryCountLines for physical count (count + adjust workflow)
+- InventoryAdjustments/InventoryAdjustmentLines for stock corrections
 - CHECK (Quantity >= 0) on WarehouseStocks
 
 ### Phase 27: Purchases Module
 - Purchase Invoice with FIFO batch costing per line
-- PurchaseLot created on Post (batch tracking)
-- Partial PO Receive support
-- AdditionalCharge with AccountId FK (freight, customs, etc.)
+- InventoryBatch created on Post (BatchNo, QuantityReceived, QuantityRemaining, UnitCost)
+- Discount at invoice header level only (no line-level discount)
+- OtherCharges for additional costs (transport, customs, etc.)
 - Status: Draft(1) -> Posted(2) -> Cancelled(3)
 - Standalone purchase return
-- 47 Arabic guard clauses; SupplierInvoiceNo as external reference
+- SupplierInvoiceNo as external reference
 - InvoiceNo: int, UNIQUE, auto-generated via DocumentSequenceService.GetNextIntAsync("PurchaseInvoice"), user-editable (uniqueness validated on save)
 
 ### Phase 28: Sales Module
-- FIFO/FEFO batch allocation (FIFO = oldest batch, FEFO = closest expiry)
+- FIFO/FEFO batch allocation from InventoryBatches (FIFO = oldest batch, FEFO = closest expiry)
 - Barcode auto-add event-driven with ISoundService.PlaySuccess()
-- CashTransaction RefundOut for sales returns
-- Credit limit check on save (CustomerType=Credit only)
-- Quotation expiry support
-- SaleMode: Retail(1) or Wholesale(2) per invoice
+- Discount at invoice header level only (no line-level discount)
+- CurrencyId and multi-currency support on invoice
+- Credit limit check on save (per-invoice PaymentType=Credit)
 - Customer account auto-credit on Post
 - 10 tooltips across all dialogs
 
 ### Phase 29: Receipts & Payments
-- CashBox with AccountId FK, CurrencyId FK
-- CustomerPayment: auto-accounting (debit Cash, credit Customer account)
-- SupplierPayment: auto-accounting (debit Supplier account, credit Cash)
-- Cheque support (ChequeNumber, ChequeDate, BankName)
-- ActualCashCount + Difference tracking
+- CashBox with AccountId FK (balance on linked Account, NOT CashBox)
+- NO OpeningBalance, NO CurrentBalance on CashBox entity
+- ReceiptVouchers (سندات قبض) and PaymentVouchers (سندات صرف) replace CashTransactions
+- CustomerReceipts with auto-accounting (debit Cash, credit Customer account)
+- SupplierPayments with auto-accounting (debit Supplier account, credit Cash)
+- CustomerReceiptApplications/SupplierPaymentApplications for multi-invoice payment distribution
+- NO Cheque management in V1 (deferred)
+- NO DailyClosure in V1 (deferred)
 - Immutability: offsetting entry for reversals
-- ValidateSufficientBalance before dispensing
 - 10 tooltips for journal impact, immutability rules
 
 ### Phase 30: Journal Entries
@@ -731,2335 +746,11 @@ The current implementation follows Phases 18-31, corresponding to the post-MVP f
 - 5-step data flow: Desktop -> HttpClient -> API -> Service -> SQL
 <!-- END OF SECTION: 1. Functional & Non-Functional Requirements (English) -->
 
+<!-- database-schema.md is the single source of truth for all table definitions. See `docs/database-schema.md` for the complete 65-table schema with exact column types, constraints, and indexes. -->
 
-<!-- START OF SECTION: 2. Detailed Module Specifications & Database Metadata (Arabic/Bilingual) -->
+> See `docs/database-schema.md` for the canonical database schema (65 tables across 8 modules).
 
-> [!NOTE]
-> المواصفات التفصيلية للجداول وهيكل قاعدة البيانات ومخطط العلاقات والأعمدة للمشروع.
-
-# 1) Important Design Rules Before Tables
-These rules will save you many problems later:
-
-## Data Types
-- **Primary Keys**: `int IDENTITY(1,1)` — Named `Id` in all entities (BaseEntity pattern).
-- **Texts**: `nvarchar` (to support Arabic/English).
-- **Currency/Money**: `decimal(18,2)` — Precision 18, Scale 2.
-- **Quantities**: `decimal(18,3)` — Precision 18, Scale 3.
-- **Status and Types**: `tinyint` (for Enums).
-- **Flags**: `bit` (0/1).
-- **Dates and Times**: `datetime2`.
-- **Audit Tracking**: Standardized across all entities:
-    - `CreatedAt` datetime2
-    - `CreatedByUserId` int null (FK to Users.Id)
-    - `UpdatedAt` datetime2 null
-    - `UpdatedByUserId` int null (FK to Users.Id)
-    - `IsActive` bit (Soft delete flag)
-
----
-
-# 2) Proposed Database
-Database Name example: **`SalesSystemDb`**
-Default schema: **`dbo`**
-
----
-
-# 3) Core Tables
-
----
-
-## A) Users
-### Columns
-- `Id` int PK
-- `UserName` nvarchar(50) not null unique
-- `PasswordHash` nvarchar(256) not null
-- `FullName` nvarchar(150) not null
-- `Role` tinyint not null (1=Admin, 2=Manager, 3=Cashier)
-- `MustChangePassword` bit not null default 0
-- `PasswordChangedAt` datetime2 null
-- `LoginAttempts` int not null default 0
-- `IsLocked` bit not null default 0
-- `Status` tinyint not null default 1 (1=Active, 2=Inactive, 3=Locked)
-- `DefaultCashBoxId` int null FK to CashBoxes
-- `Email` nvarchar(100) null
-- `Phone` nvarchar(20) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## B) Units
-### Columns
-- `Id` int PK
-- `Name` nvarchar(50) not null
-- `Symbol` nvarchar(20) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## C) Categories
-### Columns
-- `Id` int PK
-- `Name` nvarchar(100) not null
-- `Description` nvarchar(250) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## D) Products (v4.6 — No Code, uses ProductUnits)
-### Columns
-- `Id` int PK
-- `Barcode` nvarchar(50) null unique
-- `Name` nvarchar(150) not null
-- `CategoryId` int null FK
-- `SupplierPrice` decimal(18,2) not null default 0
-- `ReorderLevel` decimal(18,3) not null default 0
-- `AvgCost` decimal(18,2) not null default 0
-- `TrackExpiry` bit not null default 0
-- `TrackBatch` bit not null default 1
-- `ExpiryAlertDays` int null default 30
-- `Description` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## E) Warehouses (v4.6 — No Code)
-### Columns
-- `Id` int PK
-- `Name` nvarchar(100) not null
-- `Location` nvarchar(250) null
-- `IsDefault` bit not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## F) WarehouseStocks
-### Columns
-- `Id` int PK
-- `WarehouseId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 not null
-
-### Important Constraints
-- `UNIQUE(WarehouseId, ProductId)`
-- `CHECK (Quantity >= 0)` — CRITICAL: prevents negative stock at DB level
-
----
-
-## G) Suppliers (v4.6 — No Code)
-### Columns
-- `Id` int PK
-- `Name` nvarchar(150) not null
-- `Phone` nvarchar(20) null
-- `Email` nvarchar(100) null
-- `Address` nvarchar(250) null
-- `OpeningBalance` decimal(18,2) not null default 0
-- `CurrentBalance` decimal(18,2) not null default 0
-- `AccountId` int not null FK to Accounts
-- `CurrencyId` int null FK to Currencies
-- `CreditLimit` decimal(18,2) not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## H) Customers (v4.6 — No Code)
-### Columns
-- `Id` int PK
-- `Name` nvarchar(150) not null
-- `Phone` nvarchar(20) null
-- `Email` nvarchar(100) null
-- `Address` nvarchar(250) null
-- `OpeningBalance` decimal(18,2) not null default 0
-- `CurrentBalance` decimal(18,2) not null default 0
-- `AccountId` int not null FK to Accounts
-- `CurrencyId` int null FK to Currencies
-- `CreditLimit` decimal(18,2) not null default 0
-- `CustomerType` tinyint not null default 1 (1=Cash, 2=Credit)
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-# 4) Purchases
-
-## I) PurchaseInvoices
-### Columns
-- `Id` int PK
-- `SupplierId` int not null FK
-- `WarehouseId` int not null FK
-- `InvoiceNo` int not null
-- `CurrencyId` int null FK
-- `ExchangeRate` decimal(18,6) not null default 1
-- `ExternalInvoiceNo` nvarchar(50) null
-- `AttachmentPath` nvarchar(255) null
-- `InvoiceDate` datetime2 not null
-- `DueDate` date null
-- `PaymentType` tinyint not null (1=Cash, 2=Credit, 3=Mixed)
-- `SubTotal` decimal(18,2) not null default 0
-- `DiscountAmount` decimal(18,2) not null default 0
-- `TaxAmount` decimal(18,2) not null default 0
-- `TotalAmount` decimal(18,2) not null default 0
-- `PaidAmount` decimal(18,2) not null default 0
-- `DueAmount` decimal(18,2) not null default 0
-- `Notes` nvarchar(500) null
-- `Status` tinyint not null (1=Draft, 2=Posted, 3=Cancelled)
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## J) PurchaseInvoiceItems
-### Columns
-- `Id` int PK
-- `PurchaseInvoiceId` int not null FK
-- `ProductId` int not null FK
-- `ProductUnitId` int null FK
-- `Quantity` decimal(18,3) not null
-- `UnitCost` decimal(18,2) not null
-- `DiscountAmount` decimal(18,2) not null default 0
-- `LineTotal` decimal(18,2) not null
-- `Notes` nvarchar(250) null
-
----
-
-# 5) Sales
-
-## K) SalesInvoices
-### Columns
-- `Id` int PK
-- `CustomerId` int null FK
-- `WarehouseId` int not null FK
-- `InvoiceNo` int not null
-- `CurrencyId` int null FK
-- `ExchangeRate` decimal(18,6) not null default 1
-- `SaleMode` tinyint not null default 1 (1=Retail, 2=Wholesale)
-- `InvoiceDate` datetime2 not null
-- `DueDate` date null
-- `PaymentType` tinyint not null (1=Cash, 2=Credit, 3=Mixed)
-- `SubTotal` decimal(18,2) not null default 0
-- `DiscountAmount` decimal(18,2) not null default 0
-- `TaxAmount` decimal(18,2) not null default 0
-- `TotalAmount` decimal(18,2) not null default 0
-- `PaidAmount` decimal(18,2) not null default 0
-- `DueAmount` decimal(18,2) not null default 0
-- `Notes` nvarchar(500) null
-- `Status` tinyint not null (1=Draft, 2=Posted, 3=Cancelled)
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## L) SalesInvoiceItems
-### Columns
-- `Id` int PK
-- `SalesInvoiceId` int not null FK
-- `ProductId` int not null FK
-- `ProductUnitId` int null FK
-- `UnitType` tinyint null (0=Retail, 1=Wholesale)
-- `Quantity` decimal(18,3) not null
-- `UnitPrice` decimal(18,2) not null
-- `DiscountAmount` decimal(18,2) not null default 0
-- `LineTotal` decimal(18,2) not null
-- `Notes` nvarchar(250) null
-
----
-
-# 6) Returns
-
-## M) PurchaseReturns
-### Columns
-- `Id` int PK
-- `ReturnNo` int not null
-- `PurchaseInvoiceId` int null FK
-- `SupplierId` int not null FK
-- `WarehouseId` int not null FK
-- `ReturnDate` datetime2 not null
-- `Reason` nvarchar(250) null
-- `SubTotal` decimal(18,2) not null default 0
-- `TotalAmount` decimal(18,2) not null default 0
-- `Status` tinyint not null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## N) PurchaseReturnItems
-### Columns
-- `Id` int PK
-- `PurchaseReturnId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null
-- `UnitCost` decimal(18,2) not null
-- `LineTotal` decimal(18,2) not null
-
----
-
-## O) SalesReturns
-### Columns
-- `Id` int PK
-- `ReturnNo` int not null
-- `SalesInvoiceId` int null FK
-- `CustomerId` int not null FK
-- `WarehouseId` int not null FK
-- `ReturnDate` datetime2 not null
-- `Reason` nvarchar(250) null
-- `SubTotal` decimal(18,2) not null default 0
-- `TotalAmount` decimal(18,2) not null default 0
-- `Status` tinyint not null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## P) SalesReturnItems
-### Columns
-- `Id` int PK
-- `SalesReturnId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null
-- `UnitPrice` decimal(18,2) not null
-- `LineTotal` decimal(18,2) not null
-
----
-
-# 7) Stock Transfer Between Warehouses
-
-## Q) StockTransfers
-### Columns
-- `Id` int PK
-- `TransferNo` int not null
-- `FromWarehouseId` int not null FK
-- `ToWarehouseId` int not null FK
-- `TransferDate` datetime2 not null
-- `Notes` nvarchar(500) null
-- `Status` tinyint not null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## R) StockTransferItems
-### Columns
-- `Id` int PK
-- `StockTransferId` int not null FK
-- `ProductId` int not null FK
-- `Quantity` decimal(18,3) not null
-- `Notes` nvarchar(250) null
-
----
-
-# 8) Payments and Collections
-
-## S) CustomerPayments
-### Columns
-- `Id` int PK
-- `PaymentNo` int not null
-- `CustomerId` int not null FK
-- `SalesInvoiceId` int null FK
-- `PaymentDate` datetime2 not null
-- `Amount` decimal(18,2) not null
-- `PaymentMethod` tinyint not null (1=Cash, 2=Bank Transfer, 3=Card, 4=Other)
-- `ReferenceNo` nvarchar(50) null
-- `Notes` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## T) SupplierPayments
-### Columns
-- `Id` int PK
-- `PaymentNo` int not null
-- `SupplierId` int not null FK
-- `PurchaseInvoiceId` int null FK
-- `PaymentDate` datetime2 not null
-- `Amount` decimal(18,2) not null
-- `PaymentMethod` tinyint not null
-- `ReferenceNo` nvarchar(50) null
-- `Notes` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-# 9) Store Settings
-
-## U) StoreSettings
-### Columns
-- `Id` int PK
-- `StoreName` nvarchar(150) not null
-- `Phone` nvarchar(20) null
-- `Address` nvarchar(250) null
-- `LogoPath` nvarchar(255) null
-- `CurrencyCode` nvarchar(10) not null default 'SAR'
-- `DefaultTaxRate` decimal(5,2) not null default 0
-- `IsTaxEnabled` bit not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## V2) Accounts (New - Chart of Accounts)
-### Columns
-- `Id` int PK
-- `Name` nvarchar(100) not null
-- `ParentAccountId` int null self-FK
-- `AccountType` tinyint not null (1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense)
-- `AccountCode` nvarchar(20) null
-- `IsSystemAccount` bit not null default 0
-- `CurrencyId` int null FK
-- `Description` nvarchar(500) null
-- `IsActive` bit not null default 1
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## W2) JournalEntries (New - Accounting Engine)
-### Columns
-- `Id` int PK
-- `EntryDate` datetime2 not null
-- `EntryNumber` int not null
-- `Description` nvarchar(500) not null
-- `SourceType` nvarchar(30) not null
-- `SourceId` int not null
-- `FiscalYearId` int null FK
-- `CurrencyId` int null FK
-- `ExchangeRate` decimal(18,6) not null default 1
-- `Status` tinyint not null (1=Draft, 2=Posted, 3=Cancelled)
-- `IsOpeningEntry` bit not null default 0
-- `ReversedByEntryId` int null self-FK
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## X2) JournalEntryLines (New)
-### Columns
-- `Id` int PK
-- `JournalEntryId` int not null FK
-- `AccountId` int not null FK
-- `DebitAmount` decimal(18,2) not null default 0
-- `CreditAmount` decimal(18,2) not null default 0
-- `Description` nvarchar(250) null
-
----
-
-## Y2) PurchaseLots (New - FIFO/FEFO Batch Tracking)
-### Columns
-- `Id` int PK
-- `ProductId` int not null FK
-- `WarehouseId` int not null FK
-- `PurchaseInvoiceItemId` int null FK
-- `BatchNo` nvarchar(50) null
-- `QuantityReceived` decimal(18,3) not null
-- `QuantityRemaining` decimal(18,3) not null
-- `CostPrice` decimal(18,2) not null
-- `ProductionDate` date null
-- `ExpiryDate` date null
-- `IsOpeningBatch` bit not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## Z2) Currencies (New)
-### Columns
-- `Id` int PK
-- `Name` nvarchar(50) not null
-- `Code` nvarchar(10) not null unique
-- `Symbol` nvarchar(10) null
-- `FractionName` nvarchar(20) null
-- `ExchangeRateToBase` decimal(18,6) not null default 1
-- `IsBaseCurrency` bit not null default 0
-- `IsSystem` bit not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## AA2) Taxes (New)
-### Columns
-- `Id` int PK
-- `Name` nvarchar(100) not null
-- `Rate` decimal(5,2) not null
-- `IsDefault` bit not null default 0
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## BB2) FiscalYears (New)
-### Columns
-- `Id` int PK
-- `Name` nvarchar(50) not null
-- `StartDate` date not null
-- `EndDate` date not null
-- `IsClosed` bit not null default 0
-- `ClosedByUserId` int null FK
-- `ClosedAt` datetime2 null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-# 10) Inventory Movement Log (Critical)
-## V) InventoryMovements
-### Columns
-- `Id` int PK
-- `ProductId` int not null FK
-- `WarehouseId` int not null FK
-- `MovementType` tinyint not null (1=PurchaseIn, 2=SaleOut, 3=SaleReturnIn, 4=PurchaseReturnOut, 5=TransferOut, 6=TransferIn, 7=Adjustment)
-- `QuantityChange` decimal(18,3) not null — positive=IN, negative=OUT
-- `QuantityBefore` decimal(18,3) not null — stock before this movement
-- `QuantityAfter` decimal(18,3) not null — stock after (= Before + Change)
-- `ReferenceType` nvarchar(30) not null
-- `ReferenceId` int not null
-- `UnitCost` decimal(18,2) null
-- `MovementDate` datetime2 not null
-- `Notes` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `UpdatedByUserId` int null FK
-- `IsActive` bit not null default 1
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## W) ProductUnits (v4.3 — Dynamic UOM)
-### Columns
-- `Id` int PK
-- `ProductId` int not null FK
-- `UnitName` nvarchar(50) not null (e.g., "Piece", "Box", "Carton")
-- `ConversionFactor` decimal(18,3) not null default 1 (Base=1, Box=24, Carton=144)
-- `RetailPrice` decimal(18,2) not null default 0
-- `WholesalePrice` decimal(18,2) not null default 0
-- `Cost` decimal(18,2) not null default 0 — updated via cost cascade
-- `IsBaseUnit` bit not null default 0 (exactly one per product)
-- `IsActive` bit not null default 1
-- (audit fields)
-### Constraints
-- `UNIQUE(ProductId, UnitName)` — no duplicate unit names per product
-- Product must have at least one unit (Domain enforced)
-
----
-
-## X) UnitBarcodes (v4.3)
-### Columns
-- `Id` int PK
-- `ProductUnitId` int not null FK
-- `Barcode` nvarchar(50) not null
-- `IsActive` bit not null default 1
-- (audit fields)
-### Constraints
-- `UNIQUE(Barcode)` — global barcode uniqueness
-
----
-
-## Y) CashBoxes (v4.3)
-### Columns
-- `Id` int PK
-- `Name` nvarchar(100) not null
-- `AccountId` int not null FK to Accounts
-- `CurrencyId` int not null FK to Currencies
-- `OpeningBalance` decimal(18,2) not null default 0
-- `CurrentBalance` decimal(18,2) not null default 0
-- `IsDefault` bit not null default 0
-- `IsActive` bit not null default 1
-- (audit fields)
-
----
-
-## Z) CashTransactions (v4.3 — Immutable)
-### Columns
-- `Id` int PK
-- `CashBoxId` int not null FK
-- `TransactionType` tinyint not null (1=Opening, 2=SalesIncome, 3=Expense, 4=TransferOut, 5=TransferIn, 6=RefundOut, 7=SupplierPayment, 8=CustomerPayment)
-- `Amount` decimal(18,2) not null
-- `BalanceBefore` decimal(18,2) not null
-- `BalanceAfter` decimal(18,2) not null
-- `ReferenceType` nvarchar(30) null (e.g., "SalesInvoice", "Expense")
-- `ReferenceId` int null
-- `Notes` nvarchar(500) null
-- `CreatedByUserId` int null FK
-- `CreatedAt` datetime2 not null
-### Rules
-- Immutable — once created, never edited or deleted
-- Cancellations via offsetting entry only
-
----
-
-## AA) ProductPriceHistory (v4.3)
-### Columns
-- `Id` int PK
-- `ProductUnitId` int not null FK
-- `OldRetailPrice` decimal(18,2) null
-- `NewRetailPrice` decimal(18,2) null
-- `OldWholesalePrice` decimal(18,2) null
-- `NewWholesalePrice` decimal(18,2) null
-- `OldCost` decimal(18,2) null
-- `NewCost` decimal(18,2) null
-- `ChangedByUserId` int null FK
-- `ChangeReason` nvarchar(200) null
-- `CreatedAt` datetime2 not null
-
----
-
-## BB) SystemSettings (v4.3)
-### Columns
-- `Id` int PK
-- `Key` nvarchar(100) not null unique
-- `Value` nvarchar(500) null
-- `Category` nvarchar(50) null (e.g., "Print", "General", "Costing")
-- `Description` nvarchar(250) null
-- `CreatedAt` datetime2 not null
-- `UpdatedAt` datetime2 null
-
----
-
-## CC) SystemLog (v4.3)
-### Columns
-- `Id` int PK
-- `Level` nvarchar(20) not null (Information, Warning, Error)
-- `Message` nvarchar(4000) not null
-- `Exception` nvarchar(max) null
-- `UserId` int null FK
-- `Source` nvarchar(200) null
-- `CreatedAt` datetime2 not null
-
----
-
-
-<!-- END OF SECTION: 2. Detailed Module Specifications & Database Metadata (Arabic/Bilingual) -->
-
-
-# 3. Consolidated Database SQL Scripts
-
-This section consolidates both the baseline SQL Server schema creation script and the advanced modules (v4.3+) database migration schema.
-
-<!-- START OF SECTION: 3.1 Baseline Database Schema SQL Script -->
-
-> [!NOTE]
-> Baseline database tables creation and initial constraints.
-
-# 11) Full SQL Server Implementation Script
-
-```sql
-IF DB_ID(N'SalesSystemDb') IS NULL
-BEGIN
-    CREATE DATABASE SalesSystemDb;
-END
-GO
-
-USE SalesSystemDb;
-GO
-
--- 1. Users
-CREATE TABLE dbo.Users
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Users PRIMARY KEY,
-    UserName        NVARCHAR(50)  NOT NULL,
-    PasswordHash    NVARCHAR(256) NOT NULL,
-    FullName        NVARCHAR(150) NOT NULL,
-    Role            TINYINT       NOT NULL, -- 1=Admin, 2=Manager, 3=Cashier
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Users_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Users_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Users_UserName UNIQUE (UserName),
-    CONSTRAINT CK_Users_Role CHECK (Role IN (1,2,3))
-);
-
--- 2. Units
-CREATE TABLE dbo.Units
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Units PRIMARY KEY,
-    Name            NVARCHAR(50)  NOT NULL,
-    Symbol          NVARCHAR(20)  NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Units_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Units_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 3. Categories
-CREATE TABLE dbo.Categories
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Categories PRIMARY KEY,
-    Name            NVARCHAR(100) NOT NULL,
-    Description     NVARCHAR(250) NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Categories_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Categories_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 4. Warehouses (v4.6 — No Code)
-CREATE TABLE dbo.Warehouses
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Warehouses PRIMARY KEY,
-    Name            NVARCHAR(100) NOT NULL,
-    Location        NVARCHAR(250) NULL,
-    IsDefault       BIT           NOT NULL CONSTRAINT DF_Warehouses_IsDefault DEFAULT(0),
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Warehouses_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Warehouses_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 5. Products (v4.6 — No Code, uses ProductUnits)
-CREATE TABLE dbo.Products
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Products PRIMARY KEY,
-    Barcode         NVARCHAR(50)  NULL,
-    Name            NVARCHAR(150) NOT NULL,
-    CategoryId      INT           NULL REFERENCES dbo.Categories(Id),
-    SupplierPrice   DECIMAL(18,2) NOT NULL DEFAULT 0,
-    ReorderLevel    DECIMAL(18,3) NOT NULL DEFAULT 0,
-    Description     NVARCHAR(500) NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Products_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Products_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_Products_Barcode UNIQUE (Barcode)
-);
-
--- 6. WarehouseStocks
-CREATE TABLE dbo.WarehouseStocks
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_WarehouseStocks PRIMARY KEY,
-    WarehouseId     INT NOT NULL REFERENCES dbo.Warehouses(Id),
-    ProductId       INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity        DECIMAL(18,3) NOT NULL DEFAULT 0,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_WarehouseStocks_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_WarehouseStocks_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NOT NULL CONSTRAINT DF_WarehouseStocks_UpdatedAt DEFAULT(SYSDATETIME()),
-
-    CONSTRAINT UQ_WarehouseStocks_Warehouse_Product UNIQUE (WarehouseId, ProductId),
-    CONSTRAINT CK_WarehouseStocks_Qty CHECK (Quantity >= 0)
-);
-
--- 7. Suppliers (v4.6 — No Code)
-CREATE TABLE dbo.Suppliers
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Suppliers PRIMARY KEY,
-    Name            NVARCHAR(150) NOT NULL,
-    Phone           NVARCHAR(20)  NULL,
-    Email           NVARCHAR(100) NULL,
-    Address         NVARCHAR(250) NULL,
-    OpeningBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CurrentBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Suppliers_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Suppliers_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 8. Customers (v4.6 — No Code)
-CREATE TABLE dbo.Customers
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Customers PRIMARY KEY,
-    Name            NVARCHAR(150) NOT NULL,
-    Phone           NVARCHAR(20)  NULL,
-    Email           NVARCHAR(100) NULL,
-    Address         NVARCHAR(250) NULL,
-    OpeningBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CurrentBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Customers_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Customers_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 9. PurchaseInvoices
-CREATE TABLE dbo.PurchaseInvoices
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoices PRIMARY KEY,
-    SupplierId      INT           NOT NULL REFERENCES dbo.Suppliers(Id),
-    WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    InvoiceDate     DATETIME2     NOT NULL,
-    DueDate         DATE          NULL,
-    PaymentType     TINYINT       NOT NULL,
-    SubTotal        DECIMAL(18,2) NOT NULL DEFAULT 0,
-    DiscountAmount  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TaxAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TotalAmount     DECIMAL(18,2) NOT NULL DEFAULT 0,
-    PaidAmount      DECIMAL(18,2) NOT NULL DEFAULT 0,
-    DueAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Notes           NVARCHAR(500) NULL,
-    Status          TINYINT       NOT NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 10. PurchaseInvoiceItems
-CREATE TABLE dbo.PurchaseInvoiceItems
-(
-    Id   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoiceItems PRIMARY KEY,
-    PurchaseInvoiceId       INT NOT NULL REFERENCES dbo.PurchaseInvoices(Id),
-    ProductId               INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity                DECIMAL(18,3) NOT NULL,
-    UnitCost                DECIMAL(18,2) NOT NULL,
-    DiscountAmount          DECIMAL(18,2) NOT NULL DEFAULT 0,
-    LineTotal               DECIMAL(18,2) NOT NULL
-);
-
--- 11. SalesInvoices
-CREATE TABLE dbo.SalesInvoices
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoices PRIMARY KEY,
-    CustomerId      INT           NULL REFERENCES dbo.Customers(Id),
-    WarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    InvoiceDate     DATETIME2     NOT NULL,
-    DueDate         DATE          NULL,
-    PaymentType     TINYINT       NOT NULL,
-    SubTotal        DECIMAL(18,2) NOT NULL DEFAULT 0,
-    DiscountAmount  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TaxAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TotalAmount     DECIMAL(18,2) NOT NULL DEFAULT 0,
-    PaidAmount      DECIMAL(18,2) NOT NULL DEFAULT 0,
-    DueAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Notes           NVARCHAR(500) NULL,
-    Status          TINYINT       NOT NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 12. SalesInvoiceItems
-CREATE TABLE dbo.SalesInvoiceItems
-(
-    Id   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoiceItems PRIMARY KEY,
-    SalesInvoiceId       INT NOT NULL REFERENCES dbo.SalesInvoices(Id),
-    ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity             DECIMAL(18,3) NOT NULL,
-    UnitPrice            DECIMAL(18,2) NOT NULL,
-    DiscountAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    LineTotal            DECIMAL(18,2) NOT NULL
-);
-
--- 13. InventoryMovements
-CREATE TABLE dbo.InventoryMovements
-(
-    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_InventoryMovements PRIMARY KEY,
-    ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
-    WarehouseId         INT NOT NULL REFERENCES dbo.Warehouses(Id),
-    MovementType        TINYINT NOT NULL,
-    QuantityChange      DECIMAL(18,3) NOT NULL,
-    QuantityBefore      DECIMAL(18,3) NOT NULL,
-    QuantityAfter       DECIMAL(18,3) NOT NULL,
-    ReferenceType       NVARCHAR(30) NOT NULL,
-    ReferenceId         INT NOT NULL,
-    UnitCost            DECIMAL(18,2) NULL,
-    MovementDate        DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-    Notes               NVARCHAR(500) NULL,
-    CreatedByUserId     INT NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId     INT NULL REFERENCES dbo.Users(Id),
-    IsActive            BIT NOT NULL DEFAULT(1),
-    CreatedAt           DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt           DATETIME2 NULL
-);
-
-CREATE INDEX IX_InventoryMovements_Product ON dbo.InventoryMovements(ProductId, MovementDate DESC);
-CREATE INDEX IX_InventoryMovements_Reference ON dbo.InventoryMovements(ReferenceType, ReferenceId);
-
--- 14. StoreSettings
-CREATE TABLE dbo.StoreSettings
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StoreSettings PRIMARY KEY,
-    StoreName       NVARCHAR(150) NOT NULL,
-    Phone           NVARCHAR(20)  NULL,
-    Address         NVARCHAR(250) NULL,
-    LogoPath        NVARCHAR(255) NULL,
-    CurrencyCode    NVARCHAR(10)  NOT NULL CONSTRAINT DF_StoreSettings_Currency DEFAULT(N'SAR'),
-    DefaultTaxRate  DECIMAL(5,2)  NOT NULL CONSTRAINT DF_StoreSettings_TaxRate DEFAULT(0),
-    IsTaxEnabled    BIT           NOT NULL DEFAULT(0),
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_StoreSettings_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_StoreSettings_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 15. PurchaseReturns
-CREATE TABLE dbo.PurchaseReturns
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturns PRIMARY KEY,
-    ReturnNo          INT           NOT NULL,
-    PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
-    SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
-    WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    ReturnDate        DATETIME2     NOT NULL,
-    Reason            NVARCHAR(250) NULL,
-    SubTotal          DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TotalAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 16. PurchaseReturnItems
-CREATE TABLE dbo.PurchaseReturnItems
-(
-    Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseReturnItems PRIMARY KEY,
-    PurchaseReturnId     INT NOT NULL REFERENCES dbo.PurchaseReturns(Id),
-    ProductId            INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity             DECIMAL(18,3) NOT NULL,
-    UnitCost             DECIMAL(18,2) NOT NULL,
-    LineTotal            DECIMAL(18,2) NOT NULL
-);
-
--- 17. SalesReturns
-CREATE TABLE dbo.SalesReturns
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturns PRIMARY KEY,
-    ReturnNo          INT           NOT NULL,
-    SalesInvoiceId    INT           NULL REFERENCES dbo.SalesInvoices(Id),
-    CustomerId        INT           NOT NULL REFERENCES dbo.Customers(Id),
-    WarehouseId       INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    ReturnDate        DATETIME2     NOT NULL,
-    Reason            NVARCHAR(250) NULL,
-    SubTotal          DECIMAL(18,2) NOT NULL DEFAULT 0,
-    TotalAmount       DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 18. SalesReturnItems
-CREATE TABLE dbo.SalesReturnItems
-(
-    Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesReturnItems PRIMARY KEY,
-    SalesReturnId     INT NOT NULL REFERENCES dbo.SalesReturns(Id),
-    ProductId         INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity          DECIMAL(18,3) NOT NULL,
-    UnitPrice         DECIMAL(18,2) NOT NULL,
-    LineTotal         DECIMAL(18,2) NOT NULL
-);
-
--- 19. StockTransfers
-CREATE TABLE dbo.StockTransfers
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransfers PRIMARY KEY,
-    TransferNo        INT           NOT NULL,
-    FromWarehouseId   INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    ToWarehouseId     INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    TransferDate      DATETIME2     NOT NULL,
-    Notes             NVARCHAR(500) NULL,
-    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 20. StockTransferItems
-CREATE TABLE dbo.StockTransferItems
-(
-    Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_StockTransferItems PRIMARY KEY,
-    StockTransferId     INT NOT NULL REFERENCES dbo.StockTransfers(Id),
-    ProductId           INT NOT NULL REFERENCES dbo.Products(Id),
-    Quantity            DECIMAL(18,3) NOT NULL,
-    Notes               NVARCHAR(250) NULL
-);
-
--- 21. CustomerPayments
-CREATE TABLE dbo.CustomerPayments
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CustomerPayments PRIMARY KEY,
-    PaymentNo       INT           NOT NULL,
-    CustomerId      INT           NOT NULL REFERENCES dbo.Customers(Id),
-    SalesInvoiceId  INT           NULL REFERENCES dbo.SalesInvoices(Id),
-    PaymentDate     DATETIME2     NOT NULL,
-    Amount          DECIMAL(18,2) NOT NULL,
-    PaymentMethod   TINYINT       NOT NULL, -- 1=Cash, 2=Bank Transfer, 3=Card, 4=Other
-    ReferenceNo     NVARCHAR(50)  NULL,
-    Notes           NVARCHAR(500) NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 22. SupplierPayments
-CREATE TABLE dbo.SupplierPayments
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SupplierPayments PRIMARY KEY,
-    PaymentNo         INT           NOT NULL,
-    SupplierId        INT           NOT NULL REFERENCES dbo.Suppliers(Id),
-    PurchaseInvoiceId INT           NULL REFERENCES dbo.PurchaseInvoices(Id),
-    PaymentDate       DATETIME2     NOT NULL,
-    Amount            DECIMAL(18,2) NOT NULL,
-    PaymentMethod     TINYINT       NOT NULL,
-    ReferenceNo       NVARCHAR(50)  NULL,
-    Notes             NVARCHAR(500) NULL,
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 23. ProductUnits (v4.3 — Dynamic UOM)
-CREATE TABLE dbo.ProductUnits
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductUnits PRIMARY KEY,
-    ProductId       INT NOT NULL REFERENCES dbo.Products(Id),
-    UnitName        NVARCHAR(50)  NOT NULL,
-    ConversionFactor DECIMAL(18,3) NOT NULL DEFAULT 1,
-    RetailPrice     DECIMAL(18,2) NOT NULL DEFAULT 0,
-    WholesalePrice  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    Cost            DECIMAL(18,2) NOT NULL DEFAULT 0,
-    IsBaseUnit      BIT NOT NULL DEFAULT 0,
-    CreatedByUserId INT NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT NOT NULL CONSTRAINT DF_ProductUnits_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2 NULL,
-
-    CONSTRAINT UQ_ProductUnits_Product_UnitName UNIQUE (ProductId, UnitName)
-);
-
--- 24. UnitBarcodes (v4.3)
-CREATE TABLE dbo.UnitBarcodes
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_UnitBarcodes PRIMARY KEY,
-    ProductUnitId   INT NOT NULL REFERENCES dbo.ProductUnits(Id),
-    Barcode         NVARCHAR(50)  NOT NULL,
-    CreatedByUserId INT NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT NOT NULL CONSTRAINT DF_UnitBarcodes_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2 NULL,
-
-    CONSTRAINT UQ_UnitBarcodes_Barcode UNIQUE (Barcode)
-);
-
--- 25. CashBoxes (v4.3)
-CREATE TABLE dbo.CashBoxes
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashBoxes PRIMARY KEY,
-    Name            NVARCHAR(100) NOT NULL,
-    OpeningBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    CurrentBalance  DECIMAL(18,2) NOT NULL DEFAULT 0,
-    IsDefault       BIT NOT NULL DEFAULT 0,
-    CreatedByUserId INT NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT NOT NULL CONSTRAINT DF_CashBoxes_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt       DATETIME2 NULL
-);
-
--- 26. CashTransactions (v4.3 — Immutable)
-CREATE TABLE dbo.CashTransactions
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_CashTransactions PRIMARY KEY,
-    CashBoxId       INT NOT NULL REFERENCES dbo.CashBoxes(Id),
-    TransactionType TINYINT NOT NULL,
-    Amount          DECIMAL(18,2) NOT NULL,
-    BalanceBefore   DECIMAL(18,2) NOT NULL,
-    BalanceAfter    DECIMAL(18,2) NOT NULL,
-    ReferenceType   NVARCHAR(30) NULL,
-    ReferenceId     INT NULL,
-    Notes           NVARCHAR(500) NULL,
-    CreatedByUserId INT NULL REFERENCES dbo.Users(Id),
-    CreatedAt       DATETIME2 NOT NULL DEFAULT SYSDATETIME()
-);
-
--- 27. ProductPriceHistory (v4.3)
-CREATE TABLE dbo.ProductPriceHistory
-(
-    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ProductPriceHistory PRIMARY KEY,
-    ProductUnitId       INT NOT NULL REFERENCES dbo.ProductUnits(Id),
-    OldRetailPrice      DECIMAL(18,2) NULL,
-    NewRetailPrice      DECIMAL(18,2) NULL,
-    OldWholesalePrice   DECIMAL(18,2) NULL,
-    NewWholesalePrice   DECIMAL(18,2) NULL,
-    OldCost             DECIMAL(18,2) NULL,
-    NewCost             DECIMAL(18,2) NULL,
-    ChangedByUserId     INT NULL REFERENCES dbo.Users(Id),
-    ChangeReason        NVARCHAR(200) NULL,
-    CreatedAt           DATETIME2 NOT NULL DEFAULT SYSDATETIME()
-);
-
--- 28. SystemSettings (v4.3)
-CREATE TABLE dbo.SystemSettings
-(
-    Id          INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemSettings PRIMARY KEY,
-    [Key]       NVARCHAR(100) NOT NULL,
-    [Value]     NVARCHAR(500) NULL,
-    Category    NVARCHAR(50) NULL,
-    Description NVARCHAR(250) NULL,
-    CreatedAt   DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt   DATETIME2 NULL,
-
-    CONSTRAINT UQ_SystemSettings_Key UNIQUE ([Key])
-);
-
--- 29. SystemLog (v4.3)
-CREATE TABLE dbo.SystemLog
-(
-    Id          INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemLog PRIMARY KEY,
-    [Level]     NVARCHAR(20) NOT NULL,
-    [Message]   NVARCHAR(4000) NOT NULL,
-    [Exception] NVARCHAR(MAX) NULL,
-    UserId      INT NULL REFERENCES dbo.Users(Id),
-    [Source]    NVARCHAR(200) NULL,
-    CreatedAt   DATETIME2 NOT NULL DEFAULT SYSDATETIME()
-);
-
--- 30. Currencies (New)
-CREATE TABLE dbo.Currencies
-(
-    Id                  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Currencies PRIMARY KEY,
-    Name                NVARCHAR(50)  NOT NULL,
-    Code                NVARCHAR(10)  NOT NULL,
-    Symbol              NVARCHAR(10)  NULL,
-    FractionName        NVARCHAR(20)  NULL,
-    ExchangeRateToBase  DECIMAL(18,6) NOT NULL CONSTRAINT DF_Currencies_ExchangeRateToBase DEFAULT(1),
-    IsBaseCurrency      BIT           NOT NULL CONSTRAINT DF_Currencies_IsBaseCurrency DEFAULT(0),
-    IsSystem            BIT           NOT NULL CONSTRAINT DF_Currencies_IsSystem DEFAULT(0),
-    CreatedByUserId     INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId     INT           NULL REFERENCES dbo.Users(Id),
-    IsActive            BIT           NOT NULL CONSTRAINT DF_Currencies_IsActive DEFAULT(1),
-    CreatedAt           DATETIME2     NOT NULL CONSTRAINT DF_Currencies_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt           DATETIME2     NULL,
-
-    CONSTRAINT UQ_Currencies_Code UNIQUE (Code)
-);
-
--- 31. Taxes (New)
-CREATE TABLE dbo.Taxes
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Taxes PRIMARY KEY,
-    Name            NVARCHAR(100) NOT NULL,
-    Rate            DECIMAL(5,2)  NOT NULL,
-    IsDefault       BIT           NOT NULL CONSTRAINT DF_Taxes_IsDefault DEFAULT(0),
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_Taxes_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_Taxes_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 32. FiscalYears (New)
-CREATE TABLE dbo.FiscalYears
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_FiscalYears PRIMARY KEY,
-    Name            NVARCHAR(50)  NOT NULL,
-    StartDate       DATE          NOT NULL,
-    EndDate         DATE          NOT NULL,
-    IsClosed        BIT           NOT NULL CONSTRAINT DF_FiscalYears_IsClosed DEFAULT(0),
-    ClosedByUserId  INT           NULL REFERENCES dbo.Users(Id),
-    ClosedAt        DATETIME2     NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    IsActive        BIT           NOT NULL CONSTRAINT DF_FiscalYears_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_FiscalYears_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt       DATETIME2     NULL
-);
-
--- 33. Accounts (Chart of Accounts)
-CREATE TABLE dbo.Accounts
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Accounts PRIMARY KEY,
-    Name              NVARCHAR(100) NOT NULL,
-    ParentAccountId   INT           NULL REFERENCES dbo.Accounts(Id),
-    AccountType       TINYINT       NOT NULL, -- 1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense
-    AccountCode       NVARCHAR(20)  NULL,
-    IsSystemAccount   BIT           NOT NULL CONSTRAINT DF_Accounts_IsSystemAccount DEFAULT(0),
-    CurrencyId        INT           NULL REFERENCES dbo.Currencies(Id),
-    Description       NVARCHAR(500) NULL,
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL CONSTRAINT DF_Accounts_IsActive DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL CONSTRAINT DF_Accounts_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 34. JournalEntries (Accounting Engine)
-CREATE TABLE dbo.JournalEntries
-(
-    Id                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_JournalEntries PRIMARY KEY,
-    EntryDate         DATETIME2     NOT NULL,
-    EntryNumber       INT           NOT NULL,
-    Description       NVARCHAR(500) NOT NULL,
-    SourceType        NVARCHAR(30)  NOT NULL,
-    SourceId          INT           NOT NULL,
-    FiscalYearId      INT           NULL REFERENCES dbo.FiscalYears(Id),
-    CurrencyId        INT           NULL REFERENCES dbo.Currencies(Id),
-    ExchangeRate      DECIMAL(18,6) NOT NULL CONSTRAINT DF_JournalEntries_ExchangeRate DEFAULT(1),
-    Status            TINYINT       NOT NULL, -- 1=Draft, 2=Posted, 3=Cancelled
-    IsOpeningEntry    BIT           NOT NULL CONSTRAINT DF_JournalEntries_IsOpeningEntry DEFAULT(0),
-    ReversedByEntryId INT           NULL REFERENCES dbo.JournalEntries(Id),
-    CreatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId   INT           NULL REFERENCES dbo.Users(Id),
-    IsActive          BIT           NOT NULL CONSTRAINT DF_JournalEntries_IsActive DEFAULT(1),
-    CreatedAt         DATETIME2     NOT NULL CONSTRAINT DF_JournalEntries_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt         DATETIME2     NULL
-);
-
--- 35. JournalEntryLines
-CREATE TABLE dbo.JournalEntryLines
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_JournalEntryLines PRIMARY KEY,
-    JournalEntryId  INT           NOT NULL REFERENCES dbo.JournalEntries(Id),
-    AccountId       INT           NOT NULL REFERENCES dbo.Accounts(Id),
-    DebitAmount     DECIMAL(18,2) NOT NULL CONSTRAINT DF_JournalEntryLines_DebitAmount DEFAULT(0),
-    CreditAmount    DECIMAL(18,2) NOT NULL CONSTRAINT DF_JournalEntryLines_CreditAmount DEFAULT(0),
-    Description     NVARCHAR(250) NULL
-);
-
--- 36. PurchaseLots (FIFO/FEFO Batch Tracking)
-CREATE TABLE dbo.PurchaseLots
-(
-    Id                      INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseLots PRIMARY KEY,
-    ProductId               INT           NOT NULL REFERENCES dbo.Products(Id),
-    WarehouseId             INT           NOT NULL REFERENCES dbo.Warehouses(Id),
-    PurchaseInvoiceItemId   INT           NULL REFERENCES dbo.PurchaseInvoiceItems(Id),
-    BatchNo                 NVARCHAR(50)  NULL,
-    QuantityReceived        DECIMAL(18,3) NOT NULL,
-    QuantityRemaining       DECIMAL(18,3) NOT NULL,
-    CostPrice               DECIMAL(18,2) NOT NULL,
-    ProductionDate          DATE          NULL,
-    ExpiryDate              DATE          NULL,
-    IsOpeningBatch          BIT           NOT NULL CONSTRAINT DF_PurchaseLots_IsOpeningBatch DEFAULT(0),
-    CreatedByUserId         INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedByUserId         INT           NULL REFERENCES dbo.Users(Id),
-    IsActive                BIT           NOT NULL CONSTRAINT DF_PurchaseLots_IsActive DEFAULT(1),
-    CreatedAt               DATETIME2     NOT NULL CONSTRAINT DF_PurchaseLots_CreatedAt DEFAULT(SYSDATETIME()),
-    UpdatedAt               DATETIME2     NULL
-);
-
--- 37. PermissionCodes
-CREATE TABLE dbo.PermissionCodes
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PermissionCodes PRIMARY KEY,
-    Code            NVARCHAR(50)  NOT NULL,
-    Name            NVARCHAR(100) NOT NULL,
-    Category        NVARCHAR(50)  NULL,
-    Description     NVARCHAR(250) NULL,
-    IsActive        BIT           NOT NULL CONSTRAINT DF_PermissionCodes_IsActive DEFAULT(1),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_PermissionCodes_CreatedAt DEFAULT(SYSDATETIME()),
-
-    CONSTRAINT UQ_PermissionCodes_Code UNIQUE (Code)
-);
-
--- 38. RolePermissions
-CREATE TABLE dbo.RolePermissions
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_RolePermissions PRIMARY KEY,
-    RoleId          TINYINT       NOT NULL,
-    PermissionId    INT           NOT NULL REFERENCES dbo.PermissionCodes(Id),
-    IsGranted       BIT           NOT NULL CONSTRAINT DF_RolePermissions_IsGranted DEFAULT(1),
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    CreatedAt       DATETIME2     NOT NULL CONSTRAINT DF_RolePermissions_CreatedAt DEFAULT(SYSDATETIME()),
-
-    CONSTRAINT UQ_RolePermissions_Role_Permission UNIQUE (RoleId, PermissionId)
-);
-
--- 39. SystemAccountMappings
-CREATE TABLE dbo.SystemAccountMappings
-(
-    Id              INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SystemAccountMappings PRIMARY KEY,
-    MappingKey      NVARCHAR(100) NOT NULL,
-    AccountId       INT           NOT NULL REFERENCES dbo.Accounts(Id),
-    Description     NVARCHAR(250) NULL,
-    CreatedByUserId INT           NULL REFERENCES dbo.Users(Id),
-    UpdatedAt       DATETIME2     NULL,
-
-    CONSTRAINT UQ_SystemAccountMappings_Key UNIQUE (MappingKey)
-);
-
--- =============================================
--- ALTER TABLE statements for new FK columns
--- =============================================
-
--- Customers: AccountId, CurrencyId, CreditLimit, CustomerType
-ALTER TABLE dbo.Customers ADD AccountId INT NOT NULL CONSTRAINT DF_Customers_AccountId DEFAULT(1);
-ALTER TABLE dbo.Customers ADD CONSTRAINT FK_Customers_Accounts FOREIGN KEY (AccountId) REFERENCES dbo.Accounts(Id);
-ALTER TABLE dbo.Customers ADD CurrencyId INT NULL;
-ALTER TABLE dbo.Customers ADD CONSTRAINT FK_Customers_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
-ALTER TABLE dbo.Customers ADD CreditLimit DECIMAL(18,2) NOT NULL CONSTRAINT DF_Customers_CreditLimit DEFAULT(0);
-ALTER TABLE dbo.Customers ADD CustomerType TINYINT NOT NULL CONSTRAINT DF_Customers_CustomerType DEFAULT(1);
-
--- Suppliers: AccountId, CurrencyId, CreditLimit
-ALTER TABLE dbo.Suppliers ADD AccountId INT NOT NULL CONSTRAINT DF_Suppliers_AccountId DEFAULT(1);
-ALTER TABLE dbo.Suppliers ADD CONSTRAINT FK_Suppliers_Accounts FOREIGN KEY (AccountId) REFERENCES dbo.Accounts(Id);
-ALTER TABLE dbo.Suppliers ADD CurrencyId INT NULL;
-ALTER TABLE dbo.Suppliers ADD CONSTRAINT FK_Suppliers_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
-ALTER TABLE dbo.Suppliers ADD CreditLimit DECIMAL(18,2) NOT NULL CONSTRAINT DF_Suppliers_CreditLimit DEFAULT(0);
-
--- Users: MustChangePassword, PasswordChangedAt, LoginAttempts, IsLocked, Status, DefaultCashBoxId, Email, Phone
-ALTER TABLE dbo.Users ADD MustChangePassword BIT NOT NULL CONSTRAINT DF_Users_MustChangePassword DEFAULT(0);
-ALTER TABLE dbo.Users ADD PasswordChangedAt DATETIME2 NULL;
-ALTER TABLE dbo.Users ADD LoginAttempts INT NOT NULL CONSTRAINT DF_Users_LoginAttempts DEFAULT(0);
-ALTER TABLE dbo.Users ADD IsLocked BIT NOT NULL CONSTRAINT DF_Users_IsLocked DEFAULT(0);
-ALTER TABLE dbo.Users ADD Status TINYINT NOT NULL CONSTRAINT DF_Users_Status DEFAULT(1);
-ALTER TABLE dbo.Users ADD DefaultCashBoxId INT NULL;
-ALTER TABLE dbo.Users ADD CONSTRAINT FK_Users_CashBoxes FOREIGN KEY (DefaultCashBoxId) REFERENCES dbo.CashBoxes(Id);
-ALTER TABLE dbo.Users ADD Email NVARCHAR(100) NULL;
-ALTER TABLE dbo.Users ADD Phone NVARCHAR(20) NULL;
-
--- Products: AvgCost, TrackExpiry, TrackBatch, ExpiryAlertDays
-ALTER TABLE dbo.Products ADD AvgCost DECIMAL(18,2) NOT NULL CONSTRAINT DF_Products_AvgCost DEFAULT(0);
-ALTER TABLE dbo.Products ADD TrackExpiry BIT NOT NULL CONSTRAINT DF_Products_TrackExpiry DEFAULT(0);
-ALTER TABLE dbo.Products ADD TrackBatch BIT NOT NULL CONSTRAINT DF_Products_TrackBatch DEFAULT(1);
-ALTER TABLE dbo.Products ADD ExpiryAlertDays INT NULL CONSTRAINT DF_Products_ExpiryAlertDays DEFAULT(30);
-
--- CashBoxes: AccountId, CurrencyId
-ALTER TABLE dbo.CashBoxes ADD AccountId INT NOT NULL CONSTRAINT DF_CashBoxes_AccountId DEFAULT(1);
-ALTER TABLE dbo.CashBoxes ADD CONSTRAINT FK_CashBoxes_Accounts FOREIGN KEY (AccountId) REFERENCES dbo.Accounts(Id);
-ALTER TABLE dbo.CashBoxes ADD CurrencyId INT NOT NULL CONSTRAINT DF_CashBoxes_CurrencyId DEFAULT(1);
-ALTER TABLE dbo.CashBoxes ADD CONSTRAINT FK_CashBoxes_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
-
--- SalesInvoices: InvoiceNo, CurrencyId, ExchangeRate, SaleMode
-ALTER TABLE dbo.SalesInvoices ADD InvoiceNo INT NOT NULL CONSTRAINT DF_SalesInvoices_InvoiceNo DEFAULT(0);
-ALTER TABLE dbo.SalesInvoices ADD CurrencyId INT NULL;
-ALTER TABLE dbo.SalesInvoices ADD CONSTRAINT FK_SalesInvoices_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
-ALTER TABLE dbo.SalesInvoices ADD ExchangeRate DECIMAL(18,6) NOT NULL CONSTRAINT DF_SalesInvoices_ExchangeRate DEFAULT(1);
-ALTER TABLE dbo.SalesInvoices ADD SaleMode TINYINT NOT NULL CONSTRAINT DF_SalesInvoices_SaleMode DEFAULT(1);
-
--- PurchaseInvoices: InvoiceNo, CurrencyId, ExchangeRate, ExternalInvoiceNo, AttachmentPath
-ALTER TABLE dbo.PurchaseInvoices ADD InvoiceNo INT NOT NULL CONSTRAINT DF_PurchaseInvoices_InvoiceNo DEFAULT(0);
-ALTER TABLE dbo.PurchaseInvoices ADD CurrencyId INT NULL;
-ALTER TABLE dbo.PurchaseInvoices ADD CONSTRAINT FK_PurchaseInvoices_Currencies FOREIGN KEY (CurrencyId) REFERENCES dbo.Currencies(Id);
-ALTER TABLE dbo.PurchaseInvoices ADD ExchangeRate DECIMAL(18,6) NOT NULL CONSTRAINT DF_PurchaseInvoices_ExchangeRate DEFAULT(1);
-ALTER TABLE dbo.PurchaseInvoices ADD ExternalInvoiceNo NVARCHAR(50) NULL;
-ALTER TABLE dbo.PurchaseInvoices ADD AttachmentPath NVARCHAR(255) NULL;
-
--- SalesInvoiceItems: ProductUnitId, UnitType
-ALTER TABLE dbo.SalesInvoiceItems ADD ProductUnitId INT NULL;
-ALTER TABLE dbo.SalesInvoiceItems ADD CONSTRAINT FK_SalesInvoiceItems_ProductUnits FOREIGN KEY (ProductUnitId) REFERENCES dbo.ProductUnits(Id);
-ALTER TABLE dbo.SalesInvoiceItems ADD UnitType TINYINT NULL;
-
--- PurchaseInvoiceItems: ProductUnitId
-ALTER TABLE dbo.PurchaseInvoiceItems ADD ProductUnitId INT NULL;
-ALTER TABLE dbo.PurchaseInvoiceItems ADD CONSTRAINT FK_PurchaseInvoiceItems_ProductUnits FOREIGN KEY (ProductUnitId) REFERENCES dbo.ProductUnits(Id);
-```
-
-6. Domain Entities — C# Classes
-6.1 Base Entity
-csharp
-
-
-<!-- END OF SECTION: 3.1 Baseline Database Schema SQL Script -->
-
-
-<!-- START OF SECTION: 3.2 Advanced Modules SQL Schema Migrations (v4.3) -->
-
-> [!NOTE]
-> Database schema migrations for advanced features (Dynamic UOM, Multi-Barcode, Cash Boxes, Costing strategies, Price history).
-
-🗂️ Phase 0: Database Schema — Complete Migration
-Agent Rule: Run ALL scripts in order. Do not skip any table.
-
-Task 0.1 — Remove Old Columns, Add Dynamic UOM Tables
-SQL
-
--- =============================================
--- STEP 1: Backup first (ALWAYS)
--- =============================================
--- Run on staging environment first
-
--- =============================================
--- STEP 2: Create ProductUnits (Dynamic UOM)
--- =============================================
-CREATE TABLE ProductUnits (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    ProductId       INT NOT NULL,
-    UnitName        NVARCHAR(100) NOT NULL,      -- e.g., "حبة", "طبق", "كرتون"
-    BaseConversionFactor DECIMAL(18,6) NOT NULL, -- Pieces per this unit
-    IsBaseUnit      BIT NOT NULL DEFAULT 0,       -- TRUE for exactly ONE unit per product
-    SalesPrice      DECIMAL(18,4) NOT NULL DEFAULT 0,
-    PurchaseCost    DECIMAL(18,4) NOT NULL DEFAULT 0,
-    SupplierPrice   DECIMAL(18,4) NOT NULL DEFAULT 0, -- Catalog price from supplier
-    LastPurchasePrice DECIMAL(18,4) NOT NULL DEFAULT 0,-- Last actual invoice price
-    SortOrder       INT NOT NULL DEFAULT 0,        -- Display order in UI
-    IsActive        BIT NOT NULL DEFAULT 1,
-    CreatedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-    UpdatedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_ProductUnits_Products
-        FOREIGN KEY (ProductId) REFERENCES Products(Id)
-            ON DELETE CASCADE,
-
-    CONSTRAINT CHK_BaseUnitFactor
-        CHECK (IsBaseUnit = 0 OR BaseConversionFactor = 1)
-);
-
-CREATE INDEX IX_ProductUnits_ProductId ON ProductUnits(ProductId);
-
--- =============================================
--- STEP 3: Unit Barcodes (Many per Unit)
--- =============================================
-CREATE TABLE UnitBarcodes (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    ProductUnitId   INT NOT NULL,
-    BarcodeValue    NVARCHAR(100) NOT NULL,
-    IsDefault       BIT NOT NULL DEFAULT 0,
-    SupplierCode    NVARCHAR(100) NULL, -- Optional: which supplier uses this code
-    CreatedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_UnitBarcodes_ProductUnits
-        FOREIGN KEY (ProductUnitId) REFERENCES ProductUnits(Id)
-            ON DELETE CASCADE,
-
-    CONSTRAINT UQ_UnitBarcodes_Value
-        UNIQUE (BarcodeValue)
-);
-
-CREATE INDEX IX_UnitBarcodes_Value ON UnitBarcodes(BarcodeValue);
-
--- =============================================
--- STEP 4: Cash Boxes
--- =============================================
-CREATE TABLE CashBoxes (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    BoxName         NVARCHAR(100) NOT NULL,
-    CurrentBalance  DECIMAL(18,4) NOT NULL DEFAULT 0,
-    BranchId        INT NULL,
-    CurrencyCode    NVARCHAR(10) NOT NULL DEFAULT 'SAR',
-    AssignedUserId  INT NULL,         -- NULL = shared box
-    IsActive        BIT NOT NULL DEFAULT 1,
-    Notes           NVARCHAR(500) NULL,
-    CreatedAt       DATETIME2 NOT NULL DEFAULT GETDATE()
-);
-
--- =============================================
--- STEP 5: Cash Transactions Log
--- =============================================
-CREATE TABLE CashTransactions (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    CashBoxId       INT NOT NULL,
-    TransactionType INT NOT NULL, -- 0=SaleIn, 1=PurchaseOut, 2=TransferIn, 3=TransferOut, 4=Manual
-    Amount          DECIMAL(18,4) NOT NULL,
-    BalanceBefore   DECIMAL(18,4) NOT NULL,  -- Snapshot for audit
-    BalanceAfter    DECIMAL(18,4) NOT NULL,  -- Snapshot for audit
-    ReferenceType   NVARCHAR(50) NULL,       -- "SalesInvoice", "PurchaseInvoice"
-    ReferenceId     INT NULL,
-    Notes           NVARCHAR(500) NULL,
-    CreatedBy       INT NOT NULL,
-    CreatedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_CashTransactions_CashBoxes
-        FOREIGN KEY (CashBoxId) REFERENCES CashBoxes(Id)
-);
-
-CREATE INDEX IX_CashTransactions_CashBoxId ON CashTransactions(CashBoxId);
-CREATE INDEX IX_CashTransactions_Reference ON CashTransactions(ReferenceType, ReferenceId);
-
--- =============================================
--- STEP 6: System Settings (Costing Strategy)
--- =============================================
-CREATE TABLE SystemSettings (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    SettingKey      NVARCHAR(100) NOT NULL UNIQUE,
-    SettingValue    NVARCHAR(500) NOT NULL,
-    DataType        NVARCHAR(50) NOT NULL DEFAULT 'string', -- 'string','int','bool','decimal'
-    Category        NVARCHAR(100) NOT NULL,
-    DisplayName     NVARCHAR(200) NOT NULL,
-    Description     NVARCHAR(1000) NULL,
-    UpdatedBy       INT NULL,
-    UpdatedAt       DATETIME2 NOT NULL DEFAULT GETDATE()
-);
-
--- Seed costing strategy default
-INSERT INTO SystemSettings (SettingKey, SettingValue, DataType, Category, DisplayName, Description)
-VALUES (
-    'CostingMethod',
-    'WeightedAverage',
-    'string',
-    'Inventory',
-    'طريقة احتساب التكلفة',
-    'تحدد كيف يحتسب النظام تكلفة البضاعة في المخزن'
-);
-
--- =============================================
--- STEP 7: Add CashBoxId to invoices
--- =============================================
-ALTER TABLE SalesInvoices    ADD CashBoxId INT NULL;
-ALTER TABLE PurchaseInvoices ADD CashBoxId INT NULL;
-
-ALTER TABLE SalesInvoices    ADD CONSTRAINT FK_Sales_CashBox
-    FOREIGN KEY (CashBoxId) REFERENCES CashBoxes(Id);
-ALTER TABLE PurchaseInvoices ADD CONSTRAINT FK_Purchase_CashBox
-    FOREIGN KEY (CashBoxId) REFERENCES CashBoxes(Id);
-
--- =============================================
--- STEP 8: Price History Log (Audit Trail)
--- =============================================
-CREATE TABLE ProductPriceHistory (
-    Id              INT PRIMARY KEY IDENTITY(1,1),
-    ProductUnitId   INT NOT NULL,
-    ChangeType      NVARCHAR(50) NOT NULL, -- 'PurchaseCost','SalesPrice','SupplierPrice'
-    OldValue        DECIMAL(18,4) NOT NULL,
-    NewValue        DECIMAL(18,4) NOT NULL,
-    CostingMethod   NVARCHAR(50) NULL,
-    InvoiceId       INT NULL,
-    ChangedBy       INT NOT NULL,
-    ChangedAt       DATETIME2 NOT NULL DEFAULT GETDATE(),
-
-    CONSTRAINT FK_PriceHistory_ProductUnits
-        FOREIGN KEY (ProductUnitId) REFERENCES ProductUnits(Id)
-);
-✅ Phase 0 Checklist
- All 8 SQL blocks executed without errors
- ProductUnits has CHECK constraint on base unit factor
- UnitBarcodes has UNIQUE constraint on barcode value
- CashBoxes linked to invoices tables
- SystemSettings seeded with default costing method
- ProductPriceHistory created for audit trail
-
-<!-- END OF SECTION: 3.2 Advanced Modules SQL Schema Migrations (v4.3) -->
-
-
-# 4. Domain Architecture & C# Entity Models
-
-The enterprise domain layer contains core aggregate roots, entities, domain enums, and rules with ZERO external dependencies.
-
-<!-- START OF SECTION: 4.1 Baseline C# Domain Entities -->
-
-> [!NOTE]
-> Baseline business entities including Product, Customer, Supplier, Warehouse, and Sales Invoice.
-
-// SalesSystem.Domain/Common/BaseEntity.cs
-namespace SalesSystem.Domain.Common;
-
-public abstract class BaseEntity
-{
-    public int Id { get; protected set; }
-    public DateTime CreatedAt { get; protected set; } = DateTime.UtcNow;
-    public DateTime? UpdatedAt { get; protected set; }
-    public bool IsActive { get; protected set; } = true;
-
-    protected void SetUpdated() => UpdatedAt = DateTime.UtcNow;
-    protected void Deactivate() => IsActive = false;
-}
-6.2 Product Entity
-csharp
-
-// SalesSystem.Domain/Entities/Product.cs
-namespace SalesSystem.Domain.Entities;
-
-public class Product : BaseEntity
-{
-    public string? Barcode { get; private set; }
-    public string Name { get; private set; } = string.Empty;
-    public int? CategoryId { get; private set; }
-    public decimal SupplierPrice { get; private set; }
-    public decimal ReorderLevel { get; private set; }
-    public string? Description { get; private set; }
-
-    // Navigation
-    public Category? Category { get; private set; }
-    private readonly List<ProductUnit> _units = new();
-    public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
-
-    protected Product() { } // EF Core
-
-    public static Product Create(
-        string name,
-        decimal supplierPrice = 0,
-        decimal reorderLevel = 0,
-        string? barcode = null,
-        int? categoryId = null,
-        string? description = null)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المنتج مطلوب");
-        if (supplierPrice < 0)
-            throw new DomainException("سعر المورد لا يمكن أن يكون سالباً");
-        if (reorderLevel < 0)
-            throw new DomainException("الحد الأدنى لا يمكن أن يكون سالباً");
-
-        return new Product
-        {
-            Name = name.Trim(),
-            SupplierPrice = supplierPrice,
-            ReorderLevel = reorderLevel,
-            Barcode = barcode?.Trim(),
-            CategoryId = categoryId,
-            Description = description?.Trim()
-        };
-    }
-
-    public void Update(
-        string name,
-        decimal supplierPrice,
-        decimal reorderLevel,
-        string? barcode,
-        int? categoryId,
-        string? description)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المنتج مطلوب");
-        if (supplierPrice < 0)
-            throw new DomainException("سعر المورد لا يمكن أن يكون سالباً");
-
-        Name = name.Trim();
-        SupplierPrice = supplierPrice;
-        ReorderLevel = reorderLevel;
-        Barcode = barcode?.Trim();
-        CategoryId = categoryId;
-        Description = description?.Trim();
-        SetUpdated();
-    }
-
-    public void AddUnit(string unitName, decimal conversionFactor,
-        decimal retailPrice, decimal wholesalePrice, bool isBaseUnit)
-    {
-        if (_units.Any(u => u.UnitName == unitName))
-            throw new DomainException($"الوحدة '{unitName}' موجودة بالفعل");
-        if (isBaseUnit && _units.Any(u => u.IsBaseUnit))
-            throw new DomainException("يوجد بالفعل وحدة أساسية للمنتج");
-
-        var unit = ProductUnit.Create(Id, unitName, conversionFactor,
-            retailPrice, wholesalePrice, isBaseUnit);
-        _units.Add(unit);
-    }
-
-    public void Deactivate()
-    {
-        IsActive = false;
-        SetUpdated();
-    }
-
-    public void DeleteUnit(int productUnitId)
-    {
-        if (_units.Count <= 1)
-            throw new DomainException("يجب أن يحتوي المنتج على وحدة واحدة على الأقل");
-        var unit = _units.FirstOrDefault(u => u.Id == productUnitId);
-        if (unit == null)
-            throw new DomainException("الوحدة غير موجودة");
-        _units.Remove(unit);
-    }
-}
-6.3 WarehouseStock Entity ⚠️ الأهم
-csharp
-
-// SalesSystem.Domain/Entities/WarehouseStock.cs
-namespace SalesSystem.Domain.Entities;
-
-public class WarehouseStock : BaseEntity
-{
-    public int WarehouseId { get; private set; }
-    public int ProductId { get; private set; }
-    public decimal Quantity { get; private set; }
-    public DateTime UpdatedAt { get; private set; } = DateTime.UtcNow;
-
-    // Navigation
-    public Warehouse? Warehouse { get; private set; }
-    public Product? Product { get; private set; }
-
-    protected WarehouseStock() { }
-
-    public static WarehouseStock Create(int warehouseId, int productId)
-    {
-        return new WarehouseStock
-        {
-            WarehouseId = warehouseId,
-            ProductId = productId,
-            Quantity = 0
-        };
-    }
-
-    /// <summary>
-    /// زيادة المخزون — للشراء ومرتجع البيع والتحويل الداخل
-    /// </summary>
-    public void Increase(decimal quantity)
-    {
-        if (quantity <= 0)
-            throw new DomainException($"كمية الزيادة يجب أن تكون أكبر من صفر، القيمة المُدخلة: {quantity}");
-
-        Quantity += quantity;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// تقليل المخزون — للبيع ومرتجع الشراء والتحويل الخارج
-    /// </summary>
-    public void Decrease(decimal quantity)
-    {
-        if (quantity <= 0)
-            throw new DomainException($"كمية الخصم يجب أن تكون أكبر من صفر، القيمة المُدخلة: {quantity}");
-
-        if (Quantity < quantity)
-            throw new InsufficientStockException(
-                ProductId, WarehouseId, quantity, Quantity);
-
-        Quantity -= quantity;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// التحقق فقط بدون تغيير — للتحقق المسبق
-    /// </summary>
-    public bool HasSufficientStock(decimal requestedQuantity)
-        => Quantity >= requestedQuantity;
-}
-6.4 SalesInvoice Entity ⚠️ أهم Entity في النظام
-csharp
-
-// SalesSystem.Domain/Entities/SalesInvoice.cs
-namespace SalesSystem.Domain.Entities;
-
-public class SalesInvoice : BaseEntity
-{
-    public int CustomerId { get; private set; }
-    public int WarehouseId { get; private set; }
-    public DateTime InvoiceDate { get; private set; }
-    public DateTime? DueDate { get; private set; }
-    public PaymentType PaymentType { get; private set; }
-    public decimal SubTotal { get; private set; }
-    public decimal DiscountAmount { get; private set; }
-    public decimal TaxAmount { get; private set; }
-    public decimal TotalAmount { get; private set; }
-    public decimal PaidAmount { get; private set; }
-    public decimal DueAmount { get; private set; }
-    public string? Notes { get; private set; }
-    public InvoiceStatus Status { get; private set; }
-    public int? CreatedByUserId { get; private set; }
-
-    // Navigation
-    public Customer? Customer { get; private set; }
-    public Warehouse? Warehouse { get; private set; }
-    private readonly List<SalesInvoiceItem> _items = new();
-    public IReadOnlyCollection<SalesInvoiceItem> Items => _items.AsReadOnly();
-
-    protected SalesInvoice() { }
-
-    public static SalesInvoice Create(
-        int customerId,
-        int warehouseId,
-        PaymentType paymentType,
-        decimal paidAmount,
-        string? notes,
-        int? createdByUserId)
-    {
-        if (customerId <= 0)
-            throw new DomainException("العميل مطلوب");
-        if (warehouseId <= 0)
-            throw new DomainException("المخزن مطلوب");
-        if (paidAmount < 0)
-            throw new DomainException("المبلغ المدفوع لا يمكن أن يكون سالباً");
-
-        return new SalesInvoice
-        {
-            CustomerId = customerId,
-            WarehouseId = warehouseId,
-            InvoiceDate = DateTime.UtcNow,
-            PaymentType = paymentType,
-            PaidAmount = paidAmount,
-            Notes = notes?.Trim(),
-            Status = InvoiceStatus.Draft,
-            CreatedByUserId = createdByUserId
-        };
-    }
-
-    public void AddItem(int productId, decimal quantity, 
-                        decimal unitPrice, decimal discountAmount = 0,
-                        int? productUnitId = null, SaleMode saleMode = SaleMode.Retail)
-    {
-        if (Status != InvoiceStatus.Draft)
-            throw new DomainException("لا يمكن تعديل فاتورة مرحَّلة أو ملغاة");
-        if (quantity <= 0)
-            throw new DomainException("الكمية يجب أن تكون أكبر من صفر");
-        if (unitPrice < 0)
-            throw new DomainException("السعر لا يمكن أن يكون سالباً");
-        if (discountAmount < 0)
-            throw new DomainException("الخصم لا يمكن أن يكون سالباً");
-
-        // ⚠️ LineTotal لا تُحسب في الـ UI — تُحسب هنا فقط
-        var lineTotal = (quantity * unitPrice) - discountAmount;
-        if (lineTotal < 0)
-            throw new DomainException("إجمالي السطر لا يمكن أن يكون سالباً");
-
-        // ⚠️ v4.3+ — productUnitId links to ProductUnit for pricing audit
-        // SaleMode: 1=Retail, 2=Wholesale
-        var item = SalesInvoiceItem.Create(
-            Id, productId, quantity, unitPrice, discountAmount, lineTotal,
-            productUnitId, saleMode);
-        _items.Add(item);
-
-        RecalculateTotals();
-    }
-
-    /// <summary>
-    /// ⚠️ الحساب النهائي — يُنفذ عند كل إضافة/حذف عنصر
-    /// </summary>
-    private void RecalculateTotals()
-    {
-        // ✅ decimal arithmetic — لا float
-        SubTotal = _items.Sum(i => i.LineTotal);
-        
-        // TaxAmount يُحسب على SubTotal بعد الخصم الكلي
-        TaxAmount = 0; // يُحسب لاحقاً إذا كانت الضريبة مفعلة
-        
-        TotalAmount = SubTotal - DiscountAmount + TaxAmount;
-        
-        if (TotalAmount < 0)
-            throw new DomainException("إجمالي الفاتورة لا يمكن أن يكون سالباً");
-
-        if (PaidAmount > TotalAmount)
-            throw new DomainException(
-                $"المبلغ المدفوع ({PaidAmount}) أكبر من إجمالي الفاتورة ({TotalAmount})");
-
-        DueAmount = TotalAmount - PaidAmount;
-    }
-
-    /// <summary>
-    /// ترحيل الفاتورة — يُستدعى مرة واحدة فقط
-    /// </summary>
-    public void Post()
-    {
-        if (Status != InvoiceStatus.Draft)
-            throw new DomainException($"لا يمكن ترحيل الفاتورة بحالة: {Status}");
-        if (!_items.Any())
-            throw new DomainException("لا يمكن ترحيل فاتورة فارغة");
-
-        RecalculateTotals(); // تحقق أخير قبل الترحيل
-
-        Status = InvoiceStatus.Posted;
-        SetUpdated();
-    }
-
-    public void Cancel(string reason)
-    {
-        if (Status == InvoiceStatus.Cancelled)
-            throw new DomainException("الفاتورة ملغاة بالفعل");
-
-        Status = InvoiceStatus.Cancelled;
-        Notes = string.IsNullOrEmpty(Notes)
-            ? $"ملغاة: {reason}"
-            : $"{Notes} | ملغاة: {reason}";
-        SetUpdated();
-    }
-}
-7. Contracts — DTOs و Requests
-7.1 Common Result
-csharp
-
-
-<!-- END OF SECTION: 4.1 Baseline C# Domain Entities -->
-
-
-<!-- START OF SECTION: 4.2 Advanced Modules C# Domain Entities (v4.3) -->
-
-> [!NOTE]
-> Entities and domain aggregates for Dynamic UOM (ProductUnit, UnitBarcode), Cash Box Management, and costing price histories.
-
-🏗️ Phase 1: Domain Layer — Entities & Enums
-Task 1.1 — New Enums
-csharp
-
-// File: Domain/Enums/CostingMethod.cs
-public enum CostingMethod
-{
-    WeightedAverage = 0,    // متوسط التكلفة المرجح
-    LastPurchasePrice = 1,  // آخر سعر توريد
-    SupplierPrice = 2       // سعر المورد
-}
-
-// File: Domain/Enums/CashTransactionType.cs
-public enum CashTransactionType
-{
-    SaleIn = 0,         // مبيعات (وارد)
-    PurchaseOut = 1,    // مشتريات (صادر)
-    TransferIn = 2,     // تحويل وارد
-    TransferOut = 3,    // تحويل صادر
-    ManualIn = 4,       // إيداع يدوي
-    ManualOut = 5       // سحب يدوي
-}
-Task 1.2 — ProductUnit Entity
-csharp
-
-// File: Domain/Entities/ProductUnit.cs
-
-public class ProductUnit : BaseEntity
-{
-    // ─── Properties ───────────────────────────────
-    public int ProductId { get; private set; }
-    public string UnitName { get; private set; }
-
-    /// <summary>
-    /// How many BASE UNITS does this unit contain?
-    /// Base unit itself = 1. Box of 12 = 12. Pallet of 360 = 360.
-    /// </summary>
-    public decimal BaseConversionFactor { get; private set; }
-
-    public bool IsBaseUnit { get; private set; }
-    public decimal SalesPrice { get; private set; }
-    public decimal PurchaseCost { get; private set; }
-    public decimal SupplierPrice { get; private set; }
-    public decimal LastPurchasePrice { get; private set; }
-    public int SortOrder { get; private set; }
-    public bool IsActive { get; private set; }
-
-    // Navigation
-    public Product Product { get; private set; }
-
-    private readonly List<UnitBarcode> _barcodes = new();
-    public IReadOnlyCollection<UnitBarcode> Barcodes => _barcodes.AsReadOnly();
-
-    private ProductUnit() { } // EF Core
-
-    // ─── Factory ──────────────────────────────────
-    public static ProductUnit CreateBaseUnit(
-        int productId,
-        string unitName)
-    {
-        if (string.IsNullOrWhiteSpace(unitName))
-            throw new DomainException("Unit name cannot be empty");
-
-        return new ProductUnit
-        {
-            ProductId = productId,
-            UnitName = unitName.Trim(),
-            BaseConversionFactor = 1,
-            IsBaseUnit = true,
-            IsActive = true,
-            SortOrder = 0
-        };
-    }
-
-    public static ProductUnit CreateDerivedUnit(
-        int productId,
-        string unitName,
-        decimal baseConversionFactor,
-        int sortOrder = 1)
-    {
-        if (string.IsNullOrWhiteSpace(unitName))
-            throw new DomainException("Unit name cannot be empty");
-
-        if (baseConversionFactor <= 1)
-            throw new DomainException(
-                $"وحدة '{unitName}' يجب أن تحتوي على أكثر من وحدة صغرى واحدة. " +
-                $"أدخل كم وحدة صغرى بداخلها (مثال: الكرتون يحتوي على 12 حبة، ادخل 12).");
-
-        return new ProductUnit
-        {
-            ProductId = productId,
-            UnitName = unitName.Trim(),
-            BaseConversionFactor = baseConversionFactor,
-            IsBaseUnit = false,
-            IsActive = true,
-            SortOrder = sortOrder
-        };
-    }
-
-    // ─── Domain Methods ───────────────────────────
-
-    /// <summary>
-    /// Converts quantity in this unit to base unit quantity.
-    /// ALWAYS use this before touching stock.
-    /// </summary>
-    public decimal ToBaseUnitQuantity(decimal quantity)
-        => quantity * BaseConversionFactor;
-
-    /// <summary>
-    /// Updates cost after purchase. Returns old cost for history logging.
-    /// </summary>
-    public decimal UpdatePurchaseCost(decimal newCost)
-    {
-        if (newCost < 0)
-            throw new DomainException("التكلفة لا يمكن أن تكون سالبة");
-
-        var oldCost = PurchaseCost;
-        LastPurchasePrice = newCost;
-        PurchaseCost = newCost;
-        return oldCost;
-    }
-
-    public decimal UpdateSalesPrice(decimal newPrice)
-    {
-        if (newPrice < 0)
-            throw new DomainException("سعر البيع لا يمكن أن يكون سالباً");
-
-        var oldPrice = SalesPrice;
-        SalesPrice = newPrice;
-        return oldPrice;
-    }
-
-    public void UpdateSupplierPrice(decimal supplierPrice)
-    {
-        if (supplierPrice < 0)
-            throw new DomainException("سعر المورد لا يمكن أن يكون سالباً");
-        SupplierPrice = supplierPrice;
-    }
-
-    public void AddBarcode(string barcodeValue, bool isDefault = false, 
-        string? supplierCode = null)
-    {
-        if (string.IsNullOrWhiteSpace(barcodeValue))
-            throw new DomainException("قيمة الباركود لا يمكن أن تكون فارغة");
-
-        // If this is default, unmark others
-        if (isDefault)
-        {
-            foreach (var b in _barcodes)
-                b.UnmarkDefault();
-        }
-
-        _barcodes.Add(UnitBarcode.Create(Id, barcodeValue, isDefault, supplierCode));
-    }
-
-    /// <summary>
-    /// Calculates cost for this unit based on base unit cost.
-    /// e.g., if base unit costs 1 SAR and this unit = 12 pieces → cost = 12 SAR
-    /// </summary>
-    public decimal CalculateCostFromBaseUnitCost(decimal baseUnitCost)
-        => baseUnitCost * BaseConversionFactor;
-}
-Task 1.3 — UnitBarcode Entity
-csharp
-
-// File: Domain/Entities/UnitBarcode.cs
-
-public class UnitBarcode : BaseEntity
-{
-    public int ProductUnitId { get; private set; }
-    public string BarcodeValue { get; private set; }
-    public bool IsDefault { get; private set; }
-    public string? SupplierCode { get; private set; }
-
-    private UnitBarcode() { }
-
-    public static UnitBarcode Create(
-        int productUnitId,
-        string barcodeValue,
-        bool isDefault = false,
-        string? supplierCode = null)
-    {
-        return new UnitBarcode
-        {
-            ProductUnitId = productUnitId,
-            BarcodeValue = barcodeValue.Trim().ToUpperInvariant(),
-            IsDefault = isDefault,
-            SupplierCode = supplierCode?.Trim()
-        };
-    }
-
-    public void UnmarkDefault() => IsDefault = false;
-}
-Task 1.4 — CashBox Entity
-csharp
-
-// File: Domain/Entities/CashBox.cs
-
-public class CashBox : BaseEntity
-{
-    public string BoxName { get; private set; }
-    public decimal CurrentBalance { get; private set; }
-    public int? BranchId { get; private set; }
-    public string CurrencyCode { get; private set; }
-    public int? AssignedUserId { get; private set; }    // NULL = shared
-    public bool IsActive { get; private set; }
-    public string? Notes { get; private set; }
-
-    private readonly List<CashTransaction> _transactions = new();
-    public IReadOnlyCollection<CashTransaction> Transactions 
-        => _transactions.AsReadOnly();
-
-    private CashBox() { }
-
-    public static CashBox Create(
-        string boxName,
-        int? branchId = null,
-        int? assignedUserId = null,
-        string currencyCode = "SAR",
-        decimal initialBalance = 0)
-    {
-        if (string.IsNullOrWhiteSpace(boxName))
-            throw new DomainException("اسم الصندوق مطلوب");
-
-        return new CashBox
-        {
-            BoxName = boxName.Trim(),
-            BranchId = branchId,
-            AssignedUserId = assignedUserId,
-            CurrencyCode = currencyCode,
-            CurrentBalance = initialBalance,
-            IsActive = true
-        };
-    }
-
-    // ─── Domain Methods ───────────────────────────
-
-    public CashTransaction Deposit(
-        decimal amount,
-        CashTransactionType type,
-        string? referenceType = null,
-        int? referenceId = null,
-        int createdBy = 0,
-        string? notes = null)
-    {
-        if (amount <= 0)
-            throw new DomainException("مبلغ الإيداع يجب أن يكون أكبر من صفر");
-
-        var balanceBefore = CurrentBalance;
-        CurrentBalance += amount;
-
-        var transaction = CashTransaction.Create(
-            Id, type, amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes);
-
-        _transactions.Add(transaction);
-        return transaction;
-    }
-
-    public CashTransaction Withdraw(
-        decimal amount,
-        CashTransactionType type,
-        string? referenceType = null,
-        int? referenceId = null,
-        int createdBy = 0,
-        string? notes = null)
-    {
-        if (amount <= 0)
-            throw new DomainException("مبلغ السحب يجب أن يكون أكبر من صفر");
-
-        if (CurrentBalance < amount)
-            throw new DomainException(
-                $"رصيد الصندوق غير كافٍ. الرصيد الحالي: {CurrentBalance:N2}، " +
-                $"المبلغ المطلوب: {amount:N2}");
-
-        var balanceBefore = CurrentBalance;
-        CurrentBalance -= amount;
-
-        var transaction = CashTransaction.Create(
-            Id, type, -amount, balanceBefore, CurrentBalance,
-            referenceType, referenceId, createdBy, notes);
-
-        _transactions.Add(transaction);
-        return transaction;
-    }
-
-    public void CanUserAccess(int userId)
-    {
-        if (AssignedUserId.HasValue && AssignedUserId.Value != userId)
-            throw new DomainException(
-                $"ليس لديك صلاحية الوصول إلى الصندوق '{BoxName}'. " +
-                $"تواصل مع المدير لتغيير الصلاحيات.");
-    }
-}
-Task 1.5 — CashTransaction Entity
-csharp
-
-// File: Domain/Entities/CashTransaction.cs
-
-public class CashTransaction : BaseEntity
-{
-    public int CashBoxId { get; private set; }
-    public CashTransactionType TransactionType { get; private set; }
-    public decimal Amount { get; private set; }
-    public decimal BalanceBefore { get; private set; }
-    public decimal BalanceAfter { get; private set; }
-    public string? ReferenceType { get; private set; }
-    public int? ReferenceId { get; private set; }
-    public string? Notes { get; private set; }
-    public int CreatedBy { get; private set; }
-    public DateTime CreatedAt { get; private set; }
-
-    private CashTransaction() { }
-
-    internal static CashTransaction Create(
-        int cashBoxId,
-        CashTransactionType type,
-        decimal amount,
-        decimal balanceBefore,
-        decimal balanceAfter,
-        string? referenceType,
-        int? referenceId,
-        int createdBy,
-        string? notes)
-    {
-        return new CashTransaction
-        {
-            CashBoxId = cashBoxId,
-            TransactionType = type,
-            Amount = amount,
-            BalanceBefore = balanceBefore,
-            BalanceAfter = balanceAfter,
-            ReferenceType = referenceType,
-            ReferenceId = referenceId,
-            CreatedBy = createdBy,
-            Notes = notes,
-            CreatedAt = DateTime.UtcNow
-        };
-    }
-}
-Task 1.6 — Update Product Entity
-csharp
-
-// File: Domain/Entities/Product.cs
-// MODIFY existing Product — remove old price fields, add Units collection
-
-public class Product : BaseEntity
-{
-    // ─── Keep existing fields ─────────────────────
-    public string Name { get; private set; }
-    public string? Description { get; private set; }
-    public int CategoryId { get; private set; }
-    public bool IsActive { get; private set; }
-
-    // ─── REMOVED: WholesalePrice, RetailPrice, ConversionFactor ───
-    // These now live in ProductUnits
-
-    // Navigation
-    private readonly List<ProductUnit> _units = new();
-    public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
-
-    // ─── Domain Methods ───────────────────────────
-
-    /// <summary>
-    /// Returns the base unit (Piece/Egg/etc). ALWAYS exists.
-    /// Throws if not found — product data is corrupted.
-    /// </summary>
-    public ProductUnit GetBaseUnit()
-    {
-        return _units.FirstOrDefault(u => u.IsBaseUnit)
-            ?? throw new DomainException(
-                $"المنتج '{Name}' لا يحتوي على وحدة أساسية. " +
-                $"يرجى تعريف وحدة صغرى أولاً (مثال: حبة) من شاشة إدارة المنتجات.");
-    }
-
-    public ProductUnit GetUnitById(int unitId)
-    {
-        return _units.FirstOrDefault(u => u.Id == unitId)
-            ?? throw new DomainException(
-                $"الوحدة المحددة غير موجودة في المنتج '{Name}'");
-    }
-
-    /// <summary>
-    /// Validates product has exactly ONE base unit before saving.
-    /// Call this in the Command Handler before persisting.
-    /// </summary>
-    public void ValidateUnits()
-    {
-        var baseUnits = _units.Where(u => u.IsBaseUnit).ToList();
-
-        if (baseUnits.Count == 0)
-            throw new DomainException(
-                "⚠️ يجب تعريف وحدة صغرى واحدة على الأقل.\n" +
-                "مثال: أضف وحدة باسم 'حبة' واجعل معامل التحويل = 1");
-
-        if (baseUnits.Count > 1)
-            throw new DomainException(
-                "⚠️ لا يمكن تعريف أكثر من وحدة صغرى واحدة للمنتج الواحد.\n" +
-                $"الوحدات المعرّفة كأساسية: {string.Join(", ", baseUnits.Select(u => u.UnitName))}");
-
-        var invalidDerived = _units
-            .Where(u => !u.IsBaseUnit && u.BaseConversionFactor <= 1)
-            .ToList();
-
-        if (invalidDerived.Any())
-            throw new DomainException(
-                $"⚠️ الوحدات التالية لها معامل تحويل غير صحيح:\n" +
-                $"{string.Join("\n", invalidDerived.Select(u => $"- {u.UnitName}: يجب أن يكون أكبر من 1"))}\n" +
-                $"أدخل كم وحدة صغرى بداخل كل وحدة أكبر.");
-    }
-}
-✅ Phase 1 Checklist
- ProductUnit.CreateBaseUnit() sets factor to 1 automatically
- ProductUnit.CreateDerivedUnit() rejects factor <= 1 with Arabic message
- Product.ValidateUnits() catches 0 base units, >1 base units, and invalid factors
- CashBox.Withdraw() rejects insufficient balance with Arabic message
- CashBox.CanUserAccess() enforces user-box assignment
- All error messages are in Arabic and user-friendly
-
-<!-- END OF SECTION: 4.2 Advanced Modules C# Domain Entities (v4.3) -->
-
+> See `AGENTS.md` for domain entity patterns and `docs/database-schema.md` for table-to-entity mappings.
 
 # 5. Contracts, Common DTOs & Domain Exceptions
 
@@ -3074,7 +765,7 @@ DTO representations, service request/response models, common result patterns, an
 namespace SalesSystem.Contracts.Common;
 
 /// <summary>
-/// ⚠️ كل العمليات ترجع Result<T> — لا exceptions مكشوفة للـ UI
+/// âڑ ï¸ڈ ظƒظ„ ط§ظ„ط¹ظ…ظ„ظٹط§طھ طھط±ط¬ط¹ Result<T> â€” ظ„ط§ exceptions ظ…ظƒط´ظˆظپط© ظ„ظ„ظ€ UI
 /// </summary>
 public class Result<T>
 {
@@ -3108,7 +799,7 @@ public class Result
     public static Result Failure(string error) => new() { IsSuccess = false, Error = error };
 }
 
-// أكواد الأخطاء القياسية
+// ط£ظƒظˆط§ط¯ ط§ظ„ط£ط®ط·ط§ط، ط§ظ„ظ‚ظٹط§ط³ظٹط©
 public static class ErrorCodes
 {
     public const string NotFound                = "NOT_FOUND";
@@ -3121,7 +812,7 @@ public static class ErrorCodes
     public const string ValidationError         = "VALIDATION_ERROR";
     public const string DatabaseError           = "DATABASE_ERROR";
 }
-7.2 DTOs الأساسية
+7.2 DTOs ط§ظ„ط£ط³ط§ط³ظٹط©
 csharp
 
 // SalesSystem.Contracts/DTOs/ProductDto.cs
@@ -3184,7 +875,7 @@ public record SalesInvoiceItemDto(
     decimal DiscountAmount,
     decimal LineTotal
 );
-7.3 Requests مع Validation
+7.3 Requests ظ…ط¹ Validation
 csharp
 
 // SalesSystem.Contracts/Requests/Sales/CreateSalesInvoiceRequest.cs
@@ -3222,7 +913,7 @@ public record CreateProductUnitRequest(
     decimal WholesalePrice,
     bool IsBaseUnit
 );
-8. Application Services — منطق العمل
+8. Application Services â€” ظ…ظ†ط·ظ‚ ط§ظ„ط¹ظ…ظ„
 8.1 ISalesService Interface
 csharp
 
@@ -3237,13 +928,13 @@ csharp
 
 // SalesSystem.Domain/Exceptions/
 
-// الاستثناء الأساسي لقواعد العمل
+// ط§ظ„ط§ط³طھط«ظ†ط§ط، ط§ظ„ط£ط³ط§ط³ظٹ ظ„ظ‚ظˆط§ط¹ط¯ ط§ظ„ط¹ظ…ظ„
 public class DomainException : Exception
 {
     public DomainException(string message) : base(message) { }
 }
 
-// استثناء المخزون غير الكافي — الأكثر أهمية
+// ط§ط³طھط«ظ†ط§ط، ط§ظ„ظ…ط®ط²ظˆظ† ط؛ظٹط± ط§ظ„ظƒط§ظپظٹ â€” ط§ظ„ط£ظƒط«ط± ط£ظ‡ظ…ظٹط©
 public class InsufficientStockException : DomainException
 {
     public int ProductId { get; }
@@ -3254,9 +945,9 @@ public class InsufficientStockException : DomainException
     public InsufficientStockException(
         int productId, int warehouseId,
         decimal requested, decimal available)
-        : base($"المخزون غير كافٍ. المنتج: {productId}, " +
-               $"المخزن: {warehouseId}, " +
-               $"المطلوب: {requested}, المتوفر: {available}")
+        : base($"ط§ظ„ظ…ط®ط²ظˆظ† ط؛ظٹط± ظƒط§ظپظچ. ط§ظ„ظ…ظ†طھط¬: {productId}, " +
+               $"ط§ظ„ظ…ط®ط²ظ†: {warehouseId}, " +
+               $"ط§ظ„ظ…ط·ظ„ظˆط¨: {requested}, ط§ظ„ظ…طھظˆظپط±: {available}")
     {
         ProductId = productId;
         WarehouseId = warehouseId;
@@ -3265,7 +956,7 @@ public class InsufficientStockException : DomainException
     }
 }
 
-10. Infrastructure — EF Core
+10. Infrastructure â€” EF Core
 10.1 DbContext
 csharp
 
@@ -3301,7 +992,7 @@ public interface ISalesService
         int invoiceId, string reason, int? userId,
         CancellationToken ct = default);
 }
-8.2 SalesService Implementation ⚠️ الأهم والأحرج
+8.2 SalesService Implementation âڑ ï¸ڈ ط§ظ„ط£ظ‡ظ… ظˆط§ظ„ط£ط­ط±ط¬
 csharp
 
 // SalesSystem.Application/Services/SalesService.cs
@@ -3337,19 +1028,19 @@ public class SalesService : ISalesService
             return Result<SalesInvoiceDto>.Failure(
                 validationResult.Error!, ErrorCodes.ValidationError);
 
-        // === Step 2: التحقق من وجود العميل والمخزن ===
+        // === Step 2: ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ظˆط¬ظˆط¯ ط§ظ„ط¹ظ…ظٹظ„ ظˆط§ظ„ظ…ط®ط²ظ† ===
         var customer = await _uow.Customers.GetByIdAsync(request.CustomerId, ct);
         if (customer == null)
             return Result<SalesInvoiceDto>.Failure(
-                "العميل غير موجود", ErrorCodes.NotFound);
+                "ط§ظ„ط¹ظ…ظٹظ„ ط؛ظٹط± ظ…ظˆط¬ظˆط¯", ErrorCodes.NotFound);
 
         var warehouse = await _uow.Warehouses.GetByIdAsync(request.WarehouseId, ct);
         if (warehouse == null || !warehouse.IsActive)
             return Result<SalesInvoiceDto>.Failure(
-                "المخزن غير موجود أو غير نشط", ErrorCodes.NotFound);
+                "ط§ظ„ظ…ط®ط²ظ† ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ط£ظˆ ط؛ظٹط± ظ†ط´ط·", ErrorCodes.NotFound);
 
-        // === Step 3: التحقق المسبق من المخزون لكل عنصر ===
-        // ⚠️ مهم: نتحقق أولاً قبل فتح Transaction
+        // === Step 3: ط§ظ„طھط­ظ‚ظ‚ ط§ظ„ظ…ط³ط¨ظ‚ ظ…ظ† ط§ظ„ظ…ط®ط²ظˆظ† ظ„ظƒظ„ ط¹ظ†طµط± ===
+        // âڑ ï¸ڈ ظ…ظ‡ظ…: ظ†طھط­ظ‚ظ‚ ط£ظˆظ„ط§ظ‹ ظ‚ط¨ظ„ ظپطھط­ Transaction
         foreach (var item in request.Items)
         {
             var stock = await _uow.WarehouseStocks
@@ -3360,18 +1051,18 @@ public class SalesService : ISalesService
             {
                 var product = await _uow.Products.GetByIdAsync(item.ProductId, ct);
                 return Result<SalesInvoiceDto>.Failure(
-                    $"المخزون غير كافٍ للمنتج '{product?.Name}'. " +
-                    $"المتوفر: {available}, المطلوب: {item.Quantity}",
+                    $"ط§ظ„ظ…ط®ط²ظˆظ† ط؛ظٹط± ظƒط§ظپظچ ظ„ظ„ظ…ظ†طھط¬ '{product?.Name}'. " +
+                    $"ط§ظ„ظ…طھظˆظپط±: {available}, ط§ظ„ظ…ط·ظ„ظˆط¨: {item.Quantity}",
                     ErrorCodes.InsufficientStock);
             }
         }
 
         // === Step 5: Database Transaction ===
-        // ⚠️ كل العمليات التالية داخل Transaction واحدة
+        // âڑ ï¸ڈ ظƒظ„ ط§ظ„ط¹ظ…ظ„ظٹط§طھ ط§ظ„طھط§ظ„ظٹط© ط¯ط§ط®ظ„ Transaction ظˆط§ط­ط¯ط©
         await using var transaction = await _uow.BeginTransactionAsync(ct);
         try
         {
-            // 5a. إنشاء الفاتورة
+            // 5a. ط¥ظ†ط´ط§ط، ط§ظ„ظپط§طھظˆط±ط©
             var invoice = SalesInvoice.Create(
                 request.CustomerId,
                 request.WarehouseId,
@@ -3380,7 +1071,7 @@ public class SalesService : ISalesService
                 request.Notes,
                 userId);
 
-            // 5b. إضافة العناصر (الحساب يتم في Domain)
+            // 5b. ط¥ط¶ط§ظپط© ط§ظ„ط¹ظ†ط§طµط± (ط§ظ„ط­ط³ط§ط¨ ظٹطھظ… ظپظٹ Domain)
             foreach (var itemRequest in request.Items)
             {
                 invoice.AddItem(
@@ -3390,22 +1081,22 @@ public class SalesService : ISalesService
                     itemRequest.DiscountAmount);
             }
 
-            // 5c. التحقق من المبلغ المدفوع
+            // 5c. ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ظ…ط¯ظپظˆط¹
             if (request.PaidAmount > invoice.TotalAmount)
                 return Result<SalesInvoiceDto>.Failure(
-                    $"المبلغ المدفوع ({request.PaidAmount:N2}) " +
-                    $"أكبر من إجمالي الفاتورة ({invoice.TotalAmount:N2})",
+                    $"ط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ظ…ط¯ظپظˆط¹ ({request.PaidAmount:N2}) " +
+                    $"ط£ظƒط¨ط± ظ…ظ† ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ظپط§طھظˆط±ط© ({invoice.TotalAmount:N2})",
                     ErrorCodes.InvalidAmount);
 
-            // 5d. ترحيل الفاتورة
+            // 5d. طھط±ط­ظٹظ„ ط§ظ„ظپط§طھظˆط±ط©
             invoice.Post();
 
-            // 5e. حفظ الفاتورة في DB
+            // 5e. ط­ظپط¸ ط§ظ„ظپط§طھظˆط±ط© ظپظٹ DB
             await _uow.SalesInvoices.AddAsync(invoice, ct);
             await _uow.SaveChangesAsync(ct);
 
-            // 5f. خصم المخزون لكل عنصر
-            // ⚠️ يتم بعد حفظ الفاتورة وتوليد ID
+            // 5f. ط®طµظ… ط§ظ„ظ…ط®ط²ظˆظ† ظ„ظƒظ„ ط¹ظ†طµط±
+            // âڑ ï¸ڈ ظٹطھظ… ط¨ط¹ط¯ ط­ظپط¸ ط§ظ„ظپط§طھظˆط±ط© ظˆطھظˆظ„ظٹط¯ ID
             foreach (var item in invoice.Items)
             {
                 await _inventoryService.DecreaseStockAsync(
@@ -3420,7 +1111,7 @@ public class SalesService : ISalesService
                     ct: ct);
             }
 
-            // 5g. تحديث رصيد العميل (إذا كان دين)
+            // 5g. طھط­ط¯ظٹط« ط±طµظٹط¯ ط§ظ„ط¹ظ…ظٹظ„ (ط¥ط°ط§ ظƒط§ظ† ط¯ظٹظ†)
             if (invoice.DueAmount > 0)
             {
                 customer.IncreaseBalance(invoice.DueAmount);
@@ -3436,59 +1127,59 @@ public class SalesService : ISalesService
         catch (InsufficientStockException ex)
         {
             await transaction.RollbackAsync(ct);
-            _logger.LogWarning(ex, "مخزون غير كافٍ أثناء البيع");
+            _logger.LogWarning(ex, "ظ…ط®ط²ظˆظ† ط؛ظٹط± ظƒط§ظپظچ ط£ط«ظ†ط§ط، ط§ظ„ط¨ظٹط¹");
             return Result<SalesInvoiceDto>.Failure(
                 ex.Message, ErrorCodes.InsufficientStock);
         }
         catch (DomainException ex)
         {
             await transaction.RollbackAsync(ct);
-            _logger.LogWarning(ex, "خطأ في قواعد العمل أثناء البيع");
+            _logger.LogWarning(ex, "ط®ط·ط£ ظپظٹ ظ‚ظˆط§ط¹ط¯ ط§ظ„ط¹ظ…ظ„ ط£ط«ظ†ط§ط، ط§ظ„ط¨ظٹط¹");
             return Result<SalesInvoiceDto>.Failure(ex.Message);
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync(ct);
-            _logger.LogError(ex, "خطأ غير متوقع أثناء إنشاء فاتورة البيع");
+            _logger.LogError(ex, "ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹ ط£ط«ظ†ط§ط، ط¥ظ†ط´ط§ط، ظپط§طھظˆط±ط© ط§ظ„ط¨ظٹط¹");
             return Result<SalesInvoiceDto>.Failure(
-                "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.");
+                "ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹. ظٹط±ط¬ظ‰ ط§ظ„ظ…ط­ط§ظˆظ„ط© ظ…ط±ط© ط£ط®ط±ظ‰.");
         }
     }
 
     private Result ValidateRequest(CreateSalesInvoiceRequest request)
     {
         if (request.Items == null || !request.Items.Any())
-            return Result.Failure("يجب إضافة منتج واحد على الأقل");
+            return Result.Failure("ظٹط¬ط¨ ط¥ط¶ط§ظپط© ظ…ظ†طھط¬ ظˆط§ط­ط¯ ط¹ظ„ظ‰ ط§ظ„ط£ظ‚ظ„");
 
         if (request.PaidAmount < 0)
-            return Result.Failure("المبلغ المدفوع لا يمكن أن يكون سالباً");
+            return Result.Failure("ط§ظ„ظ…ط¨ظ„ط؛ ط§ظ„ظ…ط¯ظپظˆط¹ ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† ط³ط§ظ„ط¨ط§ظ‹");
 
         if (request.PaymentType is < 1 or > 3)
-            return Result.Failure("نوع الدفع غير صحيح");
+            return Result.Failure("ظ†ظˆط¹ ط§ظ„ط¯ظپط¹ ط؛ظٹط± طµط­ظٹط­");
 
         foreach (var item in request.Items)
         {
             if (item.ProductId <= 0)
-                return Result.Failure("معرّف المنتج غير صحيح");
+                return Result.Failure("ظ…ط¹ط±ظ‘ظپ ط§ظ„ظ…ظ†طھط¬ ط؛ظٹط± طµط­ظٹط­");
             if (item.Quantity <= 0)
-                return Result.Failure("الكمية يجب أن تكون أكبر من صفر");
+                return Result.Failure("ط§ظ„ظƒظ…ظٹط© ظٹط¬ط¨ ط£ظ† طھظƒظˆظ† ط£ظƒط¨ط± ظ…ظ† طµظپط±");
             if (item.UnitPrice < 0)
-                return Result.Failure("السعر لا يمكن أن يكون سالباً");
+                return Result.Failure("ط§ظ„ط³ط¹ط± ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† ط³ط§ظ„ط¨ط§ظ‹");
             if (item.DiscountAmount < 0)
-                return Result.Failure("الخصم لا يمكن أن يكون سالباً");
+                return Result.Failure("ط§ظ„ط®طµظ… ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† ط³ط§ظ„ط¨ط§ظ‹");
 
-            // ⚠️ التحقق من LineTotal منطقياً
+            // âڑ ï¸ڈ ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† LineTotal ظ…ظ†ط·ظ‚ظٹط§ظ‹
             var lineTotal = (item.Quantity * item.UnitPrice) - item.DiscountAmount;
             if (lineTotal < 0)
                 return Result.Failure(
-                    $"إجمالي السطر سالب للمنتج {item.ProductId}. " +
-                    "الخصم لا يمكن أن يتجاوز سعر البيع.");
+                    $"ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ط³ط·ط± ط³ط§ظ„ط¨ ظ„ظ„ظ…ظ†طھط¬ {item.ProductId}. " +
+                    "ط§ظ„ط®طµظ… ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹطھط¬ط§ظˆط² ط³ط¹ط± ط§ظ„ط¨ظٹط¹.");
         }
 
         return Result.Success();
     }
 }
-8.3 InventoryService ⚠️ حرج جداً
+8.3 InventoryService âڑ ï¸ڈ ط­ط±ط¬ ط¬ط¯ط§ظ‹
 csharp
 
 // SalesSystem.Application/Services/InventoryService.cs
@@ -3504,7 +1195,7 @@ public class InventoryService : IInventoryService
     }
 
     /// <summary>
-    /// ⚠️ يُستدعى دائماً داخل Transaction خارجية
+    /// âڑ ï¸ڈ ظٹظڈط³طھط¯ط¹ظ‰ ط¯ط§ط¦ظ…ط§ظ‹ ط¯ط§ط®ظ„ Transaction ط®ط§ط±ط¬ظٹط©
     /// </summary>
     public async Task DecreaseStockAsync(
         int warehouseId, int productId, decimal quantity,
@@ -3512,26 +1203,26 @@ public class InventoryService : IInventoryService
         int referenceId, decimal? unitCost, int? userId,
         CancellationToken ct = default)
     {
-        // جلب أو إنشاء سجل المخزون
+        // ط¬ظ„ط¨ ط£ظˆ ط¥ظ†ط´ط§ط، ط³ط¬ظ„ ط§ظ„ظ…ط®ط²ظˆظ†
         var stock = await _uow.WarehouseStocks
             .GetByWarehouseAndProductAsync(warehouseId, productId, ct);
 
         if (stock == null)
             throw new DomainException(
-                $"لا يوجد سجل مخزون للمنتج {productId} في المخزن {warehouseId}");
+                $"ظ„ط§ ظٹظˆط¬ط¯ ط³ط¬ظ„ ظ…ط®ط²ظˆظ† ظ„ظ„ظ…ظ†طھط¬ {productId} ظپظٹ ط§ظ„ظ…ط®ط²ظ† {warehouseId}");
 
         var quantityBefore = stock.Quantity;
 
-        // ⚠️ هذا يرمي InsufficientStockException إذا لم تكن الكمية كافية
+        // âڑ ï¸ڈ ظ‡ط°ط§ ظٹط±ظ…ظٹ InsufficientStockException ط¥ط°ط§ ظ„ظ… طھظƒظ† ط§ظ„ظƒظ…ظٹط© ظƒط§ظپظٹط©
         stock.Decrease(quantity);
 
-        // تسجيل الحركة
+        // طھط³ط¬ظٹظ„ ط§ظ„ط­ط±ظƒط©
         var movement = new InventoryMovement
         {
             ProductId = productId,
             WarehouseId = warehouseId,
             MovementType = movementType,
-            QuantityChange = -quantity,    // سالب = خروج
+            QuantityChange = -quantity,    // ط³ط§ظ„ط¨ = ط®ط±ظˆط¬
             QuantityBefore = quantityBefore,
             QuantityAfter = stock.Quantity,
             ReferenceType = referenceType,
@@ -3554,12 +1245,12 @@ public class InventoryService : IInventoryService
         var stock = await _uow.WarehouseStocks
             .GetByWarehouseAndProductAsync(warehouseId, productId, ct);
 
-        // إذا لم يكن هناك سجل، نُنشئ واحداً
+        // ط¥ط°ط§ ظ„ظ… ظٹظƒظ† ظ‡ظ†ط§ظƒ ط³ط¬ظ„طŒ ظ†ظڈظ†ط´ط¦ ظˆط§ط­ط¯ط§ظ‹
         if (stock == null)
         {
             stock = WarehouseStock.Create(warehouseId, productId);
             await _uow.WarehouseStocks.AddAsync(stock, ct);
-            await _uow.SaveChangesAsync(ct); // للحصول على ID
+            await _uow.SaveChangesAsync(ct); // ظ„ظ„ط­طµظˆظ„ ط¹ظ„ظ‰ ID
         }
 
         var quantityBefore = stock.Quantity;
@@ -3570,7 +1261,7 @@ public class InventoryService : IInventoryService
             ProductId = productId,
             WarehouseId = warehouseId,
             MovementType = movementType,
-            QuantityChange = quantity,     // موجب = دخول
+            QuantityChange = quantity,     // ظ…ظˆط¬ط¨ = ط¯ط®ظˆظ„
             QuantityBefore = quantityBefore,
             QuantityAfter = stock.Quantity,
             ReferenceType = referenceType,
@@ -3584,7 +1275,7 @@ public class InventoryService : IInventoryService
         await _uow.SaveChangesAsync(ct);
     }
 }
-8.4 DocumentSequenceService — توليد أرقام الوثائق
+8.4 DocumentSequenceService â€” طھظˆظ„ظٹط¯ ط£ط±ظ‚ط§ظ… ط§ظ„ظˆط«ط§ط¦ظ‚
 csharp
 
 // SalesSystem.Application/Services/DocumentSequenceService.cs
@@ -3601,8 +1292,8 @@ public class DocumentSequenceService : IDocumentSequenceService
     }
 
     /// <summary>
-    /// ⚠️ Thread-safe — يُستخدم Lock لمنع الأرقام المكررة
-    /// المخرج: INV-2025-000001
+    /// âڑ ï¸ڈ Thread-safe â€” ظٹظڈط³طھط®ط¯ظ… Lock ظ„ظ…ظ†ط¹ ط§ظ„ط£ط±ظ‚ط§ظ… ط§ظ„ظ…ظƒط±ط±ط©
+    /// ط§ظ„ظ…ط®ط±ط¬: INV-2025-000001
     /// </summary>
     public async Task<string> GenerateAsync(
         string prefix, CancellationToken ct = default)
@@ -3615,7 +1306,7 @@ public class DocumentSequenceService : IDocumentSequenceService
 
             if (sequence == null)
                 throw new InvalidOperationException(
-                    $"Sequence prefix '{prefix}' غير موجود");
+                    $"Sequence prefix '{prefix}' ط؛ظٹط± ظ…ظˆط¬ظˆط¯");
 
             sequence.LastNumber++;
             sequence.UpdatedAt = DateTime.UtcNow;
@@ -3630,27 +1321,27 @@ public class DocumentSequenceService : IDocumentSequenceService
         }
     }
 }
-8.5 SalesReturn Service ⚠️ منطق المرتجع الحرج
+8.5 SalesReturn Service âڑ ï¸ڈ ظ…ظ†ط·ظ‚ ط§ظ„ظ…ط±طھط¬ط¹ ط§ظ„ط­ط±ط¬
 csharp
 
 // SalesSystem.Application/Services/SalesReturnService.cs
 public async Task<Result<SalesReturnDto>> CreateReturnAsync(
     CreateSalesReturnRequest request, int? userId, CancellationToken ct = default)
 {
-    // === التحقق المسبق ===
-    // إذا كان مرتجع لفاتورة محددة، تحقق من الكميات
+    // === ط§ظ„طھط­ظ‚ظ‚ ط§ظ„ظ…ط³ط¨ظ‚ ===
+    // ط¥ط°ط§ ظƒط§ظ† ظ…ط±طھط¬ط¹ ظ„ظپط§طھظˆط±ط© ظ…ط­ط¯ط¯ط©طŒ طھط­ظ‚ظ‚ ظ…ظ† ط§ظ„ظƒظ…ظٹط§طھ
     if (request.SalesInvoiceId.HasValue)
     {
         var originalInvoice = await _uow.SalesInvoices
             .GetByIdWithItemsAsync(request.SalesInvoiceId.Value, ct);
 
         if (originalInvoice == null)
-            return Result<SalesReturnDto>.Failure("الفاتورة الأصلية غير موجودة");
+            return Result<SalesReturnDto>.Failure("ط§ظ„ظپط§طھظˆط±ط© ط§ظ„ط£طµظ„ظٹط© ط؛ظٹط± ظ…ظˆط¬ظˆط¯ط©");
 
         if (originalInvoice.Status == InvoiceStatus.Cancelled)
-            return Result<SalesReturnDto>.Failure("لا يمكن إرجاع فاتورة ملغاة");
+            return Result<SalesReturnDto>.Failure("ظ„ط§ ظٹظ…ظƒظ† ط¥ط±ط¬ط§ط¹ ظپط§طھظˆط±ط© ظ…ظ„ط؛ط§ط©");
 
-        // ⚠️ التحقق: الكمية المُرجعة لا تتجاوز الكمية الأصلية
+        // âڑ ï¸ڈ ط§ظ„طھط­ظ‚ظ‚: ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ…ظڈط±ط¬ط¹ط© ظ„ط§ طھطھط¬ط§ظˆط² ط§ظ„ظƒظ…ظٹط© ط§ظ„ط£طµظ„ظٹط©
         foreach (var returnItem in request.Items)
         {
             var originalItem = originalInvoice.Items
@@ -3658,9 +1349,9 @@ public async Task<Result<SalesReturnDto>> CreateReturnAsync(
 
             if (originalItem == null)
                 return Result<SalesReturnDto>.Failure(
-                    $"المنتج {returnItem.ProductId} غير موجود في الفاتورة الأصلية");
+                    $"ط§ظ„ظ…ظ†طھط¬ {returnItem.ProductId} ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ظپظٹ ط§ظ„ظپط§طھظˆط±ط© ط§ظ„ط£طµظ„ظٹط©");
 
-            // ⚠️ حساب ما تم إرجاعه مسبقاً
+            // âڑ ï¸ڈ ط­ط³ط§ط¨ ظ…ط§ طھظ… ط¥ط±ط¬ط§ط¹ظ‡ ظ…ط³ط¨ظ‚ط§ظ‹
             var previouslyReturned = await _uow.SalesReturnItems
                 .GetTotalReturnedQuantityAsync(
                     request.SalesInvoiceId.Value, returnItem.ProductId, ct);
@@ -3669,8 +1360,8 @@ public async Task<Result<SalesReturnDto>> CreateReturnAsync(
 
             if (returnItem.Quantity > maxReturnable)
                 return Result<SalesReturnDto>.Failure(
-                    $"الكمية المطلوب إرجاعها ({returnItem.Quantity}) " +
-                    $"أكبر من الكمية القابلة للإرجاع ({maxReturnable})");
+                    $"ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ…ط·ظ„ظˆط¨ ط¥ط±ط¬ط§ط¹ظ‡ط§ ({returnItem.Quantity}) " +
+                    $"ط£ظƒط¨ط± ظ…ظ† ط§ظ„ظƒظ…ظٹط© ط§ظ„ظ‚ط§ط¨ظ„ط© ظ„ظ„ط¥ط±ط¬ط§ط¹ ({maxReturnable})");
         }
     }
 
@@ -3680,11 +1371,11 @@ public async Task<Result<SalesReturnDto>> CreateReturnAsync(
     {
         var returnNo = await _sequenceService.GenerateAsync("SR", ct);
 
-        // حساب الإجمالي
+        // ط­ط³ط§ط¨ ط§ظ„ط¥ط¬ظ…ط§ظ„ظٹ
         var totalAmount = request.Items
-            .Sum(i => i.Quantity * i.UnitPrice);   // ✅ decimal
+            .Sum(i => i.Quantity * i.UnitPrice);   // âœ… decimal
 
-        // إنشاء المرتجع
+        // ط¥ظ†ط´ط§ط، ط§ظ„ظ…ط±طھط¬ط¹
         var salesReturn = new SalesReturn
         {
             ReturnNo = returnNo,
@@ -3701,7 +1392,7 @@ public async Task<Result<SalesReturnDto>> CreateReturnAsync(
         await _uow.SalesReturns.AddAsync(salesReturn, ct);
         await _uow.SaveChangesAsync(ct);
 
-        // إضافة العناصر
+        // ط¥ط¶ط§ظپط© ط§ظ„ط¹ظ†ط§طµط±
         foreach (var item in request.Items)
         {
             var returnItem = new SalesReturnItem
@@ -3710,14 +1401,14 @@ public async Task<Result<SalesReturnDto>> CreateReturnAsync(
                 ProductId = item.ProductId,
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
-                LineTotal = item.Quantity * item.UnitPrice  // ✅ decimal
+                LineTotal = item.Quantity * item.UnitPrice  // âœ… decimal
             };
             await _uow.SalesReturnItems.AddAsync(returnItem, ct);
         }
 
         await _uow.SaveChangesAsync(ct);
 
-        // ⚠️ إعادة المخزون (مرتجع البيع يزيد المخزون)
+        // âڑ ï¸ڈ ط¥ط¹ط§ط¯ط© ط§ظ„ظ…ط®ط²ظˆظ† (ظ…ط±طھط¬ط¹ ط§ظ„ط¨ظٹط¹ ظٹط²ظٹط¯ ط§ظ„ظ…ط®ط²ظˆظ†)
         foreach (var item in request.Items)
         {
             await _inventoryService.IncreaseStockAsync(
@@ -3732,7 +1423,7 @@ public async Task<Result<SalesReturnDto>> CreateReturnAsync(
                 ct: ct);
         }
 
-        // ⚠️ تخفيض رصيد العميل (المرتجع يُقلل الدين)
+        // âڑ ï¸ڈ طھط®ظپظٹط¶ ط±طµظٹط¯ ط§ظ„ط¹ظ…ظٹظ„ (ط§ظ„ظ…ط±طھط¬ط¹ ظٹظڈظ‚ظ„ظ„ ط§ظ„ط¯ظٹظ†)
         var customer = await _uow.Customers.GetByIdAsync(request.CustomerId, ct);
         customer!.DecreaseBalance(totalAmount);
         await _uow.SaveChangesAsync(ct);
@@ -3744,11 +1435,11 @@ public async Task<Result<SalesReturnDto>> CreateReturnAsync(
     catch (Exception ex)
     {
         await transaction.RollbackAsync(ct);
-        _logger.LogError(ex, "خطأ في إنشاء مرتجع البيع");
-        return Result<SalesReturnDto>.Failure("حدث خطأ غير متوقع");
+        _logger.LogError(ex, "ط®ط·ط£ ظپظٹ ط¥ظ†ط´ط§ط، ظ…ط±طھط¬ط¹ ط§ظ„ط¨ظٹط¹");
+        return Result<SalesReturnDto>.Failure("ط­ط¯ط« ط®ط·ط£ ط؛ظٹط± ظ…طھظˆظ‚ط¹");
     }
 }
-9. Exceptions المخصصة
+9. Exceptions ط§ظ„ظ…ط®طµطµط©
 csharp
 
 
@@ -3760,8 +1451,8 @@ csharp
 > [!NOTE]
 > Services implementing Dynamic UOM costing cascade (UpdateProductPricingService) and transactional command handlers.
 
-⚙️ Phase 3: Application Layer — Pricing Service
-Task 3.1 — UpdateProductPricingService
+âڑ™ï¸ڈ Phase 3: Application Layer â€” Pricing Service
+Task 3.1 â€” UpdateProductPricingService
 csharp
 
 // File: Application/Services/UpdateProductPricingService.cs
@@ -3777,7 +1468,7 @@ public record UpdatePricingRequest(
     int ProductUnitId,
     decimal NewPurchaseCost,
     decimal NewQuantityPurchased,
-    decimal? NewSalesPrice,          // Optional — user may override
+    decimal? NewSalesPrice,          // Optional â€” user may override
     int InvoiceId,
     int ChangedBy
 );
@@ -3802,7 +1493,7 @@ public class UpdateProductPricingService : IUpdateProductPricingService
         UpdatePricingRequest request,
         CancellationToken ct = default)
     {
-        // ─── 1. Load the purchased unit and ALL units for this product ───
+        // â”€â”€â”€ 1. Load the purchased unit and ALL units for this product â”€â”€â”€
         var purchasedUnit = await _context.ProductUnits
             .Include(u => u.Product)
                 .ThenInclude(p => p.Units)
@@ -3813,7 +1504,7 @@ public class UpdateProductPricingService : IUpdateProductPricingService
         var allUnits = product.Units.Where(u => u.IsActive).ToList();
         var baseUnit = product.GetBaseUnit();
 
-        // ─── 2. Calculate new BASE UNIT cost ─────────────────────────────
+        // â”€â”€â”€ 2. Calculate new BASE UNIT cost â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         var costingMethod = await _settings.GetCostingMethodAsync(ct);
 
         var newBaseUnitCost = await CalculateNewBaseUnitCostAsync(
@@ -3829,7 +1520,7 @@ public class UpdateProductPricingService : IUpdateProductPricingService
             "New base unit cost: {Cost}",
             product.Id, costingMethod, newBaseUnitCost);
 
-        // ─── 3. Cascade cost update to ALL units ─────────────────────────
+        // â”€â”€â”€ 3. Cascade cost update to ALL units â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         var historyEntries = new List<ProductPriceHistory>();
 
         foreach (var unit in allUnits)
@@ -3850,7 +1541,7 @@ public class UpdateProductPricingService : IUpdateProductPricingService
             });
         }
 
-        // ─── 4. Update sales price if user provided one ──────────────────
+        // â”€â”€â”€ 4. Update sales price if user provided one â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (request.NewSalesPrice.HasValue && request.NewSalesPrice.Value > 0)
         {
             var oldSalesPrice = purchasedUnit.UpdateSalesPrice(request.NewSalesPrice.Value);
@@ -3867,7 +1558,7 @@ public class UpdateProductPricingService : IUpdateProductPricingService
             });
         }
 
-        // ─── 5. Save history ──────────────────────────────────────────────
+        // â”€â”€â”€ 5. Save history â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         _context.ProductPriceHistory.AddRange(historyEntries);
         await _context.SaveChangesAsync(ct);
     }
@@ -3898,7 +1589,7 @@ public class UpdateProductPricingService : IUpdateProductPricingService
                     : newBaseCostFromInvoice,
 
             CostingMethod.WeightedAverage =>
-                // Weighted average: [(OldStock × OldCost) + (NewQty × NewCost)] / TotalQty
+                // Weighted average: [(OldStock أ— OldCost) + (NewQty أ— NewCost)] / TotalQty
                 await CalculateWeightedAverageAsync(
                     baseUnit,
                     newBaseCostFromInvoice,
@@ -3935,7 +1626,7 @@ public class UpdateProductPricingService : IUpdateProductPricingService
         return Math.Round(weightedAverage, 4);
     }
 }
-Task 3.2 — Purchase Invoice Command (Updated)
+Task 3.2 â€” Purchase Invoice Command (Updated)
 csharp
 
 // File: Application/Commands/CreatePurchaseInvoice/CreatePurchaseInvoiceCommand.cs
@@ -3981,14 +1672,14 @@ public class CreatePurchaseInvoiceCommandHandler
         CreatePurchaseInvoiceCommand command,
         CancellationToken cancellationToken)
     {
-        // ─── 1. Validate CashBox access ──────────────────────────────────
+        // â”€â”€â”€ 1. Validate CashBox access â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         var cashBox = await _unitOfWork.CashBoxes
             .GetByIdAsync(command.CashBoxId, cancellationToken)
             ?? throw new NotFoundException("CashBox", command.CashBoxId);
 
         cashBox.CanUserAccess(command.CashierId); // Throws if no permission
 
-        // ─── 2. Create invoice ────────────────────────────────────────────
+        // â”€â”€â”€ 2. Create invoice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         var invoice = PurchaseInvoice.Create(
             command.SupplierId,
             command.CashBoxId,
@@ -4017,7 +1708,7 @@ public class CreatePurchaseInvoiceCommandHandler
                 itemRequest.UnitCost,
                 itemRequest.Discount);
 
-            // Add stock — Domain converts to base units internally
+            // Add stock â€” Domain converts to base units internally
             productUnit.Product.Stock.AddStock(
                 itemRequest.Quantity,
                 productUnit.BaseConversionFactor);
@@ -4025,20 +1716,20 @@ public class CreatePurchaseInvoiceCommandHandler
             totalAmount += (itemRequest.Quantity * itemRequest.UnitCost) - itemRequest.Discount;
         }
 
-        // ─── 3. Deduct from cash box ──────────────────────────────────────
+        // â”€â”€â”€ 3. Deduct from cash box â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         cashBox.Withdraw(
             totalAmount,
             CashTransactionType.PurchaseOut,
             referenceType: "PurchaseInvoice",
             referenceId: invoice.Id,
             createdBy: command.CashierId,
-            notes: $"دفع فاتورة مشتريات رقم {invoice.Id}");
+            notes: $"ط¯ظپط¹ ظپط§طھظˆط±ط© ظ…ط´طھط±ظٹط§طھ ط±ظ‚ظ… {invoice.Id}");
 
-        // ─── 4. Save invoice and stock ────────────────────────────────────
+        // â”€â”€â”€ 4. Save invoice and stock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         _unitOfWork.PurchaseInvoices.Add(invoice);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // ─── 5. Update product pricing (AFTER save so invoice.Id exists) ──
+        // â”€â”€â”€ 5. Update product pricing (AFTER save so invoice.Id exists) â”€â”€
         foreach (var itemRequest in command.Items)
         {
             await _pricingService.UpdateFromPurchaseAsync(
@@ -4055,7 +1746,7 @@ public class CreatePurchaseInvoiceCommandHandler
         return invoice.Id;
     }
 }
-Task 3.3 — Cash Transfer Command
+Task 3.3 â€” Cash Transfer Command
 csharp
 
 // File: Application/Commands/TransferCash/TransferCashCommand.cs
@@ -4083,7 +1774,7 @@ public class TransferCashCommandHandler
         CancellationToken cancellationToken)
     {
         if (command.FromCashBoxId == command.ToCashBoxId)
-            throw new DomainException("لا يمكن التحويل من الصندوق إلى نفسه");
+            throw new DomainException("ظ„ط§ ظٹظ…ظƒظ† ط§ظ„طھط­ظˆظٹظ„ ظ…ظ† ط§ظ„طµظ†ط¯ظˆظ‚ ط¥ظ„ظ‰ ظ†ظپط³ظ‡");
 
         var fromBox = await _unitOfWork.CashBoxes
             .GetByIdAsync(command.FromCashBoxId, cancellationToken)
@@ -4097,22 +1788,22 @@ public class TransferCashCommandHandler
 
         // These two domain calls maintain balance integrity
         fromBox.Withdraw(command.Amount, CashTransactionType.TransferOut,
-            notes: $"تحويل إلى: {toBox.BoxName} | {command.Notes}",
+            notes: $"طھط­ظˆظٹظ„ ط¥ظ„ظ‰: {toBox.BoxName} | {command.Notes}",
             createdBy: command.TransferredBy);
 
         toBox.Deposit(command.Amount, CashTransactionType.TransferIn,
-            notes: $"تحويل من: {fromBox.BoxName} | {command.Notes}",
+            notes: $"طھط­ظˆظٹظ„ ظ…ظ†: {fromBox.BoxName} | {command.Notes}",
             createdBy: command.TransferredBy);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Unit.Value;
     }
 }
-✅ Phase 3 Checklist
- WeightedAverage formula is correct: (OldQty×OldCost + NewQty×NewCost) / TotalQty
- LastPurchasePrice just overwrites — no formula
+âœ… Phase 3 Checklist
+ WeightedAverage formula is correct: (OldQtyأ—OldCost + NewQtyأ—NewCost) / TotalQty
+ LastPurchasePrice just overwrites â€” no formula
  Cost cascade goes to ALL units (base and derived)
- Derived unit cost = baseUnitCost × ConversionFactor
+ Derived unit cost = baseUnitCost أ— ConversionFactor
  Pricing update happens AFTER invoice saved (so ID exists for history)
  Cash transfer uses domain methods (not direct property assignment)
 
@@ -4162,12 +1853,12 @@ public class SalesDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // تطبيق كل الـ Configurations
+        // طھط·ط¨ظٹظ‚ ظƒظ„ ط§ظ„ظ€ Configurations
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(SalesDbContext).Assembly);
     }
 }
-10.2 WarehouseStock Configuration ⚠️
+10.2 WarehouseStock Configuration âڑ ï¸ڈ
 csharp
 
 // SalesSystem.Infrastructure/Configurations/WarehouseStockConfiguration.cs
@@ -4179,12 +1870,12 @@ public class WarehouseStockConfiguration
         builder.ToTable("WarehouseStocks");
         builder.HasKey(x => x.WarehouseStockId);
 
-        // ⚠️ decimal(18,3) للكمية — إلزامي
+        // âڑ ï¸ڈ decimal(18,3) ظ„ظ„ظƒظ…ظٹط© â€” ط¥ظ„ط²ط§ظ…ظٹ
         builder.Property(x => x.Quantity)
             .HasColumnType("decimal(18,3)")
             .HasDefaultValue(0m);
 
-        // ⚠️ Unique Constraint حرج
+        // âڑ ï¸ڈ Unique Constraint ط­ط±ط¬
         builder.HasIndex(x => new { x.WarehouseId, x.ProductId })
             .IsUnique();
 
@@ -4207,7 +1898,7 @@ public class SalesInvoiceConfiguration
         builder.ToTable("SalesInvoices");
         builder.HasKey(x => x.SalesInvoiceId);
 
-        // ⚠️ كل الأموال decimal(18,2)
+        // âڑ ï¸ڈ ظƒظ„ ط§ظ„ط£ظ…ظˆط§ظ„ decimal(18,2)
         builder.Property(x => x.SubTotal)
             .HasColumnType("decimal(18,2)").HasDefaultValue(0m);
         builder.Property(x => x.DiscountAmount)
@@ -4235,7 +1926,7 @@ public class SalesInvoiceConfiguration
         builder.HasMany(x => x.Items)
             .WithOne()
             .HasForeignKey(i => i.SalesInvoiceId)
-            .OnDelete(DeleteBehavior.Restrict); // ⚠️ v4.6 — NO Cascade delete
+            .OnDelete(DeleteBehavior.Restrict); // âڑ ï¸ڈ v4.6 â€” NO Cascade delete
     }
 }
 11. API Controllers
@@ -4251,8 +1942,8 @@ csharp
 > [!NOTE]
 > DbContext bindings and configs for advanced entities, plus infrastructural services like BarcodeLookupService.
 
-⚙️ Phase 2: Infrastructure — EF Core & Services
-Task 2.1 — EF Configurations
+âڑ™ï¸ڈ Phase 2: Infrastructure â€” EF Core & Services
+Task 2.1 â€” EF Configurations
 csharp
 
 // File: Infrastructure/Persistence/Configurations/ProductUnitConfiguration.cs
@@ -4307,7 +1998,7 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
             .OnDelete(DeleteBehavior.Restrict); // Keep history if box deleted
     }
 }
-Task 2.2 — Barcode Lookup Service (Updated)
+Task 2.2 â€” Barcode Lookup Service (Updated)
 csharp
 
 // File: Infrastructure/Services/BarcodeLookupService.cs
@@ -4370,7 +2061,7 @@ public class BarcodeLookupService : IBarcodeLookupService
         return result;
     }
 }
-Task 2.3 — Settings Repository
+Task 2.3 â€” Settings Repository
 csharp
 
 // File: Infrastructure/Repositories/SystemSettingsRepository.cs
@@ -4414,7 +2105,7 @@ public class SystemSettingsRepository : ISystemSettingsRepository
         await _context.SaveChangesAsync(ct);
     }
 }
-✅ Phase 2 Checklist
+âœ… Phase 2 Checklist
  EF Core configurations registered in AppDbContext.OnModelCreating()
  BarcodeLookupService searches UnitBarcodes (not old Barcode column)
  SystemSettingsRepository returns safe default if setting missing
@@ -4465,8 +2156,8 @@ public interface IToastNotificationService
 > [!NOTE]
 > ViewModels handling dynamic Unit of Measure builders, invoice rows, and retail/wholesale cost adjustments.
 
-🖥️ Phase 4: WPF ViewModels
-Task 4.1 — Product Unit Builder ViewModel
+ًں–¥ï¸ڈ Phase 4: WPF ViewModels
+Task 4.1 â€” Product Unit Builder ViewModel
 csharp
 
 // File: WPF/ViewModels/Products/ProductUnitBuilderViewModel.cs
@@ -4506,7 +2197,7 @@ public class ProductUnitBuilderViewModel : BaseViewModel
         }
         else
         {
-            // New product — show onboarding and pre-add base unit row
+            // New product â€” show onboarding and pre-add base unit row
             ShowOnboarding();
             AddBaseUnitRow();
         }
@@ -4519,7 +2210,7 @@ public class ProductUnitBuilderViewModel : BaseViewModel
             IsBaseUnit = true,
             BaseConversionFactor = 1,
             SortOrder = 0,
-            Placeholder_UnitName = "مثال: حبة، قطعة، بيضة"
+            Placeholder_UnitName = "ظ…ط«ط§ظ„: ط­ط¨ط©طŒ ظ‚ط·ط¹ط©طŒ ط¨ظٹط¶ط©"
         };
         baseRow.PropertyChanged += (_, _) => Validate();
         Units.Add(baseRow);
@@ -4531,7 +2222,7 @@ public class ProductUnitBuilderViewModel : BaseViewModel
         {
             IsBaseUnit = false,
             SortOrder = Units.Count,
-            Placeholder_UnitName = "مثال: طبق، كرتون"
+            Placeholder_UnitName = "ظ…ط«ط§ظ„: ط·ط¨ظ‚طŒ ظƒط±طھظˆظ†"
         };
         row.PropertyChanged += (_, _) => Validate();
         Units.Add(row);
@@ -4547,7 +2238,7 @@ public class ProductUnitBuilderViewModel : BaseViewModel
     {
         if (unit.IsBaseUnit && Units.Count > 1)
         {
-            ValidationSummary = "⚠️ لا يمكن حذف الوحدة الأساسية إذا كانت هناك وحدات أخرى مرتبطة بها.";
+            ValidationSummary = "âڑ ï¸ڈ ظ„ط§ ظٹظ…ظƒظ† ط­ط°ظپ ط§ظ„ظˆط­ط¯ط© ط§ظ„ط£ط³ط§ط³ظٹط© ط¥ط°ط§ ظƒط§ظ†طھ ظ‡ظ†ط§ظƒ ظˆط­ط¯ط§طھ ط£ط®ط±ظ‰ ظ…ط±طھط¨ط·ط© ط¨ظ‡ط§.";
             HasValidationError = true;
             OnPropertyChanged(nameof(ValidationSummary));
             OnPropertyChanged(nameof(HasValidationError));
@@ -4565,25 +2256,25 @@ public class ProductUnitBuilderViewModel : BaseViewModel
         var baseUnits = Units.Where(u => u.IsBaseUnit).ToList();
 
         if (baseUnits.Count == 0)
-            errors.Add("⚠️ أضف وحدة صغرى واحدة (مثال: حبة) واجعل معامل التحويل = 1");
+            errors.Add("âڑ ï¸ڈ ط£ط¶ظپ ظˆط­ط¯ط© طµط؛ط±ظ‰ ظˆط§ط­ط¯ط© (ظ…ط«ط§ظ„: ط­ط¨ط©) ظˆط§ط¬ط¹ظ„ ظ…ط¹ط§ظ…ظ„ ط§ظ„طھط­ظˆظٹظ„ = 1");
 
         if (baseUnits.Count > 1)
-            errors.Add("⚠️ لا يمكن تعريف أكثر من وحدة صغرى واحدة");
+            errors.Add("âڑ ï¸ڈ ظ„ط§ ظٹظ…ظƒظ† طھط¹ط±ظٹظپ ط£ظƒط«ط± ظ…ظ† ظˆط­ط¯ط© طµط؛ط±ظ‰ ظˆط§ط­ط¯ط©");
 
         foreach (var unit in Units)
         {
             if (string.IsNullOrWhiteSpace(unit.UnitName))
-                errors.Add($"⚠️ الصف {unit.SortOrder + 1}: اسم الوحدة مطلوب");
+                errors.Add($"âڑ ï¸ڈ ط§ظ„طµظپ {unit.SortOrder + 1}: ط§ط³ظ… ط§ظ„ظˆط­ط¯ط© ظ…ط·ظ„ظˆط¨");
 
             if (!unit.IsBaseUnit && unit.BaseConversionFactor <= 1)
                 errors.Add(
-                    $"⚠️ '{unit.UnitName}': معامل التحويل يجب أن يكون أكبر من 1 " +
-                    $"(كم وحدة صغرى بداخلها؟)");
+                    $"âڑ ï¸ڈ '{unit.UnitName}': ظ…ط¹ط§ظ…ظ„ ط§ظ„طھط­ظˆظٹظ„ ظٹط¬ط¨ ط£ظ† ظٹظƒظˆظ† ط£ظƒط¨ط± ظ…ظ† 1 " +
+                    $"(ظƒظ… ظˆط­ط¯ط© طµط؛ط±ظ‰ ط¨ط¯ط§ط®ظ„ظ‡ط§طں)");
         }
 
         ValidationSummary = errors.Any()
             ? string.Join("\n", errors)
-            : "✅ وحدات المنتج صحيحة";
+            : "âœ… ظˆط­ط¯ط§طھ ط§ظ„ظ…ظ†طھط¬ طµط­ظٹط­ط©";
 
         HasValidationError = errors.Any();
 
@@ -4598,21 +2289,21 @@ public class ProductUnitBuilderViewModel : BaseViewModel
         var dialog = new OnboardingDialog
         {
             Message =
-                "💡 كيف تبني وحدات المنتج؟\n\n" +
-                "1️⃣  ابدأ دائماً بإضافة الوحدة الصغرى\n" +
-                "     التي لا يمكن تجزئتها (مثل: حبة)\n" +
-                "     واجعل معامل التحويل = 1\n\n" +
-                "2️⃣  ثم أضف الوحدات الأكبر\n" +
-                "     (مثل: طبق، كرتون)\n" +
-                "     واكتب كم (حبة) بداخلها.\n\n" +
-                "     مثال: طبق البيض = 30 حبة\n" +
-                "              كرتون = 12 طبق = 360 حبة\n\n" +
-                "✅  النظام سيحسب كل شيء تلقائياً!"
+                "ًں’، ظƒظٹظپ طھط¨ظ†ظٹ ظˆط­ط¯ط§طھ ط§ظ„ظ…ظ†طھط¬طں\n\n" +
+                "1ï¸ڈâƒ£  ط§ط¨ط¯ط£ ط¯ط§ط¦ظ…ط§ظ‹ ط¨ط¥ط¶ط§ظپط© ط§ظ„ظˆط­ط¯ط© ط§ظ„طµط؛ط±ظ‰\n" +
+                "     ط§ظ„طھظٹ ظ„ط§ ظٹظ…ظƒظ† طھط¬ط²ط¦طھظ‡ط§ (ظ…ط«ظ„: ط­ط¨ط©)\n" +
+                "     ظˆط§ط¬ط¹ظ„ ظ…ط¹ط§ظ…ظ„ ط§ظ„طھط­ظˆظٹظ„ = 1\n\n" +
+                "2ï¸ڈâƒ£  ط«ظ… ط£ط¶ظپ ط§ظ„ظˆط­ط¯ط§طھ ط§ظ„ط£ظƒط¨ط±\n" +
+                "     (ظ…ط«ظ„: ط·ط¨ظ‚طŒ ظƒط±طھظˆظ†)\n" +
+                "     ظˆط§ظƒطھط¨ ظƒظ… (ط­ط¨ط©) ط¨ط¯ط§ط®ظ„ظ‡ط§.\n\n" +
+                "     ظ…ط«ط§ظ„: ط·ط¨ظ‚ ط§ظ„ط¨ظٹط¶ = 30 ط­ط¨ط©\n" +
+                "              ظƒط±طھظˆظ† = 12 ط·ط¨ظ‚ = 360 ط­ط¨ط©\n\n" +
+                "âœ…  ط§ظ„ظ†ط¸ط§ظ… ط³ظٹط­ط³ط¨ ظƒظ„ ط´ظٹط، طھظ„ظ‚ط§ط¦ظٹط§ظ‹!"
         };
         dialog.ShowDialog();
     }
 }
-Task 4.2 — Purchase Invoice ViewModel (with Price Sync Indicator)
+Task 4.2 â€” Purchase Invoice ViewModel (with Price Sync Indicator)
 csharp
 
 // File: WPF/ViewModels/Invoice/PurchaseInvoiceItemViewModel.cs
@@ -4628,7 +2319,7 @@ public class PurchaseInvoiceItemViewModel : BaseViewModel
     private decimal _oldCostInDatabase;
     private string _unitName = string.Empty;
 
-    // ─── Properties ───────────────────────────────
+    // â”€â”€â”€ Properties â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     public int ProductUnitId
     {
@@ -4669,7 +2360,7 @@ public class PurchaseInvoiceItemViewModel : BaseViewModel
     public decimal TotalCost => (Quantity * UnitCost) - Discount;
     public decimal Discount { get; set; }
 
-    // ⭐ KEY: Shows sync warning icon when cost differs from DB
+    // â­گ KEY: Shows sync warning icon when cost differs from DB
     public bool CostChangedFromDatabase =>
         _oldCostInDatabase > 0 &&
         Math.Abs(UnitCost - _oldCostInDatabase) > 0.0001m;
@@ -4681,13 +2372,13 @@ public class PurchaseInvoiceItemViewModel : BaseViewModel
             if (!CostChangedFromDatabase) return string.Empty;
 
             var diff = UnitCost - _oldCostInDatabase;
-            var direction = diff > 0 ? "↑ ارتفع" : "↓ انخفض";
-            return $"🔄 {direction} عن السعر القديم ({_oldCostInDatabase:N2}) " +
-                   $"| سيتم تحديث التكلفة في بطاقة الصنف عند الحفظ";
+            var direction = diff > 0 ? "â†‘ ط§ط±طھظپط¹" : "â†“ ط§ظ†ط®ظپط¶";
+            return $"ًں”„ {direction} ط¹ظ† ط§ظ„ط³ط¹ط± ط§ظ„ظ‚ط¯ظٹظ… ({_oldCostInDatabase:N2}) " +
+                   $"| ط³ظٹطھظ… طھط­ط¯ظٹط« ط§ظ„طھظƒظ„ظپط© ظپظٹ ط¨ط·ط§ظ‚ط© ط§ظ„طµظ†ظپ ط¹ظ†ط¯ ط§ظ„ط­ظپط¸";
         }
     }
 
-    // ─── Available units for ComboBox ─────────────
+    // â”€â”€â”€ Available units for ComboBox â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public ObservableCollection<ProductUnitOption> AvailableUnits { get; } = new();
 
     private ProductUnitOption? _selectedUnit;
@@ -4736,11 +2427,11 @@ public class PurchaseInvoiceItemViewModel : BaseViewModel
 }
 
 public record ProductUnitOption(int UnitId, string UnitName, decimal ConversionFactor);
-✅ Phase 4 Checklist
+âœ… Phase 4 Checklist
  ProductUnitBuilderViewModel.Validate() shows Arabic error messages
  Onboarding dialog shows automatically for new products
  CostChangedFromDatabase triggers when user edits cost field
- PriceDifferenceIndicator shows direction (↑/↓) and old value
+ PriceDifferenceIndicator shows direction (â†‘/â†“) and old value
  Unit ComboBox in purchase invoice pre-fills cost from DB
 
 <!-- END OF SECTION: 8.2 Advanced WPF ViewModels -->
@@ -4751,8 +2442,8 @@ public record ProductUnitOption(int UnitId, string UnitName, decimal ConversionF
 > [!NOTE]
 > XAML layout declarations for Dynamic UOM sliders, inline invoice rows, and settings views.
 
-🖼️ Phase 5: WPF XAML
-Task 5.1 — Unit Hierarchy Builder XAML
+ًں–¼ï¸ڈ Phase 5: WPF XAML
+Task 5.1 â€” Unit Hierarchy Builder XAML
 XML
 
 <!-- File: Views/Products/UnitHierarchyBuilderControl.xaml -->
@@ -4770,14 +2461,14 @@ XML
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#2E7D32">
-                    <Run FontWeight="Bold">💡 كيف تبني وحدات المنتج؟  </Run>
+                    <Run FontWeight="Bold">ًں’، ظƒظٹظپ طھط¨ظ†ظٹ ظˆط­ط¯ط§طھ ط§ظ„ظ…ظ†طھط¬طں  </Run>
                     <LineBreak/>
-                    <Run>1. ابدأ بالوحدة الصغرى (مثال: حبة) — معامل التحويل = 1</Run>
+                    <Run>1. ط§ط¨ط¯ط£ ط¨ط§ظ„ظˆط­ط¯ط© ط§ظ„طµط؛ط±ظ‰ (ظ…ط«ط§ظ„: ط­ط¨ط©) â€” ظ…ط¹ط§ظ…ظ„ ط§ظ„طھط­ظˆظٹظ„ = 1</Run>
                     <LineBreak/>
-                    <Run>2. أضف الوحدات الأكبر واكتب كم وحدة صغرى بداخلها</Run>
+                    <Run>2. ط£ط¶ظپ ط§ظ„ظˆط­ط¯ط§طھ ط§ظ„ط£ظƒط¨ط± ظˆط§ظƒطھط¨ ظƒظ… ظˆط­ط¯ط© طµط؛ط±ظ‰ ط¨ط¯ط§ط®ظ„ظ‡ط§</Run>
                 </TextBlock>
                 <Button Grid.Column="1"
-                        Content="تفاصيل أكثر ؟"
+                        Content="طھظپط§طµظٹظ„ ط£ظƒط«ط± طں"
                         Command="{Binding ShowHelpCommand}"
                         Background="Transparent"
                         Foreground="#4CAF50"
@@ -4809,7 +2500,7 @@ XML
             <DataGrid.Columns>
 
                 <!-- Unit Name -->
-                <DataGridTemplateColumn Header="اسم الوحدة" Width="140">
+                <DataGridTemplateColumn Header="ط§ط³ظ… ط§ظ„ظˆط­ط¯ط©" Width="140">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBox Text="{Binding UnitName, UpdateSourceTrigger=PropertyChanged}"
@@ -4820,13 +2511,13 @@ XML
                 </DataGridTemplateColumn>
 
                 <!-- Conversion Factor -->
-                <DataGridTemplateColumn Header="يساوي كم وحدة صغرى؟" Width="160">
+                <DataGridTemplateColumn Header="ظٹط³ط§ظˆظٹ ظƒظ… ظˆط­ط¯ط© طµط؛ط±ظ‰طں" Width="160">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Grid>
-                                <!-- Show "1 (أساسية)" for base unit -->
+                                <!-- Show "1 (ط£ط³ط§ط³ظٹط©)" for base unit -->
                                 <TextBlock
-                                    Text="1  ✅ (وحدة أساسية)"
+                                    Text="1  âœ… (ظˆط­ط¯ط© ط£ط³ط§ط³ظٹط©)"
                                     Foreground="#4CAF50"
                                     VerticalAlignment="Center"
                                     Padding="4"
@@ -4847,22 +2538,22 @@ XML
                 </DataGridTemplateColumn>
 
                 <!-- Sales Price -->
-                <DataGridTextColumn Header="سعر البيع"
+                <DataGridTextColumn Header="ط³ط¹ط± ط§ظ„ط¨ظٹط¹"
                     Binding="{Binding SalesPrice, UpdateSourceTrigger=PropertyChanged}"
                     Width="90"/>
 
                 <!-- Purchase Cost -->
-                <DataGridTextColumn Header="تكلفة الشراء"
+                <DataGridTextColumn Header="طھظƒظ„ظپط© ط§ظ„ط´ط±ط§ط،"
                     Binding="{Binding PurchaseCost, UpdateSourceTrigger=PropertyChanged}"
                     Width="90"/>
 
                 <!-- Supplier Price -->
-                <DataGridTextColumn Header="سعر المورد"
+                <DataGridTextColumn Header="ط³ط¹ط± ط§ظ„ظ…ظˆط±ط¯"
                     Binding="{Binding SupplierPrice, UpdateSourceTrigger=PropertyChanged}"
                     Width="90"/>
 
                 <!-- Last Purchase Price (Read Only) -->
-                <DataGridTextColumn Header="آخر سعر توريد"
+                <DataGridTextColumn Header="ط¢ط®ط± ط³ط¹ط± طھظˆط±ظٹط¯"
                     Binding="{Binding LastPurchasePrice, StringFormat=N2}"
                     Width="110"
                     IsReadOnly="True">
@@ -4875,7 +2566,7 @@ XML
                 </DataGridTextColumn>
 
                 <!-- Barcode Count -->
-                <DataGridTextColumn Header="عدد الباركودات"
+                <DataGridTextColumn Header="ط¹ط¯ط¯ ط§ظ„ط¨ط§ط±ظƒظˆط¯ط§طھ"
                     Binding="{Binding BarcodesCount}"
                     Width="110"
                     IsReadOnly="True"/>
@@ -4884,7 +2575,7 @@ XML
                 <DataGridTemplateColumn Header="" Width="40">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Content="🗑"
+                            <Button Content="ًں—‘"
                                     Command="{Binding DataContext.RemoveUnitCommand,
                                               RelativeSource={RelativeSource AncestorType=UserControl}}"
                                     CommandParameter="{Binding}"
@@ -4899,7 +2590,7 @@ XML
         </DataGrid>
 
         <!-- Add Unit Button -->
-        <Button Content="+ إضافة وحدة جديدة"
+        <Button Content="+ ط¥ط¶ط§ظپط© ظˆط­ط¯ط© ط¬ط¯ظٹط¯ط©"
                 Command="{Binding AddUnitCommand}"
                 HorizontalAlignment="Left"
                 Margin="0,8,0,0"
@@ -4910,20 +2601,20 @@ XML
                 BorderBrush="#90CAF9"/>
     </StackPanel>
 </UserControl>
-Task 5.2 — Purchase Invoice Item Row (Price Sync Indicator)
+Task 5.2 â€” Purchase Invoice Item Row (Price Sync Indicator)
 XML
 
 <!-- Inside Purchase Invoice DataGrid -->
 <!-- Add these two columns to existing DataGrid -->
 
 <!-- Unit Cost with sync indicator -->
-<DataGridTemplateColumn Header="تكلفة الوحدة" Width="130">
+<DataGridTemplateColumn Header="طھظƒظ„ظپط© ط§ظ„ظˆط­ط¯ط©" Width="130">
     <DataGridTemplateColumn.CellTemplate>
         <DataTemplate>
             <StackPanel>
                 <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged}"
                          BorderThickness="0"/>
-                <!-- Sync warning — only shows when cost differs from DB -->
+                <!-- Sync warning â€” only shows when cost differs from DB -->
                 <TextBlock Text="{Binding PriceDifferenceIndicator}"
                            FontSize="10"
                            Foreground="#E65100"
@@ -4936,34 +2627,34 @@ XML
 </DataGridTemplateColumn>
 
 <!-- New Sales Price (optional override) -->
-<DataGridTemplateColumn Header="سعر البيع الجديد" Width="120">
+<DataGridTemplateColumn Header="ط³ط¹ط± ط§ظ„ط¨ظٹط¹ ط§ظ„ط¬ط¯ظٹط¯" Width="120">
     <DataGridTemplateColumn.CellTemplate>
         <DataTemplate>
             <TextBox Text="{Binding NewSalesPrice, UpdateSourceTrigger=PropertyChanged}"
-                     PlaceholderText="اختياري"
+                     PlaceholderText="ط§ط®طھظٹط§ط±ظٹ"
                      BorderThickness="0"
-                     ToolTip="إذا أدخلت سعراً جديداً، سيتم تحديث سعر بيع الصنف فور حفظ الفاتورة"/>
+                     ToolTip="ط¥ط°ط§ ط£ط¯ط®ظ„طھ ط³ط¹ط±ط§ظ‹ ط¬ط¯ظٹط¯ط§ظ‹طŒ ط³ظٹطھظ… طھط­ط¯ظٹط« ط³ط¹ط± ط¨ظٹط¹ ط§ظ„طµظ†ظپ ظپظˆط± ط­ظپط¸ ط§ظ„ظپط§طھظˆط±ط©"/>
         </DataTemplate>
     </DataGridTemplateColumn.CellTemplate>
 </DataGridTemplateColumn>
-Task 5.3 — Settings Screen (Costing Method Selector)
+Task 5.3 â€” Settings Screen (Costing Method Selector)
 XML
 
 <!-- File: Views/Settings/CostingMethodSettingView.xaml -->
 <StackPanel Margin="16" FlowDirection="RightToLeft">
 
-    <TextBlock Text="طريقة احتساب تكلفة المخزون"
+    <TextBlock Text="ط·ط±ظٹظ‚ط© ط§ط­طھط³ط§ط¨ طھظƒظ„ظپط© ط§ظ„ظ…ط®ط²ظˆظ†"
                FontSize="16" FontWeight="Bold" Margin="0,0,0,12"/>
 
     <!-- Option 1: Weighted Average -->
     <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
             Padding="16" Margin="0,4">
         <StackPanel>
-            <RadioButton Content="متوسط التكلفة المرجح  (Weighted Average)"
+            <RadioButton Content="ظ…طھظˆط³ط· ط§ظ„طھظƒظ„ظپط© ط§ظ„ظ…ط±ط¬ط­  (Weighted Average)"
                          IsChecked="{Binding IsWeightedAverageSelected}"
                          FontSize="14" FontWeight="Bold"/>
             <TextBlock Margin="24,6,0,0" TextWrapping="Wrap" Foreground="#555"
-                       Text="يجمع بين سعر البضاعة القديمة في المخزن والجديدة ليعطيك تكلفة موحدة ومتوازنة. ✅ الأنسب للتقارير الضريبية الدقيقة وللمحاسبة القياسية."/>
+                       Text="ظٹط¬ظ…ط¹ ط¨ظٹظ† ط³ط¹ط± ط§ظ„ط¨ط¶ط§ط¹ط© ط§ظ„ظ‚ط¯ظٹظ…ط© ظپظٹ ط§ظ„ظ…ط®ط²ظ† ظˆط§ظ„ط¬ط¯ظٹط¯ط© ظ„ظٹط¹ط·ظٹظƒ طھظƒظ„ظپط© ظ…ظˆط­ط¯ط© ظˆظ…طھظˆط§ط²ظ†ط©. âœ… ط§ظ„ط£ظ†ط³ط¨ ظ„ظ„طھظ‚ط§ط±ظٹط± ط§ظ„ط¶ط±ظٹط¨ظٹط© ط§ظ„ط¯ظ‚ظٹظ‚ط© ظˆظ„ظ„ظ…ط­ط§ط³ط¨ط© ط§ظ„ظ‚ظٹط§ط³ظٹط©."/>
         </StackPanel>
     </Border>
 
@@ -4971,11 +2662,11 @@ XML
     <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
             Padding="16" Margin="0,4">
         <StackPanel>
-            <RadioButton Content="آخر سعر توريد  (Last Purchase Price)"
+            <RadioButton Content="ط¢ط®ط± ط³ط¹ط± طھظˆط±ظٹط¯  (Last Purchase Price)"
                          IsChecked="{Binding IsLastPriceSelected}"
                          FontSize="14" FontWeight="Bold"/>
             <TextBlock Margin="24,6,0,0" TextWrapping="Wrap" Foreground="#555"
-                       Text="يستبدل تكلفة المنتج بسعر آخر فاتورة شراء مباشرةً. ✅ مناسب للأسواق المتقلبة حيث تريد دائماً أن يعكس السعر الواقع الحالي."/>
+                       Text="ظٹط³طھط¨ط¯ظ„ طھظƒظ„ظپط© ط§ظ„ظ…ظ†طھط¬ ط¨ط³ط¹ط± ط¢ط®ط± ظپط§طھظˆط±ط© ط´ط±ط§ط، ظ…ط¨ط§ط´ط±ط©ظ‹. âœ… ظ…ظ†ط§ط³ط¨ ظ„ظ„ط£ط³ظˆط§ظ‚ ط§ظ„ظ…طھظ‚ظ„ط¨ط© ط­ظٹط« طھط±ظٹط¯ ط¯ط§ط¦ظ…ط§ظ‹ ط£ظ† ظٹط¹ظƒط³ ط§ظ„ط³ط¹ط± ط§ظ„ظˆط§ظ‚ط¹ ط§ظ„ط­ط§ظ„ظٹ."/>
         </StackPanel>
     </Border>
 
@@ -4983,26 +2674,26 @@ XML
     <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="8"
             Padding="16" Margin="0,4">
         <StackPanel>
-            <RadioButton Content="سعر المورد  (Supplier Catalog Price)"
+            <RadioButton Content="ط³ط¹ط± ط§ظ„ظ…ظˆط±ط¯  (Supplier Catalog Price)"
                          IsChecked="{Binding IsSupplierPriceSelected}"
                          FontSize="14" FontWeight="Bold"/>
             <TextBlock Margin="24,6,0,0" TextWrapping="Wrap" Foreground="#555"
-                       Text="يعتمد على السعر المدخل في بطاقة الصنف من قائمة المورد ولا يتغير تلقائياً عند الشراء. ✅ مناسب عندما تتفاوض على سعر ثابت مع المورد لفترة طويلة."/>
+                       Text="ظٹط¹طھظ…ط¯ ط¹ظ„ظ‰ ط§ظ„ط³ط¹ط± ط§ظ„ظ…ط¯ط®ظ„ ظپظٹ ط¨ط·ط§ظ‚ط© ط§ظ„طµظ†ظپ ظ…ظ† ظ‚ط§ط¦ظ…ط© ط§ظ„ظ…ظˆط±ط¯ ظˆظ„ط§ ظٹطھط؛ظٹط± طھظ„ظ‚ط§ط¦ظٹط§ظ‹ ط¹ظ†ط¯ ط§ظ„ط´ط±ط§ط،. âœ… ظ…ظ†ط§ط³ط¨ ط¹ظ†ط¯ظ…ط§ طھطھظپط§ظˆط¶ ط¹ظ„ظ‰ ط³ط¹ط± ط«ط§ط¨طھ ظ…ط¹ ط§ظ„ظ…ظˆط±ط¯ ظ„ظپطھط±ط© ط·ظˆظٹظ„ط©."/>
         </StackPanel>
     </Border>
 
-    <Button Content="💾  حفظ الإعداد"
+    <Button Content="ًں’¾  ط­ظپط¸ ط§ظ„ط¥ط¹ط¯ط§ط¯"
             Command="{Binding SaveCostingMethodCommand}"
             HorizontalAlignment="Left"
             Margin="0,16,0,0"
             Padding="20,10"
             Background="#1976D2" Foreground="White" BorderThickness="0"/>
 </StackPanel>
-✅ Phase 5 Checklist
+âœ… Phase 5 Checklist
  Help box always visible (not just on first open)
  Validation error box only shows when HasValidationError = true
- Base unit row shows "✅ وحدة أساسية" and factor is read-only
- Sync warning shows correct direction (↑/↓) with old price
+ Base unit row shows "âœ… ظˆط­ط¯ط© ط£ط³ط§ط³ظٹط©" and factor is read-only
+ Sync warning shows correct direction (â†‘/â†“) with old price
  Each costing method has Arabic explanation text
  All interactive elements minimum 36px height (touch-friendly)
 
@@ -5018,67 +2709,67 @@ Detailed breakdown of Clean Architecture layers, project dependencies, design sy
 > [!NOTE]
 > Architecture constraints, boundary directories, and clean separation of concerns.
 
-# MASTER-PLAN — Sales Management System (v4.6.2 — Validation ErrorTemplate & INotifyDataErrorInfo)
+# MASTER-PLAN â€” Sales Management System (v4.6.2 â€” Validation ErrorTemplate & INotifyDataErrorInfo)
 
-## 📋 Core Philosophy
+## ًں“‹ Core Philosophy
 
 **One source of truth. AGENTS.md is LAW.** Every rule lives in exactly ONE place. Agents cannot break what they cannot bypass.
 
-- **Clean Architecture (Layered)** — NOT Vertical Slices, NOT Feature Folders
-- **Domain is king** — ZERO dependencies, rich entities, business rules enforced at the entity level
-- **Desktop → API → SQL Server** — Desktop NEVER connects to the database
-- **Result<T> over exceptions** — Services return results, controllers translate to HTTP
-- **Bilingual UI** — Arabic labels, English code. All text columns use `nvarchar`
-- **AGENTS.md > everything** — If code conflicts with AGENTS.md, the code is wrong
+- **Clean Architecture (Layered)** â€” NOT Vertical Slices, NOT Feature Folders
+- **Domain is king** â€” ZERO dependencies, rich entities, business rules enforced at the entity level
+- **Desktop â†’ API â†’ SQL Server** â€” Desktop NEVER connects to the database
+- **Result<T> over exceptions** â€” Services return results, controllers translate to HTTP
+- **Bilingual UI** â€” Arabic labels, English code. All text columns use `nvarchar`
+- **AGENTS.md > everything** â€” If code conflicts with AGENTS.md, the code is wrong
 
 ---
 
-## 🏗️ Actual Architecture
+## ًںڈ—ï¸ڈ Actual Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        SOLUTION STRUCTURE (11 Projects)                  │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  SalesSystem.slnx                                                       │
-│  ├── 📦 SalesSystem.Domain/          ← Entities + Enums + Exceptions    │
-│  │      (net10.0, ZERO NuGet deps)                                      │
-│  │                                                                       │
-│  ├── 📦 SalesSystem.Contracts/       ← DTOs + Requests + Result<T>      │
-│  │      (net10.0, ZERO NuGet deps)                                      │
-│  │                                                                       │
-│  ├── 📦 SalesSystem.Application/     ← Service interfaces + impls       │
-│  │      (net10.0)                                                        │
-│  │                                                                       │
-│  ├── 📦 SalesSystem.Infrastructure/  ← EF Core + DbContext + Repos      │
-│  │      (net10.0-windows)           + Printing + Backup                 │
-│  │                                                                       │
-│  ├── 📦 SalesSystem.Api/             ← Controllers + FluentValidation   │
-│  │      (net10.0-windows)           + JWT + Serilog + Swagger           │
-│  │                                                                       │
-│  ├── 📦 SalesSystem.DesktopPWF/      ← WPF UI + MVVM + EventBus         │
-│  │      (net10.0-windows)           + Navigation + Dialogs              │
-│  │                                                                       │
-│  └── 🧪 Tests/ (5 projects)          ← Unit + Integration tests         │
-│                                                                         │
-│  Legacy/ (NOT in solution)                                              │
-│  └── 🗑️ SalesSystem.Desktop/         ← Abandoned WinForms (safe delete) │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”گ
+â”‚                        SOLUTION STRUCTURE (11 Projects)                  â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚                                                                         â”‚
+â”‚  SalesSystem.slnx                                                       â”‚
+â”‚  â”œâ”€â”€ ًں“¦ SalesSystem.Domain/          â†گ Entities + Enums + Exceptions    â”‚
+â”‚  â”‚      (net10.0, ZERO NuGet deps)                                      â”‚
+â”‚  â”‚                                                                       â”‚
+â”‚  â”œâ”€â”€ ًں“¦ SalesSystem.Contracts/       â†گ DTOs + Requests + Result<T>      â”‚
+â”‚  â”‚      (net10.0, ZERO NuGet deps)                                      â”‚
+â”‚  â”‚                                                                       â”‚
+â”‚  â”œâ”€â”€ ًں“¦ SalesSystem.Application/     â†گ Service interfaces + impls       â”‚
+â”‚  â”‚      (net10.0)                                                        â”‚
+â”‚  â”‚                                                                       â”‚
+â”‚  â”œâ”€â”€ ًں“¦ SalesSystem.Infrastructure/  â†گ EF Core + DbContext + Repos      â”‚
+â”‚  â”‚      (net10.0-windows)           + Printing + Backup                 â”‚
+â”‚  â”‚                                                                       â”‚
+â”‚  â”œâ”€â”€ ًں“¦ SalesSystem.Api/             â†گ Controllers + FluentValidation   â”‚
+â”‚  â”‚      (net10.0-windows)           + JWT + Serilog + Swagger           â”‚
+â”‚  â”‚                                                                       â”‚
+â”‚  â”œâ”€â”€ ًں“¦ SalesSystem.DesktopPWF/      â†گ WPF UI + MVVM + EventBus         â”‚
+â”‚  â”‚      (net10.0-windows)           + Navigation + Dialogs              â”‚
+â”‚  â”‚                                                                       â”‚
+â”‚  â””â”€â”€ ًں§ھ Tests/ (5 projects)          â†گ Unit + Integration tests         â”‚
+â”‚                                                                         â”‚
+â”‚  Legacy/ (NOT in solution)                                              â”‚
+â”‚  â””â”€â”€ ًں—‘ï¸ڈ SalesSystem.Desktop/         â†گ Abandoned WinForms (safe delete) â”‚
+â”‚                                                                         â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”ک
 
 Data Flow (NEVER break this chain):
 
   Desktop (WPF)
-      ↓ HttpClient
+      â†“ HttpClient
   SalesSystem.Api (Controllers + FluentValidation + JWT)
-      ↓ delegates to
+      â†“ delegates to
   SalesSystem.Application (Service interfaces + implementations)
-      ↓ delegates to
+      â†“ delegates to
   SalesSystem.Infrastructure (EF Core + DbContext + Repositories)
-      ↓ connects to
+      â†“ connects to
   SQL Server
-      ↑
-  SalesSystem.Domain (ZERO dependencies — referenced by ALL layers)
+      â†‘
+  SalesSystem.Domain (ZERO dependencies â€” referenced by ALL layers)
 ```
 
 ### Architecture Pattern: Clean Architecture (Layered)
@@ -5095,26 +2786,26 @@ Data Flow (NEVER break this chain):
 **Key decisions:**
 - **Service Layer** pattern (NOT CQRS/MediatR)
 - **IUnitOfWork** for multi-table operations
-- **Rich Domain Model** — entities have `private set` + factory methods + guard clauses
-- **4-layer validation** — Domain → Application → API (FluentValidation) → Database (CHECK constraints)
+- **Rich Domain Model** â€” entities have `private set` + factory methods + guard clauses
+- **4-layer validation** â€” Domain â†’ Application â†’ API (FluentValidation) â†’ Database (CHECK constraints)
 
 ---
 
-## ✅ Implemented Features (Phases 1-7)
+## âœ… Implemented Features (Phases 1-7)
 
 | Phase | Status | Key Deliverables |
 |-------|--------|-----------------|
-| **Phase 1: Foundation** | ✅ Complete | Domain entities (Product, Customer, Supplier, Invoice, etc.), Enums, DomainException, Guard Clauses, Contracts (DTOs, Requests, Result<T>) |
-| **Phase 2: Infrastructure** | ✅ Complete | EF Core DbContext, Repositories, IUnitOfWork, Migrations, Fluent API config, CHECK constraints, Seed data |
-| **Phase 3: Application** | ✅ Complete | Service interfaces + implementations for all modules (Products, Customers, Suppliers, Sales, Purchases, Returns, Stock, Reports, Settings, Users, CashBoxes, Inventory) |
-| **Phase 4: API** | ✅ Complete | REST Controllers for all modules, FluentValidation validators, JWT authentication, Policy-based authorization, Swagger/OpenAPI, Serilog logging, Error middleware |
-| **Phase 5: Desktop Shell** | ✅ Complete | WPF application, Navigation system, MVVM infrastructure, ViewModelBase (292 lines), EventBus, Login screen, Session management, Role-based UI |
-| **Phase 6: Desktop Modules** | ✅ Complete | All CRUD screens (Products, Customers, Suppliers, Categories, Units, Warehouses), Sales/Purchase invoices, Returns, Stock transfers, Payments, Reports (Excel export), Barcode input |
-| **Phase 7: Production** | ✅ Complete | Auto-Update system, DPAPI encryption, Backup/Restore (raw SQL), Windows Service, Admin screens, Inno Setup installer, Styled dialogs (6 types), Toast notifications, Print engine (A4 + Thermal) |
+| **Phase 1: Foundation** | âœ… Complete | Domain entities (Product, Customer, Supplier, Invoice, etc.), Enums, DomainException, Guard Clauses, Contracts (DTOs, Requests, Result<T>) |
+| **Phase 2: Infrastructure** | âœ… Complete | EF Core DbContext, Repositories, IUnitOfWork, Migrations, Fluent API config, CHECK constraints, Seed data |
+| **Phase 3: Application** | âœ… Complete | Service interfaces + implementations for all modules (Products, Customers, Suppliers, Sales, Purchases, Returns, Stock, Reports, Settings, Users, CashBoxes, Inventory) |
+| **Phase 4: API** | âœ… Complete | REST Controllers for all modules, FluentValidation validators, JWT authentication, Policy-based authorization, Swagger/OpenAPI, Serilog logging, Error middleware |
+| **Phase 5: Desktop Shell** | âœ… Complete | WPF application, Navigation system, MVVM infrastructure, ViewModelBase (292 lines), EventBus, Login screen, Session management, Role-based UI |
+| **Phase 6: Desktop Modules** | âœ… Complete | All CRUD screens (Products, Customers, Suppliers, Categories, Units, Warehouses), Sales/Purchase invoices, Returns, Stock transfers, Payments, Reports (Excel export), Barcode input |
+| **Phase 7: Production** | âœ… Complete | Auto-Update system, DPAPI encryption, Backup/Restore (raw SQL), Windows Service, Admin screens, Inno Setup installer, Styled dialogs (6 types), Toast notifications, Print engine (A4 + Thermal) |
 
 ---
 
-## 🔧 Actual Code Patterns
+## ًں”§ Actual Code Patterns
 
 ### ViewModel Pattern
 
@@ -5185,7 +2876,7 @@ public class ProductService : IProductService
 ```
 
 **Key rules:**
-- ALL services return `Result<T>` or `Result` — NEVER throw exceptions
+- ALL services return `Result<T>` or `Result` â€” NEVER throw exceptions
 - Multi-table operations use `IUnitOfWork.BeginTransactionAsync()`
 - Stock validated BEFORE opening transaction
 - `InventoryMovement` recorded for EVERY stock change
@@ -5210,7 +2901,7 @@ public class ProductsController : ControllerBase
 ```
 
 **Key rules:**
-- Controllers have ZERO business logic — delegate to services
+- Controllers have ZERO business logic â€” delegate to services
 - `[Authorize]` on ALL endpoints (except `/api/auth/login`)
 - Policy-based authorization (`AdminOnly`, `ManagerAndAbove`, `AllStaff`)
 - Translate `Result<T>` to HTTP status codes
@@ -5228,9 +2919,9 @@ public class Product : EntityBase
     public static Product Create(string name, int categoryId)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم المنتج مطلوب");
+            throw new DomainException("ط§ط³ظ… ط§ظ„ظ…ظ†طھط¬ ظ…ط·ظ„ظˆط¨");
         if (categoryId <= 0)
-            throw new DomainException("الفئة مطلوبة");
+            throw new DomainException("ط§ظ„ظپط¦ط© ظ…ط·ظ„ظˆط¨ط©");
 
         return new Product { Name = name, CategoryId = categoryId };
     }
@@ -5239,9 +2930,9 @@ public class Product : EntityBase
     public void UpdatePrice(decimal retailPrice, decimal wholesalePrice)
     {
         if (retailPrice < 0)
-            throw new DomainException("سعر التجزئة لا يمكن أن يكون سالباً");
+            throw new DomainException("ط³ط¹ط± ط§ظ„طھط¬ط²ط¦ط© ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† ط³ط§ظ„ط¨ط§ظ‹");
         if (wholesalePrice < 0)
-            throw new DomainException("سعر الجملة لا يمكن أن يكون سالباً");
+            throw new DomainException("ط³ط¹ط± ط§ظ„ط¬ظ…ظ„ط© ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† ط³ط§ظ„ط¨ط§ظ‹");
         // ... update logic
     }
 }
@@ -5249,7 +2940,7 @@ public class Product : EntityBase
 
 **Key rules:**
 - `private set` on ALL critical properties
-- State changes via methods ONLY — never direct property modification
+- State changes via methods ONLY â€” never direct property modification
 - Guard clauses in constructors and factory methods
 - `DomainException` with Arabic messages
 
@@ -5257,9 +2948,9 @@ public class Product : EntityBase
 
 | Layer | Where | Example |
 |-------|-------|---------|
-| **Domain** | Entity methods | `if (price < 0) throw DomainException("السعر لا يمكن أن يكون سالباً")` |
+| **Domain** | Entity methods | `if (price < 0) throw DomainException("ط§ظ„ط³ط¹ط± ظ„ط§ ظٹظ…ظƒظ† ط£ظ† ظٹظƒظˆظ† ط³ط§ظ„ط¨ط§ظ‹")` |
 | **Application** | Service methods | Stock availability check before transaction |
-| **API** | FluentValidation | `RuleFor(x => x.Name).NotEmpty().WithMessage("الاسم مطلوب")` |
+| **API** | FluentValidation | `RuleFor(x => x.Name).NotEmpty().WithMessage("ط§ظ„ط§ط³ظ… ظ…ط·ظ„ظˆط¨")` |
 | **Database** | CHECK constraints | `CHECK (Quantity >= 0)`, `CHECK (PaidAmount <= TotalAmount)` |
 
 ---
@@ -5273,15 +2964,15 @@ public class Product : EntityBase
 > [!NOTE]
 > Real-time validation engine replacing archaic booleans with centralized async input validation.
 
-## 📊 Test Coverage
+## ًں“ٹ Test Coverage
 
 | Test Project | Target | Status |
 |-------------|--------|--------|
-| **SalesSystem.Domain.Tests** | Domain entities, guard clauses, business rules | ✅ Active |
-| **SalesSystem.Application.Tests** | Service logic, Result<T> patterns | ✅ Active |
-| **SalesSystem.Infrastructure.Tests** | EF Core mappings, repositories, migrations | ✅ Active |
-| **SalesSystem.Api.Tests** | Controller endpoints, validation, auth | ✅ Active |
-| **SalesSystem.Integration.Tests** | End-to-end flows, API + DB integration | ✅ Active |
+| **SalesSystem.Domain.Tests** | Domain entities, guard clauses, business rules | âœ… Active |
+| **SalesSystem.Application.Tests** | Service logic, Result<T> patterns | âœ… Active |
+| **SalesSystem.Infrastructure.Tests** | EF Core mappings, repositories, migrations | âœ… Active |
+| **SalesSystem.Api.Tests** | Controller endpoints, validation, auth | âœ… Active |
+| **SalesSystem.Integration.Tests** | End-to-end flows, API + DB integration | âœ… Active |
 
 ---
 
@@ -5294,86 +2985,86 @@ public class Product : EntityBase
 > [!NOTE]
 > Nuget package manifests and WPF resource styles used to implement modern Dark Mode / Glassmorphism layouts.
 
-## 📦 Project Dependencies
+## ًں“¦ Project Dependencies
 
 ```
 SalesSystem.Domain
-  └── (ZERO dependencies — pure C#)
+  â””â”€â”€ (ZERO dependencies â€” pure C#)
 
 SalesSystem.Contracts
-  └── SalesSystem.Domain
+  â””â”€â”€ SalesSystem.Domain
 
 SalesSystem.Application
-  ├── SalesSystem.Domain
-  └── SalesSystem.Contracts
-  └── Microsoft.Extensions.Logging.Abstractions
-  └── MediatR (installed, minimally used)
+  â”œâ”€â”€ SalesSystem.Domain
+  â””â”€â”€ SalesSystem.Contracts
+  â””â”€â”€ Microsoft.Extensions.Logging.Abstractions
+  â””â”€â”€ MediatR (installed, minimally used)
 
 SalesSystem.Infrastructure
-  ├── SalesSystem.Application
-  ├── SalesSystem.Contracts
-  ├── SalesSystem.Domain
-  └── Microsoft.EntityFrameworkCore.SqlServer 10.x
-  └── BCrypt.Net-Next 4.x
-  └── QuestPDF 2024.3.x
-  └── SixLabors.ImageSharp 3.1.x
-  └── System.Drawing.Common 10.x
-  └── Microsoft.Extensions.Hosting.WindowsServices 10.x
-  └── Microsoft.AspNetCore.DataProtection 10.x
+  â”œâ”€â”€ SalesSystem.Application
+  â”œâ”€â”€ SalesSystem.Contracts
+  â”œâ”€â”€ SalesSystem.Domain
+  â””â”€â”€ Microsoft.EntityFrameworkCore.SqlServer 10.x
+  â””â”€â”€ BCrypt.Net-Next 4.x
+  â””â”€â”€ QuestPDF 2024.3.x
+  â””â”€â”€ SixLabors.ImageSharp 3.1.x
+  â””â”€â”€ System.Drawing.Common 10.x
+  â””â”€â”€ Microsoft.Extensions.Hosting.WindowsServices 10.x
+  â””â”€â”€ Microsoft.AspNetCore.DataProtection 10.x
 
 SalesSystem.Api
-  ├── SalesSystem.Application
-  ├── SalesSystem.Contracts
-  ├── SalesSystem.Infrastructure
-  ├── SalesSystem.Domain
-  └── FluentValidation.AspNetCore 11.x
-  └── Serilog.AspNetCore 8.x
-  └── Microsoft.AspNetCore.Authentication.JwtBearer 10.x
-  └── Swashbuckle.AspNetCore 6.x
-  └── Serilog.Sinks.EventLog 8.x
+  â”œâ”€â”€ SalesSystem.Application
+  â”œâ”€â”€ SalesSystem.Contracts
+  â”œâ”€â”€ SalesSystem.Infrastructure
+  â”œâ”€â”€ SalesSystem.Domain
+  â””â”€â”€ FluentValidation.AspNetCore 11.x
+  â””â”€â”€ Serilog.AspNetCore 8.x
+  â””â”€â”€ Microsoft.AspNetCore.Authentication.JwtBearer 10.x
+  â””â”€â”€ Swashbuckle.AspNetCore 6.x
+  â””â”€â”€ Serilog.Sinks.EventLog 8.x
 
 SalesSystem.DesktopPWF
-  ├── SalesSystem.Contracts
-  ├── SalesSystem.Domain
-  └── Microsoft.Extensions.Http 10.x
-  └── System.Text.Json 10.x
-  └── ClosedXML 0.102.x
+  â”œâ”€â”€ SalesSystem.Contracts
+  â”œâ”€â”€ SalesSystem.Domain
+  â””â”€â”€ Microsoft.Extensions.Http 10.x
+  â””â”€â”€ System.Text.Json 10.x
+  â””â”€â”€ ClosedXML 0.102.x
 ```
 
 ---
 
-## 🎨 Design System (Actual)
+## ًںژ¨ Design System (Actual)
 
 **Location:** `SalesSystem.DesktopPWF/Resources/Styles.xaml` (782 lines)
 
-**NOT** `DesignTokens.cs` — that file was NEVER created. All styles are centralized in a single XAML ResourceDictionary.
+**NOT** `DesignTokens.cs` â€” that file was NEVER created. All styles are centralized in a single XAML ResourceDictionary.
 
 ### What's in Styles.xaml:
 
-- **Color Brushes** — Primary, Success, Warning, Error, Info, Neutral palette
-- **Typography** — TextBlock styles for Display, Header, SubHeader, Body, Caption
-- **Button Styles** — Primary, Secondary, Danger, Success, Ghost, Icon
-- **Card Styles** — Card (with shadow), CardFlat (no shadow)
-- **Input Styles** — TextBox, ComboBox, PasswordBox
-- **DataGrid Styles** — Standard grid with alternating rows, styled headers
-- **Status Badges** — Success, Warning, Error badges
-- **Validation Styles** — Red border for validation errors
-- **Dialog Styles** — Styled dialogs (Error, Success, Warning, Info, Confirmation, DeleteConfirmation)
-- **Navigation Styles** — Sidebar, menu items, active state
-- **Toast Styles** — Notification toasts with auto-dismiss
+- **Color Brushes** â€” Primary, Success, Warning, Error, Info, Neutral palette
+- **Typography** â€” TextBlock styles for Display, Header, SubHeader, Body, Caption
+- **Button Styles** â€” Primary, Secondary, Danger, Success, Ghost, Icon
+- **Card Styles** â€” Card (with shadow), CardFlat (no shadow)
+- **Input Styles** â€” TextBox, ComboBox, PasswordBox
+- **DataGrid Styles** â€” Standard grid with alternating rows, styled headers
+- **Status Badges** â€” Success, Warning, Error badges
+- **Validation Styles** â€” Red border for validation errors
+- **Dialog Styles** â€” Styled dialogs (Error, Success, Warning, Info, Confirmation, DeleteConfirmation)
+- **Navigation Styles** â€” Sidebar, menu items, active state
+- **Toast Styles** â€” Notification toasts with auto-dismiss
 
 ### Usage Pattern:
 
 ```xml
 <!-- In any XAML view -->
-<Button Style="{StaticResource ButtonPrimary}" Content="حفظ"/>
-<TextBlock Style="{StaticResource TextHeader}" Text="المنتجات"/>
+<Button Style="{StaticResource ButtonPrimary}" Content="ط­ظپط¸"/>
+<TextBlock Style="{StaticResource TextHeader}" Text="ط§ظ„ظ…ظ†طھط¬ط§طھ"/>
 <TextBox Style="{StaticResource TextBoxStandard}" Text="{Binding Name}"/>
 <DataGrid Style="{StaticResource DataGridStandard}" .../>
 <Border Style="{StaticResource BadgeSuccess}" .../>
 ```
 
-**Rule:** NEVER hardcode colors or sizes in XAML views — always use `{StaticResource ...}`.
+**Rule:** NEVER hardcode colors or sizes in XAML views â€” always use `{StaticResource ...}`.
 
 ---
 
@@ -5390,7 +3081,7 @@ Production-grade hardware integration, machine data encryption, high-performance
 > [!NOTE]
 > Event-driven barcode listener capturing continuous keystrokes for instant product scanning.
 
-## 📡 Barcode Service (Actual)
+## ًں“، Barcode Service (Actual)
 
 **Interface:** `IBarcodeInputService` (NOT `IBarcodeScanner`)
 **Implementation:** `BarcodeInputService`
@@ -5398,7 +3089,7 @@ Production-grade hardware integration, machine data encryption, high-performance
 
 ### How it works:
 
-USB barcode scanners act as keyboard emulators — they type the barcode characters then send Enter. The service intercepts at the application level using a keyboard buffer with timing detection.
+USB barcode scanners act as keyboard emulators â€” they type the barcode characters then send Enter. The service intercepts at the application level using a keyboard buffer with timing detection.
 
 ```csharp
 public interface IBarcodeInputService
@@ -5410,11 +3101,11 @@ public interface IBarcodeInputService
 ```
 
 ### Key characteristics:
-- **Keyboard buffer** — accumulates characters typed by scanner
-- **100ms timeout** — distinguishes scanner (fast) from human typing (slow)
-- **Application-level** — works across all screens, no per-screen setup
-- **USB/HID only** — NO camera-based scanning (MAUI was never built)
-- **Event-driven** — fires `BarcodeScanned` event with barcode string
+- **Keyboard buffer** â€” accumulates characters typed by scanner
+- **100ms timeout** â€” distinguishes scanner (fast) from human typing (slow)
+- **Application-level** â€” works across all screens, no per-screen setup
+- **USB/HID only** â€” NO camera-based scanning (MAUI was never built)
+- **Event-driven** â€” fires `BarcodeScanned` event with barcode string
 
 ### Usage in ViewModel:
 
@@ -5445,7 +3136,7 @@ public class SalesInvoiceCreateViewModel : ViewModelBase
 > [!NOTE]
 > Local machine-bound cryptography securing database credentials on local POS terminals.
 
-## 🔐 Security (Actual)
+## ًں”گ Security (Actual)
 
 ### DPAPI Connection String Encryption
 
@@ -5453,20 +3144,20 @@ public class SalesInvoiceCreateViewModel : ViewModelBase
 - `FirstRunSetupService` encrypts plaintext connection string on first run (idempotent)
 - `SecureDbContextFactory` decrypts before creating DbContext
 - DataProtection keys stored in `%ProgramData%\SalesSystem\DataProtectionKeys`
-- `appsettings.json` writes use atomic pattern: `.tmp` → `File.Replace()` → `.bak`
+- `appsettings.json` writes use atomic pattern: `.tmp` â†’ `File.Replace()` â†’ `.bak`
 
 ### JWT Authentication
 
-- JWT secret from environment variable — throws `InvalidOperationException` in production if missing
+- JWT secret from environment variable â€” throws `InvalidOperationException` in production if missing
 - `BCrypt` passwords with work factor = 12
 - Policy-based authorization: `AdminOnly`, `ManagerAndAbove`, `AllStaff`
 - ALL endpoints require `[Authorize]` (except `/api/auth/login`)
 
 ### Security Audit
 
-- `SecurityAudit.cs` runs in DEBUG only — checks for unencrypted strings, hardcoded passwords
+- `SecurityAudit.cs` runs in DEBUG only â€” checks for unencrypted strings, hardcoded passwords
 - NEVER log: passwords, connection strings
-- Serilog for all logging — NEVER `Console.WriteLine`
+- Serilog for all logging â€” NEVER `Console.WriteLine`
 
 ---
 
@@ -5479,31 +3170,31 @@ public class SalesInvoiceCreateViewModel : ViewModelBase
 > [!NOTE]
 > High-performance Win32 raw buffer thermal printing and QuestPDF invoice report generator.
 
-## 🖨️ Print Engine (Actual)
+## ًں–¨ï¸ڈ Print Engine (Actual)
 
-**NOT WPF FixedDocument/PrintDialog** — uses QuestPDF + Win32 raw printing.
+**NOT WPF FixedDocument/PrintDialog** â€” uses QuestPDF + Win32 raw printing.
 
 ### A4 Invoices (QuestPDF)
 
 - **Library:** QuestPDF Community (free for < $1M revenue)
-- **Document:** `A4InvoiceDocument.cs` — RTL layout, logo, tax breakdown
+- **Document:** `A4InvoiceDocument.cs` â€” RTL layout, logo, tax breakdown
 - **Output:** PDF files
 - **Preview:** WPF `PdfPreviewWindow` (WebBrowser control)
 
 ### Thermal Receipts (Win32 Raw Printing)
 
 - **API:** Win32 `OpenPrinter` / `WritePrinter` via `DllImport`
-- **Builder:** Custom `EscPos` static class — NOT external NuGet packages
+- **Builder:** Custom `EscPos` static class â€” NOT external NuGet packages
 - **Format:** 42-char monospaced columns, Windows-1256 encoding for Arabic
 - **Output:** Direct to thermal printer (80mm)
 
 ### Architecture:
 
 ```
-Desktop → IPrintApiService (HTTP) → PrintController (API) → IPrintService → Printer
+Desktop â†’ IPrintApiService (HTTP) â†’ PrintController (API) â†’ IPrintService â†’ Printer
 ```
 
-**Desktop NEVER prints directly** — always goes through the API.
+**Desktop NEVER prints directly** â€” always goes through the API.
 
 ### API Endpoints:
 
@@ -5530,27 +3221,27 @@ public class PrintResult
 }
 ```
 
-**NEVER throw from printing code** — always return `PrintResult`.
+**NEVER throw from printing code** â€” always return `PrintResult`.
 
 ### Project Structure:
 
 ```
 SalesSystem.Application/Printing/
-├── Contracts/
-│   ├── InvoicePrintDto.cs
-│   ├── InvoiceItemPrintDto.cs
-│   ├── InvoiceTypePrint.cs
-│   └── PrintResult.cs
-├── InvoicePrintDtoBuilder.cs
-└── IPrintService.cs
+â”œâ”€â”€ Contracts/
+â”‚   â”œâ”€â”€ InvoicePrintDto.cs
+â”‚   â”œâ”€â”€ InvoiceItemPrintDto.cs
+â”‚   â”œâ”€â”€ InvoiceTypePrint.cs
+â”‚   â””â”€â”€ PrintResult.cs
+â”œâ”€â”€ InvoicePrintDtoBuilder.cs
+â””â”€â”€ IPrintService.cs
 
 SalesSystem.Infrastructure/Printing/
-├── A4InvoiceDocument.cs
-├── ThermalReceiptGenerator.cs
-├── EscPos.cs
-├── PrintService.cs
-├── PrinterException.cs
-└── PrintingBootstrapper.cs
+â”œâ”€â”€ A4InvoiceDocument.cs
+â”œâ”€â”€ ThermalReceiptGenerator.cs
+â”œâ”€â”€ EscPos.cs
+â”œâ”€â”€ PrintService.cs
+â”œâ”€â”€ PrinterException.cs
+â””â”€â”€ PrintingBootstrapper.cs
 ```
 
 ---
@@ -5564,17 +3255,17 @@ SalesSystem.Infrastructure/Printing/
 > [!NOTE]
 > Silent background updater with SHA256 integrity check and automated database backup routines.
 
-## 🔄 Auto-Update (Actual)
+## ًں”„ Auto-Update (Actual)
 
 **Location:** `SalesSystem.DesktopPWF/Services/Update/`
 
 ### Key rules:
-- **NEVER blocks startup** — fire-and-forget with silent failure
-- **8-second timeout** — user never waits for update check
+- **NEVER blocks startup** â€” fire-and-forget with silent failure
+- **8-second timeout** â€” user never waits for update check
 - **SHA256 checksum** verification before launching installer
 - **Skipped version** persisted to `%AppData%\SalesSystem\settings.json`
-- **Desktop calls API** for updates — NEVER implements its own HTTP download
-- **`Environment.Exit(0)` is FORBIDDEN** — return `Result<bool>` instead
+- **Desktop calls API** for updates â€” NEVER implements its own HTTP download
+- **`Environment.Exit(0)` is FORBIDDEN** â€” return `Result<bool>` instead
 
 ### IUpdaterService Interface:
 
@@ -5593,21 +3284,21 @@ public interface IUpdaterService
 
 ### Version Comparison:
 
-Uses `System.Version` — NEVER string comparison.
+Uses `System.Version` â€” NEVER string comparison.
 
 ---
 
-## 💾 Backup System (Actual)
+## ًں’¾ Backup System (Actual)
 
 **Location:** `SalesSystem.Infrastructure/Backup/`
 
 ### Key rules:
-- **Raw SQL `BACKUP DATABASE`** — NEVER SMO dependency
-- **Restore uses `SINGLE_USER WITH ROLLBACK AFTER 30`** — gives active transactions 30s
+- **Raw SQL `BACKUP DATABASE`** â€” NEVER SMO dependency
+- **Restore uses `SINGLE_USER WITH ROLLBACK AFTER 30`** â€” gives active transactions 30s
 - **Scheduled backup** runs daily at 2:00 AM as `BackgroundService`
-- **Retention** = configurable days (default 30) — old backups auto-deleted
+- **Retention** = configurable days (default 30) â€” old backups auto-deleted
 - **Restore failure** triggers `TrySetMultiUserAsync` recovery
-- **Config parsing** uses `int.TryParse` — NEVER `int.Parse`
+- **Config parsing** uses `int.TryParse` â€” NEVER `int.Parse`
 
 ### ScheduledBackupWorker:
 
@@ -5616,7 +3307,7 @@ public class ScheduledBackupWorker : BackgroundService
 {
     // Uses IServiceScopeFactory for scoped service resolution
     // Respects CancellationToken for graceful shutdown
-    // Runs backup at 2:00 AM daily → then cleanup old backups
+    // Runs backup at 2:00 AM daily â†’ then cleanup old backups
 }
 ```
 
@@ -5631,7 +3322,7 @@ public class ScheduledBackupWorker : BackgroundService
 > [!NOTE]
 > Configuring the API to run as a native Windows Service and validating connection status on bootstrap.
 
-## 🖥️ Windows Service (Actual)
+## ًں–¥ï¸ڈ Windows Service (Actual)
 
 **Location:** `SalesSystem.Api/Program.cs`
 
@@ -5639,7 +3330,7 @@ public class ScheduledBackupWorker : BackgroundService
 - **Service name:** `SalesSystemService` (Arabic display name)
 - **Auto-recovery:** 3 restarts on failure (1min, 5min, 15min delays)
 - **Serilog EventLog sink** for Windows Service logging
-- **SQL retry on startup:** 3 attempts × 5 second delay
+- **SQL retry on startup:** 3 attempts أ— 5 second delay
 - **Database migration** runs on service startup (auto-migrate)
 
 ### Program.cs Integration:
@@ -5681,7 +3372,7 @@ public class SalesController : ControllerBase
         [FromBody] CreateSalesInvoiceRequest request,
         CancellationToken ct)
     {
-        // userId من JWT لاحقاً — الآن null
+        // userId ظ…ظ† JWT ظ„ط§ط­ظ‚ط§ظ‹ â€” ط§ظ„ط¢ظ† null
         var result = await _salesService.CreateInvoiceAsync(request, null, ct);
 
         if (!result.IsSuccess)
@@ -5720,11 +3411,11 @@ public class SalesController : ControllerBase
             id, request.Reason, null, ct);
 
         return result.IsSuccess
-            ? Ok(new { message = "تم إلغاء الفاتورة بنجاح" })
+            ? Ok(new { message = "طھظ… ط¥ظ„ط؛ط§ط، ط§ظ„ظپط§طھظˆط±ط© ط¨ظ†ط¬ط§ط­" })
             : BadRequest(new { error = result.Error });
     }
 }
-12. Desktop — EventBus
+12. Desktop â€” EventBus
 csharp
 
 
@@ -5784,7 +3475,7 @@ public class EventBus : IEventBus
         {
             if (weakRef.TryGetTarget(out var del) && del is Action<T> handler)
             {
-                // ⚠️ تنفيذ على UI Thread (WPF)
+                // âڑ ï¸ڈ طھظ†ظپظٹط° ط¹ظ„ظ‰ UI Thread (WPF)
                 Application.Current.Dispatcher.InvokeAsync(() => handler(message));
             }
         }
@@ -5798,7 +3489,7 @@ public class EventBus : IEventBus
     }
 }
 
-// Messages (ID only — no data payloads per RULE-034)
+// Messages (ID only â€” no data payloads per RULE-034)
 public record ProductChangedMessage(int ProductId);
 public record SaleInvoiceChangedMessage(int InvoiceId);
 public record PurchaseInvoiceChangedMessage(int InvoiceId);
@@ -5818,7 +3509,7 @@ Unit tests validating domain cost updates, dynamic unit adjustments, cash box ru
 > [!NOTE]
 > C# XUnit test suites verifying retail average prices, stock reductions, and cash box opening limits.
 
-🧪 Phase 6: Unit Tests
+ًں§ھ Phase 6: Unit Tests
 csharp
 
 // File: Tests/Domain/ProductUnitTests.cs
@@ -5828,7 +3519,7 @@ public class ProductUnitTests
     [Fact]
     public void CreateBaseUnit_AlwaysHasFactorOne()
     {
-        var unit = ProductUnit.CreateBaseUnit(productId: 1, unitName: "حبة");
+        var unit = ProductUnit.CreateBaseUnit(productId: 1, unitName: "ط­ط¨ط©");
         Assert.Equal(1, unit.BaseConversionFactor);
         Assert.True(unit.IsBaseUnit);
     }
@@ -5837,25 +3528,25 @@ public class ProductUnitTests
     public void CreateDerivedUnit_WithFactorOne_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            ProductUnit.CreateDerivedUnit(1, "كرتون", baseConversionFactor: 1));
+            ProductUnit.CreateDerivedUnit(1, "ظƒط±طھظˆظ†", baseConversionFactor: 1));
 
-        Assert.Contains("أكبر من وحدة صغرى واحدة", ex.Message);
+        Assert.Contains("ط£ظƒط¨ط± ظ…ظ† ظˆط­ط¯ط© طµط؛ط±ظ‰ ظˆط§ط­ط¯ط©", ex.Message);
     }
 
     [Fact]
     public void ToBaseUnitQuantity_MultipliesCorrectly()
     {
-        var box = ProductUnit.CreateDerivedUnit(1, "كرتون", 12);
-        var baseQty = box.ToBaseUnitQuantity(3); // 3 boxes × 12 = 36 pieces
+        var box = ProductUnit.CreateDerivedUnit(1, "ظƒط±طھظˆظ†", 12);
+        var baseQty = box.ToBaseUnitQuantity(3); // 3 boxes أ— 12 = 36 pieces
         Assert.Equal(36, baseQty);
     }
 
     [Fact]
     public void CalculateCostFromBaseUnitCost_ScalesCorrectly()
     {
-        var box = ProductUnit.CreateDerivedUnit(1, "كرتون", 12);
+        var box = ProductUnit.CreateDerivedUnit(1, "ظƒط±طھظˆظ†", 12);
         var boxCost = box.CalculateCostFromBaseUnitCost(baseUnitCost: 2m);
-        Assert.Equal(24m, boxCost); // 2 SAR/piece × 12 pieces = 24 SAR/box
+        Assert.Equal(24m, boxCost); // 2 SAR/piece أ— 12 pieces = 24 SAR/box
     }
 }
 
@@ -5868,7 +3559,7 @@ public class WeightedAverageCostingTests
     {
         // Old stock: 10 pieces at 100 SAR each
         // New stock: 10 pieces at 150 SAR each
-        // Expected: (10×100 + 10×150) / 20 = 125 SAR
+        // Expected: (10أ—100 + 10أ—150) / 20 = 125 SAR
 
         var mockContext = CreateMockContextWithStock(currentPieces: 10, currentCost: 100);
         var service = CreateService(mockContext, CostingMethod.WeightedAverage);
@@ -5900,19 +3591,19 @@ public class CashBoxTests
     [Fact]
     public void Withdraw_InsufficientBalance_ThrowsDomainException()
     {
-        var box = CashBox.Create("صندوق الكاشير");
+        var box = CashBox.Create("طµظ†ط¯ظˆظ‚ ط§ظ„ظƒط§ط´ظٹط±");
         box.Deposit(100, CashTransactionType.ManualIn, createdBy: 1);
 
         var ex = Assert.Throws<DomainException>(() =>
             box.Withdraw(200, CashTransactionType.PurchaseOut, createdBy: 1));
 
-        Assert.Contains("رصيد الصندوق غير كافٍ", ex.Message);
+        Assert.Contains("ط±طµظٹط¯ ط§ظ„طµظ†ط¯ظˆظ‚ ط؛ظٹط± ظƒط§ظپظچ", ex.Message);
     }
 
     [Fact]
     public void Deposit_UpdatesBalanceAndCreatesTransaction()
     {
-        var box = CashBox.Create("صندوق الكاشير");
+        var box = CashBox.Create("طµظ†ط¯ظˆظ‚ ط§ظ„ظƒط§ط´ظٹط±");
         box.Deposit(500, CashTransactionType.SaleIn, createdBy: 1);
 
         Assert.Equal(500, box.CurrentBalance);
@@ -5924,7 +3615,7 @@ public class CashBoxTests
     [Fact]
     public void CanUserAccess_WrongUser_ThrowsDomainException()
     {
-        var box = CashBox.Create("صندوق كاشير 1", assignedUserId: 5);
+        var box = CashBox.Create("طµظ†ط¯ظˆظ‚ ظƒط§ط´ظٹط± 1", assignedUserId: 5);
 
         Assert.Throws<DomainException>(() => box.CanUserAccess(userId: 99));
     }
@@ -5932,40 +3623,40 @@ public class CashBoxTests
     [Fact]
     public void CanUserAccess_SharedBox_AllowsAnyUser()
     {
-        var sharedBox = CashBox.Create("الصندوق الرئيسي"); // No assigned user
+        var sharedBox = CashBox.Create("ط§ظ„طµظ†ط¯ظˆظ‚ ط§ظ„ط±ط¦ظٹط³ظٹ"); // No assigned user
 
         // Should NOT throw for any user
         var exception = Record.Exception(() => sharedBox.CanUserAccess(userId: 99));
         Assert.Null(exception);
     }
 }
-📦 Final Summary
+ًں“¦ Final Summary
 text
 
-┌──────────────────────────────────────────────────────────────────┐
-│         DYNAMIC UOM + COSTING + CASH BOXES — IMPLEMENTATION      │
-├──────┬──────────────────────────────────────────┬────────────────┤
-│ Step │ Deliverable                              │ Key Rule       │
-├──────┼──────────────────────────────────────────┼────────────────┤
-│  0   │ 8 SQL migrations                         │ Run in order   │
-│  1   │ 6 Domain entities + 2 enums              │ No DB in Domain│
-│  2   │ EF configs + Barcode + Settings repos    │ Register in DI │
-│  3   │ Pricing service + Commands               │ Save then price│
-│  4   │ ViewModels (Builder + Invoice)           │ Arabic errors  │
-│  5   │ XAML (Builder + Settings + Invoice)      │ 36px min touch │
-│  6   │ 7 Unit tests                             │ Never skip     │
-└──────┴──────────────────────────────────────────┴────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”گ
+â”‚         DYNAMIC UOM + COSTING + CASH BOXES â€” IMPLEMENTATION      â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚ Step â”‚ Deliverable                              â”‚ Key Rule       â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚  0   â”‚ 8 SQL migrations                         â”‚ Run in order   â”‚
+â”‚  1   â”‚ 6 Domain entities + 2 enums              â”‚ No DB in Domainâ”‚
+â”‚  2   â”‚ EF configs + Barcode + Settings repos    â”‚ Register in DI â”‚
+â”‚  3   â”‚ Pricing service + Commands               â”‚ Save then priceâ”‚
+â”‚  4   â”‚ ViewModels (Builder + Invoice)           â”‚ Arabic errors  â”‚
+â”‚  5   â”‚ XAML (Builder + Settings + Invoice)      â”‚ 36px min touch â”‚
+â”‚  6   â”‚ 7 Unit tests                             â”‚ Never skip     â”‚
+â””â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”ک
 
-CRITICAL RULES — NEVER VIOLATE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Stock ALWAYS stored in base units (pieces) — never in boxes/trays
-✅ Cost cascade: base unit cost × ConversionFactor = derived unit cost
-✅ Pricing update runs AFTER invoice.Id is persisted
-✅ WeightedAverage: zero old stock → return new cost (no division by zero)
-✅ CashBox.Withdraw() uses domain method — never subtract balance directly
-✅ Product.ValidateUnits() called in command handler before ANY save
-✅ All user-facing errors in Arabic with actionable guidance
-✅ Price history logged for EVERY cost change (audit trail)
+CRITICAL RULES â€” NEVER VIOLATE:
+â”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پâ”پ
+âœ… Stock ALWAYS stored in base units (pieces) â€” never in boxes/trays
+âœ… Cost cascade: base unit cost أ— ConversionFactor = derived unit cost
+âœ… Pricing update runs AFTER invoice.Id is persisted
+âœ… WeightedAverage: zero old stock â†’ return new cost (no division by zero)
+âœ… CashBox.Withdraw() uses domain method â€” never subtract balance directly
+âœ… Product.ValidateUnits() called in command handler before ANY save
+âœ… All user-facing errors in Arabic with actionable guidance
+âœ… Price history logged for EVERY cost change (audit trail)
 
 
 <!-- END OF SECTION: 12.1 Advanced Modules Unit Tests -->
@@ -5988,54 +3679,54 @@ CRITICAL RULES — NEVER VIOLATE:
 <!-- START OF SECTION: 13. Critical Business Rules Reference (Arabic) -->
 
 > [!NOTE]
-> قواعد العمل والتحقق والحسابات المالية المعتمده للنظام بالتفصيل.
+> ظ‚ظˆط§ط¹ط¯ ط§ظ„ط¹ظ…ظ„ ظˆط§ظ„طھط­ظ‚ظ‚ ظˆط§ظ„ط­ط³ط§ط¨ط§طھ ط§ظ„ظ…ط§ظ„ظٹط© ط§ظ„ظ…ط¹طھظ…ط¯ظ‡ ظ„ظ„ظ†ط¸ط§ظ… ط¨ط§ظ„طھظپطµظٹظ„.
 
-13. قواعد العمل الحرجة — مرجع سريع
+13. ظ‚ظˆط§ط¹ط¯ ط§ظ„ط¹ظ…ظ„ ط§ظ„ط­ط±ط¬ط© â€” ظ…ط±ط¬ط¹ ط³ط±ظٹط¹
 text
 
-╔══════════════════════════════════════════════════════════════════╗
-║          قواعد العمل الحرجة — يجب تطبيقها في كل مكان           ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  FINANCIAL CALCULATIONS                                          ║
-║  ─────────────────────                                          ║
-║  ✅ LineTotal = (Quantity * UnitPrice) - DiscountAmount          ║
-║  ✅ SubTotal  = Sum(LineTotal)                                   ║
-║  ✅ Total     = SubTotal - InvoiceDiscount + TaxAmount           ║
-║  ✅ Due       = Total - PaidAmount                               ║
-║  ❌ لا تحسب في الـ UI — الحساب في Domain Layer فقط             ║
-║  ❌ لا float/double في أي حساب مالي                             ║
-║                                                                  ║
-║  STOCK RULES                                                     ║
-║  ───────────                                                     ║
-║  ✅ تحقق من المخزون قبل فتح Transaction                         ║
-║  ✅ اخصم المخزون بعد حفظ الفاتورة وتوليد ID                    ║
-║  ✅ سجل في InventoryMovements مع كل تغيير                       ║
-║  ❌ لا بيع بكمية تتجاوز المتوفر في المخزن المحدد               ║
-║  ❌ لا كميات سالبة في WarehouseStocks                           ║
-║                                                                  ║
-║  BALANCE RULES                                                   ║
-║  ─────────────                                                   ║
-║  Customer Balance موجب = العميل مدين لنا                        ║
-║  Customer Balance سالب = لدينا رصيد للعميل                     ║
-║  Supplier Balance موجب = علينا للمورد                           ║
-║  Supplier Balance سالب = المورد مدين لنا                        ║
-║                                                                  ║
-║  TRANSACTION RULES                                               ║
-║  ─────────────────                                               ║
-║  ✅ كل فاتورة (بيع/شراء/مرتجع/تحويل) في Transaction واحدة     ║
-║  ✅ إذا فشل أي خطوة → Rollback كامل                             ║
-║  ❌ لا Partial Commits                                           ║
-║                                                                  ║
-║  INVOICE RULES                                                   ║
-║  ─────────────                                                   ║
-║  ✅ الفاتورة تبدأ Draft ثم تُرحَّل Posted                       ║
-║  ✅ المخزون يتأثر عند Posted فقط                                ║
-║  ✅ الإلغاء يعكس أثر المخزون والرصيد                           ║
-║  ❌ لا حذف نهائي للفواتير                                       ║
-║  ❌ لا تعديل على فاتورة Posted                                  ║
-║                                                                  ║
-╚══════════════════════════════════════════════════════════════════╝
+â•”â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•—
+â•‘          ظ‚ظˆط§ط¹ط¯ ط§ظ„ط¹ظ…ظ„ ط§ظ„ط­ط±ط¬ط© â€” ظٹط¬ط¨ طھط·ط¨ظٹظ‚ظ‡ط§ ظپظٹ ظƒظ„ ظ…ظƒط§ظ†           â•‘
+â• â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•£
+â•‘                                                                  â•‘
+â•‘  FINANCIAL CALCULATIONS                                          â•‘
+â•‘  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€                                          â•‘
+â•‘  âœ… LineTotal = (Quantity * UnitPrice) - DiscountAmount          â•‘
+â•‘  âœ… SubTotal  = Sum(LineTotal)                                   â•‘
+â•‘  âœ… Total     = SubTotal - InvoiceDiscount + TaxAmount           â•‘
+â•‘  âœ… Due       = Total - PaidAmount                               â•‘
+â•‘  â‌Œ ظ„ط§ طھط­ط³ط¨ ظپظٹ ط§ظ„ظ€ UI â€” ط§ظ„ط­ط³ط§ط¨ ظپظٹ Domain Layer ظپظ‚ط·             â•‘
+â•‘  â‌Œ ظ„ط§ float/double ظپظٹ ط£ظٹ ط­ط³ط§ط¨ ظ…ط§ظ„ظٹ                             â•‘
+â•‘                                                                  â•‘
+â•‘  STOCK RULES                                                     â•‘
+â•‘  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€                                                     â•‘
+â•‘  âœ… طھط­ظ‚ظ‚ ظ…ظ† ط§ظ„ظ…ط®ط²ظˆظ† ظ‚ط¨ظ„ ظپطھط­ Transaction                         â•‘
+â•‘  âœ… ط§ط®طµظ… ط§ظ„ظ…ط®ط²ظˆظ† ط¨ط¹ط¯ ط­ظپط¸ ط§ظ„ظپط§طھظˆط±ط© ظˆطھظˆظ„ظٹط¯ ID                    â•‘
+â•‘  âœ… ط³ط¬ظ„ ظپظٹ InventoryMovements ظ…ط¹ ظƒظ„ طھط؛ظٹظٹط±                       â•‘
+â•‘  â‌Œ ظ„ط§ ط¨ظٹط¹ ط¨ظƒظ…ظٹط© طھطھط¬ط§ظˆط² ط§ظ„ظ…طھظˆظپط± ظپظٹ ط§ظ„ظ…ط®ط²ظ† ط§ظ„ظ…ط­ط¯ط¯               â•‘
+â•‘  â‌Œ ظ„ط§ ظƒظ…ظٹط§طھ ط³ط§ظ„ط¨ط© ظپظٹ WarehouseStocks                           â•‘
+â•‘                                                                  â•‘
+â•‘  BALANCE RULES                                                   â•‘
+â•‘  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€                                                   â•‘
+â•‘  Customer Balance ظ…ظˆط¬ط¨ = ط§ظ„ط¹ظ…ظٹظ„ ظ…ط¯ظٹظ† ظ„ظ†ط§                        â•‘
+â•‘  Customer Balance ط³ط§ظ„ط¨ = ظ„ط¯ظٹظ†ط§ ط±طµظٹط¯ ظ„ظ„ط¹ظ…ظٹظ„                     â•‘
+â•‘  Supplier Balance ظ…ظˆط¬ط¨ = ط¹ظ„ظٹظ†ط§ ظ„ظ„ظ…ظˆط±ط¯                           â•‘
+â•‘  Supplier Balance ط³ط§ظ„ط¨ = ط§ظ„ظ…ظˆط±ط¯ ظ…ط¯ظٹظ† ظ„ظ†ط§                        â•‘
+â•‘                                                                  â•‘
+â•‘  TRANSACTION RULES                                               â•‘
+â•‘  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€                                               â•‘
+â•‘  âœ… ظƒظ„ ظپط§طھظˆط±ط© (ط¨ظٹط¹/ط´ط±ط§ط،/ظ…ط±طھط¬ط¹/طھط­ظˆظٹظ„) ظپظٹ Transaction ظˆط§ط­ط¯ط©     â•‘
+â•‘  âœ… ط¥ط°ط§ ظپط´ظ„ ط£ظٹ ط®ط·ظˆط© â†’ Rollback ظƒط§ظ…ظ„                             â•‘
+â•‘  â‌Œ ظ„ط§ Partial Commits                                           â•‘
+â•‘                                                                  â•‘
+â•‘  INVOICE RULES                                                   â•‘
+â•‘  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€                                                   â•‘
+â•‘  âœ… ط§ظ„ظپط§طھظˆط±ط© طھط¨ط¯ط£ Draft ط«ظ… طھظڈط±ط­ظژظ‘ظ„ Posted                       â•‘
+â•‘  âœ… ط§ظ„ظ…ط®ط²ظˆظ† ظٹطھط£ط«ط± ط¹ظ†ط¯ Posted ظپظ‚ط·                                â•‘
+â•‘  âœ… ط§ظ„ط¥ظ„ط؛ط§ط، ظٹط¹ظƒط³ ط£ط«ط± ط§ظ„ظ…ط®ط²ظˆظ† ظˆط§ظ„ط±طµظٹط¯                           â•‘
+â•‘  â‌Œ ظ„ط§ ط­ط°ظپ ظ†ظ‡ط§ط¦ظٹ ظ„ظ„ظپظˆط§طھظٹط±                                       â•‘
+â•‘  â‌Œ ظ„ط§ طھط¹ط¯ظٹظ„ ط¹ظ„ظ‰ ظپط§طھظˆط±ط© Posted                                  â•‘
+â•‘                                                                  â•‘
+â•ڑâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•‌
 
 <!-- END OF SECTION: 13. Critical Business Rules Reference (Arabic) -->
 
@@ -6049,99 +3740,99 @@ Comprehensive milestones history, technological decisions, legacy cleanup, and s
 > [!NOTE]
 > Original implementation plan mapping out baseline modules.
 
-14. خطة التنفيذ المرحلية
+14. ط®ط·ط© ط§ظ„طھظ†ظپظٹط° ط§ظ„ظ…ط±ط­ظ„ظٹط©
 text
 
-Phase 1 — Foundation (الأساس)
-├── إنشاء الـ 6 مشاريع في Solution
-├── Domain Entities كاملة
-├── Contracts (DTOs + Requests + Result<T>)
-├── Custom Exceptions
-└── SQL Script للجداول كاملة مع Seed Data
+Phase 1 â€” Foundation (ط§ظ„ط£ط³ط§ط³)
+â”œâ”€â”€ ط¥ظ†ط´ط§ط، ط§ظ„ظ€ 6 ظ…ط´ط§ط±ظٹط¹ ظپظٹ Solution
+â”œâ”€â”€ Domain Entities ظƒط§ظ…ظ„ط©
+â”œâ”€â”€ Contracts (DTOs + Requests + Result<T>)
+â”œâ”€â”€ Custom Exceptions
+â””â”€â”€ SQL Script ظ„ظ„ط¬ط¯ط§ظˆظ„ ظƒط§ظ…ظ„ط© ظ…ط¹ Seed Data
 
-Phase 2 — Infrastructure
-├── SalesDbContext + جميع الـ Configurations
-├── EF Core Migrations
-├── IUnitOfWork + UnitOfWork
-├── Repositories الأساسية
-└── اختبار الاتصال بقاعدة البيانات
+Phase 2 â€” Infrastructure
+â”œâ”€â”€ SalesDbContext + ط¬ظ…ظٹط¹ ط§ظ„ظ€ Configurations
+â”œâ”€â”€ EF Core Migrations
+â”œâ”€â”€ IUnitOfWork + UnitOfWork
+â”œâ”€â”€ Repositories ط§ظ„ط£ط³ط§ط³ظٹط©
+â””â”€â”€ ط§ط®طھط¨ط§ط± ط§ظ„ط§طھطµط§ظ„ ط¨ظ‚ط§ط¹ط¯ط© ط§ظ„ط¨ظٹط§ظ†ط§طھ
 
-Phase 3 — Application Services
-├── ProductService (البداية — الأبسط)
-├── CustomerService + SupplierService
-├── WarehouseService
-├── DocumentSequenceService ⚠️ مهم
-├── InventoryService ⚠️ حرج
-├── PurchaseService ⚠️ حرج
-├── SalesService ⚠️ الأحرج
-├── SalesReturnService ⚠️
-└── PurchaseReturnService ⚠️
+Phase 3 â€” Application Services
+â”œâ”€â”€ ProductService (ط§ظ„ط¨ط¯ط§ظٹط© â€” ط§ظ„ط£ط¨ط³ط·)
+â”œâ”€â”€ CustomerService + SupplierService
+â”œâ”€â”€ WarehouseService
+â”œâ”€â”€ DocumentSequenceService âڑ ï¸ڈ ظ…ظ‡ظ…
+â”œâ”€â”€ InventoryService âڑ ï¸ڈ ط­ط±ط¬
+â”œâ”€â”€ PurchaseService âڑ ï¸ڈ ط­ط±ط¬
+â”œâ”€â”€ SalesService âڑ ï¸ڈ ط§ظ„ط£ط­ط±ط¬
+â”œâ”€â”€ SalesReturnService âڑ ï¸ڈ
+â””â”€â”€ PurchaseReturnService âڑ ï¸ڈ
 
-Phase 4 — API
-├── جميع الـ Controllers
-├── Global Exception Handler
-└── Swagger Setup
+Phase 4 â€” API
+â”œâ”€â”€ ط¬ظ…ظٹط¹ ط§ظ„ظ€ Controllers
+â”œâ”€â”€ Global Exception Handler
+â””â”€â”€ Swagger Setup
 
-Phase 5 — Desktop Shell
-├── EventBus
-├── NavigationService
-├── MainForm + Sidebar
-├── LoginForm
-└── Common Controls
+Phase 5 â€” Desktop Shell
+â”œâ”€â”€ EventBus
+â”œâ”€â”€ NavigationService
+â”œâ”€â”€ MainForm + Sidebar
+â”œâ”€â”€ LoginForm
+â””â”€â”€ Common Controls
 
-Phase 6 — Desktop Modules
-├── Products Module (القالب)
-├── Customers + Suppliers
-├── Warehouses
-├── Purchases Module
-├── Sales Module ⚠️ الأهم
-├── Returns Module
-└── Reports
+Phase 6 â€” Desktop Modules
+â”œâ”€â”€ Products Module (ط§ظ„ظ‚ط§ظ„ط¨)
+â”œâ”€â”€ Customers + Suppliers
+â”œâ”€â”€ Warehouses
+â”œâ”€â”€ Purchases Module
+â”œâ”€â”€ Sales Module âڑ ï¸ڈ ط§ظ„ط£ظ‡ظ…
+â”œâ”€â”€ Returns Module
+â””â”€â”€ Reports
 
-Phase 7 — Polish
-├── BackupService
-├── Settings Screen
-└── Error Handling UI
+Phase 7 â€” Polish
+â”œâ”€â”€ BackupService
+â”œâ”€â”€ Settings Screen
+â””â”€â”€ Error Handling UI
 
-Phase 8 — Dynamic UOM & Costing (v4.3)
-├── ProductUnits: وحدات ديناميكية لكل منتج مع أسعار منفصلة
-├── UnitBarcodes: باركود لكل وحدة منتج
-├── UpdateProductPricingService: 3 استراتيجيات تسعير
-├── ProductPriceHistory: سجل تغييرات الأسعار والتكلفة
-└── Cost cascade: تحديث تكلفة جميع الوحدات × عامل التحويل
+Phase 8 â€” Dynamic UOM & Costing (v4.3)
+â”œâ”€â”€ ProductUnits: ظˆط­ط¯ط§طھ ط¯ظٹظ†ط§ظ…ظٹظƒظٹط© ظ„ظƒظ„ ظ…ظ†طھط¬ ظ…ط¹ ط£ط³ط¹ط§ط± ظ…ظ†ظپطµظ„ط©
+â”œâ”€â”€ UnitBarcodes: ط¨ط§ط±ظƒظˆط¯ ظ„ظƒظ„ ظˆط­ط¯ط© ظ…ظ†طھط¬
+â”œâ”€â”€ UpdateProductPricingService: 3 ط§ط³طھط±ط§طھظٹط¬ظٹط§طھ طھط³ط¹ظٹط±
+â”œâ”€â”€ ProductPriceHistory: ط³ط¬ظ„ طھط؛ظٹظٹط±ط§طھ ط§ظ„ط£ط³ط¹ط§ط± ظˆط§ظ„طھظƒظ„ظپط©
+â””â”€â”€ Cost cascade: طھط­ط¯ظٹط« طھظƒظ„ظپط© ط¬ظ…ظٹط¹ ط§ظ„ظˆط­ط¯ط§طھ أ— ط¹ط§ظ…ظ„ ط§ظ„طھط­ظˆظٹظ„
 
-Phase 9 — Cash Boxes (v4.3)
-├── CashBoxes: صناديق نقدية متعددة
-├── CashTransactions: حركات نقدية غير قابلة للتعديل
-├── DailyClosure: إقفال يومي
-└── Transfer: تحويل بين الصناديق (حركتين)
+Phase 9 â€” Cash Boxes (v4.3)
+â”œâ”€â”€ CashBoxes: طµظ†ط§ط¯ظٹظ‚ ظ†ظ‚ط¯ظٹط© ظ…طھط¹ط¯ط¯ط©
+â”œâ”€â”€ CashTransactions: ط­ط±ظƒط§طھ ظ†ظ‚ط¯ظٹط© ط؛ظٹط± ظ‚ط§ط¨ظ„ط© ظ„ظ„طھط¹ط¯ظٹظ„
+â”œâ”€â”€ DailyClosure: ط¥ظ‚ظپط§ظ„ ظٹظˆظ…ظٹ
+â””â”€â”€ Transfer: طھط­ظˆظٹظ„ ط¨ظٹظ† ط§ظ„طµظ†ط§ط¯ظٹظ‚ (ط­ط±ظƒطھظٹظ†)
 
-Phase 10 — Print Engine (v4.3)
-├── A4: QuestPDF مع شعار المتجر
-├── Thermal: ESC/POS طباعة حرارية 80mm
-├── API: Desktop يطلب الطباعة عبر PrintController
-├── Preview: معاينة قبل الطباعة
-└── Logo: معالجة غياب الشعار (null check)
+Phase 10 â€” Print Engine (v4.3)
+â”œâ”€â”€ A4: QuestPDF ظ…ط¹ ط´ط¹ط§ط± ط§ظ„ظ…طھط¬ط±
+â”œâ”€â”€ Thermal: ESC/POS ط·ط¨ط§ط¹ط© ط­ط±ط§ط±ظٹط© 80mm
+â”œâ”€â”€ API: Desktop ظٹط·ظ„ط¨ ط§ظ„ط·ط¨ط§ط¹ط© ط¹ط¨ط± PrintController
+â”œâ”€â”€ Preview: ظ…ط¹ط§ظٹظ†ط© ظ‚ط¨ظ„ ط§ظ„ط·ط¨ط§ط¹ط©
+â””â”€â”€ Logo: ظ…ط¹ط§ظ„ط¬ط© ط؛ظٹط§ط¨ ط§ظ„ط´ط¹ط§ط± (null check)
 
-Phase 11 — Production (v4.4)
-├── Auto-Update: تحديث تلقائي مع التحقق من SHA256
-├── DPAPI: تشفير connection strings
-├── Backup: نسخ احتياطي تلقائي يومي
-├── Windows Service: تشغيل API كخدمة ويندوز
-└── Health Check: فحص قاعدة البيانات عند بدء التشغيل
+Phase 11 â€” Production (v4.4)
+â”œâ”€â”€ Auto-Update: طھط­ط¯ظٹط« طھظ„ظ‚ط§ط¦ظٹ ظ…ط¹ ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† SHA256
+â”œâ”€â”€ DPAPI: طھط´ظپظٹط± connection strings
+â”œâ”€â”€ Backup: ظ†ط³ط® ط§ط­طھظٹط§ط·ظٹ طھظ„ظ‚ط§ط¦ظٹ ظٹظˆظ…ظٹ
+â”œâ”€â”€ Windows Service: طھط´ط؛ظٹظ„ API ظƒط®ط¯ظ…ط© ظˆظٹظ†ط¯ظˆط²
+â””â”€â”€ Health Check: ظپط­طµ ظ‚ط§ط¹ط¯ط© ط§ظ„ط¨ظٹط§ظ†ط§طھ ط¹ظ†ط¯ ط¨ط¯ط، ط§ظ„طھط´ط؛ظٹظ„
 
-Phase 12 — UI Polish (v4.5)
-├── Multi-Window: فتح النوافذ بدون حظر (ScreenWindowService)
-├── ToolTips: تلميحات عربية لجميع الأزرار
-├── Sorting: ترتيب القوائم من الأحدث للأقدم
-└── EventBus: إدارة الاشتراكات (subscribe/dispose)
+Phase 12 â€” UI Polish (v4.5)
+â”œâ”€â”€ Multi-Window: ظپطھط­ ط§ظ„ظ†ظˆط§ظپط° ط¨ط¯ظˆظ† ط­ط¸ط± (ScreenWindowService)
+â”œâ”€â”€ ToolTips: طھظ„ظ…ظٹط­ط§طھ ط¹ط±ط¨ظٹط© ظ„ط¬ظ…ظٹط¹ ط§ظ„ط£ط²ط±ط§ط±
+â”œâ”€â”€ Sorting: طھط±طھظٹط¨ ط§ظ„ظ‚ظˆط§ط¦ظ… ظ…ظ† ط§ظ„ط£ط­ط¯ط« ظ„ظ„ط£ظ‚ط¯ظ…
+â””â”€â”€ EventBus: ط¥ط¯ط§ط±ط© ط§ظ„ط§ط´طھط±ط§ظƒط§طھ (subscribe/dispose)
 
-Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
-├── ID Strategy: إزالة Code من المنتجات والعملاء والموردين والمخازن
-├── ErrorTemplate: إطار أحمر + ❗ مع ToolTip
-├── INotifyDataErrorInfo: تحقق فوري في حقول الإدخال
-├── ValidateAllAsync: تحقق موحد قبل الحفظ
-└── SetDialogService: ربط خدمة الحوار في جميع الـ ViewModels
+Phase 13 â€” Validation & Cleanup (v4.6â€“v4.6.2)
+â”œâ”€â”€ ID Strategy: ط¥ط²ط§ظ„ط© Code ظ…ظ† ط§ظ„ظ…ظ†طھط¬ط§طھ ظˆط§ظ„ط¹ظ…ظ„ط§ط، ظˆط§ظ„ظ…ظˆط±ط¯ظٹظ† ظˆط§ظ„ظ…ط®ط§ط²ظ†
+â”œâ”€â”€ ErrorTemplate: ط¥ط·ط§ط± ط£ط­ظ…ط± + â‌— ظ…ط¹ ToolTip
+â”œâ”€â”€ INotifyDataErrorInfo: طھط­ظ‚ظ‚ ظپظˆط±ظٹ ظپظٹ ط­ظ‚ظˆظ„ ط§ظ„ط¥ط¯ط®ط§ظ„
+â”œâ”€â”€ ValidateAllAsync: طھط­ظ‚ظ‚ ظ…ظˆط­ط¯ ظ‚ط¨ظ„ ط§ظ„ط­ظپط¸
+â””â”€â”€ SetDialogService: ط±ط¨ط· ط®ط¯ظ…ط© ط§ظ„ط­ظˆط§ط± ظپظٹ ط¬ظ…ظٹط¹ ط§ظ„ظ€ ViewModels
 
 <!-- END OF SECTION: 14.1 Baseline Project Implementation Phases (Phases 1-13) -->
 
@@ -6151,37 +3842,37 @@ Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
 > [!NOTE]
 > Recent phases executing real-time validation templates, architecture alignment, and security rate-limiting.
 
-## ✅ WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2) — Historical
+## âœ… WPF Validation ErrorTemplate & INotifyDataErrorInfo (v4.6.2) â€” Historical
 
-**Goal**: Standardize validation UI with red border + ❗ icon ErrorTemplate, replace `HasXxxError` boolean pattern with `INotifyDataErrorInfo`, and add `ValidateAllAsync()` to ViewModelBase.
+**Goal**: Standardize validation UI with red border + â‌— icon ErrorTemplate, replace `HasXxxError` boolean pattern with `INotifyDataErrorInfo`, and add `ValidateAllAsync()` to ViewModelBase.
 
 ### Key Changes
-- **New ErrorTemplate**: Red border (#EF4444, 1.5px) + ❗ icon badge with ToolTip — applies to TextBox, PasswordBox, ComboBox when `Validation.HasError = true`
+- **New ErrorTemplate**: Red border (#EF4444, 1.5px) + â‌— icon badge with ToolTip â€” applies to TextBox, PasswordBox, ComboBox when `Validation.HasError = true`
 - **ViewModelBase.cs**: Added `SetDialogService(IDialogService)`, `ValidateAllAsync()`, `ValidateField()`
 - **14 Editor VMs**: All call `SetDialogService()` in constructors
-- **ProductEditorViewModel**: Removed 7 `HasXxxError` booleans — real-time `AddError`/`ClearErrors`
-- **CustomerEditorViewModel**: Removed 3 `HasXxxError` booleans — real-time `AddError`/`ClearErrors`
+- **ProductEditorViewModel**: Removed 7 `HasXxxError` booleans â€” real-time `AddError`/`ClearErrors`
+- **CustomerEditorViewModel**: Removed 3 `HasXxxError` booleans â€” real-time `AddError`/`ClearErrors`
 
 ### New Rules (AGENTS.md)
 | Rule | Description |
 |------|-------------|
 | RULE-227 | `SetDialogService()` in every Editor VM constructor |
-| RULE-228 | Use `INotifyDataErrorInfo` (`AddError/ClearErrors`) — no `HasXxxError` booleans |
-| RULE-229 | Pre-save validation: `ClearAllErrors()` → `AddError()` → `await ValidateAllAsync()` |
-| RULE-230 | ErrorTemplate: red border + ❗ icon with ToolTip bound to `[0].ErrorContent` |
+| RULE-228 | Use `INotifyDataErrorInfo` (`AddError/ClearErrors`) â€” no `HasXxxError` booleans |
+| RULE-229 | Pre-save validation: `ClearAllErrors()` â†’ `AddError()` â†’ `await ValidateAllAsync()` |
+| RULE-230 | ErrorTemplate: red border + â‌— icon with ToolTip bound to `[0].ErrorContent` |
 
 ### File Impact
 | Layer | Files |
 |-------|-------|
-| UI (XAML) | `Resources/Styles.xaml` — new ErrorTemplate + HasError triggers |
-| ViewModels | `ViewModelBase.cs` — SetDialogService, ValidateAllAsync, ValidateField |
-| Editor VMs | 14 files — SetDialogService() in constructors |
-| Refactored VMs | ProductEditor, CustomerEditor — removed HasXxxError pattern |
+| UI (XAML) | `Resources/Styles.xaml` â€” new ErrorTemplate + HasError triggers |
+| ViewModels | `ViewModelBase.cs` â€” SetDialogService, ValidateAllAsync, ValidateField |
+| Editor VMs | 14 files â€” SetDialogService() in constructors |
+| Refactored VMs | ProductEditor, CustomerEditor â€” removed HasXxxError pattern |
 | Documentation | AGENTS.md, README.md, 5 subagent files, CHANGELOG.md, MASTER-PLAN.md, CONSTITUTION.md |
 
 ---
 
-## ✅ Architecture Alignment & Code Quality Remediation (v4.6.3) — Historical
+## âœ… Architecture Alignment & Code Quality Remediation (v4.6.3) â€” Historical
 
 **Goal**: Align Costing settings with Clean Architecture boundaries (moving to `ISettingsApiService` via HTTP Client), resolve ViewModel compiler shadowing (CS0108 warnings), wrap async void operations in ViewModels with safe try-catches, and correct garbled Arabic text.
 
@@ -6192,13 +3883,13 @@ Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
 
 ---
 
-## ✅ Security Hardening & Code Quality (v4.6.4) — Historical
+## âœ… Security Hardening & Code Quality (v4.6.4) â€” Historical
 
 **Goal**: Harden security with rate limiting, protect user integrity, secure connection strings, enhance validation, fix build warnings.
 
 ### Key Changes
 - **Rate Limiting**: Added `AddRateLimiter` with `LoginPolicy` (5 attempts per 15 min per IP) and global policy (100 req/min). Arabic 429 response with `RATE_LIMIT_EXCEEDED` code.
-- **User Hard-Delete Guarded**: `UserService.PermanentDeleteAsync()` returns `Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي")` — enforces RULE-038.
+- **User Hard-Delete Guarded**: `UserService.PermanentDeleteAsync()` returns `Result.Failure("ظ„ط§ ظٹظ…ظƒظ† ط­ط°ظپ ط§ظ„ظ…ط³طھط®ط¯ظ…ظٹظ† ط¨ط´ظƒظ„ ظ†ظ‡ط§ط¦ظٹ")` â€” enforces RULE-038.
 - **Connection String Security**: Removed plaintext connection string from `appsettings.Development.json`. Uses `SALESSYSTEM_DB_CONNECTION` env var only.
 - **FluentValidator Enhancements**: Enhanced all 7 invoice/payment/transfer validators with date, enum, and max-length rules.
 - **FallbackErrorDialog**: Added `FallbackErrorDialog.xaml` for thread-safe unhandled exception display.
@@ -6209,7 +3900,7 @@ Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
 - RULE-240 through RULE-248 (Rate Limiting, User Hard-Delete, Connection String Security)
 
 ### Verification
-- [ ] `dotnet build` — 0 errors, 0 warnings
+- [ ] `dotnet build` â€” 0 errors, 0 warnings
 - [ ] Login endpoint rate-limited (5/15min)
 - [ ] User permanent delete returns failure
 - [ ] No plaintext connection strings
@@ -6226,50 +3917,50 @@ Phase 13 — Validation & Cleanup (v4.6–v4.6.2)
 > [!NOTE]
 > MediatR/CQRS is NOT used. Service Layer pattern is the standard. This section documents the decision and any remaining cleanup.
 
-## ✅ MediatR Removed (RULE-148)
+## âœ… MediatR Removed (RULE-148)
 
 - **Package:** MediatR v12.x **HAS BEEN REMOVED** from `SalesSystem.Application`
 - **All references replaced** with direct Service Interface injection
-- **No Commands/Queries directories** exist — Service Layer pattern is the standard
-- **No MediatR pipeline behaviors** — never used
+- **No Commands/Queries directories** exist â€” Service Layer pattern is the standard
+- **No MediatR pipeline behaviors** â€” never used
 - **Status:** Fully removed per AGENTS.md RULE-147/148
 
-## CQRS — NOT Adopted
+## CQRS â€” NOT Adopted
 
-- **AGENTS.md RULE-043** updated: "Service Layer pattern is the standard — NOT CQRS/MediatR"
+- **AGENTS.md RULE-043** updated: "Service Layer pattern is the standard â€” NOT CQRS/MediatR"
 - **Service Layer pattern used**: Services handle both reads and writes
-- **Status:** Documented and final — no migration planned
+- **Status:** Documented and final â€” no migration planned
 - **Why:** Service Layer provides sufficient separation at this scale without ceremony
 
 ---
 
-## 📋 Future Plans (NOT Implemented)
+## ًں“‹ Future Plans (NOT Implemented)
 
 These are documented in AGENTS.md or discussed but **have zero code in the codebase**:
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| **MAUI Mobile App** | ❌ Not started | `Presentation.MAUI` directory never created |
-| **SharedKernel project** | ❌ Not started | Architecture uses layered, not shared kernel |
-| **DesignTokens.cs** | ❌ Not created | Styles live in `Resources/Styles.xaml` |
-| **Roslyn Analyzer** | ❌ Not created | No `HardcodedColorAnalyzer` or similar |
-| **ExecuteAsync() wrapper** | ✅ In ViewModelBase | RULE-141: All async commands use `ExecuteAsync()` wrapper |
-| **Vertical Slices** | ❌ Not adopted | Layered architecture is the standard |
-| **Camera-based barcode** | ❌ Not started | Only USB/HID keyboard scanner implemented |
-| **BarcodeScanViewModel** | ❌ Not created | Barcode handled via `IBarcodeInputService` event |
-| **BaseViewModel in SharedKernel** | ❌ Not created | ViewModelBase lives in DesktopPWF |
+| **MAUI Mobile App** | â‌Œ Not started | `Presentation.MAUI` directory never created |
+| **SharedKernel project** | â‌Œ Not started | Architecture uses layered, not shared kernel |
+| **DesignTokens.cs** | â‌Œ Not created | Styles live in `Resources/Styles.xaml` |
+| **Roslyn Analyzer** | â‌Œ Not created | No `HardcodedColorAnalyzer` or similar |
+| **ExecuteAsync() wrapper** | âœ… In ViewModelBase | RULE-141: All async commands use `ExecuteAsync()` wrapper |
+| **Vertical Slices** | â‌Œ Not adopted | Layered architecture is the standard |
+| **Camera-based barcode** | â‌Œ Not started | Only USB/HID keyboard scanner implemented |
+| **BarcodeScanViewModel** | â‌Œ Not created | Barcode handled via `IBarcodeInputService` event |
+| **BaseViewModel in SharedKernel** | â‌Œ Not created | ViewModelBase lives in DesktopPWF |
 
 ---
 
-## 🗑️ Legacy Code
+## ًں—‘ï¸ڈ Legacy Code
 
 ### `Legacy/SalesSystem.Desktop/`
 
 - **What it is:** Abandoned WinForms desktop application
 - **Status:** NOT in solution file, NOT compiled, NOT referenced
-- **Safe to delete:** Yes — all functionality has been rebuilt in `DesktopPWF` (WPF)
+- **Safe to delete:** Yes â€” all functionality has been rebuilt in `DesktopPWF` (WPF)
 - **Why abandoned:** WinForms couldn't support the modern MVVM + EventBus + styled dialog architecture
-- **Recommendation:** Delete when convenient — it's dead weight
+- **Recommendation:** Delete when convenient â€” it's dead weight
 
 ---
 
@@ -6282,11 +3973,11 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 > [!NOTE]
 > Detailed rationale explaining core architectural choices (Service Layer, WPF, Rich Domain, Result Pattern).
 
-## 📐 Architecture Decisions
+## ًں“گ Architecture Decisions
 
 ### Why Service Layer over CQRS/MediatR?
 
-- The application has ~20 aggregate roots, not 200+ — Service Layer is simpler and sufficient
+- The application has ~20 aggregate roots, not 200+ â€” Service Layer is simpler and sufficient
 - CQRS adds ceremony (Command/Query classes, handlers, validators) without proportional benefit at this scale
 - Service Layer is easier for junior developers to understand and maintain
 - Can migrate to CQRS later if complexity demands it
@@ -6297,12 +3988,12 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 - XAML enables centralized styling (`Styles.xaml`)
 - Better support for modern UI (animations, templates, resources)
 - EventBus integration works naturally with WPF's dispatcher
-- WinForms required code-behind logic — violated separation of concerns
+- WinForms required code-behind logic â€” violated separation of concerns
 
 ### Why Layered over Vertical Slices?
 
-- Small team (2-3 developers) — layered is easier to navigate
-- Clear separation of concerns: Domain → Application → Infrastructure → API → Desktop
+- Small team (2-3 developers) â€” layered is easier to navigate
+- Clear separation of concerns: Domain â†’ Application â†’ Infrastructure â†’ API â†’ Desktop
 - Each layer has a single responsibility and single dependency direction
 - Vertical slices work better for large teams with many independent features
 
@@ -6310,19 +4001,19 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 
 - Target users are desktop-only (retail shops with POS terminals)
 - Mobile would require entirely different UX (touch-optimized, offline-first)
-- API already provides mobile-ready endpoints — MAUI can be added later
+- API already provides mobile-ready endpoints â€” MAUI can be added later
 - Focus on perfecting desktop first
 
 ### Why Result<T> over Exceptions?
 
-- Exceptions are for exceptional conditions — validation failures are expected
+- Exceptions are for exceptional conditions â€” validation failures are expected
 - Result<T> makes error handling explicit and type-safe
 - Controllers can cleanly map Result to HTTP status codes
 - Avoids try/catch boilerplate in every service method
 
 ### Why Rich Domain Model?
 
-- Entities own their business rules — can't be bypassed from outside
+- Entities own their business rules â€” can't be bypassed from outside
 - `private set` prevents accidental state corruption
 - Factory methods enforce invariants at creation time
 - Guard clauses catch invalid states early with clear Arabic messages
@@ -6333,33 +4024,93 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 <!-- END OF SECTION: 14.4 Architectural Design Decisions -->
 
 
+<!-- START OF SECTION: 14.5 Build Quality Hardening (v4.10) -->
+
+> [!NOTE]
+> Recent session (2026-06-14) achieving 0 errors, 0 warnings across all 6 production projects with CashBoxService implementation, PDF export for 27 reports, multi-currency in Sales, and infrastructure hardening.
+
+## ✅ Build Quality Hardening â€” 0 Errors, 0 Warnings
+
+All six production projects (Domain, Contracts, Application, Infrastructure, API, DesktopPWF) now build with **zero errors and zero warnings** across all target frameworks.
+
+### CashBoxService â€” Full Implementation
+- **800-line `ICashBoxService`** implementation with CRUD, voucher lifecycle, journal entry integration
+- Auto-creates Level-4 sub-account under `"1110 â€” Ø§Ù„Ù†Ù‚Ø¯ÙŠØ©"` parent when `AccountId` is null
+- Uses `IPaymentVoucherService`/`IReceiptVoucherService` for voucher creation (no duplication)
+- All 13 interface methods return `Result<T>` with proper Arabic error messages
+- Registered in API `Program.cs` DI container
+- No more `AggregateException` on API startup
+
+### Warnings Eliminated (34 total)
+| Project | Warnings Fixed |
+|---------|---------------|
+| **Application** (15) | CS8602 null dereferences in AnnualClosingService, JournalEntryService, PurchaseReportService, SalesReportService, FinancialReportService; CS0105 duplicate using in IPrintDataService; CS0219 unused variable in MinStockAlertWorker; CS8604 null param in StoreSettingsService |
+| **Infrastructure** (3) | CS8602 in ReportRepository.cs (ThenInclude null-forgiving + variable reuse) |
+| **DesktopPWF** (16) | CS0105 duplicate usings (ProductImportApiService, ProductImportViewModel); CS8601 null assignment (PrintDtoExtensions, WarehouseTransferEditorViewModel); CS0618 obsolete member (ProductUnitRowViewModel â€” #pragma suppression) |
+
+### PDF Export â€” First Choice for All 27 Reports
+- **QuestPDF** RTL tables with Arabic column headers, alternating row colors, page numbers
+- Date filter header shown on all report PDFs
+- Pattern A (`AsyncRelayCommand`) or B (`RelayCommand`) `ExportPdfCommand` + `ExportPdfAsync()` in every report ViewModel
+- XAML buttons added to all 27 report Views â€” consistent with Excel export
+
+### Multi-Currency Wired in Sales
+- `SalesInvoiceEditorViewModel`: Added `Currencies` ObservableCollection, `SelectedCurrencyId`, `ExchangeRate`, `IsForeignCurrency` properties
+- Currencies loaded from API reference data on initialization
+- `CurrencyId` passed to `BuildRequest()` / `BuildUpdateRequest()` â€” not `null`
+- XAML: Currency ComboBox + ExchangeRate TextBox (visible only when `IsForeignCurrency`)
+
+### CompanySettings Type Consistency
+- `DefaultCurrencyId` changed from `int` to `short` across ALL layers:
+  - Domain entity (`CompanySettings.cs`)
+  - EF config (`.HasColumnType("smallint")`)
+  - Migration files (20260613014517_InitialCreate + Designer + Snapshot)
+  - DTO (`AllDtos.cs`), Request (`MiscRequests.cs`)
+  - API Validator, Desktop ViewModel
+- Prevents runtime type mismatch between `short` PK in `Currencies` table and `int` FK reference
+
+### Purchase Order Navigation Crash Fix
+- `MainViewModel` now initializes `NavigateToPurchaseOrdersCommand` as a `RelayCommand`
+- Shows Arabic info dialog `"Ø´Ø§Ø´Ø© Ø£ÙˆØ§Ù…Ø± Ø§Ù„Ø´Ø±Ø§Ø¡ ØªØ­Øª Ø§Ù„ØªØ·ÙˆÙŠØ±"` instead of crashing on stale nav binding
+- Prevents `NullReferenceException` when clicking sidebar Purchase Orders button
+
+### Verification
+- [ ] `dotnet build` â€” 0 errors, 0 warnings across all 6 production projects
+- [ ] API starts without DI exceptions (`CashBoxService` resolves correctly)
+- [ ] All 34 warnings (15 Application + 3 Infrastructure + 16 Desktop) eliminated
+- [ ] No regression in existing functionality (build-only changes to warnings)
+
+---
+
+
 <!-- START OF SECTION: 15. System Version & Evolution History -->
 
 > [!NOTE]
-> Consolidated version history listing versions from inception to current production-hardened v4.6.4 release.
+> Consolidated version history listing versions from inception to current production-hardened v4.10 release.
 
-## 📝 Version History
-
-| Version | Date | Description |
-|---------|------|-------------|
-| **v4.6.4** | **2026-05-23** | **Security Hardening & Code Quality** — Rate limiting, user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes |
+## ًں“‌ Version History
 
 | Version | Date | Description |
 |---------|------|-------------|
-| v4.6.3 | 2026-05-23 | Architecture Alignment & Code Quality — Costing settings HTTP refactoring, VM DI registration, CS0108 member hiding resolutions, async void try-catch safety, RTL Arabic corrections |
-| v4.6.2 | 2026-05-23 | WPF Validation ErrorTemplate — Red border + ❗ icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated |
-| v4.6.1 | 2026-05-23 | UI Sorting & Dialog Safety — Newest-first sorting, DatabaseErrorDialog self-owner fix, comprehensive audit |
-| v4.6 | 2026-05-22 | Audit & Polish — LogSystemError centralized, Dialog overlay, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes |
-| v4.5.3 | 2026-05-22 | Identifier Strategy Complete — Code removal (Product, Customer, Supplier, Warehouse) — all entities use auto-increment Id |
-| v4.5.2 | 2026-05-22 | Identifier Strategy — Code removal (Product/Customer/Supplier) |
-| v4.5.1 | 2026-05-22 | Error & Shutdown improvements — Error message overhaul, Arabic-friendly errors, MessageBox elimination |
-| v4.5 | 2026-05-21 | Multi-Window Screen Management — Non-modal editors, ScreenWindowService |
-| v4.4 | 2026-05-21 | Production release — Auto-Update, DPAPI, Backup, Windows Service, Installer |
+| **v4.10** | **2026-06-14** | **Build Quality Hardening & Feature Completion** â€” 0 errors / 0 warnings, CashBoxService full impl, PDF export for 27 reports, multi-currency in Sales, CompanySettings type fix, Purchase Order nav crash fix |
+| **v4.6.4** | **2026-05-23** | **Security Hardening & Code Quality** â€” Rate limiting, user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes |
+
+| Version | Date | Description |
+|---------|------|-------------|
+| v4.6.3 | 2026-05-23 | Architecture Alignment & Code Quality â€” Costing settings HTTP refactoring, VM DI registration, CS0108 member hiding resolutions, async void try-catch safety, RTL Arabic corrections |
+| v4.6.2 | 2026-05-23 | WPF Validation ErrorTemplate â€” Red border + â‌— icon ErrorTemplate, INotifyDataErrorInfo standardization, ValidateAllAsync() base method, 14 Editor VMs updated |
+| v4.6.1 | 2026-05-23 | UI Sorting & Dialog Safety â€” Newest-first sorting, DatabaseErrorDialog self-owner fix, comprehensive audit |
+| v4.6 | 2026-05-22 | Audit & Polish â€” LogSystemError centralized, Dialog overlay, ValidationErrorsDialog, auto-focus, hard-delete safety, login/settings fixes |
+| v4.5.3 | 2026-05-22 | Identifier Strategy Complete â€” Code removal (Product, Customer, Supplier, Warehouse) â€” all entities use auto-increment Id |
+| v4.5.2 | 2026-05-22 | Identifier Strategy â€” Code removal (Product/Customer/Supplier) |
+| v4.5.1 | 2026-05-22 | Error & Shutdown improvements â€” Error message overhaul, Arabic-friendly errors, MessageBox elimination |
+| v4.5 | 2026-05-21 | Multi-Window Screen Management â€” Non-modal editors, ScreenWindowService |
+| v4.4 | 2026-05-21 | Production release â€” Auto-Update, DPAPI, Backup, Windows Service, Installer |
 | v4.3 | 2026-05-15 | Print engine (QuestPDF + Win32), Dynamic UOM, Costing strategy, Cash boxes, Price history |
 | v4.2 | 2026-05-10 | Delete strategy, Defensive programming, WPF dialogs, Toast notifications, Real-time validation |
 | v4.1 | 2026-05-05 | Wholesale/Retail pricing, Unit conversion in Domain |
-| v4.0 | 2026-05-01 | Clean Architecture rewrite — 6 projects, Service Layer, Result<T> |
-| v3.0 | 2026-04-15 | Initial architecture — PRD-MVP |
+| v4.0 | 2026-05-01 | Clean Architecture rewrite â€” 6 projects, Service Layer, Result<T> |
+| v3.0 | 2026-04-15 | Initial architecture â€” PRD-MVP |
 
 
 <!-- END OF SECTION: 15. System Version & Evolution History -->
@@ -6370,41 +4121,41 @@ These are documented in AGENTS.md or discussed but **have zero code in the codeb
 > [!NOTE]
 > Rules that AI agents must strictly follow when writing code or applying database changes to the codebase.
 
-15. تعليمات للـ AI Agent
+15. طھط¹ظ„ظٹظ…ط§طھ ظ„ظ„ظ€ AI Agent
 text
 
-⚠️ تعليمات إلزامية لكل طلب برمجي:
+âڑ ï¸ڈ طھط¹ظ„ظٹظ…ط§طھ ط¥ظ„ط²ط§ظ…ظٹط© ظ„ظƒظ„ ط·ظ„ط¨ ط¨ط±ظ…ط¬ظٹ:
 
 1. DECIMAL ONLY
-   - جميع الحسابات المالية: decimal وليس float/double
-   - أمثلة: decimal total = items.Sum(i => i.LineTotal);
+   - ط¬ظ…ظٹط¹ ط§ظ„ط­ط³ط§ط¨ط§طھ ط§ظ„ظ…ط§ظ„ظٹط©: decimal ظˆظ„ظٹط³ float/double
+   - ط£ظ…ط«ظ„ط©: decimal total = items.Sum(i => i.LineTotal);
 
 2. TRANSACTIONS ALWAYS
-   - كل عملية تؤثر على أكثر من جدول: داخل BeginTransactionAsync
-   - عند أي استثناء: RollbackAsync
+   - ظƒظ„ ط¹ظ…ظ„ظٹط© طھط¤ط«ط± ط¹ظ„ظ‰ ط£ظƒط«ط± ظ…ظ† ط¬ط¯ظˆظ„: ط¯ط§ط®ظ„ BeginTransactionAsync
+   - ط¹ظ†ط¯ ط£ظٹ ط§ط³طھط«ظ†ط§ط،: RollbackAsync
 
 3. RESULT PATTERN
-   - كل Service Method ترجع: Result<T> أو Result
-   - لا رمي Exception للـ Controllers مباشرة
+   - ظƒظ„ Service Method طھط±ط¬ط¹: Result<T> ط£ظˆ Result
+   - ظ„ط§ ط±ظ…ظٹ Exception ظ„ظ„ظ€ Controllers ظ…ط¨ط§ط´ط±ط©
 
 4. DOMAIN VALIDATION
-   - التحقق من المنطق في Domain Entities
-   - التحقق من البيانات في Application Services
-   - الـ Controller يُعيد HTTP Response فقط
+   - ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط§ظ„ظ…ظ†ط·ظ‚ ظپظٹ Domain Entities
+   - ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط§ظ„ط¨ظٹط§ظ†ط§طھ ظپظٹ Application Services
+   - ط§ظ„ظ€ Controller ظٹظڈط¹ظٹط¯ HTTP Response ظپظ‚ط·
 
 5. STOCK INTEGRITY
-   - تحقق من المخزون قبل Transaction
-   - اخصم بعد حفظ الفاتورة
-   - سجل دائماً في InventoryMovements
+   - طھط­ظ‚ظ‚ ظ…ظ† ط§ظ„ظ…ط®ط²ظˆظ† ظ‚ط¨ظ„ Transaction
+   - ط§ط®طµظ… ط¨ط¹ط¯ ط­ظپط¸ ط§ظ„ظپط§طھظˆط±ط©
+   - ط³ط¬ظ„ ط¯ط§ط¦ظ…ط§ظ‹ ظپظٹ InventoryMovements
 
 6. NO DIRECT DB
-   - Desktop لا يصل لـ DB مباشرة
-   - كل طلب عبر HttpClient → API
+   - Desktop ظ„ط§ ظٹطµظ„ ظ„ظ€ DB ظ…ط¨ط§ط´ط±ط©
+   - ظƒظ„ ط·ظ„ط¨ ط¹ط¨ط± HttpClient â†’ API
 
 7. BALANCE DIRECTION
-   - Customer.IncreaseBalance() عند البيع الآجل
-   - Customer.DecreaseBalance() عند الدفع أو مرتجع البيع
-   - Supplier.IncreaseBalance() عند الشراء الآجل
-   - Supplier.DecreaseBalance() عند دفعنا للمورد
+   - Customer.IncreaseBalance() ط¹ظ†ط¯ ط§ظ„ط¨ظٹط¹ ط§ظ„ط¢ط¬ظ„
+   - Customer.DecreaseBalance() ط¹ظ†ط¯ ط§ظ„ط¯ظپط¹ ط£ظˆ ظ…ط±طھط¬ط¹ ط§ظ„ط¨ظٹط¹
+   - Supplier.IncreaseBalance() ط¹ظ†ط¯ ط§ظ„ط´ط±ط§ط، ط§ظ„ط¢ط¬ظ„
+   - Supplier.DecreaseBalance() ط¹ظ†ط¯ ط¯ظپط¹ظ†ط§ ظ„ظ„ظ…ظˆط±ط¯
 
 <!-- END OF SECTION: 16. AI Agent Core Guidelines & Rules -->

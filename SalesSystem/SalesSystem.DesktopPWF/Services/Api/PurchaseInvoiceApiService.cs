@@ -27,6 +27,7 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
         bool includeInactive = false,
         int page = 1,
         int pageSize = 100,
+        int? supplierId = null,
         CancellationToken ct = default)
     {
         var queryParams = new List<string>
@@ -45,6 +46,8 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
             queryParams.Add($"status={status.Value}");
         if (includeInactive)
             queryParams.Add($"includeInactive=true");
+        if (supplierId.HasValue)
+            queryParams.Add($"supplierId={supplierId.Value}");
 
         var query = string.Join("&", queryParams);
         return await ExecutePagedAsync<PurchaseInvoiceDto>(
@@ -66,7 +69,7 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
             "PurchaseInvoiceApiService.CreateAsync");
     }
 
-    public async Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, CreatePurchaseInvoiceRequest request, CancellationToken ct = default)
+    public async Task<Result<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request, CancellationToken ct = default)
     {
         return await ExecuteAsync<PurchaseInvoiceDto>(
             () => _httpClient.PutAsJsonAsync($"{BasePath}/{id}", request, ct),
@@ -87,55 +90,18 @@ public class PurchaseInvoiceApiService : ApiServiceBase, IPurchaseInvoiceApiServ
             "PurchaseInvoiceApiService.CancelAsync");
     }
 
-    public async Task<Result> UploadAttachmentAsync(int id, byte[] fileData, string fileName, CancellationToken ct = default)
+    public async Task<Result<string>> UploadAttachmentAsync(int id, string base64Content, string fileName, CancellationToken ct = default)
     {
-        try
-        {
-            AddAuthHeader();
-            using var content = new MultipartFormDataContent();
-            using var fileContent = new ByteArrayContent(fileData);
-            content.Add(fileContent, "file", fileName);
-            var response = await _httpClient.PostAsync($"{BasePath}/{id}/attachment", content, ct);
-            return await HandleResponseAsync(response);
-        }
-        catch (Exception ex)
-        {
-            return HandleConnectionError(ex, "PurchaseInvoiceApiService.UploadAttachmentAsync");
-        }
+        var request = new { base64Content, fileName };
+        return await ExecuteAsync<string>(
+            () => _httpClient.PostAsJsonAsync($"{BasePath}/{id}/upload-attachment", request, ct),
+            "PurchaseInvoiceApiService.UploadAttachmentAsync");
     }
 
-    public async Task<Result<byte[]>> DownloadAttachmentAsync(int id, CancellationToken ct = default)
+    public async Task<Result> DeleteAttachmentAsync(int id, CancellationToken ct = default)
     {
-        try
-        {
-            AddAuthHeader();
-            var response = await _httpClient.GetAsync($"{BasePath}/{id}/attachment", ct);
-            if (response.IsSuccessStatusCode)
-            {
-                var data = await response.Content.ReadAsByteArrayAsync();
-                return Result<byte[]>.Success(data);
-            }
-            try
-            {
-                if (response.Content.Headers.ContentType?.MediaType == "application/json")
-                {
-                    var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(cancellationToken: ct);
-                    Serilog.Log.Warning("API failure: {StatusCode} - {Error} ({ErrorCode})", response.StatusCode, error?.Error, error?.ErrorCode);
-                    return Result<byte[]>.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
-                }
-                var content = await response.Content.ReadAsStringAsync(ct);
-                Serilog.Log.Warning("API failure (non-JSON): {StatusCode} - {Content}", response.StatusCode, content);
-                return Result<byte[]>.Failure($"خطأ في الخادم: {response.StatusCode}", response.StatusCode.ToString());
-            }
-            catch (Exception ex)
-            {
-                Serilog.Log.Error(ex, "Unexpected error parsing API error response. StatusCode: {StatusCode}", response.StatusCode);
-                return Result<byte[]>.Failure("حدث خطأ غير متوقع", "Unknown");
-            }
-        }
-        catch (Exception ex)
-        {
-            return HandleConnectionError<byte[]>(ex, "PurchaseInvoiceApiService.DownloadAttachmentAsync");
-        }
+        return await ExecuteCommandAsync(
+            () => _httpClient.DeleteAsync($"{BasePath}/{id}/attachment", ct),
+            "PurchaseInvoiceApiService.DeleteAttachmentAsync");
     }
 }

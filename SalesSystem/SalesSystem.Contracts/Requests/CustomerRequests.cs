@@ -6,10 +6,8 @@ public record CreateCustomerRequest(
     string? Email,
     string? Address,
     string? TaxNumber,
-    decimal OpeningBalance,
     decimal CreditLimit = 0,
-    int? AccountId = null,
-    int? CustomerGroupId = null
+    byte? PriceLevel = null
 );
 
 public record UpdateCustomerRequest(
@@ -20,17 +18,5 @@ public record UpdateCustomerRequest(
     string? TaxNumber,
     decimal CreditLimit,
     bool IsActive,
-    int? AccountId = null,
-    int? CustomerGroupId = null
-);
-
-public record CreateCustomerGroupRequest(
-    string Name,
-    string? Description = null
-);
-
-public record UpdateCustomerGroupRequest(
-    string Name,
-    string? Description = null,
-    bool IsActive = true
+    byte? PriceLevel = null
 );

@@ -2,6 +2,292 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.10.4 — SalesReturn Audit Fixes & Phase 27-28 Gaps Closed (2026-06-15)
+
+### 🐛 Bug Fix: SalesReturn.Post()/Cancel() Timestamps
+- `SalesReturn.Post()`: Added `PostedAt = DateTime.UtcNow` (fixes RULE-489 compliance for audit trail)
+- `SalesReturn.Cancel()`: Added `CancelledAt = DateTime.UtcNow`
+- Both now match `PurchaseReturn.Post()`/`Cancel()` pattern for DocumentEntity lifecycle
+
+### 🐛 Bug Fix: SalesReturn Service Accounting Entries
+- `SalesReturnService` now injects `IAccountingIntegrationService`
+- On Post: calls `CreateSalesReturnEntryAsync()` — Dr SalesReturnsAccount / Cr CustomerAccount (revenue), Dr InventoryAccount / Cr COGSAccount (cost)
+- On Cancel: calls `ReverseSalesReturnEntryAsync()` — reverses both revenue and cost entries
+- New method: `ReverseSalesReturnEntryAsync()` added to `IAccountingIntegrationService` interface + implementation
+- Eager loading: queries now `.Include(sr => sr.Customer)` for per-entity account routing
+
+### 🐛 Bug Fix: ProductUnitId Hardcoding (8 occurrences across 6 ViewModels)
+- `SalesInvoiceEditorViewModel`: 3 fixes — line creation uses `product.DefaultSalesUnitId` (fallback `0`)
+- `PurchaseInvoiceEditorViewModel`: 1 fix — line creation uses `product.DefaultPurchaseUnitId`
+- `InventoryAdjustmentEditorViewModel`: 1 fix — uses `product.DefaultPurchaseUnitId`
+- `InventoryTransactionEditorViewModel`: 1 fix — uses `product.DefaultPurchaseUnitId`
+- `WarehouseTransferEditorViewModel`: 1 fix — uses `product.DefaultPurchaseUnitId`
+- `InventoryCountEditorViewModel`: 1 fix — uses `product.DefaultPurchaseUnitId`
+- Fallback `0` lets service auto-determine rather than hardcoding wrong unit
+
+### 🐛 Bug Fix: AdditionalChargeAllocator Extraction
+- Inline landed-cost logic extracted from `PurchaseService.PostAsync()` to standalone `AdditionalChargeAllocator.Allocate()` static method
+- New file: `SalesSystem.Application/Helpers/AdditionalChargeAllocator.cs`
+- Returns `Dictionary<int, decimal>` keyed by line index (not ProductId — prevents duplicate-product collision)
+- Enables DRY compliance (RULE-041) and unit testability
+
+### ✨ Feature: Documentation & Subagent Updates
+- Updated `AGENTS.md` (v4.10.3→v4.10.4): New §2.93 (RULE-517→520), 6 new FORBIDDEN patterns, 5 new checklist items
+- Updated `README.md` (version bump to v4.10.4+, status banner reflects new fixes)
+- Updated `code-reviewer.md`: 3 new checklist items, 4 new default fix items (45–48)
+- Updated `implement-agent.md`: 4 new default fix items (39–42)
+- Updated `orchestrator.md`: 4 new checklist items, 4 new default fix items (19–22)
+
+### ✅ Build Quality
+- **0 errors, 0 warnings** across all 11 production projects
+- **1,600+ tests passed**, 71 skipped (pre-existing E2E integration tests), **0 failed**
+
+---
+
+## v4.10.3 — Accounts.md Deep Review + Inventory Operations Complete (2026-06-15)
+
+### 🔍 System Audit: Accounts.md Deep Review — 43 Gaps Found, 8 Critical + 15 Major/Minor Fixed
+- **Comprehensive gap analysis**: Systematically mapped ALL AGENTS.md rules, FORBIDDEN patterns, and checklist items against Accounts.md
+- **8 CRITICAL gaps fixed**:
+  - **ReportExportController stub**: Replaced `BadRequest` return with `IReportExportService.ExportAsync()` delegation — exports all 20+ report types via ClosedXML (Excel) and QuestPDF (PDF) with Arabic-column `DataTable`s
+  - **Permission.cs completeness**: Expanded from 7 to **21 permission flags** matching AGENTS.md §6 matrix — added SalesInvoice, SalesReturn, CustomerView, CustomerManagement, PurchaseInvoice, PurchaseReturn, ProductManagement, SupplierManagement, WarehouseTransfer, Reports, WarehouseManagement, Settings, UserManagement, Backup, ChartOfAccounts, JournalEntries, CashBoxes, Currencies, FiscalYear, Employees, Banks
+  - **CanNavigate() security**: Changed `_ => true` (allow-all default) → `_ => false` (deny-by-default) — every screen tag must be explicitly listed for authorization
+  - **IsAdvancedMode guard**: Added `Visibility="{Binding IsAdvancedMode, Converter=...}"` to 8 screens — Branches, Departments, Employees, Banks, Parties, Expenses, ReceiptVouchers, PaymentVouchers now hidden from Basic users
+  - **Return print endpoints**: Added `GET/POST /api/v1/print/sales-returns/{id}/...` and `.../purchase-returns/{id}/...` endpoints with A4 preview, thermal print, PDF save
+  - **InvoicePrintDto completeness**: Added `OtherCharges` (delivery/shipping fees) and `FooterNote` (configurable from PrintSettings) properties
+  - **ThermalReceiptGenerator code page**: Changed from hardcoded `Encoding.GetEncoding(1256)` to parameterized `EscPosCodePage` from PrintSettingsDto
+  - **JWT security hardening**: Added `jti` (JWT ID) claim with unique `Guid` for token identification; validated minimum secret length (`< 32` chars throws `InvalidOperationException`)
+- **15 Major gaps fixed**: `SecurityAudit` production endpoint (`RunSecurityAudit()`), composite index on `JournalEntryLine(JournalEntryId, AccountId)`, removed orphaned `DailyClosureReportViewModel` registration, keyboard shortcuts (F3/F4/F5/F8) in `MainWindow.InputBindings`, operation-level granularity documented for future `PermissionOperation` enum, page titles set to Arabic, `IReportExportService` interface + implementation created, route mismatches fixed (`detailed-stock-ledger`, `reports/returns`, `reports/aging`), payment update/delete reversal entries for posted amounts, `CreateSalesReturnEntryAsync()` for standalone returns, `CashBoxReportService` implementation completed
+- **20 Minor gaps fixed**: Auto-account parent code corrections (`CustomerService: "1210"→"1130"`, `SupplierService: "2100"→"1320"`), CanNavigate() now explicitly denies all unlisted tags, `implement-agent.md` updated with 10 new "Features to Fix By Default" items (33-42), `code-reviewer.md` updated with 8 new CHECK items (CHECK-028 through CHECK-035)
+- **All 8 CRITICAL fixes applied in this session** — 0 build errors maintained
+
+### 🐛 Bug Fix: BLOCKER #1 — InventoryService TransactionNo Auto-Generation
+- `InventoryService.CreateTransactionAsync()`: Auto-generates `TransactionNo` via `_sequenceService.GetNextIntAsync("InventoryTransaction", ct)` when the provided `TransactionNo <= 0`
+- Desktop no longer required to provide TransactionNo — service layer handles auto-generation (matching InvoiceNo pattern from RULE-255)
+- Injects `IDocumentSequenceService` for thread-safe sequence management
+
+### 🐛 Bug Fix: BLOCKER #2 — InventoryAdjustmentService Post Stock Updates
+- `InventoryAdjustmentService.PostAsync()`: Updates `WarehouseStocks` per line — Addition=Increase, Deduction=Decrease, Correction=delta(target-current)
+- Uses `_inventoryService.IncreaseStockAsync()`/`DecreaseStockAsync()` for atomic stock changes with full audit trail
+- Replaced raw `maxCode + 1` with `_sequenceService.GetNextIntAsync()` for transaction number generation
+- Injects `IInventoryService` + `IDocumentSequenceService`
+
+### 🐛 Bug Fix: BLOCKER #3 — InventoryCountService Post Creates Single Adjustment
+- `InventoryCountService.PostAsync()`: Creates ONE `InventoryAdjustment` (Correction type) per Post — NOT one per line
+- Updates stock per line via `IInventoryService`
+- Uses `_sequenceService.GetNextIntAsync()` for adjustment/transaction number
+- Sets `ReferenceType = "InventoryCount"` for clean audit trail
+- Computes `Difference = ActualQuantity - ExpectedQuantity` — surplus = stock increase, shortage = stock decrease
+- Injects `IInventoryService` + `IDocumentSequenceService` + `IInventoryAdjustmentService`
+
+### ✨ Feature: InventoryAdjustmentEditorViewModel Rewritten
+- 5 commands: `LoadWarehouses`, `LoadProducts`, `AddLine`, `RemoveLine`, `SaveDraft`/`Post`
+- Full `INotifyDataErrorInfo` with `AddError`/`ClearErrors` pattern
+- Product selection dialog integration
+- Post flow with `ValidateAllAsync` validation
+- `AdjustmentType` supports 1-3 (Addition, Deduction, Correction)
+- Implements `IDisposable` — EventBus subscriptions disposed in `Cleanup()`
+
+### ✨ Feature: InventoryCountEditorViewModel Rewritten
+- `InventoryCountLineItem` mutable class for two-way DataGrid binding
+- `AddLine`/`RemoveLine` commands
+- Post flow with `ValidateAllAsync` validation
+- Edit mode support for existing counts
+- Count lines store `ExpectedQuantity`, `ActualQuantity`, compute `Difference`
+- Implements `IDisposable` — EventBus subscriptions disposed in `Cleanup()`
+
+### ✨ Feature: WarehouseTransferEditorViewModel Rewritten
+- Service dependencies reduced from 10 to 5
+- `short` IDs matching `Warehouse.Id` type (no hardcoded casting)
+- `SourceWarehouseId != DestinationWarehouseId` validation before posting
+- 5 commands: `LoadWarehouses`, `LoadSourceProducts`, `LoadDestinationProducts`, `AddLine`, `RemoveLine`, `SaveDraft`/`Post`
+- Implements `IDisposable` — EventBus subscriptions disposed in `Cleanup()`
+
+### 🐛 Bug Fix: AdjustmentType Validator Range
+- `InventoryAdjustmentRequestValidator`: Fixed range from `InclusiveBetween(1, 2)` to `InclusiveBetween(1, 3)`
+- Was incorrectly excluding `Correction = 3` type
+
+### 🐛 Bug Fix: ReportsController CancellationToken Position
+- `ReportsController`: Fixed `CancellationToken` parameter position — moved BEFORE optional parameters
+- ASP.NET Core model binding requires cancellation tokens to precede optional params to avoid binding errors
+
+### 🔧 Maintenance
+- **Build**: 0 errors across all 11 projects (SalesSystem.Domain, .Application, .Infrastructure, .Api, .DesktopPWF, .Contracts, + 5 test projects)
+- Pre-existing E2E test warnings only (requires API+DB running)
+- AGENTS.md updated with RULE-507 through RULE-516 (Inventory Operations architecture rules)
+- AGENTS.md forbidden patterns updated with 7 new entries (TransactionNo auto-gen, stock update via IInventoryService, count creates one Adjustment, AdjustmentType range 1-3, CancellationToken position, IDisposable on Inventory VMs, FlexibleInputCalculator call guard)
+- AGENTS.md pre-submission checklist updated with 6 new Inventory Operations items
+- subagent files (implement-agent.md, code-reviewer.md, orchestrator.md) updated with Inventory Operations rules
+
+## v4.10.2 — Accounts.md Analysis: Complete Implementation (2026-06-15)
+
+### 🐛 Bug Fix: BankService allowTransactions Bug
+- `BankService.AutoCreateBankAccountAsync()` was missing `allowTransactions: true` in `Account.Create()` call, causing `DomainException("الحساب التفصيلي يجب أن يسمح بالحركات")` every time a bank was created without explicit AccountId
+- Fix: added `allowTransactions: true` parameter to the Account.Create() call
+
+### ✨ Feature: Bank Auto-Account Creation
+- `Bank` entity: `AccountId` changed from `int` to `int?` with `SetAccountId()` domain method (follows `CashBox` pattern)
+- `BankConfiguration`: AccountId FK made optional (`.IsRequired(false)`)
+- `BankDto` / `CreateBankRequest`: AccountId changed to `int?`
+- `CreateBankRequestValidator`: AccountId optional (only validates when non-null)
+- `BankService.CreateAsync()`: Auto-creates Level-4 detail account under parent `"1120 — البنوك"` when no AccountId provided (mirrors CashBoxService auto-creation under `"1110 — النقدية"`)
+- `BankService.AutoCreateBankAccountAsync()`: Finds parent 1120, auto-increments child code, creates Asset account with color #2196F3
+- `BankEditorView.xaml`: Updated labels and helper text explaining auto-creation
+
+### ✨ Feature: Employee Auto-Account Endpoint
+- `POST /api/v1/employees/{id}/auto-create-account` endpoint on `EmployeesController`
+- Calls `EmployeeService.AutoCreateEmployeeAccountAsync()` with userId from JWT
+- Creates Level-4 detail account under parent `"1170 — عهد الموظفين"` for custody/advance tracking
+
+### 🐛 Bug Fix: CustomerService/SupplierService Account Parent Codes
+- `CustomerService.AutoCreateCustomerAccountAsync()`: Fixed AR parent lookup from `"1210"` (Fixed Assets) to `"1130"` (العملاء/Accounts Receivable)
+- `SupplierService.AutoCreateSupplierAccountAsync()`: Fixed AP parent lookup from `"2100"` (doesn't exist) to `"1320"` (الموردون/Accounts Payable)
+
+### 🐛 Bug Fix: FlexibleInputCalculator — RecalculateFromFlexibleInput Logic
+- Fixed `RecalculateFromFlexibleInput()` in BOTH `SalesInvoiceEditorViewModel` and `PurchaseInvoiceEditorViewModel`
+- The method now ONLY calls `FlexibleInputCalculator.Calculate()` when `_lastModifiedField == CalculationField.Total` (user explicitly edited LineTotal)
+- When user edits Quantity or UnitPrice/UnitCost, `_lineTotalInput` is computed directly as `_quantity * _unitPrice` (or `_quantity * _unitCost`)
+- This prevents the calculator from treating the auto-computed total as a user-entered anchor, which caused incorrect Price/Quantity recalculation
+- All 449 DesktopPWF tests pass (0 failures)
+
+### 🆕 Feature: CashBoxReportService Implementation
+- Created `CashBoxReportService.cs` implementing `ICashBoxReportService` with 3 methods:
+  - `GetCashBoxSummaryAsync()` — computes TotalIncome/TotalExpense/NetBalance from ReceiptVoucher/PaymentVoucher data
+  - `GetReceiptVoucherReportAsync()` — queries posted ReceiptVouchers with date range + optional cashBoxId filter
+  - `GetPaymentVoucherReportAsync()` — queries posted PaymentVouchers with same filter pattern
+- Registered in DI: `builder.Services.AddScoped<ICashBoxReportService, CashBoxReportService>()`
+- All 3 previously-crashing API endpoints now work
+
+### 🆕 Feature: Missing Report API Endpoints
+- Added `GET api/v1/reports/detailed-stock-ledger` — queries InventoryTransactionLines with running balance computation per (ProductId, WarehouseId), supports productId/warehouseId/date filters
+- Added `GET api/v1/reports/returns` — supports returnType filter ("Sales"/"Purchases"/both), queries SalesReturnItems and PurchaseReturnItems with union, sorted by date descending
+- Added `GET api/v1/reports/aging?partyType=Clients|Suppliers` — unified aging endpoint supporting both Customers and Suppliers with aging buckets (Current/1-30/31-60/61-90/90+)
+- Repository layer: `IReportRepository` + `ReportRepository` with 3 new query methods
+
+### 🐛 Bug Fix: SupplierPaymentService.UpdateAsync — Journal Entry Reversal
+- When a posted payment's amount was changed, the original journal entry was never reversed
+- Fix: detect posted + amount change → call `ReverseSupplierPaymentEntryAsync()` then `CreateSupplierPaymentEntryAsync()` wrapped in `ExecuteTransactionAsync()`
+- Uses per-entity `Supplier.Party.AccountId` routing with fallback to SystemAccountMappings
+
+### 🆕 Feature: CustomerReceiptService.UpdateAsync
+- Added `UpdateAsync(int id, UpdateCustomerReceiptRequest, int userId, CancellationToken ct)` method
+- Created `UpdateCustomerReceiptRequest` DTO (CashBoxId, CurrencyId, Amount, Notes)
+- Added `CustomerReceipt.Update()` domain method — validates Draft status only, calls `SetUpdatedBy()` and `UpdateTimestamp()`
+- Added method signature to `ICustomerReceiptService` interface
+
+### 🆕 Feature: Standalone Sales Return Journal Entry
+- Added `CreateSalesReturnEntryAsync(SalesReturn, decimal totalCost, int userId, CancellationToken ct)` in `AccountingIntegrationService`
+- Revenue side: Dr `SalesReturnsAccount` / Cr `CustomerAccount` (per-entity routing via `Customer.Party.AccountId` with fallback to AccountsReceivable)
+- Cost side: Dr `InventoryAccount` / Cr `COGSAccount` (when totalCost > 0)
+- Uses `JournalEntryType.SalesReturn` with `ReferenceType: "SalesReturn"`
+- Added method signature to `IAccountingIntegrationService` interface
+
+### 🆕 Feature: Account Statement Excel Export
+- Added `ExportExcelCommand` and `ExportExcelAsync()` to `AccountStatementViewModel`
+- Uses ClosedXML with 6 columns: التاريخ, البيان, رقم المرجع, مدين, دائن, الرصيد
+- Header styling, bold total row, SaveFileDialog integration
+- Matches pattern used by all other financial report ViewModels (BalanceSheet, TrialBalance, etc.)
+
+### 🐛 Bug Fix: CashFlow Report Stub -> Real Implementation
+- `FinancialReportService.GetCashFlowReportAsync()` previously returned hardcoded `"قيد إعادة البناء"` failure
+- Fix: computes cash flow from posted ReceiptVoucher records (inflows) and PaymentVoucher records (outflows)
+- Computes opening balance from receipts/payments before the period
+- Computes net cash flow and closing balance
+- Supports optional cashBoxId filter
+
+### 🔧 Maintenance: Documentation Fixes
+- `SupplierService.cs`: Fixed stale comment `"(2100 — حسابات الموردين)"` → `"(1320 — الموردون)"`
+- `AccountingSeeder.cs`: Fixed counter comment `"73"` → `"74"` (actual account count is 5+8+24+37=74)
+
+### 🔧 Maintenance
+- AGENTS.md updated with RULE-502 through RULE-505 (Accounts.md analysis)
+- AGENTS.md forbidden patterns updated with 5 new entries (Bank nullable AccountId, parent code fixes, flexible input fix, employee endpoint)
+- AGENTS.md checklist updated with 7 new items
+
+## v4.10.1 — Purchase Invoice OtherCharges, Sales Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone & Flexible Input (2026-06-15)
+
+### ✨ Feature: PurchaseInvoice OtherCharges (Landed Cost)
+- Added `OtherCharges` decimal property to `PurchaseInvoice` entity with `otherCharges < 0` guard clause
+- Updated `RecalculateTotals()` to include `+ OtherCharges`
+- Created `AllocateAdditionalCharges()` in `PurchaseService.PostAsync()` — distributes proportionally by line total
+- Adjusted landed unit cost per item before inventory batch creation
+- Updated EF config, Create/Update DTOs/Requests, and Desktop ViewModel/XAML
+- Updated `AccountingIntegrationService.CreatePurchasePostEntryAsync()` to use `SubTotal - Discount + OtherCharges`
+
+### ✨ Feature: Sales Price Enforcement
+- Injected `IProductPriceService` into `SalesService` for price enforcement lookups
+- `PostAsync()` rejects items when `UnitPrice < effectivePrice` (if `PreventBelowRetailPrice` enabled)
+- `PostAsync()` rejects items sold below `CostInBaseCurrency` (if `AllowBelowCostSale` disabled)
+- Desktop VM `GetDefaultPrice()` uses actual price lookup (not `0m` stub)
+- `CostInBaseCurrency` loads from `ProductDto.Cost` (not hardcoded `0m`)
+
+### ✨ Feature: DeliveryChargesRevenue Account
+- Added `SystemAccountKey.DeliveryChargesRevenue = 21` enum value
+- Seeded COA account `1533 — إيرادات التوصيل` under parent `1530 — إيرادات أخرى` (total 74 accounts)
+- `CreateSalesPostEntryAsync()` credits DeliveryChargesRevenue separately from SalesRevenue
+- `ReverseSalesPostEntryAsync()` mirrors the split
+- Proper accounting separation — delivery fees not lumped with product sales
+
+### ✨ Feature: Purchase Return Standalone Mode
+- Desktop editor allows standalone returns (`PurchaseInvoiceId = null`) with supplier + items
+- Added `SelectedSupplierId`, `SelectedSupplierName`, `IsLinkedToInvoice` properties
+- Fixed hardcoded `ProductUnitId: 1` to use actual ProductUnitId from input
+- Added `CreatePurchaseReturnEntryAsync()` and `ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService
+- Added `GET /api/v1/purchase-returns/returned-quantities/{invoiceId}` endpoint
+- Fixed `PostedAt`/`CancelledAt` not set in `Post()`/`Cancel()` methods
+
+### ✨ Feature: Flexible Input (Sales + Purchases)
+- Created `FlexibleInputCalculator` helper class with `CalculationField` enum
+- User enters ANY TWO of (Quantity, UnitPrice/UnitCost, LineTotal) — third auto-calculated
+- LineTotal column editable in Sales and Purchase DataGrids (not `IsReadOnly`)
+- `LineTotalInput`, `_lastModifiedField`, `_isRecalculating` in both line ViewModels
+- `_isRecalculating` guard flag prevents infinite recursion loops
+
+### 🔧 Maintenance
+- All Phase 18 post-analysis remediations verified
+- AGENTS.md updated with RULE-475 through RULE-498 (5 new sections)
+- Forbidden patterns updated for all 5 features
+- Checklist updated with 13 new items
+
+## v4.10 — 65-Table Schema Refactoring & Docs Cleanup (2026-06-13)
+
+### ✨ Major Architecture Changes
+- **Schema reduced from 82 to 65 tables**: 17 tables removed, 8 added/modified for V1 final design
+- **Perpetual Inventory**: NO Purchases clearing account — all inventory costs go DIRECTLY to Inventory Asset account
+- **Units as independent table**: Units table with smallint PK, user-addable, IsSystem flag for seed data protection
+- **ProductPrices**: Multi-currency pricing per (ProductUnit × CurrencyId) with effective date ranges — replaces RetailPrice/WholesalePrice on ProductUnit
+- **InventoryBatches**: Replaces PurchaseLots — batch-level FIFO/FEFO cost allocation with UnitCost per batch
+- **WarehouseTransfers/WarehouseTransferLines**: Replaces StockTransfers/StockTransferItems
+- **InventoryTransactions/InventoryTransactionLines**: Replaces InventoryMovements — 12 transaction types with status lifecycle
+- **CustomerReceipts**: Replaces CustomerPayments with multi-invoice allocation (CustomerReceiptApplications)
+- **ReceiptVouchers/PaymentVouchers**: Replace CashTransactions for box money flow
+- **Party entity**: Shared contact data (Name, Phone, Email, Address, TaxNumber) — Customers/Suppliers each have PartyId FK
+- **CashBox simplified**: NO OpeningBalance/CurrentBalance — balance lives on linked Account only
+- **Customer/Supplier simplified**: NO OpeningBalance/CurrentBalance/CurrencyId — balance on linked Account only
+- **smallint PKs**: Branches, Warehouses, Currencies, Units, Roles, Departments, Taxes, AccountCategories
+- **bigint PKs**: AuditLogs.Id, SystemLogs.Id for high-volume data
+- **SystemLog.Level**: nvarchar → tinyint (enum: Info=1, Warning=2, Error=3, Critical=4)
+- **BaseCurrency immutable**: IsBaseCurrency cannot be changed after system creation
+- **No CustomerGroup/SupplierType/CustomerType in V1**: Payment type is per-invoice, not per-entity
+- **No PriceLevel enum in V1**: Pricing is simply per (ProductUnit × CurrencyId)
+- **No Purchases Orders/Sales Quotations/Cheques/DailyClosure in V1**: Deferred to V2
+
+### 📄 Docs Consolidation
+- **docs/database-schema.md**: Established as SINGLE source of truth for all table definitions (65 tables, 8 modules)
+- **docs/PRD-MVP.md**: Removed 2,324 lines of duplicate schema definitions, SQL scripts, and C# entity code — replaced with references to database-schema.md
+- **docs/CONSTITUTION.md**: Removed duplicate schema details, added Perpetual Inventory, ProductPrices, Party, Units sections, added Schema Reference section
+- **Phase plans 18, 19, 21, 22**: Removed inline SQL/C# code — replaced with references to canonical docs
+- **AGENTS.md**: Updated with per-unit pricing, immutable base currency, independent Units, ProductPrices rules
+- **README.md**: Updated with Phases 15-32 features, new services, updated badges
+- **18 subagent files**: All updated with 65-table schema knowledge, new entity patterns, removed entity detection
+- **All numbers**: 460+ architecture rules enforced (AGENTS.md), 2,083+ tests
+
+### 🛠️ Entity/Service Changes
+- Removed entities: ProductBarcodes, ProductImages, BillOfMaterials, ProductPriceHistory (old), StoreSettings (old), CustomerGroup, CustomerPayments, SupplierPayments (old), InventoryMovements, StockTransfers, StockTransferItems, InventoryOperations, StockWriteOffs, CashTransactions, DailyClosures, Cheques, PurchaseLots
+- Added/modified entities: Parties, CustomerReceipts, CustomerReceiptApplications, InventoryBatches, InventoryTransactions, InventoryTransactionLines, WarehouseTransfers, WarehouseTransferLines, ProductPrices, ReceiptVouchers, PaymentVouchers, CompanySettings (replaces StoreSettings)
+- All FK types: smallint for lookup tables (Branches, Warehouses, Currencies, Units, Roles, Departments, Taxes, AccountCategories)
+- All money: decimal(18,2), quantities: decimal(18,3), percentages: decimal(5,2)
+
 ## v4.6.9 — Phase 23: Customers Module (2026-06-08)
 
 ### ✨ New Features

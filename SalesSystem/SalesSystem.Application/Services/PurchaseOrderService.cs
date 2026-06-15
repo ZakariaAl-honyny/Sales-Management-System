@@ -52,7 +52,7 @@ public class PurchaseOrderService : IPurchaseOrderService
             (!to.HasValue || o.OrderDate <= to.Value) &&
             (searchLower == null ||
              (searchId.HasValue && o.Id == searchId.Value) ||
-             (o.Supplier != null && o.Supplier.Name.ToLower().Contains(searchLower)) ||
+             (o.Supplier != null && o.Supplier.Party != null && o.Supplier.Party.Name.ToLower().Contains(searchLower)) ||
              (o.Notes != null && o.Notes.ToLower().Contains(searchLower)));
 
         var includes = new[] { "Supplier", "Warehouse" };
@@ -218,7 +218,7 @@ public class PurchaseOrderService : IPurchaseOrderService
             o.Id,
             o.OrderNo,
             o.SupplierId,
-            o.Supplier?.Name ?? "غير معروف",
+            o.Supplier?.Party?.Name ?? "غير معروف",
             o.WarehouseId,
             o.Warehouse?.Name ?? "غير معروف",
             o.OrderDate,
@@ -236,7 +236,7 @@ public class PurchaseOrderService : IPurchaseOrderService
                 i.ProductId,
                 i.Product?.Name ?? "غير معروف",
                 i.ProductUnitId,
-                i.ProductUnit?.UnitName ?? "غير معروف",
+                i.ProductUnit?.Unit?.Name ?? "غير معروف",
                 i.Quantity,
                 i.ReceivedQuantity,
                 i.PendingReceiveQuantity,

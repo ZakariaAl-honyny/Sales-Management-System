@@ -1,0 +1,78 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.SystemAccountMappings.SystemAccountMappingEditorView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.SystemAccountMappings"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance vm:SystemAccountMappingEditorViewModel, IsDesignTimeCreatable=False}"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="تعديل حساب النظام" Style="{StaticResource HeaderStyle}"/>
+
+        <!-- Form -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="24" Margin="0,16,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Mapping Key (read-only) -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="المفتاح" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MappingKeyDisplay, Mode=OneWay}"
+                         Style="{StaticResource ModernTextBox}" IsReadOnly="True"
+                         ToolTip="مفتاح النظام — لا يمكن تغييره" Margin="0,0,0,12"/>
+
+                <!-- Account Name (read-only info) -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="الحساب المحاسبي" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding AccountCode}" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Grid.Column="1" Text="{Binding AccountName}" VerticalAlignment="Center" 
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                </Grid>
+
+                <!-- Description -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="الوصف" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="وصف اختياري لربط الحساب"
+                         Style="{StaticResource ModernTextBox}" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="80"/>
+            </Grid>
+        </Border>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Style="{StaticResource FooterStyle}" Padding="12,8">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Button Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
+                        ToolTip="حفظ تغييرات حساب النظام">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="💾" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="حفظ" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}"
+                        ToolTip="إلغاء وإغلاق النافذة">
+                    <TextBlock Text="إلغاء" VerticalAlignment="Center"/>
+                </Button>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

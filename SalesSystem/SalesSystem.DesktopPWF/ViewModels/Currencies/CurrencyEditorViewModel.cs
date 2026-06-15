@@ -6,8 +6,6 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Currencies;
 
@@ -22,12 +20,11 @@ public class CurrencyEditorViewModel : ViewModelBase
     private string _code = string.Empty;
     private string _symbol = string.Empty;
     private decimal _exchangeRateToBase;
-    private bool _isBaseCurrency;
     private string? _fractionName;
+    private int _decimalPlaces = 2;
     private string? _errorMessage;
     private string _windowTitle = "إضافة عملة جديدة";
     private CurrencyDto? _currencyDto;
-    private ObservableCollection<ExchangeRateHistoryDto> _rateHistory = new();
 
     public CurrencyEditorViewModel()
         : this(
@@ -62,30 +59,9 @@ public class CurrencyEditorViewModel : ViewModelBase
         Code = currency.Code;
         Symbol = currency.Symbol;
         ExchangeRateToBase = currency.ExchangeRateToBase;
-        IsBaseCurrency = currency.IsBaseCurrency;
         FractionName = currency.FractionName;
+        DecimalPlaces = currency.DecimalPlaces;
         WindowTitle = $"تعديل العملة: {currency.Name} ({currency.Code})";
-
-        _ = LoadRateHistoryAsync();
-    }
-
-    private async Task LoadRateHistoryAsync()
-    {
-        if (_currencyDto == null) return;
-
-        var result = await _currencyService.GetRateHistoryAsync(_currencyDto.Id);
-        if (result.IsSuccess && result.Value != null)
-        {
-            await InvokeOnUIThreadAsync(() =>
-            {
-                RateHistory.Clear();
-                foreach (var item in result.Value.OrderByDescending(x => x.EffectiveDate))
-                {
-                    RateHistory.Add(item);
-                }
-                return System.Threading.Tasks.Task.CompletedTask;
-            });
-        }
     }
 
     private void InitializeCommands()
@@ -164,16 +140,25 @@ public class CurrencyEditorViewModel : ViewModelBase
         }
     }
 
-    public bool IsBaseCurrency
-    {
-        get => _isBaseCurrency;
-        set => SetProperty(ref _isBaseCurrency, value);
-    }
-
     public string? FractionName
     {
         get => _fractionName;
         set => SetProperty(ref _fractionName, value);
+    }
+
+    public int DecimalPlaces
+    {
+        get => _decimalPlaces;
+        set
+        {
+            if (SetProperty(ref _decimalPlaces, value))
+            {
+                if (value < 0 || value > 4)
+                    AddError(nameof(DecimalPlaces), "عدد المنازل العشرية يجب أن يكون بين 0 و 4");
+                else
+                    ClearErrors(nameof(DecimalPlaces));
+            }
+        }
     }
 
     public string? ErrorMessage
@@ -188,11 +173,7 @@ public class CurrencyEditorViewModel : ViewModelBase
         set => SetProperty(ref _windowTitle, value);
     }
 
-    public ObservableCollection<ExchangeRateHistoryDto> RateHistory
-    {
-        get => _rateHistory;
-        set => SetProperty(ref _rateHistory, value);
-    }
+    public bool IsBaseCurrencyReadOnly => _currencyDto?.IsBaseCurrency ?? false;
 
     public bool IsEditing => _currencyDto != null;
 
@@ -213,23 +194,15 @@ public class CurrencyEditorViewModel : ViewModelBase
 
         ErrorMessage = null;
 
-        if (IsBaseCurrency && (_currencyDto == null || !_currencyDto.IsBaseCurrency))
-        {
-            var confirmed = await _dialogService.ShowConfirmationAsync(
-                "تعيين عملة أساسية",
-                "سيتم تعيين هذه العملة كعملة أساسية للنظام. العملة الأساسية السابقة ستصبح غير أساسية.\n\nهل أنت متأكد؟");
-            if (!confirmed) return;
-        }
-
         Result<CurrencyDto> result;
         if (_currencyDto == null)
         {
-            var request = new CreateCurrencyRequest(Name, Code, Symbol, ExchangeRateToBase, IsBaseCurrency, FractionName);
+            var request = new CreateCurrencyRequest(Name, Code, Symbol, ExchangeRateToBase, IsBaseCurrency: false, FractionName, DecimalPlaces);
             result = await _currencyService.CreateAsync(request);
         }
         else
         {
-            var request = new UpdateCurrencyRequest(Name, Symbol, ExchangeRateToBase, IsBaseCurrency, FractionName);
+            var request = new UpdateCurrencyRequest(Name, Symbol, ExchangeRateToBase, FractionName, DecimalPlaces);
             result = await _currencyService.UpdateAsync(_currencyDto.Id, request);
         }
 
@@ -267,6 +240,9 @@ public class CurrencyEditorViewModel : ViewModelBase
 
         if (ExchangeRateToBase <= 0)
             AddError(nameof(ExchangeRateToBase), "سعر الصرف يجب أن يكون أكبر من صفر");
+
+        if (DecimalPlaces < 0 || DecimalPlaces > 4)
+            AddError(nameof(DecimalPlaces), "عدد المنازل العشرية يجب أن يكون بين 0 و 4");
 
         return await ValidateAllAsync();
     }

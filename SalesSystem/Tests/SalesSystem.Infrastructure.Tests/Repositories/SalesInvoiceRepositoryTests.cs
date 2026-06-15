@@ -18,10 +18,14 @@ public class SalesInvoiceRepositoryTests
 
     private async Task SeedTestData(SalesDbContext context)
     {
-        var warehouse = Warehouse.Create(name: "Test Warehouse");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse", code: "WH-TEST");
         context.Warehouses.Add(warehouse);
+        await context.SaveChangesAsync();
         
-        var customer = Customer.Create(name: "Test Customer");
+        var party = Party.Create("Test Customer", PartyType.Customer, 1);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(party.Id);
         context.Customers.Add(customer);
         
         await context.SaveChangesAsync();
@@ -143,28 +147,6 @@ public class SalesInvoiceRepositoryTests
         var updated = await context.SalesInvoices.FirstOrDefaultAsync(i => i.Id == invoice.Id);
         updated!.DiscountAmount.Should().Be(100m);
         updated.TaxAmount.Should().Be(50m);
-    }
-
-    [Fact]
-    public async Task SoftDeleteAsync_ExistingInvoice_SetsIsActiveToFalse()
-    {
-        // Arrange
-        await using var context = CreateContext("InvoiceDb6");
-        await SeedTestData(context);
-        
-        var repository = new GenericRepository<SalesInvoice>(context);
-        
-        var invoice = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 1);
-        await repository.AddAsync(invoice);
-        await context.SaveChangesAsync();
-
-        // Act
-        await repository.SoftDeleteAsync(invoice.Id);
-        await context.SaveChangesAsync();
-
-        // Assert
-        var deleted = await context.SalesInvoices.FirstOrDefaultAsync(i => i.Id == invoice.Id);
-        deleted.Should().BeNull();
     }
 
     [Fact]
@@ -306,7 +288,9 @@ public class SalesInvoiceRepositoryTests
         await context.SaveChangesAsync();
 
         // Assert
-        var updated = await context.SalesInvoices.FirstOrDefaultAsync(i => i.Id == invoice.Id);
+        var updated = await context.SalesInvoices
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(i => i.Id == invoice.Id);
         updated!.Status.Should().Be(InvoiceStatus.Cancelled);
     }
 

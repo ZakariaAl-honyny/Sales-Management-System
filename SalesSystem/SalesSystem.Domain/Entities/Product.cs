@@ -1,69 +1,118 @@
 using SalesSystem.Domain.Common;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class Product : BaseEntity
+/// <summary>
+/// Represents a product item in the inventory.
+/// Maps to the "Products" table in the new 65-table schema.
+/// - No prices stored directly (use ProductUnits → ProductPrices)
+/// - Cost tracked via InventoryBatches (weighted average)
+/// - Barcode is a varchar(50) primary barcode for quick lookup
+/// - Images managed as a single ImagePath (ProductImages table removed)
+/// </summary>
+public class Product : ActivatableEntity
 {
+    /// <summary>
+    /// Product display name.
+    /// </summary>
     public string Name { get; private set; } = string.Empty;
-    public int? CategoryId { get; private set; }
-    public int? UnitId { get; private set; } // Legacy - Keep for now
-    public int? WholesaleUnitId { get; private set; }
-    public int? RetailUnitId { get; private set; }
-    public decimal ConversionFactor { get; private set; } = 1m;
-    public decimal MinStock { get; private set; }
-    public decimal ReorderLevel { get; private set; }
+
+    /// <summary>
+    /// Primary barcode for quick lookup. varchar(50) in DB — ASCII-only barcodes.
+    /// </summary>
+    public string? Barcode { get; private set; }
+
+    /// <summary>
+    /// Product description / notes.
+    /// </summary>
     public string? Description { get; private set; }
+
+    /// <summary>
+    /// FK to ProductCategory — every product must belong to a category.
+    /// </summary>
+    public int CategoryId { get; private set; }
+
+    /// <summary>
+    /// FK to Tax (smallint). Optional tax rate override for this product.
+    /// </summary>
+    public short? TaxId { get; private set; }
+
+    /// <summary>
+    /// Quantity threshold that triggers a reorder alert.
+    /// </summary>
+    public decimal ReorderLevel { get; private set; }
+
+    /// <summary>
+    /// Indicates whether this product can expire (has an expiry date).
+    /// When true, expiry tracking via InventoryBatches is enforced.
+    /// </summary>
+    public bool TrackExpiry { get; private set; }
+
+    /// <summary>
+    /// File path or URL to the primary product image.
+    /// Single image — no separate ProductImages table.
+    /// </summary>
     public string? ImagePath { get; private set; }
 
-    // Navigation properties
-    public virtual Category? Category { get; private set; }
-    public virtual Unit? Unit { get; private set; } // Legacy
-    public virtual Unit? WholesaleUnit { get; private set; }
-    public virtual Unit? RetailUnit { get; private set; }
-    public virtual ICollection<ProductBarcode> Barcodes { get; private set; } = new List<ProductBarcode>();
+    /// <summary>
+    /// Internal notes about the product.
+    /// </summary>
+    public string? Notes { get; private set; }
+
+    /// <summary>
+    /// Pre-selected unit for purchase screens (optional).
+    /// When set, this unit is auto-selected when creating purchase invoices for this product.
+    /// </summary>
+    public short? DefaultPurchaseUnitId { get; private set; }
+
+    /// <summary>
+    /// Pre-selected unit for sales screens (optional).
+    /// When set, this unit is auto-selected when creating sales invoices for this product.
+    /// </summary>
+    public short? DefaultSalesUnitId { get; private set; }
+
+    // ─── Navigation Properties ────────────────────────────
+
+    /// <summary>
+    /// The category this product belongs to.
+    /// </summary>
+    public virtual ProductCategory? ProductCategory { get; private set; }
+
+    /// <summary>
+    /// The default purchase unit (pre-selected in purchase screens).
+    /// </summary>
+    public virtual Unit? DefaultPurchaseUnit { get; private set; }
+
+    /// <summary>
+    /// The default sales unit (pre-selected in sales screens).
+    /// </summary>
+    public virtual Unit? DefaultSalesUnit { get; private set; }
+
+    /// <summary>
+    /// The tax rate override for this product.
+    /// </summary>
+    public virtual Tax? Tax { get; private set; }
+
+    /// <summary>
+    /// Stock records per warehouse.
+    /// </summary>
     public virtual ICollection<WarehouseStock> WarehouseStocks { get; private set; } = new List<WarehouseStock>();
 
-    // ─── Dynamic UOM (Phase 1) ───────────────────────────────────────────
+    // ─── Dynamic UOM ──────────────────────────────────────
     private readonly List<ProductUnit> _units = new();
     public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
 
-    // ─── Phase 25 — Multi-Currency Pricing & Batch Tracking ──────────────
-    // Prices are accessed via ProductUnit → ProductPrice (no direct Product → ProductPrice FK).
-    // Use service-layer aggregation: product.Units.SelectMany(u => u.Prices)
-    // to get all prices across all units.
-
+    // ─── Inventory Batches ─────────────────────────────────
     private readonly List<InventoryBatch> _inventoryBatches = new();
     public IReadOnlyCollection<InventoryBatch> InventoryBatches => _inventoryBatches.AsReadOnly();
 
-    private readonly List<ProductImage> _images = new();
-    public IReadOnlyCollection<ProductImage> Images => _images.AsReadOnly();
-
     private Product() { }
 
-    // ── Centralized conversion methods (RULE-041) ───────────────────────────
-
-    public decimal ConvertRetailToWholesaleBoxes(decimal retailQty)
-        => ConversionFactor > 0 ? Math.Floor(retailQty / ConversionFactor) : 0;
-
-    public decimal GetRemainingRetailAfterWholesale(decimal retailQty)
-        => ConversionFactor > 0 ? retailQty % ConversionFactor : retailQty;
-
-    public decimal ConvertWholesaleToRetail(decimal wholesaleQty)
-        => wholesaleQty * ConversionFactor;
-
-    public decimal GetRetailQuantityEquivalent(decimal inputQty, SaleMode mode)
-        => mode == SaleMode.Wholesale ? inputQty * ConversionFactor : inputQty;
-
-    public decimal ConvertToSmallestUnit(decimal quantity, UnitType unitType)
-        => unitType == UnitType.Wholesale ? quantity * ConversionFactor : quantity;
-
-    // ─── Dynamic UOM Methods (Phase 1) ──────────────────────────────────
+    // ─── Dynamic UOM Methods ─────────────────────────────
 
     /// <summary>
-    /// Returns the base unit (Piece/Egg/etc). ALWAYS exists for valid products.
-    /// Throws if not found — product data is corrupted.
+    /// Returns the base unit. ALWAYS exists for valid products.
     /// </summary>
     public ProductUnit GetBaseUnit()
     {
@@ -74,7 +123,7 @@ public class Product : BaseEntity
     }
 
     /// <summary>
-    /// Gets a unit by its ID. Throws if not found.
+    /// Gets a unit by its ID.
     /// </summary>
     public ProductUnit GetUnitById(int unitId)
     {
@@ -85,7 +134,6 @@ public class Product : BaseEntity
 
     /// <summary>
     /// Validates product has exactly ONE base unit before saving.
-    /// Call this in the Command Handler before persisting.
     /// </summary>
     public void ValidateUnits()
     {
@@ -98,18 +146,17 @@ public class Product : BaseEntity
 
         if (baseUnits.Count > 1)
             throw new DomainException(
-                $"لا يمكن تعريف أكثر من وحدة صغرى واحدة للمنتج الواحد.\n" +
-                $"الوحدات المعرّفة كأساسية: {string.Join(", ", baseUnits.Select(u => u.UnitName))}");
+                "لا يمكن تعريف أكثر من وحدة صغرى واحدة للمنتج الواحد.");
 
         var invalidDerived = _units
-            .Where(u => !u.IsBaseUnit && u.BaseConversionFactor <= 1)
+            .Where(u => !u.IsBaseUnit && u.Factor <= 1)
             .ToList();
 
         if (invalidDerived.Any())
             throw new DomainException(
-                $"الوحدات التالية لها معامل تحويل غير صحيح:\n" +
-                $"{string.Join("\n", invalidDerived.Select(u => $"- {u.UnitName}: يجب أن يكون أكبر من 1"))}\n" +
-                $"أدخل كم وحدة صغرى بداخل كل وحدة أكبر.");
+                "الوحدات التالية لها معامل تحويل غير صحيح:\n" +
+                $"{string.Join("\n", invalidDerived.Select(u => $"- {u.Unit?.Name ?? "?"}: يجب أن يكون أكبر من 1"))}\n" +
+                "أدخل كم وحدة صغرى بداخل كل وحدة أكبر.");
     }
 
     /// <summary>
@@ -117,9 +164,8 @@ public class Product : BaseEntity
     /// </summary>
     public void RemoveUnit(ProductUnit unit)
     {
-        if (_units.Count(u => u.IsActive) <= 1 && unit.IsActive)
+        if (_units.Count <= 1)
             throw new DomainException("يجب أن يكون للمنتج وحدة قياس واحدة على الأقل");
-
         _units.Remove(unit);
     }
 
@@ -131,30 +177,7 @@ public class Product : BaseEntity
         _units.Add(unit);
     }
 
-    // ─── Image Collection Methods ──────────────────────────────────────
-
-    /// <summary>
-    /// Adds an image to the product. If marked as primary, unmarks any existing primary.
-    /// </summary>
-    public void AddImage(ProductImage image)
-    {
-        if (image.IsPrimary)
-        {
-            foreach (var img in _images)
-                img.UnsetPrimary();
-        }
-        _images.Add(image);
-    }
-
-    /// <summary>
-    /// Removes an image from the product.
-    /// </summary>
-    public void RemoveImage(ProductImage image)
-    {
-        _images.Remove(image);
-    }
-
-    // ─── Inventory Batch Methods ───────────────────────────────────────
+    // ─── Inventory Batch Methods ─────────────────────────
 
     /// <summary>
     /// Adds an inventory batch to the product.
@@ -164,70 +187,99 @@ public class Product : BaseEntity
         _inventoryBatches.Add(batch);
     }
 
-    // ─── Factory ───────────────────────────────────────────────────────
+    // ─── Factory ─────────────────────────────────────────
 
+    /// <summary>
+    /// Creates a new product.
+    /// </summary>
+    /// <param name="name">Product display name (required).</param>
+    /// <param name="categoryId">FK to ProductCategory (required).</param>
+    /// <param name="description">Optional product description.</param>
+    /// <param name="barcode">Optional primary barcode for quick lookup.</param>
+    /// <param name="taxId">Optional FK to Tax.</param>
+    /// <param name="reorderLevel">Quantity threshold for reorder alert (default 0).</param>
+    /// <param name="trackExpiry">Whether this product can expire (default false).</param>
+    /// <param name="imagePath">Optional primary image path.</param>
+    /// <param name="notes">Optional internal notes.</param>
+    /// <param name="defaultPurchaseUnitId">Optional pre-selected unit for purchase screens.</param>
+    /// <param name="defaultSalesUnitId">Optional pre-selected unit for sales screens.</param>
+    /// <param name="createdByUserId">User who created this record.</param>
+    /// <returns>The newly created Product entity.</returns>
     public static Product Create(
         string name,
-        decimal conversionFactor = 1,
-        decimal minStock = 0,
-        int? categoryId = null,
-        int? retailUnitId = null,
-        int? wholesaleUnitId = null,
+        int categoryId,
         string? description = null,
+        string? barcode = null,
+        short? taxId = null,
+        decimal reorderLevel = 0,
+        bool trackExpiry = false,
         string? imagePath = null,
+        string? notes = null,
+        short? defaultPurchaseUnitId = null,
+        short? defaultSalesUnitId = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
-        if (conversionFactor <= 0)
-            throw new DomainException("معامل التحويل يجب أن يكون أكبر من الصفر.");
-        if (minStock < 0)
-            throw new DomainException("الحد الأدنى للمخزون لا يمكن أن يكون سالباً.");
+        if (categoryId <= 0)
+            throw new DomainException("التصنيف مطلوب.");
+        if (reorderLevel < 0)
+            throw new DomainException("مستوى إعادة الطلب لا يمكن أن يكون سالباً.");
 
         var product = new Product
         {
             Name = name,
-            ConversionFactor = conversionFactor,
-            MinStock = minStock,
+            Description = description?.Trim(),
+            Barcode = barcode?.Trim(),
             CategoryId = categoryId,
-            RetailUnitId = retailUnitId,
-            WholesaleUnitId = wholesaleUnitId,
-            Description = description,
-            ImagePath = imagePath,
-            // Sync legacy fields
-            UnitId = retailUnitId
+            TaxId = taxId,
+            ReorderLevel = reorderLevel,
+            TrackExpiry = trackExpiry,
+            ImagePath = imagePath?.Trim(),
+            Notes = notes?.Trim(),
+            DefaultPurchaseUnitId = defaultPurchaseUnitId,
+            DefaultSalesUnitId = defaultSalesUnitId,
+            IsActive = true
         };
         product.SetCreatedBy(createdByUserId);
         return product;
     }
 
+    /// <summary>
+    /// Updates the product properties.
+    /// </summary>
     public void Update(
         string name,
-        decimal conversionFactor,
-        decimal minStock,
-        int? categoryId,
-        int? retailUnitId,
-        int? wholesaleUnitId,
-        string? description,
-        int? updatedByUserId,
-        string? imagePath = null)
+        int categoryId,
+        string? description = null,
+        string? barcode = null,
+        short? taxId = null,
+        decimal reorderLevel = 0,
+        bool trackExpiry = false,
+        string? imagePath = null,
+        string? notes = null,
+        short? defaultPurchaseUnitId = null,
+        short? defaultSalesUnitId = null,
+        int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب.");
-        if (conversionFactor <= 0)
-            throw new DomainException("معامل التحويل يجب أن يكون أكبر من الصفر.");
-        if (minStock < 0)
-            throw new DomainException("الحد الأدنى للمخزون لا يمكن أن يكون سالباً.");
+        if (categoryId <= 0)
+            throw new DomainException("التصنيف مطلوب.");
+        if (reorderLevel < 0)
+            throw new DomainException("مستوى إعادة الطلب لا يمكن أن يكون سالباً.");
 
         Name = name;
-        ConversionFactor = conversionFactor;
-        MinStock = minStock;
+        Description = description?.Trim();
+        Barcode = barcode?.Trim();
         CategoryId = categoryId;
-        RetailUnitId = retailUnitId;
-        WholesaleUnitId = wholesaleUnitId;
-        Description = description;
-        ImagePath = imagePath;
-        UnitId = retailUnitId;
+        TaxId = taxId;
+        ReorderLevel = reorderLevel;
+        TrackExpiry = trackExpiry;
+        ImagePath = imagePath?.Trim();
+        Notes = notes?.Trim();
+        DefaultPurchaseUnitId = defaultPurchaseUnitId;
+        DefaultSalesUnitId = defaultSalesUnitId;
 
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

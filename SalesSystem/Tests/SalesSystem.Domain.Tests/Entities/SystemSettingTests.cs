@@ -185,10 +185,13 @@ public class SystemSettingTests
     }
 
     [Fact]
-    public void IsActive_DefaultsToTrue()
+    public void Setting_HasDefaultValues()
     {
         var setting = SystemSetting.Create("Key", "Value");
 
-        setting.IsActive.Should().BeTrue();
+        setting.SettingKey.Should().Be("Key");
+        setting.SettingValue.Should().Be("Value");
+        setting.Category.Should().Be("General");
+        setting.DataType.Should().Be("string");
     }
 }

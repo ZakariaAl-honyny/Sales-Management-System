@@ -1,7 +1,6 @@
 namespace SalesSystem.DesktopPWF.Messaging.Messages;
 
 public record ProductChangedMessage(int ProductId);
-public record CategoryChangedMessage(int CategoryId);
 public record UnitChangedMessage(int UnitId);
 public record CustomerChangedMessage(int CustomerId);
 public record SupplierChangedMessage(int SupplierId);
@@ -11,8 +10,7 @@ public record SaleInvoiceChangedMessage(int InvoiceId);
 public record PurchaseInvoiceChangedMessage(int InvoiceId);
 public record SalesReturnChangedMessage(int ReturnId);
 public record PurchaseReturnChangedMessage(int ReturnId);
-public record StockTransferChangedMessage(int TransferId);
-public record CustomerPaymentChangedMessage(int PaymentId);
+public record WarehouseTransferChangedMessage(int TransferId);
 public record SupplierPaymentChangedMessage(int PaymentId);
 public record StockChangedMessage(int ProductId, int WarehouseId);
 public record CashBoxChangedMessage(int CashBoxId);
@@ -62,4 +60,58 @@ public record ProductImageChangedMessage(int ImageId);
 /// Carries the operation ID only — NO data payload (RULE-034).
 /// </summary>
 public record InventoryOperationChangedMessage(int Id);
+
+/// <summary>
+/// Published when a purchase order is created, updated, or cancelled.
+/// Carries the order ID only — NO data payload (RULE-034).
+/// </summary>
+public record PurchaseOrderChangedMessage(int OrderId);
+
+/// <summary>
+/// Published when a customer receipt is created, posted, or cancelled.
+/// Carries the receipt ID only — NO data payload (RULE-034).
+/// </summary>
+public record CustomerReceiptChangedMessage(int ReceiptId);
+
+/// <summary>
+/// Published when an inventory count is created, posted, or cancelled.
+/// Carries the count ID only — NO data payload (RULE-034).
+/// </summary>
+public record InventoryCountChangedMessage(int CountId);
+
+/// <summary>
+/// Published when an inventory adjustment is created, posted, or cancelled.
+/// Carries the adjustment ID only — NO data payload (RULE-034).
+/// </summary>
+public record InventoryAdjustmentChangedMessage(int AdjustmentId);
+
+/// <summary>
+/// Published when a notification is marked as read or deleted.
+/// Carries no data payload (RULE-034) — notifications are per-user.
+/// </summary>
+public record NotificationChangedMessage;
+
+/// <summary>
+/// Published when an attachment is created, updated, or deleted.
+/// Carries no data payload (RULE-034).
+/// </summary>
+public record AttachmentChangedMessage;
+
+/// <summary>
+/// Published when a payment voucher is created, posted, cancelled, or modified.
+/// Carries the voucher ID only — NO data payload (RULE-034).
+/// </summary>
+public record PaymentVoucherChangedMessage(int VoucherId);
+
+/// <summary>
+/// Published when a receipt voucher is created, posted, cancelled, or updated.
+/// Carries the voucher ID for targeted refresh (RULE-034).
+/// </summary>
+public record ReceiptVoucherChangedMessage(int VoucherId);
+
+/// <summary>
+/// Published when an inventory transaction is created, posted, or cancelled.
+/// Carries the transaction ID only — NO data payload (RULE-034).
+/// </summary>
+public record InventoryTransactionChangedMessage(int TransactionId);
 

@@ -26,14 +26,19 @@
 
         <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="16">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="20">
+                <StackPanel Margin="16">
 
-                    <!-- Unit Name -->
+                    <!-- Unit Lookup (ComboBox) — replaces free-text UnitName -->
                     <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="اسم الوحدة *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding UnitName, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 ToolTip="أدخل اسم الوحدة — هذا الحقل إلزامي"/>
+                        <TextBlock Text="وحدة القياس *" Style="{StaticResource LabelStyle}"/>
+                        <ComboBox ItemsSource="{Binding AvailableUnits}"
+                                  SelectedValue="{Binding SelectedUnitLookupId, ValidatesOnDataErrors=True}"
+                                  SelectedValuePath="Id"
+                                  DisplayMemberPath="Name"
+                                  Style="{StaticResource ModernComboBox}"
+                                  ToolTip="اختر وحدة القياس من القائمة — مثل: قطعة، كيلوغرام، علبة"/>
+                        <TextBlock Text="اختيار وحدة قياس من القائمة — إذا كانت الوحدة غير موجودة، أضفها أولاً من شاشة الوحدات الرئيسية" 
+                                   Style="{StaticResource HelperTextStyle}"/>
                     </StackPanel>
 
                     <!-- Conversion Factor -->
@@ -42,22 +47,8 @@
                         <TextBox Text="{Binding ConversionFactor, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ModernTextBox}"
                                  ToolTip="عامل التحويل — عدد الوحدات الأساسية في هذه الوحدة (مثال: 12 إذا كانت العلبة = 12 قطعة)"/>
-                    </StackPanel>
-
-                    <!-- Retail Price -->
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="سعر التجزئة *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding RetailPrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 ToolTip="سعر بيع التجزئة للوحدة الواحدة"/>
-                    </StackPanel>
-
-                    <!-- Wholesale Price -->
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="سعر الجملة" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding WholesalePrice, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 ToolTip="سعر بيع الجملة للوحدة الواحدة"/>
+                        <TextBlock Text="القيمة 1 تعني أنها الوحدة الأساسية. القيم الأكبر تعني وحدات أكبر" 
+                                   Style="{StaticResource HelperTextStyle}"/>
                     </StackPanel>
 
                     <!-- Is Base Unit -->
@@ -67,44 +58,12 @@
                                   ToolTip="الوحدة الأساسية هي أصغر وحدة قياس للمنتج (مثل: قطعة)"/>
                     </StackPanel>
 
-                    <!-- Barcodes -->
-                    <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="الباركود" Style="{StaticResource LabelStyle}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <TextBox Text="{Binding NewBarcode, UpdateSourceTrigger=PropertyChanged}"
-                                     Width="200"
-                                     Style="{StaticResource ModernTextBox}"
-                                     ToolTip="أدخل باركود الوحدة — يجب أن يكون فريداً"/>
-                            <Button Command="{Binding AddBarcodeCommand}"
-                                    Style="{StaticResource SuccessButton}"
-                                    Margin="8,0,0,0"
-                                    ToolTip="إضافة باركود جديد للوحدة">
-                                <TextBlock Text="➕ إضافة"/>
-                            </Button>
-                        </StackPanel>
+                    <!-- Phase 25 Info: Pricing is managed via ProductPrices -->
+                    <Border Background="{StaticResource InfoLightBrush}" CornerRadius="4" Padding="10,8">
+                        <TextBlock Text="يتم إدارة الأسعار لكل وحدة عبر شاشة «الأسعار» في تبويب الأسعار — Pricing (ProductPrices) يتم ربطها بوحدة القياس لاحقاً"
+                                   Foreground="{StaticResource InfoTextBrush}" FontSize="11" TextWrapping="Wrap"/>
+                    </Border>
 
-                        <ListBox ItemsSource="{Binding Barcodes}"
-                                 SelectedItem="{Binding SelectedBarcode}"
-                                 Height="120"
-                                 Margin="0,8,0,0"
-                                 ToolTip="قائمة الباركود المسجلة للوحدة">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <Button Command="{Binding RemoveBarcodeCommand}"
-                                Style="{StaticResource DangerButton}"
-                                Margin="0,6,0,0" Width="120"
-                                HorizontalAlignment="Left"
-                                ToolTip="حذف الباركود المحدد من القائمة">
-                            <TextBlock Text="🗑️ حذف الباركود"/>
-                        </Button>
-                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </Border>
@@ -133,7 +92,7 @@
         <!-- Footer Buttons -->
         <Border Grid.Row="2" Background="White" Padding="10,4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-<Button Command="{Binding SaveCommand}"
+                <Button Command="{Binding SaveCommand}"
                         Style="{StaticResource PrimaryButton}"
                         ToolTip="حفظ بيانات وحدة القياس">
                     <StackPanel Orientation="Horizontal">
@@ -142,7 +101,7 @@
                     </StackPanel>
                 </Button>
 
-<Button Command="{Binding CancelCommand}"
+                <Button Command="{Binding CancelCommand}"
                         Style="{StaticResource SecondaryButton}"
                         Margin="4,0,0,0"
                         ToolTip="إلغاء الأمر والعودة للقائمة">

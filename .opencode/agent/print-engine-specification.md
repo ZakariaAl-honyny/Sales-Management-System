@@ -267,6 +267,96 @@ public class ReceiptPrinter
     }
 }
 
+## v4.10 — Print DTO Updates for 65-Table Schema
+
+### Updated InvoicePrintDto Structure
+```csharp
+// InvoicePrintDto now reflects new entity structure
+public class InvoicePrintDto
+{
+    // Header (unchanged)
+    public int InvoiceNo { get; set; }
+    public string InvoiceNumber => InvoiceNo.ToString();
+    public DateTime InvoiceDate { get; set; }
+    
+    // Party-based customer/supplier
+    public string CustomerName { get; set; }          // From Customer.Party.Name
+    public string CustomerPhone { get; set; }         // From Customer.Party.Phone
+    public string CustomerTaxNumber { get; set; }     // From Customer.Party.TaxNumber
+    public string SupplierName { get; set; }          // From Supplier.Party.Name
+    public string SupplierPhone { get; set; }         // From Supplier.Party.Phone
+    
+    // Multi-currency display
+    public int CurrencyId { get; set; }
+    public string CurrencyCode { get; set; }          // e.g., "YER", "USD"
+    public string CurrencySymbol { get; set; }        // e.g., "﷼", "$"
+    public decimal ExchangeRate { get; set; }         // rate to base currency
+    
+    // Items with per-unit display
+    public List<InvoiceItemPrintDto> Items { get; set; }
+    
+    // Totals (unchanged)
+    public decimal SubTotal { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal OtherCharges { get; set; }
+    public decimal NetTotal { get; set; }
+    public decimal PaidAmount { get; set; }
+    public decimal RemainingAmount { get; set; }
+    
+    // Perpetual Inventory costing display
+    public decimal TotalCost { get; set; }            // SUM of batch costs
+    public decimal GrossProfit { get; set; }          // NetTotal - TotalCost
+    public string PaymentTypeDisplay { get; set; }
+}
+
+public class InvoiceItemPrintDto
+{
+    public string ProductName { get; set; }
+    public string UnitName { get; set; }              // From ProductUnit.Unit.Name
+    public string UnitSymbol { get; set; }            // From ProductUnit.Unit.Symbol
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal LineTotal { get; set; }
+    
+    // Batch/costing info for detailed print
+    public string? BatchNo { get; set; }              // From InventoryBatch
+    public decimal UnitCost { get; set; }             // From InventoryBatch
+    public decimal LineCost { get; set; }             // Quantity × UnitCost
+    public decimal Profit { get; set; }               // LineTotal - LineCost
+    public string? ExpiryDate { get; set; }           // From InventoryBatch (FEFO)
+}
+```
+
+### Multi-Currency Display Pattern for Prints
+```
+// A4 Invoice — Currency column shown per line
+┌──────────────┬──────┬──────────┬───────────┬───────────┬──────────┐
+│ Product      │ Qty  │ UnitPrice│ Disc      │ Total     │ Currency │
+├──────────────┼──────┼──────────┼───────────┼───────────┼──────────┤
+│ Item Name    │ 10.0 │ 500 YER  │ 0.00      │ 5,000 YER │ YER      │
+└──────────────┴──────┴──────────┴───────────┴───────────┴──────────┘
+Total: 5,000 YER  (≈ $7.14 USD at 700 rate)
+```
+
+### Perpetual Inventory Costing Display
+```
+// Show cost + profit on invoice prints (when ShowProfitInInvoice = true)
+┌──────────────────┬─────────┬────────┬────────┬────────┬──────────┐
+│ Product          │ Qty     │ Cost   │ Price  │ Profit │ Margin   │
+├──────────────────┼─────────┼────────┼────────┼────────┼──────────┤
+│ Item (Batch #1)  │ 10      │ 3,500  │ 5,000  │ 1,500  │ 30%      │
+└──────────────────┴─────────┴────────┴────────┴────────┴──────────┘
+```
+
+### Print Line Format for Thermal (with Unit)
+```
+Item Name                         10 حبة
+  500 YER × 10 = 5,000 YER
+--------------------------------
+  التكلفة: 3,500   الربح: 1,500
+```
+
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
 Phase 21 (PRD alignment) — Users & Permissions is now complete. No direct changes to the printing engine. However, Desktop UI permission-based visibility now controls access to print buttons (e.g., Cashier may see print button but Observer may not). ApplyPermissions() in MainWindow controls nav visibility including print-related screens.

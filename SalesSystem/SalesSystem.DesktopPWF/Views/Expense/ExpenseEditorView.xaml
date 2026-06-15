@@ -1,0 +1,106 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Expense.ExpenseEditorView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Background="{StaticResource BackgroundBrush}"
+        FlowDirection="RightToLeft">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Title}" Style="{StaticResource HeaderStyle}" Foreground="White" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Form -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Border Padding="16">
+                <StackPanel>
+
+                    <!-- Expense No (read-only) -->
+                    <TextBlock Text="رقم المصروف" Style="{StaticResource LabelStyle}"/>
+                    <TextBox Text="{Binding ExpenseNo, Mode=OneWay}"
+                             IsReadOnly="True"
+                             ToolTip="رقم المصروف — يتم إنشاؤه تلقائياً"
+                             Style="{StaticResource ModernTextBox}"
+                             Background="#F3F4F6"/>
+
+                    <!-- Expense Date -->
+                    <TextBlock Text="التاريخ" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                    <DatePicker SelectedDate="{Binding ExpenseDate}"
+                                ToolTip="تاريخ المصروف"
+                                Style="{StaticResource ModernDatePicker}"
+                                Margin="0,0,0,6"/>
+
+                    <!-- Expense Account -->
+                    <TextBlock Text="حساب المصروف *" Style="{StaticResource LabelStyle}"/>
+                    <ComboBox SelectedValue="{Binding ExpenseAccountId}"
+                              ToolTip="اختر حساب المصروف — هذا الحقل إلزامي"
+                              Style="{StaticResource ModernComboBox}"/>
+
+                    <!-- CashBox -->
+                    <TextBlock Text="الصندوق *" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                    <ComboBox SelectedValue="{Binding CashBoxId}"
+                              ToolTip="اختر الصندوق — هذا الحقل إلزامي"
+                              Style="{StaticResource ModernComboBox}"/>
+
+                    <!-- Currency -->
+                    <TextBlock Text="العملة *" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                    <ComboBox SelectedValue="{Binding CurrencyId}"
+                              ToolTip="اختر العملة — هذا الحقل إلزامي"
+                              Style="{StaticResource ModernComboBox}"/>
+
+                    <!-- Amount -->
+                    <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                    <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2, ValidatesOnNotifyDataErrors=True}"
+                             ToolTip="أدخل مبلغ المصروف — يجب أن يكون أكبر من صفر"
+                             Style="{StaticResource ModernTextBox}"/>
+
+                    <!-- Notes -->
+                    <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                    <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="ملاحظات إضافية — اختياري"
+                             Style="{StaticResource ModernTextBox}"
+                             TextWrapping="Wrap" MaxHeight="80" AcceptsReturn="True"/>
+
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+
+        <!-- Error Message -->
+        <Border Grid.Row="2" Margin="0,8,0,0"
+                Background="#FEF2F2" BorderBrush="#FCA5A5" BorderThickness="1"
+                CornerRadius="4"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}, TargetNullValue=Collapsed, FallbackValue=Collapsed}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="8">
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="#991B1B" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Footer Buttons -->
+        <Border Grid.Row="3" Background="White" Padding="12,8" BorderThickness="0,1,0,0"
+                BorderBrush="{StaticResource BorderBrush}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Content="💾 حفظ"
+                        Command="{Binding SaveCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        ToolTip="حفظ بيانات المصروف"/>
+                <Button Content="🚫 إلغاء"
+                        Command="{Binding CancelCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Margin="8,0,0,0"
+                        ToolTip="إلغاء وإغلاق نافذة التحرير"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

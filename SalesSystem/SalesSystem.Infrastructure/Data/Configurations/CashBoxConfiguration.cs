@@ -12,26 +12,21 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.BoxName).IsRequired().HasMaxLength(100);
 
-        // FK to Account (optional — auto-created by service layer when null)
+        // FK to Account (optional — auto-created by service layer if null at box creation)
         builder.Property(x => x.AccountId).IsRequired(false);
         builder.HasOne(x => x.Account)
             .WithMany()
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // FK to Category (optional — for classifying cash box type)
-        builder.Property(x => x.CategoryId).IsRequired(false);
-        builder.HasOne(x => x.Category)
-            .WithMany()
-            .HasForeignKey(x => x.CategoryId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.Property(x => x.BranchId).IsRequired(false);
-        builder.Property(x => x.CurrencyId).IsRequired(false);
+        builder.Property(x => x.CurrencyId).IsRequired();
         builder.HasOne(x => x.Currency)
             .WithMany()
             .HasForeignKey(x => x.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(x => x.CategoryId).IsRequired(false);
 
         builder.Property(x => x.PhoneNumber).HasMaxLength(20).IsRequired(false);
         builder.Property(x => x.TaxNumber).HasMaxLength(50).IsRequired(false);
@@ -40,12 +35,7 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
         builder.Property(x => x.IsActive).HasDefaultValue(true);
         builder.HasIndex(x => x.BoxName);
 
-        builder.HasMany(x => x.Transactions)
-            .WithOne(x => x.CashBox)
-            .HasForeignKey(x => x.CashBoxId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // Currency is already mapped via HasForeignKey above — no need to ignore or remap
+        // Currency is already mapped via HasForeignKey above
 
         builder.HasQueryFilter(x => x.IsActive);
     }

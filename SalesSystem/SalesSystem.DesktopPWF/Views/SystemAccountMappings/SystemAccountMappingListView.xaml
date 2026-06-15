@@ -1,0 +1,104 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.SystemAccountMappings.SystemAccountMappingListView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.SystemAccountMappings"
+      mc:Ignorable="d"
+      d:DataContext="{d:DesignInstance vm:SystemAccountMappingListViewModel, IsDesignTimeCreatable=False}"
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </UserControl.Resources>
+
+    <Grid Margin="24,24,24,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="حسابات النظام" Style="{StaticResource HeaderStyle}"/>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <!-- Edit -->
+                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            ToolTip="تعديل الحساب المحاسبي المرتبط بالمفتاح المحدد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="✏️" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تعديل الربط" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Refresh -->
+                    <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
+                            ToolTip="تحديث القائمة — إعادة تحميل حسابات النظام">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔃" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <!-- Grid -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <DataGrid ItemsSource="{Binding Mappings}"
+                          SelectedItem="{Binding SelectedMapping}"
+                          Style="{StaticResource ModernDataGrid}"
+                          IsReadOnly="True"
+                          AutoGenerateColumns="False"
+                          ToolTip="قائمة حسابات النظام — اختر ربطاً لتعديل الحساب المحاسبي المرتبط">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="المفتاح" Binding="{Binding MappingKeyName}" Width="150"
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
+                        <DataGridTextColumn Header="رمز الحساب" Binding="{Binding AccountCode}" Width="100"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                        <DataGridTextColumn Header="اسم الحساب" Binding="{Binding AccountName}" Width="*"
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
+                        <DataGridTextColumn Header="الوصف" Binding="{Binding DescriptionAr}" Width="200"
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
+                    </DataGrid.Columns>
+
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="تعديل الربط" Command="{Binding EditCommand}"
+                                      ToolTip="تعديل الحساب المحاسبي المرتبط">
+                                <MenuItem.Icon><TextBlock Text="✏️"/></MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
+
+                <!-- Empty State -->
+                <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="🔗" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.3"/>
+                        <TextBlock Text="لا توجد حسابات نظام" Style="{StaticResource HeaderStyle}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="سيتم إنشاء حسابات النظام تلقائياً عند تهيئة دليل الحسابات"
+                                   Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="3"
+                Background="#80FFFFFF" Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"
+                             Background="#E3E8EE" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="جاري تحميل حسابات النظام..." FontSize="14" Margin="0,12,0,0"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

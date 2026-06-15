@@ -243,6 +243,27 @@ Code quality and convention enforcement for the Sales Management System.
 ### Phase 20 CurrencyCode Validation
 - [ ] `Currency.Create()` validates `code.Trim().Length == 3` (not `> 10` or any generic length check).
 
+## v4.10.2 — Accounts.md Analysis Remediations
+
+| Check ID | Check Description |
+|----------|------------------|
+| CHECK-020 | Does `Account.Create()` pass `allowTransactions: true` for ALL Level 4+ accounts? (BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService — ALL MUST pass `allowTransactions: true` or DomainException is thrown.) |
+| CHECK-021 | Does EVERY service interface registered in DI have a concrete implementation class? (Search `services.AddScoped<I, T>` / `services.AddTransient<I, T>` and verify `T` exists. `CashBoxReportService` was previously missing.) |
+| CHECK-022 | Do Desktop ViewModel report URLs match actual API controller routes? (Check `ReportApiService.cs` for all `Get*Async()` URLs, verify each has a matching route in the API controller. Common mismatches: `detailed-stock-ledger`, `reports/returns`, `reports/aging`.) |
+| CHECK-023 | Does `SupplierPaymentService.UpdateAsync()` create reversal journal entries when a posted payment's amount changes? (Must reverse original via `ReverseSupplierPaymentEntryAsync()`, create new entry, wrap in `ExecuteTransactionAsync()`.) |
+| CHECK-024 | Does `CustomerReceiptService` have an `UpdateAsync()` method? (Previously missing entirely. Must update receipt fields and return `Result<CustomerReceiptDto>`.) |
+| CHECK-025 | Does `AccountingIntegrationService` have `CreateSalesReturnEntryAsync()` for standalone sales returns? (Must Dr SalesReturnsAccount / Cr CustomerAccount for revenue side + Dr InventoryAccount / Cr COGSAccount for cost side.) |
+| CHECK-026 | Do ALL report services return real data (not hardcoded failure stubs)? (Check `FinancialReportService.GetCashFlowReportAsync()` — was returning `"تحت التطوير"` stub instead of computing from ReceiptVoucher/PaymentVoucher data.) |
+| CHECK-027 | Do ALL financial report ViewModels have Excel (ClosedXML) export? (Check `AccountStatementViewModel` — was missing `ExportExcelCommand` while PDF export existed.) |
+| CHECK-028 | Does `ReportExportController.Export()` delegate to `IReportExportService.ExportAsync()` instead of returning `BadRequest`? (Every report type must build an Arabic-column DataTable and export via ClosedXML (Excel) or QuestPDF (PDF).) |
+| CHECK-029 | Does `Permission.cs` define ALL 21 permission flags matching the AGENTS.md Section 6 matrix? (Missing: SalesInvoice, SalesReturn, CustomerView, CustomerManagement, PurchaseInvoice, PurchaseReturn, ProductManagement, SupplierManagement, WarehouseTransfer, Reports, WarehouseManagement, Settings, UserManagement, Backup, ChartOfAccounts, JournalEntries, CashBoxes, Currencies, FiscalYear, Employees, Banks.) |
+| CHECK-030 | Does `CanNavigate()` use `_ => false` deny-by-default with EVERY screen tag explicitly listed? (The old `_ => true` allowed unauthorized users to access Manager/Admin screens through navigation.) |
+| CHECK-031 | Do Organization Management screens (Branches, Departments, Employees, Banks, Parties, Expenses) and accounting screens (ReceiptVouchers, PaymentVouchers) have `Visibility="{Binding IsAdvancedMode, Converter=...}"` to hide from Basic users? |
+| CHECK-032 | Are keyboard shortcuts defined via `<Window.InputBindings>` at minimum F3 (Products), F4 (Customers), F5 (Purchases), F8 (Reports)? |
+| CHECK-033 | Does `InvoicePrintDto` have `OtherCharges` and `FooterNote` properties? (OtherCharges must appear in A4/thermal prints; FooterNote from PrintSettings must replace the hardcoded footer.) |
+| CHECK-034 | Does `PrintController` have return print endpoints (`GET/POST /api/v1/print/sales-returns/{id}/...` and `.../purchase-returns/{id}/...`)? |
+| CHECK-035 | Do JWT tokens include a `jti` (JWT ID) claim and is the JWT secret validated for minimum 32 characters? |
+
 ## v4.6.9 — Phase 19 Settings Module Remediations
 
 ### Phase 20 Currency Module — Enhancement Checks (v4.6.9)
@@ -412,67 +433,86 @@ These items MUST be checked for any code touching Chart of Accounts or Account e
 - [ ] Service tests: CreateAsync (success, parent not found, duplicate code), DeleteAsync (children guard, not found), PermanentDeleteAsync (hard delete guard)?
 - [ ] Controller integration tests: all CRUD endpoints, auth policies (AllStaff vs ManagerAndAbove vs AdminOnly)?
 
-### Phase 23 — Customers Module Checklist
+### Phase 23 — Customers Module Checklist (65-table schema: Parties-based, No CustomerGroup)
 
-- [ ] CustomerType stored as byte (not int/string)?
-- [ ] CustomerGroup soft-deletable with child reference guard?
-- [ ] Customer.CheckCreditLimit() returns bool (never throws)?
-- [ ] AccountId/CustomerType/CustomerGroupId optional on Customer entity?
-- [ ] CustomerGroupsController uses `:int:min(1)` (not `:byte`) route constraint?
-- [ ] CustomerGroups read = AllStaff, write = ManagerAndAbove?
-- [ ] Desktop Editor loads AvailableGroups/AvailableAccounts lookup data?
-- [ ] Seeder seeds "عام" group + "عميل نقدي" with Cash type?
-- [ ] CustomerGroup DTO includes Id, Name, Description, IsActive?
-- [ ] CustomerEditorViewModel has CustomerType dropdown with Cash/Credit options?
-- [ ] CustomerEditorViewModel has CustomerGroup dropdown for group assignment?
-- [ ] CustomerEditorViewModel has Account lookup for account linking?
-- [ ] New Customer.Create() overload accepts accountId/customerType/customerGroupId?
-- [ ] New Customer.Update() overload accepts accountId/customerType/customerGroupId?
-- [ ] CustomerDto includes AccountId, AccountName, CustomerType, CustomerGroupId, CustomerGroupName?
-- [ ] CustomerGroup entity has Create()/Update() domain methods with guard clauses?
-- [ ] CustomerGroup configuration uses nvarchar(100) for Name and nvarchar(250) for Description?
-- [ ] API route uses kebab-case `api/v1/customer-groups` (not `customergroups`)?
-- [ ] Route constraints use `:int:min(1)` (not `:byte`)?
-- [ ] All endpoints use proper HTTP status codes (201 Created, 404 vs 400)?
-- [ ] No hardcoded heights/padding on new XAML views (compact styles)?
-- [ ] Save buttons always enabled — validate on click with warning dialog?
-- [ ] All FK relationships use DeleteBehavior.Restrict?
+- [ ] Customer has `PartyId` (int, non-nullable FK to Parties) — mandatory, NOT optional?
+- [ ] Customer has `AccountId` (int, non-nullable FK to Account) — mandatory, auto-created by service?
+- [ ] Customer has NO `CustomerGroupId`, NO `CustomerType`, NO `OpeningBalance`, NO `CurrentBalance`, NO `CurrencyId`?
+- [ ] Supplier follows same pattern: `PartyId` mandatory, `AccountId` mandatory, no balance/type fields?
+- [ ] `Party` entity exists with `Name`, `Phone`, `Email`, `Address`, `TaxNumber`, `Notes`?
+- [ ] `Party` is `ActivatableEntity` with `.HasQueryFilter(x => x.IsActive)`?
+- [ ] `Customer.CheckCreditLimit()` returns bool (never throws)?
+- [ ] Service auto-creates Level-4 account under `"1210 — العملاء"` for customers?
+- [ ] Service auto-creates Level-4 account under `"2100 — حسابات الموردين"` for suppliers?
+- [ ] Account auto-creation uses `GetByCodeAsync("1210")` / `GetByCodeAsync("2100")` for parent lookup?
+- [ ] Account code auto-increments: `(int.Parse(maxCode ?? "1210") + 1).ToString()`?
+- [ ] Seeder creates default "عميل نقدي" with Party + Account under 1210?
+- [ ] Seeder creates default "مورد نقدي" with Party + Account under 2100?
+- [ ] Desktop Editor has NO CustomerGroup dropdown, CustomerType radio, AccountId selector, OpeningBalance input?
+- [ ] Desktop Editor has Party fields: Name, Phone, Email, Address, TaxNumber (editable)?
+- [ ] Desktop Editor has AccountName display-only label?
+- [ ] Desktop List has NO group filter, NO CustomerType filter?
+- [ ] API routes use `api/v1/customers` (no customer-groups endpoints)?
+- [ ] NO CustomerGroup controller, service, or repository exists in V1?
+- [ ] NO CustomerType enum exists in the codebase?
+- [ ] All FK relationships use `DeleteBehavior.Restrict`?
+- [ ] CustomerDto has `AccountId`, `AccountName`, `PartyId`, `PartyName` — NO `CustomerGroupId`, `CustomerType`?
+- [ ] Phone regex `^05\d{8}$` + Email `.EmailAddress()` in validators?
 - [ ] ComboBox uses `ModernComboBox` style (NOT `ModernTextBox`)?
 - [ ] ComboBox does NOT have both `DisplayMemberPath` and `ItemTemplate` set?
-- [ ] CustomerType NOT used to gate business logic (informational only)?
-- [ ] CreditLimit enforcement checks `CreditLimit > 0` (not CustomerType)?
-- [ ] Phone regex `^05\d{8}$` + Email `.EmailAddress()` in validators?
-- [ ] Report endpoints exist (by-group, balance, aging)?
-- [ ] All async operations use ExecuteAsync wrapper (no manual try/catch)?
 
-### FORBIDDEN Patterns (Customers Module)
-- ❌ CustomerType stored as int or string in DB
-- ❌ Hard-deleting CustomerGroup when customers reference it
-- ❌ CustomerGroup route without kebab-case
-- ❌ CustomerGroup Editor/List without proper group management UI
+### 65-Table Schema Checks (New Entity Patterns)
+- [ ] `ProductPrices` table exists with `ProductUnitId`, `CurrencyId`, `Price` decimal(18,2), `EffectiveFrom`, `EffectiveTo`?
+- [ ] `InventoryBatches` table exists with `ProductId`, `WarehouseId`, `BatchNo`, `ExpiryDate`, `QuantityReceived/Remaining` decimal(18,3), `UnitCost` decimal(18,2)?
+- [ ] `Units` table uses `smallint` PK (not `int`) — `.HasColumnType("smallint")`?
+- [ ] `Units` is an independent table with seed data (not embedded in ProductUnit)?
+- [ ] `ProductUnit` has `UnitId` FK (FK to Units table), `Factor`, `IsBaseUnit`, `DefaultPurchaseUnit`, `DefaultSalesUnit` flags?
+- [ ] `WarehouseTransfer`/`WarehouseTransferLine` replaces `StockTransfer`/`StockTransferItem`?
+- [ ] `InventoryTransaction`/`InventoryTransactionLine` replaces `InventoryMovement`?
+- [ ] `AuditLog` uses `long Id` (bigint) — `.HasColumnType("bigint")`?
+- [ ] `ImportLog` uses `long Id` (bigint) for high-volume data?
+- [ ] `SystemLog.Level` uses `tinyint` (not string)?
+- [ ] `Currency.IsBaseCurrency` is IMMUTABLE — no public setter or domain method to change after creation?
+- [ ] `Currency` entity has `IsSystem` flag protecting seed currencies from deletion?
+- [ ] `Currency` entity has `FractionName` field for sub-currency display?
+- [ ] All lookup tables (Units, Roles, Departments, Currencies, Branches, Taxes) use `smallint` PK?
+- [ ] Perpetual Inventory: NO `Purchases` account — all inventory costs go direct to Inventory Asset?
+- [ ] Purchase return reversal credits `PurchaseReturnAccountId` (not InventoryAsset directly)?
+
+### FORBIDDEN Patterns (Customers + Schema)
+- ❌ `CustomerGroupId`, `CustomerGroupName`, `CustomerType` in any V1 Customer entity, DTO, request, or service
+- ❌ `SupplierType` in any V1 Supplier entity, DTO, request, or service
+- ❌ `OpeningBalance`/`CurrentBalance`/`CurrencyId` on Customer or Supplier entity
+- ❌ User-supplied AccountId in customer/supplier Create/Update requests (auto-created by service)
+- ❌ CustomerGroupController, service, repository, or Desktop UI in V1 codebase
 - ❌ `ModernTextBox` style on `ComboBox` elements (use `ModernComboBox`)
 - ❌ `DisplayMemberPath` and `ItemTemplate` on same `ComboBox`
+- ❌ `:byte` route constraint on any controller
+- ❌ `StockTransfer`/`StockTransferItem` (use `WarehouseTransfer`/`WarehouseTransferLine`)
+- ❌ `InventoryMovement` (use `InventoryTransaction`/`InventoryTransactionLine`)
+- ❌ `decimal(18,4)` for any money/quantity field (use 18,2 or 18,3)
+- ❌ `int` PK for AuditLog or ImportLog (use `long`/bigint)
 
 ## Output Format
 For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`
 
 ---
 
-## 📋 Phase Awareness (Phases 23-31)
+## 📋 Phase Awareness (Phases 18-31)
 
-The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-31 planned**:
+The system is currently at **v4.10.3 with Phases 18-25 completed and Phases 26-31 planned**. Phase 27 (Purchases) and Phase 28 (Sales) analysis gaps have been implemented: OtherCharges landed cost for purchases, delivery charges revenue separation, price enforcement in sales, purchase return standalone mode, and flexible input (any 2 of qty/price/total calculates the third). Inventory Operations (Phase 26) completed: all 3 BLOCKER bugs fixed, Desktop ViewModels rewritten, 0 build errors.
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
-| 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
-| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
-| 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
-| 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
-| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
-| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
+| 23 — Customers Module | ✅ Completed | Parties-based (Party entity), no CustomerGroup/SupplierType, Account auto-created under 1210/2100, no balance fields on Customer/Supplier |
+| 24 — Accounting Integration | ✅ Completed | Auto journal entries, COGS (AverageCost), Payment reversals, per-entity account routing |
+| 25 — Products Module | ✅ Completed | ProductPrices (per unit×currency×effective dates), Units independent table (smallint PK), ProductUnit with Factor/IsBaseUnit, InventoryBatches (FIFO), Perpetual Inventory, product images, opening stock |
+| 26 — Warehouses Module | 📝 Planned | WarehouseTransfer/WarehouseTransferLine (replaces StockTransfer), InventoryTransaction/InventoryTransactionLine (replaces InventoryMovement), warehouse types, AccountId FK |
+| 27 — Purchases Module | 🟡 Partial — OtherCharges ✅ | Multi-currency, landed cost (OtherCharges distributed proportionally), Purchase Orders, standalone returns |
+| 28 — Sales Module | 🟡 Partial — PriceEnforcement+FlexibleInput ✅ | Multi-currency, profit display, price enforcement (PreventBelowRetailPrice/AllowBelowCostSale), DeliveryChargesRevenue account, flexible input (any 2 of qty/price/total), Sales Quotations, barcode POS, credit limit enforcement |
+| 29 — Receipts & Payments | 🟡 Partial — CashBox ✅ | CashBox refactored (no balance fields, AccountId FK, RunningBalance); Cheques, PaymentAllocation, DailyClosure planned |
+| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency (CurrencyId + ExchangeRate), attachments, FiscalYear, Annual Closing |
+| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML |
 
 ### Key Architecture Rules for Subagents
 
@@ -519,6 +559,40 @@ When writing or reviewing code in ANY layer, check these:
 - [ ] CashBoxDto has NO balance fields?
 - [ ] DbSeeder does NOT create default cash box (accounts not yet seeded)?
 
+### Phases 27-28 — Sales/Purchases Analysis Gaps (v4.10.1)
+
+- [ ] PurchaseInvoice has `OtherCharges` (decimal) property with guard `otherCharges < 0`?
+- [ ] `RecalculateTotals()` includes `+ OtherCharges` for purchase invoices?
+- [ ] `AllocateAdditionalCharges()` called in `PurchaseService.PostAsync()` — landed cost distributed proportionally by line total?
+- [ ] `OtherCharges` in `CreatePurchaseInvoiceRequest`/`UpdatePurchaseInvoiceRequest`/`PurchaseInvoiceDto`?
+- [ ] `OtherCharges` in Desktop VM `RecalculateTotals()`/`BuildRequest()`/`LoadInvoiceAsync()`?
+- [ ] `SubTotal - Discount + OtherCharges` used in `AccountingIntegrationService.CreatePurchasePostEntryAsync()`?
+- [ ] `SalesService.PostAsync()` checks `PreventBelowRetailPrice` (items below registered price rejected)?
+- [ ] `SalesService.PostAsync()` checks `AllowBelowCostSale` (items below cost rejected when disabled)?
+- [ ] `IProductPriceService` injected into `SalesService` for effective price lookups?
+- [ ] Desktop VM `GetDefaultPrice()` returns actual price (not `0m` stub)?
+- [ ] `CostInBaseCurrency` loads from invoice DTO (not hardcoded `0m`)?
+- [ ] `SystemAccountKey.DeliveryChargesRevenue = 21` exists?
+- [ ] Account `1533 — إيرادات التوصيل` seeded under parent `1530 — إيرادات أخرى`?
+- [ ] `CreateSalesPostEntryAsync()` credits DeliveryChargesRevenue separately from SalesRevenue?
+- [ ] `ReverseSalesPostEntryAsync()` mirrors the split?
+- [ ] Purchase Return validates standalone mode (allows `PurchaseInvoiceId = null`)?
+- [ ] `SelectedSupplierId`/`SelectedSupplierName`/`IsLinkedToInvoice` properties in Desktop VM?
+- [ ] `ProductUnitId` NOT hardcoded to `1` in Purchase Return editor?
+- [ ] `CreatePurchaseReturnEntryAsync()` and `ReversePurchaseReturnEntryAsync()` in AccountingIntegrationService?
+- [ ] `GET /api/v1/purchase-returns/returned-quantities/{invoiceId}` endpoint exists?
+- [ ] `PostedAt`/`CancelledAt` set in `PurchaseReturn.Post()`/`Cancel()`?
+- [ ] `SalesReturn.Post()` sets `PostedAt = DateTime.UtcNow` and `SalesReturn.Cancel()` sets `CancelledAt = DateTime.UtcNow`?
+- [ ] `SalesReturnService` injects `IAccountingIntegrationService` and creates journal entries on Post/Cancel?
+- [ ] `CreateSalesReturnEntryAsync`/`ReverseSalesReturnEntryAsync` exist in `AccountingIntegrationService`?
+- [ ] `ProductUnitId` NOT hardcoded to `1` in ANY ViewModel (use DefaultPurchaseUnitId/DefaultSalesUnitId)?
+- [ ] `AllocateAdditionalCharges()` extracted to standalone `AdditionalChargeAllocator` helper class?
+- [ ] `FlexibleInputCalculator` helper class exists with `CalculationField` enum?
+- [ ] `LineTotalInput` editable property in line ViewModels?
+- [ ] `_lastModifiedField` and `_isRecalculating` guard flag in line ViewModels?
+- [ ] `RecalculateFromFlexibleInput()` calls `FlexibleInputCalculator.Calculate()`?
+- [ ] LineTotal column NOT `IsReadOnly` in Sales/Purchase DataGrids?
+
 ### Features to Fix By Default
 
 When you encounter any code related to these areas, apply fixes automatically:
@@ -528,15 +602,46 @@ When you encounter any code related to these areas, apply fixes automatically:
 3. CashTransaction.Create() internal → CHANGE to public
 4. Deposit()/Withdraw() methods on CashBox → REMOVE
 5. Client-side balance validation → REMOVE (server validates via Account)
-6. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1110 — النقدية"
-7. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
-4. Missing `CurrencyId` on financial entities → Add multi-currency support
-5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
-6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
-7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
-8. Missing journal entry on cash operations → Call AccountingIntegrationService
-9. Missing Excel export on report → Add ClosedXML worksheet generation
-10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
-11. Payment without allocation → Add PaymentAllocation tracking
-12. Missing reversal entries on payment update/delete → Add reversal journal entries
+6. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record
+7. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1110 — النقدية"
+8. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
+9. Missing `ProductPrices` table → Add per-unit pricing replacing SalePrice/RetailPrice on Product
+10. Missing `InventoryBatches` → Add FIFO batch tracking on purchase
+11. Missing `AdditionalCharges` table → Add landed cost allocation on purchase
+12. Missing journal entry on cash operations → Call AccountingIntegrationService
+13. Missing Excel export on report → Add ClosedXML worksheet generation
+14. COGS using PurchaseCost → Change to AverageCost from ProductUnit
+15. Payment without allocation → Add PaymentAllocation tracking
+16. Missing reversal entries on payment update/delete → Add reversal journal entries
+17. Old `StockTransfer`/`StockTransferItem` → Replace with `WarehouseTransfer`/`WarehouseTransferLine`
+18. Old `InventoryMovement` → Replace with `InventoryTransaction`/`InventoryTransactionLine`
+19. CustomerGroup/SupplierType references → Remove (deferred to V2)
+20. OpeningBalance/CurrentBalance on Customer/Supplier/CashBox → Remove (balance on linked Account)
+21. PriceLevel/RetailPrice/WholesalePrice on Product → Replace with ProductPrices per-unit pricing
+22. NON-smallint PK on lookup tables → Change to smallint with `.HasColumnType("smallint")`
+23. NON-bigint PK on AuditLog → Change to bigint with `.HasColumnType("bigint")`
+24. Missing filtered unique indexes → Add `.HasFilter("[IsActive] = 1")`
+25. PurchaseInvoice without OtherCharges → ADD `OtherCharges` decimal, guard, RecalculateTotals, EF config, DTOs, Desktop VM, AccountingIntegrationService landed cost.
+26. Sales without price enforcement → ADD `IProductPriceService`, enforce PreventBelowRetailPrice/AllowBelowCostSale in PostAsync, fix GetDefaultPrice/CostInBaseCurrency.
+27. DeliveryCharges in wrong account → ADD `SystemAccountKey.DeliveryChargesRevenue = 21`, seed account 1533, credit DeliveryChargesRevenue separately.
+28. Purchase Return blocking standalone → ALLOW null PurchaseInvoiceId, fix ProductUnitId hardcode, add journal entry methods, add returned-quantities endpoint.
+29. No flexible input → CREATE FlexibleInputCalculator, add LineTotalInput/guards/RecalculateFromFlexibleInput, make LineTotal editable.
+30. `AllowBelowCostSale` blocking → CHANGE seed to `"true"`, change service from `Result.Failure` to `LogWarning`
+31. Deep review missing → Always check all 13 analysis documents before implementing new Sales/Purchases features
+32. `InventoryService.CreateTransactionAsync()` requiring Desktop to provide TransactionNo → ADD auto-generation via `_sequenceService.GetNextIntAsync()` when `<= 0`
+33. `InventoryAdjustmentService.PostAsync()` directly setting `WarehouseStock.Quantity` → CHANGE to use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync`
+34. `InventoryCountService.PostAsync()` creating one Adjustment per line → CHANGE to create ONE Adjustment per Post with `ReferenceType = "InventoryCount"`
+35. `AdjustmentType` validator with range `(1,2)` → CHANGE to `InclusiveBetween(1, 3)`
+36. `ReportsController` with `CancellationToken` after optional params → MOVE CancellationToken BEFORE optional params
+37. Inventory Operations ViewModels NOT implementing `IDisposable` → ADD `IDisposable` with `Cleanup()` in `Dispose()`
+38. `RecalculateFromFlexibleInput()` calling calculator for Quantity/Price changes → CHANGE to only call calculator when `_lastModifiedField == Total`
+39. `Account.Create()` for Level 4+ without `allowTransactions: true` → DomainException `"الحساب التفصيلي يجب أن يسمح بالحركات"` will be thrown. Check ALL callers: BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService.
+40. Service interface registered in DI but missing implementation class → `InvalidOperationException` at runtime. Check: `CashBoxReportService`, and search for all `I, T` DI registrations.
+41. Report API URL mismatch between Desktop ViewModel and Controller → `DetailedStockLedgerViewModel` calls `detailed-stock-ledger` but endpoint may not exist. `ReturnsReportViewModel` calls `reports/returns` but endpoint may not exist. `AgingReportViewModel` may call wrong URL.
+42. Payment UpdateAsync without journal entry reversal for posted amounts → SupplierPaymentService AND CustomerReceiptService must reverse + re-create journal entries when posted payment amount changes.
+43. Standalone sales return missing `CreateSalesReturnEntryAsync()` in AccountingIntegrationService → Must Dr SalesReturnsAccount/Cr CustomerAccount (revenue side) + Dr InventoryAccount/Cr COGSAccount (cost side).
+44. Report service returning hardcoded stub failure instead of actual data → Check CashFlowReport, replace `"قيد إعادة البناء"` stub with real implementation from ReceiptVoucher/PaymentVoucher.
+45. `SalesReturn.Post()` without `PostedAt` / `SalesReturn.Cancel()` without `CancelledAt` → ADD `PostedAt = DateTime.UtcNow` / `CancelledAt = DateTime.UtcNow` — matches RULE-489 pattern for PurchaseReturn.
+46. `SalesReturnService` not injecting `IAccountingIntegrationService` → ADD DI injection, call `CreateSalesReturnEntryAsync()` on Post, call `ReverseSalesReturnEntryAsync()` on Cancel.
+47. `ProductUnitId` hardcoded to `1` in Desktop ViewModels → REPLACE with `product.DefaultPurchaseUnitId` (purchase/inventory screens) or `product.DefaultSalesUnitId` (sales screens). Fallback to `0` (service auto-determines).
+48. `AllocateAdditionalCharges` inline in `PurchaseService.PostAsync()` → EXTRACT to standalone `AdditionalChargeAllocator` static helper class in `Helpers/` for DRY compliance + unit testability.

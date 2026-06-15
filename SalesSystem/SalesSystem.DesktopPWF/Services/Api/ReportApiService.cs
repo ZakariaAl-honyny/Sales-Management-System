@@ -118,4 +118,44 @@ public class ReportApiService : ApiServiceBase, IReportApiService
             () => _httpClient.GetAsync(url, ct),
             "ReportApiService.GetWarehouseMovementsAsync");
     }
+
+    public async Task<Result<List<DetailedStockLedgerDto>>> GetDetailedStockLedgerAsync(int? productId = null, int? warehouseId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
+    {
+        var url = $"{BasePath}/detailed-stock-ledger";
+        var queryParams = new List<string>();
+        if (productId.HasValue) queryParams.Add($"productId={productId}");
+        if (warehouseId.HasValue) queryParams.Add($"warehouseId={warehouseId}");
+        if (from.HasValue) queryParams.Add($"from={from.Value:yyyy-MM-dd}");
+        if (to.HasValue) queryParams.Add($"to={to.Value:yyyy-MM-dd}");
+        if (queryParams.Count > 0) url += "?" + string.Join("&", queryParams);
+
+        return await ExecuteAsync<List<DetailedStockLedgerDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "ReportApiService.GetDetailedStockLedgerAsync");
+    }
+
+    public async Task<Result<List<ReturnsReportDto>>> GetReturnsReportAsync(string? returnType = null, DateTime? from = null, DateTime? to = null, int? productId = null, CancellationToken ct = default)
+    {
+        var url = $"{BasePath}/returns";
+        var queryParams = new List<string>();
+        if (!string.IsNullOrEmpty(returnType)) queryParams.Add($"returnType={returnType}");
+        if (from.HasValue) queryParams.Add($"from={from.Value:yyyy-MM-dd}");
+        if (to.HasValue) queryParams.Add($"to={to.Value:yyyy-MM-dd}");
+        if (productId.HasValue) queryParams.Add($"productId={productId}");
+        if (queryParams.Count > 0) url += "?" + string.Join("&", queryParams);
+
+        return await ExecuteAsync<List<ReturnsReportDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "ReportApiService.GetReturnsReportAsync");
+    }
+
+    public async Task<Result<List<AgingReportDto>>> GetAgingReportAsync(string partyType = "Customers", int? partyId = null, CancellationToken ct = default)
+    {
+        var url = $"{BasePath}/aging?partyType={partyType}";
+        if (partyId.HasValue) url += $"&partyId={partyId}";
+
+        return await ExecuteAsync<List<AgingReportDto>>(
+            () => _httpClient.GetAsync(url, ct),
+            "ReportApiService.GetAgingReportAsync");
+    }
 }

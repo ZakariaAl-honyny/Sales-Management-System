@@ -1,9 +1,9 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.Export;
 using Serilog;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Reports;
@@ -16,19 +16,18 @@ public class ExpiredProductsReportViewModel : ViewModelBase
 {
     private IReportApiService? _reportApiService;
     private IWarehouseApiService? _warehouseApiService;
-    private IInventoryWriteOffApiService? _writeOffApiService;
 
     private IReportApiService ReportApiService => _reportApiService ??= App.GetService<IReportApiService>();
     private IWarehouseApiService WarehouseApiService => _warehouseApiService ??= App.GetService<IWarehouseApiService>();
-    private IInventoryWriteOffApiService WriteOffApiService => _writeOffApiService ??= App.GetService<IInventoryWriteOffApiService>();
 
     // Non-null helper for DialogService (set via SetDialogService in constructor)
     private IDialogService D => DialogService!;
 
+    private IFinancialReportExportService? _pdfExportService;
+    private IFinancialReportExportService PdfExportService => _pdfExportService ??= App.GetService<IFinancialReportExportService>();
+
     private int _thresholdDays;
     private ExpiredProductDto? _selectedProduct;
-    private decimal _writeOffQuantity;
-    private string _writeOffReason = "منتهي الصلاحية";
     private string? _errorMessage;
     private WarehouseDto? _selectedWarehouse;
 
@@ -45,12 +44,12 @@ public class ExpiredProductsReportViewModel : ViewModelBase
         LoadCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(LoadAsync)));
 
-        WriteOffCommand = new AsyncRelayCommand(
-            (Func<Task>)(async () => await ExecuteAsync(WriteOffAsync)));
-
         // Load data on initialization
-        _ = LoadAsync();
-        _ = LoadWarehousesAsync();
+        _ = ExecuteAsync(LoadAsync);
+        _ = ExecuteAsync(LoadWarehousesCoreAsync);
+
+        ExportPdfCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExportPdfAsync()));
     }
 
     #region Properties
@@ -64,7 +63,7 @@ public class ExpiredProductsReportViewModel : ViewModelBase
         {
             if (SetProperty(ref _thresholdDays, value))
             {
-                _ = LoadAsync(); // Reload when threshold changes
+                _ = ExecuteAsync(LoadAsync); // Reload when threshold changes
             }
         }
     }
@@ -75,18 +74,6 @@ public class ExpiredProductsReportViewModel : ViewModelBase
     {
         get => _selectedProduct;
         set => SetProperty(ref _selectedProduct, value);
-    }
-
-    public decimal WriteOffQuantity
-    {
-        get => _writeOffQuantity;
-        set => SetProperty(ref _writeOffQuantity, value);
-    }
-
-    public string WriteOffReason
-    {
-        get => _writeOffReason;
-        set => SetProperty(ref _writeOffReason, value);
     }
 
     public ObservableCollection<WarehouseDto> Warehouses { get; }
@@ -118,7 +105,7 @@ public class ExpiredProductsReportViewModel : ViewModelBase
     #region Commands
 
     public AsyncRelayCommand LoadCommand { get; }
-    public AsyncRelayCommand WriteOffCommand { get; }
+    public AsyncRelayCommand ExportPdfCommand { get; }
 
     #endregion
 
@@ -157,102 +144,65 @@ public class ExpiredProductsReportViewModel : ViewModelBase
         }
     }
 
-    private async Task LoadWarehousesAsync()
+    private async Task LoadWarehousesCoreAsync()
     {
-        try
+        var result = await WarehouseApiService.GetAllAsync();
+        if (result.IsSuccess && result.Value != null)
         {
-            var result = await WarehouseApiService.GetAllAsync();
-            if (result.IsSuccess && result.Value != null)
+            InvokeOnUIThread(() =>
             {
-                InvokeOnUIThread(() =>
-                {
-                    Warehouses.Clear();
-                    foreach (var wh in result.Value)
-                        Warehouses.Add(wh);
+                Warehouses.Clear();
+                foreach (var wh in result.Value)
+                    Warehouses.Add(wh);
 
-                    // Select first warehouse by default
-                    if (result.Value.Count > 0)
-                        SelectedWarehouse = result.Value[0];
-                });
-            }
+                // Select first warehouse by default
+                if (result.Value.Count > 0)
+                    SelectedWarehouse = result.Value[0];
+            });
         }
-        catch (Exception ex)
+        else
         {
-            LogSystemError("فشل في تحميل المستودعات", "ExpiredProductsReportViewModel.LoadWarehousesAsync", ex);
+            HandleFailure(result.Error ?? "فشل في تحميل المستودعات", "ExpiredProductsReportViewModel.LoadWarehousesCoreAsync");
         }
     }
 
     #endregion
 
-    #region Write-Off
+    #region Export
 
-    private async Task WriteOffAsync()
+    private async Task ExportPdfAsync()
     {
-        // Validate
-        if (SelectedProduct == null)
+        if (Products.Count == 0)
         {
-            await D.ShowWarningAsync("تنبيه", "يرجى اختيار منتج من القائمة");
+            await D.ShowWarningAsync("تنبيه", "لا توجد بيانات لتصديرها");
             return;
         }
 
-        if (WriteOffQuantity <= 0)
+        try
         {
-            await D.ShowWarningAsync("تنبيه", "الكمية يجب أن تكون أكبر من صفر");
-            return;
+            var dataTable = new System.Data.DataTable();
+            dataTable.Columns.Add("المنتج", typeof(string));
+            dataTable.Columns.Add("التصنيف", typeof(string));
+            dataTable.Columns.Add("تاريخ الانتهاء", typeof(string));
+            dataTable.Columns.Add("أيام منتهي", typeof(int));
+            dataTable.Columns.Add("المخزون الحالي", typeof(decimal));
+            dataTable.Columns.Add("الحالة", typeof(string));
+
+            foreach (var item in Products)
+            {
+                var status = item.DaysExpired > 0 ? "منتهي" : "ينتهي قريباً";
+                dataTable.Rows.Add(item.ProductName, item.CategoryName,
+                    item.ExpirationDate.ToString("yyyy/MM/dd"),
+                    item.DaysExpired, item.CurrentStock, status);
+            }
+
+            await PdfExportService.ExportToPdfAsync("المنتجات منتهية الصلاحية", dataTable, 0,
+                $"ExpiredProducts_{DateTime.Now:yyyyMMdd_HHmm}.pdf");
         }
-
-        if (SelectedWarehouse == null)
+        catch (Exception ex)
         {
-            await D.ShowWarningAsync("تنبيه", "يرجى اختيار مستودع");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(WriteOffReason))
-        {
-            await D.ShowWarningAsync("تنبيه", "يرجى إدخال سبب الإتلاف");
-            return;
-        }
-
-        // Confirmation
-        var confirmed = await D.ShowConfirmationAsync(
-            "تأكيد الإتلاف",
-            $"هل أنت متأكد من إتلاف {WriteOffQuantity} وحدة من {SelectedProduct.ProductName}؟\n\n" +
-            $"السبب: {WriteOffReason}");
-
-        if (!confirmed)
-        {
-            Log.Information("User cancelled write-off for product {ProductId}", SelectedProduct.ProductId);
-            return;
-        }
-
-        Log.Information("Executing write-off: Product={ProductId}, Warehouse={WarehouseId}, Quantity={Quantity}, Reason={Reason}",
-            SelectedProduct.ProductId, SelectedWarehouse.Id, WriteOffQuantity, WriteOffReason);
-
-        var request = new CreateStockWriteOffRequest(
-            SelectedProduct.ProductId,
-            SelectedWarehouse.Id,
-            WriteOffQuantity,
-            WriteOffReason,
-            null);
-
-        var result = await WriteOffApiService.WriteOffAsync(request);
-
-        if (result.IsSuccess)
-        {
-            await D.ShowSuccessAsync("تم بنجاح", "تم ترحيل الإتلاف بنجاح");
-
-            // Reset write-off fields
-            WriteOffQuantity = 0;
-            WriteOffReason = "منتهي الصلاحية";
-            SelectedProduct = null;
-
-            // Refresh the list
-            _ = LoadAsync();
-        }
-        else
-        {
-            Log.Warning("Write-off failed for product {ProductId}: {Error}", SelectedProduct?.ProductId, result.Error);
-            await D.ShowErrorAsync("خطأ في الإتلاف", result.Error ?? "فشل في ترحيل الإتلاف. يرجى المحاولة مرة أخرى.");
+            LogSystemError("فشل في تصدير تقرير المنتجات منتهية الصلاحية إلى PDF", "ExpiredProductsReportViewModel.ExportPdf", ex);
+            await D.ShowErrorAsync("خطأ في تصدير الملف", "حدث خطأ غير متوقع أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
         }
     }
 

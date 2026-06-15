@@ -8,36 +8,42 @@ using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.Helpers;
+using SalesSystem.DesktopPWF.Models;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Payments;
 
 /// <summary>
-/// ViewModel for Supplier Payment Editor
+/// ViewModel for Supplier Payment Editor.
+/// Enhanced with multi-invoice allocation grid for settling unpaid purchase invoices.
 /// </summary>
 public class SupplierPaymentEditorViewModel : ViewModelBase
 {
     private readonly ISupplierPaymentApiService _paymentService;
     private readonly ISupplierApiService _supplierService;
+    private readonly IPurchaseInvoiceApiService _invoiceService;
+    private readonly ISupplierPaymentApplicationApiService _applicationService;
     private readonly IEventBus _eventBus;
     private readonly IPaymentPrinter _paymentPrinter;
     private readonly ISettingsApiService _settingsService;
     private readonly IDialogService _dialogService;
-
     private readonly int? _paymentId;
     private readonly bool _isReadOnly;
 
     private int _selectedSupplierId;
     private DateTime _paymentDate = DateTime.Today;
     private decimal _amount;
-    private PaymentType _paymentType = PaymentType.Cash;
+    private PaymentMethod _paymentMethod = PaymentMethod.Cash;
     private string _notes = string.Empty;
     private string _errorMessage = string.Empty;
+    private decimal _totalAllocated;
 
     private ObservableCollection<SupplierDto> _suppliers = new();
 
     public SupplierPaymentEditorViewModel(
         ISupplierPaymentApiService paymentService,
         ISupplierApiService supplierService,
+        IPurchaseInvoiceApiService invoiceService,
+        ISupplierPaymentApplicationApiService applicationService,
         IEventBus eventBus,
         IDialogService dialogService,
         int? paymentId = null,
@@ -47,6 +53,8 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         _isReadOnly = isReadOnly;
         _paymentService = paymentService;
         _supplierService = supplierService;
+        _invoiceService = invoiceService;
+        _applicationService = applicationService;
         _eventBus = eventBus;
         _paymentPrinter = App.GetService<IPaymentPrinter>();
         _settingsService = App.GetService<ISettingsApiService>();
@@ -57,6 +65,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         CancelCommand = new RelayCommand(OnCancel);
         PrintCommand = new AsyncRelayCommand(OnPrint, () => _paymentId.HasValue);
         SearchSupplierCommand = new RelayCommand(SearchSupplier, () => !_isReadOnly);
+        LoadUnpaidInvoicesCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadUnpaidInvoicesAsync, "جاري تحميل الفواتير...")));
 
         InitializeAsync();
     }
@@ -82,6 +91,8 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         : this(
             App.GetService<ISupplierPaymentApiService>(),
             App.GetService<ISupplierApiService>(),
+            App.GetService<IPurchaseInvoiceApiService>(),
+            App.GetService<ISupplierPaymentApplicationApiService>(),
             App.GetService<IEventBus>(),
             App.GetService<IDialogService>(),
             paymentId,
@@ -98,7 +109,13 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     public int SelectedSupplierId
     {
         get => _selectedSupplierId;
-        set => SetProperty(ref _selectedSupplierId, value);
+        set
+        {
+            if (SetProperty(ref _selectedSupplierId, value))
+            {
+                ClearErrors(nameof(SelectedSupplierId));
+            }
+        }
     }
 
     public DateTime PaymentDate
@@ -110,13 +127,22 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     public decimal Amount
     {
         get => _amount;
-        set => SetProperty(ref _amount, value);
+        set
+        {
+            if (SetProperty(ref _amount, value))
+            {
+                OnPropertyChanged(nameof(RemainingToAllocate));
+            }
+        }
     }
 
-    public PaymentType PaymentType
+    public PaymentMethod PaymentMethod
     {
-        get => _paymentType;
-        set => SetProperty(ref _paymentType, value);
+        get => _paymentMethod;
+        set
+        {
+            SetProperty(ref _paymentMethod, value);
+        }
     }
 
     public string Notes
@@ -137,18 +163,42 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     public string WindowTitle => _isReadOnly ? "عرض سداد المورد" :
                                  _paymentId.HasValue ? "تعديل سداد المورد" : "إضافة سداد مورد جديد";
 
-    public ObservableCollection<PaymentTypeOption> PaymentTypeOptions { get; } = new()
+    public ObservableCollection<PaymentMethodOption> PaymentMethodOptions { get; } = new()
     {
-        new PaymentTypeOption(PaymentType.Cash, "نقدي"),
-        new PaymentTypeOption(PaymentType.Credit, "آجل"),
-        new PaymentTypeOption(PaymentType.Mixed, "مختلط")
+        new PaymentMethodOption(PaymentMethod.Cash, "نقدي"),
+        new PaymentMethodOption(PaymentMethod.BankTransfer, "تحويل بنكي"),
+        new PaymentMethodOption(PaymentMethod.CreditCard, "بطاقة ائتمان")
     };
+
+    /// <summary>
+    /// Unpaid purchase invoices for the selected supplier, available for allocation
+    /// </summary>
+    public ObservableCollection<UnpaidPurchaseInvoiceItem> UnpaidInvoices { get; } = new();
+
+    /// <summary>
+    /// Total amount allocated across all invoices
+    /// </summary>
+    public decimal TotalAllocated
+    {
+        get => _totalAllocated;
+        private set => SetProperty(ref _totalAllocated, value);
+    }
+
+    /// <summary>
+    /// Remaining payment amount after deducting allocations
+    /// </summary>
+    public decimal RemainingToAllocate => Amount - TotalAllocated;
+
+    /// <summary>
+    /// True when at least one invoice has allocation
+    /// </summary>
+    public bool HasAllocations => TotalAllocated > 0;
 
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand PrintCommand { get; }
     public ICommand SearchSupplierCommand { get; }
-
+    public ICommand LoadUnpaidInvoicesCommand { get; }
 
     private void SearchSupplier()
     {
@@ -176,7 +226,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         }
     }
 
-private async Task LoadPaymentAsync()
+    private async Task LoadPaymentAsync()
     {
         if (!_paymentId.HasValue) return;
 
@@ -190,7 +240,7 @@ private async Task LoadPaymentAsync()
                 SelectedSupplierId = payment.SupplierId;
                 PaymentDate = payment.PaymentDate;
                 Amount = payment.Amount;
-                PaymentType = (PaymentType)payment.PaymentMethod;
+                PaymentMethod = (PaymentMethod)payment.PaymentMethod;
                 Notes = payment.Notes ?? string.Empty;
             }
             else
@@ -210,59 +260,141 @@ private async Task LoadPaymentAsync()
         }
     }
 
-    private void Cancel()
+    /// <summary>
+    /// Loads unpaid purchase invoices for the selected supplier.
+    /// </summary>
+    public async Task LoadUnpaidInvoicesAsync()
     {
-        RequestClose();
+        if (SelectedSupplierId <= 0)
+        {
+            UnpaidInvoices.Clear();
+            TotalAllocated = 0;
+            return;
+        }
+
+        var result = await _invoiceService.GetAllAsync(supplierId: SelectedSupplierId, pageSize: 200);
+        if (!result.IsSuccess || result.Value == null) return;
+
+        var unpaid = result.Value
+            .Where(inv => inv.Status == 2 && inv.NetTotal > inv.PaidAmount) // Posted + outstanding
+            .Select(inv => new UnpaidPurchaseInvoiceItem
+            {
+                InvoiceId = inv.Id,
+                InvoiceNo = inv.InvoiceNo,
+                InvoiceDate = inv.InvoiceDate.ToString("yyyy-MM-dd"),
+                TotalAmount = inv.NetTotal,
+                PaidAmount = inv.PaidAmount,
+                AllocatedAmount = 0
+            })
+            .OrderByDescending(i => i.InvoiceNo)
+            .ToList();
+
+        UnpaidInvoices.Clear();
+        foreach (var item in unpaid)
+        {
+            item.PropertyChanged += OnAllocationItemChanged;
+            UnpaidInvoices.Add(item);
+        }
+
+        RecalculateAllocations();
+    }
+
+    private void OnAllocationItemChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(UnpaidInvoiceAllocationItem.AllocatedAmount))
+        {
+            RecalculateAllocations();
+        }
+    }
+
+    private void RecalculateAllocations()
+    {
+        TotalAllocated = UnpaidInvoices.Sum(i => i.AllocatedAmount);
+        OnPropertyChanged(nameof(RemainingToAllocate));
+        OnPropertyChanged(nameof(HasAllocations));
+    }
+
+    /// <summary>
+    /// Validates all fields before saving. Uses INotifyDataErrorInfo pattern.
+    /// </summary>
+    private async Task<bool> ValidateAsync()
+    {
+        ClearAllErrors();
+
+        if (SelectedSupplierId == 0)
+            AddError(nameof(SelectedSupplierId), "المورد مطلوب");
+        if (Amount <= 0)
+            AddError(nameof(Amount), "يجب إدخال المبلغ بشكل صحيح (أكبر من 0)");
+        if (RemainingToAllocate < 0)
+            AddError(nameof(Amount), "المبلغ المخصص أكبر من قيمة سند الدفع");
+
+        return await ValidateAllAsync();
     }
 
     private async Task SaveOperationAsync()
     {
-        var errors = new List<string>();
-        if (SelectedSupplierId == 0) errors.Add("• المورد مطلوب");
-        if (Amount <= 0) errors.Add("• يجب إدخال المبلغ بشكل صحيح (أكبر من 0)");
-
-        if (errors.Any())
-        {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", errors);
-            RequestFocusFirstInvalidField();
-            return;
-        }
+        if (!await ValidateAsync()) return;
 
         ErrorMessage = string.Empty;
 
-        Result<SupplierPaymentDto> result;
-
         if (_paymentId.HasValue)
         {
+            // Update existing payment
             var request = new UpdateSupplierPaymentRequest(
                 SupplierId: SelectedSupplierId,
                 Amount: Amount,
-                PaymentMethod: PaymentType,
+                PaymentMethod: PaymentMethod,
                 PaymentDate: PaymentDate,
                 Notes: Notes);
-            result = await _paymentService.UpdateAsync(_paymentId.Value, request);
+            var result = await _paymentService.UpdateAsync(_paymentId.Value, request);
+
+            if (result.IsSuccess)
+            {
+                _eventBus.Publish(new SupplierPaymentChangedMessage(result.Value!.Id));
+                RequestClose();
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
+                await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
+            }
         }
         else
         {
+            // Create new payment
             var request = new CreateSupplierPaymentRequest(
                 SupplierId: SelectedSupplierId,
                 Amount: Amount,
-                PaymentMethod: PaymentType,
+                PaymentMethod: PaymentMethod,
                 PaymentDate: PaymentDate,
                 PurchaseInvoiceId: null,
+                CashBoxId: null,
                 Notes: Notes);
-            result = await _paymentService.CreateAsync(request);
-        }
+            var result = await _paymentService.CreateAsync(request);
 
-        if (result.IsSuccess)
-        {
-            _eventBus.Publish(new SupplierPaymentChangedMessage(result.Value!.Id));
-            RequestClose();
-        }
-        else
-        {
-            ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
-            await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
+            if (result.IsSuccess)
+            {
+                var paymentId = result.Value!.Id;
+
+                // Create allocations for each invoice with an allocated amount
+                foreach (var allocation in UnpaidInvoices.Where(a => a.AllocatedAmount > 0))
+                {
+                    var appRequest = new CreateSupplierPaymentApplicationRequest(
+                        paymentId,
+                        allocation.InvoiceId,
+                        allocation.AllocatedAmount);
+
+                    await _applicationService.CreateAsync(appRequest);
+                }
+
+                _eventBus.Publish(new SupplierPaymentChangedMessage(paymentId));
+                RequestClose();
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(result.Error ?? "حدث خطأ غير معروف", "SupplierPaymentEditorViewModel.SaveAsync", "[SupplierPaymentEditorViewModel.SaveAsync] Failed to save supplier payment.");
+                await _dialogService.ShowErrorAsync("خطأ في حفظ السداد", ErrorMessage);
+            }
         }
     }
 
@@ -295,5 +427,15 @@ private async Task LoadPaymentAsync()
         {
             IsBusy = false;
         }
+    }
+
+    public override void Cleanup()
+    {
+        foreach (var item in UnpaidInvoices)
+        {
+            item.PropertyChanged -= OnAllocationItemChanged;
+        }
+        UnpaidInvoices.Clear();
+        base.Cleanup();
     }
 }

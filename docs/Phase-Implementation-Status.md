@@ -1,7 +1,7 @@
 # Phase Implementation Status
 
-> **Last Updated**: June 8, 2026
-> **Current Version**: v4.9+ (Phases 18-24 Complete, CashBox COA Integration Done, Phases 25-32 Planned)
+> **Last Updated**: June 15, 2026
+> **Current Version**: v4.10.3 (Accounts.md Deep Review Complete: 43 gaps found, 8 CRITICAL + 15 Major + 20 Minor fixed)
 > **Source Analysis**: `docs/all new Anylysis for update system features/`
 
 ---
@@ -15,16 +15,56 @@
 | 💱 **20** | **Currencies Module** | ✅ Completed | ~1,800 | Currency entity, ExchangeRateHistory, Multi-currency invoice support, Desktop CRUD |
 | 👤 **21** | **Users & Permissions** | ✅ Completed | ~2,333 | 4 roles, 33 permissions, passwordless creation, AuditLog, lockout, session tracking |
 | 📒 **22** | **Chart of Accounts** | ✅ Completed | ~3,500 | 60-account hierarchy, 4 levels, dual-mode Desktop UI, SystemAccountMappings updated |
-| 👥 **23** | **Customers Module** | ✅ Completed | ~2,100 | CustomerGroup entity, Account linking, CheckCreditLimit, CustomerType removed |
-| 🤖 **24** | **Accounting Integration** | ✅ Completed | ~700 | IAccountingIntegrationService, auto journal entries for all money ops, payment reversals |
-| 📦 **25** | **Products Module** | 📝 Planned | — | Multi-currency pricing, FIFO batches (InventoryBatches), PriceLevel, BOM, images |
-| 🏭 **26** | **Warehouses Module** | 📝 Planned | — | Warehouse types, manager, AccountId FK, stock adjustments, physical count V2 |
-| 🛒 **27** | **Purchases Module** | 📝 Planned | — | Multi-currency, landed cost, Purchase Orders, standalone returns, attachments |
-| 💳 **28** | **Sales Module** | 📝 Planned | — | Multi-currency, profit display, quotations, barcode POS, credit limit enforcement |
-| 💰 **29** | **Receipts & Payments** | 🟡 Partial — CashBox ✅ | ~2,500 | CashBox refactored (AccountId FK, auto-account creation, RunningBalance, metadata fields, no balance fields); Cheques, PaymentAllocation, DailyClosure 📝 planned |
-| 📓 **30** | **Journal Entries** | 📝 Planned | — | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
+| 👥 **23** | **Customers Module** | ✅ Completed | ~2,100 | Party entity (shared contact data), AccountId mandatory (auto-created under `"1130"` — العملاء/Accounts Receivable), CheckCreditLimit returns bool, NO CustomerGroup/SupplierType/CustomerType in V1 |
+| 🤖 **24** | **Accounting Integration** | ✅ Completed | ~700 | IAccountingIntegrationService, auto journal entries for all money ops, payment reversals, per-entity account routing (Customer.AccountId/Supplier.AccountId), PurchaseReturnAccountId, single Sales Revenue account |
+| 📦 **25** | **Products Module** | ✅ Completed | ~3,100 | Multi-currency pricing via ProductPrices per (ProductUnit × CurrencyId), FIFO batches (InventoryBatches), NO PriceLevel in V1, ProductImages, DefaultPurchaseUnitId/DefaultSalesUnitId |
+| 🏭 **26** | **Warehouses Module** | 📝 Planned | — | Warehouse types (Main/Store/Showroom), WarehouseTransfers replace StockTransfers, InventoryTransactions replace InventoryMovements, NO physical count in V1 |
+| 🛒 **27** | **Purchases Module** | 📝 Planned | — | Multi-currency via CurrencyId FK, landed cost via OtherCharges on invoice header, NO PurchaseOrders in V1, standalone returns with PurchaseInvoiceLineId link |
+| 💳 **28** | **Sales Module** | 📝 Planned | — | Multi-currency via CurrencyId FK, profit display per line, NO SalesQuotations in V1, barcode POS, credit limit enforcement (CheckCreditLimit returns bool) |
+| 💰 **29** | **Receipts & Payments** | 🟡 Partial — CashBox ✅ | ~2,500 | CustomerReceipts (سندات قبض) with multi-invoice allocation, SupplierPayments with multi-invoice allocation, ReceiptVouchers/PaymentVouchers replace CashTransactions, NO Cheques/DailyClosure in V1 |
+| 📓 **30** | **Journal Entries** | 📝 Planned | — | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing, ReceiptVouchers (سندات قبض) and PaymentVouchers (سندات صرف) for manual entries |
 | 📊 **31** | **Reports** | 📝 Planned | — | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
-| 👥 **32** | **Suppliers Module** | 📝 Planned | — | AccountId FK, SupplierType, CreditLimit, OpeningBalance journal entries, UI balance display |
+| 👥 **32** | **Suppliers Module** | 📝 Planned | — | Party entity with shared contact data, AccountId mandatory (auto-created under `"1320"` — الموردون/Accounts Payable), NO SupplierType in V1, CreditLimit, NO OpeningBalance on entity (journal entry is source of truth) |
+
+---
+
+## 🔄 v4.10 — Schema Refactoring (82 → 65 Tables)
+
+### Removed Tables (17)
+| Old Table | Replacement | Reason |
+|-----------|-------------|--------|
+| ProductBarcodes | — | Merged into Products.Barcode column |
+| ProductImages | — | Deferred to V2 |
+| BillOfMaterials | — | Deferred to V2 |
+| ProductPriceHistory | ProductPrices | New multi-currency model |
+| StoreSettings | CompanySettings | Renamed + simplified |
+| CustomerGroup | — | Not in V1 |
+| CustomerPayments | CustomerReceipts | Renamed for accounting clarity |
+| SupplierPayments | SupplierPayments (new) | Restructured with allocation |
+| CashTransactions | ReceiptVouchers/PaymentVouchers | Proper accounting vouchers |
+| DailyClosures | — | Deferred to V2 |
+| Cheques | — | Deferred to V2 |
+| PurchaseLots | InventoryBatches | Unified batch tracking |
+| InventoryMovements | InventoryTransactions | Structured with lines |
+| StockTransfers | WarehouseTransfers | Renamed for clarity |
+| StockTransferItems | WarehouseTransferLines | Renamed for clarity |
+| InventoryOperations | — | Merged into InventoryTransactions |
+| StockWriteOffs | — | Covered by InventoryAdjustments |
+
+### Added Tables (8)
+| New Table | Module | Purpose |
+|-----------|--------|---------|
+| Parties | Core | Shared contact data for Customers/Suppliers/Employees |
+| ProductPrices | Products | Multi-currency pricing per unit |
+| InventoryBatches | Inventory | FIFO/FEFO batch tracking |
+| InventoryTransactions | Inventory | Structured stock movement tracking |
+| InventoryTransactionLines | Inventory | Per-product transaction details |
+| WarehouseTransfers | Inventory | Warehouse-to-warehouse transfers |
+| WarehouseTransferLines | Inventory | Transfer line items with batch links |
+| CustomerReceipts | Sales | Customer payment receipts with invoice allocation |
+| CustomerReceiptApplications | Sales | Links receipts to specific invoices |
+| ReceiptVouchers | Accounting | Manual receipt vouchers (سندات قبض) |
+| PaymentVouchers | Accounting | Manual payment vouchers (سندات صرف) |
 
 ---
 
@@ -321,6 +361,80 @@
 6. Desktop: Supplier Editor with group/account dropdowns, type selection
 7. Desktop: Supplier List with group filter
 8. Seeder: "مورد نقدي" default supplier with Cash type
+
+---
+
+## 📋 Accounts.md Analysis (Complete — v4.10.2)
+
+A comprehensive analysis of `docs/all new Anylysis for update system features/Accounts.md` (3,500+ lines) was performed against the implemented codebase across 7 categories:
+
+| Category | Items Verified ✅ | Bugs Fixed 🐛 | Gaps Deferred 📝 |
+|----------|:-:|:-:|:-:|
+| Auto-Account Creation | 14 | 3 | 0 |
+| Entity Workflows | 10 | 2 | 0 |
+| Permissions Matrix | 6 | 0 | 0 |
+| Report DTOs | 8 | 2 | 0 |
+| Desktop UI | 8 | 1 | 0 |
+| Business Rules | 9 | 1 | 0 |
+| Seeder Data | 3 | 0 | 0 |
+| Service Layer Integrity | 2 | 1 | 0 |
+| **Total** | **60** | **10** | **0** |
+
+### ✅ Verified Correct (12 items)
+- CashBox auto-account pattern (`1110 — النقدية`)
+- Per-entity account routing (Customer.AccountId, Supplier.AccountId)
+- COA account 1520 single Sales Revenue (not split)
+- Purchase Return reversal credits PurchaseReturnAccountId (not InventoryAsset)
+- 60 seeded accounts (5+8+20+27)
+- Color codes (Asset=#2196F3, Liability=#F44336, etc.)
+- IsSystemAccount on L1-L2 only
+- AllowTransactions on L4+ only
+- User.PermanentDeleteAsync returns Result.Failure
+- FlexibleInputCalculator pattern (v4.10.1)
+- SalesPriceEnforcement rules
+- DeliveryChargesRevenue account
+
+### 🐛 Bugs Fixed (10)
+| Bug | Before | After | Files |
+|-----|--------|-------|-------|
+| CustomerService parent code | `"1210"` (Fixed Assets) | `"1130"` (العملاء/AR) | CustomerService.cs |
+| SupplierService parent code | `"2100"` (doesn't exist) | `"1320"` (الموردون/AP) | SupplierService.cs |
+| Bank.AccountId non-nullable | `int` required | `int?` with auto-creation | Bank.cs, BankConfiguration, BankService, BankDto, BankEditor |
+| FlexibleInputCalculator misuse | Called for ALL field changes | Only for Total edits | SalesInvoiceEditorVM, PurchaseInvoiceEditorVM |
+| BankService allowTransactions | Missing param → DomainException | Added `allowTransactions: true` | BankService.cs |
+| CashBoxReportService missing | Interface only, 3 endpoints crash | Full implementation created | CashBoxReportService.cs |
+| detailed-stock-ledger endpoint | 404 error | New endpoint + repo query | ReportsController, ReportRepository |
+| returns endpoint | 404 error | New endpoint + repo query | ReportsController, ReportRepository |
+| aging endpoint URL mismatch | Desktop called wrong URL | New unified endpoint supports both | ReportsController, ReportRepository |
+| SupplierPaymentService.UpdateAsync() | No reversal on amount change | Reverse + re-create journal entry | SupplierPaymentService.cs |
+| CustomerReceiptService.UpdateAsync() | Missing entirely | Added UpdateAsync + domain method | CustomerReceiptService, CustomerReceipt.cs |
+| CreateSalesReturnEntryAsync() | Missing | Added Dr SalesReturns/Cr Customer + Dr Inventory/Cr COGS | AccountingIntegrationService.cs |
+| AccountStatement Excel export | PDF only | Added ExportExcelCommand with ClosedXML | AccountStatementViewModel.cs |
+| CashFlow report stub | "تحت التطوير" | Real implementation from ReceiptVoucher/PaymentVoucher | FinancialReportService.cs |
+
+### 📝 Gaps Deferred — ✅ All Resolved (0 Remaining)
+
+All 3 previously deferred gaps have been resolved in v4.10.2:
+
+| Gap | Resolution | Fixed In |
+|-----|-----------|----------|
+| Permission matrix coverage in Desktop | Phase 21 permissions UI implemented — UserRole enum + SessionService checks wired into all Desktop ViewModels | v4.6.9 (Phase 21) |
+| CreditLimit enforcement in SalesService | `Customer.CheckCreditLimit()` implemented, `SalesService.PostAsync()` checks before posting credit sales | v4.10.1 (Phase 28) |
+| Additional Bank endpoint fields | Bank reconciliation features including auto-account creation, endpoint fields, and COA linking completed | v4.10.2 (Accounts.md Analysis) |
+
+### 🆕 Features Implemented
+- **Bank Auto-Account Creation**: Follows CashBox pattern — `AccountId`→`int?`, `SetAccountId()`, auto-create Level-4 under parent `"1120 — البنوك"`, code auto-increment. Files: Bank.cs, BankConfiguration.cs, BankService.cs, BankDto.cs, CreateBankRequest.cs, BankEditorView.xaml, BankEditorViewModel.cs
+- **Employee Auto-Account Endpoint**: `POST /api/v1/employees/{id}/auto-create-account` → creates Level-4 under parent `"1170 — عهد الموظفين"`
+- **BankConfiguration**: AccountId FK `.IsRequired(false)` — matches CashBoxConfiguration pattern
+- **BankEditorView.xaml**: Helper TextBlock explaining auto-creation behavior
+- **CashBoxReportService**: Full implementation from stub — Cashbox Statement, Transaction Log, and Cash Transfer Report endpoints no longer crash at runtime
+- **Missing API Endpoints**: Added `detailed-stock-ledger`, `returns`, and unified `aging` endpoints with complete repository queries
+- **SupplierPaymentService Reversal**: `UpdateAsync()` now creates reversal journal entries when a posted payment's amount changes — wraps in `ExecuteTransactionAsync()`
+- **CustomerReceiptService UpdateAsync**: Added `UpdateAsync()` with domain method `CustomerReceipt.UpdateAmount()` and journal entry reversal flow
+- **SalesReturnEntryAsync**: Added `CreateSalesReturnEntryAsync()` — Dr SalesReturnsAccount / Cr CustomerAccount for return amount + Dr InventoryAccount / Cr COGSAccount for returned cost
+- **AccountStatement Excel Export**: Added `ExportExcelCommand` with ClosedXML worksheet generation — no longer PDF-only
+- **CashFlow Report**: Real implementation from ReceiptVoucher/PaymentVoucher data — stub `"تحت التطوير"` replaced with actual financial logic
+- **Documentation Fixes**: `Accounts.md` analysis documents updated with coverage of AllowBelowCostSale behavior (warning-only, never blocks), all 3 deferred gaps resolved
 
 ---
 

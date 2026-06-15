@@ -42,6 +42,7 @@ public class UnitServiceTests : IDisposable
 
         _mockUow.Setup(u => u.Units).Returns(new InMemoryEfCoreRepository<Unit>(_dbContext));
         _mockUow.Setup(u => u.Products).Returns(new InMemoryEfCoreRepository<Product>(_dbContext));
+        _mockUow.Setup(u => u.ProductUnits).Returns(new InMemoryEfCoreRepository<ProductUnit>(_dbContext));
 
         _mockUow.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(async () =>
@@ -65,7 +66,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingUnit_ReturnsDto");
 
-        var unit = Unit.Create("Kilogram", "kg", null);
+        var unit = Unit.Create(name: "Kilogram", symbol: "kg");
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
@@ -116,7 +117,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateAsync_DuplicateName_ReturnsFailure");
 
-        var existing = Unit.Create("Kilogram", "kg", null);
+        var existing = Unit.Create(name: "Kilogram", symbol: "kg");
         _dbContext.Units.Add(existing);
         await _dbContext.SaveChangesAsync();
 
@@ -139,7 +140,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesUnit");
 
-        var unit = Unit.Create("Kilo", "kg", null);
+        var unit = Unit.Create(name: "Kilo", symbol: "kg");
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
@@ -178,12 +179,17 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_UnitWithProducts_ReturnsFailure");
 
-        var unit = Unit.Create("Kilogram", "kg", null);
+        var unit = Unit.Create(name: "Kilogram", symbol: "kg");
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
-        var product = Product.Create("Product", retailUnitId: unit.Id);
+        var product = Product.Create("Product", categoryId: 1);
         _dbContext.Products.Add(product);
+        await _dbContext.SaveChangesAsync();
+
+        // Link unit to product via ProductUnit (Phase 25: UnitId removed from Product)
+        var productUnit = ProductUnit.CreateBaseUnit(product.Id, unit.Id);
+        _dbContext.ProductUnits.Add(productUnit);
         await _dbContext.SaveChangesAsync();
 
         var result = await _sut.DeleteAsync(unit.Id, CancellationToken.None);
@@ -199,7 +205,7 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_UnitWithoutProducts_SoftDeletes");
 
-        var unit = Unit.Create("Unlinked Unit", "U", null);
+        var unit = Unit.Create(name: "Unlinked Unit", symbol: "U");
         _dbContext.Units.Add(unit);
         await _dbContext.SaveChangesAsync();
 
@@ -219,8 +225,8 @@ public class UnitServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetAllAsync_WithSearch_FiltersResults");
 
-        var unit1 = Unit.Create("Kilogram", "kg", null);
-        var unit2 = Unit.Create("Meter", "m", null);
+        var unit1 = Unit.Create(name: "Kilogram", symbol: "kg");
+        var unit2 = Unit.Create(name: "Meter", symbol: "m");
         _dbContext.Units.Add(unit1);
         _dbContext.Units.Add(unit2);
         await _dbContext.SaveChangesAsync();
@@ -244,9 +250,10 @@ public class UnitServiceTests : IDisposable
 
         public DbSet<Unit> Units => Set<Unit>();
         public DbSet<Product> Products => Set<Product>();
+        public DbSet<ProductUnit> ProductUnits => Set<ProductUnit>();
     }
 
-    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity
+    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : Entity
     {
         private readonly DbContext _context;
 
@@ -256,7 +263,7 @@ public class UnitServiceTests : IDisposable
         }
 
         public async Task<T?> GetByIdAsync(int id, CancellationToken ct = default)
-            => await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            => await FindByIdAsync(id, ct);
 
         public Task<IReadOnlyList<T>> GetAllAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<T>>(_context.Set<T>().ToList());
@@ -276,10 +283,10 @@ public class UnitServiceTests : IDisposable
 
         public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
         {
-            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
-            if (entity != null)
+            var entity = await FindByIdAsync(id, ct);
+            if (entity != null && entity is ActivatableEntity activatable)
             {
-                entity.MarkAsDeleted();
+                activatable.MarkAsDeleted();
                 _context.Set<T>().Update(entity);
                 await _context.SaveChangesAsync(ct);
             }
@@ -287,12 +294,32 @@ public class UnitServiceTests : IDisposable
 
         public async Task HardDeleteAsync(int id, CancellationToken ct = default)
         {
-            var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
+            var entity = await FindByIdAsync(id, ct);
             if (entity != null)
             {
                 _context.Set<T>().Remove(entity);
                 await _context.SaveChangesAsync(ct);
             }
+        }
+
+        /// <summary>
+        /// Finds an entity by Id, handling key type mismatches (e.g., int vs short for Unit).
+        /// </summary>
+        private async Task<T?> FindByIdAsync(int id, CancellationToken ct)
+        {
+            var entityType = _context.Model.FindEntityType(typeof(T));
+            var pk = entityType?.FindPrimaryKey();
+            if (pk?.Properties.Count == 1)
+            {
+                var keyType = pk.Properties[0].ClrType;
+                if (keyType == typeof(short))
+                    return await _context.Set<T>().FindAsync(new object[] { (short)id }, ct);
+                if (keyType == typeof(long))
+                    return await _context.Set<T>().FindAsync(new object[] { (long)id }, ct);
+                if (keyType == typeof(byte))
+                    return await _context.Set<T>().FindAsync(new object[] { (byte)id }, ct);
+            }
+            return await _context.Set<T>().FindAsync(new object[] { id }, ct);
         }
 
         public void DeleteRange(IEnumerable<T> entities)

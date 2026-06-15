@@ -8,11 +8,11 @@ namespace SalesSystem.Domain.Entities;
 /// Each permission can be assigned to one or more roles via RolePermission.
 /// System permissions (IsSystem = true) cannot be deleted or modified.
 /// </summary>
-public class Permission : BaseEntity
+public class Permission : ActivatableEntity
 {
-    public string Name { get; private set; } = string.Empty;               // "Sales.View"
-    public string DisplayNameAr { get; private set; } = string.Empty;      // "عرض فواتير البيع"
-    public string? Category { get; private set; }                          // "Sales", "Purchase", etc.
+    public string Code { get; private set; } = string.Empty;               // "Sales.View" (was Name)
+    public string DisplayName { get; private set; } = string.Empty;        // "عرض فواتير البيع" (was DisplayNameAr)
+    public string Category { get; private set; } = string.Empty;           // "Sales", "Purchases", etc. (now non-nullable)
     public bool IsSystem { get; private set; }                             // System permissions are protected
 
     // Navigation
@@ -21,23 +21,24 @@ public class Permission : BaseEntity
 
     protected Permission() { } // EF Core
 
-    public static Permission Create(string name, string displayNameAr, string? category = null, bool isSystem = false)
+    public static Permission Create(string code, string displayName, string category,
+        bool isSystem = false)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new DomainException("اسم الصلاحية مطلوب.");
-        if (string.IsNullOrWhiteSpace(displayNameAr))
+        if (string.IsNullOrWhiteSpace(code))
+            throw new DomainException("كود الصلاحية مطلوب.");
+        if (string.IsNullOrWhiteSpace(displayName))
             throw new DomainException("الاسم العربي للصلاحية مطلوب.");
+        if (string.IsNullOrWhiteSpace(category))
+            throw new DomainException("تصنيف الصلاحية مطلوب.");
 
         return new Permission
         {
-            Name = name.Trim(),
-            DisplayNameAr = displayNameAr.Trim(),
-            Category = category?.Trim(),
+            Code = code.Trim(),
+            DisplayName = displayName.Trim(),
+            Category = category.Trim(),
             IsSystem = isSystem
         };
     }
-
-    // ─── Domain Methods ───────────────────────────
 
     /// <summary>
     /// Returns true if this permission can be modified (non-system permissions only).

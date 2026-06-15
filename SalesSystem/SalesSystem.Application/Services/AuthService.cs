@@ -116,7 +116,7 @@ public class AuthService : IAuthService
                 await _uow.SaveChangesAsync(ct);
 
                 return Result<LoginResponse>.Success(new LoginResponse(
-                    user.Id, user.UserName, user.FullName, (byte)user.Role,
+                    user.Id, user.UserName, user.FullName, (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
                     token, expiresAt, MustChangePassword: true));
             }
 
@@ -137,7 +137,7 @@ public class AuthService : IAuthService
 
             // 10. Return success
             return Result<LoginResponse>.Success(new LoginResponse(
-                user.Id, user.UserName, user.FullName, (byte)user.Role,
+                user.Id, user.UserName, user.FullName, (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
                 jwtToken, jwtExpiresAt, MustChangePassword: false));
         }
         catch (Exception ex)

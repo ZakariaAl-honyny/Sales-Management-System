@@ -7,14 +7,7 @@ public class UpdateProductUnitRequestValidator : AbstractValidator<UpdateProduct
 {
     public UpdateProductUnitRequestValidator()
     {
-        RuleFor(x => x.UnitName)
-            .NotEmpty().WithMessage("اسم الوحدة مطلوب")
-            .MaximumLength(50).WithMessage("اسم الوحدة لا يمكن أن يتجاوز 50 حرف");
-
-        RuleFor(x => x.RetailPrice)
-            .GreaterThanOrEqualTo(0).WithMessage("سعر التجزئة لا يمكن أن يكون سالباً");
-
-        RuleFor(x => x.WholesalePrice)
-            .GreaterThanOrEqualTo(0).WithMessage("سعر الجملة لا يمكن أن يكون سالباً");
+        RuleFor(x => x.UnitId)
+            .GreaterThan((short)0).WithMessage("يجب اختيار وحدة قياس صحيحة");
     }
 }

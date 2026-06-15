@@ -4,26 +4,46 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SalesInvoice : BaseEntity
+public class SalesInvoice : DocumentEntity
 {
     public int? CustomerId { get; private set; }
-    public int WarehouseId { get; private set; }
+    public short WarehouseId { get; private set; }
     public int? CashBoxId { get; private set; }
-    public int? TaxId { get; private set; }
+    public short? TaxId { get; private set; }
     public DateTime InvoiceDate { get; private set; }
     public DateOnly? DueDate { get; private set; }
     public PaymentType PaymentType { get; private set; }
     public decimal SubTotal { get; private set; }
     public decimal DiscountAmount { get; private set; }
     public decimal TaxAmount { get; private set; }
+    /// <summary>
+    /// مصاريف إضافية / أخرى (شحن، تغليف، ...)
+    /// </summary>
+    public decimal OtherCharges { get; private set; }
     public decimal TotalAmount { get; private set; }
     public decimal PaidAmount { get; private set; }
     public decimal DueAmount { get; private set; }
     public int InvoiceNo { get; private set; }
-    public int? CurrencyId { get; private set; }
+    public short? CurrencyId { get; private set; }
     public decimal? ExchangeRate { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
+
+    /// <summary>
+    /// إجمالي التكلفة لكل الأصناف — يستخدم لحساب صافي الربح
+    /// </summary>
+    public decimal? TotalCost { get; private set; }
+
+    // ─── Computed Properties ─────────────────────────────────────────────
+    /// <summary>
+    /// صافي الربح: إجمالي الفاتورة - إجمالي التكلفة
+    /// </summary>
+    public decimal? TotalProfit => TotalAmount - (TotalCost ?? 0);
+
+    /// <summary>
+    /// المبلغ المتبقي (مرادف DueAmount للتوافق مع المخطط)
+    /// </summary>
+    public decimal RemainingAmount => DueAmount;
 
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
@@ -35,17 +55,18 @@ public class SalesInvoice : BaseEntity
     private SalesInvoice() { }
 
     public static SalesInvoice Create(
-        int warehouseId,
+        short warehouseId,
         int invoiceNo,
         int? customerId = null,
         DateTime? invoiceDate = null,
         DateOnly? dueDate = null,
         PaymentType paymentType = PaymentType.Cash,
         decimal discountAmount = 0,
+        decimal otherCharges = 0,
         string? notes = null,
         int? cashBoxId = null,
-        int? taxId = null,
-        int? currencyId = null,
+        short? taxId = null,
+        short? currencyId = null,
         decimal? exchangeRate = null,
         int? createdByUserId = null)
     {
@@ -55,6 +76,8 @@ public class SalesInvoice : BaseEntity
             throw new DomainException("رقم الفاتورة غير صحيح.");
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
+        if (otherCharges < 0)
+            throw new DomainException("المصاريف الإضافية لا يمكن أن تكون سالبة.");
         if (dueDate.HasValue && dueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow.Date))
             throw new DomainException("تاريخ الاستحقاق لا يمكن أن يكون في الماضي.");
         if (currencyId.HasValue && !exchangeRate.HasValue)
@@ -71,6 +94,7 @@ public class SalesInvoice : BaseEntity
             DueDate = dueDate,
             PaymentType = paymentType,
             DiscountAmount = discountAmount,
+            OtherCharges = otherCharges,
             CurrencyId = currencyId,
             ExchangeRate = exchangeRate,
             Notes = notes,
@@ -105,8 +129,9 @@ public class SalesInvoice : BaseEntity
     public void RecalculateTotals()
     {
         SubTotal = Items.Sum(i => i.LineTotal);
-        TotalAmount = SubTotal - DiscountAmount + TaxAmount;
+        TotalAmount = SubTotal - DiscountAmount + TaxAmount + OtherCharges;
         DueAmount = TotalAmount - PaidAmount;
+        TotalCost = Items.Sum(i => (i.CostInBaseCurrency ?? 0) * i.Quantity);
     }
 
     public void SetPaidAmount(decimal amount)
@@ -128,7 +153,7 @@ public class SalesInvoice : BaseEntity
         RecalculateTotals();
     }
 
-    public void SetTax(int? taxId, decimal taxAmount)
+    public void SetTax(short? taxId, decimal taxAmount)
     {
         if (taxAmount < 0)
             throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
@@ -146,6 +171,7 @@ public class SalesInvoice : BaseEntity
             throw new DomainException("لا يمكن ترحيل فاتورة بدون أصناف.");
 
         RecalculateTotals();
+        PostedAt = DateTime.UtcNow;
         Status = InvoiceStatus.Posted;
     }
 
@@ -157,7 +183,16 @@ public class SalesInvoice : BaseEntity
         if (PaidAmount > 0)
             throw new DomainException("لا يمكن إلغاء فاتورة مدفوعة مباشرة.");
 
+        CancelledAt = DateTime.UtcNow;
         Status = InvoiceStatus.Cancelled;
+    }
+
+    public void SetOtherCharges(decimal otherCharges)
+    {
+        if (otherCharges < 0)
+            throw new DomainException("المصاريف الإضافية لا يمكن أن تكون سالبة.");
+        OtherCharges = otherCharges;
+        RecalculateTotals();
     }
 
     public void UpdateTotals(decimal discountAmount, decimal taxAmount)

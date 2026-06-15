@@ -5,10 +5,7 @@ public record CreateSupplierRequest(
     string? Phone,
     string? Email,
     string? Address,
-    string? TaxNumber,
-    decimal OpeningBalance,
-    decimal CreditLimit = 0,
-    int? AccountId = null
+    string? TaxNumber
 );
 
 public record UpdateSupplierRequest(
@@ -17,7 +14,5 @@ public record UpdateSupplierRequest(
     string? Email,
     string? Address,
     string? TaxNumber,
-    decimal CreditLimit,
-    bool IsActive,
-    int? AccountId = null
+    bool IsActive
 );

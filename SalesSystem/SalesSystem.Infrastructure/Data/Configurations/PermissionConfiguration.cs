@@ -10,12 +10,23 @@ public class PermissionConfiguration : IEntityTypeConfiguration<Permission>
     {
         builder.ToTable("Permissions");
         builder.HasKey(p => p.Id);
-        builder.Property(p => p.Name).IsRequired().HasMaxLength(100);
-        builder.HasIndex(p => p.Name).IsUnique();
-        builder.Property(p => p.DisplayNameAr).IsRequired().HasMaxLength(200);
-        builder.Property(p => p.Category).HasMaxLength(50);
+
+        // Code (was Name) — unique, required, max 100
+        builder.Property(p => p.Code).IsRequired().HasMaxLength(100);
+        builder.HasIndex(p => p.Code).IsUnique();
+
+        // DisplayName (was DisplayNameAr) — required, max 200
+        builder.Property(p => p.DisplayName).IsRequired().HasMaxLength(200);
+
+        // Category — now non-nullable, required, max 100
+        builder.Property(p => p.Category).IsRequired().HasMaxLength(100);
+
+        // IsSystem — protects system permissions
+        builder.Property(p => p.IsSystem).IsRequired().HasDefaultValue(false);
+
         builder.HasQueryFilter(p => p.IsActive);
 
+        // Navigation: RolePermissions
         builder.HasMany(p => p.RolePermissions)
             .WithOne(rp => rp.Permission)
             .HasForeignKey(rp => rp.PermissionId)

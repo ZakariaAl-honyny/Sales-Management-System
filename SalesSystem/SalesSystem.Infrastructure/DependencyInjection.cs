@@ -20,6 +20,7 @@ public static class DependencyInjection
     {
         // Repositories
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<ISystemLogRepository, SystemLogRepository>();
 
         // LocalImageStorageService holds no scoped state (_basePath is static, ILogger is singleton)
         services.AddSingleton<ILocalImageStorageService, LocalImageStorageService>();

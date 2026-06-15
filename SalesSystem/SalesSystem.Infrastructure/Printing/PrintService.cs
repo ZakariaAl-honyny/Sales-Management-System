@@ -119,7 +119,8 @@ public class PrintService : IPrintService
                     "يرجى الذهاب إلى الإعدادات ← إعداد الطباعة وتحديد الطابعة الحرارية.");
             }
 
-            var escPosData = _thermalGenerator.GenerateEscPosCommands(invoice);
+            var escPosCodePage = await GetEscPosCodePageAsync();
+            var escPosData = _thermalGenerator.GenerateEscPosCommands(invoice, escPosCodePage);
 
             await Task.Run(() => SendRawToPrinter(printerName, escPosData));
 
@@ -190,6 +191,17 @@ public class PrintService : IPrintService
             var document = new A4InvoiceDocument(invoice);
             return document.GeneratePdf();
         });
+    }
+
+    /// <summary>
+    /// Gets the ESC/POS code page from settings (default 1256 for Arabic Windows).
+    /// </summary>
+    protected virtual async Task<int> GetEscPosCodePageAsync()
+    {
+        var codePageStr = await _settingsRepo.GetStringAsync("EscPosCodePage", "1256");
+        if (int.TryParse(codePageStr, out var codePage) && codePage > 0 && codePage <= 65535)
+            return codePage;
+        return 1256;
     }
 
     /// <summary>

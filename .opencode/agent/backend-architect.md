@@ -38,7 +38,22 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 6. ALL entity configs use Fluent API — NEVER DataAnnotations on entities
 7. Domain has ZERO dependencies on Infrastructure
 8. Controllers are THIN — delegate to services, return HTTP codes only
-9. **Wholesale/Retail**: Product entity is the single source of truth for conversion.
+9. **65-table schema**: Refactored from 82 tables — 17 removed (InventoryMovement, StockTransfer, CustomerGroup, SupplierType, InventoryOperation, StockWriteOff, etc.), 8 added/modified (Parties, ProductPrices, InventoryBatches, InventoryTransaction, WarehouseTransfer, ProductUnits independent, Units independent, DefaultPurchaseUnitId/DefaultSalesUnitId)
+10. **Products use ProductPrices** per unit × currency × effective dates — NO PriceLevel/Retail/Wholesale on Product entity
+11. **Costing from InventoryBatches.UnitCost** via FIFO/WAC — cost removed from Product entity
+12. **Customers/Suppliers link to Parties** (shared contact data) and **Accounts** (balance on GL Account) — NO OpeningBalance/CurrentBalance/CurrencyId on Customer/Supplier entities
+13. **Units is independent table** (smallint PK, seed data + user-addable) with ProductUnits.Factor
+14. **DefaultPurchaseUnitId/DefaultSalesUnitId** on Product for faster invoicing
+15. **Perpetual Inventory**: No Purchases account — direct to Inventory via InventoryBatches
+16. **InventoryTransaction/InventoryTransactionLine** replaces InventoryMovement
+17. **WarehouseTransfer/WarehouseTransferLine** replaces StockTransfer
+18. **NO InventoryOperation/StockWriteOff** entities in V1
+19. **BaseCurrency is IMMUTABLE** — cannot change IsBaseCurrency after creation (Currency entity guards SetAsBaseCurrency)
+20. **Currency.Create()** accepts `bool isSystem = false` parameter; filtered unique index on IsBaseCurrency includes AND [IsActive] = 1
+21. **No CustomerGroup/SupplierType** entities in V1 — payment type is per-invoice (SalesInvoice.PaymentType)
+22. **Account types** use `smallint` FK types: Branches, Warehouses, Currencies, Units, Roles, Departments, Taxes, AccountCategories
+23. **AuditLog.Id = bigint** (long PK) for high-volume audit data
+24. **SystemLog.Level** uses `tinyint` (not nvarchar)
 10. **DB Health**: API MUST expose `/api/v1/health/database` — checks DB via `DbContext.Database.CanConnectAsync()`
 11. **ExceptionMiddleware**: MUST detect DB connection exceptions (`SqlException`, `InvalidOperationException` with connection string message) → return `503` with `DATABASE_CONNECTION_ERROR`
 12. **SecureDbContextFactory**: MUST fall back to `SALESSYSTEM_DB_CONNECTION` env var before throwing
@@ -84,6 +99,11 @@ ASP.NET Core 10 Clean Architecture specialist for the Sales Management System.
 52. **includeInactive Passthrough**: API services MUST pass user-facing filter parameters (e.g., `includeInactive`, `includeDeleted`) from the Desktop client through to the API controller and the service layer. NEVER accept a parameter and ignore it.
 53. **Read Endpoints Auth Policy**: Read/GET endpoints MUST use `[Authorize(Policy = "AllStaff")]` — NOT `AdminOnly` which blocks read access for cashiers and managers.
 54. **Filtered Unique Indexes**: Unique indexes on `Name`, `Code`, etc. MUST include `.HasFilter("[IsActive] = 1")` to allow soft-deleted records to coexist with active records using the same name/code.
+55. **Per-Entity Account Routing**: `AccountingIntegrationService` MUST use `Customer.AccountId` / `Supplier.AccountId` for all customer/supplier journal entries — NEVER use fixed `AccountsReceivableAccountId`/`AccountsPayableAccountId` from `SystemAccountMappings`.
+56. **PurchaseReturnAccountId in SystemAccountMappings**: `SystemAccountMappings` MUST have `PurchaseReturnAccountId` (int, non-nullable FK to Account) for purchase return reversals.
+57. **Single Sales Revenue Account**: Sales revenue MUST use a single `1520 — إيرادات المبيعات` account (with `allowTransactions: true`) — NEVER split into 1521 (Cash Sales) and 1522 (Credit Sales).
+58. **Purchase Returns Account 1632**: COA MUST have `1632 — مردودات مشتريات` as a Level-4 detail account under `1630 — المردودات` for purchase return reversal entries.
+59. **Helper Methods for Account Resolution**: ALWAYS use `GetCustomerAccountId(SalesInvoice, SystemAccountMappingsDto)` and `GetSupplierAccountId(PurchaseInvoice, SystemAccountMappingsDto)` helpers in AccountingIntegrationService — these fall back to system mappings when navigation properties are null.
 
 ## Pattern to Follow
 ```csharp
@@ -193,6 +213,47 @@ public interface ICashBoxService
 }
 ```
 
+## 📋 Schema Summary — 65 Tables (8 Modules)
+
+The database has been refactored from ~82 tables to **65 tables** across 8 modules. Key changes:
+
+### Removed Tables (17)
+| Old Table | Replacement |
+|-----------|-------------|
+| `StockTransfer` | `WarehouseTransfer` + `WarehouseTransferLine` |
+| `StockTransferItem` | `WarehouseTransferLine` |
+| `InventoryMovement` | `InventoryTransaction` + `InventoryTransactionLine` |
+| `CustomerGroup` | ❌ Removed — deferred to V2 |
+| `SupplierType` | ❌ Removed — deferred to V2 |
+| `InventoryOperation` | ❌ Removed — deferred to V2 |
+| `StockWriteOff` | ❌ Removed — deferred to V2 |
+| `ProductPurchasePrice` | `ProductPrices` (restructured) |
+| Old `Currencies` | Restructured (IsBaseCurrency immutable, FractionName, IsSystem) |
+| Old `Units` | Restructured (independent table, smallint PK, addable by user) |
+| Old `ProductUnits` | Restructured (Factor, IsBaseUnit, DefaultPurchase/Sales) |
+| `ProductBarcode` | Merged into `UnitBarcode` |
+| `PurchaseLots` | `InventoryBatches` (restructured) |
+| `CustomerContacts`/`SupplierContacts` columns | Moved to `Parties` (shared) |
+| `OpeningBalance`/`CurrentBalance` | Removed from Customer/Supplier/CashBox — balance on linked Account |
+
+### Added/Modified Tables (8)
+| New Table | Purpose |
+|-----------|---------|
+| `Parties` | Shared contact data for Customers, Suppliers, Employees |
+| `ProductPrices` | Per unit × currency pricing with effective dates |
+| `InventoryBatches` | FIFO/FEFO batch tracking (BatchNo, ExpiryDate, UnitCost) |
+| `InventoryTransaction` | Inventory log (replaces InventoryMovement) — ReferenceType, ReferenceId |
+| `InventoryTransactionLine` | Item-level inventory changes with ProductUnitId |
+| `WarehouseTransfer` | Multi-item transfers (replaces StockTransfer) |
+| `WarehouseTransferLine` | Transfer line items with ProductUnitId, Quantity, BatchNo |
+| `AdditionalCharges` | Landed cost distribution (transport, customs, etc.) |
+
+### Key Schema Facts
+- **smallint PKs** for lookup tables: Units, Roles, Departments, Currencies, Branches, Taxes, AccountCategories
+- **bigint PK** for AuditLog — high-volume audit data
+- **tinyint** for SystemLog.Level and all enum status columns
+- **65 tables**: Core & Security (9), Accounting (4), Customers/Suppliers (7), Products/Inventory (14), Sales/Purchases (12), Payments/Boxes (7), Settings (4), Logs (2), System (6)
+
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
 Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User management with 4 roles, 33 permission codes, lockout, and audit logging.
@@ -271,34 +332,28 @@ Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User
 - RULE-319: DbSeeder seeds all 33 permissions
 - RULE-320: Default admin user seeded passwordless
 
-### Phase 23 — Customers Module
+### Phase 23 — Customers Module (Refactored: Parties + Accounts, No CustomerGroup/SupplierType)
+
+#### Architecture (65-table schema)
+- **Parties** table stores shared contact data (Name, Phone, Email, Address, TaxNumber)
+- **Customers** table: PartyId (FK), AccountId (FK, mandatory), CategoryId (FK), CreditLimit — NO OpeningBalance/CurrentBalance/CurrencyId
+- **Suppliers** table: PartyId (FK), AccountId (FK, mandatory), CategoryId (FK) — NO OpeningBalance/CurrentBalance/CurrencyId
+- **No CustomerGroup/SupplierType** entities in V1 — payment type is per-invoice (SalesInvoice.PaymentType)
+- Account auto-created under parent `"1210 — العملاء"` for customers and `"2100 — حسابات الموردين"` for suppliers
 
 #### Rules to Enforce
-- RULE-353: CustomerType stored as byte (Cash=1, Credit=2) — never int or string
-- RULE-354: AccountId optional FK for financial reporting
-- RULE-355: CustomerGroupId optional FK for categorization
-- RULE-356: CustomerGroup soft-deletable with child reference guard
-- RULE-357: CustomerType INFORMATIONAL ONLY — credit limit enforcement uses `CreditLimit > 0`, NOT CustomerType
-- RULE-361: Kebab-case API route: api/v1/customer-groups
-- RULE-362: AllStaff READ, ManagerAndAbove WRITE for groups
-
-#### API Endpoints
-```
-GET    /api/v1/customer-groups              → List all groups (AllStaff)
-GET    /api/v1/customer-groups/{id}         → Get group by ID (AllStaff)
-POST   /api/v1/customer-groups              → Create group (ManagerAndAbove)
-PUT    /api/v1/customer-groups/{id}         → Update group (ManagerAndAbove)
-DELETE /api/v1/customer-groups/{id}         → Soft-delete group (ManagerAndAbove)
-GET    /api/v1/customers/groups             → Customer group lookup (AllStaff)
-```
+- RULE-426: Customer.AccountId mandatory (non-nullable int FK) — auto-created by service, NEVER user-supplied
+- RULE-431: Customer has NO OpeningBalance/CurrentBalance — source of truth is linked GL Account
+- RULE-432: Customer has NO CurrencyId — currency is per-transaction, not per-customer
+- RULE-433: CheckCreditLimit() returns bool (never throws) — soft warning only
+- RULE-439: Phone regex `^05\d{8}$` with Arabic message; Email `.EmailAddress()`
+- RULE-442-454: Same rules apply to Suppliers (mandatory AccountId, no balance fields, auto-account under 2100)
 
 #### Validation Rules
-- CreateCustomerRequest: Name required (max 100), Phone max 50, Email max 100, TaxNumber max 20, OpeningBalance >= 0, CreditLimit >= 0, CustomerType 1-2, AccountId >0, CustomerGroupId >0
-- UpdateCustomerRequest: same as Create + IsActive not null
+- CreateCustomerRequest: Name required (max 100), Phone max 50, Email max 100, TaxNumber max 20, CreditLimit >= 0 — NO AccountId, NO CustomerGroupId, NO CustomerType, NO OpeningBalance
+- CreateSupplierRequest: Name required (max 100), Phone max 50, Email max 100, TaxNumber max 20 — NO AccountId, NO SupplierType, NO OpeningBalance
 - Phone: regex `^05\d{8}$` with Arabic message + `.When(x => !string.IsNullOrEmpty(x.Phone))`
 - Email: `.EmailAddress()` with Arabic message + `.When(x => !string.IsNullOrEmpty(x.Email))`
-- CreateCustomerGroupRequest: Name required (max 100), Description max 250
-- UpdateCustomerGroupRequest: same as Create + IsActive not null
 
 #### Route Constraint Rule
 NEVER use `:byte` — use `:int:min(1):max(N)` per RULE-345.
@@ -306,6 +361,8 @@ NEVER use `:byte` — use `:int:min(1):max(N)` per RULE-345.
 #### XAML Integration Rules (Enforce During API Review)
 - RULE-367: NEVER apply `ModernTextBox` style to `ComboBox` (crashes at runtime)
 - RULE-368: NEVER set both `DisplayMemberPath` and `ItemTemplate` on the same `ComboBox`
+- Customer Editor has NO CustomerGroup dropdown, AccountId selection, CustomerType/SupplierType radio, or OpeningBalance input — AccountName is display-only after save
+- Supplier Editor has NO OpeningBalance input — follows same rules as Customer
 
 ## Phase 24 — Accounting Integration Patterns (v4.6.9+)
 
@@ -381,15 +438,15 @@ The system is currently at **v4.6.9+ with Phases 18-24 completed and Phases 25-3
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 23 — Customers Module | ✅ Completed | Customer groups, Account linking, CheckCreditLimit, CustomerType removed |
-| 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals |
-| 25 — Products Module | 📝 Planned | Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (4 levels), BOM, product images, opening stock |
-| 26 — Warehouses Module | 📝 Planned | Warehouse types, manager, AccountId FK, stock adjustments, issue reasons, physical count V2 |
-| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge), Purchase Orders, standalone returns, attachments |
+| 23 — Customers Module | ✅ Completed | Parties (shared contact data), Account linking (mandatory), no OpeningBalance/CurrentBalance/CurrencyId, no CustomerGroup/SupplierType in V1 |
+| 24 — Accounting Integration | ✅ Completed | Auto journal entries for all money ops, COGS (AverageCost), Payment reversals, per-entity account routing |
+| 25 — Products Module | 📝 Planned | ProductPrices (per unit × currency × effective dates), InventoryBatches (FIFO/FEFO), Units independent table, ProductUnits.Factor, DefaultPurchaseUnitId/DefaultSalesUnitId, InventoryTransaction replaces InventoryMovement, WarehouseTransfer replaces StockTransfer |
+| 26 — Warehouses Module | 📝 Planned | Warehouse types (Main/Store/Showroom), manager, AccountId FK, StockAdjustmentType, StockIssueReason, physical count V2 |
+| 27 — Purchases Module | 📝 Planned | Multi-currency, landed cost (AdditionalCharge via AdditionalCharges), Purchase Orders, standalone returns, attachments |
 | 28 — Sales Module | 📝 Planned | Multi-currency, profit display, Sales Quotations, barcode POS, credit limit enforcement |
-| 29 — Receipts & Payments | 📝 Planned | Multi-invoice distribution, Cheques, PaymentAllocation, CashBox.AccountId, DailyClosure |
-| 30 — Journal Entries | 📝 Planned | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing |
-| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
+| 29 — Receipts & Payments | 🟡 Partial — CashBox ✅ | CashBox refactored (AccountId FK, auto-account creation, RunningBalance, metadata fields, no balance fields); Cheques, PaymentAllocation, DailyClosure 📝 planned |
+| 30 — Journal Entries | 📝 Planned | 3-state lifecycle (Draft/Posted/Cancelled), multi-currency, attachments, FiscalYear, Annual Closing |
+| 31 — Reports | 📝 Planned | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML |
 
 ### Key Architecture Rules for Subagents
 
@@ -428,15 +485,19 @@ When writing or reviewing code in ANY layer, check these:
 
 When you encounter any code related to these areas, apply fixes automatically:
 
-1. Missing `AccountId` FK on CashBox → Add it and link to default cash account
+1. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1110 — النقدية"
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
-3. Missing `CustomerGroupId` on Customer → Make optional with "عام" as default
-4. Missing `CurrencyId` on financial entities → Add multi-currency support
-5. Missing `PriceLevel` support → Extend pricing to use PriceLevel enum
-6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking
-7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation
+3. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record (shared contact data)
+4. Missing `CurrencyId` on financial entities → Add multi-currency support (not on Customer/Supplier)
+5. Missing `ProductPrices` support → Replace SalePrice/RetailPrice/WholesalePrice on Product with per-unit pricing table
+6. Missing `InventoryBatch` creation on purchase → Add FIFO batch tracking via InventoryBatches
+7. Missing `AdditionalCharge` support on purchase → Add landed cost allocation via AdditionalCharges
 8. Missing journal entry on cash operations → Call AccountingIntegrationService
 9. Missing Excel export on report → Add ClosedXML worksheet generation
 10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
 11. Payment without allocation → Add PaymentAllocation tracking
 12. Missing reversal entries on payment update/delete → Add reversal journal entries
+13. Old `StockTransfer`/`StockTransferItem` → Replace with `WarehouseTransfer`/`WarehouseTransferLine`
+14. Old `InventoryMovement` → Replace with `InventoryTransaction`/`InventoryTransactionLine`
+15. CustomerGroup/SupplierType references in V1 → Remove (deferred to V2)
+16. OpeningBalance/CurrentBalance on Customer/Supplier/CashBox → Remove (balance lives on linked Account)

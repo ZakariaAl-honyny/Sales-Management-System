@@ -1,25 +1,26 @@
 using SalesSystem.Domain.Common;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Domain.Entities;
 
 /// <summary>
-/// Join entity linking a UserRole to a Permission.
+/// Join entity linking a Role to a Permission (many-to-many).
 /// Determines which permissions are granted to each role.
+/// Unique constraint: (RoleId, PermissionId).
 /// </summary>
-public class RolePermission : BaseEntity
+public class RolePermission : Entity
 {
-    public UserRole Role { get; private set; }
+    public int RoleId { get; private set; }
+    public Role Role { get; private set; } = null!;
     public int PermissionId { get; private set; }
     public Permission Permission { get; private set; } = null!;
 
     protected RolePermission() { } // EF Core
 
-    public static RolePermission Create(UserRole role, int permissionId)
+    public static RolePermission Create(int roleId, int permissionId)
     {
         return new RolePermission
         {
-            Role = role,
+            RoleId = roleId,
             PermissionId = permissionId
         };
     }

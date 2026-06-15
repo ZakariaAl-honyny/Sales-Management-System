@@ -12,5 +12,4 @@ public interface IProductUnitService
     Task<Result<ProductUnitDto>> UpdateUnitAsync(int productId, int unitId, UpdateProductUnitRequest req, CancellationToken ct);
     Task<Result> DeleteUnitAsync(int productId, int unitId, DeleteStrategy strategy, CancellationToken ct);
     Task<Result<BarcodeResolutionDto>> ResolveBarcodeAsync(string barcode, CancellationToken ct);
-    Task<Result<List<ProductPriceHistoryDto>>> GetPriceHistoryAsync(int productId, CancellationToken ct);
 }

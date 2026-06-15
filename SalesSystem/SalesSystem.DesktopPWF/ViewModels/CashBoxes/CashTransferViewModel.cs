@@ -172,6 +172,7 @@ public class CashTransferViewModel : ViewModelBase
             SelectedSourceCashBox!.Id,
             SelectedDestinationCashBox!.Id,
             Amount,
+            (short)0,
             Notes);
 
         var result = await _cashBoxService.TransferAsync(request);

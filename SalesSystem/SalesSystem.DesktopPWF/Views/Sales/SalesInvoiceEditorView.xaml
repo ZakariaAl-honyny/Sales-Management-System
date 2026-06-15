@@ -82,6 +82,7 @@
                         <ColumnDefinition Width="300"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="🔍 البحث بالباركود" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
@@ -94,9 +95,13 @@
                     <!-- Green button: opens continuous product selection window -->
                     <Button Grid.Column="2" Content="إضافة" Command="{Binding SearchProductCommand}"
                             Style="{StaticResource SuccessButton}" Margin="8,0,0,0" Width="80" Height="36" ToolTip="البحث عن منتج وإضافته للقائمة"/>
+                    <!-- Continuous scan button -->
+                    <Button Grid.Column="3" Content="🔴 مسح مستمر" Command="{Binding StartContinuousScanCommand}"
+                            Style="{StaticResource WarningButton}" Margin="8,0,0,0" Width="100" Height="36"
+                            ToolTip="فتح نافذة المسح المستمر للباركود — كل مسحة تضيف صنفاً تلقائياً"/>
                     <!-- Separator -->
-                    <Separator Grid.Column="3" Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
-                    <TextBlock Grid.Column="4" Text="مسح الباركود يضيف الصنف تلقائياً" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <Separator Grid.Column="4" Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
+                    <TextBlock Grid.Column="5" Text="مسح الباركود يضيف الصنف تلقائياً" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
                 </Grid>
             </Border>
 
@@ -172,8 +177,55 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
+                                    <!-- Profit Column (read-only) -->
+                                    <DataGridTextColumn Header="الربح" Binding="{Binding Profit, StringFormat=N2}" Width="90" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="Text" Value="0">
+                                                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    <!-- Price Override Indicator -->
+                                    <DataGridTemplateColumn Header="تعديل" Width="50">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="🔄"
+                                                           Foreground="#E65100"
+                                                           FontSize="14"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           ToolTip="تم تعديل السعر يدوياً">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPriceOverridden}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="الخصم" Binding="{Binding DiscountAmount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="80"/>
-                                    <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotal, StringFormat=N2}" Width="100" IsReadOnly="True" FontWeight="Bold"/>
+                                    <DataGridTemplateColumn Header="الإجمالي" Width="100">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBox Text="{Binding LineTotalInput, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
+                                                         Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"
+                                                         ToolTip="يمكنك تعديل الإجمالي مباشرة — سيتم إعادة حساب السعر أو الكمية تلقائياً"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTemplateColumn Width="40">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
@@ -235,6 +287,26 @@
                                           SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,12"
                                           ToolTip="اختر طريقة الدفع: نقداً أو آجل (دفع لاحق) أو مختلط"/>
 
+                                <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
+                                <ComboBox ItemsSource="{Binding Currencies}"
+                                          SelectedValue="{Binding SelectedCurrencyId}"
+                                          SelectedValuePath="Id"
+                                          DisplayMemberPath="Name"
+                                          Style="{StaticResource ModernComboBox}"
+                                          Margin="0,0,0,6"
+                                          ToolTip="اختر عملة الفاتورة — إذا كانت غير العملة الأساسية سيظهر حقل سعر الصرف"/>
+                                <Grid Margin="0,0,0,6"
+                                      Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="سعر الصرف:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11"/>
+                                    <TextBox Grid.Column="1" Text="{Binding ExchangeRate, StringFormat=N2}"
+                                             Style="{StaticResource ModernTextBox}"
+                                             ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية"/>
+                                </Grid>
+
                                 <TextBlock Text="الصندوق النقدي *" Style="{StaticResource LabelStyle}"/>
                                 <ComboBox ItemsSource="{Binding CashBoxes}"
                                           SelectedItem="{Binding SelectedCashBox}"
@@ -279,6 +351,11 @@
                                 <Grid Margin="0,0,0,6">
                                     <TextBlock Text="قيمة الضريبة" Foreground="{StaticResource TextSecondaryBrush}"/>
                                     <TextBlock Text="{Binding TaxAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,6">
+                                    <TextBlock Text="مصاريف إضافية" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+                                    <TextBox Text="{Binding OtherCharges, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="80" HorizontalAlignment="Right" TextAlignment="Left"
+                                             ToolTip="أدخل قيمة المصاريف الإضافية (نقل، شحن، إلخ)"/>
                                 </Grid>
                                 <Grid Margin="0,0,0,6">
                                     <TextBlock Text="إجمالي الفاتورة" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>

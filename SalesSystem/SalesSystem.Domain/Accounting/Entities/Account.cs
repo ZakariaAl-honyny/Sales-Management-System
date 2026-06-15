@@ -7,7 +7,7 @@ namespace SalesSystem.Domain.Accounting.Entities;
 /// <summary>
 /// Represents a chart of accounts entry. System accounts are protected from modification/deletion.
 /// </summary>
-public class Account : BaseEntity
+public class Account : ActivatableEntity
 {
     public string AccountCode { get; private set; } = string.Empty;
     public string NameAr { get; private set; } = string.Empty;
@@ -43,6 +43,12 @@ public class Account : BaseEntity
     /// Initial balance for opening entries.
     /// </summary>
     public decimal? OpeningBalance { get; private set; }
+
+    /// <summary>
+    /// Current running balance computed from journal entry lines.
+    /// Updated by the accounting engine when journal entries are posted/reversed.
+    /// </summary>
+    public decimal? CurrentBalance { get; private set; }
 
     // ─── Navigation Properties ──────────────────────────
     public Account? ParentAccount { get; private set; }
@@ -105,7 +111,6 @@ public class Account : BaseEntity
             OpeningBalance = openingBalance,
             Notes = notes?.Trim(),
             Explanation = explanation?.Trim(),
-            IsActive = true
         };
         account.SetCreatedBy(createdByUserId);
         return account;
@@ -197,6 +202,15 @@ public class Account : BaseEntity
     /// Returns true if this account has sub-accounts (children).
     /// </summary>
     public bool HasChildren() => _subAccounts.Count > 0;
+
+    /// <summary>
+    /// Updates the current running balance. Called by the accounting engine when journal entries are posted/reversed.
+    /// </summary>
+    public void UpdateCurrentBalance(decimal newBalance)
+    {
+        CurrentBalance = newBalance;
+        UpdateTimestamp();
+    }
 
     /// <summary>
     /// Returns true if this account type has a normal debit balance (Asset or Expense).

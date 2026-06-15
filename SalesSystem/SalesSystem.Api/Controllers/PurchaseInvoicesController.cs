@@ -1,15 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Purchase invoices management API
+/// فواتير المشتريات — إدارة فواتير الشراء مع دعم العملات المتعددة والمرفقات.
 /// </summary>
 [ApiController]
 [Route("api/v1/purchase-invoices")]
@@ -17,21 +17,19 @@ namespace SalesSystem.Api.Controllers;
 public class PurchaseInvoicesController : ControllerBase
 {
     private readonly IPurchaseService _purchaseService;
+    private readonly ILogger<PurchaseInvoicesController> _logger;
 
-    public PurchaseInvoicesController(IPurchaseService purchaseService)
+    public PurchaseInvoicesController(
+        IPurchaseService purchaseService,
+        ILogger<PurchaseInvoicesController> logger)
     {
         _purchaseService = purchaseService;
+        _logger = logger;
     }
 
-    /// <summary>
-    /// Gets all purchase invoices with optional filtering and pagination
-    /// </summary>
-    /// <param name="supplierId">Filter by supplier ID</param>
-    /// <param name="status">Filter by status (1=Draft, 2=Posted, 3=Cancelled)</param>
-    /// <param name="page">Page number (default: 1)</param>
-    /// <param name="pageSize">Items per page (default: 10)</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Paginated list of purchase invoices</returns>
+    #region Invoice CRUD
+
+    /// <summary>الحصول على قائمة فواتير الشراء مع الترشيح والترقيم.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<PurchaseInvoiceDto>), 200)]
     [ProducesResponseType(400)]
@@ -50,12 +48,7 @@ public class PurchaseInvoicesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Gets a purchase invoice by ID
-    /// </summary>
-    /// <param name="id">Invoice ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Invoice details</returns>
+    /// <summary>الحصول على فاتورة شراء بواسطة المعرف.</summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(PurchaseInvoiceDto), 200)]
     [ProducesResponseType(404)]
@@ -65,12 +58,7 @@ public class PurchaseInvoicesController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Creates a new purchase invoice (draft)
-    /// </summary>
-    /// <param name="request">Purchase invoice creation request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Created invoice</returns>
+    /// <summary>إنشاء فاتورة شراء جديدة (مسودة).</summary>
     [HttpPost]
     [ProducesResponseType(typeof(PurchaseInvoiceDto), 201)]
     [ProducesResponseType(400)]
@@ -80,18 +68,15 @@ public class PurchaseInvoicesController : ControllerBase
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
         var result = await _purchaseService.CreateAsync(request, userId, ct);
-        return result.IsSuccess
-            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
-            : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+        {
+            _logger.LogInformation("تم إنشاء فاتورة شراء كمسودة: المعرف {Id} بواسطة المستخدم {UserId}", result.Value!.Id, userId);
+            return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
+        }
+        return BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Updates an existing purchase invoice (draft only)
-    /// </summary>
-    /// <param name="id">Invoice ID</param>
-    /// <param name="request">Purchase invoice update request</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Updated invoice</returns>
+    /// <summary>تحديث فاتورة شراء موجودة (المسودة فقط).</summary>
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(PurchaseInvoiceDto), 200)]
     [ProducesResponseType(400)]
@@ -102,15 +87,12 @@ public class PurchaseInvoicesController : ControllerBase
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
         var result = await _purchaseService.UpdateAsync(id, request, userId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Posts a purchase invoice (adds stock and updates supplier balance)
-    /// </summary>
-    /// <param name="id">Invoice ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Posted invoice</returns>
+    /// <summary>ترحيل فاتورة شراء (إضافة المخزون وتحديث رصيد المورد).</summary>
     [HttpPost("{id:int}/post")]
     [ProducesResponseType(typeof(PurchaseInvoiceDto), 200)]
     [ProducesResponseType(400)]
@@ -121,15 +103,12 @@ public class PurchaseInvoicesController : ControllerBase
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
         var result = await _purchaseService.PostAsync(id, userId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
-    /// <summary>
-    /// Cancels a purchase invoice (reverses stock and balances)
-    /// </summary>
-    /// <param name="id">Invoice ID</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>Cancelled invoice</returns>
+    /// <summary>إلغاء فاتورة شراء (عكس المخزون والأرصدة).</summary>
     [HttpPost("{id:int}/cancel")]
     [ProducesResponseType(typeof(PurchaseInvoiceDto), 200)]
     [ProducesResponseType(400)]
@@ -140,7 +119,9 @@ public class PurchaseInvoicesController : ControllerBase
         if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
         var result = await _purchaseService.CancelAsync(id, userId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     /// <summary>
@@ -150,6 +131,11 @@ public class PurchaseInvoicesController : ControllerBase
     /// <param name="request">Upload request with base64 content and file name</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Saved file path</returns>
+    #endregion
+
+    #region Attachments
+
+    /// <summary>رفع مرفق لفاتورة الشراء.</summary>
     [HttpPost("{id:int}/upload-attachment")]
     [ProducesResponseType(typeof(string), 200)]
     [ProducesResponseType(400)]
@@ -186,4 +172,31 @@ public class PurchaseInvoicesController : ControllerBase
 
         return File(result.Value!, "application/octet-stream", $"attachment_{id}");
     }
+
 }
+        var result = await _purchaseService.UploadAttachmentAsync(id, request.Base64Content, request.FileName, ct);
+        if (result.IsSuccess) return Ok(new { path = result.Value });
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>حذف مرفق فاتورة الشراء.</summary>
+    [HttpDelete("{id:int}/attachment")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> DeleteAttachment(int id, CancellationToken ct)
+    {
+        var result = await _purchaseService.DeleteAttachmentAsync(id, ct);
+        if (result.IsSuccess) return Ok();
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// طلب رفع مرفق.
+/// </summary>
+public record UploadAttachmentRequest(string Base64Content, string? FileName);

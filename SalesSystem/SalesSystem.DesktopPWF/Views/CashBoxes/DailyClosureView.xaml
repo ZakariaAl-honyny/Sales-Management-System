@@ -6,7 +6,7 @@
       xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CashBoxes"
       mc:Ignorable="d"
-     
+      
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
@@ -18,6 +18,7 @@
 
     <Grid Style="{StaticResource PageRootGridStyle}">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -37,41 +38,88 @@
         <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="10,6" Margin="{StaticResource StandardSectionMargin}">
             <WrapPanel Orientation="Horizontal" HorizontalAlignment="Stretch">
                 <!-- Opening Balance Card -->
-                <Border Style="{StaticResource CardStyle}" Width="180" Margin="0,0,12,0" Padding="12,10">
+                <Border Style="{StaticResource CardStyle}" Width="160" Margin="0,0,8,0" Padding="10,8">
                     <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="الرصيد الافتتاحي" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding OpeningBalance, StringFormat=N2}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        <TextBlock Text="الرصيد الافتتاحي" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding OpeningBalance, StringFormat=N2}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Total Income Card -->
-                <Border Style="{StaticResource CardStyle}" Width="180" Margin="0,0,12,0" Padding="12,10">
+                <Border Style="{StaticResource CardStyle}" Width="160" Margin="0,0,8,0" Padding="10,8">
                     <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="إجمالي الإيرادات" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding TotalIncome, StringFormat=N2}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        <TextBlock Text="إجمالي الإيرادات" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding TotalIncome, StringFormat=N2}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource SuccessBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Total Expense Card -->
-                <Border Style="{StaticResource CardStyle}" Width="180" Margin="0,0,12,0" Padding="12,10">
+                <Border Style="{StaticResource CardStyle}" Width="160" Margin="0,0,8,0" Padding="10,8">
                     <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="إجمالي المصروفات" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding TotalExpense, StringFormat=N2}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        <TextBlock Text="إجمالي المصروفات" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding TotalExpense, StringFormat=N2}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
 
                 <!-- Projected Closing Balance Card -->
-                <Border Style="{StaticResource CardStyle}" Width="200" Padding="12,10">
+                <Border Style="{StaticResource CardStyle}" Width="160" Padding="10,8">
                     <StackPanel HorizontalAlignment="Center">
-                        <TextBlock Text="الرصيد الختامي المتوقع" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding ProjectedClosingBalance, StringFormat=N2}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        <TextBlock Text="الرصيد الختامي المتوقع" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding ProjectedClosingBalance, StringFormat=N2}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                     </StackPanel>
                 </Border>
             </WrapPanel>
         </Border>
 
+        <!-- Reconciliation Section -->
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="12,8" Margin="{StaticResource StandardSectionMargin}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="160"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="160"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Actual Cash Count -->
+                <TextBlock Text="العد الفعلي للخزينة:" Grid.Column="0" VerticalAlignment="Center" 
+                           FontWeight="SemiBold" FontSize="13" Margin="0,0,8,0"
+                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                <TextBox Grid.Column="1" Text="{Binding ActualCashCount, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource ModernTextBox}"
+                         FontWeight="Bold" FontSize="14"
+                         Foreground="{StaticResource PrimaryBrush}"
+                         ToolTip="أدخل العدد الفعلي للنقدية في الخزينة — سيتم احتساب الفرق تلقائياً"
+                         AutomationProperties.AutomationId="TxtActualCashCount"/>
+
+                <!-- Difference Display -->
+                <TextBlock Text="الفرق:" Grid.Column="2" VerticalAlignment="Center" 
+                           FontWeight="SemiBold" FontSize="13" Margin="12,0,8,0"
+                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                <TextBlock Grid.Column="3" Text="{Binding DifferenceDisplay}" VerticalAlignment="Center"
+                           FontWeight="Bold" FontSize="14"
+                           AutomationProperties.AutomationId="TxtDifferenceDisplay"/>
+
+                <!-- Reconcile Button -->
+                <Button Grid.Column="4"
+                        Command="{Binding ReconcileCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Padding="8,4"
+                        Margin="12,0,0,0"
+                        VerticalAlignment="Center"
+                        ToolTip="إجراء تسوية بين الرصيد المتوقع والعد الفعلي للخزينة">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="✅" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="تسوية" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
         <!-- Toolbar -->
-        <Border Grid.Row="2" Style="{StaticResource ToolbarStyle}">
+        <Border Grid.Row="3" Style="{StaticResource ToolbarStyle}">
             <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
 
@@ -98,7 +146,7 @@
         </Border>
 
         <!-- IsClosedToday Success Banner -->
-        <Border Grid.Row="3"
+        <Border Grid.Row="4"
                 Background="{StaticResource SuccessLightBrush}"
                 BorderBrush="{StaticResource SuccessBrush}"
                 BorderThickness="1"
@@ -108,7 +156,7 @@
                 Visibility="{Binding IsClosedToday, Converter={StaticResource BoolToVisibility}}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="✅" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
-                <TextBlock Text="تم إغلاق هذا الصندوق اليوم"
+                <TextBlock Text="{Binding ReconciliationStatus, StringFormat='{}حالة الإغلاق: {0}'}"
                            Foreground="{StaticResource SuccessTextBrush}"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center"
@@ -117,7 +165,7 @@
         </Border>
 
         <!-- Error Message Bar -->
-        <Border Grid.Row="3"
+        <Border Grid.Row="4"
                 Background="{StaticResource ErrorLightBrush}"
                 BorderBrush="{StaticResource ErrorBrush}"
                 BorderThickness="1"
@@ -137,14 +185,14 @@
         </Border>
 
         <!-- Past Closures Section Label -->
-        <TextBlock Grid.Row="4"
+        <TextBlock Grid.Row="5"
                    Text="الإغلاقات السابقة"
                    Style="{StaticResource SectionHeaderStyle}"
                    Margin="{StaticResource StandardSectionMargin}"
                    AutomationProperties.AutomationId="PastClosuresSectionLabel"/>
 
         <!-- Past Closures DataGrid -->
-        <Border Grid.Row="5" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True" Margin="{StaticResource StandardSectionMargin}">
+        <Border Grid.Row="6" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True" Margin="{StaticResource StandardSectionMargin}">
             <Grid>
                 <DataGrid ItemsSource="{Binding PastClosures}"
                           SelectedItem="{Binding SelectedClosure}"
@@ -155,28 +203,63 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="التاريخ"
                                             Binding="{Binding ClosureDate, StringFormat=yyyy/MM/dd}"
-                                            Width="120"
+                                            Width="100"
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
 
                         <DataGridTextColumn Header="الرصيد الافتتاحي"
                                             Binding="{Binding OpeningBalance, StringFormat=N2}"
-                                            Width="120"
+                                            Width="110"
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
 
                         <DataGridTextColumn Header="إجمالي الإيرادات"
                                             Binding="{Binding TotalIncome, StringFormat=N2}"
-                                            Width="120"
+                                            Width="110"
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
 
                         <DataGridTextColumn Header="إجمالي المصروفات"
                                             Binding="{Binding TotalExpense, StringFormat=N2}"
-                                            Width="120"
+                                            Width="110"
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
 
                         <DataGridTextColumn Header="الرصيد الختامي"
                                             Binding="{Binding ClosingBalance, StringFormat=N2}"
-                                            Width="120"
+                                            Width="110"
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
+                        <DataGridTextColumn Header="العد الفعلي"
+                                            Binding="{Binding ActualCashCount, StringFormat=N2}"
+                                            Width="100"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
+                        <DataGridTextColumn Header="الفارق"
+                                            Binding="{Binding Difference, StringFormat=N2}"
+                                            Width="100"
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
+                        <DataGridTemplateColumn Header="التسوية" Width="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding IsReconciled}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsReconciled}" Value="True">
+                                                        <Setter Property="Text" Value="مطابق ✅"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsReconciled}" Value="False">
+                                                        <Setter Property="Text" Value="غير مطابق"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
 
@@ -191,7 +274,7 @@
         </Border>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="7"
+        <Border Grid.Row="0" Grid.RowSpan="8"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

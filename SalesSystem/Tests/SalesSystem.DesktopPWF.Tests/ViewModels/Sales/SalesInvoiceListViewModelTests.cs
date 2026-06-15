@@ -75,6 +75,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(invoices));
 
@@ -98,6 +99,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .Returns(tcs.Task);
 
@@ -122,6 +124,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(new List<SalesInvoiceDto>
             {
@@ -156,6 +159,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(invoices));
 
@@ -192,6 +196,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(invoices));
 
@@ -470,6 +475,7 @@ public class SalesInvoiceListViewModelTests : IDisposable
             SubTotal: totalAmount,
             DiscountAmount: 0,
             TaxAmount: 0,
+            OtherCharges: 0,
             TotalAmount: totalAmount,
             PaidAmount: totalAmount,
             DueAmount: 0,
@@ -480,6 +486,10 @@ public class SalesInvoiceListViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
+            CashBoxId: null,
+            CashBoxName: null,
+            TotalCost: null,
+            TotalProfit: null,
             Items: new List<SalesInvoiceItemDto>());
     }
 

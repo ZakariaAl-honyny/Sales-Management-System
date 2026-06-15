@@ -20,6 +20,7 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
     private readonly IDialogService _dialogService;
     private readonly IEventBus _eventBus;
     private readonly IToastNotificationService _toastService;
+    private readonly IScreenWindowService _screenWindowService;
 
     public JournalEntriesListViewModel()
     {
@@ -27,6 +28,7 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
         _dialogService = App.GetService<IDialogService>();
         _eventBus = App.GetService<IEventBus>();
         _toastService = App.GetService<IToastNotificationService>();
+        _screenWindowService = App.GetService<IScreenWindowService>();
         SetDialogService(_dialogService);
 
         // Subscribe to EventBus (RULE-012: unsubscribe in Cleanup)
@@ -36,6 +38,12 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
             (Func<Task>)(async () => await ExecuteAsync(LoadEntriesOperationAsync)));
         ViewDetailsCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(ViewDetailsOperationAsync)));
+        NewEntryCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await NewEntryOperationAsync()));
+        PostEntryCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(PostEntryOperationAsync)));
+        CancelEntryCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(CancelEntryOperationAsync)));
         CloseCommand = new RelayCommand(RequestClose);
     }
 
@@ -79,6 +87,9 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
 
     public ICommand RefreshCommand { get; private set; } = null!;
     public ICommand ViewDetailsCommand { get; private set; } = null!;
+    public ICommand NewEntryCommand { get; private set; } = null!;
+    public ICommand PostEntryCommand { get; private set; } = null!;
+    public ICommand CancelEntryCommand { get; private set; } = null!;
     public ICommand CloseCommand { get; private set; } = null!;
 
     // ── Operations ──
@@ -139,8 +150,7 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
                           $"التاريخ: {detail.TransactionDate:yyyy/MM/dd HH:mm}\n" +
                           $"البيان: {detail.Description}\n" +
                           $"النوع: {GetEntryTypeDisplay(detail.EntryType)}\n" +
-                          $"الحالة: {(detail.IsPosted ? "✅ مرحلة" : "📝 مسودة")}" +
-                          (detail.IsReversed ? " (مقيدة بعكس)" : "") +
+                           $"الحالة: {detail.StatusDisplay}" +
                           $"\n\nالتفاصيل:\n{detailsMessage}\n\n" +
                           $"المجموع مدين: {lines.Sum(l => l.Debit):N2}\n" +
                           $"المجموع دائن: {lines.Sum(l => l.Credit):N2}";
@@ -150,6 +160,118 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل تفاصيل القيد", "ViewJournalEntryDetails");
+        }
+    }
+
+    /// <summary>
+    /// Opens the Journal Entry Editor non-modally (RULE-160/161).
+    /// </summary>
+    private async Task NewEntryOperationAsync()
+    {
+        var editorVm = App.GetService<JournalEntryEditorViewModel>();
+        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
+        {
+            Title = "إدخال قيد يومي يدوي",
+            Width = 800,
+            Height = 600,
+            OnClosed = (vm) =>
+            {
+                if (vm is JournalEntryEditorViewModel)
+                {
+                    _ = ExecuteAsync(LoadEntriesOperationAsync);
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Posts a Draft journal entry (transitions to Posted status).
+    /// </summary>
+    private async Task PostEntryOperationAsync()
+    {
+        if (SelectedEntry == null)
+        {
+            await _dialogService.ShowWarningAsync("تنبيه", "يرجى تحديد قيد لترحيله.");
+            return;
+        }
+
+        if (SelectedEntry.IsPosted)
+        {
+            await _dialogService.ShowWarningAsync("تنبيه", "القيد مرحلة بالفعل.");
+            return;
+        }
+
+        if (SelectedEntry.IsReversed)
+        {
+            await _dialogService.ShowWarningAsync("تنبيه", "لا يمكن ترحيل قيد ملغي.");
+            return;
+        }
+
+        var confirmed = await _dialogService.ShowConfirmationAsync("تأكيد الترحيل",
+            $"سيتم ترحيل القيد: {SelectedEntry.EntryNumber}\n" +
+            $"البيان: {SelectedEntry.Description}\n\n" +
+            $"هل تريد المتابعة؟");
+
+        if (!confirmed) return;
+
+        ErrorMessage = null;
+        var result = await _journalEntryService.PostAsync(SelectedEntry.Id);
+
+        if (result.IsSuccess)
+        {
+            _toastService.ShowSuccess($"تم ترحيل القيد {SelectedEntry.EntryNumber} بنجاح");
+            _eventBus.Publish(new JournalEntryChangedMessage(SelectedEntry.Id));
+            _ = ExecuteAsync(LoadEntriesOperationAsync);
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في ترحيل القيد", "PostJournalEntry");
+        }
+    }
+
+    /// <summary>
+    /// Cancels a Posted journal entry (transitions to Cancelled status).
+    /// </summary>
+    private async Task CancelEntryOperationAsync()
+    {
+        if (SelectedEntry == null)
+        {
+            await _dialogService.ShowWarningAsync("تنبيه", "يرجى تحديد قيد لإلغائه.");
+            return;
+        }
+
+        if (!SelectedEntry.IsPosted)
+        {
+            await _dialogService.ShowWarningAsync("تنبيه", "يمكن إلغاء القيود المرحلة فقط.");
+            return;
+        }
+
+        if (SelectedEntry.IsReversed)
+        {
+            await _dialogService.ShowWarningAsync("تنبيه", "القيد ملغي بالفعل.");
+            return;
+        }
+
+        var confirmed = await _dialogService.ShowConfirmationAsync("تأكيد الإلغاء",
+            $"سيتم إلغاء القيد: {SelectedEntry.EntryNumber}\n" +
+            $"البيان: {SelectedEntry.Description}\n\n" +
+            $"سيتم إنشاء قيد عكس تلقائي.\n" +
+            $"هل تريد المتابعة؟");
+
+        if (!confirmed) return;
+
+        ErrorMessage = null;
+        var result = await _journalEntryService.CancelAsync(SelectedEntry.Id);
+
+        if (result.IsSuccess)
+        {
+            _toastService.ShowSuccess($"تم إلغاء القيد {SelectedEntry.EntryNumber} بنجاح");
+            _eventBus.Publish(new JournalEntryChangedMessage(SelectedEntry.Id));
+            _ = ExecuteAsync(LoadEntriesOperationAsync);
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء القيد", "CancelJournalEntry");
         }
     }
 
@@ -226,23 +348,12 @@ public class JournalEntryItemViewModel : ViewModelBase
     public string? ReferenceNumber => _dto.ReferenceNumber;
     public decimal TotalDebit => _dto.TotalDebit;
     public decimal TotalCredit => _dto.TotalCredit;
-    public bool IsPosted => _dto.IsPosted;
-    public bool IsReversed => _dto.IsReversed;
+    public int Status => _dto.Status;
+    public bool IsPosted => _dto.Status == 2;
+    public bool IsReversed => _dto.Status == 3;
+    public string StatusDisplay => _dto.StatusDisplay ?? "غير معروف";
     public DateTime CreatedAt => _dto.CreatedAt;
     public int? CreatedByUserId => _dto.CreatedByUserId;
-
-    /// <summary>
-    /// Arabic status text combining posted and reversed indicators.
-    /// </summary>
-    public string StatusDisplay
-    {
-        get
-        {
-            if (IsReversed) return "ملغي (عكس)";
-            if (IsPosted) return "مرحل";
-            return "مسودة";
-        }
-    }
 
     /// <summary>
     /// Debit formatted as N2.

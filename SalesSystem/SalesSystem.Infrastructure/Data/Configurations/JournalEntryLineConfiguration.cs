@@ -21,7 +21,6 @@ public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEnt
         builder.Property(x => x.Credit).HasPrecision(18, 2);
         builder.Property(x => x.Description).HasMaxLength(500);
         builder.Property(x => x.SortOrder).HasDefaultValue(0);
-        builder.Property(x => x.IsActive).HasDefaultValue(true);
 
         // FK to Account with navigation property and Restrict
         builder.HasOne(x => x.Account)
@@ -32,7 +31,7 @@ public class JournalEntryLineConfiguration : IEntityTypeConfiguration<JournalEnt
         // Indexes
         builder.HasIndex(x => x.JournalEntryId);
         builder.HasIndex(x => x.AccountId);
+        builder.HasIndex(x => new { x.JournalEntryId, x.AccountId });
 
-        builder.HasQueryFilter(x => x.IsActive);
     }
 }

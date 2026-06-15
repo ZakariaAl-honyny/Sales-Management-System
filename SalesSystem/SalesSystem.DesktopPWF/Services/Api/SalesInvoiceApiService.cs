@@ -26,6 +26,7 @@ public class SalesInvoiceApiService : ApiServiceBase, ISalesInvoiceApiService
         bool includeInactive = false,
         int page = 1,
         int pageSize = 100,
+        int? customerId = null,
         CancellationToken ct = default)
     {
         var queryParams = new List<string>
@@ -43,6 +44,8 @@ public class SalesInvoiceApiService : ApiServiceBase, ISalesInvoiceApiService
             queryParams.Add($"to={to.Value:yyyy-MM-dd}");
         if (status.HasValue)
             queryParams.Add($"status={status.Value}");
+        if (customerId.HasValue)
+            queryParams.Add($"customerId={customerId.Value}");
 
         var query = string.Join("&", queryParams);
         return await ExecutePagedAsync<SalesInvoiceDto>(
@@ -64,17 +67,18 @@ public class SalesInvoiceApiService : ApiServiceBase, ISalesInvoiceApiService
             "SalesInvoiceApiService.CreateAsync");
     }
 
-    public async Task<Result<SalesInvoiceDto>> UpdateAsync(int id, CreateSalesInvoiceRequest request, CancellationToken ct = default)
+    public async Task<Result<SalesInvoiceDto>> UpdateAsync(int id, UpdateSalesInvoiceRequest request, CancellationToken ct = default)
     {
         return await ExecuteAsync<SalesInvoiceDto>(
             () => _httpClient.PutAsJsonAsync($"{BasePath}/{id}", request, ct),
             "SalesInvoiceApiService.UpdateAsync");
     }
 
-    public async Task<Result<SalesInvoiceDto>> PostAsync(int id, CancellationToken ct = default)
+    public async Task<Result<SalesInvoiceDto>> PostAsync(int id, PostSalesInvoiceRequest? request = null, CancellationToken ct = default)
     {
+        request ??= new PostSalesInvoiceRequest();
         return await ExecuteAsync<SalesInvoiceDto>(
-            () => _httpClient.PostAsync($"{BasePath}/{id}/post", null, ct),
+            () => _httpClient.PostAsJsonAsync($"{BasePath}/{id}/post", request, ct),
             "SalesInvoiceApiService.PostAsync");
     }
 

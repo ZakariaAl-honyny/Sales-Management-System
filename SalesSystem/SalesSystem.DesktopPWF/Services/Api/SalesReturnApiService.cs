@@ -61,10 +61,11 @@ public class SalesReturnApiService : ApiServiceBase, ISalesReturnApiService
             "SalesReturnApiService.CreateAsync");
     }
 
-    public async Task<Result<SalesReturnDto>> PostAsync(int id, CancellationToken ct = default)
+    public async Task<Result<SalesReturnDto>> PostAsync(int id, PostSalesReturnRequest? request = null, CancellationToken ct = default)
     {
+        request ??= new PostSalesReturnRequest();
         return await ExecuteAsync<SalesReturnDto>(
-            () => _httpClient.PostAsync($"{BasePath}/{id}/post", null, ct),
+            () => _httpClient.PostAsJsonAsync($"{BasePath}/{id}/post", request, ct),
             "SalesReturnApiService.PostAsync");
     }
 

@@ -50,11 +50,4 @@ public class ProductUnitsController : ControllerBase
         return result.IsSuccess ? Ok() : BadRequest(new { error = result.Error });
     }
 
-    [HttpGet("price-history")]
-    [Authorize(Policy = "ManagerAndAbove")]
-    public async Task<IActionResult> GetPriceHistory(int productId, CancellationToken ct)
-    {
-        var result = await _productUnitService.GetPriceHistoryAsync(productId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-    }
 }

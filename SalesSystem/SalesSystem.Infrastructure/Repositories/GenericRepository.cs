@@ -8,9 +8,9 @@ namespace SalesSystem.Infrastructure.Repositories;
 
 /// <summary>
 /// Generic repository implementation using Entity Framework Core.
-/// Uses global query filter for soft delete (IsActive = true).
+/// Uses entity-specific query filters configured via Fluent API.
 /// </summary>
-public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
+public class GenericRepository<T> : IGenericRepository<T> where T : Entity
 {
     protected readonly SalesDbContext _context;
 
@@ -44,16 +44,16 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
     public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
     {
         var entity = await _context.Set<T>().FindAsync([id], ct);
-        if (entity != null)
+        if (entity != null && entity is ActivatableEntity activatable)
         {
-            entity.MarkAsDeleted();
+            activatable.MarkAsDeleted();
             _context.Entry(entity).State = EntityState.Modified;
         }
     }
 
     public async Task HardDeleteAsync(int id, CancellationToken ct = default)
     {
-        var entity = await _context.Set<T>().IgnoreQueryFilters().FirstOrDefaultAsync(e => ((BaseEntity)e).Id == id, ct);
+        var entity = await _context.Set<T>().IgnoreQueryFilters().FirstOrDefaultAsync(e => ((Entity)e).Id == id, ct);
         if (entity != null)
         {
             _context.Set<T>().Remove(entity);

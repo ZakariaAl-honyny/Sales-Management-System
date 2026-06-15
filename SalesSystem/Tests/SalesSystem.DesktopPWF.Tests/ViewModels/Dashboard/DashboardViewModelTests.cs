@@ -74,6 +74,7 @@ public class DashboardViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(new List<SalesInvoiceDto>()));
 
@@ -125,6 +126,7 @@ public class DashboardViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(new List<SalesInvoiceDto>()));
 
@@ -226,6 +228,7 @@ public class DashboardViewModelTests : IDisposable
             It.IsAny<bool>(),
             It.IsAny<int>(),
             It.IsAny<int>(),
+            It.IsAny<int?>(),
             It.IsAny<CancellationToken>()), Times.AtLeastOnce);
 
         viewModel.Cleanup();
@@ -330,6 +333,7 @@ public class DashboardViewModelTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<int>(),
                 It.IsAny<int>(),
+                It.IsAny<int?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<List<SalesInvoiceDto>>.Success(new List<SalesInvoiceDto>()));
 
@@ -389,6 +393,7 @@ public class DashboardViewModelTests : IDisposable
             SubTotal: totalAmount,
             DiscountAmount: 0,
             TaxAmount: 0,
+            OtherCharges: 0,
             TotalAmount: totalAmount,
             PaidAmount: totalAmount,
             DueAmount: 0,
@@ -399,6 +404,10 @@ public class DashboardViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
+            CashBoxId: null,
+            CashBoxName: null,
+            TotalCost: null,
+            TotalProfit: null,
             Items: new List<SalesInvoiceItemDto>());
     }
 
@@ -411,10 +420,9 @@ public class DashboardViewModelTests : IDisposable
             Email: null,
             Address: null,
             TaxNumber: null,
-            OpeningBalance: 0,
-            CurrentBalance: 0,
             CreditLimit: 0,
-            IsActive: isActive);
+            IsActive: isActive,
+            AccountId: 1);
     }
 
     private static SupplierDto CreateSupplierDto(int id, string name, bool isActive)
@@ -426,35 +434,25 @@ public class DashboardViewModelTests : IDisposable
             Email: null,
             Address: null,
             TaxNumber: null,
-            OpeningBalance: 0,
-            CurrentBalance: 0,
-            CreditLimit: 0,
-            IsActive: isActive);
+            IsActive: isActive,
+            AccountId: 1);
     }
 
     private static ProductDto CreateProductDto(int id, string name, bool isActive, decimal minStock = 0)
     {
         return new ProductDto(
             Id: id,
-            Barcode: null,
             Name: name,
             CategoryId: 1,
             CategoryName: "Category",
-            UnitId: 1,
-            UnitName: "Unit",
-            RetailUnitId: 1,
-            RetailUnitName: "Unit",
-            WholesaleUnitId: 1,
-            WholesaleUnitName: "Unit",
-            ConversionFactor: 1,
-            PurchasePrice: 100m,
-            SalePrice: 150m,
-            RetailPrice: 150m,
-            WholesalePrice: 1500m,
-            MinStock: minStock,
+            Barcode: null,
             Description: null,
-            ExpirationDate: null,
+            ReorderLevel: minStock,
+            TrackExpiry: false,
             ImagePath: null,
+            Notes: null,
+            DefaultPurchaseUnitId: null,
+            DefaultSalesUnitId: null,
             IsActive: isActive);
     }
 

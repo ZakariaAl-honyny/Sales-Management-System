@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Enums;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Controllers;
@@ -22,14 +21,13 @@ public class ProductPricesController : ControllerBase
 
     /// <summary>
     /// Gets the effective price for a product unit using the fallback chain:
-    /// 1. Exact match → 2. Retail fallback → 3. Base currency conversion → 4. Not found
+    /// 1. Exact match → 2. Base currency conversion → 3. Not found
     /// </summary>
     [HttpGet("effective")]
     [Authorize(Policy = "AllStaff")]
     public async Task<IActionResult> GetEffectivePrice(
         [FromQuery] int productUnitId,
         [FromQuery] int currencyId,
-        [FromQuery] PriceLevel priceLevel,
         [FromQuery] DateTime? effectiveDate = null,
         CancellationToken ct = default)
     {
@@ -37,10 +35,8 @@ public class ProductPricesController : ControllerBase
             return BadRequest(new { error = "معرف وحدة المنتج مطلوب" });
         if (currencyId <= 0)
             return BadRequest(new { error = "معرف العملة مطلوب" });
-        if (!Enum.IsDefined(typeof(PriceLevel), priceLevel))
-            return BadRequest(new { error = "مستوى السعر غير صالح" });
 
-        var result = await _service.GetEffectivePriceAsync(productUnitId, currencyId, priceLevel, effectiveDate, ct);
+        var result = await _service.GetEffectivePriceAsync(productUnitId, currencyId, effectiveDate, ct);
         if (result.IsSuccess) return Ok(result.Value);
         if (result.ErrorCode == ErrorCodes.NotFound)
             return NotFound(new { error = result.Error });
@@ -55,17 +51,14 @@ public class ProductPricesController : ControllerBase
     public async Task<IActionResult> GetEffectivePriceForInvoice(
         [FromQuery] int productUnitId,
         [FromQuery] int currencyId,
-        [FromQuery] PriceLevel priceLevel,
         CancellationToken ct = default)
     {
         if (productUnitId <= 0)
             return BadRequest(new { error = "معرف وحدة المنتج مطلوب" });
         if (currencyId <= 0)
             return BadRequest(new { error = "معرف العملة مطلوب" });
-        if (!Enum.IsDefined(typeof(PriceLevel), priceLevel))
-            return BadRequest(new { error = "مستوى السعر غير صالح" });
 
-        var result = await _service.GetEffectivePriceForInvoiceAsync(productUnitId, currencyId, priceLevel, ct);
+        var result = await _service.GetEffectivePriceForInvoiceAsync(productUnitId, currencyId, ct);
         if (result.IsSuccess) return Ok(result.Value);
         if (result.ErrorCode == ErrorCodes.NotFound)
             return NotFound(new { error = result.Error });

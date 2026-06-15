@@ -7,7 +7,7 @@ namespace SalesSystem.Application.Interfaces.Services;
 public interface IJournalEntryService
 {
     /// <summary>
-    /// Creates and posts a balanced journal entry.
+    /// Creates a journal entry in Draft status.
     /// </summary>
     /// <param name="request">Journal entry data (no CreatedBy — extracted from JWT).</param>
     /// <param name="userId">Authenticated user ID from JWT claims.</param>
@@ -33,4 +33,22 @@ public interface IJournalEntryService
     /// Gets a detailed account ledger (statement) for a date range.
     /// </summary>
     Task<Result<AccountLedgerDto>> GetAccountLedgerAsync(int accountId, DateTime startDate, DateTime endDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Posts a Draft journal entry (transitions to Posted status).
+    /// </summary>
+    /// <param name="id">Journal entry ID.</param>
+    /// <param name="userId">Authenticated user ID from JWT claims.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posted journal entry detail.</returns>
+    Task<Result<JournalEntryDetailDto>> PostJournalEntryAsync(int id, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Cancels a Posted journal entry (transitions to Cancelled status).
+    /// </summary>
+    /// <param name="id">Journal entry ID.</param>
+    /// <param name="userId">Authenticated user ID from JWT claims.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cancelled journal entry detail.</returns>
+    Task<Result<JournalEntryDetailDto>> CancelJournalEntryAsync(int id, int userId, CancellationToken ct = default);
 }

@@ -1,0 +1,178 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Reports.AccountBalancesView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:local="clr-namespace:SalesSystem.DesktopPWF.Views.Reports"
+      mc:Ignorable="d"
+      d:DesignHeight="700" d:DesignWidth="1000"
+     
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <Grid Style="{StaticResource PageRootGridStyle}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="🏦 تقرير أرصدة الحسابات"
+                   Style="{StaticResource HeaderStyle}"
+                   AutomationProperties.AutomationId="AccountBalancesPageTitle"/>
+
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="نوع الحساب:" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox Width="140"
+                              ItemsSource="{Binding AccountTypes}"
+                              SelectedValue="{Binding SelectedAccountType}"
+                              ToolTip="تصفية حسب نوع الحساب المحاسبي">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="المستوى:" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <ComboBox Width="100"
+                              ItemsSource="{Binding Levels}"
+                              SelectedValue="{Binding SelectedLevel}"
+                              ToolTip="تصفية حسب مستوى الحساب">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            ToolTip="تصدير بيانات التقرير إلى ملف Excel">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تصدير Excel" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding LoadCommand}" Style="{StaticResource PrimaryButton}"
+                            ToolTip="تحديث بيانات التقرير">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تحديث" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <Grid>
+                <Border Background="{StaticResource ErrorLightBrush}"
+                        Padding="10,6" Margin="0,0,0,0" VerticalAlignment="Top"
+                        Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <Button Grid.Column="2" Command="{Binding LoadCommand}" Style="{StaticResource SecondaryButton}" Height="28" Padding="12,0" FontSize="11"
+                                ToolTip="إعادة المحاولة">
+                            <TextBlock Text="إعادة المحاولة"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <DataGrid ItemsSource="{Binding ReportData}"
+                          AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
+                    <DataGrid.Style>
+                        <Style TargetType="DataGrid" BasedOn="{StaticResource ModernDataGrid}">
+                            <Setter Property="Visibility" Value="Visible"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.Style>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="كود الحساب" Binding="{Binding AccountCode}" Width="100"
+                                            ToolTipService.ToolTip="رقم الحساب في شجرة الحسابات"/>
+                        <DataGridTextColumn Header="اسم الحساب" Binding="{Binding AccountName}" Width="2*"
+                                            ToolTipService.ToolTip="اسم الحساب"/>
+                        <DataGridTextColumn Header="النوع" Binding="{Binding AccountType}" Width="100"
+                                            ToolTipService.ToolTip="نوع الحساب"/>
+                        <DataGridTextColumn Header="المستوى" Binding="{Binding Level}" Width="70"
+                                            ToolTipService.ToolTip="مستوى الحساب في الشجرة"/>
+                        <DataGridTextColumn Header="الرصيد المدين" Binding="{Binding DebitBalance, StringFormat={}{0:N2}}" Width="120"
+                                            ToolTipService.ToolTip="إجمالي الرصيد المدين للحساب">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                    <Setter Property="Foreground" Value="#C2410C"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="الرصيد الدائن" Binding="{Binding CreditBalance, StringFormat={}{0:N2}}" Width="120"
+                                            ToolTipService.ToolTip="إجمالي الرصيد الدائن للحساب">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                    <Setter Property="Foreground" Value="#166534"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="صافي الرصيد" Binding="{Binding NetBalance, StringFormat={}{0:N2}}" Width="120"
+                                            ToolTipService.ToolTip="صافي الرصيد (مدين - دائن)"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,40,0,0">
+                        <TextBlock Text="🏦" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
+                        <TextBlock Text="لا توجد أرصدة" FontSize="22" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="اختر نوع الحساب ثم اضغط على 'تحديث'"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border Background="#CCFFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" Panel.ZIndex="100">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <ProgressBar IsIndeterminate="True" Width="240" Height="6" Background="#E2E8F0" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,16"/>
+                        <TextBlock Text="جاري تحميل البيانات..." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="3" Style="{StaticResource FooterBarStyle}" Padding="12,8"
+                Visibility="{Binding HasData, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="📊 الملخص:" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding SummaryText}" FontSize="13" VerticalAlignment="Center"
+                           ToolTip="ملخص التقرير — إجمالي أرصدة الحسابات"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

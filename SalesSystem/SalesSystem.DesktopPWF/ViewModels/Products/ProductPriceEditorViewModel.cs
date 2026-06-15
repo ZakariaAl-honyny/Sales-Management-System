@@ -5,7 +5,6 @@ using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.Services.App.Toast;
-using SalesSystem.Domain.Enums;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -22,7 +21,6 @@ public class ProductPriceEditorViewModel : ViewModelBase
     private int? _priceId;
     private int _productUnitId;
     private int _currencyId;
-    private PriceLevel _priceLevel = PriceLevel.Retail;
     private decimal _priceValue;
     private DateTime _effectiveFrom = DateTime.Today;
     private DateTime? _effectiveTo;
@@ -104,29 +102,7 @@ public class ProductPriceEditorViewModel : ViewModelBase
         set => SetProperty(ref _currencyId, value);
     }
 
-    public PriceLevel PriceLevel
-    {
-        get => _priceLevel;
-        set
-        {
-            if (SetProperty(ref _priceLevel, value))
-            {
-                OnPropertyChanged(nameof(SelectedPriceLevelDisplay));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Gets the display name for the currently selected price level.
-    /// </summary>
-    public string SelectedPriceLevelDisplay => PriceLevel switch
-    {
-        PriceLevel.Retail => "تجزئة",
-        PriceLevel.Wholesale => "جملة",
-        PriceLevel.VIP => "VIP",
-        PriceLevel.Distributor => "موزع",
-        _ => "غير معروف"
-    };
+    public string? ProductUnitName { get; set; }
 
     public decimal PriceValue
     {
@@ -223,33 +199,6 @@ public class ProductPriceEditorViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// Available price levels for the dropdown.
-    /// </summary>
-    public ObservableCollection<PriceLevelItem> PriceLevelOptions { get; } = new()
-    {
-        new PriceLevelItem(PriceLevel.Retail, "تجزئة"),
-        new PriceLevelItem(PriceLevel.Wholesale, "جملة"),
-        new PriceLevelItem(PriceLevel.VIP, "VIP"),
-        new PriceLevelItem(PriceLevel.Distributor, "موزع"),
-    };
-
-    /// <summary>
-    /// The selected price level as a display item for the ComboBox.
-    /// </summary>
-    private PriceLevelItem? _selectedPriceLevelItem;
-    public PriceLevelItem? SelectedPriceLevelItem
-    {
-        get => _selectedPriceLevelItem;
-        set
-        {
-            if (SetProperty(ref _selectedPriceLevelItem, value) && value != null)
-            {
-                PriceLevel = value.Level;
-            }
-        }
-    }
-
     #endregion
 
     #region Commands
@@ -266,15 +215,11 @@ public class ProductPriceEditorViewModel : ViewModelBase
         _priceId = existing.Id;
         _productUnitId = existing.ProductUnitId;
         CurrencyId = existing.CurrencyId;
-        PriceLevel = existing.PriceLevel;
         PriceValue = existing.Price;
         _effectiveFrom = existing.EffectiveFrom;
         _effectiveTo = existing.EffectiveTo;
         _hasEffectiveTo = existing.EffectiveTo.HasValue;
         IsEditMode = true;
-
-        // Pre-select price level in dropdown
-        SelectedPriceLevelItem = PriceLevelOptions.FirstOrDefault(p => p.Level == existing.PriceLevel);
 
         // Pre-select currency when loaded
         if (Currencies.Any(c => c.Id == existing.CurrencyId))
@@ -355,8 +300,7 @@ public class ProductPriceEditorViewModel : ViewModelBase
     {
         var request = new CreateProductPriceRequest(
             ProductUnitId,
-            CurrencyId,
-            PriceLevel,
+            (short)CurrencyId,
             PriceValue,
             EffectiveFrom,
             HasEffectiveTo ? EffectiveTo : null);
@@ -384,7 +328,6 @@ public class ProductPriceEditorViewModel : ViewModelBase
 
         var request = new UpdateProductPriceRequest(
             PriceValue,
-            PriceLevel,
             EffectiveFrom,
             HasEffectiveTo ? EffectiveTo : null);
 
@@ -421,24 +364,4 @@ public class ProductPriceEditorViewModel : ViewModelBase
     #endregion
 }
 
-/// <summary>
-/// Helper class for binding PriceLevel enum to ComboBox with display names.
-/// </summary>
-public class PriceLevelItem
-{
-    public PriceLevel Level { get; }
-    public string DisplayName { get; }
 
-    public PriceLevelItem(PriceLevel level, string displayName)
-    {
-        Level = level;
-        DisplayName = displayName;
-    }
-
-    public override bool Equals(object? obj) =>
-        obj is PriceLevelItem other && Level == other.Level;
-
-    public override int GetHashCode() => Level.GetHashCode();
-
-    public override string ToString() => DisplayName;
-}

@@ -1,3 +1,10 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  LEGACY: CashBoxServiceTests — CashBoxService class was REMOVED from the
+//  Application layer in the 65-table schema migration. CashBox operations
+//  are now handled by ReceiptVoucher/PaymentVoucher services.
+//  This file is preserved for reference only — NOT included in build.
+// ═══════════════════════════════════════════════════════════════════════════
+#if false
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -102,7 +109,7 @@ public class CashBoxServiceTests
             "1110", "النقدية", "Cash", AccountType.Asset, 3,
             null, true, "النقدية بالصندوق", "#2196F3",
             false, 0m, null, null, 1);
-        typeof(BaseEntity).GetProperty("Id")!.SetValue(parentAccount, 10);
+        typeof(Entity).GetProperty("Id")!.SetValue(parentAccount, 10);
 
         // Mock parent lookup: accept any predicate
         _accountsRepoMock.Setup(r => r.FirstOrDefaultAsync(
@@ -125,7 +132,7 @@ public class CashBoxServiceTests
             .ReturnsAsync((Account a, CancellationToken _) =>
             {
                 // Simulate EF Core auto-generating the Id on Add
-                typeof(BaseEntity).GetProperty("Id")!.SetValue(a, 999);
+                typeof(Entity).GetProperty("Id")!.SetValue(a, 999);
                 return a;
             });
 
@@ -148,7 +155,7 @@ public class CashBoxServiceTests
     [Fact]
     public async Task RecordExpenseAsync_CreatesTransaction()
     {
-        var box = CashBox.Create("Test Box", accountId: 1);
+        var box = CashBox.Create("Test Box", accountId: 1, currencyId: 1);
         _cashBoxRepoMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(box);
 
@@ -193,8 +200,8 @@ public class CashBoxServiceTests
     [Fact]
     public async Task TransferAsync_WithValidBoxes_CreatesTwoTransactions()
     {
-        var sourceBox = CashBox.Create("Source Box", accountId: 1);
-        var destBox = CashBox.Create("Dest Box", accountId: 2);
+        var sourceBox = CashBox.Create("Source Box", accountId: 1, currencyId: 1);
+        var destBox = CashBox.Create("Dest Box", accountId: 2, currencyId: 1);
 
         _cashBoxRepoMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(sourceBox);
@@ -256,7 +263,7 @@ public class CashBoxServiceTests
     [Fact]
     public async Task PerformDailyClosureAsync_DuplicateDate_ReturnsFailure()
     {
-        var box = CashBox.Create("Test Box", accountId: 1);
+        var box = CashBox.Create("Test Box", accountId: 1, currencyId: 1);
         _cashBoxRepoMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(box);
         _closureRepoMock.Setup(r => r.AnyAsync(
@@ -271,3 +278,4 @@ public class CashBoxServiceTests
         _uowMock.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }
+#endif

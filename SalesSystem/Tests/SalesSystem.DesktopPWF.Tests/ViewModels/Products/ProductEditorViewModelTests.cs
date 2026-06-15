@@ -8,6 +8,7 @@ using Moq;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.Services.App.Toast;
@@ -19,12 +20,10 @@ using SalesSystem.DesktopPWF.ViewModels.Products;
 public class ProductEditorViewModelTests : IDisposable
 {
     private readonly Mock<IProductApiService> _mockProductService;
-    private readonly Mock<ICategoryApiService> _mockCategoryService;
-    private readonly Mock<IUnitApiService> _mockUnitService;
+    private readonly Mock<IProductCategoryApiService> _mockCategoryService;
     private readonly Mock<IEventBus> _mockEventBus;
     private readonly Mock<IDialogService> _mockDialogService;
     private readonly Mock<IProductPriceApiService> _mockPriceService;
-    private readonly Mock<IProductImageApiService> _mockImageService;
     private readonly Mock<IInventoryBatchApiService> _mockBatchService;
     private readonly Mock<IScreenWindowService> _mockScreenWindowService;
     private readonly Mock<IToastNotificationService> _mockToastService;
@@ -32,12 +31,10 @@ public class ProductEditorViewModelTests : IDisposable
     public ProductEditorViewModelTests()
     {
         _mockProductService = new Mock<IProductApiService>();
-        _mockCategoryService = new Mock<ICategoryApiService>();
-        _mockUnitService = new Mock<IUnitApiService>();
+        _mockCategoryService = new Mock<IProductCategoryApiService>();
         _mockEventBus = new Mock<IEventBus>();
         _mockDialogService = new Mock<IDialogService>();
         _mockPriceService = new Mock<IProductPriceApiService>();
-        _mockImageService = new Mock<IProductImageApiService>();
         _mockBatchService = new Mock<IInventoryBatchApiService>();
         _mockScreenWindowService = new Mock<IScreenWindowService>();
         _mockToastService = new Mock<IToastNotificationService>();
@@ -56,11 +53,9 @@ public class ProductEditorViewModelTests : IDisposable
         return new ProductEditorViewModel(
             _mockProductService.Object,
             _mockCategoryService.Object,
-            _mockUnitService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
             _mockPriceService.Object,
-            _mockImageService.Object,
             _mockBatchService.Object,
             _mockScreenWindowService.Object,
             _mockToastService.Object);
@@ -75,11 +70,9 @@ public class ProductEditorViewModelTests : IDisposable
             product,
             _mockProductService.Object,
             _mockCategoryService.Object,
-            _mockUnitService.Object,
             _mockEventBus.Object,
             _mockDialogService.Object,
             _mockPriceService.Object,
-            _mockImageService.Object,
             _mockBatchService.Object,
             _mockScreenWindowService.Object,
             _mockToastService.Object);
@@ -96,7 +89,6 @@ public class ProductEditorViewModelTests : IDisposable
         // Assert
         viewModel.SaveCommand.Should().NotBeNull();
         viewModel.CancelCommand.Should().NotBeNull();
-        viewModel.LoadLookupDataCommand.Should().NotBeNull();
     }
 
     [Fact]
@@ -119,21 +111,13 @@ public class ProductEditorViewModelTests : IDisposable
             Name: "منتج تجريبي",
             CategoryId: 1,
             CategoryName: "تصنيف 1",
-            UnitId: 1,
-            UnitName: "وحدة",
-            RetailUnitId: 1,
-            RetailUnitName: "وحدة",
-            WholesaleUnitId: 2,
-            WholesaleUnitName: "كرتون",
-            ConversionFactor: 10,
-            PurchasePrice: 100,
-            SalePrice: 200,
-            RetailPrice: 200,
-            WholesalePrice: 1800,
-            MinStock: 10,
+            ReorderLevel: 10,
             Description: null,
-            ExpirationDate: null,
+            TrackExpiry: false,
             ImagePath: null,
+            Notes: null,
+            DefaultPurchaseUnitId: null,
+            DefaultSalesUnitId: null,
             IsActive: true);
 
         // Act - Use the constructor that accepts ProductDto and services
@@ -152,13 +136,10 @@ public class ProductEditorViewModelTests : IDisposable
         // Assert
         viewModel.Name.Should().BeEmpty();
         viewModel.Barcode.Should().BeEmpty();
-        viewModel.PurchasePrice.Should().Be(0);
-        viewModel.RetailPrice.Should().Be(0);
-        viewModel.MinStock.Should().Be(0);
+        viewModel.ReorderLevel.Should().Be(0);
         viewModel.IsActive.Should().BeTrue();
         viewModel.IsBusy.Should().BeFalse();
         viewModel.Categories.Should().NotBeNull();
-        viewModel.Units.Should().NotBeNull();
     }
 
     [Fact]
@@ -181,21 +162,13 @@ public class ProductEditorViewModelTests : IDisposable
             Name: "منتج تجريبي",
             CategoryId: 1,
             CategoryName: "تصنيف 1",
-            UnitId: 1,
-            UnitName: "وحدة",
-            RetailUnitId: 1,
-            RetailUnitName: "وحدة",
-            WholesaleUnitId: 2,
-            WholesaleUnitName: "كرتون",
-            ConversionFactor: 10,
-            PurchasePrice: 100,
-            SalePrice: 200,
-            RetailPrice: 200,
-            WholesalePrice: 1800,
-            MinStock: 10,
+            ReorderLevel: 10,
             Description: null,
-            ExpirationDate: null,
+            TrackExpiry: false,
             ImagePath: null,
+            Notes: null,
+            DefaultPurchaseUnitId: null,
+            DefaultSalesUnitId: null,
             IsActive: true);
 
         var viewModel = CreateViewModel(product);
@@ -224,7 +197,7 @@ public class ProductEditorViewModelTests : IDisposable
     }
 
     [Fact]
-    public void SalePrice_Set_NotifiesPropertyChanged()
+    public void Description_Set_NotifiesPropertyChanged()
     {
         // Arrange
         var viewModel = CreateViewModel();
@@ -232,10 +205,10 @@ public class ProductEditorViewModelTests : IDisposable
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
         // Act
-        viewModel.RetailPrice = 100;
+        viewModel.Description = "وصف جديد";
 
         // Assert
-        propertyChangedEvents.Should().Contain("RetailPrice");
+        propertyChangedEvents.Should().Contain("Description");
     }
 
     [Fact]
@@ -316,7 +289,7 @@ public class ProductEditorViewModelTests : IDisposable
     {
         // Arrange
         var viewModel = CreateViewModel();
-        var category = new CategoryDto(Id: 1, Name: "فئة تجريبية", Description: null, IsActive: true);
+        var category = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", ParentId: null, ParentName: null, IsActive: true);
 
         // Act
         viewModel.SelectedCategory = category;
@@ -330,7 +303,7 @@ public class ProductEditorViewModelTests : IDisposable
     {
         // Arrange
         var viewModel = CreateViewModel();
-        viewModel.SelectedCategory = new CategoryDto(Id: 1, Name: "فئة تجريبية", Description: null, IsActive: true);
+        viewModel.SelectedCategory = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", ParentId: null, ParentName: null, IsActive: true);
 
         // Act
         viewModel.SelectedCategory = null;
@@ -348,42 +321,10 @@ public class ProductEditorViewModelTests : IDisposable
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
         // Act
-        viewModel.SelectedCategory = new CategoryDto(Id: 1, Name: "فئة تجريبية", Description: null, IsActive: true);
+        viewModel.SelectedCategory = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", ParentId: null, ParentName: null, IsActive: true);
 
         // Assert
         propertyChangedEvents.Should().Contain("SelectedCategory");
-    }
-
-    #endregion
-
-    #region Unit Selection Tests
-
-    [Fact]
-    public void SelectedUnit_WhenSet_SetsUnitId()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        var unit = new UnitDto(Id: 1, Name: "وحدة تجريبية", Symbol: "م", IsActive: true);
-
-        // Act
-        viewModel.SelectedUnit = unit;
-
-        // Assert
-        viewModel.UnitId.Should().Be(1);
-    }
-
-    [Fact]
-    public void SelectedUnit_WhenSetToNull_SetsUnitIdToNull()
-    {
-        // Arrange
-        var viewModel = CreateViewModel();
-        viewModel.SelectedUnit = new UnitDto(Id: 1, Name: "وحدة تجريبية", Symbol: "م", IsActive: true);
-
-        // Act
-        viewModel.SelectedUnit = null;
-
-        // Assert
-        viewModel.UnitId.Should().BeNull();
     }
 
     #endregion
@@ -400,21 +341,13 @@ public class ProductEditorViewModelTests : IDisposable
             Name: name,
             CategoryId: 1,
             CategoryName: "فئة تجريبية",
-            UnitId: 1,
-            UnitName: "وحدة تجريبية",
-            RetailUnitId: 1,
-            RetailUnitName: "وحدة تجريبية",
-            WholesaleUnitId: 2,
-            WholesaleUnitName: "كرتون",
-            ConversionFactor: 10,
-            PurchasePrice: 50,
-            SalePrice: 100,
-            RetailPrice: 100,
-            WholesalePrice: 900,
-            MinStock: 10,
+            ReorderLevel: 10,
             Description: null,
-            ExpirationDate: null,
+            TrackExpiry: false,
             ImagePath: null,
+            Notes: null,
+            DefaultPurchaseUnitId: null,
+            DefaultSalesUnitId: null,
             IsActive: true);
     }
 

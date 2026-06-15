@@ -4,8 +4,8 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
+using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Services;
 
@@ -14,17 +14,23 @@ public class SalesReturnService : ISalesReturnService
     private readonly IUnitOfWork _uow;
     private readonly IInventoryService _inventoryService;
     private readonly IDocumentSequenceService _sequenceService;
+    private readonly ICashBoxService _cashBoxService;
+    private readonly IAccountingIntegrationService _accountingService;
     private readonly ILogger<SalesReturnService> _logger;
 
     public SalesReturnService(
         IUnitOfWork uow,
         IInventoryService inventoryService,
         IDocumentSequenceService sequenceService,
+        ICashBoxService cashBoxService,
+        IAccountingIntegrationService accountingService,
         ILogger<SalesReturnService> logger)
     {
         _uow = uow;
         _inventoryService = inventoryService;
         _sequenceService = sequenceService;
+        _cashBoxService = cashBoxService;
+        _accountingService = accountingService;
         _logger = logger;
     }
 
@@ -86,12 +92,14 @@ public class SalesReturnService : ISalesReturnService
 
                 var salesReturn = SalesReturn.Create(
                     returnNoResult.Value!,
-                    request.WarehouseId,
+                    (short)request.WarehouseId,
                     request.CustomerId,
                     request.SalesInvoiceId,
                     request.ReturnDate,
                     request.Notes,
-                    userId: userId
+                    userId: userId,
+                    cashBoxId: request.CashBoxId,
+                    refundAmount: request.RefundAmount ?? 0
                 );
 
                 foreach (var item in request.Items)
@@ -123,14 +131,18 @@ public class SalesReturnService : ISalesReturnService
         }, ct);
     }
 
+    public async Task<Result<SalesReturnDto>> PostAsync(int id, PostSalesReturnRequest request, int userId, CancellationToken ct)
+    {
+        return await PostAsync(id, userId, ct);
+    }
+
     public async Task<Result<SalesReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Items.Product");
+            r => r.Id == id, ct, "Items.Product", "Customer", "Customer.Party");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status != InvoiceStatus.Draft) return Result<SalesReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
-
 
         return await _uow.ExecuteAsync(async () =>
         {
@@ -140,30 +152,50 @@ public class SalesReturnService : ISalesReturnService
                 sr.Post();
                 await _uow.SaveChangesAsync(ct);
 
+                // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
                 // Update Stock
                 foreach (var item in sr.Items)
                 {
-                    var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
                     await _inventoryService.IncreaseStockAsync(
                         item.ProductId,
                         sr.WarehouseId,
-                        retailQty,
-                        MovementType.SaleReturnIn,
-                        "SalesReturn",
-                        sr.Id,
-                        item.UnitPrice,
-                        userId,
-                        ct);
+                        item.Quantity,
+                        unitCost: item.UnitPrice,
+                        userId: userId,
+                        ct: ct);
                 }
 
-                // Update Customer Balance
-                if (sr.TotalAmount > 0 && sr.CustomerId.HasValue)
+                // Create payment voucher (سند صرف) for refund if CashBoxId is set
+                // TODO: Use proper currencyId and accountId when available
+                if (sr.CashBoxId.HasValue && sr.RefundAmount > 0)
                 {
-                    var customer = await _uow.Customers.GetByIdAsync(sr.CustomerId.Value, ct);
-                    if (customer != null)
+                    var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
+                        sr.CashBoxId.Value,
+                        currencyId: 1, // Default SAR
+                        sr.RefundAmount,
+                        accountId: 1, // Default cash account
+                        notes: "مردود مبيعات",
+                        sourceDocumentId: sr.Id,
+                        sourceDocumentType: "SalesReturn",
+                        userId: userId,
+                        ct: ct);
+
+                    if (!cashResult.IsSuccess)
                     {
-                        customer.DecreaseBalance(sr.TotalAmount);
+                        _logger.LogWarning("Payment voucher recording failed for sales return {Id}: {Error}",
+                            sr.Id, cashResult.Error);
                     }
+                }
+
+                // Create journal entry for the sales return
+                var totalCost = sr.Items.Sum(i => i.UnitPrice * i.Quantity);
+                var entryResult = await _accountingService.CreateSalesReturnEntryAsync(
+                    sr, totalCost, userId, ct);
+                if (!entryResult.IsSuccess)
+                {
+                    _logger.LogWarning("Journal entry creation failed for sales return {Id}: {Error}",
+                        sr.Id, entryResult.Error);
+                    return Result<SalesReturnDto>.Failure(entryResult.Error!);
                 }
 
                 await _uow.SaveChangesAsync(ct);
@@ -190,7 +222,7 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Items.Product");
+            r => r.Id == id, ct, "Items.Product", "Customer", "Customer.Party");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status == InvoiceStatus.Cancelled)
@@ -206,27 +238,25 @@ public class SalesReturnService : ISalesReturnService
                     // Reverse Stock
                     foreach (var item in sr.Items)
                     {
-                        var retailQty = item.Product!.GetRetailQuantityEquivalent(item.Quantity, item.Mode);
+                        // Phase 25: GetRetailQuantityEquivalent removed.
                         await _inventoryService.DecreaseStockAsync(
                             item.ProductId,
                             sr.WarehouseId,
-                            retailQty,
-                            MovementType.SaleOut, // Opposite of SaleReturnIn
-                            "SalesReturnCancel",
-                            sr.Id,
-                            item.UnitPrice,
-                            userId,
-                            ct);
+                            item.Quantity,
+                            unitCost: item.UnitPrice,
+                            userId: userId,
+                            ct: ct);
                     }
 
-                    // Reverse Customer Balance
-                    if (sr.TotalAmount > 0 && sr.CustomerId.HasValue)
+                    // Reverse the journal entry for the posted sales return
+                    var totalCost = sr.Items.Sum(i => i.UnitPrice * i.Quantity);
+                    var reversalResult = await _accountingService.ReverseSalesReturnEntryAsync(
+                        sr, totalCost, userId, ct);
+                    if (!reversalResult.IsSuccess)
                     {
-                        var customer = await _uow.Customers.GetByIdAsync(sr.CustomerId.Value, ct);
-                        if (customer != null)
-                        {
-                            customer.IncreaseBalance(sr.TotalAmount);
-                        }
+                        _logger.LogWarning("Journal entry reversal failed for sales return {Id}: {Error}",
+                            sr.Id, reversalResult.Error);
+                        return Result<SalesReturnDto>.Failure(reversalResult.Error!);
                     }
                 }
 
@@ -260,17 +290,20 @@ public class SalesReturnService : ISalesReturnService
             r.WarehouseId,
             r.Warehouse?.Name ?? "غير معروف",
             r.CustomerId,
-            r.Customer?.Name ?? "غير معروف",
+            r.Customer?.Party?.Name ?? "غير معروف",
             r.SalesInvoiceId,
             r.ReturnDate,
             r.SubTotal,
             0, // TaxAmount (not in entity yet)
             0, // DiscountAmount (not in entity yet)
             r.TotalAmount,
-            null, // CurrencyId — system setting
-            null, // ExchangeRate — system setting
+            r.CurrencyId,
+            r.ExchangeRate,
             r.Notes,
             (byte)r.Status,
+            r.CashBoxId,
+            null, // CashBoxName — not loaded via navigation
+            r.RefundAmount,
             r.Items.Select(it => new SalesReturnItemDto(
                 it.Id,
                 it.ProductId,

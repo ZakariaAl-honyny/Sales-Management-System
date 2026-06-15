@@ -2,8 +2,9 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -48,7 +49,9 @@ public class SuppliersController : ControllerBase
             return Unauthorized(new { error = "المستخدم غير مصرح له" });
 
         var result = await _supplierService.CreateAsync(request, userId, ct);
-        return result.IsSuccess ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+            return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
+        return BadRequest(new { error = result.Error });
     }
 
     [HttpPut("{id:int}")]
@@ -62,7 +65,11 @@ public class SuppliersController : ControllerBase
             return Unauthorized(new { error = "المستخدم غير مصرح له" });
 
         var result = await _supplierService.UpdateAsync(id, request, userId, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        if (result.IsSuccess)
+            return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     [HttpDelete("{id:int}")]
@@ -78,6 +85,8 @@ public class SuppliersController : ControllerBase
         var result = await _supplierService.DeleteAsync(id, userId, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم الحذف بنجاح", id });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 
@@ -94,6 +103,8 @@ public class SuppliersController : ControllerBase
         var result = await _supplierService.PermanentDeleteAsync(id, userId, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم الحذف النهائي بنجاح", id });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 }

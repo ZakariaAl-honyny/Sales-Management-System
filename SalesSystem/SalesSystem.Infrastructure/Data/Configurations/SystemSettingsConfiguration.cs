@@ -16,8 +16,10 @@ public class SystemSettingsConfiguration : IEntityTypeConfiguration<SystemSettin
         builder.Property(x => x.Category).HasMaxLength(100);
         builder.Property(x => x.DisplayName).IsRequired().HasMaxLength(200);
         builder.Property(x => x.Description).HasMaxLength(1000);
-        builder.HasIndex(x => x.SettingKey).IsUnique();
+        builder.Property(x => x.Note).HasMaxLength(1000);
+        builder.Property(x => x.UpdatedBy);
+        builder.HasIndex(x => x.SettingKey).IsUnique()
+            .HasDatabaseName("IX_SystemSettings_SettingKey");
 
-        builder.HasQueryFilter(x => x.IsActive);
     }
 }

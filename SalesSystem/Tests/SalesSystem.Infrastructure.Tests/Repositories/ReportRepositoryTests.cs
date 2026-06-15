@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Infrastructure.Data;
@@ -20,15 +22,56 @@ public class ReportRepositoryTests
 
     private async Task SeedTestData(SalesDbContext context)
     {
-        var warehouse = Warehouse.Create(name: "Test Warehouse");
-        var category = Category.Create(name: "Test Category");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse", code: "WH-01");
+        var category = ProductCategory.Create(name: "Test Category");
         var unit = Unit.Create(name: "Piece");
 
         context.Warehouses.Add(warehouse);
-        context.Categories.Add(category);
+        context.ProductCategories.Add(category);
         context.Units.Add(unit);
 
         await context.SaveChangesAsync();
+    }
+
+    private async Task<int> SeedAccount(SalesDbContext context, string nameAr)
+    {
+        var account = Account.Create(
+            accountCode: "9999",
+            nameAr: nameAr,
+            nameEn: nameAr,
+            accountType: AccountType.Asset,
+            level: 4,
+            isSystemAccount: false,
+            allowTransactions: true,
+            openingBalance: 0
+        );
+        context.Accounts.Add(account);
+        await context.SaveChangesAsync();
+        return account.Id;
+    }
+
+    private async Task<int> SeedCustomer(SalesDbContext context, string name)
+    {
+        var accountId = await SeedAccount(context, $"حساب {name}");
+        var party = Party.Create(name, PartyType.Customer, accountId);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(partyId: party.Id);
+        context.Customers.Add(customer);
+        await context.SaveChangesAsync();
+        return customer.Id;
+    }
+
+    private async Task<int> SeedSupplier(SalesDbContext context, string name)
+    {
+        var accountId = await SeedAccount(context, $"حساب {name}");
+        var party = Party.Create(name, PartyType.Supplier, accountId);
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var supplier = Supplier.Create(partyId: party.Id);
+        context.Suppliers.Add(supplier);
+        await context.SaveChangesAsync();
+        return supplier.Id;
     }
 
     #region Sales Report Tests
@@ -42,13 +85,12 @@ public class ReportRepositoryTests
 
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
-        var customer = Customer.Create(name: "Test Customer");
-        context.Customers.Add(customer);
+        var customerId = await SeedCustomer(context, "Test Customer");
 
         var invoice = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
             invoiceNo: 1,
-            customerId: customer.Id,
+            customerId: customerId,
             paymentType: PaymentType.Cash
         );
 
@@ -81,14 +123,13 @@ public class ReportRepositoryTests
 
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
-        var customer = Customer.Create(name: "Test Customer");
-        context.Customers.Add(customer);
+        var customerId = await SeedCustomer(context, "Test Customer");
 
         // Create a Draft invoice (not posted)
         var draftInvoice = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
             invoiceNo: 1,
-            customerId: customer.Id
+            customerId: customerId
         );
 
         var item = SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m);
@@ -118,14 +159,13 @@ public class ReportRepositoryTests
 
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
-        var customer = Customer.Create(name: "Test Customer");
-        context.Customers.Add(customer);
+        var customerId = await SeedCustomer(context, "Test Customer");
 
         // Invoice within range
         var invoiceInRange = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
             invoiceNo: 1,
-            customerId: customer.Id
+            customerId: customerId
         );
         var item1 = SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m);
         invoiceInRange.AddItem(item1);
@@ -135,7 +175,7 @@ public class ReportRepositoryTests
         var invoiceOutOfRange = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
             invoiceNo: 2,
-            customerId: customer.Id,
+            customerId: customerId,
             invoiceDate: DateTime.UtcNow.AddDays(30)
         );
         var item2 = SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m);
@@ -172,10 +212,7 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailUnitId: context.Units.First().Id,
-            wholesaleUnitId: context.Units.First().Id,
-            conversionFactor: 10m,
-            categoryId: context.Categories.First().Id
+            categoryId: context.ProductCategories.First().Id
         );
         context.Products.Add(product);
 
@@ -204,14 +241,12 @@ public class ReportRepositoryTests
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var warehouse1 = context.Warehouses.First();
-        var warehouse2 = Warehouse.Create(name: "Warehouse 2");
+        var warehouse2 = Warehouse.Create(branchId: 1, name: "Warehouse 2", code: "WH-02");
         context.Warehouses.Add(warehouse2);
 
         var product = Product.Create(
             name: "Test Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            categoryId: context.ProductCategories.First().Id
         );
         context.Products.Add(product);
 
@@ -240,7 +275,7 @@ public class ReportRepositoryTests
 
     #endregion
 
-#region Low Stock Report Tests
+    #region Low Stock Report Tests
 
     [Fact]
     public async Task GetLowStockReportAsync_NoStocksWithReorderLevel_ReturnsEmpty()
@@ -253,9 +288,7 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            categoryId: context.ProductCategories.First().Id
         );
         context.Products.Add(product);
 
@@ -286,9 +319,7 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Normal Stock Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            categoryId: context.ProductCategories.First().Id
         );
         context.Products.Add(product);
 
@@ -321,11 +352,9 @@ public class ReportRepositoryTests
 
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
-        var customer1 = Customer.Create(name: "Customer 1", openingBalance: 1000m);
-        var customer2 = Customer.Create(name: "Customer 2", openingBalance: 500m);
+        await SeedCustomer(context, "Customer 1");
+        await SeedCustomer(context, "Customer 2");
 
-        context.Customers.Add(customer1);
-        context.Customers.Add(customer2);
         await context.SaveChangesAsync();
 
         // Act
@@ -344,15 +373,11 @@ public class ReportRepositoryTests
 
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
-        var customer1 = Customer.Create(name: "Customer 1", openingBalance: 1000m);
-        var customer2 = Customer.Create(name: "Customer 2", openingBalance: 500m);
-
-        context.Customers.Add(customer1);
-        context.Customers.Add(customer2);
-        await context.SaveChangesAsync();
+        var customer1Id = await SeedCustomer(context, "Customer 1");
+        await SeedCustomer(context, "Customer 2");
 
         // Act
-        var result = await repository.GetCustomerBalancesReportAsync(customer1.Id, CancellationToken.None);
+        var result = await repository.GetCustomerBalancesReportAsync(customer1Id, CancellationToken.None);
 
         // Assert
         result.Should().HaveCount(1);
@@ -372,12 +397,8 @@ public class ReportRepositoryTests
 
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
-        var supplier1 = Supplier.Create(name: "Supplier 1", openingBalance: 1000m);
-        var supplier2 = Supplier.Create(name: "Supplier 2", openingBalance: 500m);
-
-        context.Suppliers.Add(supplier1);
-        context.Suppliers.Add(supplier2);
-        await context.SaveChangesAsync();
+        await SeedSupplier(context, "Supplier 1");
+        await SeedSupplier(context, "Supplier 2");
 
         // Act
         var result = await repository.GetSupplierBalancesReportAsync(null, CancellationToken.None);
@@ -401,23 +422,36 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            categoryId: context.ProductCategories.First().Id
         );
         context.Products.Add(product);
+        await context.SaveChangesAsync();
 
-        var movement = InventoryMovement.Create(
-            productId: product.Id,
-            warehouseId: context.Warehouses.First().Id,
-            movementType: MovementType.PurchaseIn,
-            quantityChange: 100m,
-            quantityBefore: 0m,
-            quantityAfter: 100m,
-            referenceType: "Purchase",
-            referenceId: 1
+        var warehouse = context.Warehouses.First();
+        var unit = context.Units.First();
+        var productUnit = ProductUnit.CreateBaseUnit(productId: product.Id, unitId: unit.Id);
+        product.AddUnit(productUnit);
+        await context.SaveChangesAsync();
+
+        var transaction = InventoryTransaction.Create(
+            transactionNo: 1,
+            transactionType: InventoryTransactionType.Purchase,
+            warehouseId: warehouse.Id,
+            transactionDate: DateTime.UtcNow,
+            createdByUserId: 1
         );
-        context.InventoryMovements.Add(movement);
+        context.InventoryTransactions.Add(transaction);
+        await context.SaveChangesAsync(); // Save first to get transaction.Id
+
+        var line = InventoryTransactionLine.Create(
+            inventoryTransactionId: transaction.Id,
+            productId: product.Id,
+            productUnitId: productUnit.Id,
+            quantity: 100m,
+            unitCost: 10m
+        );
+        transaction.AddLine(line);
+        transaction.Post();
         await context.SaveChangesAsync();
 
         // Act
@@ -443,38 +477,59 @@ public class ReportRepositoryTests
 
         var product = Product.Create(
             name: "Test Product",
-            retailUnitId: 1,
-            wholesaleUnitId: 1,
-            conversionFactor: 1m
+            categoryId: context.ProductCategories.First().Id
         );
         context.Products.Add(product);
+        await context.SaveChangesAsync();
+
+        var warehouse = context.Warehouses.First();
+        var unit = context.Units.First();
+        var productUnit = ProductUnit.CreateBaseUnit(productId: product.Id, unitId: unit.Id);
+        product.AddUnit(productUnit);
+        await context.SaveChangesAsync();
 
         // Movement within range
-        var movementInRange = InventoryMovement.Create(
-            productId: product.Id,
-            warehouseId: context.Warehouses.First().Id,
-            movementType: MovementType.PurchaseIn,
-            quantityChange: 100m,
-            quantityBefore: 0m,
-            quantityAfter: 100m,
-            referenceType: "Purchase",
-            referenceId: 1
+        var transactionInRange = InventoryTransaction.Create(
+            transactionNo: 1,
+            transactionType: InventoryTransactionType.Purchase,
+            warehouseId: warehouse.Id,
+            transactionDate: DateTime.UtcNow,
+            createdByUserId: 1
         );
+        context.InventoryTransactions.Add(transactionInRange);
+        await context.SaveChangesAsync(); // Save first to get transaction.Id
 
-        // Movement outside range - different date needed (InMemory stores with UTC.Now)
-        var movementOutOfRange = InventoryMovement.Create(
+        var lineInRange = InventoryTransactionLine.Create(
+            inventoryTransactionId: transactionInRange.Id,
             productId: product.Id,
-            warehouseId: context.Warehouses.First().Id,
-            movementType: MovementType.SaleOut,
-            quantityChange: -10m,
-            quantityBefore: 100m,
-            quantityAfter: 90m,
-            referenceType: "Sale",
-            referenceId: 1
+            productUnitId: productUnit.Id,
+            quantity: 100m,
+            unitCost: 10m
         );
+        transactionInRange.AddLine(lineInRange);
+        transactionInRange.Post();
+        await context.SaveChangesAsync();
 
-        context.InventoryMovements.Add(movementInRange);
-        context.InventoryMovements.Add(movementOutOfRange);
+        // Movement outside range - different type (SaleOut)
+        var transactionOutOfRange = InventoryTransaction.Create(
+            transactionNo: 2,
+            transactionType: InventoryTransactionType.Sale,
+            warehouseId: warehouse.Id,
+            transactionDate: DateTime.UtcNow.AddDays(-10),
+            createdByUserId: 1
+        );
+        context.InventoryTransactions.Add(transactionOutOfRange);
+        await context.SaveChangesAsync(); // Save first to get transaction.Id
+
+        var lineOutOfRange = InventoryTransactionLine.Create(
+            inventoryTransactionId: transactionOutOfRange.Id,
+            productId: product.Id,
+            productUnitId: productUnit.Id,
+            quantity: 10m,
+            unitCost: 10m
+        );
+        transactionOutOfRange.AddLine(lineOutOfRange);
+        transactionOutOfRange.Post();
         await context.SaveChangesAsync();
 
         // Act

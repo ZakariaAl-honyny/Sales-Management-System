@@ -55,6 +55,7 @@ public class ProductUnitsListViewModel : ViewModelBase
         AddCommand = new RelayCommand(AddUnit);
         EditCommand = new RelayCommand(EditUnit);
         DeleteCommand = new AsyncRelayCommand(DeleteUnitAsync);
+        PricesCommand = new RelayCommand(ViewPrices);
     }
 
     public void OnNavigatedTo()
@@ -103,6 +104,7 @@ public class ProductUnitsListViewModel : ViewModelBase
     public ICommand AddCommand { get; private set; } = null!;
     public ICommand EditCommand { get; private set; } = null!;
     public ICommand DeleteCommand { get; private set; } = null!;
+    public ICommand PricesCommand { get; private set; } = null!;
 
     #endregion
 
@@ -198,6 +200,35 @@ public class ProductUnitsListViewModel : ViewModelBase
             ErrorMessage = error;
             _toastService.ShowError(error);
         }
+    }
+
+    private void ViewPrices()
+    {
+        if (SelectedUnit == null) return;
+
+        var vm = new ProductPricesListViewModel(
+            App.GetService<IProductPriceApiService>(),
+            App.GetService<IProductUnitApiService>(),
+            App.GetService<IDialogService>(),
+            App.GetService<IEventBus>(),
+            App.GetService<IScreenWindowService>(),
+            App.GetService<IToastNotificationService>())
+        {
+            ProductId = ProductId,
+            ProductUnitId = SelectedUnit.Id,
+            ProductUnitName = SelectedUnit.UnitName ?? ""
+        };
+
+        _screenWindowService.OpenScreen(vm, new ScreenWindowOptions
+        {
+            Title = $"أسعار الوحدة: {SelectedUnit.UnitName}",
+            Width = 800,
+            Height = 600,
+            OnClosed = (_) =>
+            {
+                _eventBus.Publish(new ProductChangedMessage(ProductId));
+            }
+        });
     }
 
     private void OnProductChanged(ProductChangedMessage msg)

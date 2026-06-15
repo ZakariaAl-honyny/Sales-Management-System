@@ -139,16 +139,7 @@ String code pattern using **numeric hierarchy**: `XXXX` format where each digit 
 
 **File**: `SalesSystem.Domain/Accounting/Enums/AccountType.cs` (10 lines)
 
-```csharp
-public enum AccountType : byte
-{
-    Asset = 1,
-    Liability = 2,
-    Equity = 3,
-    Revenue = 4,
-    Expense = 5
-}
-```
+> See `SalesSystem.Domain/Accounting/Enums/AccountType.cs` for the canonical enum definition and `docs/AGENTS.md` Section 3 for exact enum values.
 
 **Needed**: Already correct — no changes required. Values match AGENTS.md Section 3 exactly.
 
@@ -272,10 +263,7 @@ public enum AccountType : byte
 **Problem**: No logic currently prevents deleting an account that has children. With the hierarchy, deleting a parent must cascade-restrict at the Domain level.
 
 **Decision**: Add guard clause before deletion:
-```csharp
-if (HasChildren())
-    throw new DomainException("لا يمكن حذف حساب رئيسي لديه حسابات فرعية — احذف الحسابات الفرعية أولاً");
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` Module 4.2 for the canonical Account definition.
 
 Also: System accounts (`IsSystemAccount = true`) are protected from both modification and deletion (already implemented in `Update()` and `MarkAsDeleted()`).
 
@@ -285,310 +273,29 @@ Also: System accounts (`IsSystemAccount = true`) are protected from both modific
 
 ### 4.1 Account Entity — Complete Spec
 
-**File**: `SalesSystem.Domain/Accounting/Entities/Account.cs` (expanded)
-
-```csharp
-public class Account : BaseEntity
-{
-    // ── Existing fields ──
-    public string AccountCode { get; private set; } = string.Empty;
-    public string NameAr { get; private set; } = string.Empty;
-    public string NameEn { get; private set; } = string.Empty;
-    public AccountType AccountType { get; private set; }
-    public int? ParentAccountId { get; private set; }
-    public bool IsSystemAccount { get; private set; }
-    public string? Notes { get; private set; }
-
-    // ── NEW fields for Phase 22 ──
-    public int Level { get; private set; }              // 1=Group, 2=Main, 3=Sub, 4=Detail
-    public string? Description { get; private set; }    // Help text for reports
-    public string? ColorCode { get; private set; }      // Hex color (#2196F3)
-    public bool AllowTransactions { get; private set; } // True for detail levels (>= 4)
-    public decimal? OpeningBalance { get; private set; } // Initial balance
-
-    // ── Navigation ──
-    public Account? ParentAccount { get; private set; }
-    public IReadOnlyCollection<Account> Children => _children.AsReadOnly();
-    private readonly List<Account> _children = new();
-
-    private Account() { } // EF Core
-
-    public static Account Create(
-        string accountCode,
-        string nameAr,
-        string nameEn,
-        AccountType accountType,
-        int level,
-        int? parentAccountId = null,
-        bool isSystemAccount = false,
-        string? description = null,
-        string? colorCode = null,
-        bool allowTransactions = false,
-        decimal? openingBalance = null,
-        string? notes = null,
-        int? createdByUserId = null)
-    {
-        if (string.IsNullOrWhiteSpace(accountCode))
-            throw new DomainException("رمز الحساب مطلوب");
-        if (string.IsNullOrWhiteSpace(nameAr))
-            throw new DomainException("اسم الحساب بالعربية مطلوب");
-        if (!Enum.IsDefined(typeof(AccountType), accountType))
-            throw new DomainException("نوع الحساب غير صالح");
-        if (level < 1 || level > 10)
-            throw new DomainException("مستوى الحساب يجب أن يكون بين 1 و 10");
-        if (level >= 4 && !allowTransactions)
-            throw new DomainException("الحساب التفصيلي يجب أن يسمح بالحركات");
-
-        return new Account
-        {
-            AccountCode = accountCode.Trim(),
-            NameAr = nameAr.Trim(),
-            NameEn = nameEn?.Trim() ?? string.Empty,
-            AccountType = accountType,
-            Level = level,
-            ParentAccountId = parentAccountId,
-            IsSystemAccount = isSystemAccount,
-            Description = description?.Trim(),
-            ColorCode = colorCode,
-            AllowTransactions = allowTransactions,
-            OpeningBalance = openingBalance,
-            Notes = notes?.Trim(),
-            IsActive = true
-        };
-    }
-
-    public void Update(
-        string nameAr,
-        string nameEn,
-        AccountType accountType,
-        int level,
-        int? parentAccountId = null,
-        string? description = null,
-        string? colorCode = null,
-        bool allowTransactions = false,
-        string? notes = null,
-        int? updatedByUserId = null)
-    {
-        if (IsSystemAccount)
-            throw new DomainException("لا يمكن تعديل حساب نظامي");
-        if (string.IsNullOrWhiteSpace(nameAr))
-            throw new DomainException("اسم الحساب بالعربية مطلوب");
-        if (level < 1 || level > 10)
-            throw new DomainException("مستوى الحساب يجب أن يكون بين 1 و 10");
-        if (level >= 4 && !allowTransactions)
-            throw new DomainException("الحساب التفصيلي يجب أن يسمح بالحركات");
-
-        NameAr = nameAr.Trim();
-        NameEn = nameEn?.Trim() ?? string.Empty;
-        AccountType = accountType;
-        Level = level;
-        ParentAccountId = parentAccountId;
-        Description = description?.Trim();
-        ColorCode = colorCode;
-        AllowTransactions = allowTransactions;
-        Notes = notes?.Trim();
-        SetUpdatedBy(updatedByUserId);
-        UpdateTimestamp();
-    }
-
-    public bool HasChildren() => _children.Count > 0;
-
-    public bool IsDebitNormal() =>
-        AccountType == AccountType.Asset || AccountType == AccountType.Expense;
-
-    public override void MarkAsDeleted()
-    {
-        if (IsSystemAccount)
-            throw new DomainException("لا يمكن حذف حساب نظامي");
-        if (HasChildren())
-            throw new DomainException("لا يمكن حذف حساب رئيسي لديه حسابات فرعية");
-        base.MarkAsDeleted();
-    }
-}
-```
+> See `docs/database-schema.md` Module 4.2 for the canonical Account entity definition and `docs/CONSTITUTION.md`/`AGENTS.md` for entity patterns (private set, Guard Clauses, domain methods, `MarkAsDeleted()` guard against system accounts and parent accounts with children).
 
 ### 4.2 AccountConfiguration — Expanded
 
-**File**: `Infrastructure/Data/Configurations/AccountConfiguration.cs`
-
-```csharp
-public class AccountConfiguration : IEntityTypeConfiguration<Account>
-{
-    public void Configure(EntityTypeBuilder<Account> builder)
-    {
-        builder.ToTable("Accounts");
-        builder.HasKey(x => x.Id);
-
-        builder.Property(x => x.AccountCode).IsRequired().HasMaxLength(20);
-        builder.HasIndex(x => x.AccountCode).IsUnique();
-        builder.Property(x => x.NameAr).IsRequired().HasMaxLength(200);
-        builder.Property(x => x.NameEn).HasMaxLength(200);
-        builder.Property(x => x.AccountType).IsRequired();
-        builder.Property(x => x.Level).IsRequired().HasDefaultValue(4);
-        builder.Property(x => x.Description).HasMaxLength(500);
-        builder.Property(x => x.ColorCode).HasMaxLength(7);
-        builder.Property(x => x.AllowTransactions).HasDefaultValue(false);
-        builder.Property(x => x.OpeningBalance).HasPrecision(18, 2);
-        builder.Property(x => x.Notes).HasMaxLength(500);
-        builder.Property(x => x.IsSystemAccount).HasDefaultValue(false);
-        builder.Property(x => x.IsActive).HasDefaultValue(true);
-
-        // CHECK constraints
-builder.ToTable(t => t.HasCheckConstraint("CHK_Account_Level_Range", "[Level] >= 1 AND [Level] <= 10"));
-
-        // Self-referencing parent — Restrict (RULE-214)
-        builder.HasOne(x => x.ParentAccount)
-            .WithMany(a => a.Children)
-            .HasForeignKey(x => x.ParentAccountId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(x => x.IsActive);
-    }
-}
-```
+> See `docs/database-schema.md` Module 4.2 for the canonical Account Fluent API configuration and `docs/AGENTS.md` §2.16 for EF Core conventions (DeleteBehavior.Restrict, HasPrecision, HasMaxLength, CHECK constraints, query filters).
 
 ### 4.3 DTOs
 
 **File**: `Contracts/DTOs/AllDtos.cs`
 
-```csharp
-public record AccountDto(
-    int Id,
-    string AccountCode,
-    string NameAr,
-    string NameEn,
-    byte AccountType,
-    int Level,
-    int? ParentAccountId,
-    string? ParentAccountName,
-    bool IsSystemAccount,
-    bool IsActive,
-    string? Description,
-    string? ColorCode,
-    bool AllowTransactions,
-    decimal? OpeningBalance,
-    string? Notes)
-{
-    public string AccountTypeDisplay => AccountType switch
-    {
-        1 => "أصل",
-        2 => "خصم",
-        3 => "حق ملكية",
-        4 => "إيراد",
-        5 => "مصروف",
-        _ => "غير معروف"
-    };
-
-    public string LevelDisplay => Level switch
-    {
-        1 => "رئيسي (مجموعة)",
-        2 => "فرعي",
-        3 => "فرعي فرعي",
-        4 => "تفصيلي",
-        _ => "غير معروف"
-    };
-}
-
-// Hierarchical tree node for TreeView
-public record AccountTreeNodeDto(
-    int Id,
-    string AccountCode,
-    string NameAr,
-    byte AccountType,
-    int Level,
-    string? ColorCode,
-    bool AllowTransactions,
-    decimal? OpeningBalance,
-    List<AccountTreeNodeDto> Children);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
 ### 4.4 Request DTOs
 
 **File**: `Contracts/Requests/AccountingRequests.cs` (append to existing)
 
-```csharp
-public record CreateAccountRequest(
-    string AccountCode,
-    string NameAr,
-    string NameEn,
-    byte AccountType,
-    int Level,
-    int? ParentAccountId,
-    bool IsSystemAccount,
-    string? Description,
-    string? ColorCode,
-    bool AllowTransactions,
-    decimal? OpeningBalance,
-    string? Notes);
-
-public record UpdateAccountRequest(
-    string NameAr,
-    string NameEn,
-    byte AccountType,
-    int Level,
-    int? ParentAccountId,
-    string? Description,
-    string? ColorCode,
-    bool AllowTransactions,
-    string? Notes);
-```
+> See `SalesSystem.Contracts/` for canonical Request definitions.
 
 ### 4.5 FluentValidators
 
 **File**: `Api/Validators/AccountValidators.cs`
 
-```csharp
-public class CreateAccountRequestValidator : AbstractValidator<CreateAccountRequest>
-{
-    public CreateAccountRequestValidator()
-    {
-        RuleFor(x => x.AccountCode)
-            .NotEmpty().WithMessage("رمز الحساب مطلوب")
-            .Matches(@"^\d{4,10}$").WithMessage("رمز الحساب يجب أن يكون أرقاماً فقط (4-10 خانات)");
-
-        RuleFor(x => x.NameAr)
-            .NotEmpty().WithMessage("اسم الحساب بالعربية مطلوب")
-            .MaximumLength(200).WithMessage("اسم الحساب يجب ألا يتجاوز 200 حرف");
-
-        RuleFor(x => x.NameEn)
-            .MaximumLength(200).WithMessage("الاسم بالإنجليزية يجب ألا يتجاوز 200 حرف");
-
-        RuleFor(x => x.AccountType)
-            .InclusiveBetween((byte)1, (byte)5).WithMessage("نوع الحساب غير صالح");
-
-        RuleFor(x => x.Level)
-            .InclusiveBetween(1, 4).WithMessage("مستوى الحساب يجب أن يكون بين 1 و 4");
-
-        RuleFor(x => x.ColorCode)
-            .Matches(@"^#[0-9A-Fa-f]{6}$").WithMessage("رمز اللون يجب أن يكون بصيغة Hex (#RRGGBB)")
-            .When(x => !string.IsNullOrWhiteSpace(x.ColorCode));
-
-        RuleFor(x => x.OpeningBalance)
-            .GreaterThanOrEqualTo(0).WithMessage("الرصيد الافتتاحي لا يمكن أن يكون سالباً")
-            .When(x => x.OpeningBalance.HasValue);
-
-        RuleFor(x => x.AccountCode)
-            .Must((request, code) => !(request.Level == 1 && code.Length > 4))
-            .WithMessage("رمز الحساب للمستوى الرئيسي يجب ألا يتجاوز 4 أرقام");
-    }
-}
-
-public class UpdateAccountRequestValidator : AbstractValidator<UpdateAccountRequest>
-{
-    public UpdateAccountRequestValidator()
-    {
-        RuleFor(x => x.NameAr)
-            .NotEmpty().WithMessage("اسم الحساب بالعربية مطلوب")
-            .MaximumLength(200);
-
-        RuleFor(x => x.AccountType)
-            .InclusiveBetween((byte)1, (byte)5).WithMessage("نوع الحساب غير صالح");
-
-        RuleFor(x => x.Level)
-            .InclusiveBetween(1, 4).WithMessage("مستوى الحساب يجب أن يكون بين 1 و 4");
-    }
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns (RULE-044: FluentValidation for EVERY Command).
 
 ### 4.6 Color Coding Map
 
@@ -821,17 +528,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 | `Domain/Accounting/Entities/Account.cs` | Add `IsDebitNormal()` method (already exists) |
 
 **Domain method** (RULE-042):
-```csharp
-// HasChildren guard in MarkAsDeleted
-public override void MarkAsDeleted()
-{
-    if (IsSystemAccount)
-        throw new DomainException("لا يمكن حذف حساب نظامي");
-    if (HasChildren())
-        throw new DomainException("لا يمكن حذف حساب رئيسي لديه حسابات فرعية — احذف الحسابات الفرعية أولاً");
-    base.MarkAsDeleted();
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) — `MarkAsDeleted` guards against system accounts and parent accounts with children per RULE-323/341.
 
 **Logging**: No logging in Domain — pure business logic (RULE-023: Domain has ZERO dependencies).
 
@@ -847,34 +544,11 @@ public override void MarkAsDeleted()
 
 **File**: `Infrastructure/Data/Configurations/AccountConfiguration.cs`
 
-```csharp
-// New configs to add:
-builder.Property(x => x.Level).IsRequired().HasDefaultValue(4);
-builder.Property(x => x.Description).HasMaxLength(500);
-builder.Property(x => x.ColorCode).HasMaxLength(7);
-builder.Property(x => x.AllowTransactions).HasDefaultValue(false);
-builder.Property(x => x.OpeningBalance).HasPrecision(18, 2);
-
-// CHECK constraint (Database Engineer req.)
-builder.ToTable(t => t.HasCheckConstraint("CHK_Account_Level_Range", "[Level] >= 1 AND [Level] <= 10"));
-
-// Self-referencing parent with Children navigation
-builder.HasOne(x => x.ParentAccount)
-    .WithMany(a => a.Children)      // ← Add .Children navigation
-    .HasForeignKey(x => x.ParentAccountId)
-    .OnDelete(DeleteBehavior.Restrict);
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions (DeleteBehavior.Restrict, HasPrecision, HasMaxLength, CHECK constraints, query filters) and `docs/database-schema.md` Module 4.2 for the canonical Account configuration.
 
 **Migration**: `20260605000001_ExpandAccountsForChartOfAccounts.sql`
 
-```sql
-ALTER TABLE Accounts ADD Level int NOT NULL DEFAULT 4;
-ALTER TABLE Accounts ADD Description nvarchar(500) NULL;
-ALTER TABLE Accounts ADD ColorCode nvarchar(7) NULL;
-ALTER TABLE Accounts ADD AllowTransactions bit NOT NULL DEFAULT 0;
-ALTER TABLE Accounts ADD OpeningBalance decimal(18,2) NULL;
-ALTER TABLE Accounts ADD CONSTRAINT CHK_Account_Level_Range CHECK (Level >= 1 AND Level <= 10);
-```
+> See `docs/database-schema.md` Module 4.2 for the canonical Accounts table definition with Level, Description, ColorCode, AllowTransactions, OpeningBalance, and CHECK constraints.
 
 **Logging**: `Log.Information("Account schema expanded: added Level, Description, ColorCode, AllowTransactions, OpeningBalance")`
 
@@ -897,46 +571,7 @@ Complete rewrite from 18 flat accounts to 60 hierarchically organized accounts (
 7. Set `Description` as help text in reports
 
 **Pattern** — use in-memory dictionary to link parents:
-```csharp
-var accountMap = new Dictionary<string, Account>();
-
-// Level 1 — create without parent
-var assets = Account.Create("1000", "الأصول", "Assets", AccountType.Asset, 1,
-    isSystemAccount: true, colorCode: "#2196F3",
-    description: "مجموعة الأصول — كل ما تملكه المنشأة من موارد");
-accountMap["1000"] = assets;
-
-// Level 2 — parent is Level 1
-var currentAssets = Account.Create("1100", "أصول متداولة", "Current Assets", AccountType.Asset, 2,
-    parentAccountId: null, // Will set after adding to DB or using reference
-    isSystemAccount: true, colorCode: "#2196F3",
-    description: "الأصول التي يمكن تحويلها إلى نقد خلال سنة");
-// ParentId will be set by service or we need temporary IDs
-```
-
-**IMPORTANT**: Because accounts reference each other by `ParentAccountId` and we don't know DB-generated IDs yet, the seeder must use a **two-pass approach**:
-
-```csharp
-// Pass 1: Create all accounts, add to context, SaveChanges to get IDs
-// Pass 2: Set ParentAccountId using saved IDs, update context
-```
-
-Or, use the existing approach of querying back from DB after first save:
-```csharp
-// Create level 1
-var assets = Account.Create("1000", ...);
-db.Set<Account>().Add(assets);
-// ... create all level 1
-await db.SaveChangesAsync();
-
-// Create level 2 using DB IDs
-var assetsId = db.Set<Account>().First(a => a.AccountCode == "1000").Id;
-var currentAssets = Account.Create("1100", ..., parentAccountId: assetsId, level: 2, ...);
-db.Set<Account>().Add(currentAssets);
-// ... create all level 2
-await db.SaveChangesAsync();
-// ... and so on for levels 3, 4
-```
+> See `Infrastructure/Data/Seeders/AccountingSeeder.cs` for the canonical seeder implementation (two-pass approach: create Level 1 → SaveChanges → query IDs → create Level 2, etc.).
 
 **Logging**:
 - `Log.Information("Seeded {Count} accounts across {Levels} levels.", totalCount, 4)` on success
@@ -957,13 +592,7 @@ await db.SaveChangesAsync();
 | `Api/Validators/AccountValidators.cs` | **NEW** — both validators with Arabic messages |
 
 **FluentValidation** (RULE-044):
-```csharp
-RuleFor(x => x.AccountCode)
-    .NotEmpty().WithMessage("رمز الحساب مطلوب")
-    .Matches(@"^\d{4,10}$").WithMessage("رمز الحساب يجب أن يكون أرقاماً فقط (4-10 خانات)");
-RuleFor(x => x.Level)
-    .InclusiveBetween(1, 4).WithMessage("مستوى الحساب يجب أن يكون بين 1 و 4");
-```
+> See `docs/AGENTS.md` for service layer patterns (RULE-044: FluentValidation for EVERY Command) and `Api/Validators/AccountValidators.cs` for the canonical validators.
 
 **Logging**: No logging in DTOs/Validators — pure data structures.
 
@@ -981,113 +610,7 @@ RuleFor(x => x.Level)
 | `Application/Services/AccountService.cs` | **NEW** — full implementation with IUnitOfWork |
 
 **IAccountService**:
-```csharp
-public interface IAccountService
-{
-    Task<Result<List<AccountTreeNodeDto>>> GetTreeAsync(CancellationToken ct = default);
-    Task<Result<List<AccountDto>>> GetAllAsync(CancellationToken ct = default);
-    Task<Result<AccountDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<List<AccountDto>>> GetByTypeAsync(AccountType type, CancellationToken ct = default);
-    Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, CancellationToken ct = default);
-    Task<Result<AccountDto>> UpdateAsync(int id, UpdateAccountRequest request, CancellationToken ct = default);
-    Task<Result> DeleteAsync(int id, CancellationToken ct = default);            // Soft delete
-    Task<Result> PermanentDeleteAsync(int id, CancellationToken ct = default);   // Hard delete
-}
-```
-
-**Service Patterns**:
-
-```csharp
-// CreateAsync — validates parent level
-public async Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, CancellationToken ct)
-{
-    if (request.ParentAccountId.HasValue)
-    {
-        var parent = await _uow.Accounts.GetByIdAsync(request.ParentAccountId.Value, ct);
-        if (parent == null)
-            return Result<AccountDto>.Failure("الحساب الأب غير موجود", ErrorCodes.NotFound);
-
-        // Validate level depth (must be deeper than parent, max 10)
-        if (request.Level <= parent.Level)
-            return Result<AccountDto>.Failure(
-                "مستوى الحساب الفرعي يجب أن يكون أعمق من مستوى الحساب الأب",
-                ErrorCodes.ValidationError);
-        if (request.Level > 10)
-            return Result<AccountDto>.Failure(
-                "مستوى الحساب لا يمكن أن يتجاوز 10",
-                ErrorCodes.ValidationError);
-    }
-
-    // Check unique account code
-    var existing = await _uow.Accounts.GetByCodeAsync(request.AccountCode, ct);
-    if (existing != null)
-        return Result<AccountDto>.Failure("رمز الحساب موجود مسبقاً", ErrorCodes.DuplicateBarcode);
-
-    var account = Account.Create(
-        request.AccountCode, request.NameAr, request.NameEn,
-        (AccountType)request.AccountType, request.Level,
-        request.ParentAccountId, request.IsSystemAccount,
-        request.Description, request.ColorCode, request.AllowTransactions,
-        request.OpeningBalance, request.Notes
-    );
-
-    await _uow.Accounts.AddAsync(account, ct);
-    await _uow.SaveChangesAsync(ct);
-    _logger.LogInformation("Account {AccountCode} ({NameAr}) created — Level {Level}, Type {Type}",
-        account.AccountCode, account.NameAr, account.Level, account.AccountType);
-    return Result<AccountDto>.Success(MapToDto(account));
-}
-
-// PermanentDeleteAsync — catch DbUpdateException (RULE-200)
-public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
-{
-    try
-    {
-        var account = await _uow.Accounts.GetByIdAsync(id, ct);
-        if (account == null)
-            return Result.Failure("الحساب غير موجود", ErrorCodes.NotFound);
-        if (account.IsSystemAccount)
-            return Result.Failure("لا يمكن حذف حساب نظامي", ErrorCodes.InvalidOperation);
-        if (account.HasChildren())
-            return Result.Failure("لا يمكن حذف حساب رئيسي لديه حسابات فرعية", ErrorCodes. ReferencedByOtherEntities);
-
-        _uow.Accounts.Remove(account);
-        await _uow.SaveChangesAsync(ct);
-        _logger.LogInformation("Account {Id} permanently deleted", id);
-        return Result.Success();
-    }
-    catch (DbUpdateException ex)
-    {
-        _logger.LogError(ex, "Cannot permanently delete Account {Id}: {Error}", id, ex.InnerException?.Message);
-        return Result.Failure("لا يمكن حذف هذا الحساب لأنه مرتبط بمعاملات أخرى", ErrorCodes.ReferencedByOtherEntities);
-    }
-}
-
-// GetTreeAsync — builds tree from flat list
-public async Task<Result<List<AccountTreeNodeDto>>> GetTreeAsync(CancellationToken ct)
-{
-    var all = await _uow.Accounts.GetAllAsync(ct);  // Includes inactive via query filter
-    var roots = all.Where(a => a.ParentAccountId == null)
-        .OrderBy(a => a.AccountCode)
-        .Select(a => BuildTreeNode(a, all))
-        .ToList();
-
-    return Result<List<AccountTreeNodeDto>>.Success(roots);
-}
-
-private static AccountTreeNodeDto BuildTreeNode(Account account, IEnumerable<Account> all)
-{
-    return new AccountTreeNodeDto(
-        account.Id, account.AccountCode, account.NameAr,
-        (byte)account.AccountType, account.Level, account.ColorCode,
-        account.AllowTransactions, account.OpeningBalance,
-        all.Where(c => c.ParentAccountId == account.Id)
-            .OrderBy(c => c.AccountCode)
-            .Select(c => BuildTreeNode(c, all))
-            .ToList()
-    );
-}
-```
+> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns (RULE-006, RULE-024, RULE-200 for DbUpdateException handling, RULE-035 for logging).
 
 **Error Codes** (add to ErrorCodes if not existing):
 - `DuplicateAccountCode` — Account code already exists
@@ -1126,73 +649,7 @@ private static AccountTreeNodeDto BuildTreeNode(Account account, IEnumerable<Acc
 
 **Controller purity** (RULE-203): Controller injects `IAccountService` only — NO `DbContext` or `IUnitOfWork`.
 
-```csharp
-[ApiController]
-[Route("api/v1/accounts")]
-[Authorize]
-public class AccountsController : ControllerBase
-{
-    private readonly IAccountService _accountService;
-
-    public AccountsController(IAccountService accountService)
-    {
-        _accountService = accountService;
-    }
-
-    [HttpGet("tree")]
-    public async Task<IActionResult> GetTree(CancellationToken ct)
-    {
-        var result = await _accountService.GetTreeAsync(ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
-    {
-        var result = await _accountService.GetAllAsync(ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-    }
-
-    [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id, CancellationToken ct)
-    {
-        var result = await _accountService.GetByIdAsync(id, ct);
-        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
-    }
-
-    [HttpPost]
-    [EnableRateLimiting("GlobalPolicy")]
-    public async Task<IActionResult> Create(CreateAccountRequest request, CancellationToken ct)
-    {
-        var result = await _accountService.CreateAsync(request, ct);
-        return result.IsSuccess
-            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
-            : BadRequest(new { error = result.Error });
-    }
-
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, UpdateAccountRequest request, CancellationToken ct)
-    {
-        var result = await _accountService.UpdateAsync(id, request, ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
-    }
-
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id, CancellationToken ct)
-    {
-        var result = await _accountService.DeleteAsync(id, ct);
-        return result.IsSuccess ? NoContent() : BadRequest(new { error = result.Error });
-    }
-
-    [HttpDelete("permanent/{id:int}")]
-    [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)
-    {
-        var result = await _accountService.PermanentDeleteAsync(id, ct);
-        return result.IsSuccess ? NoContent() : BadRequest(new { error = result.Error });
-    }
-}
-```
+> See `docs/AGENTS.md` for controller layer patterns (RULE-022/203 — inject services only, no DbContext/IUnitOfWork; RULE-288 — return 404 for NotFound, 400 for validation errors).
 
 **Logging**: Minimal in controller — logging happens in service layer per RULE-035.
 
@@ -1222,50 +679,7 @@ public class AccountsController : ControllerBase
 | `DesktopPWF/Services/Api/IAccountApiService.cs` | **NEW** — 5 HTTP methods |
 | `DesktopPWF/Services/Api/AccountApiService.cs` | **NEW** — HttpClient implementation with content-type guard |
 
-```csharp
-public interface IAccountApiService
-{
-    Task<Result<List<AccountDto>>> GetAllAsync(CancellationToken ct = default);
-    Task<Result<List<AccountTreeNodeDto>>> GetTreeAsync(CancellationToken ct = default);
-    Task<Result<AccountDto>> GetByIdAsync(int id, CancellationToken ct = default);
-    Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, CancellationToken ct = default);
-    Task<Result<AccountDto>> UpdateAsync(int id, UpdateAccountRequest request, CancellationToken ct = default);
-    Task<Result> DeleteAsync(int id, CancellationToken ct = default);
-    Task<Result> PermanentDeleteAsync(int id, CancellationToken ct = default);
-}
-```
-
-**HandleResponseAsync pattern** (RULE-184):
-```csharp
-protected async Task<Result<List<AccountDto>>> HandleResponseListAsync(HttpResponseMessage response)
-{
-    if (response.IsSuccessStatusCode)
-    {
-        var content = await response.Content.ReadAsStringAsync();
-        var list = JsonSerializer.Deserialize<List<AccountDto>>(content, _jsonOptions);
-        return Result<List<AccountDto>>.Success(list ?? new List<AccountDto>());
-    }
-
-    try
-    {
-        // Content-type guard (RULE-184)
-        if (response.Content.Headers.ContentType?.MediaType == "application/json")
-        {
-            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-            return Result<List<AccountDto>>.Failure(error?.Error ?? "حدث خطأ", error?.ErrorCode ?? "Unknown");
-        }
-
-        var raw = await response.Content.ReadAsStringAsync();
-        Serilog.Log.Warning("API failure (non-JSON): {StatusCode} - {Content}", response.StatusCode, raw);
-        return Result<List<AccountDto>>.Failure("خطأ في الخادم", response.StatusCode.ToString());
-    }
-    catch (Exception ex)
-    {
-        Serilog.Log.Error(ex, "Failed to parse API error response");
-        return Result<List<AccountDto>>.Failure("حدث خطأ غير متوقع", "Unknown");
-    }
-}
-```
+> See `DesktopPWF/Services/Api/` for canonical API service patterns with content-type guard (RULE-184) and `docs/CONSTITUTION.md` for the Result<T> pattern.
 
 **Logging**:
 - `Log.Information("Accounts loaded: {Count} accounts from API", result.Value?.Count ?? 0)` on success
@@ -1280,9 +694,7 @@ protected async Task<Result<List<AccountDto>>> HandleResponseListAsync(HttpRespo
 
 **File**: `DesktopPWF/Messaging/Messages/AppMessages.cs`
 
-```csharp
-public record AccountChangedMessage(int AccountId) : IEventBusMessage;
-```
+> See `DesktopPWF/Messaging/Messages/` for canonical EventBus message definitions (RULE-034: messages carry entity ID only, no data payloads).
 
 **Estimate**: ~5 minutes
 
@@ -1305,328 +717,11 @@ public record AccountChangedMessage(int AccountId) : IEventBusMessage;
 
 #### AccountsListViewModel
 
-```csharp
-public class AccountsListViewModel : ViewModelBase, IDisposable
-{
-    private readonly IAccountApiService _accountService;
-    private readonly IDialogService _dialogService;
-    private readonly IScreenWindowService _screenWindowService;
-    private readonly IEventBus _eventBus;
-    private IDisposable? _subscription;
-
-    public AccountsListViewModel(
-        IAccountApiService accountService,
-        IDialogService dialogService,
-        IScreenWindowService screenWindowService,
-        IEventBus eventBus)
-    {
-        _accountService = accountService;
-        _dialogService = dialogService;
-        _screenWindowService = screenWindowService;
-        _eventBus = eventBus;
-
-        _subscription = eventBus.Subscribe<AccountChangedMessage>(OnAccountChanged);
-        RefreshCommand = new AsyncRelayCommand(
-            (Func<Task>)(async () => await ExecuteAsync(LoadAccountsOperationAsync)));
-        AddCommand = new RelayCommand(AddAccount);
-        ToggleViewCommand = new RelayCommand(ToggleView);
-    }
-
-    // ── Observable Properties ──
-    private bool _isTreeView = true;
-    public bool IsTreeView { get => _isTreeView; set => SetProperty(ref _isTreeView, value); }
-
-    private ObservableCollection<AccountTreeNodeDto> _treeItems = new();
-    public ObservableCollection<AccountTreeNodeDto> TreeItems
-    {
-        get => _treeItems;
-        set => SetProperty(ref _treeItems, value);
-    }
-
-    private ObservableCollection<AccountDto> _flatItems = new();
-    public ObservableCollection<AccountDto> FlatItems
-    {
-        get => _flatItems;
-        set => SetProperty(ref _flatItems, value);
-    }
-
-    private AccountTreeNodeDto? _selectedNode;
-    public AccountTreeNodeDto? SelectedNode
-    {
-        get => _selectedNode;
-        set
-        {
-            SetProperty(ref _selectedNode, value);
-            OnPropertyChanged(nameof(CanEditOrDelete));
-        }
-    }
-
-    private AccountDto? _selectedItem;
-    public AccountDto? SelectedItem
-    {
-        get => _selectedItem;
-        set
-        {
-            SetProperty(ref _selectedItem, value);
-            OnPropertyChanged(nameof(CanEditOrDelete));
-        }
-    }
-
-    public bool CanEditOrDelete => (IsTreeView && SelectedNode != null) ||
-                                    (!IsTreeView && SelectedItem != null);
-
-    // ── Commands ──
-    public ICommand RefreshCommand { get; private set; } = null!;
-    public ICommand AddCommand { get; private set; } = null!;
-    public ICommand ToggleViewCommand { get; private set; } = null!;
-
-    // ── Operations ──
-    private async Task LoadAccountsOperationAsync()
-    {
-        ErrorMessage = null;
-
-        if (IsTreeView)
-        {
-            var result = await _accountService.GetTreeAsync();
-            if (result.IsSuccess && result.Value != null)
-            {
-                await InvokeOnUIThreadAsync(() =>
-                {
-                    TreeItems.Clear();
-                    foreach (var node in result.Value)
-                        TreeItems.Add(node);
-                });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الحسابات", "LoadAccounts");
-            }
-        }
-        else
-        {
-            var result = await _accountService.GetAllAsync();
-            if (result.IsSuccess && result.Value != null)
-            {
-                await InvokeOnUIThreadAsync(() =>
-                {
-                    FlatItems.Clear();
-                    // Newest-first (RULE-220): newest accounts last, but tree is ordered by code
-                    foreach (var item in result.Value.OrderBy(x => x.AccountCode))
-                        FlatItems.Add(item);
-                });
-            }
-            else
-            {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الحسابات", "LoadAccounts");
-            }
-        }
-    }
-
-    private void AddAccount()
-    {
-        int? parentId = IsTreeView ? SelectedNode?.Id : SelectedItem?.Id;
-        var editorVm = new AccountEditorViewModel(_accountService, _dialogService, parentId);
-        editorVm.FocusFirstInvalidFieldRequested += (_, _) => RequestFocusFirstInvalidField();
-
-        _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
-        {
-            Title = "إضافة حساب جديد",
-            OnClosed = (vm) =>
-            {
-                if (vm is AccountEditorViewModel editor && editor.IsSaved)
-                {
-                    _eventBus.Publish(new AccountChangedMessage(0));
-                    Application.Current.Dispatcher.InvokeAsync(() => _ = ExecuteAsync(LoadAccountsOperationAsync));
-                }
-            }
-        });
-    }
-
-    private void ToggleView()
-    {
-        IsTreeView = !IsTreeView;
-        _ = ExecuteAsync(LoadAccountsOperationAsync);
-    }
-
-    private void OnAccountChanged(AccountChangedMessage msg) =>
-        _ = ExecuteAsync(LoadAccountsOperationAsync);
-
-    public void Dispose()
-    {
-        _subscription?.Dispose();
-    }
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns (ExecuteAsync wrapper RULE-141, INotifyDataErrorInfo RULE-228/229, DialogService RULE-054, ScreenWindowService RULE-160/161, EventBus lifecycle RULE-012/013, IDisposable with Cleanup).
 
 #### AccountEditorViewModel (Editor)
 
-```csharp
-public class AccountEditorViewModel : ViewModelBase
-{
-    private readonly IAccountApiService _accountService;
-    private readonly IDialogService _dialogService;
-    private readonly int? _parentAccountId;
-
-    public AccountEditorViewModel(
-        IAccountApiService accountService,
-        IDialogService dialogService,
-        int? parentAccountId = null)
-    {
-        _accountService = accountService;
-        _dialogService = dialogService;
-        _parentAccountId = parentAccountId;
-        SetDialogService(dialogService); // RULE-227
-
-        SaveCommand = new AsyncRelayCommand(SaveAsync); // ALWAYS enabled (RULE-059)
-        CancelCommand = new RelayCommand(() => CloseRequested?.Invoke());
-
-        LoadedCommand = new AsyncRelayCommand(
-            (Func<Task>)(async () => await ExecuteAsync(LoadInitialDataAsync)));
-    }
-
-    // ── Properties ──
-    public int? AccountId { get; private set; }
-    public bool IsSaved { get; private set; }
-    public event Action? CloseRequested;
-
-    private string _accountCode = string.Empty;
-    public string AccountCode
-    {
-        get => _accountCode;
-        set
-        {
-            _accountCode = value;
-            OnPropertyChanged();
-            ClearErrors(nameof(AccountCode));
-            if (string.IsNullOrWhiteSpace(value))
-                AddError(nameof(AccountCode), "رمز الحساب مطلوب");
-            else if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{4,10}$"))
-                AddError(nameof(AccountCode), "رمز الحساب يجب أن يكون أرقاماً فقط (4-10 خانات)");
-        }
-    }
-
-    private string _nameAr = string.Empty;
-    public string NameAr
-    {
-        get => _nameAr;
-        set
-        {
-            _nameAr = value;
-            OnPropertyChanged();
-            ClearErrors(nameof(NameAr));
-            if (string.IsNullOrWhiteSpace(value))
-                AddError(nameof(NameAr), "اسم الحساب بالعربية مطلوب");
-        }
-    }
-
-    private string _nameEn = string.Empty;
-    public string NameEn { get => _nameEn; set { _nameEn = value; OnPropertyChanged(); } }
-
-    private byte _accountType = 1;
-    public byte AccountType
-    {
-        get => _accountType;
-        set { _accountType = value; OnPropertyChanged(); }
-    }
-
-    private int _level = 4;
-    public int Level
-    {
-        get => _level;
-        set { _level = value; OnPropertyChanged(); }
-    }
-
-    private string _description = string.Empty;
-    public string Description { get => _description; set { _description = value; OnPropertyChanged(); } }
-
-    private string _colorCode = string.Empty;
-    public string ColorCode { get => _colorCode; set { _colorCode = value; OnPropertyChanged(); } }
-
-    private bool _allowTransactions = true;
-    public bool AllowTransactions { get => _allowTransactions; set { _allowTransactions = value; OnPropertyChanged(); } }
-
-    private decimal? _openingBalance;
-    public decimal? OpeningBalance { get => _openingBalance; set { _openingBalance = value; OnPropertyChanged(); } }
-
-    // ── Commands ──
-    public ICommand SaveCommand { get; private set; } = null!;
-    public ICommand CancelCommand { get; private set; } = null!;
-    public ICommand LoadedCommand { get; private set; } = null!;
-
-    // ── Validation ──
-    private bool Validate()
-    {
-        ClearAllErrors(); // RULE-229
-
-        if (string.IsNullOrWhiteSpace(AccountCode))
-            AddError(nameof(AccountCode), "رمز الحساب مطلوب");
-        if (string.IsNullOrWhiteSpace(NameAr))
-            AddError(nameof(NameAr), "اسم الحساب بالعربية مطلوب");
-        if (Level < 1 || Level > 10)
-            AddError(nameof(Level), "مستوى الحساب يجب أن يكون بين 1 و 10");
-        if (Level >= 4 && !AllowTransactions)
-            AddError(nameof(AllowTransactions), "الحساب التفصيلي يجب أن يسمح بالحركات");
-
-        return !HasErrors;
-    }
-
-    // ── Save ──
-    private async Task SaveAsync()
-    {
-        if (!Validate())
-        {
-            await _dialogService.ShowValidationErrorsAsync("بيانات غير مكتملة", GetErrorsList());
-            return;
-        }
-
-        await ExecuteAsync(async () =>
-        {
-            var request = new CreateAccountRequest(
-                AccountCode, NameAr, NameEn, AccountType, Level,
-                _parentAccountId, false, Description,
-                string.IsNullOrWhiteSpace(ColorCode) ? null : ColorCode,
-                AllowTransactions, OpeningBalance, null);
-
-            var result = await _accountService.CreateAsync(request);
-            if (result.IsSuccess)
-            {
-                IsSaved = true;
-                await _dialogService.ShowSuccessAsync("تم الحفظ", "تم إنشاء الحساب بنجاح");
-                CloseRequested?.Invoke();
-            }
-            else
-            {
-                await _dialogService.ShowErrorAsync("خطأ في حفظ الحساب", result.Error ?? "حدث خطأ غير متوقع");
-            }
-        });
-    }
-
-    private async Task LoadInitialDataAsync()
-    {
-        // Auto-set Level based on parent if provided
-        if (_parentAccountId.HasValue)
-        {
-            var result = await _accountService.GetByIdAsync(_parentAccountId.Value);
-            if (result.IsSuccess && result.Value != null)
-            {
-                Level = result.Value.Level + 1;
-            }
-        }
-    }
-
-    private List<string> GetErrorsList()
-    {
-        var errors = new List<string>();
-        foreach (var prop in GetType().GetProperties())
-        {
-            var propName = prop.Name;
-            var propErrors = GetErrors(propName).Cast<string>();
-            errors.AddRange(propErrors.Select(e => $"• {e}"));
-        }
-        return errors;
-    }
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns (ExecuteAsync wrapper RULE-141, INotifyDataErrorInfo RULE-228/229, DialogService RULE-054/059, Save button always enabled).
 
 #### XAML Patterns
 
@@ -1764,14 +859,7 @@ public class AccountEditorViewModel : ViewModelBase
 ```
 
 **ViewModel Logging** (RULE-199/201):
-```csharp
-// All async operations wrapped in ExecuteAsync (RULE-141)
-// LogSystemError is the ONLY error logging method (RULE-199)
-catch (Exception ex)
-{
-    LogSystemError($"Failed to load chart of accounts", "AccountsListViewModel.LoadAccountsOperationAsync", ex);
-}
-```
+> See `docs/AGENTS.md` for ViewModel error handling patterns (RULE-199: LogSystemError is the ONLY method for system error logging, RULE-141: ExecuteAsync wrapper).
 
 **ViewModel error handling** (RULE-171/172/173):
 - Dialog titles: `"خطأ في تحميل دليل الحسابات"`, `"خطأ في حفظ الحساب"`
@@ -1792,14 +880,7 @@ catch (Exception ex)
 | `DesktopPWF/MainWindow.xaml` | Add "دليل الحسابات" navigation item in sidebar |
 
 **DI Registration**:
-```csharp
-services.AddHttpClient<IAccountApiService, AccountApiService>(client =>
-{
-    client.BaseAddress = new Uri("http://localhost:5221");
-});
-services.AddTransient<AccountsListViewModel>();
-services.AddTransient<AccountEditorViewModel>();
-```
+> See `DesktopPWF/App.xaml.cs` and `Api/Program.cs` for canonical DI registration patterns.
 
 **Navigation (MainWindow sidebar item)**:
 ```xml
@@ -1817,41 +898,7 @@ services.AddTransient<AccountEditorViewModel>();
 **File**: `ViewModels/Accounts/AccountsListViewModel.cs`
 
 Add search functionality:
-```csharp
-private string _searchText = string.Empty;
-public string SearchText
-{
-    get => _searchText;
-    set
-    {
-        _searchText = value;
-        OnPropertyChanged();
-        _ = ExecuteAsync(LoadAccountsOperationAsync); // Auto-search on typing
-    }
-}
-
-private string _filterType = "0"; // "0" = All
-public string FilterType
-{
-    get => _filterType;
-    set { _filterType = value; OnPropertyChanged(); _ = ExecuteAsync(LoadAccountsOperationAsync); }
-}
-
-// In LoadAccountsOperationAsync, after getting data:
-if (!string.IsNullOrWhiteSpace(SearchText))
-{
-    var search = SearchText.Trim();
-    var results = all.Where(a =>
-        a.NameAr.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-        a.AccountCode.Contains(search) ||
-        (a.NameEn?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
-    // Display filtered results
-}
-if (FilterType != "0" && byte.TryParse(FilterType, out var type))
-{
-    results = results.Where(a => a.AccountType == type);
-}
-```
+> See `docs/AGENTS.md` for ViewModel patterns and the canonical `AccountsListViewModel` implementation for search/filter in both TreeView and DataGrid modes (RULE-349).
 
 **Estimate**: ~30 minutes
 
@@ -2181,32 +1228,13 @@ Each account below includes the explanation text to seed into the database. Leve
 ### 12.2 Implementation Details
 
 **Account Entity Update**:
-```csharp
-// Add to Account entity in SalesSystem.Domain
-public string? Explanation { get; private set; }
-// Guard clause
-public void SetExplanation(string? explanation)
-{
-    if (explanation?.Length > 500)
-        throw new DomainException("الشرح لا يتجاوز 500 حرف");
-    Explanation = explanation;
-}
-```
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) — `Explanation` field with `SetExplanation()` guard follows the same pattern as other entity properties.
 
 **Fluent API Configuration**:
-```csharp
-// In AccountConfiguration.cs
-builder.Property(x => x.Explanation)
-    .HasMaxLength(500)
-    .HasColumnType("nvarchar(500)");
-```
+> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions (`HasMaxLength`, `HasColumnType` for `nvarchar`).
 
 **AccountDto Update**:
-```csharp
-// Add to AccountDto in SalesSystem.Contracts
-public string? Explanation { get; set; }
-public bool HasExplanation => !string.IsNullOrWhiteSpace(Explanation);
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions — `AccountDto.Explanation` and `HasExplanation` follow the same pattern as other DTO computed properties.
 
 **Seeder Update** (`ChartOfAccountsSeeder.cs`):
 - Add `Explanation` column to the seed data
@@ -2230,11 +1258,7 @@ In `AccountTreeItemViewModel` or the tree view display template:
 Same pattern for dropdown selections in account picker controls.
 
 **API Response**:
-```csharp
-// AccountDto now includes Explanation
-// GET /api/v1/accounts returns Explanation for every account
-// GET /api/v1/accounts/{id} returns full Explanation
-```
+> See `SalesSystem.Contracts/` for canonical DTO definitions — `AccountDto` includes `Explanation` field.
 
 ### 12.3 Files Changed
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SalesSystem.Api.Controllers;
+using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -13,12 +14,14 @@ namespace SalesSystem.Api.Tests.Controllers;
 public class UsersControllerTests
 {
     private readonly Mock<IUserService> _userServiceMock;
+    private readonly Mock<IUnitOfWork> _uowMock;
     private readonly UsersController _controller;
 
     public UsersControllerTests()
     {
         _userServiceMock = new Mock<IUserService>();
-        _controller = new UsersController(_userServiceMock.Object);
+        _uowMock = new Mock<IUnitOfWork>();
+        _controller = new UsersController(_userServiceMock.Object, _uowMock.Object);
     }
 
     [Fact]

@@ -13,14 +13,12 @@ public class UserTests
         var user = User.Create(
             userName: "john.doe",
             fullName: "John Doe",
-            role: UserRole.Manager,
             createdByUserId: 1
         );
 
         user.UserName.Should().Be("john.doe");
         user.PasswordHash.Should().BeNull();
         user.FullName.Should().Be("John Doe");
-        user.Role.Should().Be(UserRole.Manager);
         user.Status.Should().Be(UserStatus.Active);
         user.MustChangePassword.Should().BeTrue();
     }
@@ -33,8 +31,7 @@ public class UserTests
     {
         var action = () => User.Create(
             userName: invalidUserName!,
-            fullName: "Test",
-            role: UserRole.Cashier
+            fullName: "Test"
         );
 
         action.Should().Throw<DomainException>()
@@ -49,8 +46,7 @@ public class UserTests
     {
         var action = () => User.Create(
             userName: "testuser",
-            fullName: invalidFullName!,
-            role: UserRole.Cashier
+            fullName: invalidFullName!
         );
 
         action.Should().Throw<DomainException>()
@@ -64,14 +60,12 @@ public class UserTests
             userName: "john.doe",
             passwordHash: "hashedpassword123",
             fullName: "John Doe",
-            role: UserRole.Manager,
             createdByUserId: 1
         );
 
         user.UserName.Should().Be("john.doe");
         user.PasswordHash.Should().Be("hashedpassword123");
         user.FullName.Should().Be("John Doe");
-        user.Role.Should().Be(UserRole.Manager);
         user.IsActive.Should().BeTrue();
         user.MustChangePassword.Should().BeFalse();
     }
@@ -85,27 +79,11 @@ public class UserTests
         var action = () => User.CreateWithPassword(
             userName: "testuser",
             passwordHash: invalidPassword!,
-            fullName: "Test",
-            role: UserRole.Cashier
+            fullName: "Test"
         );
 
         action.Should().Throw<DomainException>()
             .WithMessage("*كلمة المرور مطلوبة*");
-    }
-
-    [Fact]
-    public void Create_GivenAllRoles_ShouldCreateSuccessfully()
-    {
-        foreach (UserRole role in Enum.GetValues<UserRole>())
-        {
-            var user = User.Create(
-                userName: $"user_{role}",
-                fullName: $"User {role}",
-                role: role
-            );
-
-            user.Role.Should().Be(role);
-        }
     }
 
     [Fact]
@@ -114,33 +92,15 @@ public class UserTests
         var user = User.Create(
             userName: "john.doe",
             fullName: "Original Name",
-            role: UserRole.Cashier,
             createdByUserId: 1
         );
 
         user.Update(
             fullName: "Updated Name",
-            role: UserRole.Manager,
             updatedByUserId: 1
         );
 
         user.FullName.Should().Be("Updated Name");
-        user.Role.Should().Be(UserRole.Manager);
-    }
-
-    [Fact]
-    public void Update_GivenDifferentRole_ShouldUpdateRole()
-    {
-        var user = User.Create(
-            userName: "test",
-            fullName: "Test",
-            role: UserRole.Cashier,
-            createdByUserId: 1
-        );
-
-        user.Update(fullName: "Test", role: UserRole.Admin, updatedByUserId: 1);
-
-        user.Role.Should().Be(UserRole.Admin);
     }
 
     [Fact]
@@ -149,7 +109,6 @@ public class UserTests
         var user = User.Create(
             userName: "test",
             fullName: "Test",
-            role: UserRole.Cashier,
             createdByUserId: 1
         );
 
@@ -166,7 +125,6 @@ public class UserTests
         var user = User.Create(
             userName: "test",
             fullName: "Test",
-            role: UserRole.Cashier,
             createdByUserId: 1
         );
 
@@ -183,7 +141,6 @@ public class UserTests
         var user = User.Create(
             userName: "test",
             fullName: "Test",
-            role: UserRole.Cashier,
             createdByUserId: 1
         );
         user.SetInitialPassword("old_hash");
@@ -199,7 +156,6 @@ public class UserTests
         var user = User.Create(
             userName: "test",
             fullName: "Test",
-            role: UserRole.Cashier,
             createdByUserId: 1
         );
         user.SetInitialPassword("original_hash");
@@ -215,7 +171,6 @@ public class UserTests
         var user = User.Create(
             userName: "test",
             fullName: "Test",
-            role: UserRole.Cashier,
             createdByUserId: 1
         );
         user.SetInitialPassword("old_hash");
@@ -230,7 +185,7 @@ public class UserTests
     [Fact]
     public void RecordLoginAttempt_Success_ShouldResetCounterAndUpdateLastLogin()
     {
-        var user = User.Create(userName: "test", fullName: "Test", role: UserRole.Cashier);
+        var user = User.Create(userName: "test", fullName: "Test");
 
         user.RecordLoginAttempt(success: true);
 
@@ -242,7 +197,7 @@ public class UserTests
     [Fact]
     public void RecordLoginAttempt_Failure_ShouldIncrementCounter()
     {
-        var user = User.Create(userName: "test", fullName: "Test", role: UserRole.Cashier);
+        var user = User.Create(userName: "test", fullName: "Test");
 
         user.RecordLoginAttempt(success: false);
         user.RecordLoginAttempt(success: false);
@@ -261,7 +216,7 @@ public class UserTests
     [Fact]
     public void LockAndUnlock_ShouldChangeStatus()
     {
-        var user = User.Create(userName: "test", fullName: "Test", role: UserRole.Cashier);
+        var user = User.Create(userName: "test", fullName: "Test");
 
         user.Lock();
         user.Status.Should().Be(UserStatus.Locked);
@@ -273,7 +228,7 @@ public class UserTests
     [Fact]
     public void DeactivateAndActivate_ShouldChangeStatus()
     {
-        var user = User.Create(userName: "test", fullName: "Test", role: UserRole.Cashier);
+        var user = User.Create(userName: "test", fullName: "Test");
 
         user.Deactivate();
         user.Status.Should().Be(UserStatus.Inactive);
@@ -285,7 +240,7 @@ public class UserTests
     [Fact]
     public void MarkAsDeleted_ShouldSetStatusInactive()
     {
-        var user = User.Create(userName: "test", fullName: "Test", role: UserRole.Cashier);
+        var user = User.Create(userName: "test", fullName: "Test");
 
         user.MarkAsDeleted();
 
@@ -296,7 +251,7 @@ public class UserTests
     [Fact]
     public void Restore_ShouldSetStatusActive()
     {
-        var user = User.Create(userName: "test", fullName: "Test", role: UserRole.Cashier);
+        var user = User.Create(userName: "test", fullName: "Test");
         user.MarkAsDeleted();
 
         user.Restore();
@@ -311,22 +266,10 @@ public class UserTests
         var user = User.Create(
             userName: "test",
             fullName: "Test",
-            role: UserRole.Cashier,
             createdByUserId: 99
         );
 
         user.CreatedByUserId.Should().Be(99);
     }
 
-    [Fact]
-    public void SetAvatarAndClearAvatar_ShouldUpdatePath()
-    {
-        var user = User.Create(userName: "test", fullName: "Test", role: UserRole.Cashier);
-
-        user.SetAvatar("/images/avatar.png");
-        user.AvatarPath.Should().Be("/images/avatar.png");
-
-        user.ClearAvatar();
-        user.AvatarPath.Should().BeNull();
-    }
 }

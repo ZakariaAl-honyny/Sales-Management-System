@@ -7,28 +7,36 @@ namespace SalesSystem.Domain.Entities;
 /// When a user logs in, a new session is created. Sessions can be terminated
 /// on logout or admin revocation.
 /// </summary>
-public class UserSession : BaseEntity
+public class UserSession : AuditableEntity
 {
-    public int? UserId { get; private set; }
+    public int UserId { get; private set; }
     public User? User { get; private set; }
-    public string TokenHash { get; private set; } = string.Empty;
+    public string Token { get; private set; } = string.Empty;
+    public string? DeviceName { get; private set; }
+    public string? IpAddress { get; private set; }
+    public string? UserAgent { get; private set; }
     public DateTime LoginAt { get; private set; }
-    public DateTime? LastActivityAt { get; private set; }
-    public DateTime? ExpiresAt { get; private set; }
+    public DateTime LastActivityAt { get; private set; }
+    public DateTime ExpiresAt { get; private set; }
+    public bool IsRevoked { get; private set; }
 
     protected UserSession() { } // EF Core
 
-    public static UserSession Create(int userId, string tokenHash,
-        DateTime loginAt, int expirationHours = 8)
+    public static UserSession Create(int userId, string token,
+        DateTime loginAt, int expirationHours = 8,
+        string? deviceName = null, string? ipAddress = null, string? userAgent = null)
     {
         return new UserSession
         {
             UserId = userId,
-            TokenHash = tokenHash,
+            Token = token,
+            DeviceName = deviceName,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
             LoginAt = loginAt,
             LastActivityAt = loginAt,
             ExpiresAt = loginAt.AddHours(expirationHours),
-            IsActive = true
+            IsRevoked = false
         };
     }
 
@@ -39,8 +47,18 @@ public class UserSession : BaseEntity
     public void Touch() => LastActivityAt = DateTime.UtcNow;
 
     /// <summary>
-    /// Terminates this session — sets IsActive to false.
+    /// Terminates this session — sets IsRevoked to true.
     /// Typically called on logout or admin session revocation.
     /// </summary>
-    public void Terminate() => IsActive = false;
+    public void Revoke() => IsRevoked = true;
+
+    /// <summary>
+    /// Returns true if the session has expired based on its expiry time.
+    /// </summary>
+    public bool HasExpired() => DateTime.UtcNow > ExpiresAt;
+
+    /// <summary>
+    /// Returns true if the session is still valid (not revoked and not expired).
+    /// </summary>
+    public bool IsValid() => !IsRevoked && !HasExpired();
 }

@@ -15,7 +15,9 @@ public class TaxEditorViewModel : ViewModelBase
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private string _name = string.Empty;
+    private string _code = string.Empty;
     private decimal _rate;
+    private byte _taxType = 1;
     private bool _isDefault;
     private string? _errorMessage;
     private string _windowTitle = "إضافة ضريبة جديدة";
@@ -34,7 +36,9 @@ public class TaxEditorViewModel : ViewModelBase
     {
         _taxDto = tax;
         Name = tax.Name;
+        Code = tax.Code;
         Rate = tax.Rate;
+        TaxType = tax.TaxType;
         IsDefault = tax.IsDefault;
         WindowTitle = $"تعديل ضريبة: {tax.Name}";
     }
@@ -60,6 +64,27 @@ public class TaxEditorViewModel : ViewModelBase
                     ClearErrors(nameof(Name));
             }
         }
+    }
+
+    public string Code
+    {
+        get => _code;
+        set
+        {
+            if (SetProperty(ref _code, value))
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Code), "رمز الضريبة مطلوب");
+                else
+                    ClearErrors(nameof(Code));
+            }
+        }
+    }
+
+    public byte TaxType
+    {
+        get => _taxType;
+        set => SetProperty(ref _taxType, value);
     }
 
     public decimal Rate
@@ -117,12 +142,12 @@ public class TaxEditorViewModel : ViewModelBase
         Result<TaxDto> result;
         if (_taxDto == null)
         {
-            var request = new CreateTaxRequest(Name, Rate, IsDefault);
+            var request = new CreateTaxRequest(Name, Code, Rate, TaxType, IsDefault);
             result = await _taxesService.CreateAsync(request);
         }
         else
         {
-            var request = new UpdateTaxRequest(Name, Rate, IsDefault, _taxDto.IsActive);
+            var request = new UpdateTaxRequest(Name, Code, Rate, TaxType, IsDefault, _taxDto.IsActive);
             result = await _taxesService.UpdateAsync(_taxDto.Id, request);
         }
 

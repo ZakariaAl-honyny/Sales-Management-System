@@ -11,37 +11,48 @@ public class DailyClosureConfiguration : IEntityTypeConfiguration<DailyClosure>
         builder.ToTable("DailyClosures");
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.ClosureDate)
+        // ─── Properties ─────────────────────────────────────
+        builder.Property(dc => dc.ClosureDate)
+            .IsRequired()
+            .HasColumnType("date");
+
+        builder.Property(dc => dc.OpeningBalance)
+            .HasPrecision(18, 2)
+            .IsRequired();
+        builder.Property(dc => dc.TotalIncome)
+            .HasPrecision(18, 2)
+            .IsRequired();
+        builder.Property(dc => dc.TotalExpense)
+            .HasPrecision(18, 2)
+            .IsRequired();
+        builder.Property(dc => dc.ClosingBalance)
+            .HasPrecision(18, 2)
+            .IsRequired();
+        builder.Property(dc => dc.ActualCashCount)
+            .HasPrecision(18, 2)
+            .IsRequired();
+        builder.Property(dc => dc.Difference)
+            .HasPrecision(18, 2)
             .IsRequired();
 
-        builder.Property(x => x.OpeningBalance)
+        builder.Property(dc => dc.IsReconciled)
             .IsRequired()
-            .HasPrecision(18, 2);
+            .HasDefaultValue(false);
 
-        builder.Property(x => x.TotalIncome)
-            .IsRequired()
-            .HasPrecision(18, 2);
+        builder.Property(dc => dc.Notes)
+            .HasMaxLength(500)
+            .IsRequired(false);
 
-        builder.Property(x => x.TotalExpense)
-            .IsRequired()
-            .HasPrecision(18, 2);
-
-        builder.Property(x => x.ClosingBalance)
-            .IsRequired()
-            .HasPrecision(18, 2);
-
-        builder.Property(x => x.IsActive)
-            .HasDefaultValue(true);
-
-        builder.HasOne(x => x.CashBox)
+        // ─── Foreign Keys ───────────────────────────────────
+        builder.HasOne(dc => dc.CashBox)
             .WithMany()
-            .HasForeignKey(x => x.CashBoxId)
+            .HasForeignKey(dc => dc.CashBoxId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(x => new { x.CashBoxId, x.ClosureDate })
-            .IsUnique()
-            .HasDatabaseName("IX_DailyClosures_CashBoxId_ClosureDate");
+        // ─── Indexes ────────────────────────────────────────
+        builder.HasIndex(dc => new { dc.CashBoxId, dc.ClosureDate })
+            .IsUnique();  // One closure per cash box per day
 
-        builder.HasQueryFilter(x => x.IsActive);
+        builder.HasIndex(dc => dc.ClosureDate);
     }
 }
